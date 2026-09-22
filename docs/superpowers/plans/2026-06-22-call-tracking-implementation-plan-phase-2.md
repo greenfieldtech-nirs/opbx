@@ -4,7 +4,7 @@
 
 **Goal:** Finish Call Tracking v1 by adding notification testing/delivery logs, ad-platform integration settings + toggles, queued stub uploads, and the React admin UI.
 
-**Architecture:** Extend the existing Phase 1/2 Laravel backend with three small backend APIs and two queue jobs, then build the React frontend using existing OpBX patterns (TanStack Query, shadcn/ui, react-hook-form + Zod).
+**Architecture:** Extend the existing Phase 1/2 Laravel backend with three small backend APIs and two queue jobs, then build the React frontend using existing OPBX patterns (TanStack Query, shadcn/ui, react-hook-form + Zod).
 
 **Tech Stack:** Laravel 12 (PHP 8.4), MySQL, Redis, React 18 + Vite + TypeScript + TanStack Query + shadcn/ui + react-hook-form + Zod + recharts.
 

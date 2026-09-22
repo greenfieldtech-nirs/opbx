@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting;
 
 use App\Enums\ExtensionType;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
@@ -73,6 +74,9 @@ class ExtensionRoutingService
             ExtensionType::RING_GROUP => [
                 'ring_group' => $this->loadRingGroupFromExtension($extension, $organizationId),
             ],
+            ExtensionType::QUEUE => [
+                'call_queue' => $this->loadCallQueueFromExtension($extension, $organizationId),
+            ],
             ExtensionType::CONFERENCE => [
                 'conference_room' => $this->loadConferenceRoomFromExtension($extension, $organizationId),
             ],
@@ -131,6 +135,45 @@ class ExtensionRoutingService
         }
 
         return $ringGroup;
+    }
+
+    /**
+     * Load call queue from extension configuration.
+     *
+     * @param  Extension  $extension  The extension with QUEUE type
+     * @param  int  $organizationId  The organization ID
+     * @return CallQueue|null The call queue if found, null otherwise
+     */
+    public function loadCallQueueFromExtension(Extension $extension, int $organizationId): ?CallQueue
+    {
+        $config = $extension->configuration ?? [];
+        $callQueueId = $config['call_queue_id'] ?? null;
+
+        if (! $callQueueId) {
+            Log::error('ExtensionRoutingService: QUEUE extension missing call_queue_id', [
+                'extension_id' => $extension->id,
+                'extension_number' => $extension->extension_number,
+            ]);
+
+            return null;
+        }
+
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $callQueueId)
+            ->where('organization_id', $organizationId)
+            ->first();
+
+        if (! $callQueue) {
+            Log::error('ExtensionRoutingService: Configured call queue not found', [
+                'extension_id' => $extension->id,
+                'call_queue_id' => $callQueueId,
+                'organization_id' => $organizationId,
+            ]);
+
+            return null;
+        }
+
+        return $callQueue;
     }
 
     /**
@@ -224,6 +267,7 @@ class ExtensionRoutingService
 
         match ($extension->type) {
             ExtensionType::RING_GROUP => $this->validateRingGroupConfig($extension, $config, $issues, $suggestions),
+            ExtensionType::QUEUE => $this->validateCallQueueConfig($extension, $config, $issues, $suggestions),
             ExtensionType::CONFERENCE => $this->validateConferenceConfig($extension, $config, $issues, $suggestions),
             ExtensionType::IVR => $this->validateIvrConfig($extension, $config, $issues, $suggestions),
             ExtensionType::USER,
@@ -273,6 +317,35 @@ class ExtensionRoutingService
         if (! $ringGroup) {
             $issues[] = "Ring group with ID {$ringGroupId} not found";
             $suggestions[] = 'Create a ring group or update ring_group_id';
+        }
+    }
+
+    /**
+     * Validate call queue extension configuration.
+     */
+    private function validateCallQueueConfig(
+        Extension $extension,
+        array $config,
+        array &$issues,
+        array &$suggestions
+    ): void {
+        $callQueueId = $config['call_queue_id'] ?? null;
+
+        if (! $callQueueId) {
+            $issues[] = 'Missing call_queue_id in configuration';
+            $suggestions[] = 'Add call_queue_id to extension configuration';
+
+            return;
+        }
+
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $callQueueId)
+            ->where('organization_id', $extension->organization_id)
+            ->first();
+
+        if (! $callQueue) {
+            $issues[] = "Call queue with ID {$callQueueId} not found";
+            $suggestions[] = 'Create a call queue or update call_queue_id';
         }
     }
 
@@ -357,6 +430,9 @@ class ExtensionRoutingService
             ExtensionType::RING_GROUP => isset($destination['ring_group']) && $destination['ring_group'] !== null
                 ? null
                 : 'Ring group not found',
+            ExtensionType::QUEUE => isset($destination['call_queue']) && $destination['call_queue'] !== null
+                ? null
+                : 'Call queue not found',
             ExtensionType::CONFERENCE => isset($destination['conference_room']) && $destination['conference_room'] !== null
                 ? null
                 : 'Conference room not found',

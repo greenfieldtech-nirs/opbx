@@ -86,6 +86,7 @@ class IvrMenu extends Model
             IvrDestinationType::RING_GROUP => RingGroup::find($this->failover_destination_id),
             IvrDestinationType::CONFERENCE_ROOM => ConferenceRoom::find($this->failover_destination_id),
             IvrDestinationType::IVR_MENU => self::find($this->failover_destination_id),
+            IvrDestinationType::CALL_QUEUE => \App\Models\CallQueue::find($this->failover_destination_id),
             default => null,
         };
     }

@@ -267,6 +267,7 @@ class IvrRoutingService
                 IvrDestinationType::AI_ASSISTANT => $this->routeToAiAssistant($request, $validatedDestination),
                 IvrDestinationType::AI_LOAD_BALANCER => $this->routeToAiLoadBalancer($request, $validatedDestination),
                 IvrDestinationType::BUSINESS_HOURS => $this->routeToBusinessHours($request, $validatedDestination),
+                IvrDestinationType::CALL_QUEUE => $this->routeToCallQueue($request, $validatedDestination),
                 default => $this->createErrorResponse('Unknown destination type.'),
             };
         } catch (\Exception $e) {
@@ -326,6 +327,28 @@ class IvrRoutingService
             $request,
             new DidNumber,
             ['ring_group' => $ringGroup]
+        );
+    }
+
+    /**
+     * Route to call queue destination.
+     *
+     * @param  Request  $request  The incoming request
+     * @param  \App\Models\CallQueue  $callQueue  The validated call queue
+     * @return Response CXML response
+     */
+    private function routeToCallQueue(Request $request, \App\Models\CallQueue $callQueue): Response
+    {
+        Log::debug('IvrRoutingService: Routing to call queue', [
+            'call_sid' => $request->input('CallSid'),
+            'call_queue_id' => $callQueue->id,
+        ]);
+
+        return $this->strategyExecutor->executeStrategy(
+            ExtensionType::QUEUE,
+            $request,
+            new DidNumber,
+            ['call_queue' => $callQueue]
         );
     }
 

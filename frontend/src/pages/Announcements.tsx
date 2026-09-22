@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw } from 'lucide-react';
+import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
@@ -18,10 +18,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
+
+function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
 
 export default function Announcements() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -144,6 +153,19 @@ export default function Announcements() {
     },
     onError: (error: any) => {
       toast.error('Failed to delete announcement: ' + error.message);
+    },
+  });
+
+  // Toggle hold-music (MOH) tagging
+  const toggleMohMutation = useMutation({
+    mutationFn: ({ id, is_moh }: { id: number; is_moh: boolean }) =>
+      recordingsService.update(id, { is_moh }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      toast.success(variables.is_moh ? 'Tagged as hold music' : 'Removed hold music tag');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update hold music tag: ' + error.message);
     },
   });
 
@@ -316,7 +338,7 @@ export default function Announcements() {
             onIdentityClick={(announcement) => setSelectedAnnouncement(announcement)}
             canView={false}
             canEdit={false}
-            onDelete={handleDelete}
+            canDelete={false}
             columns={[
               {
                 header: 'Status',
@@ -326,6 +348,32 @@ export default function Announcements() {
                     {announcement.status}
                   </Badge>
                 )
+              },
+              {
+                header: 'Hold Music',
+                cell: (announcement) => (
+                  <Switch
+                    checked={Boolean(announcement.is_moh)}
+                    onClick={(e) => e.stopPropagation()}
+                    onCheckedChange={(checked) => {
+                      toggleMohMutation.mutate({ id: announcement.id, is_moh: checked });
+                    }}
+                    disabled={toggleMohMutation.isPending}
+                    aria-label="Use as hold music"
+                  />
+                )
+              },
+              {
+                header: 'Size / Duration',
+                cell: (announcement) => {
+                  const size = announcement.formatted_file_size || (announcement.file_size ? `${(announcement.file_size / 1024).toFixed(1)} KB` : '—');
+                  const duration = announcement.duration_seconds != null ? formatDuration(announcement.duration_seconds) : '—';
+                  return (
+                    <span className="text-muted-foreground">
+                      {duration} <span className="text-muted-foreground/60">({size})</span>
+                    </span>
+                  );
+                }
               },
               {
                 header: 'Created By',
@@ -372,6 +420,18 @@ export default function Announcements() {
                         <Download className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(announcement);
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 )
               }

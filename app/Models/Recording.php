@@ -39,6 +39,7 @@ class Recording extends Model
         'mime_type',
         'duration_seconds',
         'status',
+        'is_moh',
         'created_by',
         'updated_by',
     ];
@@ -55,6 +56,7 @@ class Recording extends Model
             'duration_seconds' => 'integer',
             'status' => 'string',
             'type' => 'string',
+            'is_moh' => 'boolean',
         ];
     }
 

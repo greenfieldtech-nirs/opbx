@@ -14,7 +14,7 @@ immediately redials that number.
 
 ## User Story
 
-> As an OpBX user with the Web Phone open, I want to see my recent outbound
+> As an OPBX user with the Web Phone open, I want to see my recent outbound
 > calls and redial any of them in one tap, without leaving the Web Phone.
 
 ## Data Source

@@ -13,8 +13,7 @@ enum ExtensionType: string
     case AI_ASSISTANT = 'ai_assistant';
     case CUSTOM_LOGIC = 'custom_logic';
     case FORWARD = 'forward';
-    // QUEUE type reserved for Phase 4+ Call Center features - not yet fully implemented
-    // case QUEUE = 'queue';
+    case QUEUE = 'queue';
     case AI_LOAD_BALANCER = 'ai_load_balancer';
 
     /**
@@ -30,7 +29,7 @@ enum ExtensionType: string
             self::AI_ASSISTANT => 'AI Assistant',
             self::CUSTOM_LOGIC => 'Custom Logic',
             self::FORWARD => 'Call Forwarding',
-            // self::QUEUE => 'Call Queue', // Reserved for Phase 4+
+            self::QUEUE => 'Call Queue',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
         };
     }
@@ -48,7 +47,7 @@ enum ExtensionType: string
             self::AI_ASSISTANT => 'AI-powered virtual assistant',
             self::CUSTOM_LOGIC => 'Custom call routing logic',
             self::FORWARD => 'Forward calls to external number',
-            // self::QUEUE => 'Call center queue with agent management', // Reserved for Phase 4+
+            self::QUEUE => 'Call center queue with agent management',
             self::AI_LOAD_BALANCER => 'Route calls to AI Assistant Load Balancer with distribution algorithms',
         };
     }
@@ -95,6 +94,7 @@ enum ExtensionType: string
             self::AI_ASSISTANT => ['provider', 'phone_number'],
             self::CUSTOM_LOGIC => ['custom_logic_id'],
             self::FORWARD => ['forward_to'],
+            self::QUEUE => ['call_queue_id'],
             self::AI_LOAD_BALANCER => ['ai_load_balancer_id'],
         };
     }

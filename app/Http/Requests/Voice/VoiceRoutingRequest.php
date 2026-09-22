@@ -46,7 +46,7 @@ class VoiceRoutingRequest extends FormRequest
                 'required',
                 'string',
                 'max:64',
-                'regex:/^(\+?[1-9]\d{1,14}|\d{1,10}|(spy|barge)_[0-9a-f]{16,}|whisper_(caller|callee|both)_[0-9a-f]{16,})$/',
+                'regex:/^(\+?[1-9]\d{1,14}|\*\d{1,10}|\d{1,10}|(spy|barge)_[0-9a-f]{16,}|whisper_(caller|callee|both)_[0-9a-f]{16,})$/',
             ],
 
             // Domain - optional, hostname format

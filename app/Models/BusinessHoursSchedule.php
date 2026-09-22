@@ -244,6 +244,7 @@ class BusinessHoursSchedule extends Model
             '/^rg-(\d+)$/' => 'ring_group',
             '/^conf-(\d+)$/' => 'conference_room',
             '/^ivr-(\d+)$/' => 'ivr_menu',
+            '/^queue-(\d+)$/' => 'call_queue',
         ];
 
         foreach ($patterns as $pattern => $type) {

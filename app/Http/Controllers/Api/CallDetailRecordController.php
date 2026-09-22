@@ -132,6 +132,11 @@ class CallDetailRecordController extends AbstractApiCrudController
             $query->where('disposition', $request->input('disposition'));
         }
 
+        // Filter by session token (used to locate the CDR of a queue call)
+        if ($request->filled('session_token')) {
+            $query->where('session_token', $request->input('session_token'));
+        }
+
         // Filter by the extension's assigned user (partial name match)
         if ($request->filled('user')) {
             $search = $request->input('user');

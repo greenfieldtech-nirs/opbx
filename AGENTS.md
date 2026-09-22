@@ -1,14 +1,15 @@
-# AGENTS.md - Development Guidelines for OpBX
+# AGENTS.md - Development Guidelines for OPBX
 
 This document provides essential information for AI coding agents working in this repository.
 
 ## Project Overview
 
-OpBX is an open-source business PBX platform built on Laravel (PHP 8.4) and React (TypeScript).
+OPBX is an open-source business PBX platform built on Laravel (PHP 8.4) and React (TypeScript).
 - **Backend**: Laravel 12 API with MySQL + Redis
 - **Frontend**: React 18 SPA with Vite, TanStack Query, shadcn/ui
 - **Dialer Worker**: Go-based service for outbound campaigns
 - **AMD Worker**: Java (Vert.x 5) service for stream-based voicemail detection
+- **ACD Worker**: Java (Vert.x 5) service for stateful call queues (FIFO, agent states)
 - **Architecture**: Multi-tenant, uses Cloudonix CPaaS for VoIP
 
 ## Project Memory
@@ -70,6 +71,16 @@ cd amd-worker
 mvn compile                  # Compile
 mvn package -DskipTests -B   # Build shaded JAR
 # Docker image is built from amd-worker/Dockerfile
+```
+
+### ACD Worker (Java)
+```bash
+cd acd-worker
+mvn compile                  # Compile (local JDK must be 21)
+mvn package -DskipTests -B   # Build shaded JAR
+# Docker image is built from acd-worker/Dockerfile
+# Local JDK 17? Run via Docker instead:
+docker run --rm -v "$PWD/acd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
 ```
 
 ### Docker
@@ -169,6 +180,7 @@ Key variables (see `.env.example`):
 - `NGROK_AUTHTOKEN` - Local webhook testing
 - `DIALER_WORKER_API_TOKEN` - Dialer worker authentication
 - `AMD_WORKER_API_TOKEN` - AMD worker authentication
+- `ACD_WORKER_API_TOKEN` - ACD (call queue) worker authentication
 
 Never commit `.env` files or secrets to git.
 

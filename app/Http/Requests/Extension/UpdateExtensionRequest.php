@@ -101,6 +101,12 @@ class UpdateExtensionRequest extends FormRequest
                 'nullable',
                 'integer',
             ],
+            'configuration.call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('type') === ExtensionType::QUEUE->value),
+                'nullable',
+                'integer',
+                'exists:call_queues,id',
+            ],
             'configuration.ivr_id' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::IVR->value),
                 'nullable',
@@ -152,6 +158,7 @@ class UpdateExtensionRequest extends FormRequest
             'user_id.exists' => 'The selected user does not exist.',
             'configuration.conference_room_id.required_if' => 'Conference room ID is required for conference extensions.',
             'configuration.ring_group_id.required_if' => 'Ring group ID is required for ring group extensions.',
+            'configuration.call_queue_id.required_if' => 'Call queue ID is required for call queue extensions.',
             'configuration.ivr_id.required_if' => 'IVR ID is required for IVR extensions.',
             'configuration.ai_assistant_id.required_if' => 'AI assistant selection is required for AI assistant extensions.',
             'configuration.ai_assistant_id.exists' => 'The selected AI assistant does not exist.',
@@ -278,6 +285,25 @@ class UpdateExtensionRequest extends FormRequest
                         $validator->errors()->add(
                             'configuration.ai_load_balancer_id',
                             'The selected AI Load Balancer does not belong to your organization.'
+                        );
+                    }
+                }
+            }
+
+            // Validate Call Queue belongs to same organization and is active
+            if ($type === ExtensionType::QUEUE->value) {
+                $callQueueId = $this->input('configuration.call_queue_id');
+                if ($callQueueId) {
+                    $callQueue = \App\Models\CallQueue::find($callQueueId);
+                    if (! $callQueue || $callQueue->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'configuration.call_queue_id',
+                            'The selected call queue does not belong to your organization.'
+                        );
+                    } elseif (! $callQueue->isActive()) {
+                        $validator->errors()->add(
+                            'configuration.call_queue_id',
+                            'The selected call queue must be active.'
                         );
                     }
                 }

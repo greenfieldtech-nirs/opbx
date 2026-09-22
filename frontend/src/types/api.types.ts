@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup';
 
 // Ring Group Status
 export type RingGroupStatus = Status;
@@ -821,9 +821,11 @@ export interface Recording {
   remote_url?: string;
   original_filename?: string;
   file_size?: number;
+  formatted_file_size?: string;
   mime_type?: string;
   duration_seconds?: number;
   status: RecordingStatus;
+  is_moh?: boolean;
   created_by?: number;
   updated_by?: number;
   created_at: string;

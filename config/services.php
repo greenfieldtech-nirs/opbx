@@ -81,6 +81,11 @@ return [
         'api_token' => env('AMD_WORKER_API_TOKEN'),
     ],
 
+    'acd_worker' => [
+        'url' => env('ACD_WORKER_URL', 'http://acd-worker:8084'),
+        'api_token' => env('ACD_WORKER_API_TOKEN'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | UserCheck Email Validation Service

@@ -17,6 +17,7 @@ enum BusinessHoursActionType: string
     case IVR_MENU = 'ivr_menu';
     case AI_ASSISTANT = 'ai_assistant';
     case AI_LOAD_BALANCER = 'ai_load_balancer';
+    case CALL_QUEUE = 'call_queue';
 
     /**
      * Get human-readable label for the action type.
@@ -30,6 +31,7 @@ enum BusinessHoursActionType: string
             self::IVR_MENU => 'IVR Menu',
             self::AI_ASSISTANT => 'AI Assistant',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
+            self::CALL_QUEUE => 'Call Queue',
         };
     }
 

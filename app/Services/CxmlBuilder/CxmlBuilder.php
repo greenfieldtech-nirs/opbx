@@ -139,6 +139,18 @@ class CxmlBuilder
     }
 
     /**
+     * Add Pause verb to wait silently for the given number of seconds.
+     */
+    public function pause(int $length = 1): self
+    {
+        $pause = $this->document->createElement('Pause');
+        $pause->setAttribute('length', (string) $length);
+        $this->response->appendChild($pause);
+
+        return $this;
+    }
+
+    /**
      * Add Hangup verb to end the call.
      */
     public function hangup(): self

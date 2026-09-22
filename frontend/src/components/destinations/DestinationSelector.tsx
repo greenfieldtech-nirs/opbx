@@ -26,6 +26,7 @@ export function DestinationSelector({
   disabled = false,
   extensionTypes,
   showBadges = true,
+  showSubLabel = true,
   emptyMessage,
   loadingMessage = 'Loading destinations...',
   className,
@@ -77,7 +78,7 @@ export function DestinationSelector({
         onValueChange={handleChange}
         disabled={isDisabled}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full [&>span]:flex-1 [&>span]:min-w-0 [&>span]:text-left">
           <SelectValue placeholder={isLoading ? loadingMessage : placeholder} />
         </SelectTrigger>
         <SelectContent className="min-w-[300px]">
@@ -110,7 +111,7 @@ export function DestinationSelector({
                   )}
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">{option.label}</span>
-                    {option.subLabel && (
+                    {showSubLabel && option.subLabel && (
                       <span className="text-xs text-muted-foreground truncate">
                         {option.subLabel}
                       </span>

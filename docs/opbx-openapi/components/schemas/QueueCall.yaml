@@ -1,0 +1,60 @@
+type: object
+description: Statistical record for one queued caller
+properties:
+  id:
+    type: integer
+    readOnly: true
+    example: 1024
+  call_queue_id:
+    type: integer
+    example: 12
+  call_id:
+    type: string
+    description: Cloudonix call identifier
+    example: Btf0Br0tUDSfYb4UGEWJTA..
+  from_number:
+    type:
+      - string
+      - 'null'
+  to_number:
+    type:
+      - string
+      - 'null'
+  entered_at:
+    type: string
+    format: date-time
+  answered_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  abandoned_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  ended_at:
+    type:
+      - string
+      - 'null'
+    format: date-time
+  agent_user_id:
+    type:
+      - integer
+      - 'null'
+  waiting_seconds:
+    type:
+      - integer
+      - 'null'
+  handling_seconds:
+    type:
+      - integer
+      - 'null'
+  disposition:
+    type:
+      - string
+      - 'null'
+    enum:
+      - answered
+      - abandoned
+      - overflow

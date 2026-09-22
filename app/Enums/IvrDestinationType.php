@@ -13,6 +13,7 @@ enum IvrDestinationType: string
     case BUSINESS_HOURS = 'business_hours';
     case AI_ASSISTANT = 'ai_assistant';
     case AI_LOAD_BALANCER = 'ai_load_balancer';
+    case CALL_QUEUE = 'call_queue';
     case HANGUP = 'hangup';
 
     public function label(): string
@@ -25,6 +26,7 @@ enum IvrDestinationType: string
             self::BUSINESS_HOURS => 'Business Hours',
             self::AI_ASSISTANT => 'AI Assistant',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
+            self::CALL_QUEUE => 'Call Queue',
             self::HANGUP => 'Hang Up',
         };
     }
@@ -39,6 +41,7 @@ enum IvrDestinationType: string
             self::BUSINESS_HOURS => 'Route based on business hours schedule',
             self::AI_ASSISTANT => 'Route to an AI assistant',
             self::AI_LOAD_BALANCER => 'Route to an AI load balancer',
+            self::CALL_QUEUE => 'Route to a call queue with agents',
             self::HANGUP => 'End the call',
         };
     }
@@ -53,6 +56,7 @@ enum IvrDestinationType: string
             self::BUSINESS_HOURS => 'clock',
             self::AI_ASSISTANT => 'bot',
             self::AI_LOAD_BALANCER => 'scale',
+            self::CALL_QUEUE => 'list-ordered',
             self::HANGUP => 'phone-off',
         };
     }

@@ -418,6 +418,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($ringGroup, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($ringGroup, $request),
             RingGroupFallbackAction::AI_LOAD_BALANCER => $this->handleFallbackAiLoadBalancer($ringGroup, $request),
+            RingGroupFallbackAction::CALL_QUEUE => $this->handleFallbackCallQueue($ringGroup, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($ringGroup),
             default => $this->handleFallbackHangup($ringGroup), // Default to hangup for unknown actions
         };
@@ -595,6 +596,29 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
 
         return $voiceRoutingManager->executeStrategy(\App\Enums\ExtensionType::AI_LOAD_BALANCER, $request, new \App\Models\DidNumber, $destination);
+    }
+
+    private function handleFallbackCallQueue(RingGroup $ringGroup, Request $request): Response
+    {
+        $fallbackCallQueueId = $ringGroup->fallback_call_queue_id;
+
+        if (! $fallbackCallQueueId) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        $callQueue = \App\Models\CallQueue::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $fallbackCallQueueId)
+            ->where('organization_id', $ringGroup->organization_id)
+            ->first();
+
+        if (! $callQueue || ! $callQueue->isActive()) {
+            return $this->handleFallbackHangup($ringGroup);
+        }
+
+        // Use the same routing logic as normal queue dialing
+        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+
+        return $voiceRoutingManager->executeStrategy(ExtensionType::QUEUE, $request, new \App\Models\DidNumber, ['call_queue' => $callQueue]);
     }
 
     private function handleFallbackHangup(RingGroup $ringGroup): Response

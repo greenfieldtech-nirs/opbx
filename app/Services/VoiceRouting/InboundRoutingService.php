@@ -153,6 +153,7 @@ class InboundRoutingService
         match ($did->routing_type) {
             'extension' => $this->resolveExtensionDestination($did, $destination),
             'ring_group' => $this->resolveRingGroupDestination($did, $destination),
+            'call_queue' => $this->resolveCallQueueDestination($did, $destination),
             'conference_room' => $this->resolveConferenceRoomDestination($did, $destination),
             'ivr_menu', 'ivr' => $this->resolveIvrMenuDestination($did, $destination),
             'ai_assistant' => $this->resolveAiAssistantDestination($did, $destination),
@@ -184,6 +185,17 @@ class InboundRoutingService
         $ringGroup = $did->getRingGroupAttribute();
         if ($ringGroup) {
             $destination['ring_group'] = $ringGroup;
+        }
+    }
+
+    /**
+     * Resolve call queue destination for DID.
+     */
+    private function resolveCallQueueDestination(DidNumber $did, array &$destination): void
+    {
+        $callQueue = $did->getCallQueueAttribute();
+        if ($callQueue) {
+            $destination['call_queue'] = $callQueue;
         }
     }
 
@@ -494,6 +506,11 @@ class InboundRoutingService
         // If destination contains conference_room, return CONFERENCE
         if (isset($destination['conference_room'])) {
             return ExtensionType::CONFERENCE;
+        }
+
+        // If destination contains call_queue, return QUEUE
+        if (isset($destination['call_queue'])) {
+            return ExtensionType::QUEUE;
         }
 
         // If destination contains ivr_menu, return IVR

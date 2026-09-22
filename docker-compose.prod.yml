@@ -1,4 +1,4 @@
-# Production overrides for OpBX.
+# Production overrides for OPBX.
 #
 # Serves the frontend as a compiled static SPA (built by frontend/Dockerfile)
 # instead of the Vite dev server. This eliminates exposing the Vite dev server

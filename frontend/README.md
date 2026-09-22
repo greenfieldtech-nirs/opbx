@@ -1,10 +1,10 @@
-# OpBX Frontend
+# OPBX Frontend
 
-The **OpBX Frontend** is the React-based single-page application (SPA) that serves as the administrative interface for the OpBX open-source business PBX platform. It provides a modern, responsive web UI for managing phone systems, users, call routing, auto-dialer campaigns, real-time call monitoring, and platform-level administration.
+The **OPBX Frontend** is the React-based single-page application (SPA) that serves as the administrative interface for the OPBX open-source business PBX platform. It provides a modern, responsive web UI for managing phone systems, users, call routing, auto-dialer campaigns, real-time call monitoring, and platform-level administration.
 
 ## Overview
 
-OpBX is a multi-tenant business PBX platform built on Laravel (backend) and React (frontend). This frontend application communicates with the Laravel API to provide a comprehensive web interface for PBX administrators and platform managers.
+OPBX is a multi-tenant business PBX platform built on Laravel (backend) and React (frontend). This frontend application communicates with the Laravel API to provide a comprehensive web interface for PBX administrators and platform managers.
 
 **Key Capabilities:**
 
@@ -373,9 +373,9 @@ The frontend connects to a **Soketi** WebSocket server via **Laravel Echo** for 
 
 ## Related Documentation
 
-- [OpBX Backend Documentation](../README.md) — Laravel API and architecture
+- [OPBX Backend Documentation](../README.md) — Laravel API and architecture
 - [Cloudonix Docs](https://developers.cloudonix.com/) — CPaaS platform documentation
-- [OpBX REST API](https://developers.cloudonix.com/opbxRestOpenAPI) — API endpoint reference
+- [OPBX REST API](https://developers.cloudonix.com/opbxRestOpenAPI) — API endpoint reference
 - [Laravel Docs](https://laravel.com/docs/12.x) — Backend framework documentation
 - [shadcn/ui](https://ui.shadcn.com/) — UI component library documentation
 

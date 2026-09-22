@@ -174,6 +174,21 @@ export function transformAiAssistantsToOptions(
     }));
 }
 
+export function transformCallQueuesToOptions(
+  callQueues: Array<{
+    id: string | number;
+    name: string;
+  }>
+): DestinationOption[] {
+  return callQueues.map((queue) => ({
+    id: String(queue.id),
+    type: 'call_queue',
+    label: queue.name,
+    badge: getBadgeConfig('call_queue'),
+    metadata: { name: queue.name },
+  }));
+}
+
 export function transformAiLoadBalancersToOptions(
   aiLoadBalancers: Array<{
     id: string | number;

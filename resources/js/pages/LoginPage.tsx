@@ -14,7 +14,7 @@ export const LoginPage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!email || !password) {
             toast({
                 title: 'Error',
@@ -75,7 +75,7 @@ export const LoginPage: React.FC = () => {
                     className="w-full h-full flex items-center justify-center"
                 >
                     <div className="text-white text-center">
-                        <h1 className="text-6xl font-bold mb-4">OpBX</h1>
+                        <h1 className="text-6xl font-bold mb-4">OPBX</h1>
                         <p className="text-xl opacity-90">Cloud PBX Administration</p>
                     </div>
                 </AuroraBackgroundProvider>
@@ -119,9 +119,9 @@ export const LoginPage: React.FC = () => {
                                 className="w-full"
                             />
                         </div>
-                        <Button 
-                            type="submit" 
-                            className="w-full" 
+                        <Button
+                            type="submit"
+                            className="w-full"
                             size="lg"
                             disabled={isLoading}
                         >
