@@ -123,6 +123,8 @@ export interface DestinationSelectorProps {
   extensionTypes?: ExtensionType[];
   /** Show type badges in dropdown */
   showBadges?: boolean;
+  /** Show the description line (subLabel) in dropdown options (default: true) */
+  showSubLabel?: boolean;
   /** Custom empty state message */
   emptyMessage?: string;
   /** Custom loading message */
@@ -168,6 +170,8 @@ export interface DestinationTypeAndSelectorProps {
   typeClassName?: string;
   /** Additional CSS classes for destination selector container */
   destinationClassName?: string;
+  /** Show the description line (subLabel) in destination options (default: true) */
+  showSubLabel?: boolean;
 }
 
 /**

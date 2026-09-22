@@ -586,6 +586,7 @@ export default function CallQueues() {
                   layout="horizontal"
                   typeClassName="min-w-0"
                   destinationClassName="min-w-0"
+                  showSubLabel={false}
                   typeValue={form.fallback_action as DestinationType}
                   destinationValue={
                     form.fallback_action === 'extension'
