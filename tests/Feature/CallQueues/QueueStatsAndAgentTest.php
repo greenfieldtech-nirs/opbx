@@ -182,7 +182,7 @@ class QueueStatsAndAgentTest extends TestCase
             ->assertJsonPath('data.waiting_time_avg_seconds', 30)
             ->assertJsonPath('data.agents.0.state', 'WRAP_UP')
             ->assertJsonPath('data.rolling.handled_15m', 2)
-            ->assertJsonPath('data.rolling.handled_60m', 1)
+            ->assertJsonPath('data.rolling.handled_60m', 2)
             ->assertJsonPath('data.rolling.abandoned_15m', 0)
             ->assertJsonPath('data.rolling.abandoned_24h', 1);
     }
