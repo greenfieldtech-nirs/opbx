@@ -384,6 +384,25 @@ class ProviderRegistry
             description: 'Millis AI - EU Region',
         ));
 
+        $this->register(new ProviderDefinition(
+            key: 'telnyx',
+            name: 'Telnyx',
+            protocol: 'sip',
+            urlTemplate: null,
+            configFields: [
+                new ProviderConfigField(
+                    name: 'phone_number',
+                    label: 'Phone Number',
+                    type: 'tel',
+                    required: true,
+                    placeholder: '+12125551234',
+                    description: 'Phone number in E.164 format',
+                    validationRules: ['regex:/^\+[1-9]\d{1,14}$/'],
+                ),
+            ],
+            description: 'Telnyx AI voice assistant',
+        ));
+
         // WebSocket-based providers
         $this->register(new ProviderDefinition(
             key: 'deepdub',

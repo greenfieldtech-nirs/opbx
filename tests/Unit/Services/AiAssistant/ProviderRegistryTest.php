@@ -108,6 +108,7 @@ class ProviderRegistryTest extends TestCase
             'puretalk',
             'millis-us',
             'millis-eu',
+            'telnyx',
         ];
 
         foreach ($expectedSipProviders as $key) {
