@@ -821,6 +821,7 @@ export interface Recording {
   remote_url?: string;
   original_filename?: string;
   file_size?: number;
+  formatted_file_size?: string;
   mime_type?: string;
   duration_seconds?: number;
   status: RecordingStatus;

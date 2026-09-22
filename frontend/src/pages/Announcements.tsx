@@ -355,6 +355,10 @@ export default function Announcements() {
                 )
               },
               {
+                header: 'Size',
+                cell: (announcement) => announcement.formatted_file_size || (announcement.file_size ? `${(announcement.file_size / 1024).toFixed(1)} KB` : '—')
+              },
+              {
                 header: 'Created By',
                 accessorKey: 'created_by'
               },
