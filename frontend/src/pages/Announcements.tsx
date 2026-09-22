@@ -370,7 +370,7 @@ export default function Announcements() {
                   const duration = announcement.duration_seconds != null ? formatDuration(announcement.duration_seconds) : '—';
                   return (
                     <span className="text-muted-foreground">
-                      {size} <span className="text-muted-foreground/60">·</span> {duration}
+                      {duration} <span className="text-muted-foreground/60">({size})</span>
                     </span>
                   );
                 }
