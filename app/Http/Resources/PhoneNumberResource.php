@@ -68,6 +68,10 @@ class PhoneNumberResource extends JsonResource
                 $this->routing_type === 'ivr_menu' && $this->ivr_menu !== null,
                 fn() => new IvrMenuResource($this->ivr_menu)
             ),
+            'call_queue' => $this->when(
+                $this->routing_type === 'call_queue' && $this->call_queue !== null,
+                fn() => ['id' => $this->call_queue->id, 'name' => $this->call_queue->name]
+            ),
         ];
     }
 }

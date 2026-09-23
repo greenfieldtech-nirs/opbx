@@ -210,6 +210,7 @@ export interface DIDNumber {
   ai_assistant?: AiAssistant;
   ai_load_balancer?: AiAssistantLoadBalancer;
   ivr_menu?: IvrMenu;
+  call_queue?: { id: number; name: string };
   created_at: string;
   updated_at: string;
 }

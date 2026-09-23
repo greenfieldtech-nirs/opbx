@@ -232,6 +232,7 @@ export interface DIDNumber {
   ring_group?: RingGroup;
   business_hours_schedule?: BusinessHours;
   conference_room?: ConferenceRoom;
+  call_queue?: { id: number; name: string };
   created_at: string;
   updated_at: string;
 }
