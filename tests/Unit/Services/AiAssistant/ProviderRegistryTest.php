@@ -108,6 +108,7 @@ class ProviderRegistryTest extends TestCase
             'puretalk',
             'millis-us',
             'millis-eu',
+            'telnyx',
         ];
 
         foreach ($expectedSipProviders as $key) {
@@ -235,5 +236,23 @@ class ProviderRegistryTest extends TestCase
         $this->assertStringContainsString('{session}', $template);
         $this->assertStringContainsString('{from}', $template);
         $this->assertStringContainsString('{to}', $template);
+    }
+
+    public function test_telnyx_provider_supports_optional_tech_prefix_field(): void
+    {
+        $provider = $this->registry->getProvider('telnyx');
+
+        $this->assertNotNull($provider);
+
+        $techPrefixField = null;
+        foreach ($provider->configFields as $field) {
+            if ($field->name === 'tech_prefix') {
+                $techPrefixField = $field;
+                break;
+            }
+        }
+
+        $this->assertNotNull($techPrefixField, 'Telnyx should expose a tech_prefix config field');
+        $this->assertFalse($techPrefixField->required, 'tech_prefix must be optional');
     }
 }

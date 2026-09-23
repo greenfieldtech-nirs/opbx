@@ -14,7 +14,7 @@ AI Assistants let you connect answered calls to AI-powered voice agents that can
 
 OPBX integrates with multiple AI voice providers across two protocols.
 
-### SIP Providers (16)
+### SIP Providers (17)
 
 SIP providers connect using a phone number configuration field.
 
@@ -36,6 +36,7 @@ SIP providers connect using a phone number configuration field.
 | puretalk | SIP | phone_number |
 | millis-us | SIP | phone_number |
 | millis-eu | SIP | phone_number |
+| telnyx | SIP | phone_number |
 
 ### WebSocket Provider (1)
 
@@ -82,6 +83,53 @@ The URL template includes:
 | session | Unique session ID for this call |
 | from | Caller ID of the incoming call |
 | to | Destination number being called |
+
+## Connecting a Telnyx AI Assistant
+
+Telnyx AI Assistants are reachable over SIP. Unlike the other SIP providers, the Telnyx flow requires a trunk between Cloudonix and Telnyx's SIP proxy.
+
+### Prerequisites (Telnyx side)
+
+1. Create an AI Assistant in the Mission Control Portal (**AI, Storage and Compute → AI Assistants**) or via the Assistants API.
+2. Purchase a phone number with voice features and assign it to your assistant. Calls dialed to this number reach the assistant.
+3. Create a SIP Connection under **Connections → Add Connection**. Telnyx supports credentials-based auth (username/password) and IP-based auth. Credentials-based auth is the recommended path: the trunk authenticates per connection and needs no prefix. Keep the connection credentials for the next step.
+
+### Cloudonix trunk setup
+
+1. In Cloudonix, create a trunk that points at Telnyx's SIP proxy (`sip.telnyx.com`), authenticating with the Telnyx SIP Connection credentials from step 3 above.
+2. Route outbound calls to the assistant's number over this trunk.
+
+### OPBX configuration
+
+Create the AI Assistant in OPBX with the provider `telnyx` and the phone number field set to the assistant's E.164 number:
+
+```xml
+<Dial>
+  <Service provider="telnyx">+14155551234</Service>
+</Dial>
+```
+
+The number dialed must be the number assigned to the assistant; Telnyx routes the inbound call to the assistant.
+
+### IP-based authorization and tech prefixes
+
+All Cloudonix signaling toward Telnyx originates from a shared IP address. With IP-based authorization, Telnyx requires a tech prefix on the connection so calls route to the correct account. For example, with tech prefix `1212`, dialing `+12127773456` means the trunk must dial `1212+12127773456`.
+
+OPBX handles this for you: set the **Tech Prefix** field on the Telnyx assistant (optional), and OPBX composes the prefixed dial target automatically. Never hand-type the prefixed number in the phone number field.
+
+### Reference
+
+| Topic | Link |
+|-------|------|
+| Assistant quickstart (number assignment) | https://developers.telnyx.com/docs/inference/ai-assistants/no-code-voice-assistant |
+| SIP trunking overview (auth types) | https://developers.telnyx.com/docs/voice/sip-trunking/get-started |
+| SIP protocols (UDP/TCP/TLS) | https://support.telnyx.com/en/articles/1130705-sip-protocols-that-telnyx-uses |
+| Connection settings (DTMF, RFC 2833) | https://support.telnyx.com/en/articles/4351104-sip-connection-settings |
+| Realtime WebSocket (programmatic clients) | https://developers.telnyx.com/docs/inference/ai-assistants/realtime-conversations |
+
+:::note
+Telnyx publishes signaling and media IPs for its SIP proxy at sip.telnyx.com. Telnyx AI Assistants also expose a Realtime WebSocket channel for programmatic clients; OPBX call routing uses the SIP path shown above.
+:::
 
 ## Creating an AI Assistant
 
