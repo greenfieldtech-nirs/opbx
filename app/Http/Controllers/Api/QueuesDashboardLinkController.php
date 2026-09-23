@@ -26,7 +26,7 @@ class QueuesDashboardLinkController extends Controller
             $organization->save();
         }
 
-        return response()->json(['data' => ['url' => $this->buildUrl($organization->public_queues_token)]]);
+        return response()->json(['data' => ['url' => $this->buildUrl($organization, $organization->public_queues_token)]]);
     }
 
     public function regenerate(Request $request): JsonResponse
@@ -37,7 +37,7 @@ class QueuesDashboardLinkController extends Controller
         $organization->public_queues_token = (string) Str::uuid();
         $organization->save();
 
-        return response()->json(['data' => ['url' => $this->buildUrl($organization->public_queues_token)]]);
+        return response()->json(['data' => ['url' => $this->buildUrl($organization, $organization->public_queues_token)]]);
     }
 
     private function authorizeLinkAccess(Request $request): void
@@ -45,9 +45,12 @@ class QueuesDashboardLinkController extends Controller
         abort_unless($request->user()->isOwner() || $request->user()->isPBXAdmin(), 403);
     }
 
-    private function buildUrl(string $token): string
+    private function buildUrl(\App\Models\Organization $organization, string $token): string
     {
-        $base = rtrim((string) config('app.url'), '/');
+        // The link must be reachable from wallboard browsers - use the same
+        // public base as the org's webhooks, not the internal app.url.
+        $settings = \App\Models\CloudonixSettings::where('organization_id', $organization->id)->first();
+        $base = rtrim($settings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return "{$base}/public/queues-dashboard/{$token}";
     }

@@ -97,7 +97,12 @@ class QueueDashboardDataService
     {
         return $callQueue->agentRecords()
             ->withoutGlobalScope(OrganizationScope::class)
-            ->with(['user.extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
+            ->with([
+                // No authenticated org context on the public dashboard: bypass
+                // the tenant scope or every user is filtered out.
+                'user' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class),
+                'user.extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class),
+            ])
             ->get()
             ->filter(fn ($membership) => $membership->user?->extension !== null)
             ->map(fn ($membership) => [

@@ -67,9 +67,23 @@ class PublicQueuesDashboardTest extends TestCase
             'from_number' => '+15551234567',
         ]);
 
+        // Regression: without an authenticated org context the tenant scope
+        // must be bypassed or agents disappear from the public snapshot.
+        $agent = User::factory()->create(['organization_id' => $this->organization->id]);
+        \App\Models\CallQueueAgent::factory()->create([
+            'organization_id' => $this->organization->id,
+            'call_queue_id' => $this->queue->id,
+            'user_id' => $agent->id,
+        ]);
+        \App\Models\Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $agent->id,
+            'extension_number' => '3001',
+        ]);
+
         Http::fake(['http://acd-worker:8084/*' => Http::response([
             'waiting' => [['callId' => 'wallboard-1', 'position' => 1, 'waitedSeconds' => 12]],
-            'agents' => [],
+            'agents' => [['userId' => (string) $agent->id, 'extensionNumber' => '3001', 'state' => 'AVAILABLE']],
         ], 200)]);
 
         $response = $this->getJson("/api/public/queues-dashboard/{$this->token}/queues/{$this->queue->id}/live");
@@ -77,7 +91,8 @@ class PublicQueuesDashboardTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.call_queue_name', $this->queue->name)
             ->assertJsonPath('data.waiting.0.callId', 'wallboard-1')
-            ->assertJsonPath('data.waiting.0.from_number', '+15551234567');
+            ->assertJsonPath('data.waiting.0.from_number', '+15551234567')
+            ->assertJsonPath('data.agents.0.extensionNumber', '3001');
     }
 
     public function test_public_endpoints_reject_invalid_token_and_foreign_queue(): void
