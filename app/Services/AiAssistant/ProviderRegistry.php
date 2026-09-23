@@ -399,6 +399,15 @@ class ProviderRegistry
                     description: 'Phone number in E.164 format',
                     validationRules: ['regex:/^\+[1-9]\d{1,14}$/'],
                 ),
+                new ProviderConfigField(
+                    name: 'tech_prefix',
+                    label: 'Tech Prefix',
+                    type: 'text',
+                    required: false,
+                    placeholder: '1212',
+                    description: 'Optional tech prefix for IP-based authorization trunks. OPBX dials {prefix}+{phone_number} when set.',
+                    validationRules: ['regex:/^[A-Za-z0-9_-]+$/'],
+                ),
             ],
             description: 'Telnyx AI voice assistant',
         ));

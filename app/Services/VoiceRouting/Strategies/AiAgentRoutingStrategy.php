@@ -220,6 +220,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
         // Fall back to legacy configuration format (provider + phone_number)
         $phoneNumber = $config['phone_number'] ?? null;
+        $techPrefix = trim((string) ($config['tech_prefix'] ?? ''));
 
         if (! $provider || ! $phoneNumber) {
             Log::error('SIP AI Assistant missing provider or phone number', [
@@ -243,11 +244,17 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             'extension_number' => $extension?->extension_number,
             'provider' => $provider,
             'phone_number' => $phoneNumber,
+            'tech_prefix' => $techPrefix,
         ]);
 
-        // Route to AI Agent Service Provider using <Service> noun with provider and phone number
+        // Route to AI Agent Service Provider using <Service> noun with provider and phone number.
+        // Tech prefixes (e.g. Telnyx IP-auth trunks behind a shared signaling IP) are dialed as "{prefix}+{number}".
+        $dialTarget = $techPrefix !== ''
+            ? $techPrefix.'+'.$phoneNumber
+            : $phoneNumber;
+
         return response(
-            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
+            CxmlBuilder::dialServiceProvider($provider, $dialTarget),
             200,
             ['Content-Type' => 'application/xml']
         );
