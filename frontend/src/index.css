@@ -371,3 +371,25 @@
     border: 2px solid hsl(var(--background));
   }
 }
+
+/* Public queues dashboard: cube-style queue transitions */
+.queue-stage {
+  perspective: 1800px;
+}
+
+.queue-face {
+  transform-style: preserve-3d;
+  transform-origin: 50% 50%;
+  animation: queue-rotate-in 0.8s ease-out both;
+}
+
+@keyframes queue-rotate-in {
+  from {
+    transform: rotateY(-90deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
