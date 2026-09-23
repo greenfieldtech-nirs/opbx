@@ -50,7 +50,7 @@ class PublicQueuesDashboardTest extends TestCase
     {
         CallQueue::factory()->create(); // other org
 
-        $response = $this->getJson("/api/public/queues-dashboard/{$this->token}/queues");
+        $response = $this->getJson("/api/v1/public/queues-dashboard/{$this->token}/queues");
 
         $response->assertOk()
             ->assertJsonCount(1, 'data')
@@ -86,7 +86,7 @@ class PublicQueuesDashboardTest extends TestCase
             'agents' => [['userId' => (string) $agent->id, 'extensionNumber' => '3001', 'state' => 'AVAILABLE']],
         ], 200)]);
 
-        $response = $this->getJson("/api/public/queues-dashboard/{$this->token}/queues/{$this->queue->id}/live");
+        $response = $this->getJson("/api/v1/public/queues-dashboard/{$this->token}/queues/{$this->queue->id}/live");
 
         $response->assertOk()
             ->assertJsonPath('data.call_queue_name', $this->queue->name)
@@ -97,10 +97,10 @@ class PublicQueuesDashboardTest extends TestCase
 
     public function test_public_endpoints_reject_invalid_token_and_foreign_queue(): void
     {
-        $this->getJson('/api/public/queues-dashboard/not-a-real-token/queues')->assertNotFound();
+        $this->getJson('/api/v1/public/queues-dashboard/not-a-real-token/queues')->assertNotFound();
 
         $foreignQueue = CallQueue::factory()->create();
-        $this->getJson("/api/public/queues-dashboard/{$this->token}/queues/{$foreignQueue->id}/live")
+        $this->getJson("/api/v1/public/queues-dashboard/{$this->token}/queues/{$foreignQueue->id}/live")
             ->assertNotFound();
     }
 
@@ -117,9 +117,9 @@ class PublicQueuesDashboardTest extends TestCase
         $this->assertNotSame($show->json('data.url'), $regenerate->json('data.url'));
 
         // Old token is revoked, new one works.
-        $this->getJson('/api/public/queues-dashboard/'.$this->token.'/queues')->assertNotFound();
+        $this->getJson('/api/v1/public/queues-dashboard/'.$this->token.'/queues')->assertNotFound();
         $newToken = basename(parse_url($regenerate->json('data.url'), PHP_URL_PATH));
-        $this->getJson("/api/public/queues-dashboard/{$newToken}/queues")->assertOk();
+        $this->getJson("/api/v1/public/queues-dashboard/{$newToken}/queues")->assertOk();
     }
 
     public function test_pbx_user_cannot_manage_link(): void

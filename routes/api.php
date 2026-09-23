@@ -121,13 +121,6 @@ Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:d
 });
 
 // Detailed health checks - behind authentication to prevent internal info leakage
-// Public queues dashboard (wallboard deep link) - token-authed, rate limited
-Route::middleware(['throttle:120,1'])->prefix('public/queues-dashboard')->group(function (): void {
-    Route::get('{token}/queues', [PublicQueuesDashboardController::class, 'queues'])->name('public.queues.queues');
-    Route::get('{token}/queues/{queue}/live', [PublicQueuesDashboardController::class, 'live'])->name('public.queues.live');
-    Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
-});
-
 Route::middleware(['auth:sanctum'])->group(function (): void {
     Route::get('/storage/health', function () {
         try {
@@ -197,6 +190,14 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Public queues dashboard (wallboard deep link) - token-authed, rate limited
+    Route::middleware(['throttle:120,1'])->prefix('public/queues-dashboard')->group(function (): void {
+        Route::get('{token}/queues', [PublicQueuesDashboardController::class, 'queues'])->name('public.queues.queues');
+        Route::get('{token}/queues/{queue}/live', [PublicQueuesDashboardController::class, 'live'])->name('public.queues.live');
+        Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
+    });
+
+
     // Broadcasting authentication routes (for WebSocket presence channels)
     // Must be accessible to authenticated users for Laravel Echo
     Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
