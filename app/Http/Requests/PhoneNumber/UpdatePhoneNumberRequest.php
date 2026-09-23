@@ -322,7 +322,7 @@ class UpdatePhoneNumberRequest extends FormRequest
         if (! $schedule->isActive()) {
             $validator->errors()->add(
                 'routing_config.business_hours_schedule_id',
-                'The selected business hours schedule must be active. Schedule "'.$schedule->name.'" is currently inactive.'
+                'Business hours rule "'.$schedule->name.'" is not active. Activate the rule (set its status to active) before assigning it to a phone number.'
             );
         }
     }
