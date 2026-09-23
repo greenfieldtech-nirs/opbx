@@ -6,6 +6,7 @@ namespace App\Services\CallQueue;
 
 use App\Models\CallQueue;
 use App\Models\QueueCall;
+use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Http\Request;
@@ -25,6 +26,9 @@ class QueueDialOfferService
         private readonly ExtensionPresenceTracker $presence,
         private readonly QueueCallLifecycleService $lifecycle,
     ) {}
+
+    // Calls entering a queue are inbound calls: the agent <Dial> must abide by
+    // the organization's inbound call recording policy (same as ring groups).
 
     /**
      * Offer the call to the given agents. Returns null when every offered
@@ -69,8 +73,17 @@ class QueueDialOfferService
             'timeout' => $callQueue->agent_ring_timeout,
         ]);
 
+        $recording = app(CallRecordingDecisionService::class)
+            ->resolve($callQueue->organization_id, 'inbound');
+
         $builder = new CxmlBuilder;
-        $builder->dial($targets, $callQueue->agent_ring_timeout, $this->getDialCallbackUrl($request, $callQueue, $queueCall->call_id));
+        $builder->dial(
+            $targets,
+            $callQueue->agent_ring_timeout,
+            $this->getDialCallbackUrl($request, $callQueue, $queueCall->call_id),
+            record: $recording->record,
+            recordingStatusCallback: $recording->recordingStatusCallback,
+        );
 
         return $builder->toResponse();
     }

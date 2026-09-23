@@ -217,6 +217,33 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringNotContainsString('forward', strtolower($content));
     }
 
+    public function test_agent_dial_abides_by_inbound_recording_policy(): void
+    {
+        // Policy: calls entering a queue are inbound calls and must be
+        // recorded per the organization's inbound recording mode.
+        CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first()
+            ?->update(['call_recording_mode' => 'all']);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([
+            'action' => 'dial',
+            'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
+        ], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('record="record-from-answer"', $content);
+        $this->assertStringContainsString('recordingStatusCallback=', $content);
+    }
+
     public function test_poll_skips_presence_busy_agents(): void
     {
         QueueCall::factory()->create([
