@@ -146,6 +146,29 @@ class ApiKeyCoverageTest extends TestCase
         $this->withToken($ungranted)->getJson('/api/v1/trunks')->assertStatus(403);
     }
 
+    public function test_call_queues_are_grantable_read_only(): void
+    {
+        [, $token] = app(ApiKeyService::class)->create(
+            organizationId: Organization::factory()->create()->id, name: 'k',
+            permissions: [['resource' => 'call-queues', 'level' => 'read'], ['resource' => 'queue-calls', 'level' => 'read']],
+            createdBy: null,
+        );
+
+        $org = Organization::factory()->create();
+        $queue = \App\Models\CallQueue::factory()->create(['organization_id' => $org->id]);
+
+        $this->withToken($token)->getJson('/api/v1/call-queues')->assertStatus(200);
+        $this->withToken($token)->getJson('/api/v1/queue-calls')->assertStatus(200);
+
+        // Read-level keys cannot mutate.
+        $this->withToken($token)->postJson('/api/v1/call-queues', [])->assertStatus(403);
+
+        // A key without the grants is denied.
+        $ungranted = $this->keyFor([['resource' => 'extensions', 'level' => 'read']]);
+        $this->withToken($ungranted)->getJson('/api/v1/call-queues')->assertStatus(403);
+        $this->withToken($ungranted)->getJson('/api/v1/queue-calls')->assertStatus(403);
+    }
+
     public function test_credential_subroutes_are_never_grantable(): void
     {
         $org = Organization::factory()->create();

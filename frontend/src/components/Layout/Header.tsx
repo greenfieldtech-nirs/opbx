@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, User, Settings, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { QueueAgentWidget } from '@/components/queues/QueueAgentWidget';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -45,6 +46,9 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+
+        {/* Queue Agent Status (visible to queue agents) */}
+        <QueueAgentWidget />
 
 
         {/* User Menu Dropdown */}

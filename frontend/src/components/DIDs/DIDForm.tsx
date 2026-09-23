@@ -29,7 +29,7 @@ import type { DIDNumber, CreateDIDRequest, UpdateDIDRequest, RoutingType } from 
 const didSchema = z.object({
   phone_number: z.string().min(10, 'Phone number must be at least 10 digits'),
   friendly_name: z.string().optional(),
-  routing_type: z.enum(['extension', 'ai_assistant', 'ring_group', 'business_hours', 'conference_room', 'ivr_menu', 'voicemail', 'ai_load_balancer'] as const),
+  routing_type: z.enum(['extension', 'ai_assistant', 'ring_group', 'business_hours', 'conference_room', 'ivr_menu', 'voicemail', 'ai_load_balancer', 'call_queue'] as const),
   routing_config: z.object({
     extension_id: z.string().optional(),
     ai_assistant_id: z.string().optional(),

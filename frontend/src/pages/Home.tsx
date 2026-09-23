@@ -1,4 +1,5 @@
 import { HomeHeader } from './Home/HomeHeader';
+import { AnnouncementBanner } from './Home/AnnouncementBanner';
 import { Hero } from './Home/Hero';
 import { WhatIsOPBX } from './Home/WhatIsOPBX';
 import { BuiltDifferent } from './Home/BuiltDifferent';
@@ -16,6 +17,7 @@ import { Footer } from './Home/Footer';
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular">
+      <AnnouncementBanner />
       <HomeHeader />
       <Hero />
       <WhatIsOPBX />

@@ -18,6 +18,7 @@ export function DestinationTypeAndSelector({
   gridColumns = { type: 3, destination: 8 },
   extensionTypes,
   showDescriptions = false,
+  showSubLabel = true,
   className,
   typeClassName,
   destinationClassName,
@@ -59,6 +60,7 @@ export function DestinationTypeAndSelector({
       {typeValue && requiresDestination(typeValue) && (
         <div className={cn(layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3] min-w-0', destinationClassName)}>
           <DestinationSelector
+            showSubLabel={showSubLabel}
             type={typeValue}
             value={destinationValue}
             onChange={(_, option) => handleDestinationChange(option.id, option)}

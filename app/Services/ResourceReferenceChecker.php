@@ -66,6 +66,7 @@ class ResourceReferenceChecker
             'conference_room' => 'conference_room',
             'ivr_menu' => 'ivr_menu',
             'business_hours' => 'business_hours',
+            'call_queue' => 'call_queue',
         ];
 
         $configKeyMap = [
@@ -74,6 +75,7 @@ class ResourceReferenceChecker
             'conference_room' => 'conference_room_id',
             'ivr_menu' => 'ivr_menu_id',
             'business_hours' => 'business_hours_schedule_id',
+            'call_queue' => 'call_queue_id',
         ];
 
         if (!isset($routingTypeMap[$resourceType]) || !isset($configKeyMap[$resourceType])) {
@@ -108,6 +110,7 @@ class ResourceReferenceChecker
             'ring_group' => 'ring_group',
             'conference_room' => 'conference_room',
             'ivr_menu' => 'ivr_menu',
+            'call_queue' => 'call_queue',
         ];
 
         if (!isset($destinationTypeMap[$resourceType])) {
@@ -144,6 +147,7 @@ class ResourceReferenceChecker
             'ring_group' => 'ring_group',
             'conference_room' => 'conference_room',
             'ivr_menu' => 'ivr_menu',
+            'call_queue' => 'call_queue',
         ];
 
         if (!isset($failoverTypeMap[$resourceType])) {

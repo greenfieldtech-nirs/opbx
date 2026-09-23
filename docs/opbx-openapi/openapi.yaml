@@ -430,6 +430,30 @@ paths:
   /v1/call-notifications/settings/test:
     $ref: './paths/call-notifications/test.yaml#/paths/~1v1~1call-notifications~1settings~1test'
 
+  /v1/call-queues:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues'
+
+  /v1/call-queues/agents/me:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1agents~1me'
+
+  /v1/call-queues/{call_queue}:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}'
+
+  /v1/call-queues/{call_queue}/agents/me/state:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}~1agents~1me~1state'
+
+  /v1/call-queues/{call_queue}/stats:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}~1stats'
+
+  /v1/call-queues/{call_queue}/live:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}~1live'
+
+  /v1/queue-calls:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1queue-calls'
+
+  /v1/queue-calls/export:
+    $ref: './paths/call-queues/index.yaml#/paths/~1v1~1queue-calls~1export'
+
   /v1/conference-rooms:
     $ref: './paths/conference-rooms/index.yaml#/paths/~1v1~1conference-rooms'
 
@@ -787,6 +811,10 @@ components:
       $ref: './components/schemas/Organization.yaml'
     RingGroup:
       $ref: './components/schemas/RingGroup.yaml'
+    CallQueue:
+      $ref: './components/schemas/CallQueue.yaml'
+    QueueCall:
+      $ref: './components/schemas/QueueCall.yaml'
     ConferenceRoom:
       $ref: './components/schemas/ConferenceRoom.yaml'
     BusinessHoursSchedule:

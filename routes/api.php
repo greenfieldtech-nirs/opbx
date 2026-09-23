@@ -33,6 +33,12 @@ use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
+use App\Http\Controllers\Api\CallQueueAgentController;
+use App\Http\Controllers\Api\PublicQueuesDashboardController;
+use App\Http\Controllers\Api\CallQueueController;
+use App\Http\Controllers\Api\QueueCallController;
+use App\Http\Controllers\Api\QueueStatsController;
+use App\Http\Controllers\Api\QueuesDashboardLinkController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -184,6 +190,14 @@ Route::get('/sanctum/csrf-cookie', function () {
 
 // API Version 1 routes
 Route::prefix('v1')->group(function (): void {
+    // Public queues dashboard (wallboard deep link) - token-authed, rate limited
+    Route::middleware(['throttle:120,1'])->prefix('public/queues-dashboard')->group(function (): void {
+        Route::get('{token}/queues', [PublicQueuesDashboardController::class, 'queues'])->name('public.queues.queues');
+        Route::get('{token}/queues/{queue}/live', [PublicQueuesDashboardController::class, 'live'])->name('public.queues.live');
+        Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
+    });
+
+
     // Broadcasting authentication routes (for WebSocket presence channels)
     // Must be accessible to authenticated users for Laravel Echo
     Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
@@ -395,6 +409,26 @@ Route::prefix('v1')->group(function (): void {
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
+
+        // Call Queues
+        Route::get('call-queues/agents/me', [CallQueueAgentController::class, 'myQueues'])
+            ->name('call-queues.agents.me');
+        Route::get('queues-dashboard/link', [QueuesDashboardLinkController::class, 'show'])->name('queues-dashboard.link');
+        Route::post('queues-dashboard/link/regenerate', [QueuesDashboardLinkController::class, 'regenerate'])
+            ->name('queues-dashboard.link.regenerate');
+        Route::apiResource('call-queues', CallQueueController::class);
+        Route::post('call-queues/{call_queue}/toggle-status', [CallQueueController::class, 'toggleStatus'])
+            ->name('call-queues.toggle-status');
+        Route::post('call-queues/{call_queue}/agents/me/state', [CallQueueAgentController::class, 'updateMyState'])
+            ->name('call-queues.agents.me.state');
+        Route::get('call-queues/{call_queue}/stats', [QueueStatsController::class, 'stats'])
+            ->name('call-queues.stats');
+        Route::get('call-queues/{call_queue}/live', [QueueStatsController::class, 'live'])
+            ->name('call-queues.live');
+
+        // Queue call report rows (history reports)
+        Route::get('queue-calls', [QueueCallController::class, 'index'])->name('queue-calls.index');
+        Route::get('queue-calls/export', [QueueCallController::class, 'export'])->name('queue-calls.export');
 
         // Supervisor assignments
         Route::prefix('supervisors')->group(function (): void {

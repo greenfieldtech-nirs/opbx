@@ -1,18 +1,18 @@
-# OpBX Project Memory Index
+# OPBX Project Memory Index
 
 > **Agent Instruction**: Read this file first to orient yourself. Each module has its own memory file in this directory. Update the relevant memory file after making changes to any module.
 >
 > **Last Updated**: 2026-07-09
 > **Last Audit**: 2026-07-08 — Full memory audit against current codebase completed. See individual module files for updates and known discrepancies.
-> **Project**: OpBX - Open Source Business PBX on Cloudonix CPaaS
-> **Stack**: Laravel 12 (PHP 8.4) + React 18 (TypeScript) + Go Dialer Worker + Java/Vert.x 5 AMD Worker
+> **Project**: OPBX - Open Source Business PBX on Cloudonix CPaaS
+> **Stack**: Laravel 12 (PHP 8.4) + React 18 (TypeScript) + Go Dialer Worker + Java/Vert.x 5 AMD/ACD Workers
 
 ---
 
 ## Architecture Overview
 
 - **Multi-tenant**: All data scoped by `organization_id` via `OrganizationScope` global scope
-- **Cloudonix CPaaS**: All VoIP/telephony handled externally; OpBX provides PBX configuration + runtime CXML routing decisions
+- **Cloudonix CPaaS**: All VoIP/telephony handled externally; OPBX provides PBX configuration + runtime CXML routing decisions
 - **Control Plane**: React + Laravel API + MySQL (CRUD/config)
 - **Execution Plane**: Webhook ingestion + Redis state + CXML responses + Laravel queue workers
 - **Real-time**: Soketi WebSocket server (Laravel Echo/Pusher protocol)
@@ -33,6 +33,7 @@
 | **Extensions** | [extensions.md](extensions.md) | ExtensionCrudController, Extension model | Extensions |
 | **Phone Numbers (DIDs)** | [phone-numbers.md](phone-numbers.md) | PhoneNumberController, DidNumber model | PhoneNumbers |
 | **Ring Groups** | [ring-groups.md](ring-groups.md) | RingGroupController, RingGroup model | RingGroups |
+| **Call Queues (ACD)** | [call-queues.md](call-queues.md) | CallQueueController, QueuePollController, acd-worker | CallQueues, CallQueueDetail, QueueReports |
 | **IVR Menus** | [ivr-menus.md](ivr-menus.md) | IvrMenuController, IvrMenu model | IVRMenus |
 | **Business Hours** | [business-hours.md](business-hours.md) | BusinessHoursController, BusinessHoursSchedule model | BusinessHours |
 | **Conference Rooms** | [conference-rooms.md](conference-rooms.md) | ConferenceRoomController, ConferenceRoom model | ConferenceRooms |

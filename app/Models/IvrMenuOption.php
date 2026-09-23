@@ -97,6 +97,10 @@ class IvrMenuOption extends Model
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
+            IvrDestinationType::CALL_QUEUE => \App\Models\CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $orgId)
+                ->where('id', $this->destination_id)
+                ->first(),
             IvrDestinationType::CONFERENCE_ROOM => ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)

@@ -57,6 +57,7 @@ class RecordingResource extends JsonResource
             'duration_seconds' => $this->duration_seconds,
             'formatted_duration' => $this->getFormattedDuration(),
             'status' => $this->status,
+            'is_moh' => $this->is_moh,
             'public_url' => $this->getPublicUrl(), // Kept for backward compatibility
             'created_by' => $this->creator?->name ?? 'Unknown',
             'updated_by' => $this->updater?->name ?? 'Unknown',

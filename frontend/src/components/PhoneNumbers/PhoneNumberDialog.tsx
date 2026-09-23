@@ -67,6 +67,7 @@ export function PhoneNumberDialog({
           phoneNumber.routing_config.business_hours_schedule_id ||
           phoneNumber.routing_config.conference_room_id ||
           phoneNumber.routing_config.ivr_menu_id ||
+          phoneNumber.routing_config.call_queue_id ||
           '';
 
         setFormData({
@@ -154,6 +155,9 @@ export function PhoneNumberDialog({
         break;
       case 'ai_load_balancer':
         routing_config.ai_load_balancer_id = formData.target_id;
+        break;
+      case 'call_queue':
+        routing_config.call_queue_id = formData.target_id;
         break;
     }
 
@@ -296,7 +300,7 @@ export function PhoneNumberDialog({
               layout="vertical"
               typeLabel="Route calls to"
               destinationLabel="Destination"
-              allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours']}
+              allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours', 'call_queue']}
             />
             {formErrors.target_id && (
               <p className="text-xs text-red-500">{formErrors.target_id}</p>

@@ -100,6 +100,14 @@ class DidNumber extends Model
     }
 
     /**
+     * Get the routing target call queue ID.
+     */
+    public function getTargetCallQueueId(): ?int
+    {
+        return $this->getTargetId('call_queue', 'call_queue_id');
+    }
+
+    /**
      * Get the routing target business hours ID.
      */
     public function getTargetBusinessHoursId(): ?int
@@ -184,6 +192,28 @@ class DidNumber extends Model
 
         return RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
             ->where('id', $ringGroupId)
+            ->where('organization_id', $this->organization_id)
+            ->first();
+    }
+
+    /**
+     * Get the call queue for call queue routing (loaded via query).
+     *
+     * Note: This is not a true Eloquent relationship due to JSON field limitation.
+     */
+    public function getCallQueueAttribute(): ?\App\Models\CallQueue
+    {
+        $callQueueId = $this->getTargetCallQueueId();
+        if ($callQueueId === null) {
+            return null;
+        }
+
+        if (array_key_exists('_call_queue', $this->attributes)) {
+            return $this->attributes['_call_queue'];
+        }
+
+        return \App\Models\CallQueue::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('id', $callQueueId)
             ->where('organization_id', $this->organization_id)
             ->first();
     }

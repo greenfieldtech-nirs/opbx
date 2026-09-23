@@ -1,6 +1,6 @@
 # Webhook Authentication
 
-This document describes the webhook authentication implementation in OpBX. Webhooks use **Bearer token authentication**; there are no HMAC-SHA256 webhook signatures.
+This document describes the webhook authentication implementation in OPBX. Webhooks use **Bearer token authentication**; there are no HMAC-SHA256 webhook signatures.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This document describes the webhook authentication implementation in OpBX. Webho
 
 ## Overview
 
-OpBX receives webhooks from Cloudonix CPaaS for voice routing, call status updates, CDRs, and auto-dialer events. Authentication is implemented via middleware that validates Bearer tokens against organization settings or global worker secrets.
+OPBX receives webhooks from Cloudonix CPaaS for voice routing, call status updates, CDRs, and auto-dialer events. Authentication is implemented via middleware that validates Bearer tokens against organization settings or global worker secrets.
 
 There are four distinct authentication contexts:
 

@@ -26,6 +26,7 @@ class UpdateRecordingRequest extends FormRequest
         return [
             'name' => 'sometimes|required|string|max:255',
             'status' => 'sometimes|required|in:active,inactive',
+            'is_moh' => 'sometimes|boolean',
         ];
     }
 }

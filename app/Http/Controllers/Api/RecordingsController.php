@@ -60,6 +60,11 @@ class RecordingsController extends Controller
             $query->where('status', $request->status);
         }
 
+        // Filter to hold-music-tagged recordings (used by call queue MOH picker)
+        if ($request->boolean('moh')) {
+            $query->where('is_moh', true);
+        }
+
         // Search by name if specified
         if ($request->has('search')) {
             $query->where('name', 'like', '%'.$request->search.'%');

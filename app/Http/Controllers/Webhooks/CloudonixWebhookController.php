@@ -314,6 +314,17 @@ class CloudonixWebhookController extends Controller
             // Trigger call notification webhook if enabled for this organization
             $this->triggerCallNotification($sessionUpdate, $organizationId);
 
+            // Correlate with call queues (presence tracking + answer events)
+            try {
+                app(\App\Services\CallQueue\QueueCallLifecycleService::class)->handleSessionUpdate($sessionUpdate);
+            } catch (\Exception $e) {
+                Log::error('Queue call session-update processing failed', [
+                    'request_id' => $requestId,
+                    'session_id' => $validated['id'] ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return response()->json(['message' => 'Session record updated successfully'], 200);
         } catch (\Exception $e) {
             Log::error('Session update processing failed', [
@@ -426,6 +437,17 @@ class CloudonixWebhookController extends Controller
             // Trigger call notification if session update was created
             if ($sessionUpdate) {
                 $this->triggerCallNotification($sessionUpdate, $organizationId);
+            }
+
+            // Finalize queue call statistics (waiting/handling times, disposition)
+            try {
+                app(\App\Services\CallQueue\QueueCallLifecycleService::class)->handleCdr($organizationId, $request->all());
+            } catch (\Exception $e) {
+                Log::error('Queue call CDR processing failed', [
+                    'call_id' => $callId,
+                    'organization_id' => $organizationId,
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             // Check if this is an auto-dialer call and update destination

@@ -106,6 +106,11 @@ class StoreRingGroupRequest extends FormRequest
                 'nullable',
                 'exists:ai_assistant_load_balancers,id',
             ],
+            'fallback_call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
+                'nullable',
+                'exists:call_queues,id',
+            ],
             'status' => [
                 'required',
                 new Enum(RingGroupStatus::class),
@@ -351,6 +356,26 @@ class StoreRingGroupRequest extends FormRequest
                         $validator->errors()->add(
                             'fallback_ai_assistant_id',
                             'The selected extension is not an AI assistant.'
+                        );
+                    }
+                }
+            }
+
+            // Validate fallback call queue belongs to organization and is active
+            if ($fallbackAction === RingGroupFallbackAction::CALL_QUEUE->value && $this->input('fallback_call_queue_id')) {
+                $fallbackCallQueue = \App\Models\CallQueue::find($this->input('fallback_call_queue_id'));
+                if ($fallbackCallQueue) {
+                    if ($fallbackCallQueue->organization_id !== $user->organization_id) {
+                        $validator->errors()->add(
+                            'fallback_call_queue_id',
+                            'Fallback call queue must belong to your organization.'
+                        );
+                    }
+
+                    if (! $fallbackCallQueue->isActive()) {
+                        $validator->errors()->add(
+                            'fallback_call_queue_id',
+                            'Fallback call queue must be active.'
                         );
                     }
                 }

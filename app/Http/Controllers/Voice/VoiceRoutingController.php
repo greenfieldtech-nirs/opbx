@@ -45,6 +45,14 @@ class VoiceRoutingController extends Controller
             'has_org_id' => $orgId !== null,
         ]);
 
+        // *45{queue_id} dial-in agent login/logout feature code.
+        if (preg_match('/^\*45(\d+)$/', (string) $request->input('To'), $matches)) {
+            return OrganizationScope::bypass(
+                fn () => app(\App\Http\Controllers\Voice\QueueAgentDialController::class)
+                    ->handle($request, (int) $matches[1])
+            );
+        }
+
         return OrganizationScope::bypass(fn () => $this->manager->handleInbound($request));
     }
 

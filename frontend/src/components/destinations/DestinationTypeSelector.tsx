@@ -70,7 +70,7 @@ export function DestinationTypeSelector({
         onValueChange={handleChange}
         disabled={disabled || typeConfigs.length === 0}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full [&>span]:flex-1 [&>span]:min-w-0 [&>span]:text-left">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

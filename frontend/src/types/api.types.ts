@@ -70,13 +70,13 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup';
 
 // Ring Group Status
 export type RingGroupStatus = Status;
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue';
 
 // IVR Destination Type (for menu options; hangup is allowed only on failover)
 export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours';
@@ -217,6 +217,7 @@ export interface DIDNumber {
     business_hours_schedule_id?: string;
     conference_room_id?: string;
     ivr_menu_id?: string;
+    call_queue_id?: string;
   };
   cloudonix_config?: {
     number_id?: string;
@@ -231,6 +232,7 @@ export interface DIDNumber {
   ring_group?: RingGroup;
   business_hours_schedule?: BusinessHours;
   conference_room?: ConferenceRoom;
+  call_queue?: { id: number; name: string };
   created_at: string;
   updated_at: string;
 }
@@ -821,9 +823,11 @@ export interface Recording {
   remote_url?: string;
   original_filename?: string;
   file_size?: number;
+  formatted_file_size?: string;
   mime_type?: string;
   duration_seconds?: number;
   status: RecordingStatus;
+  is_moh?: boolean;
   created_by?: number;
   updated_by?: number;
   created_at: string;

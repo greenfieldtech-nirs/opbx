@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-This specification covers two frontend changes in the OpBX React application:
+This specification covers two frontend changes in the OPBX React application:
 
 1. **Live Calls — Actions column redesign:** Add three new monitoring actions (Spy, Whisper, Barge) alongside the existing Disconnect action, all rendered as icon-only buttons with tooltips. Restrict the Actions column to **Owner** and **Supervisor** roles only.
 2. **New Supervisor Management page:** Add a standalone page at `/ui/supervisors` where **Owner** and **PBX Admin** can view all supervisors, see their assignments at a glance, and edit those assignments without navigating through the user-edit flow.

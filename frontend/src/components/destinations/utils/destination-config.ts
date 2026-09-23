@@ -13,6 +13,7 @@ import {
   Scale,
   Clock,
   PhoneOff,
+  ListOrdered,
   type LucideIcon,
 } from 'lucide-react';
 import type { DestinationType, TypeMetadata, ExtensionType } from '../types/destination.types';
@@ -104,6 +105,14 @@ export const DESTINATION_TYPE_CONFIG: Record<DestinationType, TypeMetadata> = {
     category: 'ai',
     requiresDestination: true,
   },
+  call_queue: {
+    value: 'call_queue',
+    label: 'Call Queue',
+    description: 'Route to a call queue with logged-in agents',
+    icon: ListOrdered,
+    category: 'routing',
+    requiresDestination: true,
+  },
   hangup: {
     value: 'hangup',
     label: 'Hang Up',
@@ -189,6 +198,7 @@ export const DESTINATION_BADGE_CONFIG: Record<string, { color: string; icon: str
   business_hours: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: 'Clock' },
   ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'Bot' },
   ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'Scale' },
+  call_queue: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: 'ListOrdered' },
   hangup: { color: 'bg-red-100 text-red-800 border-red-200', icon: 'PhoneOff' },
 };
 
@@ -240,6 +250,7 @@ export const DEFAULT_EMPTY_MESSAGES: Record<DestinationType, string> = {
   business_hours: 'No business hours schedules available',
   ai_assistant: 'No AI assistants available',
   ai_load_balancer: 'No AI load balancers available',
+  call_queue: 'No call queues available',
   hangup: '',
 };
 

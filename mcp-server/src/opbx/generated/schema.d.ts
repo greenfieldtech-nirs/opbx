@@ -1887,6 +1887,111 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/v1/call-queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List call queues */
+        get: operations["listCallQueues"];
+        put?: never;
+        /** Create call queue */
+        post: operations["createCallQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/{call_queue}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get call queue */
+        get: operations["getCallQueue"];
+        /** Update call queue */
+        put: operations["updateCallQueue"];
+        post?: never;
+        /** Delete call queue */
+        delete: operations["deleteCallQueue"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/{call_queue}/agents/me/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update my agent state in a queue */
+        post: operations["updateMyQueueAgentState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/{call_queue}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get live call queue snapshot */
+        get: operations["getCallQueueLive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/{call_queue}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get call queue statistics */
+        get: operations["getCallQueueStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/agents/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my queue agent memberships */
+        get: operations["listMyQueueMemberships"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/call-tracking-ad-platform-integrations": {
         parameters: {
             query?: never;
@@ -3459,6 +3564,40 @@ export type paths = {
          *     Rate limited with `throttle:sensitive` middleware.
          */
         put: operations["updatePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/queue-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List queue call report rows */
+        get: operations["listQueueCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/queue-calls/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export queue calls (CSV) */
+        get: operations["exportQueueCalls"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -5074,6 +5213,73 @@ export type components = {
             updated_at?: string;
             /** Format: uri */
             webhook_url?: string | null;
+        };
+        /** @description Call queue (ACD) with agent management and statistics */
+        CallQueue: {
+            /**
+             * @description Seconds to ring an agent per dial attempt
+             * @example 20
+             */
+            agent_ring_timeout?: number;
+            agents?: {
+                extension_id?: number | null;
+                extension_number?: string | null;
+                id?: number;
+                name?: string;
+            }[];
+            /** @example 5 */
+            agents_count?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** @example Tier-1 support */
+            description?: string | null;
+            /**
+             * @example extension
+             * @enum {string}
+             */
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "hangup";
+            fallback_ai_assistant_id?: number | null;
+            fallback_ai_load_balancer_id?: number | null;
+            fallback_extension_id?: number | null;
+            fallback_ivr_menu_id?: number | null;
+            fallback_ring_group_id?: number | null;
+            /** @example 12 */
+            readonly id?: number;
+            /**
+             * @description Maximum caller wait before overflow to the fallback destination
+             * @example 300
+             */
+            max_wait_seconds?: number;
+            /**
+             * @description Hold music recording (must be tagged is_moh)
+             * @example 42
+             */
+            moh_recording_id?: number | null;
+            /**
+             * @description Queue name (unique within the organization)
+             * @example Support Queue
+             */
+            name?: string;
+            /** @example 1 */
+            organization_id?: number;
+            /**
+             * @example active
+             * @enum {string}
+             */
+            status?: "active" | "inactive";
+            /**
+             * @description Agent selection strategy
+             * @example ring_all
+             * @enum {string}
+             */
+            strategy?: "ring_all" | "round_robin" | "least_talk_time" | "fewest_calls";
+            /** Format: date-time */
+            updated_at?: string;
+            /**
+             * @description Post-call agent pause (0 = disabled)
+             * @example 15
+             */
+            wrap_up_seconds?: number;
         };
         /** @description Cloudonix call-status webhook payload */
         CallStatusPayload: {
@@ -6722,6 +6928,33 @@ export type components = {
             status: "active" | "inactive";
             /** Format: date-time */
             updated_at?: string;
+        };
+        /** @description Statistical record for one queued caller */
+        QueueCall: {
+            /** Format: date-time */
+            abandoned_at?: string | null;
+            agent_user_id?: number | null;
+            /** Format: date-time */
+            answered_at?: string | null;
+            /**
+             * @description Cloudonix call identifier
+             * @example Btf0Br0tUDSfYb4UGEWJTA..
+             */
+            call_id?: string;
+            /** @example 12 */
+            call_queue_id?: number;
+            /** @enum {string|null} */
+            disposition?: "answered" | "abandoned" | "overflow" | null;
+            /** Format: date-time */
+            ended_at?: string | null;
+            /** Format: date-time */
+            entered_at?: string;
+            from_number?: string | null;
+            handling_seconds?: number | null;
+            /** @example 1024 */
+            readonly id?: number;
+            to_number?: string | null;
+            waiting_seconds?: number | null;
         };
         /** @description Recording */
         Recording: {
@@ -11959,6 +12192,236 @@ export interface operations {
             };
         };
     };
+    listCallQueues: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of call queues */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"][];
+                        meta?: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createCallQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallQueue"];
+            };
+        };
+        responses: {
+            /** @description Call queue created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCallQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Call queue detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCallQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallQueue"];
+            };
+        };
+        responses: {
+            /** @description Call queue updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCallQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Call queue deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateMyQueueAgentState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Agent presence state (wrap_up is sticky when toggled manually)
+                     * @enum {string}
+                     */
+                    state: "available" | "wrap_up" | "logged_out";
+                };
+            };
+        };
+        responses: {
+            /** @description Agent state updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getCallQueueLive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waiting callers with positions, agent states, and rolling counts (15m/30m/1h/24h) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getCallQueueStats: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waiting/handling time aggregates (min/max/avg/stddev) and totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMyQueueMemberships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues the authenticated user is an agent of, with current state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     getAdPlatformIntegration: {
         parameters: {
             query?: never;
@@ -15901,6 +16364,71 @@ export interface operations {
             422: components["responses"]["ValidationError"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["ServerError"];
+        };
+    };
+    listQueueCalls: {
+        parameters: {
+            query?: {
+                disposition?: "answered" | "abandoned" | "overflow";
+                from?: string;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                queue_id?: number;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue call report rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["QueueCall"][];
+                        meta?: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    exportQueueCalls: {
+        parameters: {
+            query?: {
+                disposition?: "answered" | "abandoned" | "overflow";
+                from?: string;
+                queue_id?: number;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV export of queue call report rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     listRecordings: {

@@ -337,6 +337,16 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                 }
             }
 
+            // For call queue actions, target_id should be a valid call queue identifier
+            if ($type === BusinessHoursActionType::CALL_QUEUE->value) {
+                if (! preg_match('/^queue-\d+$/', $targetId)) {
+                    $validator->errors()->add(
+                        $field.'.target_id',
+                        'Call queue target ID must be in format: queue-{identifier}'
+                    );
+                }
+            }
+
             // For IVR menu actions, target_id should be a valid IVR menu identifier
             if ($type === BusinessHoursActionType::IVR_MENU->value) {
                 if (! preg_match('/^ivr-\d+$/', $targetId)) {

@@ -1,0 +1,108 @@
+type: object
+description: Call queue (ACD) with agent management and statistics
+properties:
+  id:
+    type: integer
+    readOnly: true
+    example: 12
+  organization_id:
+    type: integer
+    example: 1
+  name:
+    type: string
+    description: Queue name (unique within the organization)
+    example: Support Queue
+  description:
+    type:
+      - string
+      - 'null'
+    example: Tier-1 support
+  strategy:
+    type: string
+    enum:
+      - ring_all
+      - round_robin
+      - least_talk_time
+      - fewest_calls
+    description: Agent selection strategy
+    example: ring_all
+  agent_ring_timeout:
+    type: integer
+    description: Seconds to ring an agent per dial attempt
+    example: 20
+  max_wait_seconds:
+    type: integer
+    description: Maximum caller wait before overflow to the fallback destination
+    example: 300
+  wrap_up_seconds:
+    type: integer
+    description: Post-call agent pause (0 = disabled)
+    example: 15
+  moh_recording_id:
+    type:
+      - integer
+      - 'null'
+    description: Hold music recording (must be tagged is_moh)
+    example: 42
+  fallback_action:
+    type: string
+    enum:
+      - extension
+      - ring_group
+      - ivr_menu
+      - ai_assistant
+      - ai_load_balancer
+      - hangup
+    example: extension
+  fallback_extension_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ring_group_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ivr_menu_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
+    type:
+      - integer
+      - 'null'
+  status:
+    type: string
+    enum:
+      - active
+      - inactive
+    example: active
+  agents:
+    type: array
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        extension_id:
+          type:
+            - integer
+            - 'null'
+        extension_number:
+          type:
+            - string
+            - 'null'
+  agents_count:
+    type: integer
+    example: 5
+  created_at:
+    type: string
+    format: date-time
+  updated_at:
+    type: string
+    format: date-time

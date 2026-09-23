@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
 import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService, phoneNumbersService } from '@/services/createResourceService';
+import { callQueuesService } from '@/services/callQueues.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,6 +43,7 @@ import {
   Key,
   Wifi,
   Scale,
+  ListOrdered,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
@@ -123,6 +125,7 @@ interface ExtensionFormData {
   conference_room_id: string;
   // Ring Group - select from pre-defined
   ring_group_id: string;
+  call_queue_id: string;
   // IVR - select from pre-defined
   ivr_id: string;
   // AI Assistant
@@ -246,6 +249,7 @@ export default function ExtensionsComplete() {
     user_id: '',
     conference_room_id: '',
     ring_group_id: '',
+    call_queue_id: '',
     ivr_id: '',
     ai_provider: '',
     ai_phone_number: '',
@@ -269,6 +273,14 @@ export default function ExtensionsComplete() {
   });
 
   const conferenceRooms = conferenceRoomsData?.data || [];
+
+  // Fetch call queues for table display
+  const { data: callQueuesData } = useQuery({
+    queryKey: ['call-queues', { per_page: 100, status: 'active' }],
+    queryFn: () => callQueuesService.getAll({ per_page: 100, status: 'active' }),
+  });
+
+  const callQueues = callQueuesData?.data || [];
 
   // Fetch ring groups for table display
   const { data: ringGroupsData } = useQuery({
@@ -525,6 +537,7 @@ export default function ExtensionsComplete() {
       user: { label: 'PBX User', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
       conference: { label: 'Conference', color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
       ring_group: { label: 'Ring Group', color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+      queue: { label: 'Call Queue', color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ListOrdered },
       ivr: { label: 'IVR Menu', color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
       ai_assistant: { label: 'AI Assistant', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
       ai_load_balancer: { label: 'AI Load Balancer', color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
@@ -549,6 +562,7 @@ export default function ExtensionsComplete() {
         user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: UserCheck },
         conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
         ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
+        queue: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ListOrdered },
         ivr: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
         ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
         ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
@@ -574,6 +588,14 @@ export default function ExtensionsComplete() {
           if (ringGroupId) {
             const ringGroup = ringGroups.find(group => group.id == ringGroupId);
             return ringGroup ? ringGroup.name : `ID ${ringGroupId}`;
+          }
+          return 'Not configured';
+        }
+        case 'queue': {
+          const callQueueId = extension.configuration?.call_queue_id;
+          if (callQueueId) {
+            const callQueue = callQueues.find(queue => queue.id == callQueueId);
+            return callQueue ? callQueue.name : `ID ${callQueueId}`;
           }
           return 'Not configured';
         }
@@ -638,7 +660,8 @@ export default function ExtensionsComplete() {
     // Most types map 1:1, but mapped to ExtensionType
     const extType = (type === 'ivr_menu' ? 'ivr' :
       type === 'conference_room' ? 'conference' :
-        type as ExtensionType);
+        type === 'call_queue' ? 'queue' :
+          type as ExtensionType);
 
     const newFormData = {
       ...formData,
@@ -647,6 +670,7 @@ export default function ExtensionsComplete() {
       user_id: '',
       conference_room_id: '',
       ring_group_id: '',
+      call_queue_id: '',
       ivr_id: '',
       ai_assistant_id: '',
       ai_load_balancer_id: '',
@@ -663,6 +687,9 @@ export default function ExtensionsComplete() {
         break;
       case 'ring_group':
         newFormData.ring_group_id = value;
+        break;
+      case 'call_queue':
+        newFormData.call_queue_id = value;
         break;
       case 'ivr_menu':
         newFormData.ivr_id = value;
@@ -687,6 +714,7 @@ export default function ExtensionsComplete() {
       case 'user': return formData.user_id;
       case 'conference': return formData.conference_room_id;
       case 'ring_group': return formData.ring_group_id;
+      case 'queue': return formData.call_queue_id;
       case 'ivr': return formData.ivr_id;
       case 'ai_assistant': return formData.ai_assistant_id;
       case 'ai_load_balancer': return formData.ai_load_balancer_id;
@@ -701,6 +729,7 @@ export default function ExtensionsComplete() {
       case 'user': return 'user';
       case 'conference': return 'conference_room';
       case 'ring_group': return 'ring_group';
+      case 'queue': return 'call_queue';
       case 'ivr': return 'ivr_menu';
       case 'ai_assistant': return 'ai_assistant';
       case 'ai_load_balancer': return 'ai_load_balancer';
@@ -729,6 +758,12 @@ export default function ExtensionsComplete() {
     if (formData.type === 'ring_group') {
       if (!formData.ring_group_id) {
         errors.ring_group_id = 'Ring group selection is required';
+      }
+    }
+
+    if (formData.type === 'queue') {
+      if (!formData.call_queue_id) {
+        errors.call_queue_id = 'Call queue selection is required';
       }
     }
 
@@ -788,6 +823,14 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ring_group_id, 10);
           if (!isNaN(parsed)) {
             configuration.ring_group_id = parsed;
+          }
+        }
+        break;
+      case 'queue':
+        if (formData.call_queue_id) {
+          const parsed = parseInt(formData.call_queue_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.call_queue_id = parsed;
           }
         }
         break;
@@ -878,6 +921,14 @@ export default function ExtensionsComplete() {
           const parsed = parseInt(formData.ring_group_id, 10);
           if (!isNaN(parsed)) {
             configuration.ring_group_id = parsed;
+          }
+        }
+        break;
+      case 'queue':
+        if (formData.call_queue_id) {
+          const parsed = parseInt(formData.call_queue_id, 10);
+          if (!isNaN(parsed)) {
+            configuration.call_queue_id = parsed;
           }
         }
         break;
@@ -972,6 +1023,7 @@ export default function ExtensionsComplete() {
       user_id: 'unassigned',
       conference_room_id: '',
       ring_group_id: '',
+      call_queue_id: '',
       ivr_id: '',
       ai_provider: '',
       ai_phone_number: '',
@@ -1081,6 +1133,7 @@ export default function ExtensionsComplete() {
       user_id: extension.user_id ? extension.user_id.toString() : 'unassigned',
       conference_room_id: (typeof config === 'object' && config?.conference_room_id) ? config.conference_room_id.toString() : '',
       ring_group_id: (typeof config === 'object' && config?.ring_group_id) ? config.ring_group_id.toString() : '',
+      call_queue_id: (typeof config === 'object' && config?.call_queue_id) ? config.call_queue_id.toString() : '',
       ivr_id: ivrId ? ivrId.toString() : '',
       ai_provider: (typeof config === 'object' && config?.provider) ? config.provider : '',
       ai_phone_number: (typeof config === 'object' && config?.phone_number) ? config.phone_number : '',
@@ -1491,7 +1544,7 @@ export default function ExtensionsComplete() {
               onChange={handleDestinationChange}
               typeLabel="Extension Type"
               destinationLabel="Assignment"
-              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              allowedTypes={['user', 'conference_room', 'ring_group', 'call_queue', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
               layout="vertical"
             />
             {formErrors.user_id && <p className="text-sm text-destructive">{formErrors.user_id}</p>}
@@ -1580,7 +1633,7 @@ export default function ExtensionsComplete() {
               onChange={handleDestinationChange}
               typeLabel="Extension Type"
               destinationLabel="Assignment"
-              allowedTypes={['user', 'conference_room', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
+              allowedTypes={['user', 'conference_room', 'ring_group', 'call_queue', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'forward']}
               layout="vertical"
               disabled={currentUser?.role === 'pbx_user'}
             />

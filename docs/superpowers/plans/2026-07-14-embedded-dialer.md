@@ -4,7 +4,7 @@
 
 **Goal:** Ship a remotely-loaded, GA-style JS snippet that embeds a specific user's Web Phone widget (in an iframe) into any third-party website, authenticated by a per-user embed token, with a `window.OpbxDialer` command API.
 
-**Architecture:** Per-user `opbxd_` embed token (hashed at rest, one per user). A public `/v1/embed/*` API returns the bound extension's SIP config after validating the token + request `Origin` (with per-request CORS). A loader snippet injects an iframe served by OpBX (`/embed/dialer`, per-token `frame-ancestors` CSP) that runs a standalone widget bundle wrapping the existing `<WebPhone />`. Host page ↔ widget communicate via `postMessage`.
+**Architecture:** Per-user `opbxd_` embed token (hashed at rest, one per user). A public `/v1/embed/*` API returns the bound extension's SIP config after validating the token + request `Origin` (with per-request CORS). A loader snippet injects an iframe served by OPBX (`/embed/dialer`, per-token `frame-ancestors` CSP) that runs a standalone widget bundle wrapping the existing `<WebPhone />`. Host page ↔ widget communicate via `postMessage`.
 
 **Tech Stack:** Laravel 12 (PHP 8.4), React 18 + Vite, TanStack Query, JsSIP, MySQL, shadcn/ui.
 

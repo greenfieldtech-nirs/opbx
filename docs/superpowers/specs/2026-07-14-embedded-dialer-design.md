@@ -40,7 +40,7 @@ MUST have:
    browsers also enforce it. Honest ceiling: cannot stop a non-browser client (curl) that
    already has the token; revocation handles that. Blocks all real-browser cross-site abuse.
 4. **Delivery: script loader + iframe body (Q4 Option C).** The pasted snippet is a tiny
-   GA-style loader; the dialer itself renders in an **iframe** served from OpBX. This
+   GA-style loader; the dialer itself renders in an **iframe** served from OPBX. This
    sidesteps Tailwind style-collisions, keeps the mic permission and SIP password inside
    *our* frame, makes the config fetch same-origin from the iframe, and turns the domain
    allowlist into a clean `frame-ancestors` CSP.
@@ -58,8 +58,8 @@ Three moving parts:
 
 1. **Loader snippet** — a tiny IIFE the developer pastes. Reads a config object
    (`token`, `iconPosition`, `iconBackgroundColor`), injects a launcher + `<iframe>`
-   pointing at OpBX's embed route, and exposes `window.OpbxDialer`.
-2. **Embed widget bundle** — a separate Vite `build.lib` entry, served by OpBX, runs
+   pointing at OPBX's embed route, and exposes `window.OpbxDialer`.
+2. **Embed widget bundle** — a separate Vite `build.lib` entry, served by OPBX, runs
    inside the iframe. Mounts `<WebPhone />` wrapped in a minimal `QueryClientProvider` +
    a token-configured axios instance (no Auth/Config/Router context — the widget does not
    use them). Talks to the embed API, registers via JsSIP, listens for `postMessage`.
@@ -70,7 +70,7 @@ Three moving parts:
 ```
 CRM page (has snippet)
   → loader creates iframe: https://opbx…/embed/dialer?token=…
-      → OpBX serves iframe HTML with CSP: frame-ancestors <allowlisted domains>
+      → OPBX serves iframe HTML with CSP: frame-ancestors <allowlisted domains>
       → widget bundle loads, calls GET /v1/embed/config (Bearer opbxd_… )
           → backend validates token + Origin, returns SIP config (+ per-request CORS)
       → JsSIP registers with Cloudonix (wss)
@@ -145,7 +145,7 @@ OpbxDialer.hangup()
 OpbxDialer.open()  /  OpbxDialer.close()
 OpbxDialer.on(event, cb)  // events: 'ready' | 'call.started' | 'call.ended' | 'call.failed'
 ```
-- Each method posts `{source:'opbx-dialer', type:'command', name, args}` to the iframe with an **explicit target origin** (the OpBX origin), never `"*"`.
+- Each method posts `{source:'opbx-dialer', type:'command', name, args}` to the iframe with an **explicit target origin** (the OPBX origin), never `"*"`.
 - The iframe validates every inbound message: `event.origin` must equal the host page origin **and** be in the token's `allowed_domains`; `event.source` must be the parent window. Reject otherwise.
 - Widget → host events posted back with explicit target origin (the host page origin); the loader dispatches to `on()` subscribers.
 - **Inside the widget:** reuse the `webPhoneBus`/`pendingCoachRef` auto-dial pattern — a postMessage adapter queues the dial so `dial()` reuses the proven "set number → effect fires call" flow (not synchronous `setNumber+handleCall`).

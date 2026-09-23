@@ -7,6 +7,7 @@ import "./organization.js";
 import "./extensions.js";
 import "./phone-numbers.js";
 import "./ring-groups.js";
+import "./call-queues.js";
 import "./ivr.js";
 import "./business-hours.js";
 import "./conference-rooms.js";

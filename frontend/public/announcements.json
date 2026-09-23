@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-09-22",
+    "type": "New Feature",
+    "text": "Call Queues and Call Queue Dashboards are now available in OPBX Cloud and OPBX OSS."
+  },
+  {
+    "date": "2026-09-01",
+    "type": "New Feature",
+    "text": "OPBX MCP server is now available, use your favorite AI agent to build and configure your PBX or Contact Center."
+  }
+]

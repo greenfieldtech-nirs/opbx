@@ -1,6 +1,6 @@
 # Web Phone iOS-Style Dialer Design Specification
 
-> **Project:** OpBX - Open Source Business PBX on Cloudonix CPaaS
+> **Project:** OPBX - Open Source Business PBX on Cloudonix CPaaS
 > **Feature:** Modernize the Web Phone UI to look like an iOS mobile dialer
 > **Date:** 2026-07-12
 

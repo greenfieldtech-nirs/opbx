@@ -70,13 +70,13 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup';
 
 // AI Assistant Load Balancer Strategy
 export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue';
 
 // ============================================================================
 // Entity Types
@@ -191,6 +191,7 @@ export interface DIDNumber {
     business_hours_schedule_id?: string;
     conference_room_id?: string;
     ivr_menu_id?: string;
+    call_queue_id?: string;
   };
   status: Status;
   cloudonix_config?: {
@@ -209,6 +210,7 @@ export interface DIDNumber {
   ai_assistant?: AiAssistant;
   ai_load_balancer?: AiAssistantLoadBalancer;
   ivr_menu?: IvrMenu;
+  call_queue?: { id: number; name: string };
   created_at: string;
   updated_at: string;
 }
@@ -238,6 +240,7 @@ export interface RingGroup {
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
   fallback_ai_load_balancer_id?: string;
+  fallback_call_queue_id?: string;
   fallback_ai_load_balancer?: {
     id: string;
     name: string;
