@@ -34,9 +34,11 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
 use App\Http\Controllers\Api\CallQueueAgentController;
+use App\Http\Controllers\Api\PublicQueuesDashboardController;
 use App\Http\Controllers\Api\CallQueueController;
 use App\Http\Controllers\Api\QueueCallController;
 use App\Http\Controllers\Api\QueueStatsController;
+use App\Http\Controllers\Api\QueuesDashboardLinkController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -119,6 +121,13 @@ Route::prefix('v1/dialer/worker')->middleware(['dialer.worker.auth', 'throttle:d
 });
 
 // Detailed health checks - behind authentication to prevent internal info leakage
+// Public queues dashboard (wallboard deep link) - token-authed, rate limited
+Route::middleware(['throttle:120,1'])->prefix('public/queues-dashboard')->group(function (): void {
+    Route::get('{token}/queues', [PublicQueuesDashboardController::class, 'queues'])->name('public.queues.queues');
+    Route::get('{token}/queues/{queue}/live', [PublicQueuesDashboardController::class, 'live'])->name('public.queues.live');
+    Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
+});
+
 Route::middleware(['auth:sanctum'])->group(function (): void {
     Route::get('/storage/health', function () {
         try {
@@ -403,6 +412,9 @@ Route::prefix('v1')->group(function (): void {
         // Call Queues
         Route::get('call-queues/agents/me', [CallQueueAgentController::class, 'myQueues'])
             ->name('call-queues.agents.me');
+        Route::get('queues-dashboard/link', [QueuesDashboardLinkController::class, 'show'])->name('queues-dashboard.link');
+        Route::post('queues-dashboard/link/regenerate', [QueuesDashboardLinkController::class, 'regenerate'])
+            ->name('queues-dashboard.link.regenerate');
         Route::apiResource('call-queues', CallQueueController::class);
         Route::post('call-queues/{call_queue}/toggle-status', [CallQueueController::class, 'toggleStatus'])
             ->name('call-queues.toggle-status');

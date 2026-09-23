@@ -32,6 +32,7 @@ const CallQueues = lazy(() => import('@/pages/CallQueues'));
 const CallQueueDetail = lazy(() => import('@/pages/CallQueueDetail'));
 const QueueReports = lazy(() => import('@/pages/QueueReports'));
 const QueuesDashboard = lazy(() => import('@/pages/QueuesDashboard'));
+const PublicQueuesDashboard = lazy(() => import('@/pages/PublicQueuesDashboard'));
 const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
 const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
 const CallLogs = lazy(() => import('@/pages/CallLogs'));
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
   {
     path: '/ui/invite',
     element: <AcceptInvitation />,
+  },
+  {
+    path: '/public/queues-dashboard/:token',
+    element: <PublicQueuesDashboard />,
   },
   // Protected app routes (under /ui)
   {

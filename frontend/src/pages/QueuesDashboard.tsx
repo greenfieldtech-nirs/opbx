@@ -7,8 +7,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, Clock, PhoneCall, Timer, Users } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Clock, Copy, ExternalLink, Link2, PhoneCall, RefreshCw, Timer, Users } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   callQueuesService,
@@ -19,7 +20,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/design-system';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import api from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const TIMESPANS = [
@@ -54,6 +58,72 @@ function StatCell({ label, value }: { label: string; value: string }) {
       <div className="text-3xl font-bold">{value}</div>
       <div className="text-sm text-muted-foreground">{label}</div>
     </div>
+  );
+}
+
+function PublicLinkCard() {
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ['queues-dashboard-link'],
+    queryFn: async () => (await api.get('/queues-dashboard/link')).data,
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: async () => (await api.post('/queues-dashboard/link/regenerate')).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['queues-dashboard-link'] });
+      toast.success('Public link regenerated - the old link no longer works');
+    },
+    onError: () => toast.error('Failed to regenerate link'),
+  });
+
+  const url: string = data?.data?.url ?? '';
+
+  return (
+    <Collapsible className="rounded-lg border bg-card">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 p-4 text-left text-sm font-medium hover:bg-muted/50">
+        <Link2 className="h-4 w-4 text-muted-foreground" />
+        Public wallboard link
+        <span className="text-xs font-normal text-muted-foreground">
+          (display the queues dashboard on a public screen without login)
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3 px-4 pb-4">
+        <div className="flex gap-2">
+          <Input readOnly value={url} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
+          <Button
+            variant="outline"
+            size="icon"
+            title="Copy link"
+            onClick={() => {
+              navigator.clipboard.writeText(url);
+              toast.success('Link copied');
+            }}
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" title="Open in new tab" asChild>
+            <a href={url} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            title="Regenerate link (revokes the old one)"
+            disabled={regenerateMutation.isPending}
+            onClick={() => regenerateMutation.mutate()}
+          >
+            <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Anyone with this link can view this dashboard (queues, agents, statistics) without logging in.
+          Regenerate to revoke access.
+        </p>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -203,6 +273,8 @@ export default function QueuesDashboard() {
           )}
         </div>
       </div>
+
+      <PublicLinkCard />
 
       {activeQueue ? (
         <div className="space-y-4">
