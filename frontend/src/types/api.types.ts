@@ -76,7 +76,7 @@ export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 
 export type RingGroupStatus = Status;
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue';
 
 // IVR Destination Type (for menu options; hangup is allowed only on failover)
 export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours';
@@ -217,6 +217,7 @@ export interface DIDNumber {
     business_hours_schedule_id?: string;
     conference_room_id?: string;
     ivr_menu_id?: string;
+    call_queue_id?: string;
   };
   cloudonix_config?: {
     number_id?: string;

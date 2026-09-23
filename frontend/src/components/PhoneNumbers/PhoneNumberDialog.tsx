@@ -67,6 +67,7 @@ export function PhoneNumberDialog({
           phoneNumber.routing_config.business_hours_schedule_id ||
           phoneNumber.routing_config.conference_room_id ||
           phoneNumber.routing_config.ivr_menu_id ||
+          phoneNumber.routing_config.call_queue_id ||
           '';
 
         setFormData({
@@ -154,6 +155,9 @@ export function PhoneNumberDialog({
         break;
       case 'ai_load_balancer':
         routing_config.ai_load_balancer_id = formData.target_id;
+        break;
+      case 'call_queue':
+        routing_config.call_queue_id = formData.target_id;
         break;
     }
 

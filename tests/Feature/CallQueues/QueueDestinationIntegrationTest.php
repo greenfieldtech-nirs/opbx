@@ -195,6 +195,30 @@ class QueueDestinationIntegrationTest extends TestCase
         ]);
     }
 
+    public function test_phone_number_update_accepts_call_queue_routing(): void
+    {
+        $owner = User::factory()->create([
+            'organization_id' => $this->organization->id,
+            'role' => UserRole::OWNER,
+        ]);
+        $did = \App\Models\DidNumber::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+
+        Sanctum::actingAs($owner);
+
+        $this->putJson("/api/v1/phone-numbers/{$did->id}", [
+            'routing_type' => 'call_queue',
+            'routing_config' => ['call_queue_id' => $this->queue->id],
+            'status' => 'active',
+        ])->assertOk()->assertJsonPath('data.routing_type', 'call_queue');
+
+        $this->assertDatabaseHas('did_numbers', [
+            'id' => $did->id,
+            'routing_type' => 'call_queue',
+        ]);
+    }
+
     public function test_queue_delete_protected_when_referenced_by_did(): void
     {
         DidNumber::factory()->create([
