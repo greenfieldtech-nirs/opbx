@@ -25,6 +25,8 @@ class QueueCallLifecycleService
 
     private const DIAL_MARKER_TTL_SECONDS = 2 * 60 * 60;
 
+    private const DIAL_SKIP_TTL_SECONDS = 120;
+
     public function __construct(
         private readonly AcdWorkerClient $worker,
         private readonly ExtensionPresenceTracker $presence,
@@ -346,6 +348,15 @@ class QueueCallLifecycleService
             $callId,
             'dial_failed',
             $agentUserId
+        );
+
+        // Skip this agent for subsequent offers for a while: a no-answer agent
+        // still looks available to presence, so strategy selection would keep
+        // re-picking them (least_talk_time / fewest_calls counters unchanged).
+        Redis::setex(
+            "acd:skip:{$queue->organization_id}:{$queue->id}:{$agentUserId}",
+            self::DIAL_SKIP_TTL_SECONDS,
+            '1'
         );
     }
 

@@ -51,13 +51,41 @@ class QueueDialCallbackController extends Controller
                 ->first();
 
             if ($callQueue) {
-                Log::info('QueueDialCallbackController: Agent dial failed, returning caller to queue', [
+                Log::info('QueueDialCallbackController: Agent dial failed, offering to next agent immediately', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $context['call_id'],
                     'call_status' => $callStatus,
                 ]);
 
                 app(QueueCallLifecycleService::class)->handleDialFailed($callQueue, $context['call_id']);
+
+                // Re-offer immediately: another agent may be available and the
+                // caller should not wait out the hold cycle for the next offer.
+                $queueCall = \App\Models\QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('call_queue_id', $callQueue->id)
+                    ->where('call_id', $context['call_id'])
+                    ->whereNull('disposition')
+                    ->first();
+
+                if ($queueCall) {
+                    $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
+                    $result = app(\App\Services\CallQueue\AcdWorkerClient::class)->poll(
+                        $callQueue->organization_id,
+                        $callQueue->id,
+                        $queueCall->call_id,
+                        $dialOffer->roster($callQueue),
+                        $callQueue->strategy->value,
+                        $callQueue->max_wait_seconds
+                    );
+
+                    if (($result['action'] ?? 'wait') === 'dial') {
+                        $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
+
+                        if ($dialResponse !== null) {
+                            return $dialResponse;
+                        }
+                    }
+                }
 
                 return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
             }

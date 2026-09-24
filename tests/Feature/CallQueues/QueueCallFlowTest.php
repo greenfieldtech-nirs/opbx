@@ -386,6 +386,67 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringNotContainsString('<Say>', $content);
     }
 
+    public function test_dial_failure_reoffers_next_agent_immediately(): void
+    {
+        // Regression: a failed agent dial returned the hold CXML, so the caller
+        // waited out the full MOH/pause cycle before the next offer even when
+        // another agent was available. The failure callback must re-offer now.
+        Redis::del('acd:dial:'.self::CALL_ID);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => '999', 'extensionNumber' => '1099']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'no-answer'])
+        );
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1099', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+
+        // The failed agent is skipped for subsequent offers (no-answer agents
+        // still look available to presence), and the worker is re-polled.
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_dial_failure_without_agents_falls_back_to_hold(): void
+    {
+        Redis::del('acd:dial:'.self::CALL_ID);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response(['action' => 'wait', 'position' => 1], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'busy'])
+        );
+
+        $this->assertStringContainsString('<Say>', (string) $response->getContent());
+    }
+
     public function test_poll_announces_position_on_interval(): void
     {
         Redis::del('acd:announce:'.self::CALL_ID);
