@@ -42,6 +42,31 @@ class QueueDialCallbackController extends Controller
             'call_id' => $context['call_id'],
             'call_status' => $callStatus,
         ]);
+
+        // Answered guard: with multiple <Dial> targets (ring-all), the action
+        // callback can report a LOSING leg's outcome (e.g. an unregistered
+        // target fails) even though a real agent bridged and the call has
+        // ended. A failure status after the bridge must not trigger a re-offer
+        // (redial loop, origin never terminates, congestion) - record the
+        // bridge and end the call cleanly.
+        $queueCall = \App\Models\QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $context['call_queue_id'])
+            ->where('call_id', $context['call_id'])
+            ->whereNull('disposition')
+            ->first();
+
+        if ($queueCall?->answered_at !== null) {
+            Log::info('QueueDialCallbackController: dial completed after bridge, ignoring leg status', [
+                'call_queue_id' => $context['call_queue_id'],
+                'call_id' => $context['call_id'],
+                'call_status' => $callStatus,
+            ]);
+
+            app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], 'completed');
+
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], $callStatus);
 
         if (in_array($callStatus, ['busy', 'no-answer', 'failed'], true)) {

@@ -447,6 +447,52 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringContainsString('<Say>', (string) $response->getContent());
     }
 
+    public function test_post_bridge_failure_callback_terminates_call_not_redial(): void
+    {
+        // Regression (customer): ring-all dial to [unregistered 9000, 9001];
+        // 9001 answers, then hangs up. The dial action callback reports the
+        // LOSING leg's status (unregistered -> 'failed') instead of the
+        // completed bridge. Treating that as a dial failure caused an
+        // immediate re-offer loop (redialing 9001, origin never terminates,
+        // congestion) - the callback must recognize the bridge happened and
+        // end the call cleanly.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'answered_at' => now()->subSeconds(25),
+            'agent_user_id' => $this->agent->id,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'failed'])
+        );
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Hangup/>', $content);
+        $this->assertStringNotContainsString('<Dial', $content, 'must not redial after the bridge ended');
+
+        // No re-offer via the worker, and the outcome is recorded as a bridge.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+        $this->assertSame('answered', \Illuminate\Support\Facades\Redis::get('acd:dialresult:'.self::CALL_ID));
+
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+    }
+
     public function test_poll_announces_position_on_interval(): void
     {
         Redis::del('acd:announce:'.self::CALL_ID);
