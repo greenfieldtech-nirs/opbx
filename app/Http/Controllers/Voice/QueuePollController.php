@@ -67,6 +67,43 @@ class QueuePollController extends Controller
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
+        // Stale-document guard: with immediate connect, the pre-switch hold
+        // document is still in flight (the switch does not abort it) and its
+        // Redirect fires this poll while the offer is in flight - or after
+        // the agent already answered. In both cases the response would tear
+        // down the live <Dial>/bridge (customer-visible congestion), so we
+        // re-serve the SAME <Dial> to the same agent and never ask the worker
+        // for a new offer here.
+        $offerAgentId = app(QueueCallLifecycleService::class)->dialOfferAgentId($queueCall->call_id);
+        $dialResult = \Illuminate\Support\Facades\Redis::get("acd:dialresult:{$queueCall->call_id}");
+        $offerInFlight = $offerAgentId !== null && $dialResult === null;
+        $bridged = $queueCall->answered_at !== null;
+
+        if ($bridged || $offerInFlight) {
+            $agent = \App\Models\User::withoutGlobalScope(OrganizationScope::class)
+                ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
+                ->find($offerAgentId);
+
+            if ($agent?->extension) {
+                Log::info('QueuePollController: Stale poll, re-serving same dial', [
+                    'call_queue_id' => $callQueue->id,
+                    'call_id' => $queueCall->call_id,
+                    'bridged' => $bridged,
+                    'agent_user_id' => $offerAgentId,
+                ]);
+
+                $dialResponse = app(\App\Services\CallQueue\QueueDialOfferService::class)
+                    ->buildDialResponse($request, $callQueue, $queueCall, [[
+                        'userId' => (string) $agent->id,
+                        'extensionNumber' => $agent->extension->extension_number,
+                    ]], respectPresence: false);
+
+                if ($dialResponse !== null) {
+                    return $dialResponse;
+                }
+            }
+        }
+
         $result = app(AcdWorkerClient::class)->poll(
             $callQueue->organization_id,
             $callQueue->id,

@@ -381,6 +381,14 @@ class QueueCallLifecycleService
     }
 
     /**
+     * Agent currently offered this call (from the dial marker), or null.
+     */
+    public function dialOfferAgentId(string $callId): ?int
+    {
+        return $this->readDialMarker($callId)[1];
+    }
+
+    /**
      * @return array{0: int|null, 1: int|null} queue id and agent user id from the dial marker
      */
     private function readDialMarker(string $callId): array

@@ -338,6 +338,54 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringContainsString('caller number 1', (string) $response->getContent());
     }
 
+    public function test_poll_during_in_flight_offer_reserves_same_dial_not_a_new_offer(): void
+    {
+        // Stale hold document (pre-switch) fires a poll while the proactive
+        // <Dial> is still ringing: the poll must NOT re-offer via the worker.
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1001', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+
+        // The worker must not be asked for a new offer while one is in flight.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_poll_after_bridge_returns_same_dial_not_hold(): void
+    {
+        // The stale hold document's Redirect fires after the agent answered:
+        // responding with hold CXML would tear down the live bridge (the
+        // customer-visible congestion). The poll must re-serve the same dial.
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'answered_at' => now(),
+            'agent_user_id' => $this->agent->id,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1001', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+    }
+
     public function test_poll_announces_position_on_interval(): void
     {
         Redis::del('acd:announce:'.self::CALL_ID);
