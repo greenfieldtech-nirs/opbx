@@ -599,6 +599,120 @@ class QueueCallFlowTest extends TestCase
             && $request['type'] === 'answered');
     }
 
+    public function test_connected_status_marks_bridge_and_attributes_winning_leg(): void
+    {
+        // Regression (customer logs): the agent bridge is reported as
+        // status CONNECTED (uppercase, with callAnswerTime) - not 'answer'.
+        // Without accepting it, answered_at stays null and every downstream
+        // guard misfires. Attribution must follow the leg that actually
+        // picked up (outgoing subscriber), not the first-offered agent.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $otherAgent = \App\Models\User::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $otherExtension = \App\Models\Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $otherAgent->id,
+            'extension_number' => '1099',
+            'cloudonix_subscriber_id' => 250708,
+        ]);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $bridgeUpdate = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'connected',
+            'outgoing_subscriber_id' => 250708,
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($bridgeUpdate);
+
+        $queueCall->refresh();
+        $this->assertNotNull($queueCall->answered_at);
+        $this->assertSame($otherAgent->id, $queueCall->agent_user_id, 'attribution follows the leg that picked up');
+    }
+
+    public function test_connected_status_without_dial_marker_is_platform_answer(): void
+    {
+        // 'connected' also fires at the initial platform answer (before any
+        // offer) - without a dial marker it must NOT mark the bridge.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $platformAnswer = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'connected',
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($platformAnswer);
+
+        $this->assertNull($queueCall->refresh()->answered_at);
+    }
+
+    public function test_session_update_webhook_normalizes_status_case(): void
+    {
+        // Cloudonix sends statuses in upper case (CONNECTED, ANSWERER...);
+        // the webhook must not drop them for casing reasons.
+        $owner = \App\Models\User::factory()->create([
+            'organization_id' => $this->organization->id,
+            'role' => \App\Enums\UserRole::OWNER,
+        ]);
+
+        \App\Models\CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first()
+            ?->update(['domain_name' => 'test.example.com']);
+
+        $settings = \App\Models\CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first();
+
+        $payload = [
+            'id' => 987654321,
+            'eventId' => 'evt-'.self::CALL_ID,
+            'domainId' => 1764,
+            'domain' => 'test.example.com',
+            'subscriberId' => '248967',
+            'callerId' => '9099',
+            'destination' => '20001',
+            'direction' => 'incoming',
+            'status' => 'CONNECTED',
+            'createdAt' => now()->subMinute()->toIso8601String(),
+            'modifiedAt' => now()->toIso8601String(),
+            'action' => 'none',
+            'reason' => 'normal',
+        ];
+
+        $response = $this->postJson('/api/webhooks/cloudonix/session-update', $payload, [
+            'Authorization' => 'Bearer '.$settings->domain_requests_api_key,
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('session_updates', [
+            'organization_id' => $this->organization->id,
+            'status' => 'connected',
+        ]);
+    }
+
     public function test_initial_platform_answer_does_not_mark_answered(): void
     {
         Redis::del('acd:dial:'.self::CALL_ID);

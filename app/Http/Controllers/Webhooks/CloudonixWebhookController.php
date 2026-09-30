@@ -218,6 +218,10 @@ class CloudonixWebhookController extends Controller
 
             // Filter events by status - only process specific statuses
             // These statuses map to notification events that users care about
+            // Cloudonix reports statuses in varying case (CONNECTED, ANSWER,
+            // ringing) - normalize so casing never drops an event.
+            $validated['status'] = strtolower((string) $validated['status']);
+
             $allowedStatuses = [
                 'new', 'initiated', 'created',           // Maps to 'new' event
                 'ringing', 'ring', 'progress',           // Maps to 'ringing' event

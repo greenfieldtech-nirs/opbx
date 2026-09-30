@@ -6,6 +6,7 @@ namespace App\Services\CallQueue;
 
 use App\Enums\QueueCallDisposition;
 use App\Models\CallQueue;
+use App\Models\Extension;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
@@ -65,7 +66,10 @@ class QueueCallLifecycleService
             return;
         }
 
-        if (! in_array($sessionUpdate->status, ['answer', 'answered', 'active'], true)) {
+        // 'connected' is the bridge status for answered queue dials (carries
+        // callAnswerTime); it also fires at the initial platform answer, which
+        // the dial-marker requirement already excludes.
+        if (! in_array($sessionUpdate->status, ['answer', 'answered', 'active', 'connected', 'connect'], true)) {
             return;
         }
 
@@ -73,7 +77,12 @@ class QueueCallLifecycleService
             return;
         }
 
-        [, $agentUserId] = $this->readDialMarker($queueCall->call_id);
+        [, $markerAgentUserId] = $this->readDialMarker($queueCall->call_id);
+
+        // Attribute the leg that actually picked up: the bridge update carries
+        // the winning leg's outgoing subscriber, which maps to an extension.
+        // Falls back to the first-offered agent from the dial marker.
+        $agentUserId = $this->resolveAnsweringAgent($queueCall, $sessionUpdate) ?? $markerAgentUserId;
 
         // The session's own answer time is the INITIAL answer (caller connected
         // to the voice platform) - it includes the queue wait. The agent bridge
@@ -389,6 +398,24 @@ class QueueCallLifecycleService
             ->whereNull('disposition')
             ->orderBy('id')
             ->first();
+    }
+
+    /**
+     * Resolve the agent whose leg answered, from the bridge update's outgoing
+     * subscriber id (matched against the org's extensions).
+     */
+    private function resolveAnsweringAgent(QueueCall $queueCall, SessionUpdate $sessionUpdate): ?int
+    {
+        if (! $sessionUpdate->outgoing_subscriber_id) {
+            return null;
+        }
+
+        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $queueCall->organization_id)
+            ->where('cloudonix_subscriber_id', (string) $sessionUpdate->outgoing_subscriber_id)
+            ->first();
+
+        return $extension?->user_id ? (int) $extension->user_id : null;
     }
 
     /**
