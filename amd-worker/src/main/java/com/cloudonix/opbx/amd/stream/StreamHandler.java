@@ -300,6 +300,13 @@ public class StreamHandler {
         long elapsedMs = System.currentTimeMillis() - session.startTimeMs;
         metrics.recordDetection(result.result.value, elapsedMs);
 
+        // MDC tags land in the JSON log contract (session_token = audit key).
+        // Set/clear around the log call only: Vert.x event-loop threads are
+        // shared across streams, so MDC must never linger.
+        org.slf4j.MDC.put("session_token", session.sessionToken);
+        org.slf4j.MDC.put("call_id", session.callSid);
+        try {
+
         if (result.result == ResultType.VOICEMAIL) {
             logger.info("DECISION: VOICEMAIL call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
                 session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
@@ -309,6 +316,10 @@ public class StreamHandler {
         } else {
             logger.info("DECISION: {} call_sid={} stream_sid={} detector={} confidence={} reason=\"{}\" detection_time_ms={}",
                 result.result, session.callSid, session.streamSid, result.detector, result.confidence, result.reason, elapsedMs);
+        }
+
+        } finally {
+            org.slf4j.MDC.clear();
         }
 
         sendActionCallback(session, result.result.value, result.reason, result.confidence, elapsedMs);

@@ -75,6 +75,12 @@ loki.process "opbx" {
 		}
 	}
 
+	// Java (logstash encoder) reports level in upper case; normalize.
+	stage.template {
+		source   = "level"
+		template = "{{ ToLower .Value }}"
+	}
+
 	stage.labels {
 		values = {
 			level    = "",
