@@ -38,6 +38,7 @@ class QueueDialCallbackController extends Controller
         // finalization to distinguish a real agent bridge from a spurious
         // teardown 'answer' session update.
         Log::info('QueueDialCallbackController: dial result', [
+            'session_token' => $request->input('token'),
             'call_queue_id' => $context['call_queue_id'],
             'call_id' => $context['call_id'],
             'call_status' => $callStatus,

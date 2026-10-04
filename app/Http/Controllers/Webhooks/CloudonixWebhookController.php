@@ -65,6 +65,7 @@ class CloudonixWebhookController extends Controller
         $direction = $request->input('Direction') ?? 'unknown';
 
         Log::info('Received call-initiated webhook (async notification)', [
+            'session_token' => $request->input('token'),
             'call_id' => $callId,
             'from' => $from,
             'to' => $to,
@@ -136,6 +137,7 @@ class CloudonixWebhookController extends Controller
         $status = $request->input('CallStatus') ?? $request->input('status');
 
         Log::info('Received call-status webhook', [
+            'session_token' => $request->input('token'),
             'call_id' => $callId,
             'status' => $status,
             'payload' => $request->all(),
@@ -207,6 +209,7 @@ class CloudonixWebhookController extends Controller
         $validated = $request->validated();
 
         Log::info('Processing session-update webhook', [
+            'session_token' => $request->input('token'),
             'request_id' => $requestId,
             'session_id' => $validated['id'] ?? null,
             'event_id' => $validated['eventId'] ?? null,

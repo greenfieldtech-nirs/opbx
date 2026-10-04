@@ -23,6 +23,33 @@ discovery.relabel "opbx" {
 		regex        = "/(.*)"
 		target_label = "container"
 	}
+
+	// Map container -> service. The three PHP containers all run the Laravel
+	// codebase; workers keep their own names.
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_(app|queue_worker|scheduler)"
+		target_label = "service"
+		replacement  = "laravel"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_dialer_worker"
+		target_label = "service"
+		replacement  = "dialer-worker"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_acd_worker"
+		target_label = "service"
+		replacement  = "acd-worker"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_amd_worker"
+		target_label = "service"
+		replacement  = "amd-worker"
+	}
 }
 
 loki.source.docker "opbx" {
@@ -34,13 +61,13 @@ loki.source.docker "opbx" {
 }
 
 loki.process "opbx" {
-	// Non-JSON lines (boot output, PHP warnings) pass through untouched with
-	// only the container label - a failed json stage leaves the entry as-is.
+	// All services emit the same flat JSON contract (see the spec), so one
+	// json stage covers everything. Non-JSON lines (boot output, PHP
+	// warnings) pass through with only the container label.
 	stage.json {
 		expressions = {
 			ts            = "ts",
 			level         = "level",
-			service       = "service",
 			log_type      = "log_type",
 			org_id        = "org_id",
 			session_token = "session_token",
@@ -50,7 +77,6 @@ loki.process "opbx" {
 
 	stage.labels {
 		values = {
-			service  = "",
 			level    = "",
 			log_type = "",
 			org_id   = "",

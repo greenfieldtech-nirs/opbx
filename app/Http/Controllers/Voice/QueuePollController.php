@@ -34,6 +34,11 @@ class QueuePollController extends Controller
 {
     public function handle(QueueCallbackRequest $request): Response
     {
+        Log::info('QueuePollController: hold-loop poll', [
+            'session_token' => $request->input('token'),
+            'queue_id' => $request->input('queue_id'),
+        ]);
+
         $context = $request->queueContext();
 
         if ($context === null) {

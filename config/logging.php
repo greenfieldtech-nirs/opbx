@@ -65,6 +65,23 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Structured JSON to stdout - picked up by the log aggregation stack
+        // (Alloy -> Loki). Field mapping happens in docker/alloy/config.alloy.
+        'json' => [
+            'driver' => 'monolog',
+            'handler' => Monolog\Handler\StreamHandler::class,
+            'with' => [
+                'stream' => 'php://stdout',
+            ],
+            'formatter' => App\Logging\OpbxJsonFormatter::class,
+            'level' => env('LOG_LEVEL', 'info'),
+            'processors' => [
+                Monolog\Processor\PsrLogMessageProcessor::class,
+                App\Logging\MaskCredentialsProcessor::class,
+                App\Logging\LogTypeEnricher::class,
+            ],
+        ],
+
         'null' => [
             'driver' => 'monolog',
             'handler' => \Monolog\Handler\NullHandler::class,

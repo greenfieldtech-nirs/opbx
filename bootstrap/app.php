@@ -52,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.scope' => EnsureTenantScope::class,
             'webhook.signature' => VerifyCloudonixSignature::class,
+            'log.callflow' => \App\Http\Middleware\TagCallFlowLogs::class,
             'webhook.idempotency' => EnsureWebhookIdempotency::class,
             'voice.webhook.auth' => VerifyVoiceWebhookAuth::class,
             'rate_limit_org' => RateLimitPerOrganization::class,

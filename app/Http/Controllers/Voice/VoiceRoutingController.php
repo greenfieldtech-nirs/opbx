@@ -38,6 +38,7 @@ class VoiceRoutingController extends Controller
         $orgId = $request->input('_organization_id');
 
         Log::info('VoiceRoutingController: Handling inbound request', [
+            'session_token' => $request->input('token'),
             'to' => $request->input('To'),
             'from' => $request->input('From'),
             'domain' => $request->input('Domain'),
