@@ -34,6 +34,7 @@
 | **Phone Numbers (DIDs)** | [phone-numbers.md](phone-numbers.md) | PhoneNumberController, DidNumber model | PhoneNumbers |
 | **Ring Groups** | [ring-groups.md](ring-groups.md) | RingGroupController, RingGroup model | RingGroups |
 | **Call Queues (ACD)** | [call-queues.md](call-queues.md) | CallQueueController, QueuePollController, acd-worker | CallQueues, CallQueueDetail, QueueReports |
+| **Log Aggregation** | [log-aggregation.md](log-aggregation.md) | OpbxJsonFormatter, MaskCredentialsProcessor, alloy/loki/grafana compose profile | Grafana at /logs/ (external UI) |
 | **IVR Menus** | [ivr-menus.md](ivr-menus.md) | IvrMenuController, IvrMenu model | IVRMenus |
 | **Business Hours** | [business-hours.md](business-hours.md) | BusinessHoursController, BusinessHoursSchedule model | BusinessHours |
 | **Conference Rooms** | [conference-rooms.md](conference-rooms.md) | ConferenceRoomController, ConferenceRoom model | ConferenceRooms |

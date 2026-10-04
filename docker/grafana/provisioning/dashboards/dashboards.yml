@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: opbx
+    orgId: 1
+    folder: OPBX
+    type: file
+    disableDeletion: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

@@ -101,6 +101,13 @@ loki.process "opbx" {
 		format = "RFC3339Nano"
 	}
 
+	// php-fpm access lines are per-request noise; the app logs carry the
+	// substance. Match on the raw line (these lines are not JSON).
+	stage.drop {
+		source     = ""
+		expression = `.*"(GET|POST|PUT|PATCH|DELETE) /index.php.*`
+	}
+
 	forward_to = [loki.write.default.receiver]
 }
 
