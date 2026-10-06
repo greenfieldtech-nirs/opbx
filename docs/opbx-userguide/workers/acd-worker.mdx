@@ -1,0 +1,59 @@
+---
+sidebar_position: 3
+slug: /workers/acd-worker
+sidebar_class_name: cxGuidesSidebar
+title: "ACD Worker"
+description: "Java/Vert.x stateful call queue (FIFO) service"
+---
+
+# ACD Worker
+
+The ACD Worker is a Java/Vert.x 5 microservice that runs the brain of Call Queues. It owns the ephemeral, real-time queue state in Redis — Laravel owns voice (CXML), persistence (MySQL), and all APIs.
+
+## Purpose
+
+The worker handles:
+
+- FIFO queue ordering per queue (`enqueue`, `poll`, `dequeue`)
+- Agent state machine: `logged_out` / `available` / `wrap_up` (auto-expiring)
+- Agent selection strategies: `ring_all`, `round_robin`, `least_talk_time`, `fewest_calls`
+- Overflow decisions when a caller exceeds the queue's max wait time
+- Live queue snapshots for the wallboard/reporting APIs
+
+## How It Fits the Call Flow
+
+1. An inbound call routes to a queue — Laravel enqueues the caller in the worker and answers with hold CXML (MOH or announcement + pause)
+2. Cloudonix polls Laravel's `/api/callbacks/voice/queue-poll` endpoint after each hold segment
+3. Laravel asks the worker for a decision: **wait** (position), **dial** (agent list), or **overflow**
+4. On `dial`, Laravel returns `<Dial>` CXML directly to the agent extension(s) — never follow-me chains
+5. Dial results and CDR webhooks update the worker so agent state and queue positions stay accurate
+
+:::info Hard rule
+Queue offers always dial the agent's extension directly. Follow-me / forward chaining is never used for queue calls.
+:::
+
+## Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `ACD_WORKER_URL` | Base URL Laravel uses to reach the worker (default `http://acd-worker:8084`) |
+| `ACD_WORKER_API_TOKEN` | Bearer token authenticating Laravel → worker requests |
+
+Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue calls degrade gracefully rather than failing hard.
+
+## Common Commands
+
+```bash
+# Build (requires JDK 21; or build inside Docker)
+docker run --rm -v "$PWD/acd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
+
+# View logs
+docker compose logs -f acd-worker
+
+# Restart
+docker compose restart acd-worker
+```
+
+:::tip
+With the [centralized logging stack](/administration/centralized-logs) enabled, worker events (offers, answers, wrap-up transitions) are searchable by Cloudonix session token.
+:::

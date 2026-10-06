@@ -61,6 +61,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export
 - **Call Statistics**: Volume, duration, and disposition metrics
 - **Call Notifications**: Webhook-based notifications for call events with SSRF protection and retry logic
+- **Centralized Logging**: Optional Loki + Grafana stack aggregating structured logs from all services, with per-call audit trails searchable by Cloudonix session token ([docs](docs/LOG-AGGREGATION.md))
 
 ### Performance & Reliability
 - **Redis Caching Layer**: 50-90% faster routing lookups with automatic cache invalidation
@@ -118,6 +119,10 @@ graph TB
         AMD[AMD Worker<br/>Java/Vert.x 5]
     end
 
+    subgraph "ACD Service"
+        ACD[Call Queue Worker<br/>Java/Vert.x 5]
+    end
+
     subgraph "Voice Routing Services"
         VRM[VoiceRoutingManager]
         ORS[OutboundRoutingService]
@@ -133,6 +138,12 @@ graph TB
 
     subgraph "Real-Time"
         SOKETI[Soketi<br/>WebSocket Server<br/>Port 6001]
+    end
+
+    subgraph "Observability (optional, profile: logs)"
+        ALLOY[Alloy Collector]
+        LOKI[(Loki Log Store)]
+        GRAFANA[Grafana UI<br/>at /logs/]
     end
 
     CX -->|Webhooks| NGROK
@@ -152,6 +163,12 @@ graph TB
     GOWORKER --> REDIS
     AMD -->|Audio Stream| CX
     AMD -->|AMD Result| APP
+    ACD -->|Queue State| REDIS
+    APP -->|Queue Decisions| ACD
+    APP & GOWORKER & AMD & ACD -.->|JSON stdout| ALLOY
+    ALLOY --> LOKI
+    LOKI --> GRAFANA
+    NGINX --> GRAFANA
     QUEUE --> REDIS
     QUEUE --> MYSQL
     SCHEDULER --> APP
@@ -224,6 +241,7 @@ sequenceDiagram
 | [Laravel](https://laravel.com) | 12 | PHP application framework |
 | [PHP](https://php.net) | 8.4+ | Server-side language |
 | [Go](https://go.dev) | 1.21+ | Dialer worker microservice |
+| [Java](https://openjdk.org) | 21 | AMD & ACD (call queue) workers (Vert.x 5) |
 | [MySQL](https://mysql.com) | 8.0 | Relational database |
 | [Redis](https://redis.io) | 7 | Cache, queues, CAC counters |
 | [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
@@ -246,6 +264,9 @@ sequenceDiagram
 | [Soketi](https://soketi.app) | WebSocket server (Laravel Echo compatible) |
 | [MinIO](https://min.io) | S3-compatible object storage for recordings |
 | [ngrok](https://ngrok.com) | Webhook tunneling for local development |
+| [Grafana Loki](https://grafana.com/oss/loki/) | Log aggregation store (optional, `logs` profile) |
+| [Grafana](https://grafana.com) | Log viewer at `/logs/` (optional, `logs` profile) |
+| [Grafana Alloy](https://grafana.com/docs/alloy/) | Container log collector (optional, `logs` profile) |
 
 ---
 
@@ -335,12 +356,16 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `scheduler` | Laravel cron scheduler | - |
 | `dialer-worker` | Go auto-dialer worker | 8181 |
 | `amd-worker` | Java/Vert.x AMD worker | - |
+| `acd-worker` | Java/Vert.x call queue worker | 8084 |
 | `mcp-server` | MCP server for AI agents ([docs](mcp-server/README.md)) | 8080 |
 | `mysql` | MySQL 8.0 database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `minio` | S3-compatible storage | 9000, 9001 |
 | `soketi` | WebSocket server | 6001 |
 | `ngrok` | Webhook tunnel | 4040 |
+| `loki` | Log store — *profile `logs`* | - |
+| `alloy` | Log collector — *profile `logs`* | - |
+| `grafana` | Log viewer via nginx at `/logs/` — *profile `logs`* | - |
 
 ### Default Credentials
 
@@ -364,6 +389,9 @@ See `.env.example` for all available configuration options. Key variables:
 | `REDIS_PASSWORD` | Redis authentication password |
 | `DB_PASSWORD` | MySQL database password |
 | `NGROK_AUTHTOKEN` | ngrok authentication token |
+| `LOG_STACK_ENABLED` | Enable centralized logging (use with `--profile logs`) |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the log viewer |
+| `LOKI_RETENTION_HOURS` | Log retention (default 168 = 7 days) |
 
 ### Cloudonix Webhook Configuration
 
@@ -405,6 +433,15 @@ curl http://localhost/health
 ```bash
 docker compose logs -f app
 ```
+
+**Centralized Logs (optional):**
+```bash
+# .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>
+docker compose --profile logs up -d
+# Open http://localhost/logs/ — "OPBX Logs" dashboard has Platform and
+# Call Flow views; search a Cloudonix session token for a per-call audit trail.
+```
+See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details.
 
 **Queue Monitoring:**
 ```bash
