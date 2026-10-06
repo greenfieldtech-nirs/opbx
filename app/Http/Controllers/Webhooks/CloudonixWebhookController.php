@@ -388,6 +388,7 @@ class CloudonixWebhookController extends Controller
             $cdr = \App\Models\CallDetailRecord::createFromWebhook($request->all(), $organizationId);
 
             Log::info('CDR created successfully', [
+                'session_token' => $request->input('session.token') ?? $request->input('session_token'),
                 'call_id' => $callId,
                 'cdr_id' => $cdr->id,
                 'organization_id' => $organizationId,
