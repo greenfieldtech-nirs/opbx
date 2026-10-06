@@ -6,7 +6,7 @@
     "logs"
   ],
   "timezone": "browser",
-  "refresh": "10s",
+  "refresh": "",
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -31,15 +31,15 @@
   "panels": [
     {
       "id": 1,
-      "title": "Log entries - click a row to inspect it below",
+      "title": "Log entries - click a row to inspect it",
       "type": "table",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
-        "h": 13,
-        "w": 24,
+        "h": 24,
+        "w": 10,
         "x": 0,
         "y": 0
       },
@@ -71,16 +71,20 @@
               "labelTypes": true,
               "id": true,
               "nanos": true,
-              "tsNs": true
+              "tsNs": true,
+              "call_id": true,
+              "org_id": true,
+              "service": true,
+              "level": true
             },
-            "indexByName": {},
+            "indexByName": {
+              "Time": 0,
+              "session_token": 1,
+              "msg": 2
+            },
             "renameByName": {
               "msg": "Message",
-              "level": "Level",
-              "service": "Service",
-              "session_token": "Session token",
-              "call_id": "Call ID",
-              "org_id": "Org"
+              "session_token": "Session token"
             }
           }
         }
@@ -93,7 +97,7 @@
           "links": [
             {
               "title": "Inspect this entry",
-              "url": "${__dashboard.url}?${__url_time_range}&var-text_search=${text_search}&var-line_ts=${__data.fields.ts:percentencode}",
+              "url": "/logs/d/opbx-logs-platform?${__url_time_range}&var-text_search=${text_search}&var-line_ts=${__data.fields.ts:percentencode}",
               "targetBlank": false
             }
           ]
@@ -107,7 +111,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 180
+                "value": 190
               }
             ]
           },
@@ -118,8 +122,26 @@
             },
             "properties": [
               {
-                "id": "custom.width",
-                "value": 500
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Session token"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
               }
             ]
           }
@@ -137,18 +159,18 @@
     },
     {
       "id": 2,
-      "title": "Selected entry (parsed) - click a row above to populate",
-      "description": "Shows the clicked log entry as key/value pairs. Empty until a row is selected above.",
+      "title": "Selected entry",
+      "description": "Parsed content of the entry selected on the left. Empty until a row is clicked.",
       "type": "table",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 13
+        "h": 24,
+        "w": 14,
+        "x": 10,
+        "y": 0
       },
       "targets": [
         {
@@ -173,8 +195,28 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+          "custom": {
+            "filterable": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true
@@ -182,5 +224,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }
