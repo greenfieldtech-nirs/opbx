@@ -73,7 +73,8 @@
             "includeByName": {
               "Time": true,
               "session_token": true,
-              "msg": true
+              "msg": true,
+              "ts": true
             },
             "indexByName": {
               "Time": 0,
@@ -140,6 +141,18 @@
                   "type": "auto",
                   "wrapText": true
                 }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ts"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
               }
             ]
           }
@@ -239,5 +252,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 2
+  "version": 3
 }
