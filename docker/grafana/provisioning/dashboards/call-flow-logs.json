@@ -6,7 +6,7 @@
     "logs"
   ],
   "timezone": "browser",
-  "refresh": "",
+  "refresh": "10s",
   "time": {
     "from": "now-6h",
     "to": "now"
@@ -26,231 +26,39 @@
         "type": "textbox",
         "query": "",
         "description": "Free-text filter applied to every log line"
-      },
-      {
-        "name": "line_ts",
-        "type": "textbox",
-        "query": "none-selected",
-        "hide": 2
       }
     ]
   },
   "panels": [
     {
       "id": 1,
-      "title": "Log entries - click a row to inspect it",
-      "type": "table",
+      "title": "Call Flow Logs",
+      "type": "logs",
       "datasource": {
         "type": "loki",
         "uid": "loki"
       },
       "gridPos": {
         "h": 24,
-        "w": 10,
+        "w": 24,
         "x": 0,
         "y": 0
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | regexp \"^(?:\\\\[[^\\\\]]+\\\\] )?(?P<content>\\\\{.*)$\" | line_format \"{{.content}}\"",
-          "queryType": "range",
-          "maxLines": 500
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\""
         }
       ],
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "source": "Line",
-            "format": "json",
-            "replace": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "includeByName": {
-              "Time": true,
-              "session_token": true,
-              "msg": true,
-              "ts": true
-            },
-            "indexByName": {
-              "Time": 0,
-              "session_token": 1,
-              "msg": 2
-            },
-            "renameByName": {
-              "msg": "Message",
-              "session_token": "Session Token"
-            }
-          }
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "filterable": true
-          },
-          "links": [
-            {
-              "title": "Inspect this entry",
-              "url": "/logs/d/opbx-logs-call-flow?${__url_time_range}&var-session_token=${session_token}&var-text_search=${text_search}&var-line_ts=${__data.fields.ts:percentencode}",
-              "targetBlank": false
-            }
-          ]
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 190
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Message"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "auto",
-                  "wrapText": true
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Session token"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "auto",
-                  "wrapText": true
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ts"
-            },
-            "properties": [
-              {
-                "id": "custom.hidden",
-                "value": true
-              }
-            ]
-          }
-        ]
-      },
       "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "Time",
-            "desc": true
-          }
-        ]
-      },
-      "version": 3
-    },
-    {
-      "id": 2,
-      "title": "Selected entry",
-      "description": "Parsed content of the entry selected on the left. Empty until a row is clicked.",
-      "type": "table",
-      "datasource": {
-        "type": "loki",
-        "uid": "loki"
-      },
-      "gridPos": {
-        "h": 24,
-        "w": 14,
-        "x": 10,
-        "y": 0
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "{log_type=\"call_flow\"} |~ \"\\\"ts\\\":\\\"$line_ts\\\"\" | regexp \"^(?:\\\\[[^\\\\]]+\\\\] )?(?P<content>\\\\{.*)$\" | line_format \"{{.content}}\"",
-          "queryType": "range",
-          "maxLines": 5
-        }
-      ],
-      "transformations": [
-        {
-          "id": "extractFields",
-          "options": {
-            "source": "Line",
-            "format": "json",
-            "replace": false
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Line": true,
-              "labels": true,
-              "labelTypes": true,
-              "id": true,
-              "nanos": true,
-              "tsNs": true,
-              "Time": true
-            },
-            "indexByName": {},
-            "renameByName": {}
-          }
-        },
-        {
-          "id": "transpose",
-          "options": {}
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "filterable": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Value"
-            },
-            "properties": [
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "auto",
-                  "wrapText": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
       }
     }
   ],
   "schemaVersion": 39,
-  "version": 3
+  "version": 1
 }
