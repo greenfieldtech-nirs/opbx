@@ -1,0 +1,193 @@
+{
+  "uid": "opbx-logs-call-flow",
+  "title": "OPBX Call Flow Logs",
+  "tags": [
+    "opbx",
+    "logs"
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "session_token",
+        "label": "Session token (audit trail)",
+        "type": "textbox",
+        "query": "",
+        "description": "Cloudonix session token - filters to a single call"
+      },
+      {
+        "name": "text_search",
+        "label": "Text search",
+        "type": "textbox",
+        "query": "",
+        "description": "Free-text filter applied to every log line"
+      },
+      {
+        "name": "line_ts",
+        "type": "textbox",
+        "query": "none-selected",
+        "hide": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log entries - click a row to inspect it below",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | regexp \"^(?:\\\\[[^\\\\]]+\\\\] )?(?P<content>\\\\{.*)$\" | line_format \"{{.content}}\"",
+          "queryType": "range",
+          "maxLines": 500
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "Line",
+            "format": "json",
+            "replace": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "channel": true,
+              "extra": true,
+              "labels": true,
+              "labelTypes": true,
+              "id": true,
+              "nanos": true,
+              "tsNs": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "msg": "Message",
+              "level": "Level",
+              "service": "Service",
+              "session_token": "Session token",
+              "call_id": "Call ID",
+              "org_id": "Org"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          },
+          "links": [
+            {
+              "title": "Inspect this entry",
+              "url": "${__dashboard.url}?${__url_time_range}&var-session_token=${session_token}&var-text_search=${text_search}&var-line_ts=${__data.fields.ts:percentencode}",
+              "targetBlank": false
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Message"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 500
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Selected entry (parsed) - click a row above to populate",
+      "description": "Shows the clicked log entry as key/value pairs. Empty until a row is selected above.",
+      "type": "table",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{log_type=\"call_flow\"} |~ \"\\\"ts\\\":\\\"$line_ts\\\"\" | regexp \"^(?:\\\\[[^\\\\]]+\\\\] )?(?P<content>\\\\{.*)$\" | line_format \"{{.content}}\"",
+          "queryType": "range",
+          "maxLines": 5
+        }
+      ],
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "source": "Line",
+            "format": "json",
+            "replace": false
+          }
+        },
+        {
+          "id": "transpose",
+          "options": {}
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

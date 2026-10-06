@@ -22,12 +22,15 @@ docker compose --profile logs up -d
 ```
 
 Open `<APP_URL>/logs/` and log in with `admin` / `GRAFANA_ADMIN_PASSWORD`.
-A provisioned dashboard "OPBX Logs" (uid `opbx-logs`) has two panels:
+Two provisioned dashboards:
 
-- **Call Flow Logs** — everything related to call processing (voice webhooks,
-  CXML decisions, queue/dialer/AMD activity). Use the *Session token* box at
-  the top to audit-trail one call end to end.
-- **Platform Logs** — everything else (UI actions, provisioning, config).
+- **OPBX Call Flow Logs** (`/logs/d/opbx-logs-call-flow`) — everything related
+  to call processing (voice webhooks, CXML decisions, queue/dialer/AMD
+  activity). Filters: *Session token* (audit-trail one call end to end) and
+  *Text search* (free text). Click any row to see the parsed entry as
+  key/value pairs in the panel below.
+- **OPBX Platform Logs** (`/logs/d/opbx-logs-platform`) — everything else
+  (UI actions, provisioning, config). Same text search and click-to-inspect.
 
 When the profile is off, the app still emits the same structured JSON to
 stdout (`docker logs`); only the collection/UI is absent.

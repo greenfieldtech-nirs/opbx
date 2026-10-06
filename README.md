@@ -438,8 +438,9 @@ docker compose logs -f app
 ```bash
 # .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>
 docker compose --profile logs up -d
-# Open http://localhost/logs/ — "OPBX Logs" dashboard has Platform and
-# Call Flow views; search a Cloudonix session token for a per-call audit trail.
+# Open http://localhost/logs/ — provisioned dashboards "OPBX Call Flow Logs"
+# (session-token audit trail) and "OPBX Platform Logs", both with text
+# search and click-to-inspect detail view.
 ```
 See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details.
 

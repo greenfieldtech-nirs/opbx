@@ -33,7 +33,7 @@ GRAFANA_ADMIN_PASSWORD=<pick-a-password>
 docker compose --profile logs up -d
 ```
 
-Then open **`http://localhost/logs/`** and log in with `admin` / your `GRAFANA_ADMIN_PASSWORD`. The **OPBX Logs** dashboard is pre-provisioned (Call Flow + Platform panels, with a session-token filter box).
+Then open **`http://localhost/logs/`** and log in with `admin` / your `GRAFANA_ADMIN_PASSWORD`. Two dashboards are pre-provisioned: **OPBX Call Flow Logs** (with session-token audit-trail filter) and **OPBX Platform Logs**. Both offer a free-text search box, and clicking any log row shows the parsed entry as key/value pairs in a details panel below the list.
 
 ## Configuration
 
