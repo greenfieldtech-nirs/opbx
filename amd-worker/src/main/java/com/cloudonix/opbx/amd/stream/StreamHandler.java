@@ -111,9 +111,15 @@ public class StreamHandler {
     private void handleStart(ServerWebSocket ws, StreamMessage msg) {
         String streamSid = msg.streamSid;
         String callSid = msg.start.callSid;
-        logger.info("EVENT: start seq={} stream_sid={} call_sid={} session={} tracks={} custom_params={}",
-            msg.sequenceNumber, streamSid, callSid, msg.start.session,
-            msg.start.tracks, msg.start.customParameters);
+        org.slf4j.MDC.put("session_token", msg.start.session);
+        org.slf4j.MDC.put("call_id", callSid);
+        try {
+            logger.info("EVENT: start seq={} stream_sid={} call_sid={} session={} tracks={} custom_params={}",
+                msg.sequenceNumber, streamSid, callSid, msg.start.session,
+                msg.start.tracks, msg.start.customParameters);
+        } finally {
+            org.slf4j.MDC.clear();
+        }
 
         // Extract action options from customParameters
         String sessionToken = msg.start.session;
@@ -356,8 +362,14 @@ public class StreamHandler {
                 path += "?" + uri.getRawQuery();
             }
 
-            logger.info("Sending AMD action callback to {}:{}{} call_sid={} result={} action={}",
-                host, port, path, session.callSid, result, action);
+            org.slf4j.MDC.put("session_token", session.sessionToken);
+            org.slf4j.MDC.put("call_id", session.callSid);
+            try {
+                logger.info("Sending AMD action callback to {}:{}{} call_sid={} result={} action={}",
+                    host, port, path, session.callSid, result, action);
+            } finally {
+                org.slf4j.MDC.clear();
+            }
 
             vertx.createHttpClient()
                 .request(io.vertx.core.http.HttpMethod.POST, port, host, path)

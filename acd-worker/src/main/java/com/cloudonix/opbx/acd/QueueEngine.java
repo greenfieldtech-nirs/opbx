@@ -375,6 +375,9 @@ public class QueueEngine {
         MDC.put("org_id", org);
         MDC.put("queue_id", queue);
         MDC.put("call_id", callId);
+        // For queue calls the callId IS the Cloudonix session token; expose
+        // it under the audit-trail key too.
+        MDC.put("session_token", callId);
         try {
             if (extra.isEmpty()) {
                 log.info(msg);

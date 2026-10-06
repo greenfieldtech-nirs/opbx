@@ -57,6 +57,9 @@ class ConfigurationControllerTest extends TestCase
 
     public function test_endpoints_prefer_forwarded_origin_from_proxy(): void
     {
+        // Pin the MCP port: the developer's local .env may override it.
+        config(['services.mcp.port' => 8080]);
+
         // Simulates browser -> dev/reverse proxy -> app (proxy rewrites Host to
         // an internal name): forwarded headers must win, ports must be handled.
         $response = $this->getJson(
