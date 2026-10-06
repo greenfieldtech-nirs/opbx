@@ -63,19 +63,10 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": {
-              "Line": true,
-              "channel": true,
-              "extra": true,
-              "labels": true,
-              "labelTypes": true,
-              "id": true,
-              "nanos": true,
-              "tsNs": true,
-              "call_id": true,
-              "org_id": true,
-              "service": true,
-              "level": true
+            "includeByName": {
+              "Time": true,
+              "session_token": true,
+              "msg": true
             },
             "indexByName": {
               "Time": 0,
@@ -84,7 +75,7 @@
             },
             "renameByName": {
               "msg": "Message",
-              "session_token": "Session token"
+              "session_token": "Session Token"
             }
           }
         }
@@ -155,7 +146,8 @@
             "desc": true
           }
         ]
-      }
+      },
+      "version": 3
     },
     {
       "id": 2,
@@ -187,6 +179,22 @@
             "source": "Line",
             "format": "json",
             "replace": false
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Line": true,
+              "labels": true,
+              "labelTypes": true,
+              "id": true,
+              "nanos": true,
+              "tsNs": true,
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {}
           }
         },
         {
