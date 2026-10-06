@@ -36,13 +36,15 @@ class QueueDialOfferService
      *
      * @param  array<int, array{userId: string, extensionNumber: string}>  $agents
      */
-    public function buildDialResponse(Request $request, CallQueue $callQueue, QueueCall $queueCall, array $agents): ?Response
+    public function buildDialResponse(Request $request, CallQueue $callQueue, QueueCall $queueCall, array $agents, bool $respectPresence = true): ?Response
     {
         // Belt-and-suspenders: skip agents whose extension is on an active call.
+        // Bypassed when re-serving an in-flight offer: the agent looks busy
+        // precisely because of our own dial leg (ringing or bridged).
         $targets = [];
         $agentUserIds = [];
         foreach ($agents as $agent) {
-            if ($this->presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
+            if ($respectPresence && $this->presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
                 Log::info('QueueDialOfferService: Skipping presence-busy agent', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $queueCall->call_id,

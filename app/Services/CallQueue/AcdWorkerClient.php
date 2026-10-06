@@ -125,10 +125,19 @@ class AcdWorkerClient
                     'path' => $path,
                     'status' => $response->status(),
                     'body' => \Illuminate\Support\Str::limit($response->body(), 300),
+                    'call_id' => $payload['call_id'] ?? null,
+                    'org_id' => $payload['organization_id'] ?? null,
                 ]);
 
                 return null;
             }
+
+            Log::info('ACD worker request', [
+                'path' => $path,
+                'status' => $response->status(),
+                'call_id' => $payload['call_id'] ?? null,
+                'org_id' => $payload['organization_id'] ?? null,
+            ]);
 
             return $response;
         } catch (\Illuminate\Http\Client\ConnectionException $e) {

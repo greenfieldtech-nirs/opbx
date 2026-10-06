@@ -1,0 +1,21 @@
+<configuration>
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Flat contract shared with the rest of the stack. -->
+            <customFields>{"service":"amd-worker","log_type":"call_flow"}</customFields>
+            <includeMdcKeyNames>session_token,call_id,org_id,queue_id</includeMdcKeyNames>
+            <fieldNames>
+                <timestamp>ts</timestamp>
+                <message>msg</message>
+                <levelValue>[ignore]</levelValue>
+                <thread>[ignore]</thread>
+                <logger>[ignore]</logger>
+                <version>[ignore]</version>
+            </fieldNames>
+            <timeZone>UTC</timeZone>
+        </encoder>
+    </appender>
+    <root level="${LOG_LEVEL:-info}">
+        <appender-ref ref="JSON"/>
+    </root>
+</configuration>

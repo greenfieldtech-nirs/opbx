@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.MDC;
+
 import com.cloudonix.opbx.acd.model.AgentInfo;
 import com.cloudonix.opbx.acd.model.AgentState;
 import com.cloudonix.opbx.acd.store.QueueStore;
@@ -24,6 +26,8 @@ import io.vertx.core.Future;
  * dedicated expiry timer can be added if agents sit in wrap-up with no polls.
  */
 public class QueueEngine {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QueueEngine.class);
     private final QueueStore store;
     private final Time time;
 
@@ -61,7 +65,10 @@ public class QueueEngine {
             Map<String, String> call = Map.of("queuedAt", String.valueOf(time.nowMillis()));
             return store.hset(callKey(org, queue, callId), call)
                     .compose(v -> store.rpush(qKey, callId))
-                    .map(size -> size.intValue());
+                    .map(size -> {
+                        logEvent(org, queue, callId, "call enqueued", Map.of("position", size.intValue()));
+                        return size.intValue();
+                    });
         });
     }
 
@@ -94,18 +101,26 @@ public class QueueEngine {
             return store.hgetall(callKey(org, queue, callId)).compose(call -> {
                 long queuedAt = Long.parseLong(call.getOrDefault("queuedAt", "0"));
                 if (time.nowMillis() - queuedAt > maxWaitSeconds * 1000) {
-                    return dequeue(org, queue, callId).map(v -> Map.<String, Object>of("action", "overflow"));
+                    return dequeue(org, queue, callId).map(v -> {
+                        logEvent(org, queue, callId, "call overflowed max wait", Map.of());
+                        return Map.<String, Object>of("action", "overflow");
+                    });
                 }
 
                 return resolveAvailableAgents(org, queue, roster).compose(available -> {
                     if (available.isEmpty()) {
                         return waitResult(1);
                     }
-                    return selectAgents(org, queue, available, strategy).map(selected -> Map.<String, Object>of(
-                            "action", "dial",
-                            "agents", selected.stream().map(a -> Map.of(
-                                    "userId", a.userId(),
-                                    "extensionNumber", a.extensionNumber())).toList()));
+                    return selectAgents(org, queue, available, strategy).map(selected -> {
+                        logEvent(org, queue, callId, "offering to agents", Map.of(
+                                "strategy", strategy,
+                                "agents", selected.stream().map(AgentInfo::extensionNumber).toList().toString()));
+                        return Map.<String, Object>of(
+                                "action", "dial",
+                                "agents", selected.stream().map(a -> Map.of(
+                                        "userId", a.userId(),
+                                        "extensionNumber", a.extensionNumber())).toList());
+                    });
                 });
             });
         });
@@ -119,7 +134,7 @@ public class QueueEngine {
      * @param talkSeconds talk duration for "ended" (0 for dial_failed), may be null
      * @param wrapUpSeconds post-call wrap-up duration from queue config (0 = none), may be null
      */
-    public Future<Void> event(String org, String queue, String callId, String type,
+    public Future<Void> event(String org, String queue, String callId, String type, // logged below
             String agentUserId, Long talkSeconds, Long wrapUpSeconds) {
         return switch (type) {
             case "answered" -> {
@@ -354,5 +369,23 @@ public class QueueEngine {
     private Future<Void> dequeue(String org, String queue, String callId) {
         return store.lrem(queueKey(org, queue), callId)
                 .compose(v -> store.del(callKey(org, queue, callId)));
+    }
+
+    private void logEvent(String org, String queue, String callId, String msg, Map<String, Object> extra) {
+        MDC.put("org_id", org);
+        MDC.put("queue_id", queue);
+        MDC.put("call_id", callId);
+        // For queue calls the callId IS the Cloudonix session token; expose
+        // it under the audit-trail key too.
+        MDC.put("session_token", callId);
+        try {
+            if (extra.isEmpty()) {
+                log.info(msg);
+            } else {
+                log.info(msg + " {}", extra);
+            }
+        } finally {
+            MDC.clear();
+        }
     }
 }

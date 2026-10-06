@@ -103,7 +103,16 @@ abstract class CloudonixBaseClient
      */
     protected function client(): PendingRequest
     {
+        // Outbound Cloudonix REST calls are logged at the transport layer
+        // (no bodies at info level - headers carry the bearer token).
+        // These are control-plane calls -> default log_type "platform".
         return Http::timeout($this->timeout)
+            ->withRequestMiddleware(fn (\Psr\Http\Message\RequestInterface $request) => tap($request, function () use ($request): void {
+                Log::info('Cloudonix REST request', [
+                    'method' => $request->getMethod(),
+                    'path' => $request->getUri()->getPath(),
+                ]);
+            }))
             ->withHeaders([
                 'Authorization' => 'Bearer '.$this->token,
                 'Accept' => 'application/json',

@@ -60,6 +60,7 @@ func NewExecutor(
 func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, destination *models.Destination) error {
 	logger := e.logger.With(
 		"campaign_id", campaign.ID,
+		"org_id", campaign.OrganizationID,
 		"destination_id", destination.ID,
 		"phone", destination.PhoneNumber,
 	)

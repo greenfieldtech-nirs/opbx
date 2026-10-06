@@ -1,0 +1,130 @@
+// OPBX log collector: tails OPBX containers over the Docker socket and pushes
+// to Loki. Containers opt in via the compose label `logging.opbx/collect=true`.
+//
+// Cardinality rule (see spec): session_token / call_id are STRUCTURED
+// METADATA, never labels. Labels stay bounded: service, level, log_type,
+// org_id, container.
+
+discovery.docker "opbx" {
+	host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "opbx" {
+	targets = discovery.docker.opbx.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_label_logging_opbx_collect"]
+		regex        = "true"
+		action       = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/(.*)"
+		target_label = "container"
+	}
+
+	// Map container -> service. The three PHP containers all run the Laravel
+	// codebase; workers keep their own names.
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_(app|queue_worker|scheduler)"
+		target_label = "service"
+		replacement  = "laravel"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_dialer_worker"
+		target_label = "service"
+		replacement  = "dialer-worker"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_acd_worker"
+		target_label = "service"
+		replacement  = "acd-worker"
+	}
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex        = "/opbx_amd_worker"
+		target_label = "service"
+		replacement  = "amd-worker"
+	}
+}
+
+loki.source.docker "opbx" {
+	host          = "unix:///var/run/docker.sock"
+	targets       = discovery.relabel.opbx.output
+	forward_to    = [loki.process.opbx.receiver]
+	relabel_rules = discovery.relabel.opbx.rules
+	labels        = { job = "opbx" }
+}
+
+loki.process "opbx" {
+	// All services emit the same flat JSON contract (see the spec), so one
+	// json stage covers everything. Non-JSON lines (boot output, PHP
+	// warnings) pass through with only the container label.
+	stage.json {
+		expressions = {
+			ts            = "ts",
+			level         = "level",
+			log_type      = "log_type",
+			org_id        = "org_id",
+			session_token = "session_token",
+			call_id       = "call_id",
+		}
+	}
+
+	// Java (logstash encoder) reports level in upper case; normalize.
+	stage.template {
+		source   = "level"
+		template = "{{ ToLower .Value }}"
+	}
+
+	// Render call-related lines as "[<session_token>] <json>" for human
+	// scanning. Extraction happened above, so labels/structured-metadata are
+	// unaffected; this only changes the displayed line.
+	stage.template {
+		source   = "_rendered"
+		template = "{{ if .session_token }}[{{ .session_token }}] {{ .Entry }}{{ else }}{{ .Entry }}{{ end }}"
+	}
+
+	stage.output {
+		source = "_rendered"
+	}
+
+	stage.labels {
+		values = {
+			level    = "",
+			log_type = "",
+			org_id   = "",
+		}
+	}
+
+	stage.structured_metadata {
+		values = {
+			session_token = "",
+			call_id       = "",
+		}
+	}
+
+	stage.timestamp {
+		source = "ts"
+		format = "RFC3339Nano"
+	}
+
+	// php-fpm access lines are per-request noise; the app logs carry the
+	// substance. Match on the raw line (these lines are not JSON).
+	stage.drop {
+		source     = ""
+		expression = `.*"(GET|POST|PUT|PATCH|DELETE) /index.php.*`
+	}
+
+	forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

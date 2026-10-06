@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\CallQueue\ImmediateConnectService;
 use App\Services\CallQueue\QueueAgentStateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -40,6 +41,12 @@ class ImmediateConnectTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Ephemeral queue state (skip markers, presence, dial markers) lives in
+        // the shared dev Redis and must not leak between tests or runs.
+        foreach (Redis::keys('acd:*') as $key) {
+            Redis::del(str_replace(config('database.redis.options.prefix', ''), '', $key));
+        }
 
         $this->organization = Organization::factory()->create(['status' => 'active']);
         CloudonixSettings::factory()->create([

@@ -45,6 +45,12 @@ class QueueCallFlowTest extends TestCase
     {
         parent::setUp();
 
+        // Ephemeral queue state (skip markers, presence, dial markers) lives in
+        // the shared dev Redis and must not leak between tests or runs.
+        foreach (Redis::keys('acd:*') as $key) {
+            Redis::del(str_replace(config('database.redis.options.prefix', ''), '', $key));
+        }
+
         $this->organization = Organization::factory()->create(['status' => 'active']);
         CloudonixSettings::factory()->create([
             'organization_id' => $this->organization->id,
@@ -338,6 +344,161 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringContainsString('caller number 1', (string) $response->getContent());
     }
 
+    public function test_poll_during_in_flight_offer_reserves_same_dial_not_a_new_offer(): void
+    {
+        // Stale hold document (pre-switch) fires a poll while the proactive
+        // <Dial> is still ringing: the poll must NOT re-offer via the worker.
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1001', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+
+        // The worker must not be asked for a new offer while one is in flight.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_poll_after_bridge_returns_same_dial_not_hold(): void
+    {
+        // The stale hold document's Redirect fires after the agent answered:
+        // responding with hold CXML would tear down the live bridge (the
+        // customer-visible congestion). The poll must re-serve the same dial.
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'answered_at' => now(),
+            'agent_user_id' => $this->agent->id,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1001', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+    }
+
+    public function test_dial_failure_reoffers_next_agent_immediately(): void
+    {
+        // Regression: a failed agent dial returned the hold CXML, so the caller
+        // waited out the full MOH/pause cycle before the next offer even when
+        // another agent was available. The failure callback must re-offer now.
+        Redis::del('acd:dial:'.self::CALL_ID);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => '999', 'extensionNumber' => '1099']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'no-answer'])
+        );
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Dial', $content);
+        $this->assertStringContainsString('1099', $content);
+        $this->assertStringNotContainsString('<Say>', $content);
+
+        // The failed agent is skipped for subsequent offers (no-answer agents
+        // still look available to presence), and the worker is re-polled.
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_dial_failure_without_agents_falls_back_to_hold(): void
+    {
+        Redis::del('acd:dial:'.self::CALL_ID);
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response(['action' => 'wait', 'position' => 1], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'busy'])
+        );
+
+        $this->assertStringContainsString('<Say>', (string) $response->getContent());
+    }
+
+    public function test_post_bridge_failure_callback_terminates_call_not_redial(): void
+    {
+        // Regression (customer): ring-all dial to [unregistered 9000, 9001];
+        // 9001 answers, then hangs up. The dial action callback reports the
+        // LOSING leg's status (unregistered -> 'failed') instead of the
+        // completed bridge. Treating that as a dial failure caused an
+        // immediate re-offer loop (redialing 9001, origin never terminates,
+        // congestion) - the callback must recognize the bridge happened and
+        // end the call cleanly.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'answered_at' => now()->subSeconds(25),
+            'agent_user_id' => $this->agent->id,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake([
+            'http://acd-worker:8084/queue/poll' => Http::response([
+                'action' => 'dial',
+                'agents' => [['userId' => (string) $this->agent->id, 'extensionNumber' => '1001']],
+            ], 200),
+            'http://acd-worker:8084/*' => Http::response([], 204),
+        ]);
+
+        $sessionData = array_merge($this->sessionData(), ['callback_type' => 'queue_dial_callback']);
+        $response = app(QueueDialCallbackController::class)->handle(
+            $this->callbackRequest($sessionData, ['CallStatus' => 'failed'])
+        );
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Hangup/>', $content);
+        $this->assertStringNotContainsString('<Dial', $content, 'must not redial after the bridge ended');
+
+        // No re-offer via the worker, and the outcome is recorded as a bridge.
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+        $this->assertSame('answered', \Illuminate\Support\Facades\Redis::get('acd:dialresult:'.self::CALL_ID));
+
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+    }
+
     public function test_poll_announces_position_on_interval(): void
     {
         Redis::del('acd:announce:'.self::CALL_ID);
@@ -442,6 +603,120 @@ class QueueCallFlowTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
             && $request['type'] === 'answered');
+    }
+
+    public function test_connected_status_marks_bridge_and_attributes_winning_leg(): void
+    {
+        // Regression (customer logs): the agent bridge is reported as
+        // status CONNECTED (uppercase, with callAnswerTime) - not 'answer'.
+        // Without accepting it, answered_at stays null and every downstream
+        // guard misfires. Attribution must follow the leg that actually
+        // picked up (outgoing subscriber), not the first-offered agent.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $otherAgent = \App\Models\User::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        $otherExtension = \App\Models\Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $otherAgent->id,
+            'extension_number' => '1099',
+            'cloudonix_subscriber_id' => 250708,
+        ]);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $bridgeUpdate = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'connected',
+            'outgoing_subscriber_id' => 250708,
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($bridgeUpdate);
+
+        $queueCall->refresh();
+        $this->assertNotNull($queueCall->answered_at);
+        $this->assertSame($otherAgent->id, $queueCall->agent_user_id, 'attribution follows the leg that picked up');
+    }
+
+    public function test_connected_status_without_dial_marker_is_platform_answer(): void
+    {
+        // 'connected' also fires at the initial platform answer (before any
+        // offer) - without a dial marker it must NOT mark the bridge.
+        Redis::del('acd:dial:'.self::CALL_ID);
+        Redis::del('acd:dialresult:'.self::CALL_ID);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $platformAnswer = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'connected',
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($platformAnswer);
+
+        $this->assertNull($queueCall->refresh()->answered_at);
+    }
+
+    public function test_session_update_webhook_normalizes_status_case(): void
+    {
+        // Cloudonix sends statuses in upper case (CONNECTED, ANSWERER...);
+        // the webhook must not drop them for casing reasons.
+        $owner = \App\Models\User::factory()->create([
+            'organization_id' => $this->organization->id,
+            'role' => \App\Enums\UserRole::OWNER,
+        ]);
+
+        \App\Models\CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first()
+            ?->update(['domain_name' => 'test.example.com']);
+
+        $settings = \App\Models\CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            ->where('organization_id', $this->organization->id)
+            ->first();
+
+        $payload = [
+            'id' => 987654321,
+            'eventId' => 'evt-'.self::CALL_ID,
+            'domainId' => 1764,
+            'domain' => 'test.example.com',
+            'subscriberId' => '248967',
+            'callerId' => '9099',
+            'destination' => '20001',
+            'direction' => 'incoming',
+            'status' => 'CONNECTED',
+            'createdAt' => now()->subMinute()->toIso8601String(),
+            'modifiedAt' => now()->toIso8601String(),
+            'action' => 'none',
+            'reason' => 'normal',
+        ];
+
+        $response = $this->postJson('/api/webhooks/cloudonix/session-update', $payload, [
+            'Authorization' => 'Bearer '.$settings->domain_requests_api_key,
+        ]);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('session_updates', [
+            'organization_id' => $this->organization->id,
+            'status' => 'connected',
+        ]);
     }
 
     public function test_initial_platform_answer_does_not_mark_answered(): void

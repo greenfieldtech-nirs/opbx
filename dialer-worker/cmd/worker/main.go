@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,10 +53,9 @@ func main() {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	// Setup logger
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	// Setup logger: flat JSON contract shared with the rest of the stack
+	// (see .my_agent/specifications/log-aggregation.md).
+	logger := newLogger(os.Stdout)
 
 	logger.Info("starting dialer worker", "worker_id", cfg.WorkerID)
 
@@ -287,4 +287,21 @@ func (w *Worker) shutdownServer() {
 		}
 	}
 	w.wg.Wait()
+}
+
+// newLogger builds the contract-conformant JSON logger: ts/level(lowercase)/
+// msg plus the fixed service and log_type dimensions.
+func newLogger(w *os.File) *slog.Logger {
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				a.Key = "ts"
+			}
+			if a.Key == slog.LevelKey {
+				a.Value = slog.StringValue(strings.ToLower(a.Value.String()))
+			}
+			return a
+		},
+	})).With("service", "dialer-worker", "log_type", "call_flow")
 }

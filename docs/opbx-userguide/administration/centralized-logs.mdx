@@ -1,0 +1,75 @@
+---
+sidebar_position: 3
+slug: /administration/centralized-logs
+sidebar_class_name: cxGuidesSidebar
+title: "Centralized Logs"
+description: "Optional Loki + Grafana log aggregation with per-call audit trails"
+---
+
+# Centralized Logs
+
+OPBX ships an optional log aggregation stack (Grafana Loki + Grafana + Alloy) that collects structured logs from every service into one searchable location. It is **off by default** and intended for platform admins and developers.
+
+## What You Get
+
+- **Platform Logs** — everything not related to call processing (UI actions, configuration changes, provisioning)
+- **Call Flow Logs** — voice webhooks, CXML routing decisions, queue/dialer/AMD activity — with a **per-call audit trail**: paste a Cloudonix session token and see every log entry for that call across all services
+
+Call-related entries are rendered with the session token as a prefix, e.g.:
+
+```
+[19461556-42] {"ts":"...","msg":"CDR created successfully","disposition":"ANSWER",...}
+```
+
+## Enabling
+
+```bash
+# .env
+LOG_STACK_ENABLED=true
+GRAFANA_ADMIN_PASSWORD=<pick-a-password>
+```
+
+```bash
+docker compose --profile logs up -d
+```
+
+Then open **`http://localhost/logs/`** and log in with `admin` / your `GRAFANA_ADMIN_PASSWORD`. The **OPBX Logs** dashboard is pre-provisioned (Call Flow + Platform panels, with a session-token filter box).
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_STACK_ENABLED` | `false` | Feature flag documenting intent (the compose profile is the switch) |
+| `GRAFANA_ADMIN_USER` | `admin` | Grafana admin username |
+| `GRAFANA_ADMIN_PASSWORD` | — | Grafana admin password (required) |
+| `LOKI_RETENTION_HOURS` | `168` | Log retention in hours (default 7 days) |
+
+## Example Queries
+
+In Grafana → **Explore** with the **Loki** datasource:
+
+```logql
+# Full audit trail for one call
+{log_type="call_flow"} | session_token="sess-abc123"
+
+# All errors across the stack
+{job="opbx"} |= "\"level\":\"error\""
+
+# One organization's call traffic
+{log_type="call_flow", org_id="12"}
+
+# Queue offers
+{service="acd-worker"} |~ "offering to agents"
+```
+
+## How It Works
+
+- All services emit single-line JSON to stdout with a shared contract (`ts`, `level`, `msg`, `service`, `log_type`, plus `org_id` / `session_token` / `call_id` when known)
+- An Alloy collector tails the OPBX containers over the Docker socket and pushes to Loki — no application code changes are needed for new services beyond emitting the JSON contract
+- Credentials (API keys, passwords, bearer tokens) are masked before logs leave Laravel; `session_token` is deliberately **not** masked, since it is the audit-trail key
+- Grafana is proxied by nginx at `/logs/`, so no extra ports are exposed
+- When the profile is off, the same structured JSON still goes to stdout (`docker compose logs -f app`), just without aggregation
+
+:::caution Platform admins only
+The log viewer has full visibility across all tenants. Access is protected by the Grafana admin login — treat those credentials accordingly.
+:::

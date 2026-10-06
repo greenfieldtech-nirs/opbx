@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('webhooks/cloudonix')->group(function (): void {
+Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function (): void {
     Route::post('/call-initiated', [CloudonixWebhookController::class, 'callInitiated'])
         ->middleware(['webhook.signature', 'webhook.idempotency'])
         ->name('webhooks.cloudonix.call-initiated');
@@ -56,7 +56,7 @@ use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
-Route::prefix('voice')->group(function (): void {
+Route::prefix('voice')->middleware('log.callflow')->group(function (): void {
     // Main inbound call routing endpoint
     Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
         ->middleware(['voice.webhook.auth'])
@@ -77,7 +77,7 @@ Route::prefix('voice')->group(function (): void {
 });
 
 // Action-related callbacks
-Route::prefix('callbacks')->group(function (): void {
+Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void {
     // Ring group callback for sequential routing (round robin, priority, etc.)
     Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
         ->middleware(['voice.webhook.auth'])

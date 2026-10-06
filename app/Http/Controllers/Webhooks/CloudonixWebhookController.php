@@ -65,6 +65,7 @@ class CloudonixWebhookController extends Controller
         $direction = $request->input('Direction') ?? 'unknown';
 
         Log::info('Received call-initiated webhook (async notification)', [
+            'session_token' => $request->input('token'),
             'call_id' => $callId,
             'from' => $from,
             'to' => $to,
@@ -136,6 +137,7 @@ class CloudonixWebhookController extends Controller
         $status = $request->input('CallStatus') ?? $request->input('status');
 
         Log::info('Received call-status webhook', [
+            'session_token' => $request->input('token'),
             'call_id' => $callId,
             'status' => $status,
             'payload' => $request->all(),
@@ -207,6 +209,7 @@ class CloudonixWebhookController extends Controller
         $validated = $request->validated();
 
         Log::info('Processing session-update webhook', [
+            'session_token' => $request->input('token'),
             'request_id' => $requestId,
             'session_id' => $validated['id'] ?? null,
             'event_id' => $validated['eventId'] ?? null,
@@ -218,6 +221,10 @@ class CloudonixWebhookController extends Controller
 
             // Filter events by status - only process specific statuses
             // These statuses map to notification events that users care about
+            // Cloudonix reports statuses in varying case (CONNECTED, ANSWER,
+            // ringing) - normalize so casing never drops an event.
+            $validated['status'] = strtolower((string) $validated['status']);
+
             $allowedStatuses = [
                 'new', 'initiated', 'created',           // Maps to 'new' event
                 'ringing', 'ring', 'progress',           // Maps to 'ringing' event
@@ -381,6 +388,7 @@ class CloudonixWebhookController extends Controller
             $cdr = \App\Models\CallDetailRecord::createFromWebhook($request->all(), $organizationId);
 
             Log::info('CDR created successfully', [
+                'session_token' => $request->input('session.token') ?? $request->input('session_token'),
                 'call_id' => $callId,
                 'cdr_id' => $cdr->id,
                 'organization_id' => $organizationId,

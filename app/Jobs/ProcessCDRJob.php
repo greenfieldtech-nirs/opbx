@@ -66,6 +66,7 @@ class ProcessCDRJob implements ShouldQueue
             $cdr = CallDetailRecord::createFromWebhook($this->webhookData, $organizationId);
 
             Log::info('CDR created successfully', [
+                'session_token' => $this->webhookData['session']['token'] ?? $this->webhookData['session_token'] ?? null,
                 'call_id' => $callId,
                 'cdr_id' => $cdr->id,
                 'organization_id' => $organizationId,

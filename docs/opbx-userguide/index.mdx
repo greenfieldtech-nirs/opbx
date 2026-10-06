@@ -8,7 +8,7 @@ description: "Introduction to OPBX - the open-source business PBX platform"
 
 # Welcome to OPBX
 
-OPBX is an open-source, multi-tenant business PBX platform built on top of the [Cloudonix CPaaS](https://developers.cloudonix.com/). It provides a complete phone system for organizations of any size, combining a Laravel 12 backend, a React 18 frontend, a Go dialer worker for outbound campaigns, and a Java/Vert.x 5 AMD worker for stream-based voicemail detection.
+OPBX is an open-source, multi-tenant business PBX platform built on top of the [Cloudonix CPaaS](https://developers.cloudonix.com/). It provides a complete phone system for organizations of any size, combining a Laravel 12 backend, a React 18 frontend, a Go dialer worker for outbound campaigns, and Java/Vert.x 5 workers for stream-based voicemail detection (AMD) and call queue management (ACD).
 
 ## Key Features
 
@@ -28,6 +28,7 @@ OPBX is an open-source, multi-tenant business PBX platform built on top of the [
 - **Real-time call monitoring** with live call tracking and WebSocket updates
 - **Supervisor role** for read-only, scoped monitoring of specific users and ring groups
 - **Live call coaching** with spy (listen), whisper, and barge modes for Owners and Supervisors
+- **Centralized logging** with an optional Loki + Grafana stack, including per-call audit trails searchable by Cloudonix session token
 - **In-browser Web Phone** (JsSIP/WebRTC softphone) for placing, receiving, and coaching calls
 - **Call notifications** with per-organization webhook configuration, event filtering, and retry logic
 - **Platform management** tools for service providers hosting multiple organizations

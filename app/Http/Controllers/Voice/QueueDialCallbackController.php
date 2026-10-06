@@ -38,10 +38,36 @@ class QueueDialCallbackController extends Controller
         // finalization to distinguish a real agent bridge from a spurious
         // teardown 'answer' session update.
         Log::info('QueueDialCallbackController: dial result', [
+            'session_token' => $request->input('Session') ?? $request->input('token'),
             'call_queue_id' => $context['call_queue_id'],
             'call_id' => $context['call_id'],
             'call_status' => $callStatus,
         ]);
+
+        // Answered guard: with multiple <Dial> targets (ring-all), the action
+        // callback can report a LOSING leg's outcome (e.g. an unregistered
+        // target fails) even though a real agent bridged and the call has
+        // ended. A failure status after the bridge must not trigger a re-offer
+        // (redial loop, origin never terminates, congestion) - record the
+        // bridge and end the call cleanly.
+        $queueCall = \App\Models\QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $context['call_queue_id'])
+            ->where('call_id', $context['call_id'])
+            ->whereNull('disposition')
+            ->first();
+
+        if ($queueCall?->answered_at !== null) {
+            Log::info('QueueDialCallbackController: dial completed after bridge, ignoring leg status', [
+                'call_queue_id' => $context['call_queue_id'],
+                'call_id' => $context['call_id'],
+                'call_status' => $callStatus,
+            ]);
+
+            app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], 'completed');
+
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], $callStatus);
 
         if (in_array($callStatus, ['busy', 'no-answer', 'failed'], true)) {
@@ -51,13 +77,41 @@ class QueueDialCallbackController extends Controller
                 ->first();
 
             if ($callQueue) {
-                Log::info('QueueDialCallbackController: Agent dial failed, returning caller to queue', [
+                Log::info('QueueDialCallbackController: Agent dial failed, offering to next agent immediately', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $context['call_id'],
                     'call_status' => $callStatus,
                 ]);
 
                 app(QueueCallLifecycleService::class)->handleDialFailed($callQueue, $context['call_id']);
+
+                // Re-offer immediately: another agent may be available and the
+                // caller should not wait out the hold cycle for the next offer.
+                $queueCall = \App\Models\QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                    ->where('call_queue_id', $callQueue->id)
+                    ->where('call_id', $context['call_id'])
+                    ->whereNull('disposition')
+                    ->first();
+
+                if ($queueCall) {
+                    $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
+                    $result = app(\App\Services\CallQueue\AcdWorkerClient::class)->poll(
+                        $callQueue->organization_id,
+                        $callQueue->id,
+                        $queueCall->call_id,
+                        $dialOffer->roster($callQueue),
+                        $callQueue->strategy->value,
+                        $callQueue->max_wait_seconds
+                    );
+
+                    if (($result['action'] ?? 'wait') === 'dial') {
+                        $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
+
+                        if ($dialResponse !== null) {
+                            return $dialResponse;
+                        }
+                    }
+                }
 
                 return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
             }
