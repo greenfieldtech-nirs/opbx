@@ -26,6 +26,30 @@
         "type": "textbox",
         "query": "",
         "description": "Free-text filter applied to every log line"
+      },
+      {
+        "name": "sessions_only",
+        "label": "Display Sessions Only",
+        "type": "custom",
+        "query": "Enabled : |~ \"^\\\\[\", Disabled : |~ \"\"",
+        "options": [
+          {
+            "text": "Enabled",
+            "value": "|~ \"^\\\\[\"",
+            "selected": true
+          },
+          {
+            "text": "Disabled",
+            "value": "|~ \"\"",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Enabled",
+          "value": "|~ \"^\\\\[\"",
+          "selected": true
+        },
+        "description": "When enabled, only log entries that carry a Cloudonix session token are shown"
       }
     ]
   },
@@ -47,7 +71,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\""
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" $sessions_only"
         }
       ],
       "options": {
@@ -60,5 +84,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 2
 }
