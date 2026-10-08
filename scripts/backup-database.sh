@@ -6,12 +6,14 @@
 #   ./scripts/backup-database.sh              # Creates timestamped backup
 #   ./scripts/backup-database.sh daily        # Creates daily backup (overwrites)
 #   ./scripts/backup-database.sh weekly       # Creates weekly backup (overwrites)
+#   ./scripts/backup-database.sh pre-test     # Rotating pre-test safety backup (quiet)
 #
 # Backups are stored in ./backups/ directory
 # IMPORTANT: Backups are NOT stored in Docker volumes - they persist on host filesystem
 #
 
 set -e
+set -o pipefail
 
 # Load environment variables from .env if it exists
 if [ -f .env ]; then
@@ -28,12 +30,17 @@ DB_PASSWORD="${DB_ROOT_PASSWORD:-${DB_PASSWORD:-secret}}"
 CONTAINER_NAME="opbx_mysql"
 
 # Determine backup filename
+QUIET=false
 if [ "$1" == "daily" ]; then
     BACKUP_FILE="${BACKUP_DIR}/opbx-daily.sql.gz"
     echo "Creating daily backup..."
 elif [ "$1" == "weekly" ]; then
     BACKUP_FILE="${BACKUP_DIR}/opbx-weekly.sql.gz"
     echo "Creating weekly backup..."
+elif [ "$1" == "pre-test" ]; then
+    BACKUP_FILE="${BACKUP_DIR}/opbx-pre-test.sql.gz"
+    QUIET=true
+    echo "Creating pre-test safety backup: ${BACKUP_FILE}"
 else
     BACKUP_FILE="${BACKUP_DIR}/opbx-backup-${TIMESTAMP}.sql.gz"
     echo "Creating timestamped backup: opbx-backup-${TIMESTAMP}.sql.gz"
@@ -60,21 +67,25 @@ docker compose exec -T mysql mysqldump \
     --databases "${DB_NAME}" \
     | gzip > "${BACKUP_FILE}"
 
-# Verify backup
-if [ -f "${BACKUP_FILE}" ] && [ -s "${BACKUP_FILE}" ]; then
+# Verify backup: non-empty AND actually contains a database dump.
+# (A failed mysqldump piped into gzip still yields a small non-empty file —
+#  this check is what the file-size check alone cannot catch.)
+if [ -f "${BACKUP_FILE}" ] && [ -s "${BACKUP_FILE}" ] && gunzip -c "${BACKUP_FILE}" | grep "CREATE TABLE" >/dev/null; then
     FILE_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
     echo "SUCCESS: Backup created at ${BACKUP_FILE} (${FILE_SIZE})"
-    
+
     # Show record counts
-    echo ""
-    echo "Database contents:"
-    docker compose exec -T mysql mysql \
-        -u "${DB_USER}" \
-        -p"${DB_PASSWORD}" \
-        -e "USE ${DB_NAME}; SHOW TABLE STATUS;" \
-        | awk 'NR>1 {print "  " $1 ": " $5 " rows"}' 2>/dev/null || true
+    if [ "$QUIET" = false ]; then
+        echo ""
+        echo "Database contents:"
+        docker compose exec -T mysql mysql \
+            -u "${DB_USER}" \
+            -p"${DB_PASSWORD}" \
+            -e "USE ${DB_NAME}; SHOW TABLE STATUS;" \
+            | awk 'NR>1 {print "  " $1 ": " $5 " rows"}' 2>/dev/null || true
+    fi
 else
-    echo "ERROR: Backup failed or is empty!"
+    echo "ERROR: Backup failed, is empty, or contains no table definitions!"
     exit 1
 fi
 

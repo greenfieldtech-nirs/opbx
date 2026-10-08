@@ -31,6 +31,12 @@ fi
 # Default to running all tests
 TEST_FILTER="${1:-}"
 
+# Safety net: back up the production database before every test battery.
+# Tests are guarded to only touch opbx_test (phpunit.xml.dist force + TestCase
+# guard), but this backup is the last line of defense. Failure is a warning,
+# not a blocker.
+./scripts/backup-database.sh pre-test || echo "WARNING: pre-test backup failed; continuing (tests are guarded to opbx_test)"
+
 echo "=========================================="
 echo "Running OpenPBX PHPUnit Tests"
 echo "Database: MySQL (opbx_test)"
