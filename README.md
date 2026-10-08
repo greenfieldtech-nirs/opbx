@@ -410,6 +410,7 @@ See `.env.example` for all available configuration options. Key variables:
 | `NGROK_AUTHTOKEN` | ngrok authentication token |
 | `LOG_STACK_ENABLED` | Enable centralized logging (use with `--profile logs`) |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the log viewer |
+| `GRAFANA_ROOT_URL` | Public URL of the log viewer (`<APP_URL>/logs/`); must match or Grafana 403s queries |
 | `LOKI_RETENTION_HOURS` | Log retention (default 168 = 7 days) |
 
 ### Cloudonix Webhook Configuration
@@ -455,7 +456,7 @@ docker compose logs -f app
 
 **Centralized Logs (optional):**
 ```bash
-# .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>
+# .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>, GRAFANA_ROOT_URL=<APP_URL>/logs/
 docker compose --profile logs up -d
 # Open http://localhost/logs/ — provisioned dashboards "OPBX Call Flow Logs"
 # (session-token audit trail) and "OPBX Platform Logs", both with text

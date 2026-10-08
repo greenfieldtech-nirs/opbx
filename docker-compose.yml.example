@@ -533,11 +533,15 @@ services:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana_data:/var/lib/grafana
     environment:
-      # Grafana 301s any request whose Host does not match root_url's domain.
-      # OPBX is reached via varying hosts (localhost, ngrok, custom domains),
-      # so the nginx /logs/ block pins Host to "localhost" and root_url
-      # matches it. Grafana only generates relative URLs beyond that.
-      - GF_SERVER_ROOT_URL=http://localhost/logs/
+      # root_url MUST name the URL the browser actually uses: Grafana's CSRF
+      # middleware rejects any authenticated POST (e.g. /api/ds/query) whose
+      # Origin header does not match it, with 403 "origin not allowed".
+      # Set GRAFANA_ROOT_URL in .env to "<APP_URL>/logs/".
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost/logs/}
+      # Any additional hostnames the UI is reached by (ngrok, localhost, a
+      # second domain) - space-separated, no scheme. root_url's own host is
+      # always trusted and does not need listing here.
+      - GF_SECURITY_CSRF_TRUSTED_ORIGINS=${GRAFANA_CSRF_TRUSTED_ORIGINS:-}
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}

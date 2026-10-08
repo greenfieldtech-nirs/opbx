@@ -173,6 +173,9 @@ reports/
 /volumes/minio/
 /volumes/mysql/
 /volumes/redis/
+# Older bind-mount paths still used by some local docker-compose.yml files.
+/volumes/mysql_data/
+/volumes/redis_data/
 /volumes/amd-dumps/
 
 # ============================================================================

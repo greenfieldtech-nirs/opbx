@@ -78,6 +78,8 @@ by `App\Logging\MaskCredentialsProcessor` before records leave Laravel.
 |---------|---------|---------|
 | `LOG_STACK_ENABLED` | `false` | Documented flag; the real switch is the compose profile |
 | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / (empty→`admin`) | Grafana login |
+| `GRAFANA_ROOT_URL` | `http://localhost/logs/` | **Must match the URL the browser uses** (`<APP_URL>/logs/`) |
+| `GRAFANA_CSRF_TRUSTED_ORIGINS` | (empty) | Extra hostnames reaching the UI (ngrok, second domain); space-separated, no scheme |
 | `LOKI_RETENTION_HOURS` | `168` (7d) | Loki compactor retention |
 | `OPBX_LOG_STACK` | `single,json` | Laravel channels inside containers (`json` = stdout contract) |
 
@@ -87,3 +89,36 @@ by `App\Logging\MaskCredentialsProcessor` before records leave Laravel.
   (already in compose) for Docker-socket access; harmless on Docker.
 - nginx `/logs/` uses lazy upstream resolution, so the main app is unaffected
   when the profile is off (`/logs/` then 502s).
+
+## Troubleshooting
+
+**Dashboard panels stay empty and the browser console shows `403` with
+`origin not allowed` on `POST /logs/api/ds/query`.**
+
+Grafana's CSRF middleware compares the browser's `Origin` header against
+`GF_SERVER_ROOT_URL` and rejects authenticated POSTs that do not match. It
+rejects them *before* the request logger runs, so nothing appears in
+`docker compose logs grafana` — only the browser sees the 403.
+
+Set `GRAFANA_ROOT_URL` in `.env` to the public URL (`<APP_URL>/logs/`) and
+recreate the container:
+
+```bash
+docker compose --profile logs up -d --force-recreate grafana
+```
+
+If the UI is also reached over other hostnames, list them in
+`GRAFANA_CSRF_TRUSTED_ORIGINS` (space-separated, no scheme). The nginx
+`/logs/` block forwards the real `Host`, so `root_url` is the single place
+the public URL is configured.
+
+**Verifying the pipeline without waiting for traffic.** Write one contract
+line to a collected container's captured output and query Loki for it:
+
+```bash
+docker exec opbx_app sh -c 'echo "{\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%S.%6NZ)\",\"level\":\"info\",\"service\":\"laravel\",\"msg\":\"smoke test\",\"log_type\":\"platform\"}" > /proc/1/fd/2'
+```
+
+Note `/proc/1/fd/2`, not `fd/1`: in the php-fpm containers PID 1's stdout is
+`/dev/null`, and Laravel's `php://stdout` reaches Docker only because php-fpm
+re-emits worker output on stderr (`catch_workers_output = yes`).
