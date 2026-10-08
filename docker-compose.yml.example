@@ -249,7 +249,11 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
+    # MinIO pulled their images from Docker Hub (docker.io/minio/minio is gone).
+    # bitnamilegacy is Broadcom's frozen archive of the Bitnami build — same binary.
+    # user: root required: image defaults to uid 1001 which can't write the bind mount.
+    image: bitnamilegacy/minio:2025.5.24
+    user: root
     container_name: opbx_minio
     # SECURITY: MinIO ports are disabled by default for security
     # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
