@@ -442,7 +442,9 @@ docker compose --profile logs up -d
 # (session-token audit trail) and "OPBX Platform Logs", both with text
 # search and click-to-inspect detail view.
 ```
-See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details.
+See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details, or
+[SUBMITTING_LOGS.md](SUBMITTING_LOGS.md) for the end-user guide (setup,
+dashboards, session-token filtering, exporting logs for bug reports).
 
 **Queue Monitoring:**
 ```bash
