@@ -40,7 +40,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | json | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ if .msg }}{{ .msg }}{{ else }}(non-JSON log line){{ end }}\""
+          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | regexp \"(?P<raw>.*)\" | json |~ \"\" | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ .raw }}\""
         }
       ],
       "options": {
@@ -53,5 +53,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 6
+  "version": 7
 }

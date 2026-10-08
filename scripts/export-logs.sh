@@ -39,8 +39,8 @@ done
 
 OUT="${OUT:-opbx-logs-${TYPE}-$(date +%Y%m%d-%H%M%S).txt}"
 
-# Same rendering as the dashboard: [level] [session_token] message
-QUERY=$(printf '{log_type="%s"} |~ "%s" |~ "%s" | json %s | line_format "{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ if .msg }}{{ .msg }}{{ else }}(non-JSON log line){{ end }}"' \
+# Same rendering as the dashboard: [level] [session_token] raw log entry
+QUERY=$(printf '{log_type="%s"} |~ "%s" |~ "%s" | regexp "(?P<raw>.*)" | json %s | line_format "{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ .raw }}"' \
   "$TYPE" "$SESSION" "$TEXT" "$SESSIONS_ONLY")
 
 echo "Querying Loki (type=$TYPE, since=$SINCE)..." >&2

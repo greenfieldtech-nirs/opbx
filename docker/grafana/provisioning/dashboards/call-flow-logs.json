@@ -71,7 +71,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | json $sessions_only | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ if .msg }}{{ .msg }}{{ else }}(non-JSON log line){{ end }}\""
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | regexp \"(?P<raw>.*)\" | json $sessions_only | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ .raw }}\""
         }
       ],
       "options": {
@@ -84,5 +84,5 @@
     }
   ],
   "schemaVersion": 39,
-  "version": 7
+  "version": 8
 }
