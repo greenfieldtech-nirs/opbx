@@ -7,6 +7,7 @@ namespace Tests\Unit\Logging;
 use App\Http\Middleware\TagCallFlowLogs;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class TagCallFlowLogsTest extends TestCase
@@ -28,7 +29,7 @@ class TagCallFlowLogsTest extends TestCase
      *
      * @dataProvider tokenSources
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('tokenSources')]
+    #[DataProvider('tokenSources')]
     public function test_shares_session_token_from_all_known_payload_shapes(array $payload, string $expected): void
     {
         Log::shouldReceive('shareContext')

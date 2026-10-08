@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Webhooks\AutoDialerWebhookController;
 use App\Http\Controllers\Webhooks\CloudonixWebhookController;
+use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
+use Illuminate\Cache\RedisStore;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,13 +52,14 @@ Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function 
 |
 */
 
+use App\Http\Controllers\Voice\AlbsFollowThroughController;
 use App\Http\Controllers\Voice\AmdActionController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
 use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
-Route::prefix('voice')->middleware('log.callflow')->group(function (): void {
+Route::prefix('voice')->middleware(['log.callflow', 'log.voice'])->group(function (): void {
     // Main inbound call routing endpoint
     Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
         ->middleware(['voice.webhook.auth'])
@@ -77,14 +80,14 @@ Route::prefix('voice')->middleware('log.callflow')->group(function (): void {
 });
 
 // Action-related callbacks
-Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void {
+Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(function (): void {
     // Ring group callback for sequential routing (round robin, priority, etc.)
     Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.ring-group-callback');
 
     // ALB follow-through callback for failover routing
-    Route::post('/voice/albs-follow-through', [\App\Http\Controllers\Voice\AlbsFollowThroughController::class, 'handle'])
+    Route::post('/voice/albs-follow-through', [AlbsFollowThroughController::class, 'handle'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.albs-follow-through');
 
@@ -112,8 +115,6 @@ Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void 
 |
 */
 
-use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
-
 Route::prefix('webhooks/auto-dialer')->group(function (): void {
     Route::post('/call-status', [AutoDialerWebhookController::class, 'callStatus'])
         ->middleware(['webhook.signature', 'webhook.idempotency'])
@@ -137,7 +138,7 @@ Route::get('/health', function () {
         'timestamp' => now()->toIso8601String(),
         'services' => [
             'database' => DB::connection()->getDatabaseName() ? 'connected' : 'disconnected',
-            'redis' => Cache::getStore() instanceof \Illuminate\Cache\RedisStore ? 'connected' : 'disconnected',
+            'redis' => Cache::getStore() instanceof RedisStore ? 'connected' : 'disconnected',
         ],
     ]);
 })->name('health');

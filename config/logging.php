@@ -1,5 +1,9 @@
 <?php
 
+use App\Logging\CallSiteProcessor;
+use App\Logging\LogTypeEnricher;
+use App\Logging\MaskCredentialsProcessor;
+use App\Logging\OpbxJsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -69,22 +73,23 @@ return [
         // (Alloy -> Loki). Field mapping happens in docker/alloy/config.alloy.
         'json' => [
             'driver' => 'monolog',
-            'handler' => Monolog\Handler\StreamHandler::class,
+            'handler' => StreamHandler::class,
             'with' => [
                 'stream' => 'php://stdout',
             ],
-            'formatter' => App\Logging\OpbxJsonFormatter::class,
+            'formatter' => OpbxJsonFormatter::class,
             'level' => env('LOG_LEVEL', 'info'),
             'processors' => [
-                Monolog\Processor\PsrLogMessageProcessor::class,
-                App\Logging\MaskCredentialsProcessor::class,
-                App\Logging\LogTypeEnricher::class,
+                PsrLogMessageProcessor::class,
+                CallSiteProcessor::class,
+                MaskCredentialsProcessor::class,
+                LogTypeEnricher::class,
             ],
         ],
 
         'null' => [
             'driver' => 'monolog',
-            'handler' => \Monolog\Handler\NullHandler::class,
+            'handler' => NullHandler::class,
         ],
 
         'daily' => [

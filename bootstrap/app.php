@@ -9,11 +9,13 @@ use App\Http\Middleware\EnforceApiKeyScope;
 use App\Http\Middleware\EnsurePlatformManager;
 use App\Http\Middleware\EnsureTenantScope;
 use App\Http\Middleware\EnsureWebhookIdempotency;
+use App\Http\Middleware\LogVoiceRequests;
 use App\Http\Middleware\RateLimitPerOrganization;
 use App\Http\Middleware\RateLimitSensitiveOperations;
 use App\Http\Middleware\ResolveApiKey;
 use App\Http\Middleware\ResolveEmbedToken;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TagCallFlowLogs;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -52,7 +54,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.scope' => EnsureTenantScope::class,
             'webhook.signature' => VerifyCloudonixSignature::class,
-            'log.callflow' => \App\Http\Middleware\TagCallFlowLogs::class,
+            'log.callflow' => TagCallFlowLogs::class,
+            'log.voice' => LogVoiceRequests::class,
             'webhook.idempotency' => EnsureWebhookIdempotency::class,
             'voice.webhook.auth' => VerifyVoiceWebhookAuth::class,
             'rate_limit_org' => RateLimitPerOrganization::class,
@@ -147,7 +150,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // saving() hook) into a clean 403 instead of a 500. This fires only if
         // a request attempts to persist the platform owner's own account while
         // they are operating as an organization.
-        $exceptions->render(function (\RuntimeException $e, $request) {
+        $exceptions->render(function (RuntimeException $e, $request) {
             if (str_contains($e->getMessage(), 'operate-as effective user')
                 && ($request->is('api/*') || $request->expectsJson())) {
                 return response()->json([

@@ -6,7 +6,9 @@ namespace App\Services\CallNotifications;
 
 use App\Models\CallNotificationLog;
 use App\Models\CallNotificationsSettings;
+use App\Scopes\OrganizationScope;
 use App\Services\Security\SsrfUrlValidator;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -71,7 +73,7 @@ class WebhookDispatcher
 
         // Create log entry
         // Must bypass OrganizationScope since webhooks have no authenticated user context
-        $log = \App\Scopes\OrganizationScope::bypass(function () use ($settings, $payload, $eventId, $sessionToken) {
+        $log = OrganizationScope::bypass(function () use ($settings, $payload, $eventId, $sessionToken) {
             return CallNotificationLog::create([
                 'organization_id' => $settings->organization_id,
                 'call_session_token' => $sessionToken,
@@ -164,8 +166,10 @@ class WebhookDispatcher
                 );
 
                 Log::info('Call notification webhook delivered successfully', [
+                    'type' => 'HTTP_RESPONSE',
                     'organization_id' => $settings->organization_id,
                     'event_id' => $log->event_id,
+                    'status' => $response->status(),
                     'response_time_ms' => $responseTimeMs,
                 ]);
 
@@ -186,9 +190,10 @@ class WebhookDispatcher
             );
 
             Log::warning('Call notification webhook returned non-success status', [
+                'type' => 'HTTP_RESPONSE',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
-                'status_code' => $response->status(),
+                'status' => $response->status(),
                 'response_body' => $response->body(),
             ]);
 
@@ -197,7 +202,7 @@ class WebhookDispatcher
                 'status_code' => $response->status(),
             ];
 
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+        } catch (ConnectionException $e) {
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
             $log->markAsFailed(
@@ -213,6 +218,7 @@ class WebhookDispatcher
             );
 
             Log::error('Call notification webhook connection failed', [
+                'type' => 'HTTP_REQUEST',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
                 'error' => $e->getMessage(),
@@ -239,6 +245,7 @@ class WebhookDispatcher
             );
 
             Log::error('Call notification webhook delivery failed', [
+                'type' => 'HTTP_REQUEST',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
                 'error' => $e->getMessage(),
@@ -298,7 +305,7 @@ class WebhookDispatcher
         $current = (int) (Redis::get($key) ?? 0);
         $ttl = Redis::ttl($key);
 
-        $settings = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId) {
+        $settings = OrganizationScope::bypass(function () use ($organizationId) {
             return CallNotificationsSettings::forOrganization($organizationId)->first();
         });
         $limit = $settings?->rate_limit_per_minute ?? 500;

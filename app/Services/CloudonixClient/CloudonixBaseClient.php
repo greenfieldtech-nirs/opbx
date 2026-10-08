@@ -12,6 +12,8 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Base HTTP client for Cloudonix REST API.
@@ -107,10 +109,17 @@ abstract class CloudonixBaseClient
         // (no bodies at info level - headers carry the bearer token).
         // These are control-plane calls -> default log_type "platform".
         return Http::timeout($this->timeout)
-            ->withRequestMiddleware(fn (\Psr\Http\Message\RequestInterface $request) => tap($request, function () use ($request): void {
+            ->withRequestMiddleware(fn (RequestInterface $request) => tap($request, function () use ($request): void {
                 Log::info('Cloudonix REST request', [
+                    'type' => 'HTTP_REQUEST',
                     'method' => $request->getMethod(),
                     'path' => $request->getUri()->getPath(),
+                ]);
+            }))
+            ->withResponseMiddleware(fn (ResponseInterface $response) => tap($response, function () use ($response): void {
+                Log::info('Cloudonix REST response', [
+                    'type' => 'HTTP_RESPONSE',
+                    'status' => $response->getStatusCode(),
                 ]);
             }))
             ->withHeaders([
