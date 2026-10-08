@@ -1,0 +1,73 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      composer-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /mcp-server
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /dialer-worker
+    schedule:
+      interval: weekly
+    groups:
+      gomod-minor:
+        update-types: [minor, patch]
+
+  - package-ecosystem: maven
+    directory: /amd-worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: maven
+    directory: /acd-worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /dialer-worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /amd-worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /acd-worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /mcp-server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
