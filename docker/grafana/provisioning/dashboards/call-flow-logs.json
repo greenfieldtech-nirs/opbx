@@ -31,11 +31,11 @@
         "name": "sessions_only",
         "label": "Display Sessions Only",
         "type": "custom",
-        "query": "Enabled : |~ \"^\\\\[\", Disabled : |~ \"\"",
+        "query": "Enabled : | session_token != \"\", Disabled : |~ \"\"",
         "options": [
           {
             "text": "Enabled",
-            "value": "|~ \"^\\\\[\"",
+            "value": "| session_token != \"\"",
             "selected": true
           },
           {
@@ -46,7 +46,7 @@
         ],
         "current": {
           "text": "Enabled",
-          "value": "|~ \"^\\\\[\"",
+          "value": "| session_token != \"\"",
           "selected": true
         },
         "description": "When enabled, only log entries that carry a Cloudonix session token are shown"
@@ -71,7 +71,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" $sessions_only"
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | json $sessions_only"
         }
       ],
       "options": {
@@ -79,10 +79,14 @@
         "showLabels": false,
         "wrapLogMessage": true,
         "enableLogDetails": true,
-        "sortOrder": "Descending"
+        "sortOrder": "Descending",
+        "displayedFields": [
+          "session_token",
+          "call_id"
+        ]
       }
     }
   ],
   "schemaVersion": 39,
-  "version": 2
+  "version": 4
 }

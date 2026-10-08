@@ -81,18 +81,6 @@ loki.process "opbx" {
 		template = "{{ ToLower .Value }}"
 	}
 
-	// Render call-related lines as "[<session_token>] <json>" for human
-	// scanning. Extraction happened above, so labels/structured-metadata are
-	// unaffected; this only changes the displayed line.
-	stage.template {
-		source   = "_rendered"
-		template = "{{ if .session_token }}[{{ .session_token }}] {{ .Entry }}{{ else }}{{ .Entry }}{{ end }}"
-	}
-
-	stage.output {
-		source = "_rendered"
-	}
-
 	stage.labels {
 		values = {
 			level    = "",

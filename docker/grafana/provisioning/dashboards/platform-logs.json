@@ -40,7 +40,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"platform\"} |~ \"$text_search\""
+          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | json"
         }
       ],
       "options": {
@@ -48,10 +48,14 @@
         "showLabels": false,
         "wrapLogMessage": true,
         "enableLogDetails": true,
-        "sortOrder": "Descending"
+        "sortOrder": "Descending",
+        "displayedFields": [
+          "session_token",
+          "call_id"
+        ]
       }
     }
   ],
   "schemaVersion": 39,
-  "version": 1
+  "version": 3
 }
