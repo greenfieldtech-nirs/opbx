@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: opbx_nginx
     ports:
       - "${APP_PORT:-80}:80"
@@ -249,7 +249,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
     container_name: opbx_minio
     # SECURITY: MinIO ports are disabled by default for security
     # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
@@ -281,7 +281,7 @@ services:
     restart: unless-stopped
 
   soketi:
-    image: 'quay.io/soketi/soketi:latest-16-alpine'
+    image: 'quay.io/soketi/soketi:1.6-16-alpine'
     container_name: opbx_websocket
     ports:
       - "${SOKETI_PORT:-6001}:6001"
@@ -419,7 +419,7 @@ services:
   # Provides a public URL for Cloudonix webhooks
   # Docs: https://ngrok.com/docs
   ngrok:
-    image: ngrok/ngrok:latest
+    image: ngrok/ngrok:3-alpine
     container_name: opbx_ngrok
     # Use a shell command to conditionally add --url when NGROK_DOMAIN is set
     entrypoint: ["/bin/sh", "-c"]
