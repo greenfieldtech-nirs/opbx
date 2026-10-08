@@ -40,7 +40,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | json"
+          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | json | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ if .msg }}{{ .msg }}{{ else }}(non-JSON log line){{ end }}\""
         }
       ],
       "options": {
@@ -48,14 +48,10 @@
         "showLabels": false,
         "wrapLogMessage": true,
         "enableLogDetails": true,
-        "sortOrder": "Descending",
-        "displayedFields": [
-          "session_token",
-          "call_id"
-        ]
+        "sortOrder": "Descending"
       }
     }
   ],
   "schemaVersion": 39,
-  "version": 3
+  "version": 6
 }
