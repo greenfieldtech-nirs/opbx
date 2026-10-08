@@ -343,6 +343,25 @@ docker compose down -v
 ./scripts/restore-database.sh backups/opbx-daily.sql.gz
 ```
 
+### Database Backups
+
+`./scripts/backup-database.sh` dumps the MySQL database (via `mysqldump` inside the container) to `./backups/` on the **host** filesystem. Every backup is verified to contain a valid dump.
+
+```bash
+./scripts/backup-database.sh           # Timestamped backup (keeps last 10)
+./scripts/backup-database.sh daily     # Rotating daily backup (overwrites)
+./scripts/backup-database.sh weekly    # Rotating weekly backup (overwrites)
+./scripts/backup-database.sh pre-test  # Safety backup (runs automatically before ./run-tests.sh)
+```
+
+**Scheduling (production):** trigger backups from the **host**, not a container — a broken stack must not stop your backups. Example cron entry:
+
+```cron
+0 3 * * * cd /path/to/opbx && ./scripts/backup-database.sh daily >> /var/log/opbx-backup.log 2>&1
+```
+
+Backups in `./backups/` live on the same disk as the database — copy them off-box (rsync/rclone/S3) for real disaster protection.
+
 See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full details.
 
 ### Docker Services
@@ -721,7 +740,7 @@ We welcome contributions from the community! Here's how to get started:
 
 ### Pull Request Process
 
-1. Ensure all tests pass: `docker compose exec app php artisan test`
+1. Ensure all tests pass: `./run-tests.sh` (never run `php artisan test` directly in the container — it must go through `run-tests.sh`, which targets the `opbx_test` database and takes a pre-test backup)
 2. Run code quality checks: `vendor/bin/pint` and frontend linting
 3. Update `CHANGELOG.md` with your changes
 4. Open a PR with a clear description of changes
