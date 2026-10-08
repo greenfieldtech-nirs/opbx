@@ -45,6 +45,13 @@ Every service emits one JSON object per line: `ts`, `level`, `msg`,
 metadata*, never labels. Labels are bounded: `service`, `level`,
 `log_type`, `org_id`, `container`.
 
+## Exporting logs to a file
+
+- **CSV from the dashboard**: panel menu (⋮) → Inspect → Data → Download CSV.
+- **Plain text**: `./scripts/export-logs.sh [--type call_flow|platform]
+  [--session <token>] [--text <string>] [--all] [--since 24h] [file]` — renders
+  the same lines as the dashboard (`[level] [token] message`, chronological).
+
 ## Useful queries (Explore → Loki)
 
 ```

@@ -62,6 +62,17 @@ In Grafana → **Explore** with the **Loki** datasource:
 {service="acd-worker"} |~ "offering to agents"
 ```
 
+## Exporting to a File
+
+- **CSV**: open the panel menu (⋮) → **Inspect → Data → Download CSV** — exports exactly what your filters show.
+- **Plain text** (on the host):
+
+```bash
+./scripts/export-logs.sh --session sess-abc123 call-audit.txt
+```
+
+See `./scripts/export-logs.sh --help` for all filters (type, text, time window, sessions-only toggle).
+
 ## How It Works
 
 - All services emit single-line JSON to stdout with a shared contract (`ts`, `level`, `msg`, `service`, `log_type`, plus `org_id` / `session_token` / `call_id` when known)
