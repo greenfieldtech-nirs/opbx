@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     supervisor \
     icu-dev \
     su-exec \
+    ffmpeg \
     && docker-php-ext-install \
     pdo_mysql \
     mbstring \
