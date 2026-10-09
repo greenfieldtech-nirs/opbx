@@ -98,9 +98,19 @@ class CallQueue extends Model
             $currentId = $queue->moh_recording_id;
 
             if ($previousId !== null && $previousId !== $currentId) {
-                $previous = OrganizationScope::bypass(fn () => Recording::find($previousId));
-                if ($previous instanceof Recording) {
-                    app(MohSegmentationService::class)->invalidate($previous);
+                // Only drop segments when no other queue still uses the
+                // recording — queues may share a MOH recording.
+                $stillReferenced = OrganizationScope::bypass(
+                    fn () => static::where('moh_recording_id', $previousId)
+                        ->whereKeyNot($queue->id)
+                        ->exists()
+                );
+
+                if (! $stillReferenced) {
+                    $previous = OrganizationScope::bypass(fn () => Recording::find($previousId));
+                    if ($previous instanceof Recording) {
+                        app(MohSegmentationService::class)->invalidate($previous);
+                    }
                 }
             }
 

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\CallQueue;
 
+use App\Models\CallQueue;
 use App\Models\Recording;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,10 @@ class MohSegmentationService
     private const SEGMENT_SECONDS = 10;
 
     private const REDIS_KEY_PREFIX = 'moh:segments:';
+
+    // Segments outlive the key on expiry; the list is rebuildable from the
+    // objects, so a self-healing TTL for orphans is acceptable.
+    private const REDIS_TTL_SECONDS = 604800; // 7 days
 
     private const FFMPEG_TIMEOUT_SECONDS = 300;
 
@@ -79,6 +85,16 @@ class MohSegmentationService
 
     private function doSegment(Recording $recording): void
     {
+        // Skip work when no queue references the recording anymore (the job
+        // may have been dispatched before an unset/swap landed).
+        if (! $this->isReferencedByQueue($recording)) {
+            Log::info('MohSegmentationService: recording not referenced by any queue, skipping', [
+                'recording_id' => $recording->id,
+            ]);
+
+            return;
+        }
+
         $disk = Storage::disk($this->diskName());
         $sourcePath = "{$recording->organization_id}/{$recording->file_path}";
 
@@ -111,8 +127,10 @@ class MohSegmentationService
                 throw new \RuntimeException('ffmpeg exited '.$process->getExitCode().': '.$process->getErrorOutput());
             }
 
-            $files = glob($workDir.'/[0-9][0-9][0-9].'.$extension) ?: [];
-            sort($files);
+            // [0-9]* keeps matching past segment 999; input.{ext} starts with
+            // a letter so it stays excluded.
+            $files = glob($workDir.'/[0-9]*.'.$extension) ?: [];
+            sort($files, SORT_NATURAL);
 
             // ponytail: a single segment buys nothing over playing the file
             // itself; leave the recording unsegmented.
@@ -132,7 +150,20 @@ class MohSegmentationService
                 $paths[] = $target;
             }
 
-            Redis::set(self::REDIS_KEY_PREFIX.$recording->id, json_encode($paths));
+            // Re-check before publishing: a queue may have released the
+            // recording while ffmpeg was running. The Redis key is the source
+            // of truth, so don't resurrect segments for a released recording.
+            if (! $this->isReferencedByQueue($recording)) {
+                $disk->delete($paths);
+
+                Log::info('MohSegmentationService: recording released during segmentation, skipping publish', [
+                    'recording_id' => $recording->id,
+                ]);
+
+                return;
+            }
+
+            Redis::setex(self::REDIS_KEY_PREFIX.$recording->id, self::REDIS_TTL_SECONDS, json_encode($paths));
 
             Log::info('MohSegmentationService: MOH segmented', [
                 'recording_id' => $recording->id,
@@ -144,6 +175,13 @@ class MohSegmentationService
             }
             @rmdir($workDir);
         }
+    }
+
+    private function isReferencedByQueue(Recording $recording): bool
+    {
+        return OrganizationScope::bypass(
+            fn () => CallQueue::where('moh_recording_id', $recording->id)->exists()
+        );
     }
 
     private function diskName(): string

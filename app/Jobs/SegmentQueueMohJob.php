@@ -20,8 +20,6 @@ class SegmentQueueMohJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 2;
-
     public function __construct(
         private readonly int $recordingId
     ) {

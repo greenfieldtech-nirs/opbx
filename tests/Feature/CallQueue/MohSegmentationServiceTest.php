@@ -92,8 +92,16 @@ class MohSegmentationServiceTest extends TestCase
             $this->markTestSkipped('ffmpeg not available in the test container');
         }
 
+        Queue::fake();
+
         $recording = $this->makeUploadedRecording();
         $this->putRealWavFixture($recording);
+
+        // segment() only publishes while a queue references the recording
+        CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'moh_recording_id' => $recording->id,
+        ]);
 
         $this->service->segment($recording);
 
@@ -108,6 +116,57 @@ class MohSegmentationServiceTest extends TestCase
         }
 
         $this->assertSame($segments, json_decode(Redis::get($this->redisKey($recording->id)), true));
+        $this->assertGreaterThan(0, Redis::ttl($this->redisKey($recording->id)));
+    }
+
+    public function test_segment_publishes_nothing_when_no_queue_references_recording(): void
+    {
+        if (! $this->ffmpegAvailable()) {
+            $this->markTestSkipped('ffmpeg not available in the test container');
+        }
+
+        $recording = $this->makeUploadedRecording();
+        $this->putRealWavFixture($recording);
+
+        $this->service->segment($recording);
+
+        $this->assertSame([], $this->service->segmentsFor($recording));
+        $this->assertNull(Redis::get($this->redisKey($recording->id)));
+        Storage::disk('recordings')->assertMissing(
+            "{$this->organization->id}/moh-segments/{$recording->id}/000.wav"
+        );
+    }
+
+    public function test_shared_recording_segments_survive_until_last_queue_releases(): void
+    {
+        Queue::fake();
+
+        $recording = $this->makeUploadedRecording();
+
+        $queueA = CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'moh_recording_id' => $recording->id,
+        ]);
+        $queueB = CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'moh_recording_id' => $recording->id,
+        ]);
+
+        $segmentPath = "{$this->organization->id}/moh-segments/{$recording->id}/000.wav";
+        Storage::disk('recordings')->put($segmentPath, 'audio-bytes');
+        Redis::set($this->redisKey($recording->id), json_encode([$segmentPath]));
+
+        // Queue A releases the recording; queue B still uses it.
+        $queueA->update(['moh_recording_id' => null]);
+
+        $this->assertNotNull(Redis::get($this->redisKey($recording->id)));
+        Storage::disk('recordings')->assertExists($segmentPath);
+
+        // Last queue releases it: segments are invalidated.
+        $queueB->update(['moh_recording_id' => null]);
+
+        $this->assertNull(Redis::get($this->redisKey($recording->id)));
+        Storage::disk('recordings')->assertMissing($segmentPath);
     }
 
     public function test_segments_for_returns_empty_when_not_segmented(): void
@@ -141,9 +200,15 @@ class MohSegmentationServiceTest extends TestCase
     public function test_segment_failure_leaves_no_key_and_logs(): void
     {
         Log::spy();
+        Queue::fake();
 
         // file_path points at an object that does not exist on the disk
         $recording = $this->makeUploadedRecording('missing.wav');
+
+        CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'moh_recording_id' => $recording->id,
+        ]);
 
         $this->service->segment($recording);
 
