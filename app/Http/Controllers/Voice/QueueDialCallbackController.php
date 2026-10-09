@@ -7,8 +7,11 @@ namespace App\Http\Controllers\Voice;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Voice\QueueCallbackRequest;
 use App\Models\CallQueue;
+use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
+use App\Services\CallQueue\AcdWorkerClient;
 use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\CallQueue\QueueDialOfferService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Http\Response;
@@ -50,7 +53,7 @@ class QueueDialCallbackController extends Controller
         // ended. A failure status after the bridge must not trigger a re-offer
         // (redial loop, origin never terminates, congestion) - record the
         // bridge and end the call cleanly.
-        $queueCall = \App\Models\QueueCall::withoutGlobalScope(OrganizationScope::class)
+        $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
             ->where('call_queue_id', $context['call_queue_id'])
             ->where('call_id', $context['call_id'])
             ->whereNull('disposition')
@@ -87,15 +90,15 @@ class QueueDialCallbackController extends Controller
 
                 // Re-offer immediately: another agent may be available and the
                 // caller should not wait out the hold cycle for the next offer.
-                $queueCall = \App\Models\QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
                     ->where('call_queue_id', $callQueue->id)
                     ->where('call_id', $context['call_id'])
                     ->whereNull('disposition')
                     ->first();
 
                 if ($queueCall) {
-                    $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
-                    $result = app(\App\Services\CallQueue\AcdWorkerClient::class)->poll(
+                    $dialOffer = app(QueueDialOfferService::class);
+                    $result = app(AcdWorkerClient::class)->poll(
                         $callQueue->organization_id,
                         $callQueue->id,
                         $queueCall->call_id,
@@ -113,7 +116,7 @@ class QueueDialCallbackController extends Controller
                     }
                 }
 
-                return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
+                return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id'], null, $context['moh_idx']);
             }
         }
 
