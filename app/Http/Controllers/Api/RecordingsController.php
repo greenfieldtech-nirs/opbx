@@ -14,6 +14,7 @@ use App\Jobs\ProcessRecordingUpload;
 use App\Jobs\ValidateRemoteUrl;
 use App\Models\ApiKey;
 use App\Models\Recording;
+use App\Services\CallQueue\MohSegmentationService;
 use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
@@ -404,6 +405,10 @@ class RecordingsController extends Controller
                 ]);
             }
         }
+
+        // Queues referencing this recording are nulled by the FK (nullOnDelete,
+        // no model events), so drop any MOH segments derived from it here.
+        app(MohSegmentationService::class)->invalidate($recording);
 
         $recording->delete();
 

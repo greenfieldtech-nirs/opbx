@@ -7,8 +7,9 @@ namespace App\Models;
 use App\Enums\CallQueueStatus;
 use App\Enums\CallQueueStrategy;
 use App\Enums\RingGroupFallbackAction;
-use App\Models\AiAssistantLoadBalancer;
+use App\Jobs\SegmentQueueMohJob;
 use App\Scopes\OrganizationScope;
+use App\Services\CallQueue\MohSegmentationService;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -72,6 +73,41 @@ class CallQueue extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Keep MOH segments in sync with the assigned recording (WP1, Scenario 2):
+     * segment the new recording off-request, drop the old recording's segments.
+     */
+    protected static function booted(): void
+    {
+        // ponytail: split created/updated because changes are only synced on
+        // update — wasChanged() is empty right after an insert.
+        static::created(function (CallQueue $queue): void {
+            if ($queue->moh_recording_id !== null) {
+                SegmentQueueMohJob::dispatch($queue->moh_recording_id);
+            }
+        });
+
+        static::updated(function (CallQueue $queue): void {
+            if (! $queue->wasChanged('moh_recording_id')) {
+                return;
+            }
+
+            $previousId = $queue->getOriginal('moh_recording_id');
+            $currentId = $queue->moh_recording_id;
+
+            if ($previousId !== null && $previousId !== $currentId) {
+                $previous = OrganizationScope::bypass(fn () => Recording::find($previousId));
+                if ($previous instanceof Recording) {
+                    app(MohSegmentationService::class)->invalidate($previous);
+                }
+            }
+
+            if ($currentId !== null) {
+                SegmentQueueMohJob::dispatch($currentId);
+            }
+        });
     }
 
     /**
