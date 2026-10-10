@@ -29,9 +29,18 @@ class ExtensionPresenceTracker
         'congestion', 'congested', 'busy', 'completed', 'hangup', 'bye',
     ];
 
-    public function handleSessionUpdate(int $organizationId, ?string $destination, string $status): void
+    public function handleSessionUpdate(int $organizationId, ?string $destination, string $status, ?string $action = null): void
     {
         if (! $destination) {
+            return;
+        }
+
+        // A deleted session has ended whatever its last status was: Cloudonix
+        // sends the deletion with the final status (e.g. 'connected'), which
+        // would otherwise leave the destination "busy" for the whole TTL.
+        if ($action === 'deleted') {
+            Redis::del(self::key($organizationId, $destination));
+
             return;
         }
 

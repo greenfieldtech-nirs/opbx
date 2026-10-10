@@ -55,7 +55,8 @@ class QueueCallLifecycleService
         $this->presence->handleSessionUpdate(
             $sessionUpdate->organization_id,
             $sessionUpdate->destination,
-            $sessionUpdate->status
+            $sessionUpdate->status,
+            $sessionUpdate->action
         );
 
         // Session updates correlate by session token: call_ids holds SIP call
