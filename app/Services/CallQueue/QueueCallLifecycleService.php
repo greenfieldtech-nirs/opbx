@@ -316,6 +316,11 @@ class QueueCallLifecycleService
                     $demotedAgentId
                 );
             }
+
+            // Caller left while conference-offer agent sessions still ring.
+            if ($callQueue) {
+                app(ConferenceOfferService::class)->cancel($callQueue, $queueCall->call_id);
+            }
         }
 
         Redis::del(self::DIAL_MARKER_PREFIX.$queueCall->call_id);
@@ -420,6 +425,12 @@ class QueueCallLifecycleService
         );
 
         Redis::del(self::DIAL_MARKER_PREFIX.$queueCall->call_id);
+
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)->find($queueCall->call_queue_id);
+
+        if ($callQueue) {
+            app(ConferenceOfferService::class)->cancel($callQueue, $queueCall->call_id);
+        }
     }
 
     private function findPendingQueueCall(int $organizationId, array $callIds): ?QueueCall

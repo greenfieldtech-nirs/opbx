@@ -19,6 +19,7 @@ use App\Models\RingGroup;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\AcdWorkerClient;
+use App\Services\CallQueue\ConferenceOfferService;
 use App\Services\CallQueue\QueueCallLifecycleService;
 use App\Services\CallQueue\QueueDialOfferService;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -74,6 +75,20 @@ class QueuePollController extends Controller
         // strategy never saw this call (unknown state) — end gracefully.
         if (! $queueCall) {
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        // Conference-mediated ring-all: a winner means the caller belongs in
+        // the room (application switch missed, or a stale hold document);
+        // a pending offer means agent sessions are still ringing - hold
+        // without asking the worker for a second offer.
+        $conferenceOffers = app(ConferenceOfferService::class);
+
+        if ($conferenceOffers->winnerOf($queueCall->call_id) !== null) {
+            return app(QueueConferenceController::class)->joinResponse($callQueue, $queueCall);
+        }
+
+        if ($conferenceOffers->isOfferPending($queueCall->call_id)) {
+            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id, null, $context['moh_idx']);
         }
 
         // Stale-document guard: with immediate connect, the pre-switch hold

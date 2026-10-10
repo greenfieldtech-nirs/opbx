@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\CallQueue;
 
 use App\Models\CallQueue;
+use App\Models\CloudonixSettings;
 use App\Models\QueueCall;
+use App\Scopes\OrganizationScope;
 use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
@@ -31,14 +33,23 @@ class QueueDialOfferService
     // the organization's inbound call recording policy (same as ring groups).
 
     /**
-     * Offer the call to the given agents. Returns null when every offered
-     * agent is presence-busy (caller should keep holding).
+     * Offer the call to the given agents. Returns null when the caller should
+     * keep holding: every offered agent is presence-busy, or the offer runs
+     * out-of-band as per-agent conference sessions (conference_ring_all).
      *
      * @param  array<int, array{userId: string, extensionNumber: string}>  $agents
      * @param  bool  $reserve  re-serving the pending offer: no presence filter, offer marker kept as-is
      */
     public function buildDialResponse(Request $request, CallQueue $callQueue, QueueCall $queueCall, array $agents, bool $reserve = false): ?Response
     {
+        $conferenceOffers = app(ConferenceOfferService::class);
+
+        if (! $reserve && $conferenceOffers->isEnabledFor($callQueue)) {
+            $conferenceOffers->offer($callQueue, $queueCall, $agents);
+
+            return null;
+        }
+
         // Belt-and-suspenders: skip agents whose extension is on an active call.
         // Bypassed when re-serving an in-flight offer: the agent looks busy
         // precisely because of our own dial leg (ringing or bridged).
@@ -52,6 +63,7 @@ class QueueDialOfferService
                     'agent_user_id' => $agent['userId'],
                     'extension_number' => $agent['extensionNumber'],
                 ]);
+
                 continue;
             }
             $targets[] = (string) $agent['extensionNumber'];
@@ -101,7 +113,7 @@ class QueueDialOfferService
             'callback_type' => 'queue_dial_callback',
         ]);
 
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
         $baseUrl = rtrim($cloudonixSettings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return $baseUrl.route('voice.queue-dial-callback', ['session_data' => $sessionData], false);
@@ -123,8 +135,8 @@ class QueueDialOfferService
     public function roster(CallQueue $callQueue): array
     {
         return $callQueue->agents()
-            ->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
-            ->with(['extension' => fn ($q) => $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class)])
+            ->withoutGlobalScope(OrganizationScope::class)
+            ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
             ->get()
             ->filter(fn ($user) => $user->extension !== null)
             ->map(fn ($user) => [

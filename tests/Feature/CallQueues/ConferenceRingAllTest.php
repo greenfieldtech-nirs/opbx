@@ -6,17 +6,25 @@ namespace Tests\Feature\CallQueues;
 
 use App\Enums\CallQueueStrategy;
 use App\Enums\ExtensionType;
+use App\Enums\QueueCallDisposition;
 use App\Enums\UserRole;
+use App\Http\Controllers\Voice\QueuePollController;
+use App\Http\Requests\Voice\QueueCallbackRequest;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
 use App\Models\CloudonixSettings;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\QueueCall;
 use App\Models\User;
 use App\Services\CallQueue\ConferenceOfferService;
 use App\Services\CallQueue\ExtensionPresenceTracker;
+use App\Services\CallQueue\ImmediateConnectService;
+use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Testing\TestResponse;
@@ -101,13 +109,25 @@ class ConferenceRingAllTest extends TestCase
     /**
      * Cloudonix + worker fakes: originations return agent-tok-1, agent-tok-2, ...
      */
-    private function fakeCloudonix(): void
+    /**
+     * @param  array<string, mixed>  $workerPoll  acd-worker /queue/poll decision
+     * @param  array<string, mixed>  $workerLive  acd-worker /queue/live snapshot
+     */
+    private function fakeCloudonix(array $workerPoll = ['action' => 'wait', 'position' => 1], array $workerLive = []): void
     {
         $originated = 0;
 
-        Http::fake(function ($request) use (&$originated) {
+        Http::fake(function ($request) use (&$originated, $workerPoll, $workerLive) {
+            if (str_contains($request->url(), 'acd-worker:8084/queue/poll')) {
+                return Http::response($workerPoll, 200);
+            }
+
+            if (str_contains($request->url(), 'acd-worker:8084/queue/live')) {
+                return Http::response($workerLive, 200);
+            }
+
             if (str_contains($request->url(), 'acd-worker:8084')) {
-                return Http::response([], 204);
+                return Http::response(['position' => 1], 200);
             }
 
             // Origination (POST /calls/{domain}/application); session paths
@@ -128,6 +148,7 @@ class ConferenceRingAllTest extends TestCase
             'call_id' => self::CALL_ID,
             'session_token' => self::CALL_ID,
             'from_number' => '9000',
+            'entered_at' => now()->subSeconds(5),
         ]);
     }
 
@@ -287,6 +308,177 @@ class ConferenceRingAllTest extends TestCase
         $after = (string) $this->post($joinUrl)->getContent();
         $this->assertStringContainsString('<Conference', $after);
         $this->assertStringContainsString('endConferenceOnExit="true"', $after);
+    }
+
+    private function dialDecision(): array
+    {
+        return ['action' => 'dial', 'agents' => $this->agents()];
+    }
+
+    private function pollRequest(): QueueCallbackRequest
+    {
+        return QueueCallbackRequest::create('/callbacks/voice/queue-poll', 'POST', [
+            'CallSid' => self::CALL_ID,
+            'session_data' => json_encode([
+                'call_queue_id' => $this->queue->id,
+                'call_id' => self::CALL_ID,
+                'organization_id' => $this->organization->id,
+                'callback_type' => 'queue_poll',
+            ]),
+        ]);
+    }
+
+    private function originations(): int
+    {
+        return Http::recorded(fn ($request) => $request->method() === 'POST'
+            && ! str_contains($request->url(), '/sessions/')
+            && str_ends_with($request->url(), '/application'))->count();
+    }
+
+    public function test_route_with_available_agents_rings_agent_sessions_and_holds_caller(): void
+    {
+        $this->queue->update(['immediate_connect' => true]);
+        $this->fakeCloudonix($this->dialDecision());
+
+        $response = app(QueueRoutingStrategy::class)->route(Request::create('/voice/route', 'POST', [
+            'CallSid' => self::CALL_ID,
+            'Session' => self::CALL_ID,
+            'From' => '9000',
+            'To' => '525591153987',
+            '_organization_id' => $this->organization->id,
+        ]), new DidNumber, ['call_queue' => $this->queue]);
+
+        $content = (string) $response->getContent();
+        $this->assertStringNotContainsString('<Number>', $content, 'no multi-target Dial in the caller session');
+        $this->assertStringContainsString('<Redirect', $content, 'caller keeps holding in the poll loop');
+        $this->assertSame(2, $this->originations());
+    }
+
+    public function test_flag_off_keeps_legacy_multi_number_dial(): void
+    {
+        $this->queue->update(['immediate_connect' => true, 'conference_ring_all' => false]);
+        $this->fakeCloudonix($this->dialDecision());
+
+        $response = app(QueueRoutingStrategy::class)->route(Request::create('/voice/route', 'POST', [
+            'CallSid' => self::CALL_ID,
+            'From' => '9000',
+            'To' => '525591153987',
+            '_organization_id' => $this->organization->id,
+        ]), new DidNumber, ['call_queue' => $this->queue]);
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Number>1001</Number>', $content);
+        $this->assertStringContainsString('<Number>1002</Number>', $content);
+        $this->assertSame(0, $this->originations());
+    }
+
+    public function test_poll_dial_decision_starts_conference_offer(): void
+    {
+        $this->fakeCloudonix($this->dialDecision());
+        $this->queueCall();
+
+        $content = (string) app(QueuePollController::class)->handle($this->pollRequest())->getContent();
+
+        $this->assertStringNotContainsString('<Number>', $content);
+        $this->assertStringContainsString('<Redirect', $content);
+        $this->assertSame(2, $this->originations());
+    }
+
+    public function test_poll_while_offer_pending_holds_without_new_offer(): void
+    {
+        $this->fakeCloudonix($this->dialDecision());
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+
+        $content = (string) app(QueuePollController::class)->handle($this->pollRequest())->getContent();
+
+        $this->assertStringContainsString('<Redirect', $content);
+        $this->assertSame(2, $this->originations(), 'no second round of agent sessions');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_poll_after_winner_serves_room_join_not_a_new_offer(): void
+    {
+        // Covers a missed application switch and stale hold documents: the
+        // caller is sent into the room, never offered to agents again.
+        $this->fakeCloudonix($this->dialDecision());
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+
+        $content = (string) app(QueuePollController::class)->handle($this->pollRequest())->getContent();
+
+        $this->assertStringContainsString('<Conference', $content);
+        $this->assertStringContainsString('q'.$this->queue->id.'c'.self::CALL_ID, $content);
+        $this->assertStringNotContainsString('<Number>', $content);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+    }
+
+    public function test_caller_abandon_during_offer_ends_agent_sessions(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+
+        app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
+            'call_id' => 'sip-call-id-1',
+            'session' => ['token' => self::CALL_ID, 'callEndTime' => now()->getTimestampMs()],
+        ]);
+
+        $this->assertSame(QueueCallDisposition::ABANDONED, $queueCall->refresh()->disposition);
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/sessions/agent-tok-1'));
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/sessions/agent-tok-2'));
+    }
+
+    public function test_answered_conference_call_finalizes_with_real_winner_and_wrap_up(): void
+    {
+        $this->queue->update(['wrap_up_seconds' => 30]);
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->secondAgent, 'agent-tok-2');
+
+        app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
+            'call_id' => 'sip-call-id-1',
+            'session' => ['token' => self::CALL_ID, 'callEndTime' => now()->addMinute()->getTimestampMs()],
+        ]);
+
+        $queueCall->refresh();
+        $this->assertSame(QueueCallDisposition::ANSWERED, $queueCall->disposition);
+        $this->assertSame($this->secondAgent->id, $queueCall->agent_user_id);
+
+        // Wrap-up goes to the agent who actually took the call.
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'acd-worker:8084/events')
+            && $request['type'] === 'ended'
+            && $request['agentUserId'] === (string) $this->secondAgent->id
+            && $request['wrapUpSeconds'] === 30);
+    }
+
+    public function test_overflow_ends_pending_agent_sessions(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+
+        app(QueueCallLifecycleService::class)->markOverflowed($queueCall);
+
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/sessions/agent-tok-1'));
+        $this->assertFalse(app(ConferenceOfferService::class)->isOfferPending(self::CALL_ID));
+    }
+
+    public function test_agent_login_offers_conference_without_application_switch(): void
+    {
+        $this->queue->update(['immediate_connect' => true]);
+        $this->fakeCloudonix($this->dialDecision(), [
+            'waiting' => [['callId' => self::CALL_ID, 'position' => 1, 'waitedSeconds' => 5]],
+            'agents' => [],
+        ]);
+        $this->queueCall();
+
+        app(ImmediateConnectService::class)->connectAvailableCallers($this->queue);
+
+        $this->assertSame(2, $this->originations());
+        Http::assertNotSent(fn ($request) => str_ends_with($request->url(), '/sessions/'.self::CALL_ID.'/application'));
     }
 
     public function test_cancel_ends_every_pending_agent_session(): void
