@@ -90,6 +90,12 @@ class StoreCallQueueRequest extends FormRequest
             'immediate_connect' => [
                 'boolean',
             ],
+            // No prepareForValidation default on purpose: updates inherit the
+            // defaults, and an omitted flag must not silently switch it off.
+            'conference_ring_all' => [
+                'sometimes',
+                'boolean',
+            ],
             'announce_position_timeout' => [
                 Rule::requiredIf(fn () => $this->boolean('announce_position')),
                 'nullable',

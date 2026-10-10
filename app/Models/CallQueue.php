@@ -40,6 +40,7 @@ class CallQueue extends Model
         'announce_position_timeout',
         'announce_position_language',
         'immediate_connect',
+        'conference_ring_all',
         'moh_recording_id',
         'fallback_action',
         'fallback_extension_id',
@@ -67,6 +68,7 @@ class CallQueue extends Model
             'announce_position' => 'boolean',
             'announce_position_timeout' => 'integer',
             'immediate_connect' => 'boolean',
+            'conference_ring_all' => 'boolean',
         ];
     }
 
