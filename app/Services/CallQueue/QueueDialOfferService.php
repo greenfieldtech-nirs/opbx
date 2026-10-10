@@ -35,8 +35,9 @@ class QueueDialOfferService
      * agent is presence-busy (caller should keep holding).
      *
      * @param  array<int, array{userId: string, extensionNumber: string}>  $agents
+     * @param  bool  $reserve  re-serving the pending offer: no presence filter, offer marker kept as-is
      */
-    public function buildDialResponse(Request $request, CallQueue $callQueue, QueueCall $queueCall, array $agents, bool $respectPresence = true): ?Response
+    public function buildDialResponse(Request $request, CallQueue $callQueue, QueueCall $queueCall, array $agents, bool $reserve = false): ?Response
     {
         // Belt-and-suspenders: skip agents whose extension is on an active call.
         // Bypassed when re-serving an in-flight offer: the agent looks busy
@@ -44,7 +45,7 @@ class QueueDialOfferService
         $targets = [];
         $agentUserIds = [];
         foreach ($agents as $agent) {
-            if ($respectPresence && $this->presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
+            if (! $reserve && $this->presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
                 Log::info('QueueDialOfferService: Skipping presence-busy agent', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $queueCall->call_id,
@@ -61,11 +62,12 @@ class QueueDialOfferService
             return null;
         }
 
-        // Remember the offered agents for answer attribution.
-        // ponytail: ring_all may offer several agents; we attribute the answer to the
-        // first offered agent. Exact per-leg attribution requires bridged-leg CDR
-        // correlation — add if ring_all attribution proves too coarse.
-        $this->lifecycle->markDial($callQueue->id, $queueCall->call_id, $agentUserIds[0]);
+        // Remember every offered agent: the marker drives bridge detection and
+        // stale-poll re-serves, and attributes the answer when only one agent
+        // was offered. A re-serve must not shrink the original offer set.
+        if (! $reserve) {
+            $this->lifecycle->markDial($callQueue->id, $queueCall->call_id, $agentUserIds);
+        }
 
         Log::info('QueueDialOfferService: Offering call to agents', [
             'call_queue_id' => $callQueue->id,

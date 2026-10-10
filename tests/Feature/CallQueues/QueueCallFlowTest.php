@@ -605,24 +605,26 @@ class QueueCallFlowTest extends TestCase
             && $request['type'] === 'answered');
     }
 
-    public function test_connected_status_marks_bridge_and_attributes_winning_leg(): void
+    public function test_connected_status_marks_bridge_and_attributes_offered_agent_not_caller(): void
     {
         // Regression (customer logs): the agent bridge is reported as
         // status CONNECTED (uppercase, with callAnswerTime) - not 'answer'.
         // Without accepting it, answered_at stays null and every downstream
-        // guard misfires. Attribution must follow the leg that actually
-        // picked up (outgoing subscriber), not the first-offered agent.
+        // guard misfires.
+        // Regression (customer session ed4819f9...): outgoingSubscriberId is the
+        // CALLER's subscriber - present from the very first route request,
+        // before any agent is dialed. Attribution must never follow it.
         Redis::del('acd:dial:'.self::CALL_ID);
         Redis::del('acd:dialresult:'.self::CALL_ID);
 
-        $otherAgent = \App\Models\User::factory()->create([
+        $callerUser = User::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
-        $otherExtension = \App\Models\Extension::factory()->create([
+        Extension::factory()->create([
             'organization_id' => $this->organization->id,
-            'user_id' => $otherAgent->id,
-            'extension_number' => '1099',
-            'cloudonix_subscriber_id' => 250708,
+            'user_id' => $callerUser->id,
+            'extension_number' => '9000',
+            'cloudonix_subscriber_id' => 250707,
         ]);
 
         $queueCall = QueueCall::factory()->create([
@@ -638,14 +640,178 @@ class QueueCallFlowTest extends TestCase
             'organization_id' => $this->organization->id,
             'session_token' => self::CALL_ID,
             'status' => 'connected',
-            'outgoing_subscriber_id' => 250708,
+            'outgoing_subscriber_id' => 250707,
         ]);
 
         app(QueueCallLifecycleService::class)->handleSessionUpdate($bridgeUpdate);
 
         $queueCall->refresh();
         $this->assertNotNull($queueCall->answered_at);
-        $this->assertSame($otherAgent->id, $queueCall->agent_user_id, 'attribution follows the leg that picked up');
+        $this->assertSame($this->agent->id, $queueCall->agent_user_id, 'single-target offer attributes the offered agent');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'answered'
+            && $request['agentUserId'] === (string) $this->agent->id);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/events')
+            && ($request['agentUserId'] ?? null) === (string) $callerUser->id);
+    }
+
+    public function test_ring_all_bridge_credits_no_agent_when_winner_unknown(): void
+    {
+        // A multi-target <Dial> carries no reliable winning leg. Crediting the
+        // first-offered agent (or the caller) marked the wrong user BUSY /
+        // WRAP_UP in the worker while the real answerer stayed AVAILABLE.
+        $second = $this->createAgent('1002');
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, [$this->agent->id, $second->id]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        $bridgeUpdate = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => self::CALL_ID,
+            'status' => 'connected',
+        ]);
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($bridgeUpdate);
+
+        $queueCall->refresh();
+        $this->assertNotNull($queueCall->answered_at, 'the bridge is still detected');
+        $this->assertNull($queueCall->agent_user_id);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'answered'
+            && ! isset($request['agentUserId']));
+    }
+
+    public function test_ring_all_cdr_finalizes_without_crediting_an_agent(): void
+    {
+        $second = $this->createAgent('1002');
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'entered_at' => now()->subMinutes(2),
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, [$this->agent->id, $second->id]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        app(QueueCallLifecycleService::class)->recordDialResult(self::CALL_ID, 'completed');
+        app(QueueCallLifecycleService::class)->handleCdr($this->organization->id, [
+            'call_id' => 'sip-call-id-1',
+            'session' => [
+                'token' => self::CALL_ID,
+                'callAnswerTime' => now()->subMinute()->getTimestampMs(),
+                'callEndTime' => now()->getTimestampMs(),
+            ],
+        ]);
+
+        $queueCall->refresh();
+        $this->assertSame(QueueCallDisposition::ANSWERED, $queueCall->disposition);
+        $this->assertNull($queueCall->agent_user_id);
+
+        // No agent is pushed into wrap-up on a guess.
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'ended'
+            && ! isset($request['agentUserId']));
+    }
+
+    public function test_ring_all_dial_failure_releases_no_agent(): void
+    {
+        // Ring-all never marks its agents BUSY, so a failed offer has nobody
+        // to release (an unconditional dial_failed would also resurrect a
+        // LOGGED_OUT agent in the worker).
+        $second = $this->createAgent('1002');
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, [$this->agent->id, $second->id]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
+        app(QueueCallLifecycleService::class)->handleDialFailed($this->queue, self::CALL_ID);
+
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/events')
+            && $request['type'] === 'dial_failed');
+    }
+
+    public function test_poll_during_in_flight_ring_all_offer_reserves_every_target(): void
+    {
+        // Regression (Scenario 3, "only one rings"): the stale-poll guard
+        // re-served the in-flight ring_all <Dial> to the first-offered agent
+        // only, replacing the parallel offer with a single-target one.
+        $second = $this->createAgent('1002');
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, [$this->agent->id, $second->id]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Number>1001</Number>', $content);
+        $this->assertStringContainsString('<Number>1002</Number>', $content);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
+
+        // The re-serve keeps the original offer set intact.
+        $this->assertSame(
+            [$this->agent->id, $second->id],
+            app(QueueCallLifecycleService::class)->dialOfferAgentIds(self::CALL_ID)
+        );
+    }
+
+    public function test_poll_after_ring_all_bridge_keeps_first_offered_reserve(): void
+    {
+        // Deliberately unchanged (pending conference-mediated offers): after a
+        // ring_all bridge the winner is unknown, and a non-<Dial> response tears
+        // the live bridge down - the first-offered agent is re-served.
+        $second = $this->createAgent('1002');
+
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+            'answered_at' => now(),
+        ]);
+        app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, [$this->agent->id, $second->id]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+
+        $content = (string) $response->getContent();
+        $this->assertStringContainsString('<Number>1001</Number>', $content);
+        $this->assertStringNotContainsString('1002', $content);
+    }
+
+    private function createAgent(string $extensionNumber): User
+    {
+        $agent = User::factory()->create([
+            'organization_id' => $this->organization->id,
+            'role' => UserRole::PBX_USER,
+        ]);
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $agent->id,
+            'extension_number' => $extensionNumber,
+            'type' => ExtensionType::USER,
+        ]);
+        \App\Models\CallQueueAgent::factory()->create([
+            'organization_id' => $this->organization->id,
+            'call_queue_id' => $this->queue->id,
+            'user_id' => $agent->id,
+        ]);
+
+        return $agent;
     }
 
     public function test_connected_status_without_dial_marker_is_platform_answer(): void

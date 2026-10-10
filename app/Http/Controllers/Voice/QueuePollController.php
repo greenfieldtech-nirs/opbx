@@ -83,29 +83,41 @@ class QueuePollController extends Controller
         // down the live <Dial>/bridge (customer-visible congestion), so we
         // re-serve the SAME <Dial> to the same agent and never ask the worker
         // for a new offer here.
-        $offerAgentId = app(QueueCallLifecycleService::class)->dialOfferAgentId($queueCall->call_id);
+        $offerAgentIds = app(QueueCallLifecycleService::class)->dialOfferAgentIds($queueCall->call_id);
         $dialResult = Redis::get("acd:dialresult:{$queueCall->call_id}");
-        $offerInFlight = $offerAgentId !== null && $dialResult === null;
+        $offerInFlight = $offerAgentIds !== [] && $dialResult === null;
         $bridged = $queueCall->answered_at !== null;
 
         if ($bridged || $offerInFlight) {
-            $agent = User::withoutGlobalScope(OrganizationScope::class)
-                ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
-                ->find($offerAgentId);
+            // While ringing, re-serve the WHOLE offer: a ring_all <Dial> cut
+            // down to one target rings only that agent. After the bridge the
+            // winner is unknown for ring_all; the first-offered agent is kept
+            // (prior behavior) until conference-mediated offers replace this.
+            $reserveIds = $bridged ? array_slice($offerAgentIds, 0, 1) : $offerAgentIds;
 
-            if ($agent?->extension) {
+            $agents = User::withoutGlobalScope(OrganizationScope::class)
+                ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
+                ->whereIn('id', $reserveIds)
+                ->get()
+                ->filter(fn (User $agent) => $agent->extension !== null)
+                ->sortBy(fn (User $agent) => array_search($agent->id, $reserveIds, true))
+                ->map(fn (User $agent) => [
+                    'userId' => (string) $agent->id,
+                    'extensionNumber' => $agent->extension->extension_number,
+                ])
+                ->values()
+                ->all();
+
+            if ($agents !== []) {
                 Log::info('QueuePollController: Stale poll, re-serving same dial', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $queueCall->call_id,
                     'bridged' => $bridged,
-                    'agent_user_id' => $offerAgentId,
+                    'agent_user_ids' => $reserveIds,
                 ]);
 
                 $dialResponse = app(QueueDialOfferService::class)
-                    ->buildDialResponse($request, $callQueue, $queueCall, [[
-                        'userId' => (string) $agent->id,
-                        'extensionNumber' => $agent->extension->extension_number,
-                    ]], respectPresence: false);
+                    ->buildDialResponse($request, $callQueue, $queueCall, $agents, reserve: true);
 
                 if ($dialResponse !== null) {
                     return $dialResponse;

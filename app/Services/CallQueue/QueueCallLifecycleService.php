@@ -6,7 +6,6 @@ namespace App\Services\CallQueue;
 
 use App\Enums\QueueCallDisposition;
 use App\Models\CallQueue;
-use App\Models\Extension;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
@@ -34,11 +33,16 @@ class QueueCallLifecycleService
     ) {}
 
     /**
-     * Remember which agent a queued call was dialed to (for answer attribution).
+     * Remember which agents a queued call was offered to. The marker doubles
+     * as the "dial offer pending" signal for bridge detection.
+     *
+     * @param  int|array<int, int>  $agentUserIds  every agent in the <Dial> (ring_all offers several)
      */
-    public function markDial(int $queueId, string $callId, int $agentUserId): void
+    public function markDial(int $queueId, string $callId, int|array $agentUserIds): void
     {
-        Redis::setex(self::DIAL_MARKER_PREFIX.$callId, self::DIAL_MARKER_TTL_SECONDS, (string) $queueId.':'.$agentUserId);
+        $ids = implode(',', array_map('intval', (array) $agentUserIds));
+
+        Redis::setex(self::DIAL_MARKER_PREFIX.$callId, self::DIAL_MARKER_TTL_SECONDS, $queueId.':'.$ids);
     }
 
     /**
@@ -77,22 +81,20 @@ class QueueCallLifecycleService
             return;
         }
 
-        [, $markerAgentUserId] = $this->readDialMarker($queueCall->call_id);
-
-        // Attribute the leg that actually picked up: the bridge update carries
-        // the winning leg's outgoing subscriber, which maps to an extension.
-        // Falls back to the first-offered agent from the dial marker.
-        $agentUserId = $this->resolveAnsweringAgent($queueCall, $sessionUpdate) ?? $markerAgentUserId;
-
         // The session's own answer time is the INITIAL answer (caller connected
         // to the voice platform) - it includes the queue wait. The agent bridge
         // is the first answered-status update that arrives while a dial offer is
         // pending (the initial answer precedes any dial marker). Without the
         // marker check, waiting/handling times are computed against the wrong
         // anchor and both metrics are wrong.
-        if ($agentUserId === null) {
+        if ($this->readDialMarker($queueCall->call_id)[0] === null) {
             return;
         }
+
+        // Null for a multi-target (ring_all) offer: the session carries no
+        // reliable winning leg (outgoingSubscriberId is the CALLER), so no
+        // agent is credited rather than the wrong one.
+        $agentUserId = $this->attributedAgentId($queueCall->call_id);
 
         $queueCall->update([
             'answered_at' => $sessionUpdate->session_modified_at ?? $sessionUpdate->created_at ?? now(),
@@ -232,7 +234,7 @@ class QueueCallLifecycleService
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($answerAt));
             $handlingSeconds = max(0, (int) $answerAt->diffInSeconds($endAt));
 
-            [, $agentUserId] = $this->readDialMarker($queueCall->call_id);
+            $agentUserId = $this->attributedAgentId($queueCall->call_id);
 
             $queueCall->update([
                 'answered_at' => $answerAt,
@@ -254,7 +256,7 @@ class QueueCallLifecycleService
             );
         } else {
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($endAt));
-            $demotedAgentId = $queueCall->agent_user_id ?? $this->readDialMarker($queueCall->call_id)[1];
+            $demotedAgentId = $queueCall->agent_user_id ?? $this->attributedAgentId($queueCall->call_id);
 
             $queueCall->update([
                 'answered_at' => null,
@@ -345,9 +347,11 @@ class QueueCallLifecycleService
      */
     public function handleDialFailed(CallQueue $queue, string $callId): void
     {
-        [$markerQueueId, $agentUserId] = $this->readDialMarker($callId);
+        [$markerQueueId] = $this->readDialMarker($callId);
+        $agentUserId = $this->attributedAgentId($callId);
 
-        if ($agentUserId === null || (int) $markerQueueId !== $queue->id) {
+        // A ring_all offer never marked its agents busy: nothing to release.
+        if ($agentUserId === null || $markerQueueId !== $queue->id) {
             return;
         }
 
@@ -401,44 +405,39 @@ class QueueCallLifecycleService
     }
 
     /**
-     * Resolve the agent whose leg answered, from the bridge update's outgoing
-     * subscriber id (matched against the org's extensions).
+     * Agents offered this call by the pending <Dial>, in offer order (empty when none).
+     *
+     * @return array<int, int>
      */
-    private function resolveAnsweringAgent(QueueCall $queueCall, SessionUpdate $sessionUpdate): ?int
-    {
-        if (! $sessionUpdate->outgoing_subscriber_id) {
-            return null;
-        }
-
-        $extension = Extension::withoutGlobalScope(OrganizationScope::class)
-            ->where('organization_id', $queueCall->organization_id)
-            ->where('cloudonix_subscriber_id', (string) $sessionUpdate->outgoing_subscriber_id)
-            ->first();
-
-        return $extension?->user_id ? (int) $extension->user_id : null;
-    }
-
-    /**
-     * Agent currently offered this call (from the dial marker), or null.
-     */
-    public function dialOfferAgentId(string $callId): ?int
+    public function dialOfferAgentIds(string $callId): array
     {
         return $this->readDialMarker($callId)[1];
     }
 
     /**
-     * @return array{0: int|null, 1: int|null} queue id and agent user id from the dial marker
+     * The agent a bridge can be credited to: exact for a single-target offer,
+     * null for a multi-target (ring_all) offer whose winning leg is unknown.
+     */
+    private function attributedAgentId(string $callId): ?int
+    {
+        $offered = $this->dialOfferAgentIds($callId);
+
+        return count($offered) === 1 ? $offered[0] : null;
+    }
+
+    /**
+     * @return array{0: int|null, 1: array<int, int>} queue id and offered agent user ids
      */
     private function readDialMarker(string $callId): array
     {
         $value = Redis::get(self::DIAL_MARKER_PREFIX.$callId);
 
         if (! $value || ! str_contains($value, ':')) {
-            return [null, null];
+            return [null, []];
         }
 
-        [$queueId, $agentUserId] = explode(':', $value, 2);
+        [$queueId, $agentUserIds] = explode(':', $value, 2);
 
-        return [(int) $queueId, (int) $agentUserId];
+        return [(int) $queueId, array_map('intval', array_filter(explode(',', $agentUserIds), 'strlen'))];
     }
 }
