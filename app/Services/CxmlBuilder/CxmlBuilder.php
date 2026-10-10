@@ -284,6 +284,40 @@ class CxmlBuilder
     }
 
     /**
+     * Join a call-queue conference room (conference-mediated ring-all).
+     *
+     * Emits only attributes Cloudonix documents for <Conference>. Both the
+     * caller and the winning agent end the room on exit: it exists solely to
+     * bridge the two sessions. Recording applies to the whole room.
+     *
+     * @param  string  $room  Room name (letters/digits only)
+     * @param  bool  $record  Record the room from start
+     * @param  string|null  $recordingStatusCallback  URL notified once the recording is ready
+     */
+    public function dialQueueConference(string $room, bool $record = false, ?string $recordingStatusCallback = null): self
+    {
+        $dial = $this->document->createElement('Dial');
+
+        $conference = $this->document->createElement('Conference', htmlspecialchars($room, self::XML_ENCODING, 'UTF-8'));
+        $conference->setAttribute('startConferenceOnEnter', 'true');
+        $conference->setAttribute('endConferenceOnExit', 'true');
+        $conference->setAttribute('beep', 'false');
+
+        if ($record) {
+            $conference->setAttribute('record', 'record-from-start');
+
+            if ($recordingStatusCallback !== null) {
+                $conference->setAttribute('recordingStatusCallback', $recordingStatusCallback);
+            }
+        }
+
+        $dial->appendChild($conference);
+        $this->response->appendChild($dial);
+
+        return $this;
+    }
+
+    /**
      * Build dial action for an extension.
      *
      * @param  string  $sipUri  SIP URI of the extension

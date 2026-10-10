@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services\CallQueue;
 
 use App\Enums\QueueCallDisposition;
+use App\Jobs\ReconcileQueueCallDispositionJob;
 use App\Models\CallQueue;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -122,6 +124,36 @@ class QueueCallLifecycleService
     }
 
     /**
+     * Record a conference-mediated bridge: the winning agent is known exactly
+     * (it claimed the call from its own session), so the bridge is confirmed
+     * immediately and the CDR finalization credits the right agent.
+     */
+    public function markConferenceBridge(QueueCall $queueCall, int $agentUserId): void
+    {
+        $queueCall->update([
+            'answered_at' => now(),
+            'agent_user_id' => $agentUserId,
+        ]);
+
+        Redis::setex("acd:bridge:{$queueCall->call_id}", self::DIAL_MARKER_TTL_SECONDS, $queueCall->answered_at->toIso8601String());
+        $this->recordDialResult($queueCall->call_id, 'answered');
+
+        Log::info('Queue call answered (conference)', [
+            'queue_call_id' => $queueCall->id,
+            'call_id' => $queueCall->call_id,
+            'agent_user_id' => $agentUserId,
+        ]);
+
+        $this->worker->event(
+            $queueCall->organization_id,
+            $queueCall->call_queue_id,
+            $queueCall->call_id,
+            'answered',
+            $agentUserId
+        );
+    }
+
+    /**
      * Process a completed CDR: finalizes the queue call record.
      *
      * @param  array<string, mixed>  $payload  Raw CDR webhook payload (timestamps under session.callStartTime etc., epoch ms)
@@ -159,7 +191,7 @@ class QueueCallLifecycleService
             && (Redis::exists("acd:dial:{$queueCall->call_id}") || $queueCall->answered_at !== null)) {
             Redis::setex("acd:cdr:{$queueCall->call_id}", 3600, json_encode($payload));
 
-            \App\Jobs\ReconcileQueueCallDispositionJob::dispatch($queueCall->id)
+            ReconcileQueueCallDispositionJob::dispatch($queueCall->id)
                 ->delay(now()->addSeconds(10));
 
             Log::info('Queue call CDR parked awaiting dial result', [
@@ -198,7 +230,7 @@ class QueueCallLifecycleService
             return;
         }
 
-        $callQueue = CallQueue::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->find($queueCall->call_queue_id);
 
         $dialResult = Redis::get("acd:dialresult:{$queueCall->call_id}");
@@ -209,10 +241,10 @@ class QueueCallLifecycleService
         // own callAnswerTime is the initial platform answer (includes queue wait).
         $answerAt = $queueCall->answered_at
             ?? (isset($session['callAnswerTime']) && $session['callAnswerTime'] > 0
-                ? \Illuminate\Support\Carbon::createFromTimestampMs($session['callAnswerTime'])
+                ? Carbon::createFromTimestampMs($session['callAnswerTime'])
                 : null);
         $endAt = isset($session['callEndTime']) && $session['callEndTime'] > 0
-            ? \Illuminate\Support\Carbon::createFromTimestampMs($session['callEndTime'])
+            ? Carbon::createFromTimestampMs($session['callEndTime'])
             : now();
 
         $enteredAt = $queueCall->entered_at;
@@ -228,7 +260,7 @@ class QueueCallLifecycleService
             // Prefer the bridge timestamp captured at the (confirmed) bridge
             // update; fall back to what is stored, then the CDR answer time.
             if ($bridgeIso) {
-                $answerAt = \Illuminate\Support\Carbon::parse($bridgeIso);
+                $answerAt = Carbon::parse($bridgeIso);
             }
 
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($answerAt));

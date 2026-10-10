@@ -54,6 +54,7 @@ Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function 
 
 use App\Http\Controllers\Voice\AlbsFollowThroughController;
 use App\Http\Controllers\Voice\AmdActionController;
+use App\Http\Controllers\Voice\QueueConferenceController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
 use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
@@ -104,6 +105,13 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
     // Proactive (immediate connect) dial endpoint - HMAC-signed URL, no Bearer auth
     Route::any('/voice/queue-dial', [QueueImmediateDialController::class, 'handle'])
         ->name('voice.queue-dial');
+
+    // Conference-mediated ring-all (HMAC-signed URLs, no Bearer auth):
+    // originated agent legs claim the call; the caller joins the winner's room.
+    Route::any('/voice/queue-agent-connect', [QueueConferenceController::class, 'agentConnect'])
+        ->name('voice.queue-agent-connect');
+    Route::any('/voice/queue-conference-join', [QueueConferenceController::class, 'callerJoin'])
+        ->name('voice.queue-conference-join');
 });
 
 /*
