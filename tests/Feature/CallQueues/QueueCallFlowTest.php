@@ -457,8 +457,7 @@ class QueueCallFlowTest extends TestCase
         $this->assertStringContainsString('1099', $content);
         $this->assertStringNotContainsString('<Say>', $content);
 
-        // The failed agent is skipped for subsequent offers (no-answer agents
-        // still look available to presence), and the worker is re-polled.
+        // The worker is re-polled for the next offer.
         Http::assertSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
     }
 
