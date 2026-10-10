@@ -47,6 +47,7 @@ interface QueueFormState {
   announce_position_timeout: number;
   announce_position_language: string;
   immediate_connect: boolean;
+  conference_ring_all: boolean;
   moh_recording_id: string;
   fallback_action: string;
   fallback_extension_id: string;
@@ -69,6 +70,7 @@ const emptyForm: QueueFormState = {
   announce_position_timeout: 60,
   announce_position_language: '',
   immediate_connect: false,
+  conference_ring_all: false,
   moh_recording_id: '',
   fallback_action: 'hangup',
   fallback_extension_id: '',
@@ -201,6 +203,7 @@ export default function CallQueues() {
       announce_position_timeout: queue.announce_position_timeout ?? 60,
       announce_position_language: queue.announce_position_language ?? '',
       immediate_connect: queue.immediate_connect ?? false,
+      conference_ring_all: queue.conference_ring_all ?? false,
       moh_recording_id: queue.moh_recording_id ? String(queue.moh_recording_id) : '',
       fallback_action: queue.fallback_action,
       fallback_extension_id: queue.fallback_extension_id ? String(queue.fallback_extension_id) : '',
@@ -227,6 +230,7 @@ export default function CallQueues() {
     announce_position_timeout: form.announce_position_timeout,
     announce_position_language: form.announce_position ? form.announce_position_language || null : null,
     immediate_connect: form.immediate_connect,
+    conference_ring_all: form.conference_ring_all,
     moh_recording_id: form.moh_recording_id ? Number(form.moh_recording_id) : null,
     fallback_action: form.fallback_action,
     fallback_extension_id: form.fallback_extension_id ? Number(form.fallback_extension_id) : null,
@@ -529,6 +533,22 @@ export default function CallQueues() {
                 onCheckedChange={(v) => set('immediate_connect', v)}
               />
             </div>
+
+            {form.strategy === 'ring_all' && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label>Ring Agents in Separate Calls</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Each agent is rung in a call of their own; the first to answer is connected to the
+                    caller and the other agents stop ringing. Prevents late rings and three-way calls.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.conference_ring_all}
+                  onCheckedChange={(v) => set('conference_ring_all', v)}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Agents *</Label>
