@@ -43,6 +43,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "i18n-iso-countries": "^7.14.0",
+    "jssip": "3.10.0",
     "laravel-echo": "^1.16.1",
     "libphonenumber-js": "^1.12.33",
     "lucide-react": "^0.447.0",

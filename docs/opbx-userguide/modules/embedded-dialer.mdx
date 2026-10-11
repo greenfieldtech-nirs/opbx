@@ -180,10 +180,10 @@ Mitigations:
 
 ### Host-site CSP
 
-The widget loads the JsSIP library from `jssip.net` and connects to Cloudonix
-over `wss://webrtc.cloudonix.io`. If the embedding site enforces a Content
-Security Policy, it must allow those origins (`script-src https://jssip.net` and
-`connect-src wss://webrtc.cloudonix.io`) or the dialer cannot register.
+The widget ships the JsSIP library in its own bundle (no third-party script
+origin) and connects to Cloudonix over `wss://webrtc.cloudonix.io`. If the
+embedding site enforces a Content Security Policy, it must allow that origin
+(`connect-src wss://webrtc.cloudonix.io`) or the dialer cannot register.
 
 ## Related API Endpoints
 
