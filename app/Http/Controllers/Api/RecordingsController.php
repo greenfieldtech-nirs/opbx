@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\StoreRecordingRequest;
@@ -45,16 +44,12 @@ class RecordingsController extends Controller
     {
         $user = $this->getAuthenticatedUser();
 
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            // This shouldn't happen for authenticated endpoints, but return error if it does
-            return $user;
-        }
-
         // Set the current user ID for resource generation
         RecordingResource::setCurrentUserId($user->id);
 
-        $query = Recording::query();
+        $this->authorize('viewAny', Recording::class);
+
+        $query = Recording::with(['creator', 'updater']);
 
         // Filter by status if specified
         if ($request->has('status') && in_array($request->status, ['active', 'inactive'])) {
@@ -83,10 +78,6 @@ class RecordingsController extends Controller
     {
         $user = $this->getAuthenticatedUser();
 
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            return $user;
-        }
         // Recording creation is tracked per-user (created_by/updated_by are FKs
         // to users); API keys have no user identity, so creation requires a user token.
         if ($user instanceof ApiKey) {
@@ -176,15 +167,12 @@ class RecordingsController extends Controller
     {
         $user = $this->getAuthenticatedUser();
 
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            return $user;
-        }
-
         // Verify tenant ownership
         if ($recording->organization_id !== $user->organization_id) {
             abort(404);
         }
+
+        $this->authorize('view', $recording);
 
         RecordingResource::setCurrentUserId($user->id);
 
@@ -199,11 +187,6 @@ class RecordingsController extends Controller
     public function update(UpdateRecordingRequest $request, Recording $recording): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
-
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            return $user;
-        }
 
         // Verify tenant ownership
         if ($recording->organization_id !== $user->organization_id) {
@@ -234,15 +217,12 @@ class RecordingsController extends Controller
     {
         $user = $this->getAuthenticatedUser();
 
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            return $user;
-        }
-
         // Verify tenant ownership
         if ($recording->organization_id !== $user->organization_id) {
             abort(404);
         }
+
+        $this->authorize('download', $recording);
 
         if (! $recording->isUploaded()) {
             return response()->json(['error' => 'Only uploaded recordings can be downloaded'], 400);
@@ -370,20 +350,13 @@ class RecordingsController extends Controller
     {
         $user = $this->getAuthenticatedUser();
 
-        // Handle unauthenticated response
-        if ($user instanceof JsonResponse) {
-            return $user;
-        }
-
         // Verify tenant ownership
         if ($recording->organization_id !== $user->organization_id) {
             abort(404);
         }
 
         // Check if user has permission to delete recordings
-        if (! $user->hasRole(UserRole::OWNER) && ! $user->hasRole(UserRole::PBX_ADMIN)) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $this->authorize('delete', $recording);
 
         // Log the deletion attempt
         $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
