@@ -258,6 +258,8 @@ class AppServiceProvider extends ServiceProvider
 
             // Also validate other critical security settings
             $this->validateSecurityConfiguration();
+
+            $this->assertNoDefaultSecrets();
         }
 
         // API keys are authorized solely by their per-resource permissions
@@ -340,6 +342,26 @@ class AppServiceProvider extends ServiceProvider
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {
             // Add any console-specific bootstrapping here
+        }
+    }
+
+    /**
+     * Refuse to boot in production with empty or shipped-default worker/Soketi secrets.
+     */
+    public function assertNoDefaultSecrets(): void
+    {
+        $secrets = [
+            'DIALER_WORKER_API_TOKEN' => config('services.dialer_worker.token'),
+            'AMD_WORKER_API_TOKEN' => config('services.amd_worker.api_token'),
+            'ACD_WORKER_API_TOKEN' => config('services.acd_worker.api_token'),
+            'PUSHER_APP_SECRET' => config('broadcasting.connections.pusher.secret'),
+        ];
+
+        foreach ($secrets as $name => $value) {
+            $value = (string) $value;
+            if ($value === '' || str_contains($value, 'change-in-production') || $value === 'pbxappsecret') {
+                throw new \RuntimeException("{$name} is empty or a shipped default; set a real secret (openssl rand -hex 32).");
+            }
         }
     }
 

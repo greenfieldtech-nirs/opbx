@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -74,6 +75,9 @@ func (c *Config) Validate() error {
 	}
 	if c.LaravelAPIToken == "" {
 		return fmt.Errorf("LARAVEL_API_TOKEN is required")
+	}
+	if strings.Contains(c.LaravelAPIToken, "change-in-production") {
+		return fmt.Errorf("LARAVEL_API_TOKEN is a shipped default; set a real secret")
 	}
 
 	// Validate Redis configuration

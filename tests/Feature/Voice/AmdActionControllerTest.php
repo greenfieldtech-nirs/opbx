@@ -75,7 +75,7 @@ class AmdActionControllerTest extends TestCase
 
         config(['services.amd_worker.api_token' => '']);
         $this->postJson('/api/voice/amd-session', ['session' => 'sess-live-1'], ['Authorization' => 'Bearer '])
-            ->assertUnauthorized();
+            ->assertStatus(503);
     }
 
     public function test_payload_action_is_ignored_in_favour_of_campaign_config(): void

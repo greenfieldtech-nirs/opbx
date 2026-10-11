@@ -197,7 +197,13 @@ class AmdActionController extends Controller
         $authHeader = (string) $request->header('Authorization', '');
         $expectedToken = (string) config('services.amd_worker.api_token', '');
 
-        if ($expectedToken !== '' && hash_equals('Bearer '.$expectedToken, $authHeader)) {
+        if ($expectedToken === '') {
+            Log::error('AMD worker: AMD_WORKER_API_TOKEN is not configured');
+
+            return response()->json(['status' => 'error', 'message' => 'AMD worker authentication is not configured'], 503);
+        }
+
+        if (hash_equals('Bearer '.$expectedToken, $authHeader)) {
             return null;
         }
 

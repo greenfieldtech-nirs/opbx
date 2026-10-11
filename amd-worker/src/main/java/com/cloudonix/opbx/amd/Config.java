@@ -35,7 +35,7 @@ public class Config {
         this.detectors = Arrays.asList(detectorsEnv.split(","));
         this.dumpAudio = Boolean.parseBoolean(getEnv("AMD_DUMP_AUDIO", "false"));
         this.dumpAudioPath = getEnv("AMD_DUMP_AUDIO_PATH", "/tmp/amd-dumps");
-        this.apiToken = getEnv("AMD_WORKER_API_TOKEN", "");
+        this.apiToken = requireToken("AMD_WORKER_API_TOKEN", getEnv("AMD_WORKER_API_TOKEN", ""));
         this.actionCallbackUrl = getEnv("AMD_ACTION_CALLBACK_URL", "http://nginx/api/voice/amd-action");
         this.sessionCheckUrl = deriveSessionCheckUrl(actionCallbackUrl, System.getenv("AMD_SESSION_CHECK_URL"));
     }
@@ -53,6 +53,14 @@ public class Config {
             return "";
         }
         return actionCallbackUrl.substring(0, actionCallbackUrl.length() - "/amd-action".length()) + "/amd-session";
+    }
+
+    /** Refuse to start with an empty or shipped-default token. */
+    static String requireToken(String name, String token) {
+        if (token == null || token.isBlank() || token.contains("change-in-production")) {
+            throw new IllegalStateException(name + " is empty or a shipped default; set a real secret");
+        }
+        return token;
     }
 
     private static String getEnv(String key, String defaultValue) {
