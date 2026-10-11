@@ -10,7 +10,6 @@ use App\Enums\RingGroupFallbackAction;
 use App\Http\Controllers\Controller;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
-use App\Models\AiAssistantLoadBalancerMember;
 use App\Models\AutoDialerCallSession;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -22,6 +21,7 @@ use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\AutoDialer\MetadataHelper;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\VoiceRouting\AlbsDistributionService;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -43,7 +43,8 @@ class AlbsFollowThroughController extends Controller
 
     public function __construct(
         private readonly ProviderRegistry $providerRegistry,
-        private readonly WebSocketUrlBuilder $urlBuilder
+        private readonly WebSocketUrlBuilder $urlBuilder,
+        private readonly AlbsDistributionService $distribution
     ) {}
 
     /**
@@ -217,7 +218,7 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Select next assistant
-        $nextAssistant = $this->selectNextAssistant($albs, $triedAssistantIds);
+        $nextAssistant = $this->distribution->selectAssistant($albs, $triedAssistantIds);
 
         if (! $nextAssistant) {
             Log::info('ALBS Follow Through: No more assistants to try', [
@@ -302,77 +303,6 @@ class AlbsFollowThroughController extends Controller
     {
         $key = self::TENTATIVE_ASSISTANTS_KEY.$callSid;
         Cache::forget($key);
-    }
-
-    /**
-     * Select the next available AI Assistant based on strategy.
-     */
-    private function selectNextAssistant(AiAssistantLoadBalancer $albs, array $triedIds): ?AiAssistant
-    {
-        $availableMembers = $albs->members->reject(function (AiAssistantLoadBalancerMember $member) use ($triedIds) {
-            return in_array($member->ai_assistant_id, $triedIds);
-        });
-
-        if ($availableMembers->isEmpty()) {
-            return null;
-        }
-
-        return match ($albs->strategy->value) {
-            'priority' => $this->selectByPriority($availableMembers),
-            'percentage' => $this->selectByPercentage($availableMembers),
-            'round_robin' => $this->selectByRoundRobin($availableMembers, $albs->id),
-            default => $this->selectByPriority($availableMembers),
-        };
-    }
-
-    /**
-     * Select assistant with highest priority (lowest number).
-     */
-    private function selectByPriority($members): ?AiAssistant
-    {
-        $selected = $members->sortBy('priority')->first();
-
-        return $selected?->aiAssistant;
-    }
-
-    /**
-     * Select assistant based on percentage weights.
-     */
-    private function selectByPercentage($members): ?AiAssistant
-    {
-        $totalWeight = $members->sum('weight');
-
-        if ($totalWeight <= 0) {
-            return $members->first()?->aiAssistant;
-        }
-
-        $random = mt_rand(1, $totalWeight);
-        $cumulative = 0;
-
-        foreach ($members->sortBy('position') as $member) {
-            $cumulative += $member->weight;
-
-            if ($random <= $cumulative) {
-                return $member->aiAssistant;
-            }
-        }
-
-        return $members->first()?->aiAssistant;
-    }
-
-    /**
-     * Select assistant using round robin across available members.
-     */
-    private function selectByRoundRobin($members, int $albsId): ?AiAssistant
-    {
-        $key = 'albs:rr:'.$albsId;
-        $counter = Cache::increment($key);
-        $index = ($counter - 1) % $members->count();
-
-        $sorted = $members->sortBy('position');
-        $member = $sorted->values()->get($index);
-
-        return $member?->aiAssistant;
     }
 
     /**
