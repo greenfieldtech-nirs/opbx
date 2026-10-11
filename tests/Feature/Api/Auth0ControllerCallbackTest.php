@@ -72,7 +72,7 @@ class Auth0ControllerCallbackTest extends TestCase
             'provider' => SocialIdentityProvider::GOOGLE,
             'provider_subject' => 'google-oauth2|123',
         ]);
-        $identity->user->update(['is_platform_manager' => true]);
+        $identity->user->forceFill(['is_platform_manager' => true])->save();
 
         $state = $this->fakeAuth0Responses($identity->provider_email);
 
