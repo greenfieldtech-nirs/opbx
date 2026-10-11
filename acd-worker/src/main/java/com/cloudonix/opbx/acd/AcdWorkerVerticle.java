@@ -44,7 +44,8 @@ public class AcdWorkerVerticle extends AbstractVerticle {
     @Override
     public void start(Promise<Void> startPromise) {
         // No connect at boot: the pooled client connects per command, and /health reports Redis.
-        this.store = new RedisQueueStore(vertx, config.redisUri());
+        this.store = new RedisQueueStore(vertx, config.redisUri(), config.redisPassword);
+        logger.info("ACD Redis at {}", config.redisUri());
         this.engine = new QueueEngine(store, Time.system());
         startServers().onComplete(startPromise);
     }

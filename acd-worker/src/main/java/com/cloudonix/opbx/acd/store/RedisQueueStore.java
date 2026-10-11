@@ -74,9 +74,10 @@ public class RedisQueueStore implements QueueStore {
      * Pooled client: each command borrows a connection, so a Redis restart or
      * failover heals on the next command (a single connect()ed connection never does).
      */
-    public RedisQueueStore(Vertx vertx, String redisUri) {
+    public RedisQueueStore(Vertx vertx, String redisUri, String password) {
         this.client = Redis.createClient(vertx, new RedisOptions()
                 .setConnectionString(redisUri)
+                .setPassword(password == null || password.isEmpty() ? null : password)
                 .setMaxPoolSize(16)
                 .setMaxPoolWaiting(1024));
         this.redis = RedisAPI.api(client);

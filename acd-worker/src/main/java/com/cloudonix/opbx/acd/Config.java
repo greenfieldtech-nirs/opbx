@@ -38,8 +38,8 @@ public class Config {
         return value != null ? value : defaultValue;
     }
 
+    /** No credentials in the URI: the password goes to RedisOptions.setPassword, so it is never logged or mis-parsed. */
     public String redisUri() {
-        String auth = redisPassword.isEmpty() ? "" : ":" + redisPassword + "@";
-        return "redis://" + auth + redisHost + ":" + redisPort;
+        return "redis://" + redisHost + ":" + redisPort;
     }
 }
