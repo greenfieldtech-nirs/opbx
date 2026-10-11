@@ -31,7 +31,7 @@ See `.env.example`. Key variables:
 | `OPBX_BASE_URL` | — (required) | OPBX base URL (no trailing slash) |
 | `PORT` / `HOST` | 8080 / 0.0.0.0 | Listen address |
 | `OPBX_TIMEOUT_MS` | 15000 | Per-call upstream timeout |
-| `AUTH_IDENTITY_CACHE_TTL_SECONDS` | 300 | `/auth/me` identity cache TTL |
+| `AUTH_IDENTITY_CACHE_TTL_SECONDS` | 30 | `/auth/me` identity cache TTL | | `AUTH_NEGATIVE_CACHE_TTL_SECONDS` | 30 | Cache TTL for rejected credentials | | `RATE_LIMIT_IP_PER_MIN` | 600 | Per-client-IP limit on /mcp before credential resolution (uses `req.ip` = X-Forwarded-For via `trustProxy`) |
 | `RATE_LIMIT_READ_PER_MIN` / `_WRITE_` / `_SENSITIVE_` | 120 / 30 / 10 | Per-identity rate classes |
 | `LOG_LEVEL` | info | Pino level |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — (disabled) | OTLP/HTTP endpoint for traces |

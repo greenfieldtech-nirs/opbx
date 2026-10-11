@@ -67,7 +67,8 @@ describe("IdentityResolver", () => {
   it("does not call OPBX for opbxk_ API keys", async () => {
     const resolver = new IdentityResolver(config, logger);
     const identity = await resolver.resolve("opbxk_abc123");
-    expect(identity).toEqual({ principalType: "apikey" });
+    expect(identity).toMatchObject({ principalType: "apikey" });
+    expect(identity.credentialKey).toMatch(/^[0-9a-f]{16}$/);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -91,5 +92,14 @@ describe("IdentityResolver", () => {
     );
     const resolver = new IdentityResolver(config, logger);
     await expect(resolver.resolve("pat")).rejects.toThrow(AuthenticationError);
+  });
+
+  it("caches rejected credentials (negative cache)", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: "nope" }), { status: 401 }));
+    const resolver = new IdentityResolver(config, logger);
+    await expect(resolver.resolve("bad")).rejects.toThrow();
+    await expect(resolver.resolve("bad")).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

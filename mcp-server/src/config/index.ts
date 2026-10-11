@@ -14,7 +14,13 @@ const envSchema = z.object({
   OPBX_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
 
   /** TTL for cached identity resolutions (/auth/me), seconds. */
-  AUTH_IDENTITY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  AUTH_IDENTITY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+
+  /** TTL for cached credential rejections (negative identity results), seconds. */
+  AUTH_NEGATIVE_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+
+  /** Per-client-IP requests/min to /mcp, applied before credential resolution. */
+  RATE_LIMIT_IP_PER_MIN: z.coerce.number().int().positive().default(600),
 
   /** MCP-side rate limits (requests/min per identity). */
   RATE_LIMIT_READ_PER_MIN: z.coerce.number().int().positive().default(120),

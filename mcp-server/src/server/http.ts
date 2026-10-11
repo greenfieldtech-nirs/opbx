@@ -61,6 +61,17 @@ export async function buildHttpServer(deps: HttpServerDeps) {
   });
 
   const mcpHandler = async (req: import("fastify").FastifyRequest, reply: import("fastify").FastifyReply) => {
+    // req.ip honours trustProxy:true (nginx sets X-Forwarded-For; 8080 is loopback-only).
+    try {
+      rateLimiter.checkIp(req.ip);
+    } catch (err) {
+      return reply.status(429).send({
+        jsonrpc: "2.0",
+        error: { code: -32002, message: (err as Error).message },
+        id: null,
+      });
+    }
+
     let credential: string;
     try {
       credential = IdentityResolver.credentialFromHeader(req.headers.authorization);

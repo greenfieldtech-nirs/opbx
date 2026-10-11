@@ -34,11 +34,19 @@ export class RateLimiter {
     const subject =
       identity.principalType === "user"
         ? `u:${identity.userId}`
-        : "k:apikey";
-    const key = `${subject}:${rateClass}`;
+        : `k:${identity.credentialKey ?? "unknown"}`;
+    this.hit(`${subject}:${rateClass}`, this.limitFor(rateClass), `Rate limit for ${rateClass} operations exceeded (max ${this.limitFor(rateClass)}/min). Tool: ${toolName}`);
+  }
+
+  /** Per-client-IP guard run before credential resolution. */
+  checkIp(ip: string): void {
+    const limit = this.config.RATE_LIMIT_IP_PER_MIN;
+    this.hit(`ip:${ip}`, limit, `Too many requests from this address (max ${limit}/min)`);
+  }
+
+  private hit(key: string, limit: number, message: string): void {
     const now = Date.now();
     const windowStart = now - 60_000;
-    const limit = this.limitFor(rateClass);
 
     let list = this.hits.get(key);
     if (!list) {
@@ -47,9 +55,7 @@ export class RateLimiter {
     }
     while (list.length > 0 && list[0]! <= windowStart) list.shift();
     if (list.length >= limit) {
-      throw new RateLimitError(
-        `Rate limit for ${rateClass} operations exceeded (max ${limit}/min). Tool: ${toolName}`,
-      );
+      throw new RateLimitError(message);
     }
     list.push(now);
   }

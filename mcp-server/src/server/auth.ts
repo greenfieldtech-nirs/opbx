@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Config } from "../config/index.js";
 import type { Logger } from "pino";
 import { OpbxClient } from "../opbx/client.js";
+import { OpbxError } from "../opbx/errors.js";
 import {
   USER_ROLES,
   type AuthenticatedIdentity,
@@ -33,7 +34,9 @@ export class AuthenticationError extends Error {
 }
 
 interface CacheEntry {
-  identity: AuthenticatedIdentity;
+  identity?: AuthenticatedIdentity;
+  /** Negative result: credential was rejected; rethrown until expiry. */
+  error?: unknown;
   expiresAt: number;
 }
 
@@ -60,15 +63,36 @@ export class IdentityResolver {
 
   async resolve(credential: string): Promise<AuthenticatedIdentity> {
     if (credential.startsWith(API_KEY_PREFIX)) {
-      return { principalType: "apikey" };
+      return {
+        principalType: "apikey",
+        credentialKey: createHash("sha256").update(credential).digest("hex").slice(0, 16),
+      };
     }
 
     const cacheKey = createHash("sha256").update(credential).digest("hex");
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return cached.identity;
+      if (cached.error !== undefined) throw cached.error;
+      return cached.identity!;
     }
 
+    try {
+      return await this.fetchIdentity(credential, cacheKey);
+    } catch (err) {
+      // Cache rejections only; network/upstream failures must be retried.
+      const transient =
+        err instanceof OpbxError && (err.type === "network_error" || err.type === "upstream_error");
+      if (!transient) {
+        this.store(cacheKey, {
+          error: err,
+          expiresAt: Date.now() + this.config.AUTH_NEGATIVE_CACHE_TTL_SECONDS * 1000,
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async fetchIdentity(credential: string, cacheKey: string): Promise<AuthenticatedIdentity> {
     const client = new OpbxClient(this.config, credential, this.logger);
     const response = await client.call("GET", "/v1/auth/me", "getCurrentUser");
     const user = response.user;
@@ -93,6 +117,14 @@ export class IdentityResolver {
       isPlatformManager: user.is_platform_manager === true,
     };
 
+    this.store(cacheKey, {
+      identity,
+      expiresAt: Date.now() + this.config.AUTH_IDENTITY_CACHE_TTL_SECONDS * 1000,
+    });
+    return identity;
+  }
+
+  private store(cacheKey: string, entry: CacheEntry): void {
     if (this.cache.size >= IdentityResolver.MAX_ENTRIES) {
       // Cheap eviction: drop expired entries, else clear oldest quarter.
       const now = Date.now();
@@ -105,10 +137,6 @@ export class IdentityResolver {
         }
       }
     }
-    this.cache.set(cacheKey, {
-      identity,
-      expiresAt: Date.now() + this.config.AUTH_IDENTITY_CACHE_TTL_SECONDS * 1000,
-    });
-    return identity;
+    this.cache.set(cacheKey, entry);
   }
 }
