@@ -5,7 +5,7 @@ import "testing"
 func validCfg() *Config {
 	return &Config{
 		LaravelAPIURL: "http://x", LaravelAPIToken: "realtoken", RedisHost: "r", RedisPort: "6379",
-		WorkerID: "w", PollInterval: 1, HealthCheckPort: "1", WebhookPort: "2",
+		WorkerID: "w", PollInterval: 1, WebhookPort: "2",
 	}
 }
 

@@ -146,36 +146,6 @@ func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64,
 	return &callResp, nil
 }
 
-// UpdateCallStatus updates the status of a call session
-func (c *Client) UpdateCallStatus(ctx context.Context, sessionID int64, req models.UpdateCallStatusRequest) error {
-	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/status", sessionID)
-	return c.patch(ctx, url, req, nil)
-}
-
-// SetCallDisposition sets the disposition for a completed call
-func (c *Client) SetCallDisposition(ctx context.Context, sessionID int64, req models.SetDispositionRequest) (*models.SetDispositionResponse, error) {
-	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/disposition", sessionID)
-
-	var response models.APIResponse
-	err := c.post(ctx, url, req, &response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set disposition: %w", err)
-	}
-
-	// Extract response data
-	responseData, err := json.Marshal(response.Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response data: %w", err)
-	}
-
-	var dispResp models.SetDispositionResponse
-	if err := json.Unmarshal(responseData, &dispResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &dispResp, nil
-}
-
 // HTTP helper methods
 
 func (c *Client) get(ctx context.Context, path string, result interface{}) error {
@@ -184,10 +154,6 @@ func (c *Client) get(ctx context.Context, path string, result interface{}) error
 
 func (c *Client) post(ctx context.Context, path string, body, result interface{}) error {
 	return c.doRequest(ctx, http.MethodPost, path, body, result)
-}
-
-func (c *Client) patch(ctx context.Context, path string, body, result interface{}) error {
-	return c.doRequest(ctx, http.MethodPatch, path, body, result)
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}) error {

@@ -23,9 +23,7 @@ type Config struct {
 	// Worker Configuration
 	WorkerID        string
 	PollInterval    time.Duration
-	HealthCheckPort string
 	WebhookPort     string
-	WebhookSecret   string
 
 	// Retry Configuration (per spec)
 	RetryIntervals []time.Duration
@@ -46,9 +44,7 @@ func Load() (*Config, error) {
 
 		WorkerID:        getEnv("WORKER_ID", "worker-1"),
 		PollInterval:    getEnvDuration("POLL_INTERVAL", 10*time.Second),
-		HealthCheckPort: getEnv("HEALTH_CHECK_PORT", "8080"),
 		WebhookPort:     getEnv("WEBHOOK_PORT", "8081"),
-		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
 
 		// Per spec: 5min → 15min → 60min → 24hr
 		RetryIntervals: []time.Duration{
@@ -98,13 +94,9 @@ func (c *Config) Validate() error {
 	if c.PollInterval <= 0 {
 		return fmt.Errorf("POLL_INTERVAL must be positive")
 	}
-	if c.HealthCheckPort == "" {
-		return fmt.Errorf("HEALTH_CHECK_PORT is required")
-	}
 	if c.WebhookPort == "" {
 		return fmt.Errorf("WEBHOOK_PORT is required")
 	}
-	// Note: WEBHOOK_SECRET is optional - only required if webhook signature verification is enabled
 
 	return nil
 }

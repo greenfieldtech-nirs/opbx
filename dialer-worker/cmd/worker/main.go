@@ -34,7 +34,6 @@ type Worker struct {
 	logger      *slog.Logger
 
 	// State
-	activeCampaigns     map[int64]*models.Campaign
 	processingCampaigns sync.Map // tracks campaign IDs currently being processed
 	shutdown            chan struct{}
 
@@ -88,16 +87,8 @@ func main() {
 		executor:        exec,
 		retryMgr:        retryMgr,
 		logger:          logger,
-		activeCampaigns: make(map[int64]*models.Campaign),
 		shutdown:        make(chan struct{}),
 		campaignSem:     make(chan struct{}, 10), // Max 10 concurrent campaigns
-	}
-
-	// Register worker in Redis
-	ctx := context.Background()
-	if err := redisClient.RegisterWorker(ctx, cfg.WorkerID, 30*time.Second); err != nil {
-		logger.Error("failed to register worker", "error", err)
-		os.Exit(1)
 	}
 
 	// Start webhook server
@@ -148,11 +139,8 @@ func (w *Worker) processCampaigns() {
 
 	w.logger.Info("found active campaigns", "count", len(campaigns))
 
-	// Update active campaigns map
-	w.activeCampaigns = make(map[int64]*models.Campaign)
 	for i := range campaigns {
 		campaign := &campaigns[i]
-		w.activeCampaigns[campaign.ID] = campaign
 		w.logger.Info("processing campaign", "id", campaign.ID, "name", campaign.Name, "status", campaign.Status, "cac", campaign.CAC, "cps", campaign.CPS)
 
 		// Register with rate limiter
@@ -256,13 +244,13 @@ func (w *Worker) startWebhookServer() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	// Create webhook handler
-	webhookHandler := webhook.NewHandler(w.executor, w.config.WebhookSecret)
-	webhookHandler.RegisterRoutes(router)
+	webhook.RegisterRoutes(router)
 
 	w.webhookServer = &http.Server{
-		Addr:    ":" + w.config.WebhookPort,
-		Handler: router,
+		Addr:              ":" + w.config.WebhookPort,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
 	}
 
 	w.logger.Info("starting webhook server", "port", w.config.WebhookPort)

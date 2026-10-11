@@ -16,9 +16,7 @@ type KeyPrefix string
 const (
 	PrefixCallState     KeyPrefix = "dialer:call"
 	PrefixCampaignState KeyPrefix = "dialer:campaign"
-	PrefixWorkerState   KeyPrefix = "dialer:worker"
 	PrefixLock          KeyPrefix = "dialer:lock"
-	PrefixIdempotency   KeyPrefix = "dialer:idem"
 	PrefixRetry         KeyPrefix = "dialer:retry"
 	PrefixCAC           KeyPrefix = "dialer:cac"
 )
@@ -31,10 +29,6 @@ const (
 	DefaultLockTTL = 30 * time.Second
 	// DefaultCallStateTTL is the default TTL for call state entries
 	DefaultCallStateTTL = 60 * time.Second
-	// ConnectedCallPersistTTL is the TTL extension for connected calls
-	ConnectedCallPersistTTL = 60 * time.Second
-	// DefaultIdempotencyTTL is the default TTL for idempotency keys
-	DefaultIdempotencyTTL = 24 * time.Hour
 )
 
 // Client handles Redis operations for the dialer worker
@@ -78,46 +72,6 @@ func (c *Client) SetCallState(ctx context.Context, callID string, state *CallSta
 	return err
 }
 
-// GetCallState retrieves call state from Redis
-func (c *Client) GetCallState(ctx context.Context, callID string) (*CallState, error) {
-	key := fmt.Sprintf("%s:%s", PrefixCallState, callID)
-	result, err := c.client.HGetAll(ctx, key).Result()
-	if err != nil {
-		return nil, err
-	}
-	if len(result) == 0 {
-		return nil, nil
-	}
-	return CallStateFromMap(result)
-}
-
-// DeleteCallState removes call state from Redis
-func (c *Client) DeleteCallState(ctx context.Context, callID string) error {
-	key := fmt.Sprintf("%s:%s", PrefixCallState, callID)
-	return c.client.Del(ctx, key).Err()
-}
-
-// UpdateCallStateTTL updates the TTL of a call state based on session status
-// - If status is "connected", TTL is removed (key persists until CDR)
-// - Otherwise, TTL is extended by 60 seconds
-func (c *Client) UpdateCallStateTTL(ctx context.Context, callID string, status string) error {
-	key := fmt.Sprintf("%s:%s", PrefixCallState, callID)
-
-	if status == "connected" {
-		// Remove TTL when call is connected - will persist until CDR
-		return c.client.Persist(ctx, key).Err()
-	}
-
-	// Extend TTL by 60 seconds for other statuses
-	return c.client.Expire(ctx, key, ConnectedCallPersistTTL).Err()
-}
-
-// IncrementActiveCalls increments active call count for a campaign
-func (c *Client) IncrementActiveCalls(ctx context.Context, campaignID int64) (int64, error) {
-	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
-	return c.client.Incr(ctx, key).Result()
-}
-
 // DecrementActiveCalls decrements active call count for a campaign
 func (c *Client) DecrementActiveCalls(ctx context.Context, campaignID int64) (int64, error) {
 	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
@@ -158,12 +112,6 @@ func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (i
 		return values[1].(int64), false, nil
 	}
 	return newVal, true, nil
-}
-
-// ResetActiveCalls sets the active call counter to zero for a campaign
-func (c *Client) ResetActiveCalls(ctx context.Context, campaignID int64) error {
-	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
-	return c.client.Set(ctx, key, 0, 0).Err()
 }
 
 // CountCallStatesForCampaign counts how many dialer:call:* keys exist for a given campaign.
@@ -232,21 +180,6 @@ func (c *Client) ReleaseLock(ctx context.Context, lockKey string) error {
 	return c.client.Del(ctx, key).Err()
 }
 
-// === Idempotency ===
-
-// IsIdempotent checks if a webhook has been processed
-func (c *Client) IsIdempotent(ctx context.Context, eventID string) (bool, error) {
-	key := fmt.Sprintf("%s:%s", PrefixIdempotency, eventID)
-	exists, err := c.client.Exists(ctx, key).Result()
-	return exists > 0, err
-}
-
-// MarkIdempotent marks an event as processed
-func (c *Client) MarkIdempotent(ctx context.Context, eventID string, ttl time.Duration) error {
-	key := fmt.Sprintf("%s:%s", PrefixIdempotency, eventID)
-	return c.client.Set(ctx, key, "1", ttl).Err()
-}
-
 // === Retry Queue ===
 
 // ScheduleRetry schedules a destination for retry after a delay
@@ -288,27 +221,6 @@ func (c *Client) GetRetryableDestinations(ctx context.Context, campaignID int64,
 func (c *Client) RemoveRetry(ctx context.Context, campaignID int64, destinationID int64) error {
 	key := fmt.Sprintf("%s:%d", PrefixRetry, campaignID)
 	return c.client.ZRem(ctx, key, destinationID).Err()
-}
-
-// === Worker State ===
-
-// RegisterWorker registers the worker as active
-func (c *Client) RegisterWorker(ctx context.Context, workerID string, ttl time.Duration) error {
-	key := fmt.Sprintf("%s:%s", PrefixWorkerState, workerID)
-	return c.client.Set(ctx, key, time.Now().Unix(), ttl).Err()
-}
-
-// GetWorkerCount returns the number of active workers
-func (c *Client) GetWorkerCount(ctx context.Context) (int64, error) {
-	pattern := fmt.Sprintf("%s:*", PrefixWorkerState)
-	var count int64
-
-	iter := c.client.Scan(ctx, 0, pattern, 0).Iterator()
-	for iter.Next(ctx) {
-		count++
-	}
-
-	return count, iter.Err()
 }
 
 // === Caller ID Pool Strategy Methods ===
@@ -368,47 +280,4 @@ func (cs *CallState) ToMap() map[string]interface{} {
 		"status":         cs.Status,
 		"started_at":     cs.StartedAt.Format(time.RFC3339),
 	}
-}
-
-// CallStateFromMap creates a CallState from a Redis hash map
-// Returns an error if required fields cannot be parsed
-func CallStateFromMap(m map[string]string) (*CallState, error) {
-	if len(m) == 0 {
-		return nil, fmt.Errorf("empty map provided")
-	}
-
-	var cs CallState
-	var parseErrs []error
-
-	if startedAt, err := time.Parse(time.RFC3339, m["started_at"]); err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("failed to parse started_at: %w", err))
-	} else {
-		cs.StartedAt = startedAt
-	}
-
-	if sessionID, err := strconv.ParseInt(m["session_id"], 10, 64); err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("failed to parse session_id: %w", err))
-	} else {
-		cs.SessionID = sessionID
-	}
-
-	if campaignID, err := strconv.ParseInt(m["campaign_id"], 10, 64); err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("failed to parse campaign_id: %w", err))
-	} else {
-		cs.CampaignID = campaignID
-	}
-
-	if destinationID, err := strconv.ParseInt(m["destination_id"], 10, 64); err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("failed to parse destination_id: %w", err))
-	} else {
-		cs.DestinationID = destinationID
-	}
-
-	cs.Status = m["status"]
-
-	if len(parseErrs) > 0 {
-		return &cs, fmt.Errorf("call state parsing errors: %v", parseErrs)
-	}
-
-	return &cs, nil
 }

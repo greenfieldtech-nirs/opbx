@@ -240,101 +240,6 @@ func (e *Executor) selectCallerID(
 	return selected, nil
 }
 
-// HandleCDR processes a CDR event from Cloudonix (via Laravel webhook)
-func (e *Executor) HandleCDR(ctx context.Context, event *models.CDREvent) error {
-	logger := e.logger.With("session_id", event.SessionID)
-
-	// Get call state from Redis
-	callState, err := e.redisClient.GetCallState(ctx, event.SessionID)
-	if err != nil {
-		logger.Error("failed to get call state", "error", err)
-		return fmt.Errorf("failed to get call state: %w", err)
-	}
-	if callState == nil {
-		logger.Warn("call state not found, may be expired")
-		return nil
-	}
-
-	logger = logger.With(
-		"campaign_id", callState.CampaignID,
-		"destination_id", callState.DestinationID,
-	)
-
-	// Decrement active call count
-	activeCount, err := e.limiter.DecrementActive(ctx, callState.CampaignID)
-	if err != nil {
-		logger.Error("failed to decrement active count", "error", err)
-	} else {
-		logger.Info("call completed", "active_calls_remaining", activeCount)
-	}
-
-	// Update call status in Laravel
-	statusReq := models.UpdateCallStatusRequest{
-		Status:       event.Status,
-		Disposition:  event.Disposition,
-		Duration:     event.Duration,
-		Billsec:      event.Billsec,
-		RecordingURL: event.RecordingURL,
-		CompletedAt:  event.CompletedAt,
-	}
-	if err := e.apiClient.UpdateCallStatus(ctx, callState.SessionID, statusReq); err != nil {
-		logger.Error("failed to update call status", "error", err)
-	}
-
-	// Handle disposition and retry logic
-	if err := e.handleDisposition(ctx, callState, event); err != nil {
-		logger.Error("failed to handle disposition", "error", err)
-		return err
-	}
-
-	// Clean up call state
-	sessionKey := strconv.FormatInt(callState.SessionID, 10)
-	if err := e.redisClient.DeleteCallState(ctx, sessionKey); err != nil {
-		logger.Error("failed to delete call state", "error", err)
-	}
-
-	return nil
-}
-
-// handleDisposition handles call disposition and retry logic
-func (e *Executor) handleDisposition(ctx context.Context, callState *redis.CallState, event *models.CDREvent) error {
-	logger := e.logger.With(
-		"session_id", callState.SessionID,
-		"disposition", event.Disposition,
-	)
-
-	// Determine if should retry
-	shouldRetry := e.retryMgr.ShouldRetry(0, event.Disposition)
-	var nextRetryAt models.FlexTime
-	if shouldRetry {
-		nextRetryAt = models.FlexTime(time.Now().Add(e.retryMgr.GetRetryDelay(0)))
-	}
-
-	// Set disposition in Laravel
-	dispositionReq := models.SetDispositionRequest{
-		Disposition:   event.Disposition,
-		ShouldRetry:   shouldRetry,
-		AttemptNumber: 1, // TODO: Get actual attempt count
-		NextRetryAt:   nextRetryAt,
-		Duration:      event.Duration,
-		Billsec:       event.Billsec,
-	}
-	resp, err := e.apiClient.SetCallDisposition(ctx, callState.SessionID, dispositionReq)
-	if err != nil {
-		return fmt.Errorf("failed to set disposition: %w", err)
-	}
-
-	// Clear retry tracking on success (call completed, no retry needed)
-	if !resp.WillRetry {
-		if clearErr := e.retryTracker.ClearTriedDIDs(ctx, callState.CampaignID, callState.DestinationID); clearErr != nil {
-			logger.Error("failed to clear retry tracking", "error", clearErr)
-		}
-	}
-
-	logger.Info("disposition set", "will_retry", resp.WillRetry, "destination_status", resp.DestinationStatus)
-	return nil
-}
-
 // handleInitiationFailure handles a failed call initiation
 func (e *Executor) handleInitiationFailure(ctx context.Context, campaign *models.Campaign, destination *models.Destination, err error) error {
 	logger := e.logger.With(
@@ -352,9 +257,4 @@ func (e *Executor) handleInitiationFailure(ctx context.Context, campaign *models
 	}
 
 	return err
-}
-
-// GetPendingRetries gets destinations ready for retry
-func (e *Executor) GetPendingRetries(ctx context.Context, campaignID int64, limit int) ([]int64, error) {
-	return e.redisClient.GetRetryableDestinations(ctx, campaignID, limit)
 }

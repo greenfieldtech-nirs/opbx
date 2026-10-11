@@ -61,13 +61,6 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	}
 }
 
-// UnregisterCampaign removes a campaign from rate limiting
-func (rl *CACRateLimiter) UnregisterCampaign(campaignID int64) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	delete(rl.campaigns, campaignID)
-}
-
 // CanDial checks if a call can be dialed for the given campaign.
 // Returns true, the new active call count, and nil error if a slot was reserved.
 func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, int64, error) {
@@ -134,35 +127,7 @@ func (rl *CACRateLimiter) RecordCall(campaignID int64) {
 	}
 }
 
-// IncrementActive increments active call count in Redis
-func (rl *CACRateLimiter) IncrementActive(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.IncrementActiveCalls(ctx, campaignID)
-}
-
 // DecrementActive decrements active call count in Redis
 func (rl *CACRateLimiter) DecrementActive(ctx context.Context, campaignID int64) (int64, error) {
 	return rl.redis.DecrementActiveCalls(ctx, campaignID)
-}
-
-// GetActiveCount gets current active call count from Redis
-func (rl *CACRateLimiter) GetActiveCount(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.GetActiveCalls(ctx, campaignID)
-}
-
-// IsCACAvailable checks if CAC slots are available without recording
-func (rl *CACRateLimiter) IsCACAvailable(ctx context.Context, campaignID int64) (bool, error) {
-	rl.mu.RLock()
-	limiter, exists := rl.campaigns[campaignID]
-	rl.mu.RUnlock()
-
-	if !exists {
-		return false, nil
-	}
-
-	activeCalls, err := rl.redis.GetActiveCalls(ctx, campaignID)
-	if err != nil {
-		return false, err
-	}
-
-	return int(activeCalls) < limiter.CAC, nil
 }

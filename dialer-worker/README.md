@@ -183,9 +183,7 @@ Configuration is loaded entirely from environment variables. Copy `.env.example`
 | `REDIS_DB` | No | `0` | Redis database number |
 | `WORKER_ID` | Yes | `worker-1` | Unique identifier for this worker instance |
 | `POLL_INTERVAL` | No | `10s` | Interval between campaign polls |
-| `HEALTH_CHECK_PORT` | Yes | `8080` | Port for health check HTTP server |
-| `WEBHOOK_PORT` | Yes | `8081` | Port for CDR webhook HTTP server |
-| `WEBHOOK_SECRET` | No | *(empty)* | HMAC-SHA256 secret for webhook signature verification |
+| `WEBHOOK_PORT` | Yes | `8081` | Port for the health-check HTTP server |
 
 ### Retry Configuration (Hardcoded)
 
@@ -299,30 +297,9 @@ The worker exposes an HTTP server on `WEBHOOK_PORT` (default 8081) with the foll
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/webhooks/cdr` | POST | HMAC-SHA256 (optional) | Receives CDR events from Laravel |
 | `/webhooks/health` | GET | None | Health check returning `{"status": "healthy"}` |
 
-### CDR Webhook Format
-
-```json
-{
-  "session_id": "123456789",
-  "status": "completed",
-  "disposition": "answered",
-  "duration": 120,
-  "billsec": 115,
-  "recording_url": "https://recordings.example.com/call-123.mp3",
-  "completed_at": "2024-01-15T10:30:00Z"
-}
-```
-
-### Webhook Signature Verification
-
-When `WEBHOOK_SECRET` is configured, the worker verifies the `X-Webhook-Signature` header using HMAC-SHA256:
-
-```
-expected = HMAC-SHA256(webhook_secret, request_body)
-```
+The worker does not receive CDRs: Laravel handles call events, decrements the CAC counter and owns retry timing.
 
 ## Caller ID Pool Strategies
 

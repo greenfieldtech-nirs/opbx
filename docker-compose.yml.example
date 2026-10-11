@@ -430,9 +430,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_DB=0
       - POLL_INTERVAL=${DIALER_POLL_INTERVAL:-10s}
-      - HEALTH_CHECK_PORT=${DIALER_HEALTH_PORT:-8080}
       - WEBHOOK_PORT=${DIALER_WEBHOOK_PORT:-8081}
-      - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:?set DIALER_WEBHOOK_SECRET}
     # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     networks:
       - opbx
