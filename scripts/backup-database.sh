@@ -27,6 +27,9 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DB_NAME="${DB_DATABASE:-opbx}"
 DB_USER="root"
 DB_PASSWORD="${DB_ROOT_PASSWORD:-${DB_PASSWORD:-secret}}"
+# Passed to the container by name (-e MYSQL_PWD) so the value never appears on a
+# command line that compose echoes on failure, nor in printed hints.
+export MYSQL_PWD="${DB_PASSWORD}"
 CONTAINER_NAME="opbx_mysql"
 
 # Determine backup filename
@@ -58,9 +61,8 @@ fi
 
 # Create backup
 echo "Dumping database '${DB_NAME}'..."
-docker compose exec -T mysql mysqldump \
+docker compose exec -T -e MYSQL_PWD mysql mysqldump \
     -u "${DB_USER}" \
-    -p"${DB_PASSWORD}" \
     --single-transaction \
     --routines \
     --triggers \
@@ -78,9 +80,8 @@ if [ -f "${BACKUP_FILE}" ] && [ -s "${BACKUP_FILE}" ] && gunzip -c "${BACKUP_FIL
     if [ "$QUIET" = false ]; then
         echo ""
         echo "Database contents:"
-        docker compose exec -T mysql mysql \
+        docker compose exec -T -e MYSQL_PWD mysql mysql \
             -u "${DB_USER}" \
-            -p"${DB_PASSWORD}" \
             -e "USE ${DB_NAME}; SHOW TABLE STATUS;" \
             | awk 'NR>1 {print "  " $1 ": " $5 " rows"}' 2>/dev/null || true
     fi
@@ -98,4 +99,4 @@ fi
 
 echo ""
 echo "To restore from this backup, run:"
-echo "  gunzip < ${BACKUP_FILE} | docker compose exec -T mysql mysql -u ${DB_USER} -p'${DB_PASSWORD}'"
+echo "  gunzip < ${BACKUP_FILE} | docker compose exec -T mysql mysql -u ${DB_USER} -p\"\$DB_ROOT_PASSWORD\""

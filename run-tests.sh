@@ -43,7 +43,9 @@ echo "Database: MySQL (opbx_test)"
 echo "=========================================="
 
 # Run tests with proper environment variables
-DB_PASSWORD="${DB_PASSWORD:-}"
+# Exported and passed by name only (-e DB_PASSWORD): a value on the command line
+# is echoed by compose when the command fails.
+export DB_PASSWORD="${DB_PASSWORD:-}"
 DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-}"
 
 docker compose exec \
@@ -53,7 +55,7 @@ docker compose exec \
     -e DB_PORT=3306 \
     -e DB_DATABASE=opbx_test \
     -e DB_USERNAME=opbx \
-    -e DB_PASSWORD="$DB_PASSWORD" \
+    -e DB_PASSWORD \
     -e CACHE_STORE=array \
     -e QUEUE_CONNECTION=sync \
     -e SESSION_DRIVER=array \
