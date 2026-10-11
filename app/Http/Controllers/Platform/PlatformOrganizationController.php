@@ -56,7 +56,7 @@ class PlatformOrganizationController extends Controller
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
             }
 
-            $perPage = $request->input('per_page', 25);
+            $perPage = $this->perPage($request, 25);
 
             $paginator = $query->paginate(min($perPage, 100));
 

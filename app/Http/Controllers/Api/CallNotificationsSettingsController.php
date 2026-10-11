@@ -249,7 +249,7 @@ class CallNotificationsSettingsController extends Controller
                 $query->where('created_at', '<=', $request->input('to'));
             }
 
-            $logs = $query->paginate($request->input('per_page', 50));
+            $logs = $query->paginate($this->perPage($request, 50));
 
             return response()->json([
                 'data' => CallNotificationLogResource::collection($logs->items()),
@@ -271,7 +271,7 @@ class CallNotificationsSettingsController extends Controller
         $latestLogs = CallNotificationLog::forOrganization($user->organization_id)
             ->whereIn('id', $subquery)
             ->orderBy('created_at', 'desc')
-            ->paginate($request->input('per_page', 50));
+            ->paginate($this->perPage($request, 50));
 
         // Apply filters if provided
         if ($request->has('status')) {
@@ -280,7 +280,7 @@ class CallNotificationsSettingsController extends Controller
                 ->whereIn('id', $subquery)
                 ->where('status', $request->input('status'))
                 ->orderBy('created_at', 'desc')
-                ->paginate($request->input('per_page', 50));
+                ->paginate($this->perPage($request, 50));
 
             return response()->json([
                 'data' => CallNotificationLogResource::collection($filteredLogs->items()),

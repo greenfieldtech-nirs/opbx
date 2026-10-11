@@ -20,6 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Abstract base controller for CRUD API operations.
@@ -702,7 +704,7 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getCreateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ], 201);
-        } catch (HttpResponseException $e) {
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
             throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'creation', [
@@ -856,7 +858,7 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getUpdateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ]);
-        } catch (HttpResponseException $e) {
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
             throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'update', [
@@ -944,7 +946,7 @@ abstract class AbstractApiCrudController extends Controller
             ]);
 
             return response()->json(null, 204);
-        } catch (HttpResponseException $e) {
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
             // Designed responses from hooks (e.g. last-owner 409) must not become 500s.
             throw $e;
         } catch (\Exception $e) {

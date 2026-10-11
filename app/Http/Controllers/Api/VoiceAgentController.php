@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\VoiceAgentProvider;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVoiceAgentRequest;
 use App\Http\Requests\UpdateVoiceAgentRequest;
@@ -57,7 +58,7 @@ class VoiceAgentController extends Controller
             $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
         }
 
-        $agents = $query->paginate($request->get('per_page', 20));
+        $agents = $query->paginate($this->perPage($request, 20));
 
         return new VoiceAgentCollection($agents);
     }
@@ -302,7 +303,7 @@ class VoiceAgentController extends Controller
 
         $providers = [];
 
-        foreach (\App\Enums\VoiceAgentProvider::cases() as $provider) {
+        foreach (VoiceAgentProvider::cases() as $provider) {
             $providers[$provider->value] = [
                 'name' => $provider->getDisplayName(),
                 'requires_auth' => $provider->requiresAuthentication(),

@@ -92,8 +92,7 @@ class PhoneNumberController extends Controller
         }
 
         // Paginate
-        $perPage = (int) $request->input('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
+        $perPage = $this->perPage($request, 20);
 
         $phoneNumbers = $query->orderBy('created_at', 'desc')->paginate($perPage);
 

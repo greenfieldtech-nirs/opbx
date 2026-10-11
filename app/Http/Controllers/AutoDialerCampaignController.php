@@ -44,7 +44,7 @@ class AutoDialerCampaignController extends Controller
         $filters = [
             'status' => $request->status,
             'search' => $request->search,
-            'per_page' => $request->per_page ?? 25,
+            'per_page' => $this->perPage($request, 25),
         ];
 
         $campaigns = $this->managementService->listCampaigns(
@@ -358,7 +358,7 @@ class AutoDialerCampaignController extends Controller
 
         $filters = [
             'status' => $request->status,
-            'per_page' => $request->per_page ?? 50,
+            'per_page' => $this->perPage($request, 50),
         ];
 
         $destinations = $this->managementService->getDestinations($campaign, $filters);

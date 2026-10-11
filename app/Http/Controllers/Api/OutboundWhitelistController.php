@@ -142,8 +142,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
         $query->orderBy($sortField, $sortOrder);
 
         // Paginate
-        $perPage = (int) $request->input('per_page', 25); // Default to 25 for backward compatibility
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
+        $perPage = $this->perPage($request, 25);
 
         $models = $query->paginate($perPage);
 

@@ -9,6 +9,7 @@ use App\Enums\ListStatus;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\ListManagementService;
@@ -41,7 +42,7 @@ class DistributionListController extends Controller
                 $q->where('name', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 25);
+            ->paginate($this->perPage($request, 25));
 
         return response()->json([
             'data' => DistributionListResource::collection($lists),
@@ -288,7 +289,7 @@ class DistributionListController extends Controller
                 $q->where('phone_number', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 50);
+            ->paginate($this->perPage($request, 50));
 
         return response()->json([
             'data' => ListDestinationResource::collection($destinations),
