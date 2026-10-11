@@ -57,12 +57,12 @@ public class AcdWorkerVerticle extends AbstractVerticle {
 
     private Future<Void> startServers() {
         Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
 
-        // Authenticated API routes
+        // Authenticated API routes. Auth runs before the body is read; bodies are small JSON.
         router.route("/queue/*").handler(this::requireAuth);
         router.route("/events").handler(this::requireAuth);
         router.route("/agents/*").handler(this::requireAuth);
+        router.route().handler(BodyHandler.create(false).setBodyLimit(64 * 1024));
 
         router.post("/queue/enqueue").handler(this::handleEnqueue);
         router.post("/queue/poll").handler(this::handlePoll);
