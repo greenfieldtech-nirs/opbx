@@ -14,8 +14,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -32,6 +34,7 @@ public class AcdWorkerVerticle extends AbstractVerticle {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private final Config config;
+    private RedisQueueStore store;
     private QueueEngine engine;
 
     public AcdWorkerVerticle(Config config) {
@@ -40,15 +43,15 @@ public class AcdWorkerVerticle extends AbstractVerticle {
 
     @Override
     public void start(Promise<Void> startPromise) {
-        RedisQueueStore.create(vertx, config.redisUri())
-                .onSuccess(store -> {
-                    this.engine = new QueueEngine(store, Time.system());
-                    startServers().onComplete(startPromise);
-                })
-                .onFailure(cause -> {
-                    logger.error("Failed to connect to Redis at {}: {}", config.redisUri(), cause.getMessage(), cause);
-                    startPromise.fail(cause);
-                });
+        // No connect at boot: the pooled client connects per command, and /health reports Redis.
+        this.store = new RedisQueueStore(vertx, config.redisUri());
+        this.engine = new QueueEngine(store, Time.system());
+        startServers().onComplete(startPromise);
+    }
+
+    @Override
+    public void stop(Promise<Void> stopPromise) {
+        (store != null ? store.close() : Future.<Void>succeededFuture()).onComplete(stopPromise);
     }
 
     private Future<Void> startServers() {
@@ -71,11 +74,21 @@ public class AcdWorkerVerticle extends AbstractVerticle {
                 .onSuccess(server -> logger.info("ACD API listening on port {}", config.httpPort));
 
         HttpServer healthServer = vertx.createHttpServer()
-                .requestHandler(req -> req.response().setStatusCode(200).end("ok"));
+                .requestHandler(healthHandler(store));
         Future<HttpServer> healthFuture = healthServer.listen(config.healthPort)
                 .onSuccess(server -> logger.info("ACD health listening on port {}", config.healthPort));
 
         return Future.all(apiFuture, healthFuture).mapEmpty();
+    }
+
+    /** 200 only while Redis answers, so Docker's healthcheck restarts a worker that lost Redis. */
+    static Handler<HttpServerRequest> healthHandler(QueueStore store) {
+        return req -> store.ping()
+                .onSuccess(v -> req.response().setStatusCode(200).end("ok"))
+                .onFailure(cause -> {
+                    logger.warn("Health check failed: Redis ping error={}", cause.getMessage());
+                    req.response().setStatusCode(503).end("redis unavailable");
+                });
     }
 
     // ==========================================================================

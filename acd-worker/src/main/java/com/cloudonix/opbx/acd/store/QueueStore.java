@@ -23,4 +23,7 @@ public interface QueueStore {
     Future<Void> del(String... keys);
 
     Future<Long> incr(String key);
+
+    /** Succeeds only when the backing store answers. */
+    Future<Void> ping();
 }

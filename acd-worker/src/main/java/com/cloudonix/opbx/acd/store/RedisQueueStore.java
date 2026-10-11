@@ -10,21 +10,33 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.redis.client.Redis;
 import io.vertx.redis.client.RedisAPI;
+import io.vertx.redis.client.RedisOptions;
 import io.vertx.redis.client.Response;
 
 /** Redis-backed {@link QueueStore} using the Vert.x redis client. */
 public class RedisQueueStore implements QueueStore {
+    private final Redis client;
     private final RedisAPI redis;
 
-    private RedisQueueStore(RedisAPI redis) {
-        this.redis = redis;
+    /**
+     * Pooled client: each command borrows a connection, so a Redis restart or
+     * failover heals on the next command (a single connect()ed connection never does).
+     */
+    public RedisQueueStore(Vertx vertx, String redisUri) {
+        this.client = Redis.createClient(vertx, new RedisOptions()
+                .setConnectionString(redisUri)
+                .setMaxPoolSize(16)
+                .setMaxPoolWaiting(1024));
+        this.redis = RedisAPI.api(client);
     }
 
-    public static Future<RedisQueueStore> create(Vertx vertx, String redisUri) {
-        return Redis.createClient(vertx, redisUri)
-                .connect()
-                .map(RedisAPI::api)
-                .map(RedisQueueStore::new);
+    @Override
+    public Future<Void> ping() {
+        return redis.ping(List.of()).mapEmpty();
+    }
+
+    public Future<Void> close() {
+        return client.close();
     }
 
     @Override

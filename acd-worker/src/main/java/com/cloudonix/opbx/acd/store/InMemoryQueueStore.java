@@ -72,4 +72,9 @@ public class InMemoryQueueStore implements QueueStore {
     public Future<Long> incr(String key) {
         return Future.succeededFuture(strings.computeIfAbsent(key, k -> new AtomicLong()).incrementAndGet());
     }
+
+    @Override
+    public Future<Void> ping() {
+        return Future.succeededFuture();
+    }
 }
