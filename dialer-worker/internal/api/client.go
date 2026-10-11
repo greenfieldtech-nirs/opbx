@@ -47,7 +47,7 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 	}
 
 	// Debug: log the data type
-	c.logger.Info("GetActiveCampaigns response", "data_type", fmt.Sprintf("%T", response.Data))
+	c.logger.Debug("GetActiveCampaigns response", "data_type", fmt.Sprintf("%T", response.Data))
 
 	// Extract campaigns from data wrapper
 	campaignsData, err := json.Marshal(response.Data)
@@ -60,9 +60,9 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 		return nil, fmt.Errorf("failed to unmarshal campaigns: %w", err)
 	}
 
-	c.logger.Info("GetActiveCampaigns result", "count", len(campaigns))
+	c.logger.Debug("GetActiveCampaigns result", "count", len(campaigns))
 	for i, camp := range campaigns {
-		c.logger.Info("Campaign details",
+		c.logger.Debug("Campaign details",
 			"index", i,
 			"id", camp.ID,
 			"name", camp.Name,
@@ -74,7 +74,7 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 		)
 		// Log pool items
 		for j, item := range camp.CallerIDPool {
-			c.logger.Info("Pool item",
+			c.logger.Debug("Pool item",
 				"campaign_id", camp.ID,
 				"index", j,
 				"did_id", item.DIDID,
@@ -201,7 +201,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	}
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512)) // never log unbounded error pages
 		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 

@@ -57,13 +57,21 @@ func NewExecutor(
 	}
 }
 
+// maskPhone keeps only the last 4 digits so logs carry no full phone numbers.
+func maskPhone(p string) string {
+	if len(p) <= 4 {
+		return "****"
+	}
+	return "****" + p[len(p)-4:]
+}
+
 // ExecuteCall executes a single call to a destination
 func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, destination *models.Destination) error {
 	logger := e.logger.With(
 		"campaign_id", campaign.ID,
 		"org_id", campaign.OrganizationID,
 		"destination_id", destination.ID,
-		"phone", destination.PhoneNumber,
+		"phone", maskPhone(destination.PhoneNumber),
 	)
 
 	// Check CAC availability (reserves a slot if available)
@@ -188,9 +196,9 @@ func (e *Executor) selectCallerID(
 		}, nil
 	}
 
-	// Log pool contents
+	// Log pool contents (debug only: noisy and per-call)
 	for i, item := range campaign.CallerIDPool {
-		e.logger.Info("pool item",
+		e.logger.Debug("pool item",
 			"index", i,
 			"did_id", item.DIDID,
 			"phone_number", item.PhoneNumber,
