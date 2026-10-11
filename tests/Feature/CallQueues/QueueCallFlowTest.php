@@ -101,6 +101,7 @@ class QueueCallFlowTest extends TestCase
         return QueueCallbackRequest::create('/callbacks/voice/queue-poll', 'POST', array_merge([
             'CallSid' => self::CALL_ID,
             'session_data' => json_encode($sessionData),
+            '_organization_id' => $this->organization->id,
         ], $extra));
     }
 

@@ -319,6 +319,7 @@ class ConferenceRingAllTest extends TestCase
     {
         return QueueCallbackRequest::create('/callbacks/voice/queue-poll', 'POST', [
             'CallSid' => self::CALL_ID,
+            '_organization_id' => $this->organization->id,
             'session_data' => json_encode([
                 'call_queue_id' => $this->queue->id,
                 'call_id' => self::CALL_ID,

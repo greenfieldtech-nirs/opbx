@@ -58,7 +58,7 @@ class QueuePollController extends Controller
 
         $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $context['call_queue_id'])
-            ->when($context['organization_id'], fn ($q, $orgId) => $q->where('organization_id', $orgId))
+            ->where('organization_id', $context['organization_id'])
             ->first();
 
         if (! $callQueue) {
@@ -66,6 +66,7 @@ class QueuePollController extends Controller
         }
 
         $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $callQueue->organization_id)
             ->where('call_queue_id', $callQueue->id)
             ->where('call_id', $context['call_id'])
             ->whereNull('disposition')

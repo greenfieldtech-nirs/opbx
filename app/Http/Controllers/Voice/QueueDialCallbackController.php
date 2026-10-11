@@ -54,6 +54,7 @@ class QueueDialCallbackController extends Controller
         // (redial loop, origin never terminates, congestion) - record the
         // bridge and end the call cleanly.
         $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $context['organization_id'])
             ->where('call_queue_id', $context['call_queue_id'])
             ->where('call_id', $context['call_id'])
             ->whereNull('disposition')
@@ -71,53 +72,57 @@ class QueueDialCallbackController extends Controller
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
+        // The queue must belong to the authenticated org before any state is touched.
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $context['call_queue_id'])
+            ->where('organization_id', $context['organization_id'])
+            ->first();
+
+        if (! $callQueue) {
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         app(QueueCallLifecycleService::class)->recordDialResult($context['call_id'], $callStatus);
 
         if (in_array($callStatus, ['busy', 'no-answer', 'failed'], true)) {
-            $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
-                ->where('id', $context['call_queue_id'])
-                ->when($context['organization_id'], fn ($q, $orgId) => $q->where('organization_id', $orgId))
+            Log::info('QueueDialCallbackController: Agent dial failed, offering to next agent immediately', [
+                'call_queue_id' => $callQueue->id,
+                'call_id' => $context['call_id'],
+                'call_status' => $callStatus,
+            ]);
+
+            app(QueueCallLifecycleService::class)->handleDialFailed($callQueue, $context['call_id']);
+
+            // Re-offer immediately: another agent may be available and the
+            // caller should not wait out the hold cycle for the next offer.
+            $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $callQueue->organization_id)
+                ->where('call_queue_id', $callQueue->id)
+                ->where('call_id', $context['call_id'])
+                ->whereNull('disposition')
                 ->first();
 
-            if ($callQueue) {
-                Log::info('QueueDialCallbackController: Agent dial failed, offering to next agent immediately', [
-                    'call_queue_id' => $callQueue->id,
-                    'call_id' => $context['call_id'],
-                    'call_status' => $callStatus,
-                ]);
+            if ($queueCall) {
+                $dialOffer = app(QueueDialOfferService::class);
+                $result = app(AcdWorkerClient::class)->poll(
+                    $callQueue->organization_id,
+                    $callQueue->id,
+                    $queueCall->call_id,
+                    $dialOffer->roster($callQueue),
+                    $callQueue->strategy->value,
+                    $callQueue->max_wait_seconds
+                );
 
-                app(QueueCallLifecycleService::class)->handleDialFailed($callQueue, $context['call_id']);
+                if (($result['action'] ?? 'wait') === 'dial') {
+                    $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
 
-                // Re-offer immediately: another agent may be available and the
-                // caller should not wait out the hold cycle for the next offer.
-                $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
-                    ->where('call_queue_id', $callQueue->id)
-                    ->where('call_id', $context['call_id'])
-                    ->whereNull('disposition')
-                    ->first();
-
-                if ($queueCall) {
-                    $dialOffer = app(QueueDialOfferService::class);
-                    $result = app(AcdWorkerClient::class)->poll(
-                        $callQueue->organization_id,
-                        $callQueue->id,
-                        $queueCall->call_id,
-                        $dialOffer->roster($callQueue),
-                        $callQueue->strategy->value,
-                        $callQueue->max_wait_seconds
-                    );
-
-                    if (($result['action'] ?? 'wait') === 'dial') {
-                        $dialResponse = $dialOffer->buildDialResponse($request, $callQueue, $queueCall, $result['agents'] ?? []);
-
-                        if ($dialResponse !== null) {
-                            return $dialResponse;
-                        }
+                    if ($dialResponse !== null) {
+                        return $dialResponse;
                     }
                 }
-
-                return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id'], null, $context['moh_idx']);
             }
+
+            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id'], null, $context['moh_idx']);
         }
 
         return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
