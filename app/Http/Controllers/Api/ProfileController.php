@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\OperateAsSelfMutationException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Profile\UpdateOrganizationRequest;
@@ -195,6 +196,8 @@ class ProfileController extends Controller
                     ])->all(),
                 ],
             ]);
+        } catch (OperateAsSelfMutationException $e) {
+            throw $e; // rendered as 403 by bootstrap/app.php
         } catch (\Exception $e) {
             Log::error('Profile update failed', [
                 'request_id' => $requestId,
@@ -351,6 +354,8 @@ class ProfileController extends Controller
             return response()->json([
                 'message' => 'Password updated successfully. Please log in again with your new password.',
             ]);
+        } catch (OperateAsSelfMutationException $e) {
+            throw $e; // rendered as 403 by bootstrap/app.php
         } catch (\Exception $e) {
             Log::error('Password change failed', [
                 'request_id' => $requestId,

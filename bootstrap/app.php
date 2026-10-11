@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Exceptions\OperateAsSelfMutationException;
 use App\Http\Middleware\ApplyOperateAsOrganization;
 use App\Http\Middleware\BypassOrganizationScope;
 use App\Http\Middleware\DialerWorkerAuth;
@@ -150,9 +151,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // saving() hook) into a clean 403 instead of a 500. This fires only if
         // a request attempts to persist the platform owner's own account while
         // they are operating as an organization.
-        $exceptions->render(function (RuntimeException $e, $request) {
-            if (str_contains($e->getMessage(), 'operate-as effective user')
-                && ($request->is('api/*') || $request->expectsJson())) {
+        $exceptions->render(function (OperateAsSelfMutationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'error' => [
                         'code' => 'OPERATE_AS_SELF_MUTATION_FORBIDDEN',
