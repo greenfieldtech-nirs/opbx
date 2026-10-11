@@ -234,7 +234,7 @@ class Auth0Controller extends Controller
         // Keep the verified profile server-side; the client only gets an opaque id
         // (display fields are never trusted back by the join-request endpoint).
         $onboardingId = Str::random(48);
-        Cache::put('auth0:onboarding:'.$onboardingId, $profile, now()->addMinutes(15));
+        Cache::put('auth0:onboarding:'.$onboardingId, $profile, now()->addMinutes(60));
 
         return response()->json([
             'error' => ['code' => 'AUTH0_REGISTRATION_REQUIRED', 'message' => 'Please complete onboarding.'],
