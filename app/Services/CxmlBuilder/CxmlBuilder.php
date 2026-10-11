@@ -268,7 +268,7 @@ class CxmlBuilder
         }
 
         if ($waitUrl !== null) {
-            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+            $conference->setAttribute('waitUrl', $waitUrl);
         }
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
