@@ -110,7 +110,8 @@ public class AmdWorkerVerticle extends AbstractVerticle {
     public void stop(Promise<Void> stopPromise) {
         Future<? > wsClose = wsServer != null ? wsServer.close() : Future.succeededFuture();
         Future<? > httpClose = httpServer != null ? httpServer.close() : Future.succeededFuture();
-        Future.all(wsClose, httpClose).onComplete(ar -> {
+        Future<Void> clientClose = streamHandler != null ? streamHandler.close() : Future.succeededFuture();
+        Future.all(wsClose, httpClose, clientClose).onComplete(ar -> {
             if (onnxModel != null) {
                 onnxModel.close();
             }

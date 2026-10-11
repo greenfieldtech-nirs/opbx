@@ -108,7 +108,7 @@ public class StreamSession {
         this.actionVoicemail = actionVoicemail;
         this.actionUnknown = actionUnknown;
         this.vad = new EnergyVad(16000, 10, 200, 3000, 3, 20);
-        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, minBeepStartMs, result -> {
+        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, minBeepStartMs, resolved, result -> {
             if (onResultLogged != null) {
                 onResultLogged.accept(result);
             }

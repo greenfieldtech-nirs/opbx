@@ -9,6 +9,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.VerticleBase;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.WebSocket;
+import io.vertx.core.http.WebSocketClient;
 import io.vertx.core.json.JsonObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,8 @@ class StreamHandlerAuthTest {
     private static final String TOKEN = "tok-abcdefghijklmnop";
 
     private Vertx vertx;
+    /** A field, not per connect: Vert.x 5 closes an unreachable client, which can drop a handshake mid-flight. */
+    private WebSocketClient wsClient;
     private int laravelPort;
     /** Session-check requests waiting for the test to answer, with the context to answer on. */
     private final BlockingQueue<Pending> sessionChecks = new LinkedBlockingQueue<>();
@@ -45,6 +48,7 @@ class StreamHandlerAuthTest {
     @BeforeEach
     void setUp() throws Exception {
         vertx = Vertx.vertx();
+        wsClient = vertx.createWebSocketClient();
         laravelPort = await(vertx.createHttpServer().requestHandler(req -> {
             Context ctx = Vertx.currentContext();
             req.body().onSuccess(buf -> {
@@ -140,6 +144,52 @@ class StreamHandlerAuthTest {
         assertEquals((short) 1008, closed.get(StreamHandler.START_TIMEOUT_MS + 3000, TimeUnit.MILLISECONDS));
     }
 
+    @Test
+    void aBeepSendsExactlyOneCallback() throws Exception {
+        WebSocket ws = connect(startAmd(30_000));
+        CompletableFuture<Short> closed = closeCode(ws);
+        await(ws.writeTextMessage(start(8000)));
+        sessionChecks.poll(5, TimeUnit.SECONDS).respond(200, "{\"active\":true}");
+
+        // 2.5 s silence, 0.8 s beep, 0.5 s silence: caught by the rolling buffer (and the VAD).
+        // Not awaited: the worker closes the socket on detection, failing the trailing writes.
+        int[] plan = {2500, 800, 500};
+        for (int part = 0; part < plan.length; part++) {
+            for (int ms = 0; ms < plan[part]; ms += 20) {
+                ws.writeTextMessage(media(part == 1));
+            }
+        }
+
+        JsonObject action = actionCallbacks.poll(5, TimeUnit.SECONDS);
+        assertNotNull(action);
+        assertEquals("voicemail", action.getString("result"));
+        assertEquals((short) 1000, closed.get(5, TimeUnit.SECONDS));
+        assertNull(actionCallbacks.poll(1, TimeUnit.SECONDS), "second callback for one detection");
+    }
+
+    /** 20 ms of 8 kHz mu-law: an 850 Hz tone or silence. */
+    private static String media(boolean tone) {
+        byte[] mulaw = new byte[160];
+        for (int i = 0; i < mulaw.length; i++) {
+            mulaw[i] = linearToMulaw(tone ? (short) (8000 * Math.sin(2 * Math.PI * 850 * i / 8000.0)) : 0);
+        }
+        return new JsonObject().put("event", "media").put("streamSid", "MZ1")
+            .put("media", new JsonObject().put("track", "inbound")
+                .put("payload", java.util.Base64.getEncoder().encodeToString(mulaw)))
+            .encode();
+    }
+
+    private static byte linearToMulaw(short sample) {
+        int sign = (sample >> 8) & 0x80;
+        int s = sign != 0 ? -sample : sample;
+        s = Math.min(s, 32635) + 0x84;
+        int exponent = 7;
+        for (int mask = 0x4000; (s & mask) == 0 && exponent > 0; exponent--, mask >>= 1) {
+        }
+        int mantissa = (s >> (exponent + 3)) & 0x0F;
+        return (byte) ~(sign | (exponent << 4) | mantissa);
+    }
+
     /** Deploys a StreamHandler on its own verticle context, as AmdWorkerVerticle does; returns the WS port. */
     private int startAmd(int detectionTimeoutMs) throws Exception {
         String base = "http://localhost:" + laravelPort + "/api/voice/amd-action";
@@ -158,7 +208,7 @@ class StreamHandlerAuthTest {
     }
 
     private WebSocket connect(int port) throws Exception {
-        return await(vertx.createWebSocketClient().connect(port, "localhost", "/ws/detect"));
+        return await(wsClient.connect(port, "localhost", "/ws/detect"));
     }
 
     private static CompletableFuture<Short> closeCode(WebSocket ws) {

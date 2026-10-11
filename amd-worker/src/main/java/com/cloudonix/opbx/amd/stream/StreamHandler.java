@@ -27,6 +27,8 @@ public class StreamHandler {
     private static final Logger logger = LoggerFactory.getLogger(StreamHandler.class);
     static final long START_TIMEOUT_MS = 5000;
     private static final long SESSION_CHECK_TIMEOUT_MS = 2000;
+    private static final long CALLBACK_TIMEOUT_MS = 5000;
+    private static final long CALLBACK_RETRY_DELAY_MS = 1000;
 
     private final Vertx vertx;
     private final int maxConcurrentStreams;
@@ -314,9 +316,8 @@ public class StreamHandler {
                 if (toneResult != null) {
                     logger.info("Tone detected in rolling buffer call_sid={} stream_sid={} start_ms={} reason=\"{}\"",
                         session.callSid, session.streamSid, (int) checkStartMs, toneResult.reason);
-                    if (session.pipeline.resolveWithResult(toneResult)) {
-                        logResultAndClose(ws, session, toneResult);
-                    }
+                    // resolveWithResult runs onResultLogged (logResultAndClose) itself, once.
+                    session.pipeline.resolveWithResult(toneResult);
                 }
             }
         }
@@ -388,10 +389,10 @@ public class StreamHandler {
     }
 
     private void handleTimeout(ServerWebSocket ws, StreamSession session) {
-        if (session.resolved.get()) {
+        // Same flag as the pipeline: a late detector result after this cannot send a second callback.
+        if (!session.resolved.compareAndSet(false, true)) {
             return;
         }
-        session.resolved.set(true);
         long elapsedMs = System.currentTimeMillis() - session.startTimeMs;
         metrics.recordDetection("unknown", elapsedMs);
         logger.info("DECISION: UNKNOWN (timeout) call_sid={} stream_sid={} elapsed_ms={} reason=\"No voicemail detected within timeout\"",
@@ -466,45 +467,55 @@ public class StreamHandler {
 
         String json = buildCallbackPayload(session, result, action, reason, confidence, detectionTimeMs);
 
+        org.slf4j.MDC.put("session_token", session.sessionToken);
+        org.slf4j.MDC.put("call_id", session.callSid);
         try {
-            java.net.URI uri = new java.net.URI(actionCallbackUrl);
-            String host = uri.getHost();
-            int port = uri.getPort() != -1 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
-            String path = uri.getRawPath();
-            if (uri.getRawQuery() != null) {
-                path += "?" + uri.getRawQuery();
-            }
-
-            org.slf4j.MDC.put("session_token", session.sessionToken);
-            org.slf4j.MDC.put("call_id", session.callSid);
-            try {
-                logger.info("Sending AMD action callback to {}:{}{} call_sid={} result={} action={}",
-                    host, port, path, session.callSid, result, action);
-            } finally {
-                org.slf4j.MDC.clear();
-            }
-
-            httpClient
-                .request(io.vertx.core.http.HttpMethod.POST, port, host, path)
-                .compose(req -> {
-                    req.putHeader("Content-Type", "application/json");
-                    req.putHeader("Authorization", "Bearer " + apiToken);
-                    return req.send(json);
-                })
-                .onComplete(ar -> {
-                    if (ar.succeeded()) {
-                        var response = ar.result();
-                        logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
-                            session.callSid, result, action, response.statusCode());
-                        response.body(); // consume body to avoid resource leak
-                    } else {
-                        logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
-                            session.callSid, result, action, ar.cause().getMessage());
-                    }
-                });
-        } catch (java.net.URISyntaxException e) {
-            logger.error("Invalid action callback URL: {} error={}", actionCallbackUrl, e.getMessage());
+            logger.info("Sending AMD action callback to {} call_sid={} result={} action={}",
+                actionCallbackUrl, session.callSid, result, action);
+        } finally {
+            org.slf4j.MDC.clear();
         }
+
+        postCallback(vertx, httpClient, actionCallbackUrl, apiToken, json).onComplete(ar -> {
+            if (ar.succeeded()) {
+                logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
+                    session.callSid, result, action, ar.result());
+            } else {
+                logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
+                    session.callSid, result, action, ar.cause().getMessage());
+            }
+        });
+    }
+
+    /**
+     * POST the callback (SSL follows the URL scheme) with a 5 s timeout per attempt and one
+     * retry after 1 s on a connection error or 5xx. Completes with the final status code.
+     */
+    static Future<Integer> postCallback(Vertx vertx, HttpClient client, String url, String token, String json) {
+        return postOnce(client, url, token, json).transform(ar -> {
+            if (ar.succeeded() && ar.result() < 500) {
+                return Future.succeededFuture(ar.result());
+            }
+            return vertx.timer(CALLBACK_RETRY_DELAY_MS).compose(v -> postOnce(client, url, token, json));
+        });
+    }
+
+    private static Future<Integer> postOnce(HttpClient client, String url, String token, String json) {
+        RequestOptions options = new RequestOptions()
+            .setMethod(HttpMethod.POST)
+            .setAbsoluteURI(url)
+            .setConnectTimeout(CALLBACK_TIMEOUT_MS)
+            .setIdleTimeout(CALLBACK_TIMEOUT_MS)
+            .putHeader("Content-Type", "application/json")
+            .putHeader("Authorization", "Bearer " + token);
+        return client.request(options)
+            .compose(req -> req.send(json))
+            .compose(resp -> resp.body().map(body -> resp.statusCode())) // drain so the connection is reused
+            .timeout(CALLBACK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    public Future<Void> close() {
+        return httpClient.close();
     }
 
     private String resolveAction(StreamSession session, String result) {
