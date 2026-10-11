@@ -58,6 +58,9 @@ docker compose exec \
     -e QUEUE_CONNECTION=sync \
     -e SESSION_DRIVER=array \
     -e BROADCAST_CONNECTION=null \
+    -e REDIS_DB=15 \
+    -e REDIS_CACHE_DB=14 \
+    -e REDIS_PREFIX=opbx-test- \
     -e PULSE_ENABLED=false \
     -e TELESCOPE_ENABLED=false \
     -e NIGHTWATCH_ENABLED=false \

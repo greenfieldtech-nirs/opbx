@@ -9,16 +9,19 @@ use App\Enums\UserRole;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
 use App\Models\CloudonixSettings;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\QueueCall;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\ImmediateConnectService;
 use App\Services\CallQueue\QueueAgentStateService;
+use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
 
 /**
@@ -36,17 +39,16 @@ class ImmediateConnectTest extends TestCase
     private User $agent;
 
     private const CALL_ID = 'ic-call-001';
+
     private const SESSION_TOKEN = 'ic-session-token-001';
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Ephemeral queue state (skip markers, presence, dial markers) lives in
-        // the shared dev Redis and must not leak between tests or runs.
-        foreach (Redis::keys('acd:*') as $key) {
-            Redis::del(str_replace(config('database.redis.options.prefix', ''), '', $key));
-        }
+        // Ephemeral queue state (skip markers, presence, dial markers) must not
+        // leak between tests. Flushing is safe: TestCase pins Redis to test db 15.
+        Redis::connection()->flushdb();
 
         $this->organization = Organization::factory()->create(['status' => 'active']);
         CloudonixSettings::factory()->create([
@@ -119,7 +121,7 @@ class ImmediateConnectTest extends TestCase
         // Immediate connect at entry returns <Dial> from the initial routing
         // response - no hold CXML, no application switch (switching mid-MOH
         // leaves the caller hearing music until the track ends).
-        QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        QueueCall::withoutGlobalScope(OrganizationScope::class)
             ->where('call_id', self::CALL_ID)->delete();
 
         Http::fake([
@@ -139,8 +141,8 @@ class ImmediateConnectTest extends TestCase
             '_organization_id' => $this->organization->id,
         ]);
 
-        $response = app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
-            ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
+        $response = app(QueueRoutingStrategy::class)
+            ->route($request, new DidNumber, ['call_queue' => $this->queue]);
 
         $content = (string) $response->getContent();
         $this->assertStringContainsString('<Dial', $content);
@@ -153,7 +155,7 @@ class ImmediateConnectTest extends TestCase
 
     public function test_call_entering_without_agents_returns_hold_cxml(): void
     {
-        QueueCall::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        QueueCall::withoutGlobalScope(OrganizationScope::class)
             ->where('call_id', self::CALL_ID)->delete();
 
         Http::fake([
@@ -169,8 +171,8 @@ class ImmediateConnectTest extends TestCase
             '_organization_id' => $this->organization->id,
         ]);
 
-        $response = app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
-            ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
+        $response = app(QueueRoutingStrategy::class)
+            ->route($request, new DidNumber, ['call_queue' => $this->queue]);
 
         $this->assertStringContainsString('queue-poll', (string) $response->getContent());
     }
@@ -277,8 +279,8 @@ class ImmediateConnectTest extends TestCase
             '_organization_id' => $this->organization->id,
         ]);
 
-        app(\App\Services\VoiceRouting\Strategies\QueueRoutingStrategy::class)
-            ->route($request, new \App\Models\DidNumber, ['call_queue' => $this->queue]);
+        app(QueueRoutingStrategy::class)
+            ->route($request, new DidNumber, ['call_queue' => $this->queue]);
 
         $this->assertDatabaseHas('queue_calls', [
             'call_queue_id' => $this->queue->id,

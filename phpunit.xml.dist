@@ -27,7 +27,8 @@
           silently win over these values, and RefreshDatabase will migrate:fresh the PRODUCTION
           database. Both <env> AND <server> are required because Laravel's env() reads $_SERVER
           before $_ENV, and PHPUnit only populates one per tag. DB_PASSWORD is intentionally
-          NOT forced so run-tests.sh can inject it.
+          NOT forced so run-tests.sh can inject it. REDIS_DB/REDIS_CACHE_DB move every
+          Redis read/write (incl. the prefix-free dialer connection) off the live db0/db1.
         -->
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
@@ -42,6 +43,10 @@
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="REDIS_DB" value="15" force="true"/>
+        <env name="REDIS_CACHE_DB" value="14" force="true"/>
+        <env name="REDIS_PREFIX" value="opbx-test-" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="BCRYPT_ROUNDS" value="4" force="true"/>
         <server name="CACHE_STORE" value="array" force="true"/>
@@ -54,5 +59,9 @@
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <server name="SESSION_DRIVER" value="array" force="true"/>
         <server name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <server name="REDIS_DB" value="15" force="true"/>
+        <server name="REDIS_CACHE_DB" value="14" force="true"/>
+        <server name="REDIS_PREFIX" value="opbx-test-" force="true"/>
+        <server name="BROADCAST_CONNECTION" value="null" force="true"/>
     </php>
 </phpunit>

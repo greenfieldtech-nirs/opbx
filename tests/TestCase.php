@@ -26,6 +26,17 @@ abstract class TestCase extends BaseTestCase
         }
 
         parent::setUp();
+
+        // Redis is shared with the live stack (db0 holds acd:*/dialer:* keys the
+        // workers read), so tests must stay on the dedicated test DBs before any
+        // test code can write or flush.
+        $redis = config('database.redis');
+        if ((string) $redis['default']['database'] !== '15'
+            || (string) $redis['cache']['database'] !== '14'
+            || (string) $redis['dialer']['database'] !== '15'
+            || ! str_starts_with((string) $redis['options']['prefix'], 'opbx-test-')) {
+            throw new \RuntimeException('Refusing to run tests against non-test Redis databases; see phpunit.xml.dist REDIS_* overrides.');
+        }
     }
 
     protected function tearDown(): void
