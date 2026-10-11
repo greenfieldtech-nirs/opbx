@@ -22,6 +22,9 @@ return [
 
     'allowed_extensions' => ['mp3', 'wav'],
 
+    // Largest call recording DownloadCallRecordingJob will fetch (bytes). Default 500 MB.
+    'max_download_bytes' => (int) env('RECORDINGS_MAX_DOWNLOAD_BYTES', 524288000),
+
     /*
     |--------------------------------------------------------------------------
     | Storage Configuration

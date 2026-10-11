@@ -64,12 +64,28 @@ class DownloadCallRecordingJob implements ShouldQueue
             return;
         }
 
+        $maxBytes = (int) config('recordings.max_download_bytes', 524288000);
+        $tmpFile = tempnam(sys_get_temp_dir(), 'cdr-rec-');
+
         try {
             // No redirects: the host allowlist below would not apply to the redirect target.
-            $response = Http::timeout(60)->withoutRedirecting()->get($this->sourceUrl);
+            // Stream to a temp file (not memory) and abort once the body exceeds the cap.
+            $response = Http::timeout(60)
+                ->withoutRedirecting()
+                ->sink($tmpFile)
+                ->withOptions(['progress' => function ($downloadTotal, $downloaded) use ($maxBytes): void {
+                    if ($downloaded > $maxBytes) {
+                        throw new \RuntimeException("Recording exceeds the {$maxBytes} byte limit");
+                    }
+                }])
+                ->get($this->sourceUrl);
 
             if (! $response->successful()) {
                 throw new \RuntimeException("Failed to download recording: HTTP {$response->status()}");
+            }
+
+            if (filesize($tmpFile) > $maxBytes) {
+                throw new \RuntimeException("Recording exceeds the {$maxBytes} byte limit");
             }
 
             $contentType = $response->header('Content-Type') ?: 'audio/mpeg';
@@ -83,7 +99,12 @@ class DownloadCallRecordingJob implements ShouldQueue
             $relativePath = "call-recordings/{$cdr->id}.{$extension}";
             $storagePath = "{$cdr->organization_id}/{$relativePath}";
 
-            Storage::disk('recordings')->put($storagePath, $response->body());
+            $stream = fopen($tmpFile, 'rb');
+            try {
+                Storage::disk('recordings')->put($storagePath, $stream);
+            } finally {
+                fclose($stream);
+            }
 
             $cdr->update([
                 'recording_status' => 'available',
@@ -102,9 +123,10 @@ class DownloadCallRecordingJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            $cdr->update(['recording_status' => 'failed']);
-
+            // Status stays as-is while retries remain; failed() marks it failed for good.
             throw $e;
+        } finally {
+            @unlink($tmpFile);
         }
     }
 

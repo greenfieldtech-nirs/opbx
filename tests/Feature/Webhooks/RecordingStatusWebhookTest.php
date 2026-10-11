@@ -89,11 +89,14 @@ class RecordingStatusWebhookTest extends TestCase
         Storage::fake('recordings');
         Http::fake(['*' => Http::response('', 302, ['Location' => 'http://169.254.169.254/latest/meta-data'])]);
 
+        $job = new DownloadCallRecordingJob($this->cdr->id, 'https://api.cloudonix.io/recordings/r1.mp3');
         try {
-            (new DownloadCallRecordingJob($this->cdr->id, 'https://api.cloudonix.io/recordings/r1.mp3'))->handle();
+            $job->handle();
             $this->fail('A redirect must fail the download');
-        } catch (\RuntimeException) {
-            // expected
+        } catch (\RuntimeException $e) {
+            // Not failed yet: retries remain. failed() runs when they are exhausted.
+            $this->assertSame('pending', $this->cdr->fresh()->recording_status);
+            $job->failed($e);
         }
 
         Http::assertSentCount(1);
