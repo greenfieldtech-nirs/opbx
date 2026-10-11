@@ -10,9 +10,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.cloudonix.opbx.acd.model.AgentInfo;
+import com.cloudonix.opbx.acd.model.AgentState;
 import com.cloudonix.opbx.acd.store.InMemoryQueueStore;
 
-import io.vertx.core.Vertx;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 
 /**
  * QueueEngine unit tests against the in-memory store with a fake clock.
@@ -197,7 +199,7 @@ class QueueEngineTest {
         engine.setAgentState("org1", "q1", "u1", com.cloudonix.opbx.acd.model.AgentState.AVAILABLE, null, null, null)
                 .result();
 
-        engine.event("org1", "q1", "call-1", "answered", "u1", null, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
 
         // Next caller moves to head; agent is BUSY so no dial.
         engine.enqueue("org1", "q1", "call-2").result();
@@ -212,8 +214,8 @@ class QueueEngineTest {
         engine.setAgentState("org1", "q1", "u1", com.cloudonix.opbx.acd.model.AgentState.AVAILABLE, 0L, 0L, null)
                 .result();
 
-        engine.event("org1", "q1", "call-1", "answered", "u1", null, null).result();
-        engine.event("org1", "q1", "call-1", "ended", "u1", 42L, 15L).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
+        engine.event("org1", "q1", "call-1", "ended", "u1", 42L, 15L, null).result();
 
         // Agent is in wrap-up: least_talk_time still picks them (only agent) but dial must not happen.
         engine.enqueue("org1", "q1", "call-2").result();
@@ -233,11 +235,95 @@ class QueueEngineTest {
         engine.setAgentState("org1", "q1", "u1", com.cloudonix.opbx.acd.model.AgentState.AVAILABLE, null, null, null)
                 .result();
 
-        // Offer, then agent fails to answer. Call stays queued.
-        engine.event("org1", "q1", "call-1", "dial_failed", "u1", null, null).result();
+        // A spurious bridge marked the agent BUSY, then the dial failed. Call stays queued.
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.event("org1", "q1", "call-1", "dial_failed", "u1", null, null, null).result();
 
         Map<String, Object> reOffer = poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300);
         assertEquals("dial", reOffer.get("action"));
+    }
+
+    @Test
+    void endedAfterLogoutDoesNotLogTheAgentBackIn() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, 0L, 0L, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "e1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.LOGGED_OUT, null, null, null).result();
+
+        engine.event("org1", "q1", "call-1", "ended", "u1", 42L, 0L, "e2").result();
+
+        assertTrue(store.hgetall(QueueEngine.agentKey("org1", "q1", "u1")).result().isEmpty());
+        engine.enqueue("org1", "q1", "call-2").result();
+        assertEquals("wait", poll("q1", "call-2", List.of(agent("u1")), "ring_all", 300).get("action"));
+    }
+
+    @Test
+    void dialFailedKeepsAPausedAgentPaused() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.WRAP_UP, null, null, null).result(); // sticky pause
+
+        engine.event("org1", "q1", "call-1", "dial_failed", "u1", null, null, null).result();
+
+        assertEquals("WRAP_UP", agentHash("u1").get("state"));
+    }
+
+    @Test
+    void dialFailedForALoggedOutAgentDoesNotRecreateTheHash() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.event("org1", "q1", "call-1", "dial_failed", "u1", null, null, null).result();
+
+        assertTrue(agentHash("u1").isEmpty());
+    }
+
+    @Test
+    void replayedEndedEventCountsOnce() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, 100L, 2L, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+        engine.event("org1", "q1", "call-1", "ended", "u1", 30L, 0L, "e1").result();
+        // The agent takes the next call, then Laravel replays the first 'ended'.
+        engine.enqueue("org1", "q1", "call-2").result();
+        engine.event("org1", "q1", "call-2", "answered", "u1", null, null, "a2").result();
+
+        engine.event("org1", "q1", "call-1", "ended", "u1", 30L, 0L, "e1").result();
+
+        Map<String, String> hash = agentHash("u1");
+        assertEquals("BUSY", hash.get("state"));
+        assertEquals("130", hash.get("talkSecondsTotal"));
+        assertEquals("3", hash.get("callsHandledTotal"));
+    }
+
+    @Test
+    void replayedAnsweredEventDoesNotMarkTheAgentBusyAgain() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+        engine.event("org1", "q1", "call-1", "ended", "u1", 5L, 0L, "e1").result();
+
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+
+        assertEquals("AVAILABLE", agentHash("u1").get("state"));
+    }
+
+    @Test
+    void wrapUpExpiryDoesNotRecreateAnAgentLoggedOutMidRead() {
+        GatedStore gated = new GatedStore();
+        QueueEngine gatedEngine = new QueueEngine(gated, fakeTime);
+        gatedEngine.enqueue("org1", "q1", "call-1").result();
+        gatedEngine.setAgentState("org1", "q1", "u1", AgentState.WRAP_UP, null, null, 10L).result();
+        fakeTime.advance(11_000);
+
+        // The poll reads the expired WRAP_UP hash; the read is held while the agent logs out.
+        gated.holdNextRead(QueueEngine.agentKey("org1", "q1", "u1"));
+        var pending = gatedEngine.poll("org1", "q1", "call-1", List.of(agent("u1")), "ring_all", 300);
+        gatedEngine.setAgentState("org1", "q1", "u1", AgentState.LOGGED_OUT, null, null, null).result();
+        gated.release();
+
+        assertEquals("wait", pending.result().get("action"));
+        assertTrue(gated.hgetall(QueueEngine.agentKey("org1", "q1", "u1")).result().isEmpty());
     }
 
     @Test
@@ -245,7 +331,7 @@ class QueueEngineTest {
         engine.enqueue("org1", "q1", "call-1").result();
         engine.enqueue("org1", "q1", "call-2").result();
 
-        engine.event("org1", "q1", "call-1", "abandoned", null, null, null).result();
+        engine.event("org1", "q1", "call-1", "abandoned", null, null, null, null).result();
 
         Map<String, Object> result = poll("q1", "call-2", List.of(), "ring_all", 300);
         assertEquals("wait", result.get("action"));
@@ -334,6 +420,36 @@ class QueueEngineTest {
         List<Map<String, Object>> waiting = (List<Map<String, Object>>) live.get("waiting");
         assertEquals(1, waiting.size());
         assertTrue(((String) waiting.get(0).get("callId")).equals("call-1"));
+    }
+
+    private Map<String, String> agentHash(String userId) {
+        return store.hgetall(QueueEngine.agentKey("org1", "q1", userId)).result();
+    }
+
+    /** Store whose next read of one key is answered (with the value at read time) only on release(). */
+    static class GatedStore extends InMemoryQueueStore {
+        private String heldKey;
+        private Promise<Map<String, String>> held;
+        private Map<String, String> snapshot;
+
+        void holdNextRead(String key) {
+            heldKey = key;
+        }
+
+        void release() {
+            held.complete(snapshot);
+        }
+
+        @Override
+        public Future<Map<String, String>> hgetall(String key) {
+            if (key.equals(heldKey)) {
+                heldKey = null;
+                snapshot = super.hgetall(key).result();
+                held = Promise.promise();
+                return held.future();
+            }
+            return super.hgetall(key);
+        }
     }
 
     private String firstAgentUserId(Map<String, Object> result) {

@@ -69,6 +69,9 @@ class AcdWorkerClient
             'agentUserId' => $agentUserId !== null ? (string) $agentUserId : null,
             'talkSeconds' => $talkSeconds,
             'wrapUpSeconds' => $wrapUpSeconds,
+            // Stable across the inline attempt and SendAcdEventJob replays: the worker dedupes
+            // on it, so an event it already applied (slow response) is not counted twice.
+            'eventId' => (string) Str::uuid(),
         ], fn ($value) => $value !== null);
 
         // A worker blip must not lose ended/abandoned/dial_failed: replay from the queue.

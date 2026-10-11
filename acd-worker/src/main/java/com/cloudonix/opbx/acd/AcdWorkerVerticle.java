@@ -181,7 +181,8 @@ public class AcdWorkerVerticle extends AbstractVerticle {
                 body.get("type").asText(),
                 body.hasNonNull("agentUserId") ? body.get("agentUserId").asText() : null,
                 body.hasNonNull("talkSeconds") ? body.get("talkSeconds").asLong() : null,
-                body.hasNonNull("wrapUpSeconds") ? body.get("wrapUpSeconds").asLong() : null)
+                body.hasNonNull("wrapUpSeconds") ? body.get("wrapUpSeconds").asLong() : null,
+                body.hasNonNull("eventId") ? body.get("eventId").asText() : null)
                 .onSuccess(v -> ctx.response().setStatusCode(204).end())
                 .onFailure(cause -> serverError(ctx, cause));
     }

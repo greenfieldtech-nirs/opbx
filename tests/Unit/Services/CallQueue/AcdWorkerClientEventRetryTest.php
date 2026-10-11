@@ -23,6 +23,35 @@ class AcdWorkerClientEventRetryTest extends TestCase
         Queue::assertPushed(SendAcdEventJob::class, fn (SendAcdEventJob $job) => $job->payload['type'] === 'ended' && $job->payload['callId'] === 'call-1');
     }
 
+    public function test_the_replay_carries_the_same_event_id_as_the_inline_attempt(): void
+    {
+        Queue::fake();
+        Http::fake(['*' => Http::response('', 503)]);
+
+        (new AcdWorkerClient)->event(1, 2, 'call-1', 'ended', 7, 30);
+
+        $sentId = null;
+        Http::assertSent(function ($request) use (&$sentId) {
+            $sentId = $request['eventId'] ?? null;
+
+            return true;
+        });
+        $this->assertNotEmpty($sentId);
+        Queue::assertPushed(SendAcdEventJob::class, fn (SendAcdEventJob $job) => $job->payload['eventId'] === $sentId);
+    }
+
+    public function test_each_event_gets_its_own_id(): void
+    {
+        Http::fake(['*' => Http::response('', 204)]);
+
+        $client = new AcdWorkerClient;
+        $client->event(1, 2, 'call-1', 'dial_failed', 7);
+        $client->event(1, 2, 'call-1', 'dial_failed', 7);
+
+        $ids = Http::recorded()->map(fn ($pair) => $pair[0]['eventId'])->all();
+        $this->assertCount(2, array_unique($ids));
+    }
+
     public function test_an_accepted_event_is_not_queued(): void
     {
         Queue::fake();

@@ -15,6 +15,27 @@ import io.vertx.redis.client.Response;
 
 /** Redis-backed {@link QueueStore} using the Vert.x redis client. */
 public class RedisQueueStore implements QueueStore {
+    // Returns {position, added}.
+    private static final String ENQUEUE_LUA = """
+            local pos = redis.call('LPOS', KEYS[1], ARGV[1])
+            if pos then return {pos + 1, 0} end
+            redis.call('HSET', KEYS[2], 'queuedAt', ARGV[2])
+            return {redis.call('RPUSH', KEYS[1], ARGV[1]), 1}
+            """;
+
+    // KEYS: agent hash [, event key]. ARGV: allowed states (csv), expected wrapUpUntil ('' = any),
+    // event ttl, incr talk, incr calls, field/value pairs. Returns 1 applied, 0 skipped, -1 duplicate.
+    private static final String TRANSITION_LUA = """
+            if KEYS[2] and not redis.call('SET', KEYS[2], '1', 'NX', 'EX', ARGV[3]) then return -1 end
+            local state = redis.call('HGET', KEYS[1], 'state')
+            if not state or not string.find(',' .. ARGV[1] .. ',', ',' .. state .. ',', 1, true) then return 0 end
+            if ARGV[2] ~= '' and redis.call('HGET', KEYS[1], 'wrapUpUntil') ~= ARGV[2] then return 0 end
+            if #ARGV > 5 then redis.call('HSET', KEYS[1], unpack(ARGV, 6)) end
+            if ARGV[4] ~= '0' then redis.call('HINCRBY', KEYS[1], 'talkSecondsTotal', ARGV[4]) end
+            if ARGV[5] ~= '0' then redis.call('HINCRBY', KEYS[1], 'callsHandledTotal', ARGV[5]) end
+            return 1
+            """;
+
     private final Redis client;
     private final RedisAPI redis;
 
@@ -40,11 +61,6 @@ public class RedisQueueStore implements QueueStore {
     }
 
     @Override
-    public Future<Long> rpush(String key, String value) {
-        return redis.rpush(List.of(key, value)).map(Response::toLong);
-    }
-
-    @Override
     public Future<Long> lrem(String key, String value) {
         return redis.lrem(key, "0", value).map(Response::toLong);
     }
@@ -52,6 +68,11 @@ public class RedisQueueStore implements QueueStore {
     @Override
     public Future<List<String>> lrangeAll(String key) {
         return redis.lrange(key, "0", "-1").map(response -> response.stream().map(Response::toString).toList());
+    }
+
+    @Override
+    public Future<Long> lpos(String key, String value) {
+        return redis.lpos(List.of(key, value)).map(response -> response == null ? null : response.toLong());
     }
 
     @Override
@@ -84,5 +105,36 @@ public class RedisQueueStore implements QueueStore {
     @Override
     public Future<Long> incr(String key) {
         return redis.incr(key).map(Response::toLong);
+    }
+
+    @Override
+    public Future<EnqueueResult> enqueueIfAbsent(String queueKey, String callKey, String callId, long queuedAt) {
+        return redis.eval(List.of(ENQUEUE_LUA, "2", queueKey, callKey, callId, String.valueOf(queuedAt)))
+                .map(r -> new EnqueueResult(r.get(0).toInteger(), r.get(1).toInteger() == 1));
+    }
+
+    @Override
+    public Future<TransitionOutcome> transitionAgent(AgentTransition t) {
+        List<String> args = new ArrayList<>();
+        args.add(TRANSITION_LUA);
+        if (t.eventKey() != null) {
+            args.addAll(List.of("2", t.agentKey(), t.eventKey()));
+        } else {
+            args.addAll(List.of("1", t.agentKey()));
+        }
+        args.add(String.join(",", t.allowedFrom()));
+        args.add(t.expectWrapUpUntil() == null ? "" : t.expectWrapUpUntil());
+        args.add(String.valueOf(t.eventTtlSeconds()));
+        args.add(String.valueOf(t.incrTalkSeconds()));
+        args.add(String.valueOf(t.incrCalls()));
+        t.fields().forEach((k, v) -> {
+            args.add(k);
+            args.add(v);
+        });
+        return redis.eval(args).map(r -> switch (r.toInteger()) {
+            case 1 -> TransitionOutcome.APPLIED;
+            case -1 -> TransitionOutcome.DUPLICATE;
+            default -> TransitionOutcome.SKIPPED;
+        });
     }
 }
