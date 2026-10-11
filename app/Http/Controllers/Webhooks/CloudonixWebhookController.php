@@ -34,6 +34,7 @@ use App\Services\CallTracking\CallTrackingEventDispatcher;
 use App\Services\CallTracking\CallTrackingSessionService;
 use App\Services\PhoneNumberService;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -279,7 +280,8 @@ class CloudonixWebhookController extends Controller
             }
 
             // Check for duplicate event (idempotency)
-            $existingUpdate = SessionUpdate::where('organization_id', $organizationId)
+            $existingUpdate = SessionUpdate::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
                 ->where('event_id', $validated['eventId'])
                 ->first();
 
@@ -349,11 +351,14 @@ class CloudonixWebhookController extends Controller
             }
 
             return response()->json(['message' => 'Session record updated successfully'], 200);
+        } catch (UniqueConstraintViolationException) {
+            // A concurrent delivery of the same (org, session, event) won the insert.
+            return response()->json(['message' => 'Session record updated successfully'], 200);
         } catch (\Exception $e) {
             Log::error('Session update processing failed', [
                 'request_id' => $requestId,
-                'session_id' => $payload['id'] ?? null,
-                'event_id' => $payload['eventId'] ?? null,
+                'session_id' => $validated['id'] ?? null,
+                'event_id' => $validated['eventId'] ?? null,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);

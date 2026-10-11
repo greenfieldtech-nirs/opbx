@@ -8,8 +8,10 @@ use App\Models\CallDetailRecord;
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
+use App\Services\PhoneNumberService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -121,6 +123,30 @@ class CloudonixWebhookControllerTest extends TestCase
             ->assertUnauthorized();
 
         $this->assertSame(0, SessionUpdate::withoutGlobalScopes()->count());
+    }
+
+    public function test_session_update_duplicate_event_is_acknowledged_once(): void
+    {
+        $this->postJson('/api/webhooks/cloudonix/session-update', $this->sessionPayload(), $this->auth())->assertOk();
+        $this->postJson('/api/webhooks/cloudonix/session-update', $this->sessionPayload(), $this->auth())->assertOk();
+
+        $this->assertSame(1, SessionUpdate::withoutGlobalScopes()->where('event_id', 'evt-1')->count());
+    }
+
+    public function test_session_update_failure_returns_json_error_with_logged_context(): void
+    {
+        Log::spy();
+        $this->mock(PhoneNumberService::class, function ($mock): void {
+            $mock->shouldReceive('normalizeToE164')->andThrow(new \RuntimeException('boom'));
+        });
+
+        $this->postJson('/api/webhooks/cloudonix/session-update', $this->sessionPayload('evt-fail'), $this->auth())
+            ->assertStatus(500)
+            ->assertJson(['error' => 'Session update processing failed']);
+
+        Log::shouldHaveReceived('error')
+            ->withArgs(fn ($m, $ctx = []) => $m === 'Session update processing failed' && ($ctx['event_id'] ?? null) === 'evt-fail' && ($ctx['session_id'] ?? null) === 777001)
+            ->once();
     }
 
     public function test_session_update_ignores_statuses_outside_the_allow_list(): void
