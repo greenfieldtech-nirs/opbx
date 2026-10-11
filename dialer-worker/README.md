@@ -224,6 +224,10 @@ sequenceDiagram
     Note over L: Laravel handles the CDR: updates the session, releases the CAC slot, schedules retries
 ```
 
+## Deployment: single replica
+
+Run exactly one worker (`deploy.replicas: 1` in `docker-compose.yml.example`). CPS pacing is in-process, so a second replica would double the dial rate. CAC is enforced in Redis, and Laravel claims each destination atomically, so a duplicate can never place the same call twice.
+
 ## Rate Limiting
 
 The worker implements two complementary rate-limiting mechanisms per campaign:

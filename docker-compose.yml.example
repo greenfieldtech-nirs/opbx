@@ -421,6 +421,10 @@ services:
     container_name: opbx_dialer_worker
     labels:
       - "logging.opbx/collect=true"
+    # D5: exactly one replica. CPS pacing and the in-flight batch are in-process state,
+    # so a second worker would double the dial rate. Do not scale this service.
+    deploy:
+      replicas: 1
     environment:
       - WORKER_ID=${DIALER_WORKER_ID:-worker-1}
       - LARAVEL_API_URL=${DIALER_LARAVEL_API_URL:-http://nginx}
