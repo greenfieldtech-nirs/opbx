@@ -236,6 +236,6 @@ class QueueDestinationIntegrationTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $this->deleteJson("/api/v1/call-queues/{$this->queue->id}")->assertStatus(500);
+        $this->deleteJson("/api/v1/call-queues/{$this->queue->id}")->assertStatus(409);
     }
 }
