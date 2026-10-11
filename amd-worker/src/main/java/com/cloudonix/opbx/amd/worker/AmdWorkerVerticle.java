@@ -57,8 +57,12 @@ public class AmdWorkerVerticle extends AbstractVerticle {
             config.dumpAudio,
             config.dumpAudioPath,
             config.apiToken,
-            config.actionCallbackUrl
+            config.actionCallbackUrl,
+            config.sessionCheckUrl
         );
+        if (config.sessionCheckUrl.isEmpty()) {
+            logger.error("No AMD session check URL (set AMD_SESSION_CHECK_URL or an AMD_ACTION_CALLBACK_URL ending in /amd-action); every stream will be rejected");
+        }
 
         wsServer = vertx.createHttpServer(new HttpServerOptions().setPort(config.websocketPort));
         wsServer.webSocketHandler(streamHandler::handleConnection);

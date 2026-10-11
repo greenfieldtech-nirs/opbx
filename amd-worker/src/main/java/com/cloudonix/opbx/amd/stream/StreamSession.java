@@ -43,6 +43,10 @@ public class StreamSession {
     public volatile String actionVoicemail = null;
     public volatile String actionUnknown = null;
     public volatile String sessionToken = null;
+    /** null while the Laravel session check is in flight; TRUE = active session, FALSE = rejected. */
+    public volatile Boolean sessionVerified = null;
+    /** Action callback produced before verification finished; sent on TRUE, dropped on FALSE. */
+    public Runnable heldCallback;
 
     private final java.util.List<double[]> rawAudioChunks = new java.util.ArrayList<>();
     private static final int MAX_RETAINED_AUDIO_MS = 5000; // Keep last 5 seconds for rolling buffer checks

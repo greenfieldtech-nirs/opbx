@@ -22,6 +22,7 @@ public class Config {
     public final String dumpAudioPath;
     public final String apiToken;
     public final String actionCallbackUrl;
+    public final String sessionCheckUrl;
 
     public Config() {
         this.websocketPort = Integer.parseInt(getEnv("AMD_WEBSOCKET_PORT", "8082"));
@@ -36,6 +37,22 @@ public class Config {
         this.dumpAudioPath = getEnv("AMD_DUMP_AUDIO_PATH", "/tmp/amd-dumps");
         this.apiToken = getEnv("AMD_WORKER_API_TOKEN", "");
         this.actionCallbackUrl = getEnv("AMD_ACTION_CALLBACK_URL", "http://nginx/api/voice/amd-action");
+        this.sessionCheckUrl = deriveSessionCheckUrl(actionCallbackUrl, System.getenv("AMD_SESSION_CHECK_URL"));
+    }
+
+    /**
+     * Session-check endpoint: AMD_SESSION_CHECK_URL if set, else the action callback URL
+     * with its trailing /amd-action segment replaced by /amd-session. Returns "" when it
+     * cannot be derived, which makes every stream fail verification (fail closed).
+     */
+    public static String deriveSessionCheckUrl(String actionCallbackUrl, String override) {
+        if (override != null && !override.isBlank()) {
+            return override;
+        }
+        if (actionCallbackUrl == null || !actionCallbackUrl.endsWith("/amd-action")) {
+            return "";
+        }
+        return actionCallbackUrl.substring(0, actionCallbackUrl.length() - "/amd-action".length()) + "/amd-session";
     }
 
     private static String getEnv(String key, String defaultValue) {
