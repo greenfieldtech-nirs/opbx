@@ -46,6 +46,7 @@ export const settingsService = {
             domain_requests_api_key: null,
             embed_allowed_domains: [],
             no_answer_timeout: 60,
+            call_recording_mode: 'disabled',
             recording_format: 'mp3',
             callback_url: res.data.callback_url,
             cdr_url: res.data.cdr_url,

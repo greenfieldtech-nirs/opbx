@@ -156,7 +156,7 @@ export default function Settings() {
           domain_requests_api_key: data.domain_requests_api_key || '',
           webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
-          call_recording_mode: data.call_recording_mode,
+          call_recording_mode: data.call_recording_mode || 'disabled',
           recording_format: data.recording_format,
         });
 
@@ -814,7 +814,7 @@ export default function Settings() {
                         disabled={isValidating}
                       >
                         <SelectTrigger id="call_recording_mode">
-                          <SelectValue placeholder="Select call recording mode" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="disabled">Do not record calls</SelectItem>
