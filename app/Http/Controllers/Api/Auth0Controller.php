@@ -15,6 +15,8 @@ use App\Services\Auth0\Auth0Config;
 use App\Services\Auth0\Auth0Service;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class Auth0Controller extends Controller
@@ -229,13 +231,18 @@ class Auth0Controller extends Controller
             return $this->buildAuthResponse($user);
         }
 
+        // Keep the verified profile server-side; the client only gets an opaque id
+        // (display fields are never trusted back by the join-request endpoint).
+        $onboardingId = Str::random(48);
+        Cache::put('auth0:onboarding:'.$onboardingId, $profile, now()->addMinutes(15));
+
         return response()->json([
             'error' => ['code' => 'AUTH0_REGISTRATION_REQUIRED', 'message' => 'Please complete onboarding.'],
             'profile' => [
+                'onboarding_id' => $onboardingId,
                 'email' => $profile['email'],
                 'name' => $profile['name'],
                 'provider' => $profile['provider'],
-                'subject' => $profile['subject'],
             ],
         ], Response::HTTP_CONFLICT);
     }

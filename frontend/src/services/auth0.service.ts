@@ -40,7 +40,7 @@ export interface Auth0RegistrationRequired {
     email: string;
     name: string;
     provider: string;
-    subject: string;
+    onboarding_id: string;
   };
 }
 
@@ -74,10 +74,7 @@ export const auth0Service = {
 
   submitJoinRequest(data: {
     organization_slug: string;
-    provider: string;
-    provider_subject: string;
-    email: string;
-    name: string;
+    onboarding_id: string;
   }): Promise<unknown> {
     return api.post('/organizations/join-requests', data).then((res) => res.data);
   },

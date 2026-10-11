@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\OrganizationJoinRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -45,12 +46,16 @@ class OrganizationJoinRequestControllerTest extends TestCase
     {
         $organization = Organization::factory()->create(['status' => 'active']);
 
-        $response = $this->postJson('/api/v1/organizations/join-requests', [
-            'organization_slug' => $organization->slug,
+        Cache::put('auth0:onboarding:abc', [
             'provider' => 'google',
-            'provider_subject' => 'google-oauth2|123',
+            'subject' => 'google-oauth2|123',
             'email' => 'applicant@example.com',
             'name' => 'Applicant',
+        ], now()->addMinutes(15));
+
+        $response = $this->postJson('/api/v1/organizations/join-requests', [
+            'organization_slug' => $organization->slug,
+            'onboarding_id' => 'abc',
         ]);
 
         $response->assertCreated();

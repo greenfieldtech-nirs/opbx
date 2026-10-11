@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\OrganizationJoinRequest;
 
-use App\Enums\SocialIdentityProvider;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequest extends FormRequest
@@ -21,10 +20,7 @@ class StoreRequest extends FormRequest
     {
         return [
             'organization_slug' => ['required', 'string', 'exists:organizations,slug'],
-            'provider' => ['required', 'string', 'in:'.implode(',', SocialIdentityProvider::values())],
-            'provider_subject' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
-            'name' => ['nullable', 'string', 'max:255'],
+            'onboarding_id' => ['required', 'string', 'max:128'],
         ];
     }
 }
