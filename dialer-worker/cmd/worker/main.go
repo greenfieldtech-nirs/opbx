@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -19,18 +20,34 @@ import (
 	"opbx/dialer-worker/internal/models"
 	"opbx/dialer-worker/internal/redis"
 	"opbx/dialer-worker/internal/webhook"
-	"opbx/dialer-worker/pkg/retry"
+	apierrors "opbx/dialer-worker/pkg/errors"
 	"sync"
 )
+
+// campaignAPI is the Laravel surface the poll loop needs (satisfied by *api.Client).
+type campaignAPI interface {
+	GetActiveCampaigns(ctx context.Context) ([]models.Campaign, error)
+	GetPendingDestinations(ctx context.Context, campaignID int64, limit int) ([]models.Destination, error)
+}
+
+// callExecutor dials one destination (satisfied by *executor.Executor).
+type callExecutor interface {
+	ExecuteCall(ctx context.Context, campaign *models.Campaign, destination *models.Destination) error
+}
+
+// pacer applies the per-campaign CPS pacing (satisfied by *limiter.CACRateLimiter).
+type pacer interface {
+	RegisterCampaign(campaignID int64, cac int, cps int)
+	WaitTime(campaignID int64) time.Duration
+}
 
 // Worker is the main dialer worker
 type Worker struct {
 	config      *config.Config
-	apiClient   *api.Client
+	apiClient   campaignAPI
 	redisClient *redis.Client
-	limiter     *limiter.CACRateLimiter
-	executor    *executor.Executor
-	retryMgr    *retry.Manager
+	limiter     pacer
+	executor    callExecutor
 	logger      *slog.Logger
 
 	// State
@@ -72,11 +89,8 @@ func main() {
 	// Create rate limiter
 	racLimiter := limiter.NewCACRateLimiter(redisClient)
 
-	// Create retry manager
-	retryMgr := retry.NewManager(cfg)
-
 	// Create executor
-	exec := executor.NewExecutor(apiClient, redisClient, racLimiter, retryMgr, cfg.WorkerID, logger)
+	exec := executor.NewExecutor(apiClient, redisClient, racLimiter, cfg.WorkerID, logger)
 
 	// Create worker
 	worker := &Worker{
@@ -85,7 +99,6 @@ func main() {
 		redisClient: redisClient,
 		limiter:     racLimiter,
 		executor:    exec,
-		retryMgr:    retryMgr,
 		logger:      logger,
 		shutdown:    make(chan struct{}),
 		campaignSem: make(chan struct{}, 10), // Max 10 concurrent campaigns
@@ -208,7 +221,12 @@ func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign)
 
 	logger.Info("processing destinations", "count", len(destinations))
 
-	// Process each destination
+	w.dialBatch(ctx, logger, campaign, destinations)
+}
+
+// dialBatch dials the destinations in order, paced by CPS. A 429 from Laravel
+// backs off for Retry-After and aborts the rest of the batch.
+func (w *Worker) dialBatch(ctx context.Context, logger *slog.Logger, campaign *models.Campaign, destinations []models.Destination) {
 	for i := range destinations {
 		dest := &destinations[i]
 		select {
@@ -217,18 +235,34 @@ func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign)
 		default:
 		}
 
-		// Wait for rate limiter
-		waitTime := w.limiter.WaitTime(campaign.ID)
-		if waitTime > 0 {
+		if waitTime := w.limiter.WaitTime(campaign.ID); waitTime > 0 {
 			logger.Debug("rate limiting", "wait", waitTime)
-			time.Sleep(waitTime)
+			if !w.sleep(waitTime) {
+				return
+			}
 		}
 
-		// Execute call
 		if err := w.executor.ExecuteCall(ctx, campaign, dest); err != nil {
+			var rl *apierrors.RetryableError
+			if errors.As(err, &rl) {
+				logger.Warn("rate limited by Laravel, backing off and aborting batch", "retry_after", rl.RetryAfter)
+				w.sleep(rl.RetryAfter)
+				return
+			}
 			logger.Error("failed to execute call", "destination_id", dest.ID, "error", err)
-			continue
 		}
+	}
+}
+
+// sleep waits for d or until shutdown; it reports whether the full wait elapsed.
+func (w *Worker) sleep(d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-w.shutdown:
+		return false
+	case <-t.C:
+		return true
 	}
 }
 

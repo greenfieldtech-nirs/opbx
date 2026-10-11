@@ -9,7 +9,6 @@ import (
 
 	"opbx/dialer-worker/internal/models"
 	apierrors "opbx/dialer-worker/pkg/errors"
-	"opbx/dialer-worker/pkg/retry"
 )
 
 type fakeAPI struct {
@@ -39,7 +38,7 @@ func (l *fakeLimiter) RecordCall(int64) { l.recorded++ }
 
 func newTestExecutor(api callInitiator, rl slotLimiter) *Executor {
 	// A nil redis client is fine: the caller-ID pool is disabled in these tests.
-	return NewExecutor(api, nil, rl, &retry.Manager{}, "w1", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return NewExecutor(api, nil, rl, "w1", slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func TestExecuteCallConflictIsASkipAndFreesTheReservedSlot(t *testing.T) {

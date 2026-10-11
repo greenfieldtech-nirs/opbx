@@ -10,7 +10,6 @@ import (
 	"opbx/dialer-worker/internal/models"
 	"opbx/dialer-worker/internal/redis"
 	apierrors "opbx/dialer-worker/pkg/errors"
-	"opbx/dialer-worker/pkg/retry"
 )
 
 // Timeout and duration constants
@@ -33,7 +32,6 @@ type Executor struct {
 	apiClient       callInitiator
 	redisClient     *redis.Client
 	limiter         slotLimiter
-	retryMgr        *retry.Manager
 	strategyFactory *callerid.StrategyFactory
 	retryTracker    *callerid.RetryTracker
 	workerID        string
@@ -45,7 +43,6 @@ func NewExecutor(
 	apiClient callInitiator,
 	redisClient *redis.Client,
 	limiter slotLimiter,
-	retryMgr *retry.Manager,
 	workerID string,
 	logger *slog.Logger,
 ) *Executor {
@@ -53,7 +50,6 @@ func NewExecutor(
 		apiClient:       apiClient,
 		redisClient:     redisClient,
 		limiter:         limiter,
-		retryMgr:        retryMgr,
 		strategyFactory: callerid.NewStrategyFactory(redisClient),
 		retryTracker:    callerid.NewRetryTracker(redisClient),
 		workerID:        workerID,
@@ -126,7 +122,8 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 				logger.Error("failed to mark DID as tried", "error", markErr)
 			}
 		}
-		return e.handleInitiationFailure(ctx, campaign, destination, err)
+		// Laravel owns retry timing (next_retry_at) and fails the destination after N consecutive errors.
+		return err
 	}
 
 	// Parse session ID from response
@@ -223,23 +220,4 @@ func (e *Executor) selectCallerID(
 
 	e.logger.Info("selected caller ID", "did_id", selected.DIDID, "phone_number", selected.PhoneNumber)
 	return selected, nil
-}
-
-// handleInitiationFailure handles a failed call initiation
-func (e *Executor) handleInitiationFailure(ctx context.Context, campaign *models.Campaign, destination *models.Destination, err error) error {
-	logger := e.logger.With(
-		"campaign_id", campaign.ID,
-		"destination_id", destination.ID,
-	)
-
-	// Check if we should retry
-	if e.retryMgr.ShouldRetry(destination.DialAttempts, "failed") {
-		delay := e.retryMgr.GetRetryDelay(destination.DialAttempts)
-		if scheduleErr := e.redisClient.ScheduleRetry(ctx, destination.ID, campaign.ID, delay); scheduleErr != nil {
-			logger.Error("failed to schedule retry", "error", scheduleErr)
-		}
-		logger.Info("retry scheduled after initiation failure", "delay", delay)
-	}
-
-	return err
 }

@@ -24,10 +24,6 @@ type Config struct {
 	WorkerID     string
 	PollInterval time.Duration
 	WebhookPort  string
-
-	// Retry Configuration (per spec)
-	RetryIntervals []time.Duration
-	MaxRetries     int
 }
 
 // Load loads configuration from environment variables
@@ -45,15 +41,6 @@ func Load() (*Config, error) {
 		WorkerID:     getEnv("WORKER_ID", "worker-1"),
 		PollInterval: getEnvDuration("POLL_INTERVAL", 10*time.Second),
 		WebhookPort:  getEnv("WEBHOOK_PORT", "8081"),
-
-		// Per spec: 5min → 15min → 60min → 24hr
-		RetryIntervals: []time.Duration{
-			5 * time.Minute,
-			15 * time.Minute,
-			60 * time.Minute,
-			24 * time.Hour,
-		},
-		MaxRetries: 4,
 	}
 
 	if err := cfg.Validate(); err != nil {

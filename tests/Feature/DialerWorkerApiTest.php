@@ -436,6 +436,36 @@ class DialerWorkerApiTest extends TestCase
         $this->assertNotNull($fresh->last_error);
     }
 
+    public function test_destination_fails_after_consecutive_initiate_errors_and_is_excluded(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['error' => 'boom'], 500)]);
+
+        foreach (range(1, 3) as $i) {
+            $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(500);
+            // Skip the backoff wait between attempts.
+            OrganizationScope::bypass(fn () => AutoDialerDestination::whereKey($destination->id)->update(['next_retry_at' => null]));
+        }
+
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(DestinationStatus::FAILED, $fresh->status);
+        $this->assertSame(3, $fresh->consecutive_initiate_failures);
+        $this->workerRequest('GET', "/campaigns/{$campaign->id}/destinations/pending")->assertJsonCount(0, 'data');
+    }
+
+    public function test_failed_initiate_backs_off_so_the_destination_is_not_pending_yet(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['error' => 'boom'], 500)]);
+
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(500);
+
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(DestinationStatus::PENDING, $fresh->status);
+        $this->assertTrue($fresh->next_retry_at->isFuture());
+        $this->workerRequest('GET', "/campaigns/{$campaign->id}/destinations/pending")->assertJsonCount(0, 'data');
+    }
+
     public function test_replayed_idempotency_key_returns_original_response_without_dialling_again(): void
     {
         [$campaign, $destination] = $this->initiateFixture();

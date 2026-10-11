@@ -14,7 +14,6 @@ type KeyPrefix string
 
 const (
 	PrefixCampaignState KeyPrefix = "dialer:campaign"
-	PrefixRetry         KeyPrefix = "dialer:retry"
 	PrefixCAC           KeyPrefix = "dialer:cac"
 )
 
@@ -85,49 +84,6 @@ func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (i
 		return values[1].(int64), false, nil
 	}
 	return newVal, true, nil
-}
-
-// === Retry Queue ===
-
-// ScheduleRetry schedules a destination for retry after a delay
-func (c *Client) ScheduleRetry(ctx context.Context, destinationID int64, campaignID int64, delay time.Duration) error {
-	key := fmt.Sprintf("%s:%d", PrefixRetry, campaignID)
-	score := time.Now().Add(delay).Unix()
-	return c.client.ZAdd(ctx, key, &redis.Z{
-		Score:  float64(score),
-		Member: destinationID,
-	}).Err()
-}
-
-// GetRetryableDestinations gets destinations ready for retry
-func (c *Client) GetRetryableDestinations(ctx context.Context, campaignID int64, limit int) ([]int64, error) {
-	key := fmt.Sprintf("%s:%d", PrefixRetry, campaignID)
-	now := float64(time.Now().Unix())
-
-	results, err := c.client.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Min:    "0",
-		Max:    fmt.Sprintf("%f", now),
-		Offset: 0,
-		Count:  int64(limit),
-	}).Result()
-
-	if err != nil {
-		return nil, err
-	}
-
-	destinations := make([]int64, len(results))
-	for i, r := range results {
-		// Parse the member (destinationID stored as string)
-		fmt.Sscanf(r, "%d", &destinations[i])
-	}
-
-	return destinations, nil
-}
-
-// RemoveRetry removes a destination from the retry queue
-func (c *Client) RemoveRetry(ctx context.Context, campaignID int64, destinationID int64) error {
-	key := fmt.Sprintf("%s:%d", PrefixRetry, campaignID)
-	return c.client.ZRem(ctx, key, destinationID).Err()
 }
 
 // === Caller ID Pool Strategy Methods ===

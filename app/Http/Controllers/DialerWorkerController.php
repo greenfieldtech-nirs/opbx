@@ -200,7 +200,9 @@ class DialerWorkerController extends Controller
         );
 
         if (! $result['success']) {
-            $this->destinationService->releaseClaim($destination->id, (string) $result['error']);
+            if ($this->destinationService->releaseClaim($destination->id, (string) $result['error'])) {
+                $this->campaignService->incrementFailedCalls($campaign);
+            }
 
             Log::error('DialerWorker: Failed to initiate call via Cloudonix', [
                 'campaign_id' => $campaign->id,
@@ -223,6 +225,8 @@ class DialerWorkerController extends Controller
             'worker_id' => $validated['worker_id'],
             'initiated_at' => $validated['initiated_at'],
         ]);
+
+        $this->destinationService->clearInitiateFailures($destination->id);
 
         // Increment campaign pending calls counter
         $this->campaignService->incrementPendingCalls($campaign);

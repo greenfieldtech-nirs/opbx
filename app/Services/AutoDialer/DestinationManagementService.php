@@ -59,6 +59,9 @@ class DestinationManagementService
             return AutoDialerDestination::whereIn('list_id', $listIds)
                 ->where('status', DestinationStatus::PENDING)
                 ->where('dial_attempts', '<', $campaign->max_dial_attempts)
+                ->where(function ($query) {
+                    $query->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
+                })
                 ->orderBy('created_at', 'asc')
                 ->limit($limit)
                 ->get();
@@ -134,18 +137,43 @@ class DestinationManagementService
         );
     }
 
+    /** Consecutive initiate errors after which a destination is failed instead of retried. */
+    public const MAX_INITIATE_FAILURES = 3;
+
     /**
-     * Undo a claim after a definite failure to place the call (attempt stays counted).
+     * Undo a claim after a definite failure to place the call (the attempt stays counted).
+     *
+     * Schedules the next try with backoff (next_retry_at), or fails the destination after
+     * MAX_INITIATE_FAILURES consecutive errors. Returns true when it was failed.
      */
-    public function releaseClaim(int $destinationId, string $error): void
+    public function releaseClaim(int $destinationId, string $error): bool
+    {
+        return OrganizationScope::bypass(function () use ($destinationId, $error) {
+            $destination = AutoDialerDestination::find($destinationId);
+            if (! $destination || $destination->status !== DestinationStatus::DIALING) {
+                return false;
+            }
+
+            $failures = $destination->consecutive_initiate_failures + 1;
+            $failed = $failures >= self::MAX_INITIATE_FAILURES;
+
+            $destination->update([
+                'status' => $failed ? DestinationStatus::FAILED : DestinationStatus::PENDING,
+                'consecutive_initiate_failures' => $failures,
+                'next_retry_at' => $failed ? null : now()->addMinutes(2 ** ($failures - 1)),
+                'last_error' => mb_substr($error, 0, 250),
+            ]);
+
+            return $failed;
+        });
+    }
+
+    public function clearInitiateFailures(int $destinationId): void
     {
         OrganizationScope::bypass(
             fn () => AutoDialerDestination::whereKey($destinationId)
-                ->where('status', DestinationStatus::DIALING)
-                ->update([
-                    'status' => DestinationStatus::PENDING,
-                    'last_error' => mb_substr($error, 0, 250),
-                ])
+                ->where('consecutive_initiate_failures', '>', 0)
+                ->update(['consecutive_initiate_failures' => 0])
         );
     }
 

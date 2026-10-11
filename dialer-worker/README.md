@@ -27,7 +27,6 @@ graph TB
         CFG["internal/config/config.go<br/>Environment Config"]
         MOD["internal/models/models.go<br/>Data Models"]
         CID["internal/callerid/<br/>Caller ID Strategies"]
-        RET["pkg/retry/manager.go<br/>Retry/Backoff Logic"]
         ERR["pkg/errors/errors.go<br/>Error Types"]
     end
 
@@ -97,8 +96,6 @@ dialer-worker/
 ├── pkg/
 │   ├── errors/
 │   │   └── errors.go        # Custom error types (~41 lines)
-│   └── retry/
-│       └── manager.go       # Retry/backoff logic (~66 lines)
 │
 ├── .env.example             # Example environment configuration
 ├── Dockerfile               # Multi-stage Docker build
@@ -185,18 +182,9 @@ Configuration is loaded entirely from environment variables. Copy `.env.example`
 | `POLL_INTERVAL` | No | `10s` | Interval between campaign polls |
 | `WEBHOOK_PORT` | Yes | `8081` | Port for the health-check HTTP server |
 
-### Retry Configuration (Hardcoded)
+### Retries
 
-Retry intervals are fixed per the functional specification:
-
-| Attempt | Delay |
-|---------|-------|
-| 1st retry | 5 minutes |
-| 2nd retry | 15 minutes |
-| 3rd retry | 60 minutes |
-| 4th retry | 24 hours |
-
-Maximum retries: **4**
+Laravel owns retry timing (`next_retry_at`, backoff, and failing a destination after 3 consecutive initiate errors). The worker only dials what `destinations/pending` returns and backs off for `Retry-After` on HTTP 429.
 
 Retryable dispositions: `busy`, `no-answer`, `cancelled`
 
@@ -233,13 +221,7 @@ sequenceDiagram
     end
 
     C->>L: CDR event (call completed)
-    L->>W: POST /webhooks/cdr
-    W->>R: Get call state by session ID
-    W->>R: Decrement active call count
-    W->>L: PATCH /calls/{session}/status
-    W->>L: POST /calls/{session}/disposition
-    W->>R: Delete call state
-    W->>R: Schedule retry (if applicable)
+    Note over L: Laravel handles the CDR: updates the session, releases the CAC slot, schedules retries
 ```
 
 ## Rate Limiting
@@ -279,17 +261,10 @@ With safety clamps:
 | `dialer:call:{session_id}` | Hash | Call state (campaign_id, destination_id, status, started_at) | 60s (extended to persistent on "connected") |
 | `dialer:cac:{campaign_id}:active` | String | Active call counter for CAC limit | No TTL |
 | `dialer:campaign:{campaign_id}` | *(reserved)* | Campaign state | - |
-| `dialer:worker:{worker_id}` | String | Worker heartbeat timestamp | 30s |
-| `dialer:lock:{lock_key}` | String | Distributed lock (e.g., `dest:{id}`) | 30s |
-| `dialer:idem:{event_id}` | String | Idempotency key for processed webhooks | 24h |
-| `dialer:retry:{campaign_id}` | Sorted Set | Retry queue (score = retry timestamp, member = destination_id) | No TTL |
 
 ### Key Operations
 
-- **Call State**: Stored as Redis Hash with `HSET` + `EXPIRE` via pipeline. TTL is removed (`PERSIST`) when call status becomes "connected" to prevent expiration before CDR arrives
 - **CAC Counter**: Atomically incremented/decremented with Lua script to prevent race conditions
-- **Locks**: Acquired with `SET NX EX` (set if not exists with expiry)
-- **Retry Queue**: Redis Sorted Set ordered by retry timestamp; worker fetches items with `ZRangeByScore` where score <= now
 
 ## Webhook Endpoints
 
