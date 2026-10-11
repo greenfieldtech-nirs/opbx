@@ -323,7 +323,7 @@ sequenceDiagram
    - **Frontend**: http://localhost:3000
    - **API**: http://localhost/api/v1
    - **ngrok Dashboard**: http://localhost:4040
-   - **MinIO Console**: http://localhost:9001
+   - **MinIO Console**: http://localhost:9001 (requires `-f docker-compose.ports.yml`)
 
 ### ⚠️ Database Persistence
 

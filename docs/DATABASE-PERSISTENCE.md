@@ -64,7 +64,7 @@ flowchart TB
 
 2. **Redis AOF persistence** is enabled (`--appendonly yes`) so Redis data survives normal container restarts. Treat Redis as operational cache/queue storage rather than a primary source of truth.
 
-3. **Neither MySQL nor Redis expose ports by default**. External access is disabled unless explicitly configured via `.env` variables (`DB_EXPOSE_PORT`, `REDIS_EXPOSE_PORT`). Both remain fully accessible within the Docker network.
+3. **Neither MySQL nor Redis expose ports by default** (opt in, loopback-only, with `-f docker-compose.ports.yml`). External access is disabled unless explicitly configured via `.env` variables (`DB_EXPOSE_PORT`, `REDIS_EXPOSE_PORT`). Both remain fully accessible within the Docker network.
 
 ---
 

@@ -50,9 +50,8 @@ class ConfigurationControllerTest extends TestCase
         $this->assertStringContainsString('pbx.example.com', $endpoints['api_base_url']);
         $this->assertStringEndsWith('/api/v1', $endpoints['api_base_url']);
         $this->assertSame(9090, $endpoints['mcp_port']);
-        $this->assertStringContainsString(':9090/mcp', $endpoints['mcp_url']);
-        // MCP URL uses the request host without the UI port.
-        $this->assertStringContainsString('pbx.example.com', $endpoints['mcp_url']);
+        // MCP is proxied by nginx at /mcp on the request origin.
+        $this->assertSame('https://pbx.example.com/mcp', $endpoints['mcp_url']);
     }
 
     public function test_endpoints_prefer_forwarded_origin_from_proxy(): void
@@ -70,8 +69,8 @@ class ConfigurationControllerTest extends TestCase
         $response->assertOk();
         $endpoints = $response->json('endpoints');
         $this->assertSame('https://pbx.example.com:8443/api/v1', $endpoints['api_base_url']);
-        // MCP URL: forwarded host WITHOUT the UI port, with the MCP port.
-        $this->assertSame('https://pbx.example.com:8080/mcp', $endpoints['mcp_url']);
+        // MCP URL: same forwarded origin, proxied at /mcp.
+        $this->assertSame('https://pbx.example.com:8443/mcp', $endpoints['mcp_url']);
     }
 
     public function test_endpoints_derive_from_organization_webhook_base_url(): void
@@ -139,7 +138,7 @@ class ConfigurationControllerTest extends TestCase
         $response->assertOk();
         $endpoints = $response->json('endpoints');
         $this->assertSame('https://pbx.example.com:8443/api/v1', $endpoints['api_base_url']);
-        $this->assertSame('https://pbx.example.com:9090/mcp', $endpoints['mcp_url']);
+        $this->assertSame('https://pbx.example.com:8443/mcp', $endpoints['mcp_url']);
     }
 
     public function test_application_config_exposes_auth0_when_enabled(): void

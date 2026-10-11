@@ -24,7 +24,7 @@ The MCP server is a service in the main Docker Compose stack:
 docker compose up -d --build mcp-server
 ```
 
-It listens on host port **8080** by default (`MCP_PORT`), and reaches OPBX internally via nginx.
+It listens on host port **8080** (`MCP_PORT`) on 127.0.0.1 only, and only when started with `-f docker-compose.ports.yml`, and reaches OPBX internally via nginx.
 
 | Endpoint | Purpose |
 |----------|---------|

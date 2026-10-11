@@ -100,7 +100,7 @@ services:
       - MINIO_USE_PATH_STYLE=true
       - MCP_PORT=${MCP_PORT:-8080}
       # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       mysql:
         condition: service_healthy
@@ -146,7 +146,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
       # Auto Dialer Worker authentication
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       - app
       - redis
@@ -185,7 +185,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
       # Auto Dialer Worker authentication
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       - app
     networks:
@@ -198,8 +198,7 @@ services:
     # SECURITY: MySQL port exposure is disabled by default for security
     # Set DB_EXPOSE_PORT in .env to enable external access (not recommended for production)
     # MySQL remains accessible within the Docker network at port 3306
-    ports:
-      - "${DB_EXPOSE_PORT:-}:3306"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
       - MYSQL_DATABASE=${DB_DATABASE:-opbx}
@@ -227,8 +226,7 @@ services:
     # SECURITY: Redis port exposure is disabled by default for security
     # Set REDIS_EXPOSE_PORT in .env to enable external access (not recommended for production)
     # Redis remains accessible within the Docker network at port 6379
-    ports:
-      - "${REDIS_EXPOSE_PORT:-}:6379"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     volumes:
       # PERSISTENCE: Bind mount stores Redis data in ./volumes/redis on the host.
       # AOF is enabled so data is written to disk and survives container removal.
@@ -258,9 +256,7 @@ services:
     # SECURITY: MinIO ports are disabled by default for security
     # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
     # MinIO remains accessible within the Docker network
-    ports:
-      - "${MINIO_EXPOSE_PORT:-}:9000"  # MinIO API
-      - "${MINIO_CONSOLE_EXPOSE_PORT:-}:9001"  # MinIO Console (Web UI)
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
@@ -294,7 +290,7 @@ services:
       SOKETI_DEBUG: '${SOKETI_DEBUG:-0}'
       SOKETI_DEFAULT_APP_ID: '${PUSHER_APP_ID:-app-id}'
       SOKETI_DEFAULT_APP_KEY: '${PUSHER_APP_KEY:-pbxappkey}'
-      SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:-pbxappsecret}'
+      SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:?set PUSHER_APP_SECRET}'
       SOKETI_METRICS_SERVER_PORT: '9601'
       SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: 'false'
       SOKETI_DEFAULT_APP_ENABLE_STATISTICS: 'true'
@@ -326,7 +322,7 @@ services:
     environment:
       - AMD_WEBSOCKET_PORT=8082
       - AMD_HTTP_PORT=8083
-      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:-dev-amd-token-change-in-production}
+      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:?set AMD_WORKER_API_TOKEN}
       - AMD_MODEL_PATH=/app/models/beep_detector.onnx
       - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
       - AMD_LOG_LEVEL=info
@@ -364,7 +360,7 @@ services:
     environment:
       - ACD_HTTP_PORT=8084
       - ACD_HEALTH_PORT=8085
-      - ACD_WORKER_API_TOKEN=${ACD_WORKER_API_TOKEN:-dev-acd-token-change-in-production}
+      - ACD_WORKER_API_TOKEN=${ACD_WORKER_API_TOKEN:?set ACD_WORKER_API_TOKEN}
       - ACD_LOG_LEVEL=info
       - ACD_REDIS_HOST=redis
       - ACD_REDIS_PORT=6379
@@ -392,7 +388,7 @@ services:
     environment:
       - WORKER_ID=${DIALER_WORKER_ID:-worker-1}
       - LARAVEL_API_URL=${DIALER_LARAVEL_API_URL:-http://nginx}
-      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -400,11 +396,8 @@ services:
       - POLL_INTERVAL=${DIALER_POLL_INTERVAL:-10s}
       - HEALTH_CHECK_PORT=${DIALER_HEALTH_PORT:-8080}
       - WEBHOOK_PORT=${DIALER_WEBHOOK_PORT:-8081}
-      - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:-}
-    ports:
-      # Host-side port is separate from the container's WEBHOOK_PORT (8081)
-      # because dev machines often have other services on 8081.
-      - "${DIALER_WEBHOOK_HOST_PORT:-8181}:8081"  # Webhook endpoint for CDR
+      - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:?set DIALER_WEBHOOK_SECRET}
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     networks:
       - opbx
     depends_on:
@@ -459,8 +452,7 @@ services:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: opbx_mcp
-    ports:
-      - "${MCP_PORT:-8080}:8080"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
       NODE_ENV: production
       OPBX_BASE_URL: http://nginx
@@ -544,7 +536,7 @@ services:
       - GF_SECURITY_CSRF_TRUSTED_ORIGINS=${GRAFANA_CSRF_TRUSTED_ORIGINS:-}
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
       - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_AUTH_DISABLE_LOGIN_FORM=false
     depends_on:

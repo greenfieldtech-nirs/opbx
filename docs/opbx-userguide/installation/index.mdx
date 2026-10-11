@@ -30,8 +30,8 @@ You also need these ports available on your host machine (all can be remapped vi
 | 3000 | React frontend (Vite dev server) |
 | 6001 | Soketi WebSocket server |
 | 4040 | ngrok web interface |
-| 8181 | Dialer worker webhook listener (container port 8081) |
-| 8080 | MCP server (AI-agent API; configurable via `MCP_PORT`) |
+| 8181 | (via `docker-compose.ports.yml`, 127.0.0.1 only) Dialer worker webhook listener (container port 8081) |
+| 8080 | (via `docker-compose.ports.yml`, 127.0.0.1 only) MCP server (AI-agent API; configurable via `MCP_PORT`) |
 
 ## Installation Steps
 

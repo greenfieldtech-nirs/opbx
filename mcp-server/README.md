@@ -42,7 +42,7 @@ docker compose up -d --build mcp-server
 curl http://localhost:8080/health
 ```
 
-MCP endpoint: `http://localhost:8080/mcp` (host port via `MCP_PORT`).
+MCP endpoint: `http://localhost:8080/mcp` (host port via `MCP_PORT`; requires `-f docker-compose.ports.yml`, loopback only).
 
 Standalone (without the OPBX compose stack):
 

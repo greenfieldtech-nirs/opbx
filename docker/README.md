@@ -97,9 +97,9 @@ graph TB
 | 3 | **scheduler** | Same as `app` | Runs Laravel's task scheduler every 60 seconds | None |
 | 4 | **frontend** | `frontend/Dockerfile.dev` (React/Vite) | React SPA development server with HMR | `3000` |
 | 5 | **nginx** | `nginx:alpine` | Reverse proxy and static file server; routes traffic to appropriate backend | `80` |
-| 6 | **mysql** | `mysql:8.0` | Primary relational database for all tenant data | `3306` (optional via `DB_EXPOSE_PORT`) |
-| 7 | **redis** | `redis:7-alpine` | Caching, session store, queue backend, and pub/sub | `6379` (optional via `REDIS_EXPOSE_PORT`) |
-| 8 | **minio** | `minio/minio:latest` | S3-compatible object storage for call recordings | `9000`, `9001` (optional via `MINIO_EXPOSE_PORT`) |
+| 6 | **mysql** | `mysql:8.0` | Primary relational database for all tenant data | `3306` (loopback-only via `docker-compose.ports.yml`) |
+| 7 | **redis** | `redis:7-alpine` | Caching, session store, queue backend, and pub/sub | `6379` (loopback-only via `docker-compose.ports.yml`) |
+| 8 | **minio** | `minio/minio:latest` | S3-compatible object storage for call recordings | `9000`, `9001` (loopback-only via `docker-compose.ports.yml`) |
 | 9 | **soketi** | `quay.io/soketi/soketi:latest-16-alpine` | WebSocket server for real-time frontend updates | `6001`, `9601` |
 | 10 | **dialer-worker** | `dialer-worker/Dockerfile` (Go) | Outbound campaign dialer; polls for jobs and handles CDR webhooks | `8081` |
 | 11 | **amd-worker** | `amd-worker/Dockerfile` (Java/Vert.x 5) | Stream-based voicemail/beep detection via WebSocket | Internal only |
