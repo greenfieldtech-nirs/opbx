@@ -91,13 +91,14 @@ public class StreamSession {
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
                            java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
-                           boolean dumpAudio, String dumpAudioPath) {
-        this(vertx, callSid, streamSid, timeoutMs, detectors, beepMl, dumpAudio, dumpAudioPath, null, null, null, null);
+                           boolean dumpAudio, String dumpAudioPath, int minBeepStartMs) {
+        this(vertx, callSid, streamSid, timeoutMs, detectors, beepMl, dumpAudio, dumpAudioPath, minBeepStartMs,
+            null, null, null, null);
     }
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
                            java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
-                           boolean dumpAudio, String dumpAudioPath,
+                           boolean dumpAudio, String dumpAudioPath, int minBeepStartMs,
                            String sessionToken, String actionHuman, String actionVoicemail, String actionUnknown) {
         this.callSid = callSid;
         this.streamSid = streamSid;
@@ -107,7 +108,7 @@ public class StreamSession {
         this.actionVoicemail = actionVoicemail;
         this.actionUnknown = actionUnknown;
         this.vad = new EnergyVad(16000, 10, 200, 3000, 3, 20);
-        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, result -> {
+        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, minBeepStartMs, result -> {
             if (onResultLogged != null) {
                 onResultLogged.accept(result);
             }

@@ -23,6 +23,8 @@ public class Config {
     public final String apiToken;
     public final String actionCallbackUrl;
     public final String sessionCheckUrl;
+    /** Tones starting earlier than this are not taken as a voicemail beep (greeting audio). */
+    public final int minBeepStartMs;
 
     public Config() {
         this.websocketPort = Integer.parseInt(getEnv("AMD_WEBSOCKET_PORT", "8082"));
@@ -38,6 +40,7 @@ public class Config {
         this.apiToken = requireToken("AMD_WORKER_API_TOKEN", getEnv("AMD_WORKER_API_TOKEN", ""));
         this.actionCallbackUrl = getEnv("AMD_ACTION_CALLBACK_URL", "http://nginx/api/voice/amd-action");
         this.sessionCheckUrl = deriveSessionCheckUrl(actionCallbackUrl, System.getenv("AMD_SESSION_CHECK_URL"));
+        this.minBeepStartMs = Integer.parseInt(getEnv("AMD_MIN_BEEP_START_MS", "2000"));
     }
 
     /**

@@ -19,14 +19,15 @@ public class DetectionPipeline {
     private final int timeoutMs;
     private final Consumer<DetectionResult> onResult;
 
-    public DetectionPipeline(int timeoutMs, List<String> detectorNames, BeepMlDetector beepMl, Consumer<DetectionResult> onResult) {
+    public DetectionPipeline(int timeoutMs, List<String> detectorNames, BeepMlDetector beepMl, int minBeepStartMs,
+                             Consumer<DetectionResult> onResult) {
         this.timeoutMs = timeoutMs;
         this.onResult = onResult;
         if (beepMl != null && detectorNames.contains("beep_ml")) {
             detectors.add(beepMl);
         }
         if (detectorNames.contains("tone_energy")) {
-            detectors.add(new ToneEnergyDetector());
+            detectors.add(new ToneEnergyDetector(minBeepStartMs));
         }
     }
 

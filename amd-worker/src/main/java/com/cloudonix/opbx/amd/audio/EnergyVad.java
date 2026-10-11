@@ -9,6 +9,8 @@ import java.util.List;
 public class EnergyVad {
     private static final Logger logger = LoggerFactory.getLogger(EnergyVad.class);
     public record VadSegment(double[] pcmData, double startMs, double endMs) {}
+    /** Frames kept from before speech start, so a segment shows its onset (the tone detector needs it). */
+    private static final int LEAD_IN_FRAMES = 3;
 
     private final int sampleRate;
     private final int silenceFrames;
@@ -27,6 +29,7 @@ public class EnergyVad {
     // Track audio for the current ongoing speech segment
     private double[] currentSpeechBuffer = new double[0];
     private double currentSpeechStartMs = 0;
+    private final java.util.ArrayDeque<double[]> recentFrames = new java.util.ArrayDeque<>();
 
     public EnergyVad(int sampleRate, int silenceFrames, int clipMinMs, int clipMaxMs, int vadSensitivity, int frameMs) {
         this.sampleRate = sampleRate;
@@ -46,6 +49,7 @@ public class EnergyVad {
         currentStreamMs = 0;
         currentSpeechBuffer = new double[0];
         currentSpeechStartMs = 0;
+        recentFrames.clear();
     }
 
     public List<VadSegment> process(double[] pcmData, double startMs) {
@@ -71,16 +75,15 @@ public class EnergyVad {
                 silenceCounter = 0;
                 if (!inSpeech && speechCounter >= 2) {
                     inSpeech = true;
-                    currentSpeechStartMs = bufferStartMs;
+                    currentSpeechStartMs = Math.max(0, bufferStartMs - recentFrames.size() * frameMs);
                     currentSpeechBuffer = new double[0];
+                    for (double[] lead : recentFrames) {
+                        currentSpeechBuffer = append(currentSpeechBuffer, lead);
+                    }
                     logger.debug("VAD speech start at_ms={}", (int) currentSpeechStartMs);
                 }
                 if (inSpeech) {
-                    // Append frame to current speech buffer
-                    double[] expanded = new double[currentSpeechBuffer.length + frameSamples];
-                    System.arraycopy(currentSpeechBuffer, 0, expanded, 0, currentSpeechBuffer.length);
-                    System.arraycopy(frame, 0, expanded, currentSpeechBuffer.length, frameSamples);
-                    currentSpeechBuffer = expanded;
+                    currentSpeechBuffer = append(currentSpeechBuffer, frame);
 
                     // Emit segment if it exceeds clipMaxMs, then start a new one
                     double segmentDurationMs = currentStreamMs - currentSpeechStartMs;
@@ -98,6 +101,8 @@ public class EnergyVad {
                     double durationMs = segmentEndMs - currentSpeechStartMs;
                     if (durationMs >= clipMinMs && durationMs <= clipMaxMs) {
                         logger.debug("VAD speech end duration_ms={} start_ms={} end_ms={}", (int) durationMs, (int) currentSpeechStartMs, (int) segmentEndMs);
+                        // A beep is exactly this shape (short tone, then silence): hand it to the detectors.
+                        newSegments.add(new VadSegment(currentSpeechBuffer, currentSpeechStartMs, segmentEndMs));
                     } else {
                         logger.debug("VAD speech discarded duration_ms={} (outside min/max)", (int) durationMs);
                     }
@@ -107,6 +112,11 @@ public class EnergyVad {
                     silenceCounter = 0;
                     currentSpeechBuffer = new double[0];
                 }
+            }
+
+            recentFrames.addLast(frame);
+            if (recentFrames.size() > LEAD_IN_FRAMES) {
+                recentFrames.removeFirst();
             }
 
             int shiftSamples = frameSamples;
@@ -143,6 +153,13 @@ public class EnergyVad {
         double baseThreshold = 0.001;
         double threshold = baseThreshold / vadSensitivity;
         return energy > threshold;
+    }
+
+    private static double[] append(double[] a, double[] b) {
+        double[] out = new double[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 
     private double[] trimArray(double[] arr, int offset) {

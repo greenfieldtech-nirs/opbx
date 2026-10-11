@@ -149,7 +149,7 @@ class StreamHandlerAuthTest {
             public Future<?> start() {
                 StreamHandler handler = new StreamHandler(vertx, 10, detectionTimeoutMs, List.of("tone_energy"),
                     null, new MetricsService(), new ObjectMapper(), false, "/tmp", "test-token",
-                    base, Config.deriveSessionCheckUrl(base, null));
+                    base, Config.deriveSessionCheckUrl(base, null), 2000);
                 return vertx.createHttpServer().webSocketHandler(handler::handleConnection).listen(0)
                     .onSuccess(s -> port[0] = s.actualPort());
             }

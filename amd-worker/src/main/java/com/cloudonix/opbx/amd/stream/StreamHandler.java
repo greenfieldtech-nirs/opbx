@@ -43,14 +43,17 @@ public class StreamHandler {
     private final HttpClient httpClient;
     private final Map<String, StreamSession> activeStreams = new ConcurrentHashMap<>();
     private final Map<ServerWebSocket, String> wsToStreamSid = new ConcurrentHashMap<>();
-    private final ToneEnergyDetector toneEnergyDetector = new ToneEnergyDetector();
+    private final int minBeepStartMs;
+    private final ToneEnergyDetector toneEnergyDetector;
 
     public StreamHandler(Vertx vertx, int maxConcurrentStreams, int defaultTimeoutMs,
                          List<String> detectors, BeepMlDetector beepMlDetector,
                          MetricsService metrics, ObjectMapper mapper,
                          boolean dumpAudio, String dumpAudioPath, String apiToken,
-                         String actionCallbackUrl, String sessionCheckUrl) {
+                         String actionCallbackUrl, String sessionCheckUrl, int minBeepStartMs) {
         this.vertx = vertx;
+        this.minBeepStartMs = minBeepStartMs;
+        this.toneEnergyDetector = new ToneEnergyDetector(minBeepStartMs);
         this.maxConcurrentStreams = maxConcurrentStreams;
         this.defaultTimeoutMs = defaultTimeoutMs;
         this.detectors = detectors;
@@ -169,7 +172,7 @@ public class StreamHandler {
 
         StreamSession session = new StreamSession(
             vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
-            dumpAudio, dumpAudioPath, sessionToken, actionHuman, actionVoicemail, actionUnknown
+            dumpAudio, dumpAudioPath, minBeepStartMs, sessionToken, actionHuman, actionVoicemail, actionUnknown
         );
 
         // Atomically register this stream. If another connection already registered
@@ -295,10 +298,10 @@ public class StreamHandler {
             session.dumper.append(float32_16k);
         }
 
-        // Run tone detector on rolling buffer to catch beeps that VAD may classify as silence.
-        // Only enable after ~11.5s since the real voicemail beep is always around 12-13s.
+        // Run tone detector on rolling buffer to catch beeps that VAD may classify as silence
+        // (the detector itself rejects tones starting before minBeepStartMs).
         if (!session.resolved.get()
-            && session.totalAudioMs >= 11500
+            && session.totalAudioMs >= minBeepStartMs
             && session.totalAudioMs - session.lastToneCheckMs >= 500) {
             session.lastToneCheckMs = session.totalAudioMs;
             double[] recentAudio = session.getRecentAudio(1500);
