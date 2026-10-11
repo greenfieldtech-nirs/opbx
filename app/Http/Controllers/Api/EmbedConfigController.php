@@ -14,6 +14,11 @@ final class EmbedConfigController extends Controller
 {
     public function config(Request $request, WebPhoneConfigBuilder $builder): JsonResponse
     {
+        // Config carries SIP credentials: the middleware already validated any Origin, here one is mandatory.
+        if (! $request->headers->get('Origin')) {
+            return response()->json(['message' => 'Origin required.'], 403);
+        }
+
         $user = $request->attributes->get('embedUser');
         $config = $builder->buildForUser($user);
 

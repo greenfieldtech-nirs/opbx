@@ -24,6 +24,12 @@ final class ResolveEmbedToken
             return response()->json(['message' => 'Invalid embed token.'], 401);
         }
 
+        $user = $embedToken->user;
+        $org = OrganizationScope::bypass(fn () => $embedToken->organization);
+        if (! $user?->isActive() || ! $org?->isActive()) {
+            return response()->json(['message' => 'Embed token is not active.'], 403);
+        }
+
         $origin = $request->headers->get('Origin');
         if (! $this->originAllowed($origin, $this->allowedDomainsFor($embedToken))) {
             return response()->json(['message' => 'Origin not allowed.'], 403);
