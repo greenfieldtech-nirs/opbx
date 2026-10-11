@@ -7,9 +7,12 @@ namespace App\Http\Controllers\Api;
 use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\AiAssistantLoadBalancer\StoreAlbsRequest;
+use App\Http\Requests\AiAssistantLoadBalancer\UpdateAlbsRequest;
 use App\Http\Resources\AiAssistantLoadBalancerResource;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -58,6 +61,16 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
     protected function getDefaultSortOrder(): string
     {
         return 'desc';
+    }
+
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreAlbsRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateAlbsRequest::class;
     }
 
     protected function getRouteParameterName(): string
@@ -214,7 +227,7 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         $model->loadMissing(AiAssistantLoadBalancer::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
-    protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
+    protected function acquireUpdateLock(Model $model, Request $request): ?Lock
     {
         $lockKey = "lock:albs:{$model->id}";
         $lock = Cache::lock($lockKey, self::LOCK_TIMEOUT_SECONDS);
@@ -246,7 +259,7 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         return $lock;
     }
 
-    protected function releaseUpdateLock(?\Illuminate\Contracts\Cache\Lock $lock, Model $model, Request $request): void
+    protected function releaseUpdateLock(?Lock $lock, Model $model, Request $request): void
     {
         if ($lock) {
             $lock->release();

@@ -644,15 +644,11 @@ abstract class AbstractApiCrudController extends Controller
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
         // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
-        $formRequestClass = $this->getStoreRequestClass();
-        if ($formRequestClass !== null) {
-            $request = app($formRequestClass);
-        }
+        $formRequestClass = $this->getStoreRequestClass()
+            ?? throw new \LogicException(static::class.' must declare a store FormRequest');
+        $request = app($formRequestClass);
 
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
+        $validated = $request->validated();
 
         // Log will be handled by success/failure methods below
 
@@ -706,6 +702,8 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getCreateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ], 201);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
@@ -795,18 +793,16 @@ abstract class AbstractApiCrudController extends Controller
         }
 
         // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
-        $formRequestClass = $this->getUpdateRequestClass();
-        if ($formRequestClass !== null) {
-            // Bind the resolved model to the route parameter so the FormRequest can
-            // access it via route model binding in authorize()/rules().
-            $request->route()->setParameter($this->getRouteParameterName(), $model);
-            $request = app($formRequestClass);
-        }
+        $formRequestClass = $this->getUpdateRequestClass()
+            ?? throw new \LogicException(static::class.' must declare an update FormRequest');
+        // Bind the resolved model to the route parameter so the FormRequest can
+        // access it via route model binding in authorize()/rules().
+        $request->route()->setParameter($this->getRouteParameterName(), $model);
+        $request = app($formRequestClass);
 
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
+        $validated = $request->validated();
+        // Never allow re-parenting a record to another tenant.
+        unset($validated['organization_id']);
 
         // Track changed fields for logging (handles JSON/array fields properly)
         $changedFields = $this->getChangedFields($model, $validated);
@@ -860,6 +856,8 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getUpdateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ]);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,

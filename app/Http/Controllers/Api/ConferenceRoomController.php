@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\UserStatus;
+use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\ConferenceRoom\StoreConferenceRoomRequest;
 use App\Http\Requests\ConferenceRoom\UpdateConferenceRoomRequest;
 use App\Http\Resources\ConferenceRoomResource;
 use App\Models\ConferenceRoom;
-use App\Http\Controllers\Traits\AppliesFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -24,6 +23,7 @@ use Illuminate\Http\Request;
 class ConferenceRoomController extends AbstractApiCrudController
 {
     use AppliesFilters;
+
     /**
      * Get the model class name for this controller.
      */
@@ -79,12 +79,12 @@ class ConferenceRoomController extends AbstractApiCrudController
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
+                'scope' => 'withStatus',
             ],
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
     }
 
@@ -155,7 +155,13 @@ class ConferenceRoomController extends AbstractApiCrudController
         );
     }
 
-    // No need to override store() and update()
-    // Laravel will automatically resolve and validate FormRequest classes
-    // based on route-model binding and type hints in the parent controller
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreConferenceRoomRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateConferenceRoomRequest::class;
+    }
 }

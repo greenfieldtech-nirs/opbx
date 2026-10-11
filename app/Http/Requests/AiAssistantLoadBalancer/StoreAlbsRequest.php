@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AiAssistantLoadBalancer;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
-use App\Enums\AiAssistantStatus;use App\Models\AiAssistant;
+use App\Models\AiAssistant;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for creating a new AI Assistant Load Balancer.
@@ -76,22 +78,22 @@ class StoreAlbsRequest extends FormRequest
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ring_group_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
-                'exists:ring_groups,id',
+                Rule::exists('ring_groups', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ivr_menu_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
-                'exists:ivr_menus,id',
+                Rule::exists('ivr_menus', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
             'status' => [
                 'required',
@@ -106,7 +108,7 @@ class StoreAlbsRequest extends FormRequest
             'members.*.ai_assistant_id' => [
                 'required',
                 'distinct',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
             'members.*.priority' => [
                 'nullable',
@@ -216,7 +218,7 @@ class StoreAlbsRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -279,7 +281,7 @@ class StoreAlbsRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackExtension->status !== AiAssistantStatus::ACTIVE) {
+                    if ($fallbackExtension->status !== UserStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'
