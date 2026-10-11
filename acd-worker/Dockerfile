@@ -11,5 +11,7 @@ FROM eclipse-temurin:21-jre
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/target/acd-worker-1.0.0.jar ./app.jar
+RUN useradd -r -u 10001 app && chown -R app /app
+USER app
 EXPOSE 8084 8085
 ENTRYPOINT ["java", "-Dorg.slf4j.simpleLogger.showDateTime=true", "-Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS", "-jar", "app.jar"]

@@ -19,6 +19,14 @@ public class Main {
         logger.info("AMD Worker starting version=1.0.0");
         Config config = new Config();
         Vertx vertx = Vertx.vertx();
+        // SIGTERM (docker stop): undeploy so stop() closes servers and clients; bounded under Docker's 10 s grace.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                vertx.close().toCompletionStage().toCompletableFuture().get(8, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception e) {
+                logger.warn("Shutdown did not complete cleanly error={}", e.toString());
+            }
+        }));
         AmdWorkerVerticle verticle = new AmdWorkerVerticle(config);
         vertx.deployVerticle(verticle).onComplete(ar -> {
             if (ar.succeeded()) {
