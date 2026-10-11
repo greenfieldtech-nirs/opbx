@@ -29,7 +29,7 @@ class RateLimitPerOrganization
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      * @param  string  $limitType  The rate limit configuration key (e.g., 'webhook', 'api', 'voice_routing')
      */
     public function handle(Request $request, Closure $next, string $limitType = 'default'): Response
@@ -37,7 +37,7 @@ class RateLimitPerOrganization
         // Extract organization ID from request
         $organizationId = $this->extractOrganizationId($request);
 
-        if (!$organizationId) {
+        if (! $organizationId) {
             Log::warning('Rate limit: Organization not identified', [
                 'path' => $request->path(),
                 'ip' => $request->ip(),
@@ -52,7 +52,7 @@ class RateLimitPerOrganization
         // Get rate limit configuration
         $limits = config("rate-limiting.{$limitType}");
 
-        if (!$limits) {
+        if (! $limits) {
             Log::error('Rate limit: Invalid limit type', [
                 'limit_type' => $limitType,
                 'organization_id' => $organizationId,
@@ -63,7 +63,7 @@ class RateLimitPerOrganization
         }
 
         // Fallback to hardcoded defaults if config not loaded (e.g., in tests)
-        if (!$limits) {
+        if (! $limits) {
             $limits = [
                 'max_attempts' => 60,
                 'per_minutes' => 1,
@@ -111,13 +111,7 @@ class RateLimitPerOrganization
      */
     private function extractOrganizationId(Request $request): ?int
     {
-        // Try to get from middleware-injected parameter (webhooks)
-        $orgId = $request->input('_organization_id');
-
-        if ($orgId) {
-            return (int) $orgId;
-        }
-
+        // Never from request input: it is client-controlled on authenticated routes.
         // Try to get from authenticated user (API requests)
         $user = $request->user();
 

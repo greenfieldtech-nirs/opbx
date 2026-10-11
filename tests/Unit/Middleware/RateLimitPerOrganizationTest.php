@@ -21,14 +21,16 @@ class RateLimitPerOrganizationTest extends TestCase
     use RefreshDatabase;
 
     private RateLimitPerOrganization $middleware;
+
     private Organization $organization;
+
     private User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->middleware = new RateLimitPerOrganization();
+        $this->middleware = new RateLimitPerOrganization;
 
         // Create test organization and user
         $this->organization = Organization::factory()->create();
@@ -79,12 +81,12 @@ class RateLimitPerOrganizationTest extends TestCase
                 'default'
             );
 
-            $this->assertEquals(200, $response->getStatusCode(), "Request ".($i+1)." should succeed");
+            $this->assertEquals(200, $response->getStatusCode(), 'Request '.($i + 1).' should succeed');
 
             // Check cache value to debug
             $key = "rate_limit:org:{$this->organization->id}:default";
             $attempts = Cache::get($key);
-            $this->assertEquals($i + 1, $attempts, "Cache should have ".($i+1)." attempts after request ".($i+1));
+            $this->assertEquals($i + 1, $attempts, 'Cache should have '.($i + 1).' attempts after request '.($i + 1));
         }
     }
 
@@ -228,9 +230,9 @@ class RateLimitPerOrganizationTest extends TestCase
     }
 
     /**
-     * Test rate limit extracts organization from request parameter.
+     * A client-supplied _organization_id must not select the rate-limit bucket.
      */
-    public function test_extracts_organization_from_request_parameter(): void
+    public function test_ignores_organization_id_request_parameter(): void
     {
         $request = Request::create('/test', 'GET');
         $request->merge(['_organization_id' => $this->organization->id]);
@@ -241,7 +243,7 @@ class RateLimitPerOrganizationTest extends TestCase
             'default'
         );
 
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(400, $response->getStatusCode());
     }
 
     /**
