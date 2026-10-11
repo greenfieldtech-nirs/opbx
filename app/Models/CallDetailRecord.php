@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Call Detail Record (CDR) Model
@@ -178,7 +179,7 @@ class CallDetailRecord extends Model
             $subscriber = self::assertSubscriberFromCallerId($from, $organizationId);
         }
 
-        return self::create([
+        $attributes = [
             'organization_id' => $organizationId,
             'session_timestamp' => isset($payload['timestamp'])
                 ? Carbon::createFromTimestamp($payload['timestamp'])
@@ -213,7 +214,17 @@ class CallDetailRecord extends Model
             'amd_result' => $amdResult,
             'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
-        ]);
+        ];
+
+        // No unique DB index on (organization_id, call_id) by owner decision (D9):
+        // dedupe here, serialised per call so concurrent deliveries create one row.
+        // Callers can tell a replay apart via ->wasRecentlyCreated.
+        return Cache::lock("cdr:create:{$organizationId}:{$attributes['call_id']}", 10)->block(5, function () use ($attributes, $organizationId): self {
+            return self::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
+                ->where('call_id', $attributes['call_id'])
+                ->first() ?? self::create($attributes);
+        });
     }
 
     /**

@@ -401,6 +401,12 @@ class CloudonixWebhookController extends Controller
         try {
             $cdr = CallDetailRecord::createFromWebhook($request->all(), $organizationId);
 
+            if (! $cdr->wasRecentlyCreated) {
+                Log::info('Duplicate CDR ignored', ['call_id' => $callId, 'organization_id' => $organizationId, 'cdr_id' => $cdr->id]);
+
+                return response()->json(['message' => 'CDR already recorded'], 200);
+            }
+
             Log::info('CDR created successfully', [
                 'session_token' => $request->input('session.token') ?? $request->input('session_token'),
                 'call_id' => $callId,
