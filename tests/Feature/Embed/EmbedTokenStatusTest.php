@@ -47,6 +47,14 @@ final class EmbedTokenStatusTest extends TestCase
     {
         [$t] = $this->seedAll();
         $this->fetchConfig($t, null)->assertStatus(403);
+        $this->withHeaders(['Sec-Fetch-Site' => 'cross-site'])->fetchConfig($t, null)->assertStatus(403);
+    }
+
+    public function test_same_origin_widget_request_without_origin_gets_200(): void
+    {
+        // The embed iframe is served by OPBX: its same-origin GET carries no Origin.
+        [$t] = $this->seedAll();
+        $this->withHeaders(['Sec-Fetch-Site' => 'same-origin'])->fetchConfig($t, null)->assertOk();
     }
 
     public function test_disabled_user_gets_403(): void
