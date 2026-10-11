@@ -6,7 +6,6 @@ import (
 	"math"
 	"sync"
 	"time"
-
 )
 
 // counterStore is the Redis surface the limiter needs (satisfied by *redis.Client).

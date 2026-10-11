@@ -109,13 +109,8 @@ func (c *Client) GetPendingDestinations(ctx context.Context, campaignID int64, l
 	return destinations, nil
 }
 
-// InitiateCall creates a new call session via Laravel
-func (c *Client) InitiateCall(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string) (*models.InitiateCallResponse, error) {
-	return c.InitiateCallWithCallerID(ctx, campaignID, destinationID, phoneNumber, workerID, "", 0)
-}
-
 // InitiateCallWithCallerID creates a new call session via Laravel with a specific Caller ID
-func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64) (*models.InitiateCallResponse, error) {
+func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64, idemKey string) (*models.InitiateCallResponse, error) {
 	req := models.InitiateCallRequest{
 		CampaignID:    campaignID,
 		DestinationID: destinationID,
@@ -127,7 +122,7 @@ func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64,
 	}
 
 	var response models.APIResponse
-	err := c.post(ctx, "/api/v1/dialer/worker/calls/initiate", req, &response)
+	err := c.doRequest(ctx, http.MethodPost, "/api/v1/dialer/worker/calls/initiate", req, &response, map[string]string{"Idempotency-Key": idemKey})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate call: %w", err)
 	}
@@ -149,14 +144,14 @@ func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64,
 // HTTP helper methods
 
 func (c *Client) get(ctx context.Context, path string, result interface{}) error {
-	return c.doRequest(ctx, http.MethodGet, path, nil, result)
+	return c.doRequest(ctx, http.MethodGet, path, nil, result, nil)
 }
 
 func (c *Client) post(ctx context.Context, path string, body, result interface{}) error {
-	return c.doRequest(ctx, http.MethodPost, path, body, result)
+	return c.doRequest(ctx, http.MethodPost, path, body, result, nil)
 }
 
-func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}) error {
+func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}, headers map[string]string) error {
 	url := c.baseURL + path
 
 	var bodyReader io.Reader
@@ -176,6 +171,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	req.Header.Set("Authorization", "Bearer "+c.apiToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -196,6 +194,10 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 			Err:        errors.ErrRateLimitExceeded,
 			RetryAfter: duration,
 		}
+	}
+
+	if resp.StatusCode == http.StatusConflict {
+		return fmt.Errorf("%w (%s)", errors.ErrDestinationConflict, path)
 	}
 
 	if resp.StatusCode >= 400 {

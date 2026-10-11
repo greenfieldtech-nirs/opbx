@@ -18,6 +18,8 @@ var (
 	ErrWebhookUnauthorized = errors.New("unauthorized webhook request")
 	ErrRedisConnection     = errors.New("redis connection error")
 	ErrLaravelAPIError     = errors.New("laravel api error")
+	// ErrDestinationConflict means Laravel refused the call because the destination is already claimed (HTTP 409).
+	ErrDestinationConflict = errors.New("destination already claimed")
 )
 
 // RetryableError represents an error that can be retried

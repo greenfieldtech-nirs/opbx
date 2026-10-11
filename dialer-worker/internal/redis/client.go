@@ -14,7 +14,6 @@ type KeyPrefix string
 
 const (
 	PrefixCampaignState KeyPrefix = "dialer:campaign"
-	PrefixLock          KeyPrefix = "dialer:lock"
 	PrefixRetry         KeyPrefix = "dialer:retry"
 	PrefixCAC           KeyPrefix = "dialer:cac"
 )
@@ -23,8 +22,6 @@ const (
 const (
 	// DefaultConnectTimeout is the timeout for Redis connection attempts
 	DefaultConnectTimeout = 5 * time.Second
-	// DefaultLockTTL is the default TTL for distributed locks
-	DefaultLockTTL = 30 * time.Second
 )
 
 // Client handles Redis operations for the dialer worker
@@ -88,22 +85,6 @@ func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (i
 		return values[1].(int64), false, nil
 	}
 	return newVal, true, nil
-}
-
-// === Lock Management ===
-
-// AcquireLock attempts to acquire a distributed lock
-func (c *Client) AcquireLock(ctx context.Context, lockKey string, ttl time.Duration) (bool, error) {
-	key := fmt.Sprintf("%s:%s", PrefixLock, lockKey)
-	// Use SET with NX (only if not exists) and EX (expire)
-	result, err := c.client.SetNX(ctx, key, "1", ttl).Result()
-	return result, err
-}
-
-// ReleaseLock releases a distributed lock
-func (c *Client) ReleaseLock(ctx context.Context, lockKey string) error {
-	key := fmt.Sprintf("%s:%s", PrefixLock, lockKey)
-	return c.client.Del(ctx, key).Err()
 }
 
 // === Retry Queue ===

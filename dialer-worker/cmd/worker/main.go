@@ -80,15 +80,15 @@ func main() {
 
 	// Create worker
 	worker := &Worker{
-		config:          cfg,
-		apiClient:       apiClient,
-		redisClient:     redisClient,
-		limiter:         racLimiter,
-		executor:        exec,
-		retryMgr:        retryMgr,
-		logger:          logger,
-		shutdown:        make(chan struct{}),
-		campaignSem:     make(chan struct{}, 10), // Max 10 concurrent campaigns
+		config:      cfg,
+		apiClient:   apiClient,
+		redisClient: redisClient,
+		limiter:     racLimiter,
+		executor:    exec,
+		retryMgr:    retryMgr,
+		logger:      logger,
+		shutdown:    make(chan struct{}),
+		campaignSem: make(chan struct{}, 10), // Max 10 concurrent campaigns
 	}
 
 	// Start webhook server

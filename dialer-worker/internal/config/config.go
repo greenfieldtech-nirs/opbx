@@ -21,9 +21,9 @@ type Config struct {
 	RedisDB       int
 
 	// Worker Configuration
-	WorkerID        string
-	PollInterval    time.Duration
-	WebhookPort     string
+	WorkerID     string
+	PollInterval time.Duration
+	WebhookPort  string
 
 	// Retry Configuration (per spec)
 	RetryIntervals []time.Duration
@@ -42,9 +42,9 @@ func Load() (*Config, error) {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       getEnvInt("REDIS_DB", 0),
 
-		WorkerID:        getEnv("WORKER_ID", "worker-1"),
-		PollInterval:    getEnvDuration("POLL_INTERVAL", 10*time.Second),
-		WebhookPort:     getEnv("WEBHOOK_PORT", "8081"),
+		WorkerID:     getEnv("WORKER_ID", "worker-1"),
+		PollInterval: getEnvDuration("POLL_INTERVAL", 10*time.Second),
+		WebhookPort:  getEnv("WEBHOOK_PORT", "8081"),
 
 		// Per spec: 5min → 15min → 60min → 24hr
 		RetryIntervals: []time.Duration{

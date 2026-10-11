@@ -10,6 +10,7 @@ use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Destination Management Service
@@ -115,17 +116,37 @@ class DestinationManagementService
     }
 
     /**
-     * Update destination status to dialing.
+     * Atomically claim a pending destination for dialling.
+     *
+     * Returns false when another request already claimed it (or it is no longer
+     * pending), so a destination can never be dialled twice.
      */
-    public function markAsDialing(AutoDialerDestination $destination): void
+    public function claimForDialing(int $destinationId): bool
     {
-        OrganizationScope::bypass(function () use ($destination) {
-            $destination->update([
-                'status' => DestinationStatus::DIALING,
-                'dial_attempts' => $destination->dial_attempts + 1,
-                'last_dialed_at' => now(),
-            ]);
-        });
+        return OrganizationScope::bypass(
+            fn () => AutoDialerDestination::whereKey($destinationId)
+                ->where('status', DestinationStatus::PENDING)
+                ->update([
+                    'status' => DestinationStatus::DIALING,
+                    'dial_attempts' => DB::raw('dial_attempts + 1'),
+                    'last_dialed_at' => now(),
+                ]) === 1
+        );
+    }
+
+    /**
+     * Undo a claim after a definite failure to place the call (attempt stays counted).
+     */
+    public function releaseClaim(int $destinationId, string $error): void
+    {
+        OrganizationScope::bypass(
+            fn () => AutoDialerDestination::whereKey($destinationId)
+                ->where('status', DestinationStatus::DIALING)
+                ->update([
+                    'status' => DestinationStatus::PENDING,
+                    'last_error' => mb_substr($error, 0, 250),
+                ])
+        );
     }
 
     /**

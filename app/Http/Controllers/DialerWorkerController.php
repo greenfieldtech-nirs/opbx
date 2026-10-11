@@ -18,6 +18,7 @@ use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\DialerWorkerCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -156,6 +157,13 @@ class DialerWorkerController extends Controller
             ], 422);
         }
 
+        // A replayed request (lost response) gets the original answer, not a second call.
+        $idemKey = $request->header('Idempotency-Key');
+        $idemCacheKey = $idemKey ? 'dialer:initiate:'.$destination->id.':'.hash('sha256', $idemKey) : null;
+        if ($idemCacheKey && ($cached = Cache::get($idemCacheKey))) {
+            return response()->json($cached, 201);
+        }
+
         // Get Cloudonix settings for the organization
         $cloudonixSettings = $campaign->organization->cloudonixSettings;
 
@@ -174,6 +182,13 @@ class DialerWorkerController extends Controller
         $webhookBaseUrl = $cloudonixSettings->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
         $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
 
+        // Claim before placing the call: the loser of a race gets 409 and never dials.
+        if (! $this->destinationService->claimForDialing($destination->id)) {
+            return response()->json([
+                'message' => 'Destination is not pending (already claimed or finished)',
+            ], 409);
+        }
+
         // Initiate the call via Cloudonix API with selected Caller ID
         $result = $cloudonixService->initiateCall(
             $campaign,
@@ -185,6 +200,8 @@ class DialerWorkerController extends Controller
         );
 
         if (! $result['success']) {
+            $this->destinationService->releaseClaim($destination->id, (string) $result['error']);
+
             Log::error('DialerWorker: Failed to initiate call via Cloudonix', [
                 'campaign_id' => $campaign->id,
                 'destination_id' => $destination->id,
@@ -207,9 +224,6 @@ class DialerWorkerController extends Controller
             'initiated_at' => $validated['initiated_at'],
         ]);
 
-        // Update destination status
-        $this->destinationService->markAsDialing($destination);
-
         // Increment campaign pending calls counter
         $this->campaignService->incrementPendingCalls($campaign);
 
@@ -221,7 +235,7 @@ class DialerWorkerController extends Controller
             'call_id' => $result['call_id'],
         ]);
 
-        return response()->json([
+        $payload = [
             'message' => 'Call initiated',
             'data' => [
                 'session_id' => $session->id,
@@ -230,7 +244,13 @@ class DialerWorkerController extends Controller
                 'caller_did_id' => $validated['caller_did_id'] ?? null,
                 'callback_url' => $callbackUrl,
             ],
-        ], 201);
+        ];
+
+        if ($idemCacheKey) {
+            Cache::put($idemCacheKey, $payload, now()->addHour());
+        }
+
+        return response()->json($payload, 201);
     }
 
     /**

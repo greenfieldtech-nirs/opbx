@@ -2,29 +2,37 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
-	"opbx/dialer-worker/internal/api"
 	"opbx/dialer-worker/internal/callerid"
-	"opbx/dialer-worker/internal/limiter"
 	"opbx/dialer-worker/internal/models"
 	"opbx/dialer-worker/internal/redis"
+	apierrors "opbx/dialer-worker/pkg/errors"
 	"opbx/dialer-worker/pkg/retry"
 )
 
 // Timeout and duration constants
-const (
-	// DefaultLockTTL is the default TTL for distributed locks
-	DefaultLockTTL = 30 * time.Second
-)
+const ()
+
+// callInitiator places a call through Laravel (satisfied by *api.Client).
+type callInitiator interface {
+	InitiateCallWithCallerID(ctx context.Context, campaignID, destinationID int64, phoneNumber, workerID, callerID string, callerDIDID int64, idemKey string) (*models.InitiateCallResponse, error)
+}
+
+// slotLimiter reserves and releases CAC slots (satisfied by *limiter.CACRateLimiter).
+type slotLimiter interface {
+	CanDial(ctx context.Context, campaignID int64) (bool, int64, error)
+	DecrementActive(ctx context.Context, campaignID int64) (int64, error)
+	RecordCall(campaignID int64)
+}
 
 // Executor handles the execution of dialer calls
 type Executor struct {
-	apiClient       *api.Client
+	apiClient       callInitiator
 	redisClient     *redis.Client
-	limiter         *limiter.CACRateLimiter
+	limiter         slotLimiter
 	retryMgr        *retry.Manager
 	strategyFactory *callerid.StrategyFactory
 	retryTracker    *callerid.RetryTracker
@@ -34,9 +42,9 @@ type Executor struct {
 
 // NewExecutor creates a new call executor
 func NewExecutor(
-	apiClient *api.Client,
+	apiClient callInitiator,
 	redisClient *redis.Client,
-	limiter *limiter.CACRateLimiter,
+	limiter slotLimiter,
 	retryMgr *retry.Manager,
 	workerID string,
 	logger *slog.Logger,
@@ -61,19 +69,6 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 		"destination_id", destination.ID,
 		"phone", destination.PhoneNumber,
 	)
-
-	// Acquire distributed lock for destination
-	lockKey := fmt.Sprintf("dest:%d", destination.ID)
-	acquired, err := e.redisClient.AcquireLock(ctx, lockKey, DefaultLockTTL)
-	if err != nil {
-		logger.Error("failed to acquire lock", "error", err)
-		return fmt.Errorf("failed to acquire lock: %w", err)
-	}
-	if !acquired {
-		logger.Info("destination already locked, skipping")
-		return nil
-	}
-	defer e.redisClient.ReleaseLock(ctx, lockKey)
 
 	// Check CAC availability (reserves a slot if available)
 	canDial, activeCount, err := e.limiter.CanDial(ctx, campaign.ID)
@@ -112,13 +107,19 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 		e.workerID,
 		selectedCallerID.PhoneNumber,
 		selectedCallerID.DIDID,
+		fmt.Sprintf("%d-%d", destination.ID, destination.DialAttempts),
 	)
 	if err != nil {
-		logger.Error("failed to initiate call", "error", err)
-		// Roll back the CAC slot reserved by CanDial
+		// Roll back the CAC slot reserved by CanDial: no session exists, so no CDR will free it.
 		if _, decErr := e.limiter.DecrementActive(ctx, campaign.ID); decErr != nil {
 			logger.Error("failed to decrement active count after initiation failure", "error", decErr)
 		}
+		// 409: another claim owns this destination. Not a failure; just skip it.
+		if errors.Is(err, apierrors.ErrDestinationConflict) {
+			logger.Info("destination already claimed, skipping")
+			return nil
+		}
+		logger.Error("failed to initiate call", "error", err)
 		// Mark this DID as tried for retry tracking
 		if campaign.CallerIDPoolEnabled {
 			if markErr := e.retryTracker.MarkDIDAsTried(ctx, campaign.ID, destination.ID, selectedCallerID.DIDID); markErr != nil {
