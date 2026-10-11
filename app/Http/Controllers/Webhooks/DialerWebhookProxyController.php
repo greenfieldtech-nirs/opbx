@@ -8,10 +8,10 @@ use App\Enums\DestinationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AutoDialerCallSession;
 use App\Scopes\OrganizationScope;
+use App\Services\AutoDialer\CDRPublisher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 
 /**
  * Dialer Webhook Proxy Controller
@@ -183,7 +183,7 @@ class DialerWebhookProxyController extends Controller
         $this->updateDestinationFromDisposition($session, $disposition, $duration, $billsec);
 
         // Decrement the CAC counter in Redis so the worker knows a slot freed up
-        $this->decrementCacCounter($session->campaign_id, $session->session_token);
+        app(CDRPublisher::class)->decrementCacCounter($session->campaign_id, $session->session_token);
 
         Log::info('Dialer call completed', [
             'session_id' => $session->id,
@@ -220,7 +220,7 @@ class DialerWebhookProxyController extends Controller
         $this->updateDestinationFromDisposition($session, $disposition, 0, 0);
 
         // Decrement the CAC counter in Redis so the worker knows a slot freed up
-        $this->decrementCacCounter($session->campaign_id, $session->session_token);
+        app(CDRPublisher::class)->decrementCacCounter($session->campaign_id, $session->session_token);
 
         Log::info('Dialer call failed', [
             'session_id' => $session->id,
@@ -359,53 +359,5 @@ class DialerWebhookProxyController extends Controller
         }
 
         return now()->addMinutes($delay)->toIso8601String();
-    }
-
-    /**
-     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
-     *
-     * Uses the 'dialer' connection (no key prefix) because the Go worker
-     * writes raw keys like dialer:cac:{id}:active without any prefix.
-     * Idempotency is enforced per session token so a completed call only
-     * decrements the counter once, even if multiple webhooks arrive.
-     */
-    private function decrementCacCounter(int $campaignId, string $sessionToken): void
-    {
-        try {
-            $redis = Redis::connection('dialer');
-
-            $idempotencyKey = "dialer:cac:decremented:{$sessionToken}";
-            if ($redis->get($idempotencyKey)) {
-                Log::info('CAC decrement already processed for session', [
-                    'campaign_id' => $campaignId,
-                    'session_token' => $sessionToken,
-                ]);
-
-                return;
-            }
-
-            $workerKey = "dialer:cac:{$campaignId}:active";
-            $newCount = $redis->decr($workerKey);
-
-            // Prevent counter from going negative
-            if ($newCount < 0) {
-                $redis->set($workerKey, 0);
-                $newCount = 0;
-            }
-
-            $redis->setex($idempotencyKey, 86400, '1');
-
-            Log::info('CAC counter decremented', [
-                'campaign_id' => $campaignId,
-                'active_calls' => $newCount,
-                'session_token' => $sessionToken,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to decrement CAC counter', [
-                'campaign_id' => $campaignId,
-                'session_token' => $sessionToken,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }
