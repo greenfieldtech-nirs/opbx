@@ -13,6 +13,7 @@ use App\Http\Requests\Webhook\CallInitiatedRequest;
 use App\Http\Requests\Webhook\CdrRequest;
 use App\Http\Requests\Webhook\RecordingStatusRequest;
 use App\Http\Requests\Webhook\SessionUpdateRequest;
+use App\Jobs\DispatchCallNotificationJob;
 use App\Jobs\DownloadCallRecordingJob;
 use App\Jobs\ProcessInboundCallJob;
 use App\Models\AutoDialerCallSession;
@@ -27,7 +28,6 @@ use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
-use App\Services\CallNotifications\WebhookDispatcher;
 use App\Services\CallQueue\QueueCallLifecycleService;
 use App\Services\PhoneNumberService;
 use Carbon\Carbon;
@@ -48,7 +48,6 @@ class CloudonixWebhookController extends Controller
     use HandlesWebhookErrors;
 
     public function __construct(
-        private readonly WebhookDispatcher $webhookDispatcher,
         private readonly NotificationPayloadBuilder $payloadBuilder,
         private readonly PhoneNumberService $phoneNumberService,
         private readonly CDRPublisher $cdrPublisher
@@ -809,17 +808,16 @@ class CloudonixWebhookController extends Controller
                 'webhook_url' => $settings->webhook_url,
             ]);
 
-            $result = $this->webhookDispatcher->dispatch(
+            DispatchCallNotificationJob::dispatch(
                 $settings,
                 $payload,
                 $payload['event_id'],
                 $sessionUpdate->session_token ?? (string) $sessionUpdate->session_id
             );
 
-            Log::info('=== CALL NOTIFICATION END ===', [
+            Log::info('=== CALL NOTIFICATION QUEUED ===', [
                 'organization_id' => $organizationId,
                 'session_id' => $sessionUpdate->session_id,
-                'dispatch_result' => $result ? 'success' : 'failed',
             ]);
 
         } catch (\Exception $e) {

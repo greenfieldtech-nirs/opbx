@@ -39,12 +39,8 @@ class WebhookDispatcherTest extends TestCase
 
     private function mockRedisForSuccessfulDispatch(): void
     {
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
     }
 
     protected function tearDown(): void
@@ -60,12 +56,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null); // First request, no rate limit
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -108,8 +100,8 @@ class WebhookDispatcherTest extends TestCase
     public function test_dispatch_returns_false_on_rate_limit_exceeded(): void
     {
         // Simulate rate limit exceeded
-        Redis::shouldReceive('get')
-            ->andReturn('500'); // At limit
+        Redis::shouldReceive('incr')
+            ->andReturn(501); // Over the limit
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -140,12 +132,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -206,12 +194,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -269,12 +253,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
