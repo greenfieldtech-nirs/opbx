@@ -120,11 +120,9 @@ class ExtensionPasswordController extends Controller
             ], 400);
         }
 
-        $length = (int) $request->input('length', 12);
-        $length = min(max($length, 6), 64);
-
         try {
-            $newPassword = $this->passwordGenerator->generate($length);
+            // generate() takes a word count (2-5), not a character length.
+            $newPassword = $this->passwordGenerator->generate();
 
             $extension->update(['password' => $newPassword]);
 
