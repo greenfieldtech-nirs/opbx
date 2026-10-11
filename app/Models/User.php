@@ -77,7 +77,6 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
-        'is_platform_manager',
         'phone',
         'street_address',
         'city',

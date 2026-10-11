@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Enums\UserRole;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Controllers\Traits\ValidatesTenantScope;
+use App\Http\Requests\User\CreateUserRequest;
+use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Models\UserEmbedToken;
@@ -16,10 +18,11 @@ use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Symfony\Component\HttpKernel\Exception\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Users management API controller.
@@ -69,6 +72,16 @@ class UsersController extends AbstractApiCrudController
     protected function getResourceClass(): string
     {
         return UserResource::class;
+    }
+
+    protected function getStoreRequestClass(): ?string
+    {
+        return CreateUserRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateUserRequest::class;
     }
 
     /**

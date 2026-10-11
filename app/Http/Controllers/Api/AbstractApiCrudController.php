@@ -14,6 +14,7 @@ use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -945,6 +946,9 @@ abstract class AbstractApiCrudController extends Controller
             ]);
 
             return response()->json(null, 204);
+        } catch (HttpResponseException $e) {
+            // Designed responses from hooks (e.g. last-owner 409) must not become 500s.
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,
