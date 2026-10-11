@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /**
@@ -148,6 +150,48 @@ class WebhookSignatureTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertJson(['status' => 'accepted']);
+    }
+
+    public function test_no_key_returns_401_when_require_auth_enabled(): void
+    {
+        config(['cloudonix.webhooks.require_auth' => true]);
+        $this->keylessOrg();
+
+        $this->postJson(self::TEST_WEBHOOK_URL, $this->validPayload(['domain' => 'no-auth.cloudonix.net']))
+            ->assertStatus(401);
+    }
+
+    public function test_no_key_is_allowed_with_warning_when_require_auth_disabled(): void
+    {
+        config(['cloudonix.webhooks.require_auth' => false]);
+        $org = $this->keylessOrg();
+        Log::spy();
+
+        $this->postJson(self::TEST_WEBHOOK_URL, $this->validPayload(['domain' => 'no-auth.cloudonix.net']))
+            ->assertStatus(200);
+
+        Log::shouldHaveReceived('warning')
+            ->with('webhook.unauthenticated', \Mockery::on(fn ($c) => $c['organization_id'] === $org->id))
+            ->once();
+    }
+
+    public function test_duplicate_domain_name_is_rejected_by_database(): void
+    {
+        $this->expectException(QueryException::class);
+
+        CloudonixSettings::factory()->create(['domain_name' => self::DOMAIN]);
+    }
+
+    private function keylessOrg(): Organization
+    {
+        $org = Organization::factory()->create();
+        CloudonixSettings::factory()->create([
+            'organization_id' => $org->id,
+            'domain_name' => 'no-auth.cloudonix.net',
+            'domain_requests_api_key' => null,
+        ]);
+
+        return $org;
     }
 
     public function test_domain_resolved_by_uuid_top_level(): void

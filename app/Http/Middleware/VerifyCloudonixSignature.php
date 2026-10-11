@@ -22,10 +22,8 @@ use Symfony\Component\HttpFoundation\Response;
  *    - Bearer token MUST be present and match
  *    - If token missing or mismatch → 401 Unauthorized
  * 4. If organization has NO domain_requests_api_key configured:
- *    - Request processed without token validation
- *
- * This ensures backward compatibility while allowing organizations to enable
- * webhook authentication when needed.
+ *    - 401 when cloudonix.webhooks.require_auth is true; otherwise allowed with a
+ *      `webhook.unauthenticated` warning (rollout window).
  *
  * Used for: call-initiated, call-status, session-update, and CDR webhooks
  *
@@ -202,8 +200,17 @@ class VerifyCloudonixSignature
             ];
         }
 
-        // Case 2: Organization has NO webhook auth configured
-        // Allow request regardless of token presence
+        // Case 2: no key configured. Enforced once CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true;
+        // until then warn-only so legacy orgs keep working during key rollout.
+        if (config('cloudonix.webhooks.require_auth')) {
+            return ['success' => false, 'reason' => 'Webhook key not configured', 'method' => null];
+        }
+
+        Log::warning('webhook.unauthenticated', [
+            'organization_id' => $settings->organization_id,
+            'route' => $request->path(),
+        ]);
+
         return [
             'success' => true,
             'reason' => null,
