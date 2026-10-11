@@ -158,12 +158,74 @@ class QueueEngineTest {
         Map<String, Object> result = poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300);
         assertEquals("overflow", result.get("action"));
 
-        // Overflowed call is dequeued. A subsequent poll re-enqueues for recovery
-        // (returns wait once), then offers on the next poll.
+        // Overflowed call is dequeued; an in-flight poll waits and does not re-enqueue a ghost.
         Map<String, Object> rePoll = poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300);
         assertEquals("wait", rePoll.get("action"));
-        Map<String, Object> rePoll2 = poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300);
-        assertEquals("dial", rePoll2.get("action"));
+        assertEquals(List.of(), store.lrangeAll(QueueEngine.queueKey("org1", "q1")).result());
+    }
+
+    @Test
+    void pollAfterAnsweredWaitsWithoutReenqueue() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.event("org1", "q1", "call-1", "answered", null, null, null, null).result();
+
+        Map<String, Object> result = poll("q1", "call-1", List.of(), "ring_all", 300);
+
+        assertEquals("wait", result.get("action"));
+        assertEquals(List.of(), store.lrangeAll(QueueEngine.queueKey("org1", "q1")).result());
+    }
+
+    @Test
+    void headCallWithMissingHashWaitsInsteadOfOverflowing() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        store.del(QueueEngine.callKey("org1", "q1", "call-1")).result(); // dequeued mid-poll
+        fakeTime.advance(301_000);
+
+        assertEquals("wait", poll("q1", "call-1", List.of(), "ring_all", 300).get("action"));
+    }
+
+    @Test
+    void lateAnsweredForAnEndedCallDoesNotMarkTheAgentBusy() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        engine.event("org1", "q1", "call-1", "abandoned", null, null, null, "x1").result();
+
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+
+        assertEquals("AVAILABLE", agentHash("u1").get("state"));
+    }
+
+    @Test
+    void roundRobinPassesABusyAgentsTurnOnWithoutSkippingAnyone() {
+        for (String id : List.of("u1", "u2", "u3")) {
+            engine.setAgentState("org1", "q1", id, AgentState.AVAILABLE, null, null, null).result();
+        }
+        List<AgentInfo> roster = List.of(agent("u1"), agent("u2"), agent("u3"));
+        engine.enqueue("org1", "q1", "call-1").result();
+
+        assertEquals("u1", firstAgentUserId(poll("q1", "call-1", roster, "round_robin", 300)));
+        // u1 goes busy on another call: u2 is next (an index into the shrunken list would pick u3).
+        engine.setAgentState("org1", "q1", "u1", AgentState.BUSY, null, null, null).result();
+        assertEquals("u2", firstAgentUserId(poll("q1", "call-1", roster, "round_robin", 300)));
+        assertEquals("u3", firstAgentUserId(poll("q1", "call-1", roster, "round_robin", 300)));
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        assertEquals("u1", firstAgentUserId(poll("q1", "call-1", roster, "round_robin", 300)));
+    }
+
+    @Test
+    void roundRobinWithOneBusyAgentOfThreeStaysEven() {
+        for (String id : List.of("u1", "u2", "u3")) {
+            engine.setAgentState("org1", "q1", id, AgentState.AVAILABLE, null, null, null).result();
+        }
+        engine.setAgentState("org1", "q1", "u2", AgentState.BUSY, null, null, null).result();
+        List<AgentInfo> roster = List.of(agent("u1"), agent("u2"), agent("u3"));
+        engine.enqueue("org1", "q1", "call-1").result();
+
+        Map<String, Integer> counts = new java.util.HashMap<>();
+        for (int i = 0; i < 6; i++) {
+            counts.merge(firstAgentUserId(poll("q1", "call-1", roster, "round_robin", 300)), 1, Integer::sum);
+        }
+        assertEquals(Map.of("u1", 3, "u3", 3), counts);
     }
 
     @Test

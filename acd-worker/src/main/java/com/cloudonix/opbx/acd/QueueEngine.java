@@ -23,7 +23,8 @@ import io.vertx.core.Future;
  *   acd:queue:{org}:{queue}              list   callIds (FIFO)
  *   acd:call:{org}:{queue}:{callId}      hash   queuedAt (epoch ms)
  *   acd:agent:{org}:{queue}:{userId}     hash   state, wrapUpUntil, talkSecondsTotal, callsHandledTotal
- *   acd:rr:{org}:{queue}                 string round-robin cursor
+ *   acd:rr:{org}:{queue}                 string round-robin cursor (userId offered last)
+ *   acd:done:{org}:{queue}:{callId}      string dequeued-call tombstone (10 min): a late poll must not re-enqueue it
  *   acd:evt:{org}:{eventId}              string seen lifecycle event (dedupes Laravel replays)
  *
  * Agent hash transitions are conditional and atomic (store Lua): an event never
@@ -37,6 +38,7 @@ public class QueueEngine {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(QueueEngine.class);
     /** Longer than Laravel's SendAcdEventJob retry window (5 tries, ~6.5 min of backoff). */
     static final long EVENT_DEDUPE_TTL_SECONDS = 86_400;
+    static final long DONE_TTL_SECONDS = 600;
     private final QueueStore store;
     private final Time time;
 
@@ -61,6 +63,10 @@ public class QueueEngine {
         return "acd:rr:" + org + ":" + queue;
     }
 
+    static String doneKey(String org, String queue, String callId) {
+        return "acd:done:" + org + ":" + queue + ":" + callId;
+    }
+
     static String eventKey(String org, String eventId) {
         return "acd:evt:" + org + ":" + eventId;
     }
@@ -69,7 +75,13 @@ public class QueueEngine {
      * Enqueue a call. Idempotent: an already-queued call keeps its original position.
      */
     public Future<Integer> enqueue(String org, String queue, String callId) {
-        return store.enqueueIfAbsent(queueKey(org, queue), callKey(org, queue, callId), callId, time.nowMillis())
+        return enqueue(org, queue, callId, null);
+    }
+
+    /** @param doneKey when set, a call dequeued within the tombstone TTL is not re-added (position 0). */
+    private Future<Integer> enqueue(String org, String queue, String callId, String doneKey) {
+        return store.enqueueIfAbsent(queueKey(org, queue), callKey(org, queue, callId), doneKey, callId,
+                time.nowMillis())
                 .map(result -> {
                     if (result.added()) {
                         logEvent(org, queue, callId, "call enqueued", Map.of("position", result.position()));
@@ -91,11 +103,11 @@ public class QueueEngine {
         String qKey = queueKey(org, queue);
         return store.lpos(qKey, callId).compose(index -> {
             if (index == null) {
-                // Unknown call: worker likely restarted. Re-enqueue for recovery
-                // (Laravel stops polling once a call is answered/abandoned/overflowed,
-                // so a poll for an unknown call implies the lost state was a queued call).
-                return enqueue(org, queue, callId)
-                        .compose(position -> waitResult(position));
+                // Unknown call: worker likely restarted, so re-enqueue for recovery. A call
+                // dequeued moments ago (a hold-loop poll racing answered/abandoned) is not
+                // re-added: its tombstone wins and the poll just waits.
+                return enqueue(org, queue, callId, doneKey(org, queue, callId))
+                        .compose(position -> waitResult(Math.max(position, 1)));
             }
 
             int position = index.intValue() + 1;
@@ -105,7 +117,11 @@ public class QueueEngine {
 
             // This call is at the head of the queue.
             return store.hgetall(callKey(org, queue, callId)).compose(call -> {
-                long queuedAt = Long.parseLong(call.getOrDefault("queuedAt", "0"));
+                if (call.isEmpty()) {
+                    // Dequeued between our LPOS and this read: not queued, and not an overflow.
+                    return waitResult(1);
+                }
+                long queuedAt = Long.parseLong(call.get("queuedAt"));
                 if (time.nowMillis() - queuedAt > maxWaitSeconds * 1000) {
                     return dequeue(org, queue, callId).map(v -> {
                         logEvent(org, queue, callId, "call overflowed max wait", Map.of());
@@ -117,7 +133,7 @@ public class QueueEngine {
                     if (available.isEmpty()) {
                         return waitResult(1);
                     }
-                    return selectAgents(org, queue, available, strategy).map(selected -> {
+                    return selectAgents(org, queue, roster, available, strategy).map(selected -> {
                         logEvent(org, queue, callId, "offering to agents", Map.of(
                                 "strategy", strategy,
                                 "agents", selected.stream().map(AgentInfo::extensionNumber).toList().toString()));
@@ -147,9 +163,12 @@ public class QueueEngine {
         return switch (type) {
             case "answered" -> {
                 Future<Void> markBusy = agentUserId != null
+                        // A late 'answered' for a call already ended/abandoned (tombstoned) must not
+                        // mark the agent BUSY with no 'ended' left to release them.
                         ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
                                 Set.of(AgentState.AVAILABLE.name()), null,
-                                Map.of("state", AgentState.BUSY.name()), 0, 0, evtKey, EVENT_DEDUPE_TTL_SECONDS))
+                                Map.of("state", AgentState.BUSY.name()), 0, 0, evtKey, EVENT_DEDUPE_TTL_SECONDS,
+                                doneKey(org, queue, callId)))
                         : Future.succeededFuture();
                 yield markBusy.compose(v -> dequeue(org, queue, callId));
             }
@@ -167,7 +186,7 @@ public class QueueEngine {
                         ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
                                 Set.of(AgentState.BUSY.name()), null,
                                 Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0,
-                                evtKey, EVENT_DEDUPE_TTL_SECONDS))
+                                evtKey, EVENT_DEDUPE_TTL_SECONDS, null))
                         : Future.succeededFuture();
                 // Call stays queued (not dequeued) so the next poll can re-offer it.
                 yield agentUpdate;
@@ -268,7 +287,8 @@ public class QueueEngine {
                         "wrapUpUntil", String.valueOf(time.nowMillis() + wrapUpSeconds * 1000))
                 : Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0");
         return transition(org, queue, callId, "ended", new AgentTransition(agentKey(org, queue, userId),
-                Set.of(AgentState.BUSY.name()), null, updates, talkSeconds, 1, evtKey, EVENT_DEDUPE_TTL_SECONDS));
+                Set.of(AgentState.BUSY.name()), null, updates, talkSeconds, 1, evtKey, EVENT_DEDUPE_TTL_SECONDS,
+                null));
     }
 
     private Future<Void> transition(String org, String queue, String callId, String type, AgentTransition t) {
@@ -297,7 +317,7 @@ public class QueueEngine {
                 if (wrapUpUntil > 0 && now >= wrapUpUntil) {
                     // Flip only the wrap-up we read: a logout (DEL) or a new pause in between wins.
                     return store.transitionAgent(new AgentTransition(key, Set.of(AgentState.WRAP_UP.name()), until,
-                            Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0, null, 0))
+                            Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0, null, 0, null))
                             .compose(outcome -> outcome == TransitionOutcome.APPLIED
                                     ? Future.succeededFuture(new AgentStateWithFields(AgentState.AVAILABLE, fields))
                                     : store.hgetall(key).map(fresh -> new AgentStateWithFields(
@@ -338,16 +358,19 @@ public class QueueEngine {
     private record AgentWithState(AgentInfo agent, AgentState state, Map<String, String> fields) {
     }
 
-    private Future<List<AgentInfo>> selectAgents(String org, String queue, List<AgentInfo> available, String strategy) {
+    private Future<List<AgentInfo>> selectAgents(String org, String queue, List<AgentInfo> roster,
+            List<AgentInfo> available, String strategy) {
         if ("ring_all".equals(strategy)) {
             return Future.succeededFuture(available);
         }
 
         if ("round_robin".equals(strategy)) {
-            return store.incr(rrKey(org, queue)).map(n -> {
-                int index = (int) ((n - 1) % available.size());
-                return List.of(available.get(index));
-            });
+            // Rotate over the stable roster, not the shifting available list, so a busy agent's
+            // turn passes to the next one without skipping anyone.
+            Map<String, AgentInfo> byId = new HashMap<>();
+            available.forEach(a -> byId.put(a.userId(), a));
+            return store.nextRoundRobin(rrKey(org, queue), roster.stream().map(AgentInfo::userId).toList(),
+                    byId.keySet()).map(id -> List.of(byId.get(id)));
         }
 
         if ("least_talk_time".equals(strategy)) {
@@ -370,8 +393,8 @@ public class QueueEngine {
     }
 
     private Future<Void> dequeue(String org, String queue, String callId) {
-        return store.lrem(queueKey(org, queue), callId)
-                .compose(v -> store.del(callKey(org, queue, callId)));
+        return store.dequeue(queueKey(org, queue), callKey(org, queue, callId), doneKey(org, queue, callId), callId,
+                DONE_TTL_SECONDS);
     }
 
     private void logEvent(String org, String queue, String callId, String msg, Map<String, Object> extra) {

@@ -16,14 +16,8 @@ import io.vertx.core.Future;
 public class InMemoryQueueStore implements QueueStore {
     private final Map<String, List<String>> lists = new HashMap<>();
     private final Map<String, Map<String, String>> hashes = new HashMap<>();
-    private final Map<String, Long> counters = new HashMap<>();
+    private final Map<String, String> strings = new HashMap<>();
     private final Set<String> flags = new HashSet<>();
-
-    @Override
-    public synchronized Future<Long> lrem(String key, String value) {
-        List<String> list = lists.get(key);
-        return Future.succeededFuture(list != null && list.remove(value) ? 1L : 0L);
-    }
 
     @Override
     public synchronized Future<List<String>> lrangeAll(String key) {
@@ -52,15 +46,10 @@ public class InMemoryQueueStore implements QueueStore {
         for (String key : keys) {
             lists.remove(key);
             hashes.remove(key);
-            counters.remove(key);
+            strings.remove(key);
             flags.remove(key);
         }
         return Future.succeededFuture();
-    }
-
-    @Override
-    public synchronized Future<Long> incr(String key) {
-        return Future.succeededFuture(counters.merge(key, 1L, Long::sum));
     }
 
     @Override
@@ -69,12 +58,15 @@ public class InMemoryQueueStore implements QueueStore {
     }
 
     @Override
-    public synchronized Future<EnqueueResult> enqueueIfAbsent(String queueKey, String callKey, String callId,
-            long queuedAt) {
+    public synchronized Future<EnqueueResult> enqueueIfAbsent(String queueKey, String callKey, String doneKey,
+            String callId, long queuedAt) {
         List<String> list = lists.computeIfAbsent(queueKey, k -> new ArrayList<>());
         int index = list.indexOf(callId);
         if (index >= 0) {
             return Future.succeededFuture(new EnqueueResult(index + 1, false));
+        }
+        if (doneKey != null && flags.contains(doneKey)) {
+            return Future.succeededFuture(new EnqueueResult(0, false));
         }
         hashes.computeIfAbsent(callKey, k -> new HashMap<>()).put("queuedAt", String.valueOf(queuedAt));
         list.add(callId);
@@ -87,7 +79,8 @@ public class InMemoryQueueStore implements QueueStore {
             return Future.succeededFuture(TransitionOutcome.DUPLICATE);
         }
         Map<String, String> hash = hashes.get(t.agentKey());
-        if (hash == null || !t.allowedFrom().contains(hash.get("state"))
+        if (hash == null || (t.absentKey() != null && flags.contains(t.absentKey()))
+                || !t.allowedFrom().contains(hash.get("state"))
                 || (t.expectWrapUpUntil() != null && !t.expectWrapUpUntil().equals(hash.get("wrapUpUntil")))) {
             return Future.succeededFuture(TransitionOutcome.SKIPPED);
         }
@@ -97,5 +90,31 @@ public class InMemoryQueueStore implements QueueStore {
         hash.merge("callsHandledTotal", String.valueOf(t.incrCalls()),
                 (a, b) -> String.valueOf(Long.parseLong(a) + Long.parseLong(b)));
         return Future.succeededFuture(TransitionOutcome.APPLIED);
+    }
+
+    @Override
+    public synchronized Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId,
+            long doneTtlSeconds) {
+        flags.add(doneKey);
+        List<String> list = lists.get(queueKey);
+        if (list != null) {
+            list.remove(callId);
+        }
+        hashes.remove(callKey);
+        return Future.succeededFuture();
+    }
+
+    @Override
+    public synchronized Future<String> nextRoundRobin(String cursorKey, List<String> rosterIds,
+            Set<String> availableIds) {
+        int start = rosterIds.indexOf(strings.get(cursorKey)) + 1; // 0 when no or unknown cursor
+        for (int k = 0; k < rosterIds.size(); k++) {
+            String id = rosterIds.get((start + k) % rosterIds.size());
+            if (availableIds.contains(id)) {
+                strings.put(cursorKey, id);
+                return Future.succeededFuture(id);
+            }
+        }
+        return Future.succeededFuture(null);
     }
 }
