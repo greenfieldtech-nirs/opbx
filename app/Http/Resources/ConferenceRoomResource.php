@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\ConferenceRoom;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Conference Room API Resource
  *
  * Transforms conference room model data for API responses.
  *
- * @mixin \App\Models\ConferenceRoom
+ * @mixin ConferenceRoom
  */
 class ConferenceRoomResource extends JsonResource
 {
@@ -23,6 +25,9 @@ class ConferenceRoomResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        // PINs are secrets: only roles that can update the room (D12) see them.
+        $canSeePins = Gate::allows('update', $this->resource);
+
         return [
             'id' => $this->id,
             'organization_id' => $this->organization_id,
@@ -32,9 +37,9 @@ class ConferenceRoomResource extends JsonResource
             'status' => $this->status->value,
 
             // Security settings
-            'pin' => $this->pin,
+            'pin' => $this->when($canSeePins, $this->pin),
             'pin_required' => $this->pin_required,
-            'host_pin' => $this->host_pin,
+            'host_pin' => $this->when($canSeePins, $this->host_pin),
 
             // Recording settings
             'recording_enabled' => $this->recording_enabled,
