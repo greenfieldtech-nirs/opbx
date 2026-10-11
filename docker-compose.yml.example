@@ -365,18 +365,14 @@ services:
       - AMD_MODEL_PATH=/app/models/beep_detector.onnx
       - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
       - AMD_MIN_BEEP_START_MS=${AMD_MIN_BEEP_START_MS:-2000}
-      - AMD_LOG_LEVEL=info
+      - AMD_LOG_LEVEL=${AMD_LOG_LEVEL:-info}
       - AMD_DUMP_AUDIO=${AMD_DUMP_AUDIO:-false}
       - AMD_DUMP_AUDIO_PATH=${AMD_DUMP_AUDIO_PATH:-/tmp/amd-dumps}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./amd-worker/models:/app/models:ro
       - ./volumes/amd-dumps:/tmp/amd-dumps
     depends_on:
       - nginx
-      - redis
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -401,7 +397,7 @@ services:
       - ACD_HTTP_PORT=8084
       - ACD_HEALTH_PORT=8085
       - ACD_WORKER_API_TOKEN=${ACD_WORKER_API_TOKEN:?set ACD_WORKER_API_TOKEN}
-      - ACD_LOG_LEVEL=info
+      - ACD_LOG_LEVEL=${ACD_LOG_LEVEL:-info}
       - ACD_REDIS_HOST=redis
       - ACD_REDIS_PORT=6379
       - ACD_REDIS_PASSWORD=${REDIS_PASSWORD}

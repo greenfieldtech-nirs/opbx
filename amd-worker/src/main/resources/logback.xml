@@ -15,7 +15,7 @@
             <timeZone>UTC</timeZone>
         </encoder>
     </appender>
-    <root level="${LOG_LEVEL:-info}">
+    <root level="${AMD_LOG_LEVEL:-info}">
         <appender-ref ref="JSON"/>
     </root>
 </configuration>

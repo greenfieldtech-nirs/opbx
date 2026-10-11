@@ -13,7 +13,6 @@ public class Config {
     public final String redisHost;
     public final int redisPort;
     public final String redisPassword;
-    public final String logLevel;
 
     public Config() {
         this.httpPort = Integer.parseInt(getEnv("ACD_HTTP_PORT", "8084"));
@@ -22,7 +21,6 @@ public class Config {
         this.redisHost = getEnv("ACD_REDIS_HOST", "redis");
         this.redisPort = Integer.parseInt(getEnv("ACD_REDIS_PORT", "6379"));
         this.redisPassword = getEnv("ACD_REDIS_PASSWORD", "");
-        this.logLevel = getEnv("ACD_LOG_LEVEL", "info");
     }
 
     /** Refuse to start with an empty or shipped-default token. */

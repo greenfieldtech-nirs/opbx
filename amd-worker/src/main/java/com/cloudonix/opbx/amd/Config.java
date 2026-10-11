@@ -16,7 +16,6 @@ public class Config {
     public final String modelPath;
     public final int maxConcurrentStreams;
     public final int defaultTimeoutSeconds;
-    public final String logLevel;
     public final List<String> detectors;
     public final boolean dumpAudio;
     public final String dumpAudioPath;
@@ -32,7 +31,6 @@ public class Config {
         this.modelPath = getEnv("AMD_MODEL_PATH", "./models/beep_detector.onnx");
         this.maxConcurrentStreams = Integer.parseInt(getEnv("AMD_MAX_CONCURRENT_STREAMS", "100"));
         this.defaultTimeoutSeconds = Integer.parseInt(getEnv("AMD_DEFAULT_TIMEOUT_SECONDS", "30"));
-        this.logLevel = getEnv("AMD_LOG_LEVEL", "info");
         String detectorsEnv = getEnv("AMD_DETECTORS", "beep_ml,tone_energy");
         this.detectors = Arrays.asList(detectorsEnv.split(","));
         this.dumpAudio = Boolean.parseBoolean(getEnv("AMD_DUMP_AUDIO", "false"));

@@ -14,4 +14,4 @@ COPY --from=builder /build/target/acd-worker-1.0.0.jar ./app.jar
 RUN useradd -r -u 10001 app && chown -R app /app
 USER app
 EXPOSE 8084 8085
-ENTRYPOINT ["java", "-Dorg.slf4j.simpleLogger.showDateTime=true", "-Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

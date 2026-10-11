@@ -8,13 +8,7 @@ import org.slf4j.LoggerFactory;
 public class Main {
 
     public static void main(String[] args) {
-        // Configure slf4j-simple log level from env var BEFORE creating any logger.
-        // slf4j-simple reads org.slf4j.simpleLogger.defaultLogLevel system property.
-        String logLevel = System.getenv("AMD_LOG_LEVEL");
-        if (logLevel != null && !logLevel.isEmpty()) {
-            System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", logLevel);
-        }
-
+        // Log level: AMD_LOG_LEVEL, read by logback.xml.
         Logger logger = LoggerFactory.getLogger(Main.class);
         logger.info("AMD Worker starting version=1.0.0");
         Config config = new Config();
