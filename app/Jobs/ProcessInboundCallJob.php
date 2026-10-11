@@ -19,15 +19,21 @@ class ProcessInboundCallJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 3;
+
+    public int $timeout = 30;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     /**
      * Create a new job instance.
      *
-     * @param array<string, mixed> $webhookData
+     * @param  array<string, mixed>  $webhookData
      */
     public function __construct(
         public array $webhookData
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
@@ -44,7 +50,7 @@ class ProcessInboundCallJob implements ShouldQueue
             'to' => $toNumber,
         ]);
 
-        if (!$callId || !$fromNumber || !$toNumber) {
+        if (! $callId || ! $fromNumber || ! $toNumber) {
             Log::error('Invalid inbound call webhook data', [
                 'webhook_data' => $this->webhookData,
             ]);
@@ -57,7 +63,7 @@ class ProcessInboundCallJob implements ShouldQueue
             ->where('status', 'active')
             ->first();
 
-        if (!$didNumber) {
+        if (! $didNumber) {
             Log::warning('DID not found for inbound call', [
                 'call_id' => $callId,
                 'to_number' => $toNumber,

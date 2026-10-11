@@ -101,8 +101,7 @@ class ListManagementService
 
         if ($isLargeFile) {
             // Dispatch large file job
-            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping)
-                ->onQueue('auto-dialer');
+            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping);
 
             Log::info('ListManagementService: Dispatched large file processing', [
                 'list_id' => $listId,
@@ -111,8 +110,7 @@ class ListManagementService
             ]);
         } else {
             // Dispatch regular upload job
-            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId, false, $mapping)
-                ->onQueue('auto-dialer');
+            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId, false, $mapping);
 
             Log::info('ListManagementService: Dispatched upload processing', [
                 'list_id' => $listId,

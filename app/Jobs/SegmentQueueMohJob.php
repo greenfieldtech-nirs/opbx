@@ -20,10 +20,17 @@ class SegmentQueueMohJob implements ShouldQueue
 {
     use Queueable;
 
+    public int $tries = 3;
+
+    public int $timeout = 360;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     public function __construct(
         private readonly int $recordingId
     ) {
-        $this->onQueue('default');
+        $this->onConnection('auto-dialer')->onQueue('auto-dialer-long');
     }
 
     public function handle(MohSegmentationService $segmentation): void

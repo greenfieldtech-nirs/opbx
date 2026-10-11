@@ -15,6 +15,11 @@ class ProcessRecordingUpload implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 90;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     /**
      * The number of times the job may be attempted.
      */
@@ -46,12 +51,13 @@ class ProcessRecordingUpload implements ShouldQueue
         // Temporarily disable organization scope for job processing
         $recording = Recording::withoutGlobalScopes()->find($this->recordingId);
 
-        if (!$recording) {
+        if (! $recording) {
             Log::warning('ProcessRecordingUpload: Recording not found', [
                 'recording_id' => $this->recordingId,
                 'total_recordings' => Recording::withoutGlobalScopes()->count(),
                 'latest_recording_id' => Recording::withoutGlobalScopes()->max('id'),
             ]);
+
             return;
         }
 
@@ -60,11 +66,12 @@ class ProcessRecordingUpload implements ShouldQueue
             'name' => $recording->name,
         ]);
 
-        if (!$recording->isUploaded()) {
+        if (! $recording->isUploaded()) {
             Log::warning('ProcessRecordingUpload: Recording is not an upload', [
                 'recording_id' => $this->recordingId,
                 'type' => $recording->type,
             ]);
+
             return;
         }
 
@@ -77,11 +84,12 @@ class ProcessRecordingUpload implements ShouldQueue
             // Get the file from MinIO storage
             $storagePath = "{$recording->organization_id}/{$recording->file_path}";
 
-            if (!Storage::disk('recordings')->exists($storagePath)) {
+            if (! Storage::disk('recordings')->exists($storagePath)) {
                 Log::error('ProcessRecordingUpload: File not found in MinIO storage', [
                     'recording_id' => $this->recordingId,
                     'storage_path' => $storagePath,
                 ]);
+
                 return;
             }
 
@@ -95,15 +103,15 @@ class ProcessRecordingUpload implements ShouldQueue
                 // Since FFMPEG is not available, we'll use basic file operations
                 $fileSize = strlen($fileContent);
 
-            // Update file size if it wasn't captured during upload
-            if ($recording->file_size !== $fileSize) {
-                $recording->update(['file_size' => $fileSize]);
-                Log::info('ProcessRecordingUpload: Updated file size', [
-                    'recording_id' => $this->recordingId,
-                    'old_size' => $recording->file_size,
-                    'new_size' => $fileSize,
-                ]);
-            }
+                // Update file size if it wasn't captured during upload
+                if ($recording->file_size !== $fileSize) {
+                    $recording->update(['file_size' => $fileSize]);
+                    Log::info('ProcessRecordingUpload: Updated file size', [
+                        'recording_id' => $this->recordingId,
+                        'old_size' => $recording->file_size,
+                        'new_size' => $fileSize,
+                    ]);
+                }
 
                 // For WAV files, try to extract duration from header
                 if ($recording->mime_type === 'audio/wav') {
@@ -146,7 +154,7 @@ class ProcessRecordingUpload implements ShouldQueue
     {
         try {
             $handle = fopen($filePath, 'rb');
-            if (!$handle) {
+            if (! $handle) {
                 return 0;
             }
 
@@ -154,6 +162,7 @@ class ProcessRecordingUpload implements ShouldQueue
             $header = fread($handle, 44);
             if (strlen($header) < 24) {
                 fclose($handle);
+
                 return 0;
             }
 

@@ -154,6 +154,45 @@ services:
       - opbx
     restart: unless-stopped
 
+  queue-worker-long:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: opbx_queue_worker_long
+    labels:
+      - "logging.opbx/collect=true"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    command: ["php", "artisan", "queue:work", "auto-dialer", "--queue=auto-dialer-long", "--sleep=3", "--tries=3", "--timeout=7200"]
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      # Structured JSON logs to stdout for the optional log stack (alloy/loki).
+      - LOG_STACK=${OPBX_LOG_STACK:-single,json}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-opbx}
+      - DB_USERNAME=${DB_USERNAME:-opbx}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - RUN_MIGRATIONS=false
+      # Auto Dialer Worker authentication
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
+    depends_on:
+      - app
+      - redis
+    networks:
+      - opbx
+    restart: unless-stopped
+
   scheduler:
     build:
       context: .

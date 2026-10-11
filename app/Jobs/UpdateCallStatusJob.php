@@ -20,15 +20,21 @@ class UpdateCallStatusJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 3;
+
+    public int $timeout = 30;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     /**
      * Create a new job instance.
      *
-     * @param array<string, mixed> $webhookData
+     * @param  array<string, mixed>  $webhookData
      */
     public function __construct(
         public array $webhookData
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the job.
@@ -43,7 +49,7 @@ class UpdateCallStatusJob implements ShouldQueue
             'status' => $status,
         ]);
 
-        if (!$callId || !$status) {
+        if (! $callId || ! $status) {
             Log::error('Invalid call status webhook data', [
                 'webhook_data' => $this->webhookData,
             ]);
@@ -53,7 +59,7 @@ class UpdateCallStatusJob implements ShouldQueue
 
         $callLog = CallLog::where('call_id', $callId)->first();
 
-        if (!$callLog) {
+        if (! $callLog) {
             Log::warning('Call log not found for status update', [
                 'call_id' => $callId,
             ]);
@@ -63,7 +69,7 @@ class UpdateCallStatusJob implements ShouldQueue
 
         $newStatus = $this->mapStatus($status);
 
-        if (!$newStatus) {
+        if (! $newStatus) {
             Log::warning('Unknown call status', [
                 'call_id' => $callId,
                 'status' => $status,
@@ -75,11 +81,11 @@ class UpdateCallStatusJob implements ShouldQueue
         // Prepare additional data
         $additionalData = [];
 
-        if ($newStatus === CallStatus::ANSWERED && !$callLog->answered_at) {
+        if ($newStatus === CallStatus::ANSWERED && ! $callLog->answered_at) {
             $additionalData['answered_at'] = now();
         }
 
-        if ($newStatus->isTerminal() && !$callLog->ended_at) {
+        if ($newStatus->isTerminal() && ! $callLog->ended_at) {
             $additionalData['ended_at'] = now();
 
             if ($callLog->answered_at) {

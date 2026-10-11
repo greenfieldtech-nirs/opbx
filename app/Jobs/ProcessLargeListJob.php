@@ -38,7 +38,9 @@ class ProcessLargeListJob implements ShouldQueue
         public string $jobId,
         public int $totalRows,
         public array $mapping = [],
-    ) {}
+    ) {
+        $this->onConnection('auto-dialer')->onQueue('auto-dialer-long');
+    }
 
     /**
      * Execute the job.
@@ -116,8 +118,7 @@ class ProcessLargeListJob implements ShouldQueue
 
                 // Dispatch job for this chunk
                 $chunkJobId = "{$this->jobId}_chunk_{$chunkNumber}";
-                ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, $this->mapping)
-                    ->onQueue('auto-dialer');
+                ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, $this->mapping);
 
                 Log::info('ProcessLargeListJob: Dispatched chunk', [
                     'source_list_id' => $this->sourceListId,

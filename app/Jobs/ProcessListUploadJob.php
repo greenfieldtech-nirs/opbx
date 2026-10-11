@@ -47,7 +47,9 @@ class ProcessListUploadJob implements ShouldQueue
         public string $jobId,
         public bool $isNewVersion = false,
         public array $mapping = [],
-    ) {}
+    ) {
+        $this->onConnection('auto-dialer')->onQueue('auto-dialer-long');
+    }
 
     /**
      * Execute the job.

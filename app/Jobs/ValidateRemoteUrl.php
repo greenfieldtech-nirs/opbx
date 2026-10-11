@@ -14,6 +14,11 @@ class ValidateRemoteUrl implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 60;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     /**
      * The number of times the job may be attempted.
      */
@@ -40,18 +45,20 @@ class ValidateRemoteUrl implements ShouldQueue
     {
         $recording = Recording::find($this->recordingId);
 
-        if (!$recording) {
+        if (! $recording) {
             Log::warning('ValidateRemoteUrl: Recording not found', [
                 'recording_id' => $this->recordingId,
             ]);
+
             return;
         }
 
-        if (!$recording->isRemote()) {
+        if (! $recording->isRemote()) {
             Log::warning('ValidateRemoteUrl: Recording is not a remote URL', [
                 'recording_id' => $this->recordingId,
                 'type' => $recording->type,
             ]);
+
             return;
         }
 
@@ -67,15 +74,15 @@ class ValidateRemoteUrl implements ShouldQueue
             // Update recording with additional information if available
             $updates = [];
 
-            if (isset($urlInfo['size']) && !$recording->file_size) {
+            if (isset($urlInfo['size']) && ! $recording->file_size) {
                 $updates['file_size'] = $urlInfo['size'];
             }
 
-            if (isset($urlInfo['mime_type']) && !$recording->mime_type) {
+            if (isset($urlInfo['mime_type']) && ! $recording->mime_type) {
                 $updates['mime_type'] = $urlInfo['mime_type'];
             }
 
-            if (!empty($updates)) {
+            if (! empty($updates)) {
                 $recording->update($updates);
                 Log::info('ValidateRemoteUrl: Updated recording with URL info', [
                     'recording_id' => $this->recordingId,

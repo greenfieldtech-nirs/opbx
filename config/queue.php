@@ -68,7 +68,7 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 120),
             'block_for' => null,
             'after_commit' => false,
         ],
@@ -94,15 +94,18 @@ return [
         | Auto Dialer Queue
         |--------------------------------------------------------------------------
         |
-        | Dedicated queue connection for auto-dialer campaigns to ensure
-        | calls are processed with proper rate limiting and isolation.
+        | Dedicated queue connection for long-running work (list imports, MOH
+        | segmentation; jobs use the `auto-dialer-long` queue on it). Its
+        | retry_after must exceed the longest job $timeout (7200s) or a running
+        | job is handed to a second worker. Served by `queue-worker-long`.
         |
         */
         'auto-dialer' => [
-            'driver' => env('AUTO_DIALER_QUEUE_DRIVER', 'redis'),
+            // Follows a sync default connection (tests) so explicit onConnection('auto-dialer') jobs still run inline.
+            'driver' => env('AUTO_DIALER_QUEUE_DRIVER', env('QUEUE_CONNECTION') === 'sync' ? 'sync' : 'redis'),
             'connection' => env('AUTO_DIALER_QUEUE_CONNECTION', 'default'),
             'queue' => env('AUTO_DIALER_QUEUE', 'auto-dialer'),
-            'retry_after' => (int) env('AUTO_DIALER_QUEUE_RETRY_AFTER', 3600),
+            'retry_after' => (int) env('AUTO_DIALER_QUEUE_RETRY_AFTER', 7500),
             'block_for' => null,
             'after_commit' => false,
         ],

@@ -26,7 +26,7 @@ class ProcessAutoDialerCampaignJob implements ShouldQueue
     /**
      * The number of seconds the job can run before timing out.
      */
-    public int $timeout = 300; // 5 minutes
+    public int $timeout = 100; // must stay below the default connection's retry_after (120)
 
     /**
      * Create a new job instance.
