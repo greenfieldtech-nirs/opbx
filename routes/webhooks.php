@@ -78,6 +78,10 @@ Route::prefix('voice')->middleware(['log.callflow', 'log.voice'])->group(functio
     // AMD action handler — receives detection results from AMD worker
     Route::post('/amd-action', [AmdActionController::class, 'handle'])
         ->name('voice.amd-action');
+
+    // AMD stream admission — worker checks the stream's session token on start
+    Route::post('/amd-session', [AmdActionController::class, 'session'])
+        ->name('voice.amd-session');
 });
 
 // Action-related callbacks
