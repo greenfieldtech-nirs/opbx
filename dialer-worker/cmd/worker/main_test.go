@@ -68,7 +68,6 @@ func testWorker(exec callExecutor) *Worker {
 		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		executor: exec,
 		limiter:  noPacer{},
-		shutdown: make(chan struct{}),
 	}
 }
 
@@ -100,15 +99,54 @@ func TestBatchContinuesAfterOrdinaryError(t *testing.T) {
 
 func TestBackoffIsInterruptedByShutdown(t *testing.T) {
 	w := testWorker(&fakeExec{errs: []error{&apierrors.RetryableError{Err: apierrors.ErrRateLimitExceeded, RetryAfter: time.Hour}}})
-	close(w.shutdown)
+	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
-		w.dialBatch(context.Background(), w.logger, &models.Campaign{ID: 1}, make([]models.Destination, 2))
+		w.dialBatch(ctx, w.logger, &models.Campaign{ID: 1}, make([]models.Destination, 2))
 		close(done)
 	}()
+	cancel()
 	select {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("shutdown did not interrupt the backoff")
+	}
+}
+
+// blockingExec blocks inside ExecuteCall until released and records whether its ctx was cancelled.
+type blockingExec struct {
+	started, release chan struct{}
+	ctxErr           error
+}
+
+func (b *blockingExec) ExecuteCall(ctx context.Context, _ *models.Campaign, _ *models.Destination) error {
+	close(b.started)
+	<-b.release
+	b.ctxErr = ctx.Err()
+	return nil
+}
+
+func TestSigtermDuringInitiateWaitsForItToFinish(t *testing.T) {
+	exec := &blockingExec{started: make(chan struct{}), release: make(chan struct{})}
+	w := testWorker(exec)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		w.dialBatch(ctx, w.logger, &models.Campaign{ID: 1}, make([]models.Destination, 3))
+	}()
+	<-exec.started
+	cancel() // SIGTERM while the initiate is in flight
+
+	if w.drain(50 * time.Millisecond) {
+		t.Fatal("drain returned while an initiate was still in flight")
+	}
+	close(exec.release)
+	if !w.drain(time.Second) {
+		t.Fatal("drain did not complete after the initiate finished")
+	}
+	if exec.ctxErr != nil {
+		t.Fatalf("the in-flight initiate was cancelled: %v", exec.ctxErr)
 	}
 }

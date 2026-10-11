@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"opbx/dialer-worker/internal/redis"
 	"opbx/dialer-worker/internal/webhook"
 	apierrors "opbx/dialer-worker/pkg/errors"
-	"sync"
 )
 
 // campaignAPI is the Laravel surface the poll loop needs (satisfied by *api.Client).
@@ -41,41 +41,34 @@ type pacer interface {
 	WaitTime(campaignID int64) time.Duration
 }
 
+// drainTimeout bounds how long shutdown waits for in-flight initiates (the API
+// client times out at 30s, so this lets an initiate finish).
+const drainTimeout = 45 * time.Second
+
 // Worker is the main dialer worker
 type Worker struct {
-	config      *config.Config
-	apiClient   campaignAPI
-	redisClient *redis.Client
-	limiter     pacer
-	executor    callExecutor
-	logger      *slog.Logger
+	config    *config.Config
+	apiClient campaignAPI
+	limiter   pacer
+	executor  callExecutor
+	logger    *slog.Logger
 
-	// State
-	processingCampaigns sync.Map // tracks campaign IDs currently being processed
-	shutdown            chan struct{}
-
-	// Concurrency control
-	campaignSem chan struct{} // semaphore to limit concurrent campaigns
-
-	// Webhook server
-	webhookServer *http.Server
-	wg            sync.WaitGroup
+	processingCampaigns sync.Map      // campaign IDs currently being processed
+	campaignSem         chan struct{} // limits concurrent campaigns
+	wg                  sync.WaitGroup
 }
 
 func main() {
-	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	// Setup logger: flat JSON contract shared with the rest of the stack
+	// Flat JSON contract shared with the rest of the stack
 	// (see .my_agent/specifications/log-aggregation.md).
 	logger := newLogger(os.Stdout)
-
 	logger.Info("starting dialer worker", "worker_id", cfg.WorkerID)
 
-	// Create Redis client
 	redisClient, err := redis.NewClient(cfg)
 	if err != nil {
 		logger.Error("failed to connect to Redis", "error", err)
@@ -83,67 +76,84 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	// Create API client
 	apiClient := api.NewClient(cfg, logger)
-
-	// Create rate limiter
 	racLimiter := limiter.NewCACRateLimiter(redisClient)
-
-	// Create executor
 	exec := executor.NewExecutor(apiClient, redisClient, racLimiter, cfg.WorkerID, logger)
 
-	// Create worker
 	worker := &Worker{
 		config:      cfg,
 		apiClient:   apiClient,
-		redisClient: redisClient,
 		limiter:     racLimiter,
 		executor:    exec,
 		logger:      logger,
-		shutdown:    make(chan struct{}),
 		campaignSem: make(chan struct{}, 10), // Max 10 concurrent campaigns
 	}
 
-	// Start webhook server
-	go worker.startWebhookServer()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	// Start main loop
-	go worker.run()
+	srv := newHealthServer(cfg.WebhookPort)
+	worker.wg.Add(1)
+	go func() {
+		defer worker.wg.Done()
+		logger.Info("starting health server", "port", cfg.WebhookPort)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("health server error", "error", err)
+		}
+	}()
 
-	// Wait for shutdown signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	worker.wg.Add(1)
+	go func() {
+		defer worker.wg.Done()
+		worker.run(ctx)
+	}()
 
-	<-sigChan
-	logger.Info("shutdown signal received, stopping worker...")
-	close(worker.shutdown)
+	<-ctx.Done()
+	logger.Info("shutdown signal received, draining in-flight calls...")
 
-	// Graceful shutdown
-	worker.shutdownServer()
+	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := srv.Shutdown(shutCtx); err != nil {
+		logger.Error("health server shutdown error", "error", err)
+	}
+	cancel()
+
+	if !worker.drain(drainTimeout) {
+		logger.Warn("drain timeout reached, exiting with calls still in flight")
+	}
 	logger.Info("worker stopped")
 }
 
-// run is the main worker loop
-func (w *Worker) run() {
+// drain waits for every tracked goroutine; it reports false on timeout.
+func (w *Worker) drain(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() { w.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// run is the main worker loop; it returns when ctx is cancelled.
+func (w *Worker) run(ctx context.Context) {
 	ticker := time.NewTicker(w.config.PollInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-w.shutdown:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			w.processCampaigns()
+			w.processCampaigns(ctx)
 		}
 	}
 }
 
-// processCampaigns fetches and processes active campaigns
-func (w *Worker) processCampaigns() {
+// processCampaigns fetches active campaigns and starts a tracked goroutine for each.
+func (w *Worker) processCampaigns(ctx context.Context) {
 	w.logger.Info("polling for campaigns")
-	ctx := context.Background()
 
-	// Get active campaigns from Laravel
 	campaigns, err := w.apiClient.GetActiveCampaigns(ctx)
 	if err != nil {
 		w.logger.Error("failed to get active campaigns", "error", err)
@@ -156,20 +166,24 @@ func (w *Worker) processCampaigns() {
 		campaign := &campaigns[i]
 		w.logger.Info("processing campaign", "id", campaign.ID, "name", campaign.Name, "status", campaign.Status, "cac", campaign.CAC, "cps", campaign.CPS)
 
-		// Register with rate limiter
 		w.limiter.RegisterCampaign(campaign.ID, campaign.CAC, campaign.CPS)
 
-		// Skip if this campaign is already being processed by a previous cycle's goroutine
+		// Skip if a previous cycle is still processing this campaign
 		if _, alreadyProcessing := w.processingCampaigns.LoadOrStore(campaign.ID, true); alreadyProcessing {
 			w.logger.Info("campaign already being processed, skipping", "id", campaign.ID)
 			continue
 		}
 
-		// Process the campaign in a goroutine with semaphore, clearing the flag when done
+		w.wg.Add(1)
 		go func(c *models.Campaign) {
-			w.campaignSem <- struct{}{}        // Acquire semaphore
-			defer func() { <-w.campaignSem }() // Release semaphore
+			defer w.wg.Done()
 			defer w.processingCampaigns.Delete(c.ID)
+			select {
+			case w.campaignSem <- struct{}{}:
+				defer func() { <-w.campaignSem }()
+			case <-ctx.Done():
+				return
+			}
 			w.processCampaign(ctx, c)
 		}(campaign)
 	}
@@ -224,29 +238,28 @@ func (w *Worker) processCampaign(ctx context.Context, campaign *models.Campaign)
 	w.dialBatch(ctx, logger, campaign, destinations)
 }
 
-// dialBatch dials the destinations in order, paced by CPS. A 429 from Laravel
+// dialBatch dials the destinations in order, paced by CPS. Once started, an initiate
+// is not cancelled by shutdown (ctx only stops the batch between destinations). A 429 from Laravel
 // backs off for Retry-After and aborts the rest of the batch.
 func (w *Worker) dialBatch(ctx context.Context, logger *slog.Logger, campaign *models.Campaign, destinations []models.Destination) {
 	for i := range destinations {
 		dest := &destinations[i]
-		select {
-		case <-w.shutdown:
+		if ctx.Err() != nil {
 			return
-		default:
 		}
 
 		if waitTime := w.limiter.WaitTime(campaign.ID); waitTime > 0 {
 			logger.Debug("rate limiting", "wait", waitTime)
-			if !w.sleep(waitTime) {
+			if !sleep(ctx, waitTime) {
 				return
 			}
 		}
 
-		if err := w.executor.ExecuteCall(ctx, campaign, dest); err != nil {
+		if err := w.executor.ExecuteCall(context.WithoutCancel(ctx), campaign, dest); err != nil {
 			var rl *apierrors.RetryableError
 			if errors.As(err, &rl) {
 				logger.Warn("rate limited by Laravel, backing off and aborting batch", "retry_after", rl.RetryAfter)
-				w.sleep(rl.RetryAfter)
+				sleep(ctx, rl.RetryAfter)
 				return
 			}
 			logger.Error("failed to execute call", "destination_id", dest.ID, "error", err)
@@ -254,54 +267,30 @@ func (w *Worker) dialBatch(ctx context.Context, logger *slog.Logger, campaign *m
 	}
 }
 
-// sleep waits for d or until shutdown; it reports whether the full wait elapsed.
-func (w *Worker) sleep(d time.Duration) bool {
+// sleep waits for d or until ctx is cancelled; it reports whether the full wait elapsed.
+func sleep(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
-	case <-w.shutdown:
+	case <-ctx.Done():
 		return false
 	case <-t.C:
 		return true
 	}
 }
 
-// startWebhookServer starts the webhook HTTP server
-func (w *Worker) startWebhookServer() {
+// newHealthServer builds the HTTP server that serves only the health route.
+func newHealthServer(port string) *http.Server {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-
 	webhook.RegisterRoutes(router)
 
-	w.webhookServer = &http.Server{
-		Addr:              ":" + w.config.WebhookPort,
+	return &http.Server{
+		Addr:              ":" + port,
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 	}
-
-	w.logger.Info("starting webhook server", "port", w.config.WebhookPort)
-
-	w.wg.Add(1)
-	go func() {
-		defer w.wg.Done()
-		if err := w.webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			w.logger.Error("webhook server error", "error", err)
-		}
-	}()
-}
-
-// shutdownServer gracefully shuts down the webhook server
-func (w *Worker) shutdownServer() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if w.webhookServer != nil {
-		if err := w.webhookServer.Shutdown(ctx); err != nil {
-			w.logger.Error("webhook server shutdown error", "error", err)
-		}
-	}
-	w.wg.Wait()
 }
 
 // newLogger builds the contract-conformant JSON logger: ts/level(lowercase)/
