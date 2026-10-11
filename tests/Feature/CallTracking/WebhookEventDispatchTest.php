@@ -5,20 +5,33 @@ declare(strict_types=1);
 namespace Tests\Feature\CallTracking;
 
 use App\Jobs\DispatchCallTrackingWebhookJob;
-use App\Jobs\ProcessCDRJob;
 use App\Models\CallTrackingCampaign;
 use App\Models\CallTrackingNotificationSettings;
 use App\Models\CallTrackingNumber;
+use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class WebhookEventDispatchTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** @param array<string, mixed> $payload */
+    private function postCdr(Organization $organization, array $payload): void
+    {
+        CloudonixSettings::factory()->create([
+            'organization_id' => $organization->id,
+            'domain_name' => 'tracking.cloudonix.net',
+            'domain_requests_api_key' => 'tracking-requests-api-key-1234567890',
+        ]);
+
+        $this->postJson('/api/webhooks/cloudonix/cdr', ['domain' => 'tracking.cloudonix.net'] + $payload, [
+            'Authorization' => 'Bearer tracking-requests-api-key-1234567890',
+        ])->assertOk();
+    }
 
     public function test_cdr_dispatch_webhook_job_for_converted_event(): void
     {
@@ -66,7 +79,6 @@ class WebhookEventDispatchTest extends TestCase
             'disposition' => 'CONNECTED',
             'duration' => 90,
             'billsec' => 90,
-            '_organization_id' => $organization->id,
             'timestamp' => now()->timestamp,
             'session' => [
                 'id' => 12345,
@@ -76,7 +88,7 @@ class WebhookEventDispatchTest extends TestCase
             ],
         ];
 
-        Bus::dispatchNow(new ProcessCDRJob($payload));
+        $this->postCdr($organization, $payload);
 
         Queue::assertPushed(DispatchCallTrackingWebhookJob::class, function (DispatchCallTrackingWebhookJob $job) {
             return $job->eventType === 'call.converted';

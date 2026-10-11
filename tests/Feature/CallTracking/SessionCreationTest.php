@@ -4,20 +4,33 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CallTracking;
 
-use App\Jobs\ProcessCDRJob;
 use App\Models\CallTrackingCampaign;
 use App\Models\CallTrackingNumber;
 use App\Models\CallTrackingSession;
+use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Organization;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class SessionCreationTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** @param array<string, mixed> $payload */
+    private function postCdr(Organization $organization, array $payload): void
+    {
+        CloudonixSettings::factory()->create([
+            'organization_id' => $organization->id,
+            'domain_name' => 'tracking.cloudonix.net',
+            'domain_requests_api_key' => 'tracking-requests-api-key-1234567890',
+        ]);
+
+        $this->postJson('/api/webhooks/cloudonix/cdr', ['domain' => 'tracking.cloudonix.net'] + $payload, [
+            'Authorization' => 'Bearer tracking-requests-api-key-1234567890',
+        ])->assertOk();
+    }
 
     public function test_cdr_creates_converted_session_for_call_tracking_did(): void
     {
@@ -51,7 +64,6 @@ class SessionCreationTest extends TestCase
             'disposition' => 'CONNECTED',
             'duration' => 90,
             'billsec' => 90,
-            '_organization_id' => $organization->id,
             'timestamp' => now()->timestamp,
             'session' => [
                 'id' => 12345,
@@ -61,7 +73,7 @@ class SessionCreationTest extends TestCase
             ],
         ];
 
-        Bus::dispatchSync(new ProcessCDRJob($payload));
+        $this->postCdr($organization, $payload);
 
         $session = CallTrackingSession::withoutGlobalScope(OrganizationScope::class)->first();
         $this->assertNotNull($session);
@@ -103,7 +115,6 @@ class SessionCreationTest extends TestCase
             'disposition' => 'CONNECTED',
             'duration' => 30,
             'billsec' => 30,
-            '_organization_id' => $organization->id,
             'timestamp' => now()->timestamp,
             'session' => [
                 'id' => 67890,
@@ -113,7 +124,7 @@ class SessionCreationTest extends TestCase
             ],
         ];
 
-        Bus::dispatchSync(new ProcessCDRJob($payload));
+        $this->postCdr($organization, $payload);
 
         $session = CallTrackingSession::withoutGlobalScope(OrganizationScope::class)->first();
         $this->assertNotNull($session);
@@ -132,14 +143,13 @@ class SessionCreationTest extends TestCase
             'disposition' => 'CONNECTED',
             'duration' => 90,
             'billsec' => 90,
-            '_organization_id' => $organization->id,
             'timestamp' => now()->timestamp,
             'session' => [
                 'id' => 11111,
             ],
         ];
 
-        Bus::dispatchSync(new ProcessCDRJob($payload));
+        $this->postCdr($organization, $payload);
 
         $this->assertNull(CallTrackingSession::withoutGlobalScope(OrganizationScope::class)->first());
     }

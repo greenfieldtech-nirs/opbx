@@ -29,6 +29,9 @@ use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
 use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\CallTracking\CallTrackingAdPlatformDispatcher;
+use App\Services\CallTracking\CallTrackingEventDispatcher;
+use App\Services\CallTracking\CallTrackingSessionService;
 use App\Services\PhoneNumberService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -416,6 +419,8 @@ class CloudonixWebhookController extends Controller
                 'billsec' => $cdr->billsec,
             ]);
 
+            $this->trackCallFromCdr($cdr, $organizationId);
+
             // Also update CallLog if it exists (for backwards compatibility)
             $callLog = CallLog::where('call_id', $callId)->first();
             if ($callLog) {
@@ -604,6 +609,31 @@ class CloudonixWebhookController extends Controller
         ]);
 
         return response()->json(['message' => 'Recording status processed'], 200);
+    }
+
+    /**
+     * Create the call-tracking session (and fire its events) when the CDR's number is a tracking number.
+     * Never fails the CDR webhook: the CDR is already stored.
+     */
+    private function trackCallFromCdr(CallDetailRecord $cdr, int $organizationId): void
+    {
+        try {
+            $session = app(CallTrackingSessionService::class)->createFromCDR($cdr, $organizationId);
+
+            if ($session) {
+                app(CallTrackingEventDispatcher::class)->dispatch($session);
+
+                if ($session->is_converted) {
+                    app(CallTrackingAdPlatformDispatcher::class)->dispatch($session);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Call tracking processing failed for CDR', [
+                'call_id' => $cdr->call_id,
+                'organization_id' => $organizationId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
