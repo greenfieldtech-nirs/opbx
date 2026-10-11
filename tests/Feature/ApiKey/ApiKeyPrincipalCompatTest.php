@@ -38,6 +38,7 @@ class ApiKeyPrincipalCompatTest extends TestCase
 
         $response = $this->withToken($token)->postJson('/api/v1/ivr-menus', [
             'name' => 'Key-created IVR',
+            'tts_text' => 'Hello',
             'max_timeout' => 5,
             'inter_digit_timeout' => 3,
             'max_turns' => 2,

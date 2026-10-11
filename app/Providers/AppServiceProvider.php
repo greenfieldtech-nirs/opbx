@@ -24,6 +24,7 @@ use App\Models\CloudonixSettings;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\InboundBlacklist;
+use App\Models\IvrMenu;
 use App\Models\Organization;
 use App\Models\OrganizationJoinRequest;
 use App\Models\PersonalAccessToken;
@@ -45,6 +46,7 @@ use App\Policies\ConferenceRoomPolicy;
 use App\Policies\DistributionListPolicy;
 use App\Policies\ExtensionPolicy;
 use App\Policies\InboundBlacklistPolicy;
+use App\Policies\IvrMenuPolicy;
 use App\Policies\OrganizationJoinRequestPolicy;
 use App\Policies\RecordingPolicy;
 use App\Policies\UserPolicy;
@@ -295,6 +297,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(AutoDialerCampaign::class, AutoDialerCampaignPolicy::class);
         Gate::policy(AutoDialerList::class, DistributionListPolicy::class);
         Gate::policy(ApiKey::class, ApiKeyPolicy::class);
+        Gate::policy(IvrMenu::class, IvrMenuPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes

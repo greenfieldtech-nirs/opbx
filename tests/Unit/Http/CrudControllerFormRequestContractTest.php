@@ -17,11 +17,9 @@ class CrudControllerFormRequestContractTest extends TestCase
     /**
      * Controllers that legitimately lack hooks.
      * CallDetailRecordController has GET-only routes.
-     * TODO(Task 0.3): IvrMenuController overrides store()/update() itself; remove once it uses FormRequests.
      */
     private const ALLOWLIST = [
         'CallDetailRecordController',
-        'IvrMenuController',
     ];
 
     public function test_every_crud_controller_declares_store_and_update_form_requests(): void
