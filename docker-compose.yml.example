@@ -526,7 +526,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:11.6.0
+    image: grafana/grafana:12.4.12
     container_name: opbx_grafana
     profiles: ["logs"]
     volumes:
