@@ -259,7 +259,11 @@ class AppServiceProvider extends ServiceProvider
             // Also validate other critical security settings
             $this->validateSecurityConfiguration();
 
-            $this->assertNoDefaultSecrets();
+            // Not in console: `composer dump-autoload` runs package:discover during the image
+            // build with no .env. Containers are covered by validate-env.sh at entrypoint.
+            if (! $this->app->runningInConsole()) {
+                $this->assertNoDefaultSecrets();
+            }
         }
 
         // API keys are authorized solely by their per-resource permissions
