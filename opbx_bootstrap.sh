@@ -158,6 +158,12 @@ else
     print_success "APP_KEY is already set"
 fi
 
+# Worker tokens, Soketi secret and dialer webhook secret: validate-env.sh
+# refuses to start the app with the shipped placeholders.
+print_info "Ensuring shared service secrets are set..."
+bash docker/scripts/generate-secrets.sh .env
+print_info "Grafana (/logs/) login: admin / the GRAFANA_ADMIN_PASSWORD value in .env"
+
 print_header "Step 3: Configuration Files"
 
 # Check/Create config/broadcasting.php

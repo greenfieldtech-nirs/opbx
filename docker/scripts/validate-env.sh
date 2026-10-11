@@ -52,6 +52,12 @@ fi
 REQUIRED_VARS=(
     "DB_PASSWORD"
     "APP_KEY"
+    "GRAFANA_ADMIN_PASSWORD"
+    "PUSHER_APP_SECRET"
+    "DIALER_WORKER_API_TOKEN"
+    "AMD_WORKER_API_TOKEN"
+    "ACD_WORKER_API_TOKEN"
+    "DIALER_WEBHOOK_SECRET"
 )
 
 # Track validation status
@@ -63,7 +69,7 @@ check_placeholder() {
     local var_value="${!var_name:-}"
 
     # Check for common placeholder values
-    local placeholders=("CHANGE_ME" "GENERATE_32_CHAR" "64_CHAR_SECRET" "default123" "password" "secret")
+    local placeholders=("CHANGE_ME" "GENERATE_32_CHAR" "64_CHAR_SECRET" "default123" "password" "secret" "change-in-production" "pbxappsecret")
 
     for placeholder in "${placeholders[@]}"; do
         if [[ "$var_value" == *"$placeholder"* ]]; then
@@ -73,6 +79,13 @@ check_placeholder() {
             return 1
         fi
     done
+
+    # Exact-match defaults (too short to substring-match safely)
+    if [[ "$var_value" == "admin" ]]; then
+        echo -e "${RED}✗ CRITICAL: ${var_name} is set to the default value 'admin'${NC}"
+        VALIDATION_FAILED=1
+        return 1
+    fi
 
     # Check for empty values
     if [[ -z "$var_value" ]]; then
