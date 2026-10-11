@@ -3,7 +3,6 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -14,7 +13,6 @@ import (
 type KeyPrefix string
 
 const (
-	PrefixCallState     KeyPrefix = "dialer:call"
 	PrefixCampaignState KeyPrefix = "dialer:campaign"
 	PrefixLock          KeyPrefix = "dialer:lock"
 	PrefixRetry         KeyPrefix = "dialer:retry"
@@ -27,8 +25,6 @@ const (
 	DefaultConnectTimeout = 5 * time.Second
 	// DefaultLockTTL is the default TTL for distributed locks
 	DefaultLockTTL = 30 * time.Second
-	// DefaultCallStateTTL is the default TTL for call state entries
-	DefaultCallStateTTL = 60 * time.Second
 )
 
 // Client handles Redis operations for the dialer worker
@@ -59,34 +55,14 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-// === Call State Management ===
-
-// SetCallState stores call state in Redis with TTL
-func (c *Client) SetCallState(ctx context.Context, callID string, state *CallState, ttl time.Duration) error {
-	key := fmt.Sprintf("%s:%s", PrefixCallState, callID)
-	// Use pipeline to set hash fields and TTL atomically
-	pipe := c.client.Pipeline()
-	pipe.HSet(ctx, key, state.ToMap())
-	pipe.Expire(ctx, key, ttl)
-	_, err := pipe.Exec(ctx)
-	return err
-}
-
-// DecrementActiveCalls decrements active call count for a campaign
+// DecrementActiveCalls decrements the active call count for a campaign, never below zero.
+// Only used to roll back a slot reserved for a call that was never placed; Laravel
+// releases slots for real calls and reconciles the count (dialer:reconcile-cac).
 func (c *Client) DecrementActiveCalls(ctx context.Context, campaignID int64) (int64, error) {
 	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
-	return c.client.Decr(ctx, key).Result()
-}
-
-// GetActiveCalls gets the current active call count for a campaign
-func (c *Client) GetActiveCalls(ctx context.Context, campaignID int64) (int64, error) {
-	key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
-	result, err := c.client.Get(ctx, key).Int64()
-	if err == redis.Nil {
-		// Key doesn't exist, return 0
-		return 0, nil
-	}
-	return result, err
+	return c.client.Eval(ctx,
+		`local n = tonumber(redis.call('GET', KEYS[1]) or '0'); if n > 0 then return redis.call('DECR', KEYS[1]) end; return 0`,
+		[]string{key}).Int64()
 }
 
 // IncrementIfBelow atomically increments a counter if it's below the max value
@@ -112,56 +88,6 @@ func (c *Client) IncrementIfBelow(ctx context.Context, key string, max int64) (i
 		return values[1].(int64), false, nil
 	}
 	return newVal, true, nil
-}
-
-// CountCallStatesForCampaign counts how many dialer:call:* keys exist for a given campaign.
-// This scans all call state hashes and checks the campaign_id field.
-func (c *Client) CountCallStatesForCampaign(ctx context.Context, campaignID int64) (int64, error) {
-	pattern := fmt.Sprintf("%s:*", PrefixCallState)
-	var count int64
-	campaignStr := strconv.FormatInt(campaignID, 10)
-
-	iter := c.client.Scan(ctx, 0, pattern, 100).Iterator()
-	for iter.Next(ctx) {
-		key := iter.Val()
-		cid, err := c.client.HGet(ctx, key, "campaign_id").Result()
-		if err != nil {
-			continue
-		}
-		if cid == campaignStr {
-			count++
-		}
-	}
-	if err := iter.Err(); err != nil {
-		return count, err
-	}
-	return count, nil
-}
-
-// ReconcileActiveCalls reconciles the CAC counter with actual call state keys.
-// If the counter is higher than the number of live call states, it resets the
-// counter to the actual count. Returns the reconciled count.
-func (c *Client) ReconcileActiveCalls(ctx context.Context, campaignID int64) (int64, bool, error) {
-	counter, err := c.GetActiveCalls(ctx, campaignID)
-	if err != nil {
-		return 0, false, err
-	}
-
-	actual, err := c.CountCallStatesForCampaign(ctx, campaignID)
-	if err != nil {
-		return counter, false, err
-	}
-
-	if counter > actual {
-		// Counter is inflated — reset to actual
-		key := fmt.Sprintf("%s:%d:active", PrefixCAC, campaignID)
-		if err := c.client.Set(ctx, key, actual, 0).Err(); err != nil {
-			return counter, false, err
-		}
-		return actual, true, nil
-	}
-
-	return counter, false, nil
 }
 
 // === Lock Management ===
@@ -258,26 +184,4 @@ func (c *Client) SMembers(ctx context.Context, key string) ([]string, error) {
 // Del deletes a key
 func (c *Client) Del(ctx context.Context, key string) error {
 	return c.client.Del(ctx, key).Err()
-}
-
-// === CallState struct for Redis storage ===
-
-// CallState represents the state of a call stored in Redis
-type CallState struct {
-	SessionID     int64
-	CampaignID    int64
-	DestinationID int64
-	Status        string
-	StartedAt     time.Time
-}
-
-// ToMap converts CallState to a map for Redis storage
-func (cs *CallState) ToMap() map[string]interface{} {
-	return map[string]interface{}{
-		"session_id":     strconv.FormatInt(cs.SessionID, 10),
-		"campaign_id":    strconv.FormatInt(cs.CampaignID, 10),
-		"destination_id": strconv.FormatInt(cs.DestinationID, 10),
-		"status":         cs.Status,
-		"started_at":     cs.StartedAt.Format(time.RFC3339),
-	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"opbx/dialer-worker/internal/api"
@@ -19,8 +18,6 @@ import (
 const (
 	// DefaultLockTTL is the default TTL for distributed locks
 	DefaultLockTTL = 30 * time.Second
-	// DefaultCallStateTTL is the default TTL for call state entries in Redis
-	DefaultCallStateTTL = 60 * time.Second
 )
 
 // Executor handles the execution of dialer calls
@@ -135,19 +132,6 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 	sessionID := resp.SessionID
 	callID := resp.CallID
 	logger.Info("call initiated", "session_id", sessionID, "call_id", callID, "active_calls", activeCount)
-
-	// Record call state in Redis with initial 60 second TTL
-	// TTL will be extended or removed based on session status updates
-	callState := &redis.CallState{
-		SessionID:     sessionID,
-		CampaignID:    campaign.ID,
-		DestinationID: destination.ID,
-		Status:        string(models.CallStatusInitiated),
-		StartedAt:     time.Now(),
-	}
-	if err := e.redisClient.SetCallState(ctx, strconv.FormatInt(sessionID, 10), callState, DefaultCallStateTTL); err != nil {
-		logger.Error("failed to store call state", "error", err)
-	}
 
 	// Record call timing in rate limiter
 	e.limiter.RecordCall(campaign.ID)

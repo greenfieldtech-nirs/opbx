@@ -251,7 +251,7 @@ The worker implements two complementary rate-limiting mechanisms per campaign:
 - **Definition**: Maximum number of simultaneous outbound calls allowed for a campaign
 - **Range**: 1-50 concurrent calls
 - **Implementation**: Atomic Redis Lua script (`IncrementIfBelow`) ensures safe counter increments across multiple worker instances
-- **Self-healing**: The worker reconciles the Redis counter against actual call state keys on every poll cycle to correct drift from missed CDRs or crashes
+- **Self-healing**: Laravel owns the count. The worker only reserves a slot atomically (and rolls it back if the call is never placed); Laravel releases it on CDR and `dialer:reconcile-cac` (every minute) resets it to the number of live call sessions
 
 ### Calls Per Second (CPS)
 

@@ -7,13 +7,18 @@ import (
 	"sync"
 	"time"
 
-	"opbx/dialer-worker/internal/redis"
 )
+
+// counterStore is the Redis surface the limiter needs (satisfied by *redis.Client).
+type counterStore interface {
+	IncrementIfBelow(ctx context.Context, key string, max int64) (int64, bool, error)
+	DecrementActiveCalls(ctx context.Context, campaignID int64) (int64, error)
+}
 
 // CACRateLimiter implements rate limiting based on Concurrent Active Calls (CAC)
 // per the functional specification
 type CACRateLimiter struct {
-	redis     *redis.Client
+	store     counterStore
 	mu        sync.RWMutex
 	campaigns map[int64]*CampaignLimiter
 }
@@ -29,9 +34,9 @@ type CampaignLimiter struct {
 }
 
 // NewCACRateLimiter creates a new CAC-based rate limiter
-func NewCACRateLimiter(redisClient *redis.Client) *CACRateLimiter {
+func NewCACRateLimiter(store counterStore) *CACRateLimiter {
 	return &CACRateLimiter{
-		redis:     redisClient,
+		store:     store,
 		campaigns: make(map[int64]*CampaignLimiter),
 	}
 }
@@ -80,7 +85,7 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 
 	// Check CAC limit atomically using Redis Lua script
 	key := fmt.Sprintf("dialer:cac:%d:active", campaignID)
-	newCount, acquired, err := rl.redis.IncrementIfBelow(ctx, key, int64(limiter.CAC))
+	newCount, acquired, err := rl.store.IncrementIfBelow(ctx, key, int64(limiter.CAC))
 	if err != nil {
 		return false, 0, err
 	}
@@ -129,5 +134,5 @@ func (rl *CACRateLimiter) RecordCall(campaignID int64) {
 
 // DecrementActive decrements active call count in Redis
 func (rl *CACRateLimiter) DecrementActive(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.DecrementActiveCalls(ctx, campaignID)
+	return rl.store.DecrementActiveCalls(ctx, campaignID)
 }

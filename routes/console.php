@@ -23,3 +23,10 @@ Schedule::command('auto-dialer:check-campaigns')
     ->runInBackground()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/auto-dialer-scheduler.log'));
+
+// Laravel owns the CAC count: heal drift from missed or duplicate CDRs every minute.
+Schedule::command('dialer:reconcile-cac')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/auto-dialer-scheduler.log'));
