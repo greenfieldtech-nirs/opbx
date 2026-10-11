@@ -113,7 +113,7 @@ public class StreamSession {
                 onResultLogged.accept(result);
             }
         });
-        this.dumper = new AudioDumper(dumpAudio, dumpAudioPath, callSid, streamSid);
+        this.dumper = new AudioDumper(dumpAudio, dumpAudioPath, callSid, streamSid, timeoutMs * 16); // 16 kHz
     }
 
     public void startTimeoutTimer(Vertx vertx) {
@@ -136,7 +136,7 @@ public class StreamSession {
         clearTimeout(vertx);
         resolved.set(true);
         if (dumper != null && dumper.isEnabled()) {
-            dumper.finalizeDump();
+            dumper.finalizeDump(vertx);
         }
     }
 }

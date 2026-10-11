@@ -1,5 +1,7 @@
 package com.cloudonix.opbx.amd.audio;
 
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,10 +18,14 @@ public class AudioDumper {
     private final String dumpDir;
     private final String callSid;
     private final String streamSid;
-    private final List<double[]> chunks = new ArrayList<>();
+    private final int maxSamples;
+    private List<double[]> chunks = new ArrayList<>();
+    private int retainedSamples = 0;
 
-    public AudioDumper(boolean enabled, String dumpDir, String callSid, String streamSid) {
+    /** @param maxSamples cap on buffered audio (the stream's detection window); later audio is not dumped */
+    public AudioDumper(boolean enabled, String dumpDir, String callSid, String streamSid, int maxSamples) {
         this.enabled = enabled;
+        this.maxSamples = maxSamples;
         this.dumpDir = dumpDir;
         this.callSid = callSid;
         this.streamSid = streamSid;
@@ -30,16 +36,28 @@ public class AudioDumper {
     }
 
     public void append(double[] float32Pcm) {
-        if (!enabled) {
+        if (!enabled || retainedSamples >= maxSamples) {
             return;
         }
         chunks.add(float32Pcm.clone());
+        retainedSamples += float32Pcm.length;
     }
 
-    public void finalizeDump() {
+    /** Writes the WAV on a worker thread (file I/O must not block the event loop). */
+    public Future<Void> finalizeDump(Vertx vertx) {
         if (!enabled || chunks.isEmpty()) {
-            return;
+            return Future.succeededFuture();
         }
+        List<double[]> taken = chunks;
+        chunks = new ArrayList<>();
+        retainedSamples = 0;
+        return vertx.executeBlocking(() -> {
+            write(taken);
+            return null;
+        }, false);
+    }
+
+    private void write(List<double[]> chunks) {
         try {
             int totalSamples = 0;
             for (double[] chunk : chunks) {
