@@ -19,6 +19,7 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TagCallFlowLogs;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -27,6 +28,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -161,6 +163,27 @@ return Application::configure(basePath: dirname(__DIR__))
                     ],
                 ], 403);
             }
+        });
+
+        // Voice routes are consumed by Cloudonix, which can only act on CXML: an HTML/JSON 500 drops the
+        // caller. (A middleware cannot do this: the router converts controller exceptions to responses
+        // before middleware sees them.) Auth/validation/HTTP errors keep their own status.
+        $exceptions->render(function (Throwable $e, $request) {
+            if (! $request->is('api/voice/route', 'api/voice/ivr-input', 'api/callbacks/voice/*')
+                || $e instanceof HttpExceptionInterface
+                || $e instanceof AuthenticationException
+                || $e instanceof AuthorizationException
+                || $e instanceof ValidationException) {
+                return null;
+            }
+
+            report($e);
+
+            return response(
+                CxmlBuilder::sayWithHangup('We are sorry, an error occurred. Please try again later.', true),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         });
 
         // Handle authorization exceptions for API routes
