@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\CallQueue;
 
+use App\Jobs\SendAcdEventJob;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -70,7 +71,19 @@ class AcdWorkerClient
             'wrapUpSeconds' => $wrapUpSeconds,
         ], fn ($value) => $value !== null);
 
-        $this->post('/events', $payload);
+        // A worker blip must not lose ended/abandoned/dial_failed: replay from the queue.
+        if (! $this->sendEvent($payload)) {
+            SendAcdEventJob::dispatch($payload);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return bool whether the worker accepted the event
+     */
+    public function sendEvent(array $payload): bool
+    {
+        return $this->post('/events', $payload) !== null;
     }
 
     /**
