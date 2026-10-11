@@ -33,6 +33,7 @@ use App\Models\Recording;
 use App\Models\User;
 use App\Observers\BusinessHoursCacheObserver;
 use App\Observers\ExtensionCacheObserver;
+use App\Observers\ExtensionRelatedCacheObserver;
 use App\Policies\AiAssistantLoadBalancerPolicy;
 use App\Policies\AiAssistantPolicy;
 use App\Policies\ApiKeyPolicy;
@@ -338,6 +339,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers for cache invalidation (Phase 1 Step 8)
         Extension::observe(ExtensionCacheObserver::class);
+        User::observe(ExtensionRelatedCacheObserver::class);
+        AiAssistant::observe(ExtensionRelatedCacheObserver::class);
 
         // Register consolidated business hours cache observer for all related models
         $businessHoursObserver = app(BusinessHoursCacheObserver::class);
