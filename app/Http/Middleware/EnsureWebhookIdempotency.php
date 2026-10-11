@@ -113,7 +113,8 @@ class EnsureWebhookIdempotency
                 'url' => $request->fullUrl(),
             ]);
 
-            // 409 (not 2xx) so the sender keeps the event pending and retries after the first attempt settles.
+            // Concurrent duplicate. Cloudonix does not retry webhooks (owner, 2026-10-11), so 409 only
+            // signals the duplicate; if the first attempt then fails, the event is not redelivered.
             return response()->json(['error' => 'Webhook is being processed'], 409);
         }
 
