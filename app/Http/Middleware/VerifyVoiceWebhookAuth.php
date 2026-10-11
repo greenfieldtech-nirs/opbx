@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\CloudonixSettings;
-use App\Models\DidNumber;
-use App\Models\Extension;
+use App\Services\CloudonixSettingsResolver;
+use App\Services\PhoneNumberService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Services\PhoneNumberService;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -30,12 +29,9 @@ class VerifyVoiceWebhookAuth
     public function __construct(
         private readonly PhoneNumberService $phoneNumberService
     ) {}
+
     /**
      * Handle an incoming request
-     *
-     * @param Request $request
-     * @param Closure $next
-     * @return Response
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -52,7 +48,7 @@ class VerifyVoiceWebhookAuth
         }
 
         // Extract Bearer token
-        if (!str_starts_with($authHeader, 'Bearer ')) {
+        if (! str_starts_with($authHeader, 'Bearer ')) {
             Log::warning('Voice webhook Authorization header not Bearer format', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -69,7 +65,7 @@ class VerifyVoiceWebhookAuth
         $fromNumber = $this->phoneNumberService->stripFormatting($payload['from'] ?? $payload['From'] ?? null);
         $toNumber = $this->phoneNumberService->stripFormatting($payload['to'] ?? $payload['To'] ?? null);
 
-        if (!$domain) {
+        if (! $domain) {
             Log::warning('Voice webhook missing Domain in request body', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -78,7 +74,7 @@ class VerifyVoiceWebhookAuth
             return $this->badRequestResponse('Missing Domain in request');
         }
 
-        if (!$toNumber) {
+        if (! $toNumber) {
             Log::warning('Voice webhook missing "to" or "To" number', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -90,7 +86,7 @@ class VerifyVoiceWebhookAuth
         // Verify token for the organization identified by Domain
         $verificationResult = $this->verifyTokenForDomain($providedToken, $domain, $toNumber, $fromNumber);
 
-        if (!$verificationResult['verified']) {
+        if (! $verificationResult['verified']) {
             Log::warning('Voice webhook authentication failed', [
                 'ip' => $request->ip(),
                 'path' => $request->path(),
@@ -127,10 +123,10 @@ class VerifyVoiceWebhookAuth
      * 1. Find CloudonixSettings by domain_name or domain_uuid
      * 2. Verify Bearer token matches domain_requests_api_key
      *
-     * @param string $providedToken The Bearer token from the request
-     * @param string $domain Domain name from the request
-     * @param string|null $toNumber Destination phone number for context
-     * @param string|null $fromNumber Source phone number for context
+     * @param  string  $providedToken  The Bearer token from the request
+     * @param  string  $domain  Domain name from the request
+     * @param  string|null  $toNumber  Destination phone number for context
+     * @param  string|null  $fromNumber  Source phone number for context
      * @return array{verified: bool, organization_id?: int, reason?: string}
      */
     private function verifyTokenForDomain(
@@ -142,12 +138,12 @@ class VerifyVoiceWebhookAuth
         // Find CloudonixSettings by domain
         $settings = CloudonixSettings::where('domain_name', $domain)->first();
 
-        if (!$settings) {
+        if (! $settings) {
             // Try to find by domain UUID
             $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
         }
 
-        if (!$settings) {
+        if (! $settings) {
             Log::warning('Voice webhook: Organization not found for domain', [
                 'domain' => $domain,
                 'to_number' => $toNumber,
@@ -172,7 +168,7 @@ class VerifyVoiceWebhookAuth
             ];
         }
 
-        if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
+        if (! hash_equals($settings->domain_requests_api_key, $providedToken)) {
             Log::warning('Voice webhook: Token mismatch', [
                 'organization_id' => $settings->organization_id,
                 'domain' => $domain,
@@ -184,22 +180,23 @@ class VerifyVoiceWebhookAuth
             ];
         }
 
+        app(CloudonixSettingsResolver::class)->prime($settings);
+
         return [
             'verified' => true,
             'organization_id' => $settings->organization_id,
         ];
     }
 
-
     /**
      * Return unauthorized response in CXML format
      */
     private function unauthorizedResponse(): Response
     {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            '  <Say language="en-US">Unauthorized. Authentication failed.</Say>' . "\n" .
-            '  <Hangup/>' . "\n" .
+        $cxml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".
+            '<Response>'."\n".
+            '  <Say language="en-US">Unauthorized. Authentication failed.</Say>'."\n".
+            '  <Hangup/>'."\n".
             '</Response>';
 
         return response($cxml, 401)
@@ -211,10 +208,10 @@ class VerifyVoiceWebhookAuth
      */
     private function badRequestResponse(string $message): Response
     {
-        $cxml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n" .
-            '<Response>' . "\n" .
-            "  <Say language=\"en-US\">Bad request. {$message}.</Say>" . "\n" .
-            '  <Hangup/>' . "\n" .
+        $cxml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".
+            '<Response>'."\n".
+            "  <Say language=\"en-US\">Bad request. {$message}.</Say>"."\n".
+            '  <Hangup/>'."\n".
             '</Response>';
 
         return response($cxml, 400)

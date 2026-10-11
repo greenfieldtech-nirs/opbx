@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\CallRecording;
 
-use App\Models\CloudonixSettings;
+use App\Services\CloudonixSettingsResolver;
 
 /**
  * Decides whether a given call leg should be recorded, based on the
@@ -32,13 +32,13 @@ class CallRecordingDecisionService
             return CallRecordingDecision::none();
         }
 
-        $settings = CloudonixSettings::where('organization_id', $organizationId)->first();
+        $settings = app(CloudonixSettingsResolver::class)->forOrganization($organizationId);
 
         if (! $settings || ! $this->shouldRecord($settings->call_recording_mode, $callCategory)) {
             return CallRecordingDecision::none();
         }
 
-        $baseUrl = rtrim($settings->effective_webhook_base_url ?? config('app.url'), '/');
+        $baseUrl = app(CloudonixSettingsResolver::class)->webhookBaseUrl($organizationId);
 
         return new CallRecordingDecision(
             record: 'record-from-answer',

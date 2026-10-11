@@ -12,7 +12,6 @@ use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
 use App\Models\AutoDialerCallSession;
-use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
@@ -21,6 +20,7 @@ use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\AutoDialer\MetadataHelper;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
@@ -413,13 +413,7 @@ class AlbsFollowThroughController extends Controller
         // Get organization ID from request (set by middleware)
         $organizationId = $request->input('_organization_id');
 
-        // Look up organization's Cloudonix settings
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
-
-        // Use configured webhook base URL, or fall back to app URL
-        $baseUrl = $cloudonixSettings
-            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
-            : rtrim(config('app.url'), '/');
+        $baseUrl = app(CloudonixSettingsResolver::class)->webhookBaseUrl((int) $organizationId);
 
         // Build the relative URL using the named route
         $relativeUrl = route('voice.albs-follow-through', [

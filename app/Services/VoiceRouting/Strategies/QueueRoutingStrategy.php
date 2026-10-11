@@ -7,13 +7,13 @@ namespace App\Services\VoiceRouting\Strategies;
 use App\Enums\ExtensionType;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Models\CallQueue;
-use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\AcdWorkerClient;
 use App\Services\CallQueue\MohSegmentationService;
 use App\Services\CallQueue\QueueDialOfferService;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -210,13 +210,7 @@ class QueueRoutingStrategy implements RoutingStrategy
 
     private function baseUrl(Request $request): string
     {
-        $organizationId = (int) $request->input('_organization_id');
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
-
-        return rtrim(
-            $cloudonixSettings?->effective_webhook_base_url ?? config('app.url'),
-            '/'
-        );
+        return app(CloudonixSettingsResolver::class)->webhookBaseUrl((int) $request->input('_organization_id'));
     }
 
     private function getPollUrl(Request $request, CallQueue $callQueue, string $callId, ?int $nextMohIdx = null): string

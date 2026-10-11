@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\ApplicationConfig;
 use App\Services\WebhookUrlResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -203,11 +204,10 @@ class CloudonixSettings extends Model
      */
     public function getEffectiveWebhookBaseUrlAttribute(): ?string
     {
-        if (! $this->organization) {
-            return null;
-        }
-
-        return WebhookUrlResolver::resolveWebhookBaseUrl($this->organization);
+        // Same rule as WebhookUrlResolver::resolveWebhookBaseUrl(), without re-loading this row via the organization.
+        return WebhookUrlResolver::shouldUseApplicationUrl()
+            ? ApplicationConfig::getApplicationWebhookBaseUrl()
+            : $this->webhook_base_url;
     }
 
     /**

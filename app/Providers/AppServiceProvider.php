@@ -63,6 +63,7 @@ use App\Services\CallStateManager\CallStateManager;
 use App\Services\CallTracking\CallTrackingDestinationResolver;
 use App\Services\Cloudonix\CloudonixVoiceService;
 use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\EmailValidation\Contracts\EmailValidatorInterface;
 use App\Services\EmailValidation\UserCheckEmailValidator;
 use App\Services\InboundBlacklist\InboundBlacklistService;
@@ -105,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(CloudonixSettingsResolver::class);
+
         // Register service singletons
         $this->app->singleton(
             CloudonixClient::class,
