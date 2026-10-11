@@ -60,7 +60,8 @@ class DownloadCallRecordingJob implements ShouldQueue
         }
 
         try {
-            $response = Http::timeout(60)->get($this->sourceUrl);
+            // No redirects: the host allowlist below would not apply to the redirect target.
+            $response = Http::timeout(60)->withoutRedirecting()->get($this->sourceUrl);
 
             if (! $response->successful()) {
                 throw new \RuntimeException("Failed to download recording: HTTP {$response->status()}");
@@ -73,7 +74,8 @@ class DownloadCallRecordingJob implements ShouldQueue
                 default => 'mp3',
             };
 
-            $relativePath = "call-recordings/{$cdr->call_id}.{$extension}";
+            // Keyed by the CDR id: call_id comes from the webhook payload and could carry "../".
+            $relativePath = "call-recordings/{$cdr->id}.{$extension}";
             $storagePath = "{$cdr->organization_id}/{$relativePath}";
 
             Storage::disk('recordings')->put($storagePath, $response->body());
@@ -102,11 +104,8 @@ class DownloadCallRecordingJob implements ShouldQueue
     }
 
     /**
-     * The recordingStatusCallback webhook that supplies $this->sourceUrl has no
-     * strong authentication (see CloudonixWebhookController::recordingStatus()),
-     * so this job must not blindly fetch whatever URL it's given - that would
-     * let anyone who can reach the webhook make this server issue arbitrary
-     * outbound requests (SSRF). Only fetch from Cloudonix's own domains.
+     * Defence in depth against SSRF: even an authenticated recordingStatus
+     * webhook only ever points at Cloudonix's own domains, so refuse anything else.
      */
     private function isAllowedRecordingHost(string $url): bool
     {

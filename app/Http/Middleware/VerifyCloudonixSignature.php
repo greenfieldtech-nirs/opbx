@@ -168,10 +168,12 @@ class VerifyCloudonixSignature
 
     /**
      * Authenticate the request based on organization's auth configuration.
+     * Also used by CloudonixWebhookController::recordingStatus(), whose payload
+     * carries no domain (the org is only known from the matched CDR).
      *
      * @return array{success: bool, reason: string|null, method: string|null}
      */
-    private function authenticateRequest(Request $request, CloudonixSettings $settings): array
+    public function authenticateRequest(Request $request, CloudonixSettings $settings): array
     {
         $providedToken = $this->extractBearerToken($request);
 

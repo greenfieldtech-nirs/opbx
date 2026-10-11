@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Webhooks;
 
+use App\Enums\DestinationStatus;
 use App\Exceptions\Webhook\WebhookBusinessLogicException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\HandlesWebhookErrors;
+use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Requests\Webhook\CallInitiatedRequest;
 use App\Http\Requests\Webhook\CdrRequest;
 use App\Http\Requests\Webhook\RecordingStatusRequest;
 use App\Http\Requests\Webhook\SessionUpdateRequest;
 use App\Jobs\DownloadCallRecordingJob;
 use App\Jobs\ProcessInboundCallJob;
+use App\Models\AutoDialerCallSession;
+use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerDestination;
 use App\Models\CallDetailRecord;
+use App\Models\CallLog;
 use App\Models\CallNotificationsSettings;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
@@ -22,9 +28,15 @@ use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
 use App\Services\CallNotifications\WebhookDispatcher;
+use App\Services\CallQueue\QueueCallLifecycleService;
 use App\Services\PhoneNumberService;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Str;
 
 /**
  * Handles incoming webhooks from Cloudonix CPaaS.
@@ -57,7 +69,7 @@ class CloudonixWebhookController extends Controller
      * @see https://developers.cloudonix.com/Documentation/make.com/webhooks
      * @see VoiceRoutingController::handleInbound() for CXML routing
      */
-    public function callInitiated(CallInitiatedRequest $request): \Illuminate\Http\JsonResponse
+    public function callInitiated(CallInitiatedRequest $request): JsonResponse
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $from = $request->input('From') ?? $request->input('from');
@@ -131,7 +143,7 @@ class CloudonixWebhookController extends Controller
      *
      * @see https://developers.cloudonix.com/Documentation/make.com/webhooks
      */
-    public function callStatus(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    public function callStatus(Request $request): JsonResponse
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $status = $request->input('CallStatus') ?? $request->input('status');
@@ -145,7 +157,7 @@ class CloudonixWebhookController extends Controller
 
         // Update call log if it exists
         if ($callId) {
-            $callLog = \App\Models\CallLog::where('call_id', $callId)->first();
+            $callLog = CallLog::where('call_id', $callId)->first();
 
             if ($callLog) {
                 $updateData = [];
@@ -184,8 +196,10 @@ class CloudonixWebhookController extends Controller
             $mappedStatus = $statusMap[strtolower($status)] ?? null;
 
             if ($mappedStatus) {
-                \App\Scopes\OrganizationScope::bypass(function () use ($sessionToken, $mappedStatus) {
-                    $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+                $organizationId = (int) $request->input('_organization_id');
+                OrganizationScope::bypass(function () use ($organizationId, $sessionToken, $mappedStatus) {
+                    $session = AutoDialerCallSession::where('organization_id', $organizationId)
+                        ->where('session_token', $sessionToken)->first();
                     if ($session && in_array($session->status, ['initiated', 'ringing'], true)) {
                         $session->update(['status' => $mappedStatus]);
                     }
@@ -203,9 +217,9 @@ class CloudonixWebhookController extends Controller
      * Handle session update webhook.
      * Session updates are sent during call progress for monitoring and debugging.
      */
-    public function sessionUpdate(SessionUpdateRequest $request): \Illuminate\Http\JsonResponse
+    public function sessionUpdate(SessionUpdateRequest $request): JsonResponse
     {
-        $requestId = (string) \Illuminate\Support\Str::uuid();
+        $requestId = (string) Str::uuid();
         $validated = $request->validated();
 
         Log::info('Processing session-update webhook', [
@@ -278,7 +292,7 @@ class CloudonixWebhookController extends Controller
             }
 
             // Process and store session update within a transaction
-            $sessionUpdate = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $organizationId, $requestId) {
+            $sessionUpdate = DB::transaction(function () use ($validated, $organizationId, $requestId) {
                 $sessionUpdate = SessionUpdate::create([
                     'organization_id' => $organizationId,
                     'session_id' => $validated['id'],
@@ -323,7 +337,7 @@ class CloudonixWebhookController extends Controller
 
             // Correlate with call queues (presence tracking + answer events)
             try {
-                app(\App\Services\CallQueue\QueueCallLifecycleService::class)->handleSessionUpdate($sessionUpdate);
+                app(QueueCallLifecycleService::class)->handleSessionUpdate($sessionUpdate);
             } catch (\Exception $e) {
                 Log::error('Queue call session-update processing failed', [
                     'request_id' => $requestId,
@@ -353,7 +367,7 @@ class CloudonixWebhookController extends Controller
      * Handle CDR (Call Detail Record) webhook.
      * This is called by Cloudonix after a call completes.
      */
-    public function cdr(CdrRequest $request): \Illuminate\Http\JsonResponse
+    public function cdr(CdrRequest $request): JsonResponse
     {
         $callId = $request->input('call_id');
         $organizationId = $request->input('_organization_id');
@@ -385,7 +399,7 @@ class CloudonixWebhookController extends Controller
 
         // Process CDR synchronously so we can return proper response
         try {
-            $cdr = \App\Models\CallDetailRecord::createFromWebhook($request->all(), $organizationId);
+            $cdr = CallDetailRecord::createFromWebhook($request->all(), $organizationId);
 
             Log::info('CDR created successfully', [
                 'session_token' => $request->input('session.token') ?? $request->input('session_token'),
@@ -398,7 +412,7 @@ class CloudonixWebhookController extends Controller
             ]);
 
             // Also update CallLog if it exists (for backwards compatibility)
-            $callLog = \App\Models\CallLog::where('call_id', $callId)->first();
+            $callLog = CallLog::where('call_id', $callId)->first();
             if ($callLog) {
                 $updateData = [
                     'cloudonix_cdr' => $request->all(),
@@ -449,7 +463,7 @@ class CloudonixWebhookController extends Controller
 
             // Finalize queue call statistics (waiting/handling times, disposition)
             try {
-                app(\App\Services\CallQueue\QueueCallLifecycleService::class)->handleCdr($organizationId, $request->all());
+                app(QueueCallLifecycleService::class)->handleCdr($organizationId, $request->all());
             } catch (\Exception $e) {
                 Log::error('Queue call CDR processing failed', [
                     'call_id' => $callId,
@@ -508,7 +522,7 @@ class CloudonixWebhookController extends Controller
      * matches, and authenticated from there (see below). snake_case fallbacks
      * are also checked in case Cloudonix's real payload differs from the docs.
      */
-    public function recordingStatus(RecordingStatusRequest $request): \Illuminate\Http\JsonResponse
+    public function recordingStatus(RecordingStatusRequest $request): JsonResponse
     {
         $callId = $request->input('CallSid') ?? $request->input('call_id');
         $sessionToken = $request->input('Session') ?? $request->input('session_token') ?? $request->input('session.token');
@@ -525,33 +539,13 @@ class CloudonixWebhookController extends Controller
             'payload' => $request->all(),
         ]);
 
-        // 'absent' means Cloudonix determined there is no recording to fetch;
-        // 'in-progress' only arrives if recordingStatusCallbackEvent is
-        // explicitly widened beyond the 'completed' default this app requests -
-        // neither carries a usable RecordingUrl.
-        if ($recordingStatus === 'absent' || ! $recordingUrl) {
-            Log::info('Recording status webhook: nothing to download', [
-                'call_id' => $callId,
-                'recording_status' => $recordingStatus,
-            ]);
-
-            $query = CallDetailRecord::withoutGlobalScope(OrganizationScope::class);
-            $cdr = $callId ? $query->where('call_id', $callId)->first() : null;
-            $cdr?->update(['recording_status' => 'failed']);
-
-            return response()->json(['message' => 'No recording to download'], 200);
-        }
-
-        $query = CallDetailRecord::withoutGlobalScope(OrganizationScope::class);
-
-        $cdr = $callId
-            ? $query->where('call_id', $callId)->first()
-            : null;
-
+        // This payload carries no `domain`, so the webhook.signature middleware can't
+        // run on this route (see routes/webhooks.php): the org is only known from the
+        // matched CDR. Authenticate with that org's webhook key before ANY write.
+        $query = fn () => CallDetailRecord::withoutGlobalScope(OrganizationScope::class);
+        $cdr = $callId ? $query()->where('call_id', $callId)->first() : null;
         if (! $cdr && $sessionToken) {
-            $cdr = CallDetailRecord::withoutGlobalScope(OrganizationScope::class)
-                ->where('session_token', $sessionToken)
-                ->first();
+            $cdr = $query()->where('session_token', $sessionToken)->first();
         }
 
         if (! $cdr) {
@@ -563,21 +557,32 @@ class CloudonixWebhookController extends Controller
             return response()->json(['message' => 'No matching call detail record found'], 200);
         }
 
-        // This payload carries no `domain` field, so the shared webhook.signature
-        // middleware can't run for this route (see routes/webhooks.php). Once the
-        // organization is known via the matched CDR, apply the same bearer-token
-        // check that middleware performs for every other Cloudonix webhook.
         $settings = CloudonixSettings::where('organization_id', $cdr->organization_id)->first();
-        if ($settings && $settings->domain_requests_api_key) {
-            $token = $request->bearerToken();
-            if (! $token || ! hash_equals($settings->domain_requests_api_key, $token)) {
-                Log::warning('Recording status webhook: authentication failed', [
-                    'organization_id' => $cdr->organization_id,
-                    'call_id' => $callId,
-                ]);
+        $auth = $settings
+            ? app(VerifyCloudonixSignature::class)->authenticateRequest($request, $settings)
+            : ['success' => false, 'reason' => 'No Cloudonix settings for organization'];
+        if (! $auth['success']) {
+            Log::warning('Recording status webhook: authentication failed', [
+                'organization_id' => $cdr->organization_id,
+                'call_id' => $callId,
+                'reason' => $auth['reason'],
+            ]);
 
-                return response()->json(['error' => 'Unauthorized'], 401);
-            }
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // 'absent' means Cloudonix determined there is no recording to fetch;
+        // 'in-progress' only arrives if recordingStatusCallbackEvent is
+        // explicitly widened beyond the 'completed' default this app requests -
+        // neither carries a usable RecordingUrl.
+        if ($recordingStatus === 'absent' || ! $recordingUrl) {
+            Log::info('Recording status webhook: nothing to download', [
+                'call_id' => $callId,
+                'recording_status' => $recordingStatus,
+            ]);
+            $cdr->update(['recording_status' => 'failed']);
+
+            return response()->json(['message' => 'No recording to download'], 200);
         }
 
         $cdr->update([
@@ -664,7 +669,7 @@ class CloudonixWebhookController extends Controller
             'direction' => 'incoming', // Assume incoming for CDR events
             'status' => $status,
             'session_created_at' => $callStartTimeSeconds
-                ? \Carbon\Carbon::createFromTimestamp($callStartTimeSeconds)
+                ? Carbon::createFromTimestamp($callStartTimeSeconds)
                 : now(),
             'session_modified_at' => now(),
             'call_start_time' => $callStartTimeMs,
@@ -714,7 +719,7 @@ class CloudonixWebhookController extends Controller
                 'organization_id' => $organizationId,
             ]);
 
-            $settings = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId) {
+            $settings = OrganizationScope::bypass(function () use ($organizationId) {
                 return CallNotificationsSettings::forOrganization($organizationId)
                     ->active()
                     ->first();
@@ -774,7 +779,7 @@ class CloudonixWebhookController extends Controller
 
             // Get previous status from database
             // Must bypass OrganizationScope since webhooks have no authenticated user
-            $previousStatus = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId, $sessionUpdate) {
+            $previousStatus = OrganizationScope::bypass(function () use ($organizationId, $sessionUpdate) {
                 return SessionUpdate::where('organization_id', $organizationId)
                     ->where('session_id', $sessionUpdate->session_id)
                     ->where('id', '<', $sessionUpdate->id)
@@ -857,7 +862,7 @@ class CloudonixWebhookController extends Controller
      *
      * Updates auto-dialer destination records when a CDR is received.
      */
-    private function processAutoDialerCDR(\Illuminate\Http\Request $request, \App\Models\CallDetailRecord $cdr): void
+    private function processAutoDialerCDR(Request $request, CallDetailRecord $cdr): void
     {
         // Cloudonix CDR nests the session token at session.token, not session_token
         $sessionToken = $request->input('session.token') ?? $request->input('session_token');
@@ -884,9 +889,10 @@ class CloudonixWebhookController extends Controller
 
         // All auto-dialer queries must bypass OrganizationScope since
         // webhooks have no authenticated user context.
-        \App\Scopes\OrganizationScope::bypass(function () use ($request, $cdr, $sessionToken, $callId): void {
-            // Find auto-dialer session by session token
-            $session = \App\Models\AutoDialerCallSession::where('session_token', $sessionToken)->first();
+        OrganizationScope::bypass(function () use ($request, $cdr, $sessionToken, $callId): void {
+            // Find auto-dialer session by session token, within the CDR's (authenticated) org
+            $session = AutoDialerCallSession::where('organization_id', $cdr->organization_id)
+                ->where('session_token', $sessionToken)->first();
 
             if (! $session) {
                 // Not an auto-dialer call — this is normal for regular inbound/outbound calls
@@ -911,7 +917,7 @@ class CloudonixWebhookController extends Controller
             ]);
 
             // Load campaign for retry logic
-            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+            $campaign = AutoDialerCampaign::find($session->campaign_id);
 
             // Update the session itself with CDR data
             $disposition = $request->input('disposition', 'unknown');
@@ -937,7 +943,7 @@ class CloudonixWebhookController extends Controller
             }
 
             // Update destination record
-            $destination = \App\Models\AutoDialerDestination::find($session->destination_id);
+            $destination = AutoDialerDestination::find($session->destination_id);
             $shouldRetryVoicemail = false;
 
             if ($destination) {
@@ -955,7 +961,7 @@ class CloudonixWebhookController extends Controller
                     }
 
                     $destination->update([
-                        'status' => \App\Enums\DestinationStatus::PENDING,
+                        'status' => DestinationStatus::PENDING,
                         'next_retry_at' => $nextRetry,
                         'last_disposition' => 'voicemail',
                         'duration' => $request->input('duration', 0),
@@ -1034,7 +1040,7 @@ class CloudonixWebhookController extends Controller
                 'disposition' => $disposition,
             ]);
 
-            $campaign = \App\Models\AutoDialerCampaign::find($session->campaign_id);
+            $campaign = AutoDialerCampaign::find($session->campaign_id);
             if ($campaign) {
                 Log::info('Auto-dialer: Campaign found, current stats', [
                     'campaign_id' => $campaign->id,

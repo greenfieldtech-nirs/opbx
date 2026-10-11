@@ -60,7 +60,7 @@ class DialerWebhookProxyController extends Controller
         $workerId = $customData['worker_id'] ?? null;
 
         // Find the session - either by session_token or by call_id
-        $session = $this->findSession($sessionToken, $callId);
+        $session = $this->findSession((int) $request->input('_organization_id'), $sessionToken, $callId);
 
         Log::debug('Dialer webhook session lookup', [
             'session_token' => $sessionToken,
@@ -248,27 +248,20 @@ class DialerWebhookProxyController extends Controller
     }
 
     /**
-     * Find session by token or call ID.
-     *
-     * Bypasses organization scope since webhooks don't have authenticated users.
+     * Find session by token or call ID, within the organization authenticated
+     * by VerifyCloudonixSignature (webhooks have no user, so the scope is bypassed).
      */
-    private function findSession(?string $sessionToken, ?string $callId): ?AutoDialerCallSession
+    private function findSession(int $organizationId, ?string $sessionToken, ?string $callId): ?AutoDialerCallSession
     {
-        return OrganizationScope::bypass(function () use ($sessionToken, $callId): ?AutoDialerCallSession {
-            $query = AutoDialerCallSession::with(['destination', 'campaign']);
+        return OrganizationScope::bypass(function () use ($organizationId, $sessionToken, $callId): ?AutoDialerCallSession {
+            $query = fn () => AutoDialerCallSession::with(['destination', 'campaign'])
+                ->where('organization_id', $organizationId);
 
-            if ($sessionToken) {
-                $session = $query->where('session_token', $sessionToken)->first();
-                if ($session) {
-                    return $session;
-                }
+            if ($sessionToken && ($session = $query()->where('session_token', $sessionToken)->first())) {
+                return $session;
             }
 
-            if ($callId) {
-                return $query->where('call_id', $callId)->first();
-            }
-
-            return null;
+            return $callId ? $query()->where('call_id', $callId)->first() : null;
         });
     }
 

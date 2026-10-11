@@ -432,4 +432,25 @@ class DialerWebhookProxyTest extends TestCase
             );
         }
     }
+
+    public function test_webhook_cannot_touch_another_orgs_session(): void
+    {
+        $otherOrg = Organization::factory()->create();
+        $otherSettings = CloudonixSettings::factory()->create([
+            'organization_id' => $otherOrg->id,
+            'domain_uuid' => '7aa6c13b-809e-3d08-a305-24e9fd6b3da9',
+            'domain_name' => 'other-org.cloudonix.net',
+            'domain_requests_api_key' => 'other-org-test-key',
+        ]);
+
+        // Authenticated as the other org, but naming this org's session.
+        $this->postJson('/api/webhooks/cloudonix/dialer', [
+            'type' => 'call.initiated',
+            'call_id' => 'test-call-id-456',
+            'session_token' => 'test-session-token-123',
+            'domain' => $otherSettings->domain_name,
+        ], ['Authorization' => 'Bearer other-org-test-key'])->assertNotFound(); // not found within the authenticated org
+
+        $this->assertEquals('initiated', $this->session->fresh()->status);
+    }
 }
