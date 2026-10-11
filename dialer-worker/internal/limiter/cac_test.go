@@ -63,3 +63,37 @@ func TestRollbackNeverGoesNegative(t *testing.T) {
 		t.Fatalf("counter went to %d", store.n)
 	}
 }
+
+func TestReRegisteringKeepsPacingStateAndAppliesNewLimits(t *testing.T) {
+	rl := NewCACRateLimiter(&fakeStore{})
+	rl.RegisterCampaign(1, 2, 1) // 1 CPS => 1s interval
+	rl.RecordCall(1)
+
+	rl.RegisterCampaign(1, 5, 2) // the next poll, with an edited campaign
+
+	if rl.WaitTime(1) <= 0 {
+		t.Fatal("LastCallTime was lost on re-register")
+	}
+	l := rl.campaigns[1]
+	if l.CAC != 5 || l.CPS != 2 || l.MinInterval.Milliseconds() != 500 {
+		t.Fatalf("limits not updated: %+v", l)
+	}
+}
+
+func TestConcurrentUseIsRaceFree(t *testing.T) {
+	rl := NewCACRateLimiter(&fakeStore{})
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				rl.RegisterCampaign(1, 50, 30)
+				rl.RecordCall(1)
+				rl.WaitTime(1)
+				rl.CanDial(context.Background(), 1)
+			}
+		}()
+	}
+	wg.Wait()
+}

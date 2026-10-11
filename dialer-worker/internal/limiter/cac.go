@@ -57,6 +57,11 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	// Calculate minimum interval between calls from CPS: 1000/CPS milliseconds
 	minInterval := time.Duration(math.Round(1000.0/float64(cps))) * time.Millisecond
 
+	// Update in place so LastCallTime (CPS pacing) survives every poll.
+	if l, ok := rl.campaigns[campaignID]; ok {
+		l.CAC, l.CPS, l.MinInterval = cac, cps, minInterval
+		return
+	}
 	rl.campaigns[campaignID] = &CampaignLimiter{
 		CampaignID:  campaignID,
 		CAC:         cac,
@@ -70,6 +75,12 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, int64, error) {
 	rl.mu.RLock()
 	limiter, exists := rl.campaigns[campaignID]
+	var lastCall time.Time
+	var minInterval time.Duration
+	var cac int
+	if exists {
+		lastCall, minInterval, cac = limiter.LastCallTime, limiter.MinInterval, limiter.CAC
+	}
 	rl.mu.RUnlock()
 
 	if !exists {
@@ -77,14 +88,13 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 	}
 
 	// Check minimum interval between calls first (local check)
-	now := time.Now()
-	if now.Sub(limiter.LastCallTime) < limiter.MinInterval {
+	if time.Since(lastCall) < minInterval {
 		return false, 0, nil // Rate limited by time
 	}
 
 	// Check CAC limit atomically using Redis Lua script
 	key := fmt.Sprintf("dialer:cac:%d:active", campaignID)
-	newCount, acquired, err := rl.store.IncrementIfBelow(ctx, key, int64(limiter.CAC))
+	newCount, acquired, err := rl.store.IncrementIfBelow(ctx, key, int64(cac))
 	if err != nil {
 		return false, 0, err
 	}
@@ -106,9 +116,9 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 // WaitTime returns how long to wait before next call can be made
 func (rl *CACRateLimiter) WaitTime(campaignID int64) time.Duration {
 	rl.mu.RLock()
-	limiter, exists := rl.campaigns[campaignID]
-	rl.mu.RUnlock()
+	defer rl.mu.RUnlock()
 
+	limiter, exists := rl.campaigns[campaignID]
 	if !exists {
 		return 0
 	}
