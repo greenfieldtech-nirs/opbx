@@ -64,7 +64,7 @@ class DownloadCallRecordingJob implements ShouldQueue
             return;
         }
 
-        $maxBytes = (int) config('recordings.max_download_bytes', 524288000);
+        $maxBytes = (int) config('recordings.max_download_bytes', 209715200);
         $tmpFile = tempnam(sys_get_temp_dir(), 'cdr-rec-');
 
         try {
