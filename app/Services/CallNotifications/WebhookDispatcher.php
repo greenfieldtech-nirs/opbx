@@ -140,6 +140,8 @@ class WebhookDispatcher
         $headers['Content-Type'] = 'application/json';
         $headers['Accept'] = 'application/json';
         $headers['User-Agent'] = 'Cloudonix-PBX-Webhook/1.0';
+        // Delivery logs must never hold the customer's webhook secret.
+        $loggedHeaders = isset($headers['Authorization']) ? ['Authorization' => '[redacted]'] + $headers : $headers;
 
         $requestBody = json_encode($payload);
 
@@ -152,7 +154,7 @@ class WebhookDispatcher
 
             // Capture debug info
             $debugInfo = [
-                'request_headers' => $headers,
+                'request_headers' => $loggedHeaders,
                 'request_body' => $requestBody,
                 'response_headers' => $response->headers(),
             ];
@@ -211,7 +213,7 @@ class WebhookDispatcher
                 'Connection error: '.$e->getMessage(),
                 $responseTimeMs,
                 [
-                    'request_headers' => $headers,
+                    'request_headers' => $loggedHeaders,
                     'request_body' => $requestBody,
                     'response_headers' => null,
                 ]
@@ -238,7 +240,7 @@ class WebhookDispatcher
                 'Exception: '.$e->getMessage(),
                 $responseTimeMs,
                 [
-                    'request_headers' => $headers,
+                    'request_headers' => $loggedHeaders,
                     'request_body' => $requestBody,
                     'response_headers' => null,
                 ]

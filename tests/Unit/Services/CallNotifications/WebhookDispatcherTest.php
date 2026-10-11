@@ -50,7 +50,7 @@ class WebhookDispatcherTest extends TestCase
     protected function tearDown(): void
     {
         parent::tearDown();
-        \Mockery::close();
+        Mockery::close();
     }
 
     public function test_dispatch_returns_true_on_successful_delivery(): void
@@ -89,6 +89,20 @@ class WebhookDispatcherTest extends TestCase
         $this->assertNotNull($log);
         $this->assertTrue($log->is_success);
         $this->assertEquals(200, $log->response_status_code);
+    }
+
+    public function test_delivery_log_never_stores_the_auth_secret(): void
+    {
+        Http::fake(['example.com/webhook' => Http::response(['success' => true], 200)]);
+        $this->mockRedisForSuccessfulDispatch();
+        $this->settings->update(['auth_method' => 'bearer_token', 'auth_secret' => 'super-secret-value']);
+
+        $this->dispatcher->dispatch($this->settings->fresh(), ['event_type' => 'call.status_update'], 'event-redact', 'tok');
+
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer super-secret-value'));
+        $log = CallNotificationLog::where('event_id', 'event-redact')->first();
+        $this->assertSame('[redacted]', $log->request_headers['Authorization']);
+        $this->assertStringNotContainsString('super-secret-value', json_encode($log->getAttributes()));
     }
 
     public function test_dispatch_returns_false_on_rate_limit_exceeded(): void
