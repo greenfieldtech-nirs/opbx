@@ -37,6 +37,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -407,10 +408,11 @@ class CloudonixWebhookController extends Controller
         try {
             $cdr = CallDetailRecord::createFromWebhook($request->all(), $organizationId);
 
-            if (! $cdr->wasRecentlyCreated) {
-                Log::info('Duplicate CDR ignored', ['call_id' => $callId, 'organization_id' => $organizationId, 'cdr_id' => $cdr->id]);
-
-                return response()->json(['message' => 'CDR already recorded'], 200);
+            // A replay re-runs the side effects that are safe to repeat, in case the first
+            // delivery crashed part-way; notifications are not re-sent (owner, 2026-10-11).
+            $isReplay = ! $cdr->wasRecentlyCreated;
+            if ($isReplay) {
+                Log::info('Duplicate CDR: re-running idempotent side effects', ['call_id' => $callId, 'organization_id' => $organizationId, 'cdr_id' => $cdr->id]);
             }
 
             Log::info('CDR created successfully', [
@@ -471,7 +473,7 @@ class CloudonixWebhookController extends Controller
             }
 
             // Trigger call notification if session update was created
-            if ($sessionUpdate) {
+            if ($sessionUpdate && ! $isReplay) {
                 $this->triggerCallNotification($sessionUpdate, $organizationId);
             }
 
@@ -491,8 +493,13 @@ class CloudonixWebhookController extends Controller
                 'call_id' => $callId,
                 'session_token' => $request->input('session.token') ?? $request->input('session_token'),
             ]);
+            // Not idempotent (campaign counters): mark done per CDR only after it completes.
+            $autoDialerDoneKey = "cdr:autodialer-done:{$cdr->id}";
             try {
-                $this->processAutoDialerCDR($request, $cdr);
+                if (! Cache::has($autoDialerDoneKey)) {
+                    $this->processAutoDialerCDR($request, $cdr);
+                    Cache::put($autoDialerDoneKey, true, now()->addDays(7));
+                }
                 Log::info('CDR: Auto-dialer processing completed', [
                     'call_id' => $callId,
                 ]);
@@ -506,7 +513,7 @@ class CloudonixWebhookController extends Controller
             }
 
             // Return 204 No Content to indicate successful creation
-            return response()->json(['message' => 'CDR Inserted successfully'], 200);
+            return response()->json(['message' => $isReplay ? 'CDR already recorded' : 'CDR Inserted successfully'], 200);
         } catch (\Exception $e) {
             Log::error('CDR processing failed', [
                 'call_id' => $callId,

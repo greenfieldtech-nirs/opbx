@@ -12,6 +12,7 @@ use App\Models\DidNumber;
 use App\Models\Organization;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class SessionCreationTest extends TestCase
@@ -81,6 +82,36 @@ class SessionCreationTest extends TestCase
         $this->assertSame('CA12345', $session->call_id);
         $this->assertTrue($session->is_answered);
         $this->assertTrue($session->is_converted);
+    }
+
+    public function test_replayed_cdr_does_not_create_a_second_session(): void
+    {
+        $organization = Organization::factory()->create(['status' => 'active']);
+        $campaign = CallTrackingCampaign::factory()->create(['organization_id' => $organization->id]);
+        $did = DidNumber::factory()->create([
+            'organization_id' => $organization->id,
+            'phone_number' => '+14155550001',
+            'status' => 'active',
+            'routing_type' => 'call_tracking',
+            'routing_config' => ['call_tracking_campaign_id' => $campaign->id],
+        ]);
+        CallTrackingNumber::factory()->create([
+            'organization_id' => $organization->id,
+            'call_tracking_campaign_id' => $campaign->id,
+            'did_number_id' => $did->id,
+            'status' => 'active',
+        ]);
+        $payload = ['domain' => 'tracking.cloudonix.net', 'call_id' => 'CA-REPLAY', 'from' => '+1987654321', 'to' => $did->phone_number,
+            'disposition' => 'CONNECTED', 'duration' => 90, 'billsec' => 90, 'timestamp' => now()->timestamp];
+
+        $this->postCdr($organization, $payload);
+        // A replay reaches the controller only when the first delivery failed (successful
+        // responses are served from the idempotency cache): drop that cache to simulate it.
+        Cache::flush();
+        $this->postJson('/api/webhooks/cloudonix/cdr', $payload, ['Authorization' => 'Bearer tracking-requests-api-key-1234567890'])
+            ->assertOk()->assertJson(['message' => 'CDR already recorded']);
+
+        $this->assertSame(1, CallTrackingSession::withoutGlobalScope(OrganizationScope::class)->where('call_id', 'CA-REPLAY')->count());
     }
 
     public function test_cdr_does_not_convert_when_duration_below_threshold(): void
