@@ -13,6 +13,7 @@ use App\Models\OutboundWhitelist;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\OutboundRoutingService;
+use Carbon\Carbon;
 use Mockery;
 use Tests\TestCase;
 
@@ -52,7 +53,7 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $this->settings = new CloudonixSettings([
             'organization_id' => $this->organization->id,
             'domain_uuid' => 'test-domain-uuid-123',
-            'domain_api_key' => 'XIBB0E3CD4FB1F46698DE5FC51B49A012E',
+            'domain_api_key' => 'XI-test-not-a-real-key',
             'domain_name' => 'test.cloudonix.io',
         ]);
         $this->settings->id = 1;
@@ -60,7 +61,7 @@ class AutoDialerCloudonixServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        \Mockery::close();
+        Mockery::close();
         parent::tearDown();
     }
 
@@ -262,7 +263,7 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $this->assertArrayHasKey('deadline', $payload);
 
         // Deadline must be a valid ISO-8601 timestamp, 5 minutes ahead of now.
-        $deadline = \Carbon\Carbon::parse($payload['deadline']);
+        $deadline = Carbon::parse($payload['deadline']);
         $this->assertEqualsWithDelta(
             now()->addMinutes(5)->getTimestamp(),
             $deadline->getTimestamp(),

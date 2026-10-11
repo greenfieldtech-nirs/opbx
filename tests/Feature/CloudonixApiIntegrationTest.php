@@ -36,7 +36,7 @@ class CloudonixApiIntegrationTest extends TestCase
     public function test_cloudonix_api_connection(): void
     {
         $domain = env('CLOUDONIX_TEST_DOMAIN', 'dograh-ejm4ke.cloudonix.net');
-        $apiKey = env('CLOUDONIX_TEST_API_KEY', 'XIBB0E3CD4FB1F46698DE5FC51B49A012E');
+        $apiKey = env('CLOUDONIX_TEST_API_KEY', 'XI-test-not-a-real-key');
         $testMode = env('CLOUDONIX_TEST_MODE', 'fake');
 
         // Skip if no credentials available

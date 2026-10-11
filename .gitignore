@@ -192,3 +192,6 @@ reports/
 .superpowers/
 .agent-screenshots/
 acd-worker/target/
+
+# Per-developer Claude Code permissions (may contain tokens)
+**/.claude/settings.local.json
