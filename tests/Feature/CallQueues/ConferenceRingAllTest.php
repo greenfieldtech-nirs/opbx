@@ -624,8 +624,15 @@ class ConferenceRingAllTest extends TestCase
         $queueCall = $this->queueCall();
         $offers = app(ConferenceOfferService::class);
         $offers->offer($this->queue, $queueCall, $this->agents());
-        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
-        $this->post($this->relative($offers->signedUrl('voice.queue-conference-join', $this->queue, $queueCall)));
+        $agentCxml = (string) $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1')->getContent();
+        $callerCxml = (string) $this->post($this->relative($offers->signedUrl('voice.queue-conference-join', $this->queue, $queueCall)))->getContent();
+
+        // The agent leaving ends the room, and the caller has no verb after the room: the call ends
+        // instead of returning to the queue.
+        $this->assertStringContainsString('endConferenceOnExit="true"', $agentCxml);
+        $this->assertStringContainsString('endConferenceOnExit="true"', $callerCxml);
+        $this->assertMatchesRegularExpression('#</Dial>\s*</Response>#', $callerCxml);
+        $this->assertStringNotContainsString('<Redirect', $callerCxml);
 
         app(QueueCallLifecycleService::class)->handleSessionUpdate(SessionUpdate::factory()->create([
             'organization_id' => $this->organization->id,
