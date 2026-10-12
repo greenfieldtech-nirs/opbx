@@ -41,10 +41,6 @@ export default function Supervisors() {
 
   // Guard: only owner and pbx_admin can access this page
   const canAccess = currentUser?.role === 'owner' || currentUser?.role === 'pbx_admin';
-  if (!canAccess) {
-    return <Navigate to="/ui/dashboard" replace />;
-  }
-
   const { data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['users'],
     queryFn: () => usersService.getAll({ per_page: 1000 }),
@@ -159,6 +155,10 @@ export default function Supervisors() {
       </div>
     );
   };
+
+  if (!canAccess) {
+    return <Navigate to="/ui/dashboard" replace />;
+  }
 
   return (
     <div className="space-y-6">

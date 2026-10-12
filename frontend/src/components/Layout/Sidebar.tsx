@@ -182,7 +182,7 @@ export function Sidebar() {
     
     // First, check if current URL matches any section's items
     const currentPath = location.pathname;
-    let matchingSection = allSectionsList.find(section => 
+    const matchingSection = allSectionsList.find(section => 
       section.items.some(item => !item.isHeader && currentPath.startsWith(item.href))
     );
     

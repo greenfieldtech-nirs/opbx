@@ -279,7 +279,7 @@ const InboundBlacklistPage: React.FC = () => {
   };
 
   const paginatedData = useMemo(() => {
-    let result = [...blacklist];
+    const result = [...blacklist];
 
     // Client-side sorting
     if (sortField) {

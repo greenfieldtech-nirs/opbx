@@ -20,18 +20,6 @@ export function OwnerRoute({ children, roles = ['owner'] }: OwnerRouteProps) {
   const { user, isLoading } = useAuth();
   const hasShownToast = useRef(false);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Check if user has an allowed role
   const isAllowed = !!user?.role && roles.includes(user.role);
 
@@ -44,6 +32,18 @@ export function OwnerRoute({ children, roles = ['owner'] }: OwnerRouteProps) {
       hasShownToast.current = true;
     }
   }, [isLoading, isAllowed]);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Redirect to dashboard if not allowed
   if (!isAllowed) {

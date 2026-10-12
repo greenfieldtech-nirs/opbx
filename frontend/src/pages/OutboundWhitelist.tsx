@@ -281,7 +281,7 @@ const OutboundWhitelistPage: React.FC = () => {
   };
 
   const paginatedData = useMemo(() => {
-    let result = [...whitelist];
+    const result = [...whitelist];
 
     // Client-side sorting
     if (sortField) {

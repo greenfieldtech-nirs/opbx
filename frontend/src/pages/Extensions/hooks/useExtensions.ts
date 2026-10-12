@@ -359,7 +359,7 @@ export function useExtensions(currentUser: { role: string; id?: string } | null)
   const openEditDialog = (extension: Extension) => {
     setSelectedExtension(extension);
 
-    let config = extension.configuration;
+    const config = extension.configuration;
     let ivrId: string | null = null;
     if (typeof config === 'object' && config) {
       ivrId = config.ivr_id || config.ivr_menu_id;
