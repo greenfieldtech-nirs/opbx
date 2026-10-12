@@ -195,3 +195,6 @@ acd-worker/target/
 
 # Per-developer Claude Code permissions (may contain tokens)
 **/.claude/settings.local.json
+
+# Stray SQLite database created by running the app outside Docker
+/opbx
