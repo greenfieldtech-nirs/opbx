@@ -19,7 +19,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Mark session_updates stuck in an active state as deleted (no CDR/delete webhook arrived).
-Schedule::command('session-updates:cleanup', ['--force' => true])
+Schedule::command('session-updates:cleanup --force')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->onOneServer()

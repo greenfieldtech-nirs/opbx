@@ -77,4 +77,22 @@ class MaintenanceCommandsTest extends TestCase
         $this->assertStringContainsString('session-updates:cleanup', $commands);
         $this->assertStringContainsString('--force', $commands);
     }
+
+    /** Every scheduled command line must parse against its command's options (e.g. no --force='1' on a flag). */
+    public function test_every_scheduled_command_line_binds_to_its_definition(): void
+    {
+        $artisan = $this->app->make(\Illuminate\Contracts\Console\Kernel::class);
+
+        foreach ($this->app->make(Schedule::class)->events() as $event) {
+            $args = trim(\Illuminate\Support\Str::after((string) $event->command, "'artisan'"));
+            $name = strtok($args, ' ');
+            $command = $artisan->all()[$name] ?? null;
+            $this->assertNotNull($command, "Scheduled command [{$name}] is not registered");
+
+            $input = new \Symfony\Component\Console\Input\StringInput($args);
+            $definition = clone $command->getDefinition();
+            $definition->addArgument(new \Symfony\Component\Console\Input\InputArgument('command'));
+            $input->bind($definition); // throws on --flag='1' or unknown options
+        }
+    }
 }
