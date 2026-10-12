@@ -16,7 +16,7 @@ use Monolog\Processor\ProcessorInterface;
  */
 class MaskCredentialsProcessor implements ProcessorInterface
 {
-    private const MASK_PATTERN = '/authorization|api[_-]?key|password|secret|token/i';
+    private const MASK_PATTERN = '/authorization|api[_-]?key|password|secret|token|^sig$/i'; // ^sig$: HMAC of signed URLs (queue dial, recordings)
 
     private const MASKED_KEYS_EXEMPT = ['session_token'];
 
