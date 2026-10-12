@@ -4,6 +4,12 @@
  */
 
 import { z } from 'zod';
+import type {
+  CreateIvrMenuRequest,
+  IvrDestinationType,
+  IvrFailoverDestinationType,
+  IvrMenuStatus,
+} from '@/types/api.types';
 
 export const IVR_LIMITS = {
   name: 255,
@@ -65,8 +71,51 @@ export const ivrMenuSchema = z
     }
   });
 
-/** Returns the first validation message, or null when the payload is valid. */
-export function firstIvrMenuError(payload: unknown): string | null {
-  const r = ivrMenuSchema.safeParse(payload);
-  return r.success ? null : r.error.issues[0].message;
+/** Values held by the IVR menu form (UI shape; `useTTS` is UI-only). */
+export interface IvrMenuFormValues {
+  name: string;
+  useTTS: boolean;
+  audio_file_path: string;
+  recording_id?: number;
+  tts_text: string;
+  tts_voice?: string;
+  max_timeout: number;
+  inter_digit_timeout: number;
+  max_turns: number;
+  failover_destination_type: IvrFailoverDestinationType;
+  failover_destination_id?: string;
+  status: IvrMenuStatus;
+  options: Array<{
+    input_digits: string;
+    description?: string;
+    destination_type: IvrDestinationType;
+    destination_id: string;
+  }>;
 }
+
+/** Maps form values to the API payload (only the active audio source is sent). */
+export function toIvrPayload(v: IvrMenuFormValues): CreateIvrMenuRequest {
+  return {
+    name: v.name,
+    audio_file_path: v.useTTS ? undefined : (v.recording_id ? undefined : v.audio_file_path),
+    recording_id: v.useTTS ? undefined : v.recording_id,
+    tts_text: v.useTTS ? v.tts_text : undefined,
+    tts_voice: v.useTTS ? v.tts_voice : undefined,
+    max_timeout: v.max_timeout,
+    inter_digit_timeout: v.inter_digit_timeout,
+    max_turns: v.max_turns,
+    failover_destination_type: v.failover_destination_type,
+    failover_destination_id: v.failover_destination_id,
+    status: v.status,
+    options: (v.options ?? []).map((o, i) => ({
+      input_digits: o.input_digits,
+      description: o.description,
+      destination_type: o.destination_type,
+      destination_id: o.destination_id,
+      priority: i + 1,
+    })),
+  };
+}
+
+/** Form schema: validates the API payload, so error paths match the form field names. */
+export const ivrMenuFormSchema = z.preprocess((v) => toIvrPayload(v as IvrMenuFormValues), ivrMenuSchema);

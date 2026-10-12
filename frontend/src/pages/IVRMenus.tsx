@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { queryKeys } from '@/lib/queryKeys';
-import { firstIvrMenuError } from '@/schemas/ivrMenu';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
@@ -20,7 +19,6 @@ import { cn } from '@/lib/utils';
 import type {
   IvrMenu,
   IvrMenuStatus,
-  IvrFailoverDestinationType,
   CreateIvrMenuRequest,
   UpdateIvrMenuRequest,
 } from '@/types/api.types';
@@ -62,7 +60,7 @@ import {
 } from '@/components/design-system';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
-import { IvrMenuForm, type IvrMenuFormData } from '@/components/ivr/IvrMenuForm';
+import { IvrMenuForm, EMPTY_IVR_FORM, ivrMenuToFormValues } from '@/components/ivr/IvrMenuForm';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 
@@ -90,22 +88,6 @@ export default function IVRMenus() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState<IvrMenu | null>(null);
   
-  // Form data
-  const [formData, setFormData] = useState<IvrMenuFormData>({
-    name: '',
-    audio_file_path: '',
-    recording_id: undefined,
-    tts_text: '',
-    tts_voice: undefined,
-    useTTS: false,
-    max_timeout: 1,
-    inter_digit_timeout: 1,
-    max_turns: 1,
-    failover_destination_type: 'hangup' as IvrFailoverDestinationType,
-    status: 'active' as IvrMenuStatus,
-    options: [],
-  });
-
   // Helper to render destination badge (matches Extensions page format)
 
   // Available recordings for audio selection
@@ -179,7 +161,6 @@ export default function IVRMenus() {
       // Invalidate all IVR menu queries including those with parameters
       void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
-      resetForm();
       toast.success('IVR menu created successfully');
     },
     onError: (error: Error | unknown) => {
@@ -196,7 +177,6 @@ export default function IVRMenus() {
       void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedMenu(null);
-      resetForm();
       toast.success('IVR menu updated successfully');
     },
     onError: (error: Error | unknown) => {
@@ -253,89 +233,9 @@ export default function IVRMenus() {
     }
   };
 
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      audio_file_path: '',
-      recording_id: undefined,
-      tts_text: '',
-      tts_voice: undefined,
-      useTTS: false,
-      max_timeout: 1,
-      inter_digit_timeout: 1,
-      max_turns: 1,
-      failover_destination_type: 'hangup' as IvrFailoverDestinationType,
-      status: 'active' as IvrMenuStatus,
-      options: [],
-    });
-  };
-
-  // Build the API payload from the form and validate it with the shared zod schema.
-  const buildRequest = (): CreateIvrMenuRequest | null => {
-    const requestData: CreateIvrMenuRequest = {
-      name: formData.name,
-      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
-      recording_id: formData.useTTS ? undefined : formData.recording_id,
-      tts_text: formData.useTTS ? formData.tts_text : undefined,
-      tts_voice: formData.useTTS ? formData.tts_voice : undefined,
-      max_timeout: formData.max_timeout,
-      inter_digit_timeout: formData.inter_digit_timeout,
-      max_turns: formData.max_turns,
-      failover_destination_type: formData.failover_destination_type as any,
-      failover_destination_id: formData.failover_destination_id,
-      status: formData.status as IvrMenuStatus,
-      options: formData.options.map((option, index) => ({
-        input_digits: option.input_digits,
-        description: option.description,
-        destination_type: option.destination_type,
-        destination_id: option.destination_id,
-        priority: index + 1,
-      })),
-    };
-
-    const error = firstIvrMenuError(requestData);
-    if (error) {
-      toast.error(error);
-      return null;
-    }
-    return requestData;
-  };
-
-  // Handle create
-  const handleCreate = () => {
-    const requestData = buildRequest();
-    if (requestData) createMutation.mutate(requestData);
-  };
-
-  // Handle update
-  const handleUpdate = () => {
-    if (!selectedMenu) return;
-    const requestData = buildRequest();
-    if (requestData) updateMutation.mutate({ id: selectedMenu.id, data: requestData as UpdateIvrMenuRequest });
-  };
-
   // Open edit dialog
   const openEditDialog = (menu: IvrMenu) => {
     setSelectedMenu(menu);
-    setFormData({
-      name: menu.name,
-      audio_file_path: menu.recording_id ? undefined : menu.audio_file_path,
-      recording_id: menu.recording_id,
-      tts_text: menu.tts_text,
-      tts_voice: menu.tts_voice,
-      useTTS: !!menu.tts_text,
-      max_timeout: menu.max_timeout,
-      inter_digit_timeout: menu.inter_digit_timeout,
-      max_turns: menu.max_turns,
-      failover_destination_type: menu.failover_destination_type,
-      failover_destination_id: menu.failover_destination_id ? String(menu.failover_destination_id) : undefined,
-      status: menu.status,
-      options: (menu.options || []).map(opt => ({
-        ...opt,
-        destination_id: String(opt.destination_id)
-      })),
-    });
     setIsEditDialogOpen(true);
   };
 
@@ -542,8 +442,7 @@ export default function IVRMenus() {
         onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
           if (open) {
-            resetForm();
-          }
+                }
         }
         }
       >
@@ -557,8 +456,11 @@ export default function IVRMenus() {
 
           <IvrMenuForm
             mode="create"
-            formData={formData}
-            setFormData={setFormData}
+            defaultValues={EMPTY_IVR_FORM}
+            onSubmit={(data) => createMutation.mutate(data)}
+            onCancel={() => setIsCreateDialogOpen(false)}
+            isPending={createMutation.isPending}
+            submitLabel="Create Menu"
             recordings={recordingsData?.data as Recording[] | undefined}
             voices={voices}
             voiceFilters={filters}
@@ -566,14 +468,6 @@ export default function IVRMenus() {
             cloudonixSettings={cloudonixSettings}
           />
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
-              Create Menu
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog >
 
@@ -589,8 +483,11 @@ export default function IVRMenus() {
 
           <IvrMenuForm
             mode="edit"
-            formData={formData}
-            setFormData={setFormData}
+            defaultValues={selectedMenu ? ivrMenuToFormValues(selectedMenu) : EMPTY_IVR_FORM}
+            onSubmit={(data) => selectedMenu && updateMutation.mutate({ id: selectedMenu.id, data: data as UpdateIvrMenuRequest })}
+            onCancel={() => setIsEditDialogOpen(false)}
+            isPending={updateMutation.isPending}
+            submitLabel="Update Menu"
             isRecordingUrl={selectedMenu?.is_recording_url}
             recordings={recordingsData?.data as Recording[] | undefined}
             voices={voices}
@@ -599,14 +496,6 @@ export default function IVRMenus() {
             cloudonixSettings={cloudonixSettings}
           />
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
-              Update Menu
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog >
 

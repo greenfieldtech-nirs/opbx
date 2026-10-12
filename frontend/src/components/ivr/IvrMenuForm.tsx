@@ -4,12 +4,14 @@
  */
 
 import { useState } from 'react';
-import { IVR_LIMITS } from '@/schemas/ivrMenu';
-import type {
-  IvrMenuStatus,
-  IvrDestinationType,
-  IvrFailoverDestinationType,
-} from '@/types/api.types';
+import { useFieldArray, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  ivrMenuFormSchema,
+  IVR_LIMITS,
+  type IvrMenuFormValues,
+} from '@/schemas/ivrMenu';
+import type { CreateIvrMenuRequest, IvrDestinationType, IvrMenu } from '@/types/api.types';
 import type {
   CloudonixSettings,
   CloudonixVoice,
@@ -39,29 +41,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { DialogFooter } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { Plus, Phone, Trash2, RefreshCw, ChevronDown } from 'lucide-react';
-
-export interface IvrMenuFormData {
-  name: string;
-  description?: string;
-  audio_file_path?: string;
-  recording_id?: number;
-  tts_text?: string;
-  tts_voice?: string;
-  useTTS: boolean;
-  max_timeout: number;
-  inter_digit_timeout: number;
-  max_turns: number;
-  failover_destination_type: IvrFailoverDestinationType;
-  failover_destination_id?: string;
-  status: IvrMenuStatus;
-  options: Array<{
-    input_digits: string;
-    description?: string;
-    destination_type: IvrDestinationType;
-    destination_id: string;
-  }>;
-}
 
 // Voice selector component with search and advanced filters
 const VoiceSelector: React.FC<{
@@ -237,8 +227,11 @@ const VoiceSelector: React.FC<{
 export interface IvrMenuFormProps {
   /** Edit mode offers "Disconnect" on destination pickers and keeps the stored default voice shown. */
   mode: 'create' | 'edit';
-  formData: IvrMenuFormData;
-  setFormData: (data: IvrMenuFormData) => void;
+  defaultValues: IvrMenuFormValues;
+  onSubmit: (payload: CreateIvrMenuRequest) => void;
+  onCancel: () => void;
+  isPending?: boolean;
+  submitLabel: string;
   /** True when the edited menu's audio is a recording URL. */
   isRecordingUrl?: boolean;
   recordings?: Recording[];
@@ -248,10 +241,52 @@ export interface IvrMenuFormProps {
   cloudonixSettings?: CloudonixSettings;
 }
 
+export const EMPTY_IVR_FORM: IvrMenuFormValues = {
+  name: '',
+  useTTS: false,
+  audio_file_path: '',
+  recording_id: undefined,
+  tts_text: '',
+  tts_voice: undefined,
+  max_timeout: 1,
+  inter_digit_timeout: 1,
+  max_turns: 1,
+  failover_destination_type: 'hangup',
+  failover_destination_id: undefined,
+  status: 'active',
+  options: [],
+};
+
+export const ivrMenuToFormValues = (menu: IvrMenu): IvrMenuFormValues => ({
+  name: menu.name,
+  useTTS: !!menu.tts_text,
+  audio_file_path: (menu.recording_id ? '' : menu.audio_file_path) ?? '',
+  recording_id: menu.recording_id ?? undefined,
+  tts_text: menu.tts_text ?? '',
+  tts_voice: menu.tts_voice ?? undefined,
+  max_timeout: menu.max_timeout,
+  inter_digit_timeout: menu.inter_digit_timeout,
+  max_turns: menu.max_turns,
+  failover_destination_type: menu.failover_destination_type,
+  failover_destination_id: menu.failover_destination_id ? String(menu.failover_destination_id) : undefined,
+  status: menu.status,
+  options: (menu.options || []).map((o) => ({
+    input_digits: o.input_digits,
+    description: o.description ?? '',
+    destination_type: o.destination_type,
+    destination_id: String(o.destination_id),
+  })),
+});
+
+const OPTION_TYPES = ['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours', 'call_queue'] as const;
+
 export function IvrMenuForm({
   mode,
-  formData,
-  setFormData,
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isPending,
+  submitLabel,
   isRecordingUrl,
   recordings,
   voices,
@@ -261,370 +296,443 @@ export function IvrMenuForm({
 }: IvrMenuFormProps) {
   const isEdit = mode === 'edit';
   const [isMenuSettingsOpen, setIsMenuSettingsOpen] = useState(false);
+  const [tab, setTab] = useState('audio');
+
+  const form = useForm<IvrMenuFormValues>({
+    // The schema validates the API payload derived from the form values, so
+    // handleSubmit receives that payload (not form values): see submit below.
+    resolver: zodResolver(ivrMenuFormSchema) as never,
+    defaultValues,
+    mode: 'onChange',
+  });
+  const { control, setValue, trigger, watch, formState: { errors } } = form;
+  const { fields, append, remove } = useFieldArray({ control, name: 'options' });
+
+  const useTTS = watch('useTTS');
+  const audioFilePath = watch('audio_file_path') ?? '';
+  const recordingId = watch('recording_id');
+  const ttsText = watch('tts_text') ?? '';
+  const options = watch('options');
+  const failoverType = watch('failover_destination_type');
+
+  // Audio source errors land on tts_text (see ivrMenuSchema); re-check it when any audio field changes.
+  const setAudio = (
+    name: 'audio_file_path' | 'recording_id' | 'tts_text' | 'tts_voice' | 'useTTS',
+    value: string | number | boolean | undefined,
+  ) => {
+    setValue(name, value as never, { shouldDirty: true, shouldValidate: true });
+    void trigger('tts_text');
+  };
+
+  const audioError = errors.tts_text?.message;
+  const optionsError = errors.options?.root?.message ?? errors.options?.message;
+  const audioTabInvalid = !!(errors.tts_text || errors.audio_file_path || errors.recording_id || errors.tts_voice);
+  const optionsTabInvalid = !!(errors.options || errors.failover_destination_id || errors.max_timeout || errors.inter_digit_timeout || errors.max_turns);
 
   const addMenuOption = () => {
     // Next digit = highest existing numeric digit + 1
-    const existingDigits = formData.options
-      .map(option => parseInt(option.input_digits))
-      .filter(digit => !isNaN(digit));
-    const nextDigit = existingDigits.length > 0 ? Math.max(...existingDigits) + 1 : 1;
-
-    setFormData({
-      ...formData,
-      options: [
-        ...formData.options,
-        {
-          input_digits: nextDigit.toString(),
-          description: '',
-          destination_type: 'extension' as IvrDestinationType,
-          destination_id: '',
-        },
-      ],
+    const existing = (options ?? []).map((o) => parseInt(o.input_digits)).filter((d) => !isNaN(d));
+    append({
+      input_digits: String(existing.length > 0 ? Math.max(...existing) + 1 : 1),
+      description: '',
+      destination_type: 'extension' as IvrDestinationType,
+      destination_id: '',
     });
   };
 
-  const removeMenuOption = (index: number) => {
-    setFormData({
-      ...formData,
-      options: (formData.options || []).filter((_, i) => i !== index),
-    });
-  };
-
-  const updateMenuOption = (index: number, field: keyof IvrMenuFormData['options'][0], value: string | number | boolean) => {
-    const updatedOptions = [...formData.options];
-    updatedOptions[index] = { ...updatedOptions[index], [field]: value };
-    setFormData({ ...formData, options: updatedOptions });
+  // Jump to the first tab that holds an error (the errors argument is fresh; the render-time ones are not).
+  const onInvalid = (e: typeof errors) => {
+    if (e.tts_text || e.audio_file_path || e.recording_id || e.tts_voice) setTab('audio');
+    else if (e.options || e.failover_destination_id) setTab('options');
   };
 
   return (
-    <>
-    {/* Name field above tabs */}
-    <div className="mb-6">
-      <div className="space-y-2">
-        <Label htmlFor="edit-name">Name *</Label>
-        <Input
-          id="edit-name"
-          value={formData.name || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="e.g., Main Menu"
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit((parsed) => onSubmit(parsed as unknown as CreateIvrMenuRequest), onInvalid)} noValidate>
+        <FormField
+          control={control}
+          name="name"
+          render={({ field }) => (
+            <FormItem className="mb-6">
+              <FormLabel>Name *</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="e.g., Main Menu" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-      </div>
-    </div>
 
-    <Tabs defaultValue="audio" className="w-full">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="audio">Audio</TabsTrigger>
-        <TabsTrigger value="options">Menu Options</TabsTrigger>
-      </TabsList>
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="audio" className={cn(audioTabInvalid && 'text-destructive')}>
+              Audio{audioTabInvalid && ' (!)'}
+            </TabsTrigger>
+            <TabsTrigger value="options" className={cn(optionsTabInvalid && 'text-destructive')}>
+              Menu Options{optionsTabInvalid && ' (!)'}
+            </TabsTrigger>
+          </TabsList>
 
-      <TabsContent value="audio" className="space-y-4">
-        <div className="space-y-4">
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-audio-resource">Audio Resource</Label>
-            <Select
-              value={formData.useTTS ? 'text-to-speech' : 'audio-file'}
-              onValueChange={(value) => {
-                if (value === 'text-to-speech') {
-                  setFormData({ ...formData, useTTS: true, audio_file_path: '', tts_text: formData.tts_text || '' });
-                } else {
-                  setFormData({ ...formData, useTTS: false, tts_text: '', audio_file_path: formData.audio_file_path || '' });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="audio-file">Audio File</SelectItem>
-                <SelectItem value="text-to-speech">Text-to-Speech</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {!formData.useTTS ? (
+          <TabsContent value="audio" className="space-y-4">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-audio-source">Audio Source</Label>
+                <Label htmlFor="audio-resource">Audio Resource</Label>
                 <Select
-                  value={formData.recording_id ? 'recording' : (formData.audio_file_path?.startsWith('http') ? 'remote' : 'recording')}
+                  value={useTTS ? 'text-to-speech' : 'audio-file'}
                   onValueChange={(value) => {
-                    if (value === 'remote') {
-                      setFormData({ ...formData, audio_file_path: 'https://' });
+                    if (value === 'text-to-speech') {
+                      setValue('audio_file_path', '');
+                      setAudio('useTTS', true);
                     } else {
-                      setFormData({ ...formData, audio_file_path: '' });
+                      setValue('tts_text', '');
+                      setAudio('useTTS', false);
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="audio-resource">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="recording">From Recordings</SelectItem>
-                    <SelectItem value="remote">Remote URL</SelectItem>
+                    <SelectItem value="audio-file">Audio File</SelectItem>
+                    <SelectItem value="text-to-speech">Text-to-Speech</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {isRecordingUrl || (!formData.audio_file_path?.startsWith('http') && !formData.recording_id) ? (
-                <div className="space-y-2">
-                  <Label htmlFor="edit-recording-select">Select Recording</Label>
-                  <Select
-                    value={formData.recording_id?.toString() || ''}
-                    onValueChange={(value) => setFormData({ ...formData, recording_id: value ? parseInt(value) : undefined, audio_file_path: '' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a recording" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {recordings?.map((recording: Recording) => (
-                        <SelectItem key={recording.id} value={recording.id.toString()}>
-                          {recording.name || `Recording ${recording.id}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    Select from uploaded recordings or upload new ones in the Recordings page
-                  </p>
+              {!useTTS ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="audio-source">Audio Source</Label>
+                    <Select
+                      value={recordingId ? 'recording' : (audioFilePath.startsWith('http') ? 'remote' : 'recording')}
+                      onValueChange={(value) => {
+                        setValue('recording_id', undefined);
+                        setAudio('audio_file_path', value === 'remote' ? 'https://' : '');
+                      }}
+                    >
+                      <SelectTrigger id="audio-source">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recording">From Recordings</SelectItem>
+                        <SelectItem value="remote">Remote URL</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {isRecordingUrl || (!audioFilePath.startsWith('http') && !recordingId) ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="recording-select">Select Recording</Label>
+                      <Select
+                        value={recordingId?.toString() || ''}
+                        onValueChange={(value) => {
+                          setValue('audio_file_path', '');
+                          setAudio('recording_id', value ? parseInt(value) : undefined);
+                        }}
+                      >
+                        <SelectTrigger id="recording-select">
+                          <SelectValue placeholder="Choose a recording" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {recordings?.map((recording: Recording) => (
+                            <SelectItem key={recording.id} value={recording.id.toString()}>
+                              {recording.name || `Recording ${recording.id}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Select from uploaded recordings or upload new ones in the Recordings page
+                      </p>
+                      {audioError && <p role="alert" className="text-sm font-medium text-destructive">{audioError}</p>}
+                    </div>
+                  ) : (
+                    <FormField
+                      control={control}
+                      name="audio_file_path"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Remote Audio URL</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              onChange={(e) => { field.onChange(e); void trigger('tts_text'); }}
+                              placeholder="https://example.com/audio/welcome.mp3"
+                            />
+                          </FormControl>
+                          <p className="text-sm text-muted-foreground">
+                            Enter a full URL to an audio file (MP3, WAV, etc.) - {audioFilePath.length}/{IVR_LIMITS.audioFilePath} characters
+                            {audioFilePath.length > 450 && (
+                              <span className="text-amber-600 ml-2">Approaching limit</span>
+                            )}
+                          </p>
+                          <FormMessage />
+                          {audioError && <p role="alert" className="text-sm font-medium text-destructive">{audioError}</p>}
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="edit-audio-url">Remote Audio URL</Label>
-                  <Input
-                    id="edit-audio-url"
-                    value={formData.audio_file_path || ''}
-                    onChange={(e) => setFormData({ ...formData, audio_file_path: e.target.value })}
-                    placeholder="https://example.com/audio/welcome.mp3"
-                    maxLength={500}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Enter a full URL to an audio file (MP3, WAV, etc.) - {(formData.audio_file_path || '').length}/500 characters
-                    {(formData.audio_file_path || '').length > 450 && (
-                      <span className="text-amber-600 ml-2">Approaching limit</span>
+                <div className="space-y-4">
+                  <FormField
+                    control={control}
+                    name="tts_voice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <VoiceSelector
+                          value={isEdit ? (field.value || 'en-US-Neural2-A') : (field.value as string)}
+                          onChange={field.onChange}
+                          voices={voices}
+                          filters={filters}
+                          onRefresh={onRefreshVoices}
+                          cloudonixSettings={cloudonixSettings}
+                        />
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </p>
+                  />
+
+                  <FormField
+                    control={control}
+                    name="tts_text"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Text to Speak</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            placeholder="Enter the text that will be converted to speech"
+                            rows={4}
+                          />
+                        </FormControl>
+                        <p className={cn('text-sm text-muted-foreground', ttsText.length > IVR_LIMITS.ttsText && 'text-destructive font-medium')}>
+                          {ttsText.length}/{IVR_LIMITS.ttsText} characters. Use SSML tags for advanced formatting.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               )}
             </div>
-          ) : (
+          </TabsContent>
+
+          <TabsContent value="options" className="space-y-4">
             <div className="space-y-4">
-              <VoiceSelector
-                value={isEdit ? (formData.tts_voice || 'en-US-Neural2-A') : formData.tts_voice}
-                onChange={(value) => setFormData({ ...formData, tts_voice: value })}
-                voices={voices}
-                filters={filters}
-                onRefresh={onRefreshVoices}
-                cloudonixSettings={cloudonixSettings}
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-tts-text">Text to Speak</Label>
-                <Textarea
-                  id="edit-tts-text"
-                  value={formData.tts_text || ''}
-                  onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
-                  placeholder="Enter the text that will be converted to speech"
-                  rows={4}
-                  maxLength={IVR_LIMITS.ttsText}
-                />
-                <p className="text-sm text-muted-foreground">
-                  {(formData.tts_text || '').length}/{IVR_LIMITS.ttsText} characters. Use SSML tags for advanced formatting.
-                </p>
+              <div className="flex justify-between items-center">
+                <Label className="text-base font-medium">Menu Options</Label>
+                <div className="flex items-center gap-2">
+                  {fields.length >= IVR_LIMITS.options.max && (
+                    <span className="text-sm text-amber-600">Maximum {IVR_LIMITS.options.max} options</span>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={addMenuOption}
+                    size="sm"
+                    disabled={fields.length >= IVR_LIMITS.options.max}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Option
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </TabsContent>
+              {optionsError && <p role="alert" className="text-sm font-medium text-destructive">{optionsError}</p>}
 
-      <TabsContent value="options" className="space-y-4">
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <Label className="text-base font-medium">Menu Options</Label>
-            <div className="flex items-center gap-2">
-              {(formData.options || []).length >= 20 && (
-                <span className="text-sm text-amber-600">Maximum 20 options</span>
+              {fields.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No menu options configured</p>
+                  <p className="text-sm">Add options below to define how callers navigate your IVR menu</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {fields.map((item, index) => {
+                    const option = options?.[index];
+                    return (
+                      <Card key={item.id} className="w-full">
+                        <CardContent className="p-4">
+                          <div className="flex flex-col md:flex-row gap-6 items-start w-full">
+                            <FormField
+                              control={control}
+                              name={`options.${index}.input_digits`}
+                              render={({ field }) => (
+                                <FormItem className="w-full md:w-20 shrink-0">
+                                  <FormLabel>Digits *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      onChange={(e) => {
+                                        // Only digits, * and # are allowed
+                                        if (/^[0-9*#]*$/.test(e.target.value)) field.onChange(e);
+                                      }}
+                                      placeholder="1"
+                                      maxLength={IVR_LIMITS.inputDigits}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <div className="flex-1 min-w-0 w-full space-y-2">
+                              <DestinationTypeAndSelector
+                                typeValue={option?.destination_type}
+                                destinationValue={option?.destination_id ?? ''}
+                                onChange={(type, destId) => {
+                                  setValue(`options.${index}.destination_type`, type as IvrDestinationType, { shouldDirty: true });
+                                  setValue(`options.${index}.destination_id`, destId, { shouldDirty: true, shouldValidate: true });
+                                }}
+                                layout="horizontal"
+                                typeClassName="w-full md:w-[220px] flex-none"
+                                destinationClassName="flex-1 min-w-0"
+                                allowedTypes={[...OPTION_TYPES]}
+                                extensionTypes={option?.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                                allowDisconnect={isEdit}
+                                typeLabel="Type"
+                                destinationLabel="Destination"
+                              />
+                              <FormField
+                                control={control}
+                                name={`options.${index}.destination_id`}
+                                render={() => <FormMessage />}
+                              />
+                            </div>
+                            <div className="w-full md:w-10 shrink-0 md:pt-6">
+                              <button
+                                type="button"
+                                onClick={() => remove(index)}
+                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
+                                aria-label="Delete option"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
-              <Button
-                type="button"
-                onClick={addMenuOption}
-                size="sm"
-                disabled={(formData.options || []).length >= 20}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Option
-              </Button>
+
+              {/* Menu Settings - Collapsible */}
+              <Collapsible open={isMenuSettingsOpen} onOpenChange={setIsMenuSettingsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="outline" className="flex w-full justify-between p-4 font-medium">
+                    Menu Settings
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isMenuSettingsOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={control}
+                      name="max_timeout"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Timeout (seconds)</FormLabel>
+                          <Select value={String(field.value || 3)} onValueChange={(v) => field.onChange(parseInt(v))}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                                <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-muted-foreground">
+                            How long to wait for the user to first input speech or DTMF
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={control}
+                      name="inter_digit_timeout"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Inter-digit Timeout (seconds)</FormLabel>
+                          <Select value={String(field.value || 2)} onValueChange={(v) => field.onChange(parseInt(v))}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
+                                <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-muted-foreground">
+                            How long to wait between DTMF digits
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={control}
+                      name="max_turns"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Maximum Turns</FormLabel>
+                          <Select value={String(field.value || 3)} onValueChange={(v) => field.onChange(parseInt(v))}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                <SelectItem key={num} value={String(num)}>{num}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-muted-foreground">
+                            How many times to replay the menu on invalid input
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <DestinationTypeAndSelector
+                    typeValue={failoverType}
+                    destinationValue={watch('failover_destination_id') || ''}
+                    onChange={(type, destId) => {
+                      setValue('failover_destination_type', type as IvrMenuFormValues['failover_destination_type'], { shouldDirty: true });
+                      setValue('failover_destination_id', destId || undefined, { shouldDirty: true, shouldValidate: true });
+                    }}
+                    layout="vertical"
+                    includeHangup={true}
+                    allowDisconnect={isEdit}
+                    allowedTypes={[...OPTION_TYPES]}
+                    extensionTypes={failoverType === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
+                    typeLabel="Failover Action"
+                    destinationLabel="Failover Destination"
+                  />
+                  <FormField
+                    control={control}
+                    name="failover_destination_id"
+                    render={() => <FormMessage />}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             </div>
-          </div>
+          </TabsContent>
+        </Tabs>
 
-          {(formData.options || []).length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Phone className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No menu options configured</p>
-              <p className="text-sm">Add options below to define how callers navigate your IVR menu</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {(formData.options || []).map((option, index) => (
-                <Card key={index} className="w-full">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row gap-6 items-start md:items-end w-full">
-                      <div className="w-full md:w-20 shrink-0 space-y-2">
-                        <Label>Digits *</Label>
-                        <Input
-                          value={option.input_digits}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Only allow digits and some special characters (*, #)
-                            if (/^[0-9*#]*$/.test(value)) {
-                              updateMenuOption(index, 'input_digits', value);
-                            }
-                          }}
-                          placeholder="1"
-                          maxLength={10}
-                          className={option.input_digits && !/^[0-9*#]+$/.test(option.input_digits) ? 'border-red-500' : ''}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0 w-full">
-                        <DestinationTypeAndSelector
-                          allowDisconnect={isEdit}
-                          typeValue={option.destination_type}
-                          destinationValue={option.destination_id}
-                          onChange={(type, destId) => {
-                            const updatedOptions = [...formData.options];
-                            updatedOptions[index] = {
-                              ...updatedOptions[index],
-                              destination_type: type as IvrDestinationType,
-                              destination_id: destId
-                            };
-                            setFormData({ ...formData, options: updatedOptions });
-                          }}
-                          layout="horizontal"
-                          typeClassName="w-full md:w-[220px] flex-none"
-                          destinationClassName="flex-1 min-w-0"
-                          allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours', 'call_queue']}
-                          extensionTypes={option.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
-                          typeLabel="Type"
-                          destinationLabel="Destination"
-                        />
-                      </div>
-                      <div className="w-full md:w-10 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => removeMenuOption(index)}
-                          className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
-                          aria-label="Delete option"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* Menu Settings - Collapsible */}
-          <Collapsible open={isMenuSettingsOpen} onOpenChange={setIsMenuSettingsOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="outline" className="flex w-full justify-between p-4 font-medium">
-                Menu Settings
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isMenuSettingsOpen ? 'rotate-180' : ''}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-max-timeout">Max Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.max_timeout || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait for the user to first input speech or DTMF
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-inter-digit-timeout">Inter-digit Timeout (seconds)</Label>
-                  <Select
-                    value={String(formData.inter_digit_timeout || 2)}
-                    onValueChange={(value) => setFormData({ ...formData, inter_digit_timeout: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How long to wait between DTMF digits
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-max-turns">Maximum Turns</Label>
-                  <Select
-                    value={String(formData.max_turns || 3)}
-                    onValueChange={(value) => setFormData({ ...formData, max_turns: parseInt(value) })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                        <SelectItem key={num} value={String(num)}>
-                          {num}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-sm text-muted-foreground">
-                    How many times to replay the menu on invalid input
-                  </p>
-                </div>
-              </div>
-
-              <DestinationTypeAndSelector
-                allowDisconnect={isEdit}
-                typeValue={formData.failover_destination_type}
-                destinationValue={formData.failover_destination_id || ''}
-                onChange={(type, destId) => {
-                  setFormData({
-                    ...formData,
-                    failover_destination_type: type as IvrFailoverDestinationType,
-                    failover_destination_id: destId || undefined
-                  });
-                }}
-                layout="vertical"
-                includeHangup={true}
-                allowedTypes={['extension', 'ring_group', 'conference_room', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'business_hours', 'call_queue']}
-                extensionTypes={formData.failover_destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
-                typeLabel="Failover Action"
-                destinationLabel="Failover Destination"
-              />
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      </TabsContent>
-    </Tabs>
-    </>
+        <DialogFooter className="mt-6">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isPending}>
+            {submitLabel}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Form>
   );
 }

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { firstIvrMenuError } from '../ivrMenu';
+import { ivrMenuSchema } from '../ivrMenu';
+
+const firstIvrMenuError = (p: unknown): string | null => {
+  const r = ivrMenuSchema.safeParse(p);
+  return r.success ? null : r.error.issues[0].message;
+};
 
 const valid = () => ({
   name: 'Main',
