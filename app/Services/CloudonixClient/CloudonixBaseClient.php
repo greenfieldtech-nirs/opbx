@@ -8,7 +8,9 @@ use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Services\CircuitBreaker\CircuitBreaker;
 use App\Services\CircuitBreaker\CircuitBreakerOpenException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -127,7 +129,27 @@ abstract class CloudonixBaseClient
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ])
-            ->baseUrl($this->baseUrl);
+            ->baseUrl($this->baseUrl)
+            ->retry(2, 200, $this->shouldRetry(...), throw: false);
+    }
+
+    /**
+     * Retry only idempotent GETs, and only on connection errors, 429 or 5xx.
+     * Writes (POST/PUT/DELETE) are never retried: a second attempt could repeat the side effect.
+     */
+    protected function shouldRetry(\Throwable $e, PendingRequest $request, ?string $method = null): bool
+    {
+        if (strtoupper((string) $method) !== 'GET') {
+            return false;
+        }
+
+        if ($e instanceof RequestException) {
+            $status = $e->response->status();
+
+            return $status === 429 || $status >= 500;
+        }
+
+        return $e instanceof ConnectionException;
     }
 
     /**
@@ -297,6 +319,7 @@ abstract class CloudonixBaseClient
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/json',
             ])
-            ->baseUrl($this->baseUrl);
+            ->baseUrl($this->baseUrl)
+            ->retry(2, 200, $this->shouldRetry(...), throw: false);
     }
 }

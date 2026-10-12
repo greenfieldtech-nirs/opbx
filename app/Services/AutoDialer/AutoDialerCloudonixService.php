@@ -17,11 +17,12 @@ use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\CloudonixClient\CloudonixCallsClient;
+use App\Services\CloudonixClient\CloudonixDomainsClient;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\AlbsDistributionService;
 use App\Services\VoiceRouting\OutboundRoutingService;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -1043,87 +1044,19 @@ XML;
      */
     private function makeApiCall(CloudonixSettings $settings, array $payload): ?array
     {
-        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
-        $domain = $settings->domain_uuid;
-        $endpoint = "{$baseUrl}/calls/{$domain}/application";
-
         Log::debug('AutoDialer: Making Cloudonix API call', [
-            'endpoint' => $endpoint,
             'payload' => $payload,
         ]);
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$settings->domain_api_key,
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/json',
-        ])->timeout(30)->post($endpoint, $payload);
+        $data = (new CloudonixCallsClient($settings))->originateApplicationCall($payload);
 
-        if ($response->successful()) {
-            $data = $response->json();
-
+        if ($data !== null) {
             Log::info('AutoDialer: Cloudonix API call successful', [
                 'response' => $data,
             ]);
-
-            return $data;
         }
 
-        Log::error('AutoDialer: Cloudonix API call failed', [
-            'status' => $response->status(),
-            'body' => $response->body(),
-        ]);
-
-        return null;
-    }
-
-    /**
-     * Get call status from Cloudonix.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function getCallStatus(CloudonixSettings $settings, string $callId): ?array
-    {
-        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
-        $domain = $settings->domain_uuid;
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$settings->domain_api_key,
-            'Accept' => 'application/json',
-        ])->timeout(30)->get("{$baseUrl}/calls/{$domain}/sessions/{$callId}");
-
-        if ($response->successful()) {
-            return $response->json();
-        }
-
-        return null;
-    }
-
-    /**
-     * Hangup an active call.
-     */
-    public function hangupCall(CloudonixSettings $settings, string $callId): bool
-    {
-        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
-        $domain = $settings->domain_uuid;
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer '.$settings->domain_api_key,
-            'Accept' => 'application/json',
-        ])->timeout(30)->delete("{$baseUrl}/calls/{$domain}/sessions/{$callId}");
-
-        return $response->successful();
-    }
-
-    /**
-     * Get CDR (Call Detail Record) for a call.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function getCallCdr(CloudonixSettings $settings, string $callId): ?array
-    {
-        // CDR is typically retrieved via webhook or a separate endpoint
-        // For now, return session details which include call information
-        return $this->getCallStatus($settings, $callId);
+        return $data;
     }
 
     /**
@@ -1133,29 +1066,6 @@ XML;
      */
     public static function validateCredentials(string $domainUuid, string $apiKey): array
     {
-        $baseUrl = rtrim(config('cloudonix.api.base_url', 'https://api.cloudonix.io'), '/');
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$apiKey,
-                'Accept' => 'application/json',
-            ])->timeout(30)->get("{$baseUrl}/customers/self/domains/{$domainUuid}");
-
-            $success = $response->successful();
-
-            return [
-                'valid' => $success,
-                'profile' => $success ? $response->json() : null,
-            ];
-        } catch (\Exception $e) {
-            Log::error('AutoDialer: Credential validation failed', [
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'valid' => false,
-                'profile' => null,
-            ];
-        }
+        return CloudonixDomainsClient::validateDomainCredentials($domainUuid, $apiKey);
     }
 }

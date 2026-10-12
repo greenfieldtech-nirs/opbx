@@ -14,6 +14,7 @@ use App\Http\Resources\IvrMenuResource;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use App\Services\Cloudonix\CloudonixVoiceService;
+use App\Services\CloudonixClient\CloudonixApiException;
 use App\ValueObjects\IvrAudioConfig;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -342,7 +343,9 @@ class IvrMenuController extends AbstractApiCrudController
             // Handle specific CloudonixClient errors
             $errorMessage = $e->getMessage();
 
-            if (str_contains($errorMessage, 'token') || str_contains($errorMessage, 'unauthorized') || str_contains($errorMessage, 'authentication')) {
+            $api = $e instanceof CloudonixApiException ? $e : null;
+
+            if ($api?->isAuthFailure()) {
                 $statusCode = 401; // Unauthorized
                 $userMessage = 'Authentication failed with Cloudonix API.';
                 $troubleshooting = [
@@ -350,7 +353,7 @@ class IvrMenuController extends AbstractApiCrudController
                     'Regenerate API key in Cloudonix dashboard',
                     'Update organization settings with new token',
                 ];
-            } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'connection') || str_contains($errorMessage, 'network')) {
+            } elseif ($api?->isConnectionFailure()) {
                 $statusCode = 502; // Bad Gateway
                 $userMessage = 'Unable to connect to Cloudonix API.';
                 $troubleshooting = [
