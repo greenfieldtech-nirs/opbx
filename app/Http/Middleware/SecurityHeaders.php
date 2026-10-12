@@ -167,7 +167,7 @@ class SecurityHeaders
         $domains = [];
 
         // Add Cloudonix API domain if configured
-        $cloudonixDomain = config('cloudonix.api_base_url');
+        $cloudonixDomain = config('cloudonix.api.base_url');
         if ($cloudonixDomain) {
             $parsed = parse_url($cloudonixDomain);
             if (isset($parsed['scheme']) && isset($parsed['host'])) {
