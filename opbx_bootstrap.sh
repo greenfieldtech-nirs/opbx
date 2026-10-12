@@ -285,8 +285,9 @@ for DIR in "${DIRS_TO_CHECK[@]}"; do
         print_info "Created directory: $DIR"
     fi
 
-    # Set permissions (777 is fine for Docker, as container user will own files)
-    chmod -R 777 "$DIR" 2>/dev/null || true
+    # 775, not 777: the app container's entrypoint (root) chowns these bind
+    # mounts to www-data on start, so world-writable is never needed.
+    chmod -R 775 "$DIR" 2>/dev/null || true
 done
 
 print_success "Storage and cache directories are ready"
