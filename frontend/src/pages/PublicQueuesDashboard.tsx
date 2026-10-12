@@ -74,6 +74,8 @@ export default function PublicQueuesDashboard() {
     setCycleTick(ROTATE_SECONDS);
 
     const timer = setInterval(() => {
+      // Rotating queues changes the polled queue; pause while the tab is hidden.
+      if (document.hidden) return;
       setCycleTick((tick) => {
         if (tick > 1) {
           return tick - 1;

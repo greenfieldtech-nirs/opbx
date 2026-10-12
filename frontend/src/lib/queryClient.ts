@@ -5,8 +5,8 @@ import type { AxiosError } from 'axios';
 // refetch) and inactive data is kept for the default gcTime. Immediate UI updates after a
 // write are guaranteed by the MutationCache below, which invalidates every query once any
 // mutation succeeds (only mounted queries refetch; the rest are just marked stale).
-// Pollers opt in per query with refetchInterval; background polling stays off by default
-// (refetchIntervalInBackground) and is enabled explicitly only on live pages.
+// Pollers opt in per query with refetchInterval; polling stops while the tab is hidden
+// (refetchIntervalInBackground is false everywhere, never enable it).
 export const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onSuccess: () => {

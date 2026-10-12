@@ -57,6 +57,8 @@ export function RefreshTimer({ interval, isRefreshing, onRefresh, className }: R
 
     // Normal state: tick progress every 50ms
     timerRef.current = setInterval(() => {
+      // No polling while the tab is hidden; refreshes as soon as it is visible again.
+      if (document.hidden) return;
       const elapsed = Date.now() - startTimeRef.current;
       const pct = Math.min((elapsed / interval) * 100, 100);
       setProgress(pct);

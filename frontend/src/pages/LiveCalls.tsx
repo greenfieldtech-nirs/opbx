@@ -151,7 +151,6 @@ export default function LiveCalls() {
     queryKey: queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
-    refetchIntervalInBackground: true,
     staleTime: 0, // Always consider data stale to enable refresh
   });
 
