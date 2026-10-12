@@ -209,14 +209,17 @@ class CallDetailRecordController extends AbstractApiCrudController
             return response()->json(['error' => 'Recording file not found in storage'], 404);
         }
 
-        $fileContent = Storage::disk('recordings')->get($storagePath);
+        $disk = Storage::disk('recordings');
 
-        return response()->stream(function () use ($fileContent) {
-            echo $fileContent;
+        return response()->stream(function () use ($disk, $storagePath): void {
+            $source = $disk->readStream($storagePath);
+            $output = fopen('php://output', 'w');
+            stream_copy_to_stream($source, $output);
+            fclose($source);
+            fclose($output);
         }, 200, [
             'Content-Type' => $call_detail_record->recording_mime_type ?? 'audio/mpeg',
-            'Content-Length' => strlen($fileContent),
-            'Accept-Ranges' => 'bytes',
+            'Content-Length' => $disk->size($storagePath),
             'Cache-Control' => 'private, no-cache',
         ]);
     }
