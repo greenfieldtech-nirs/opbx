@@ -36,7 +36,6 @@ function formatDuration(totalSeconds: number): string {
 
 export default function Announcements() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
 
 
   // Form state for filters

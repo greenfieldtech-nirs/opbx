@@ -153,7 +153,7 @@ export default function RingGroups() {
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'members' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   // Debounce search input
   useEffect(() => {

@@ -16,10 +16,8 @@ import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService,conferenceRoomsService,ringGroupsService,ivrMenusService,aiAssistantLoadBalancersService,phoneNumbersService } from '@/services/createResourceService';
+import { conferenceRoomsService,ringGroupsService,ivrMenusService,phoneNumbersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
-import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
-import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
 Plus,
@@ -124,10 +122,10 @@ export default function ExtensionsComplete() {
   const [sortField, setSortField] = useState<SortField>('extension_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   // Sync state
-  const [syncComparison, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: Record<string, unknown>; from_cloudonix: Record<string, unknown> } | null>(null);
+  const [, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: Record<string, unknown>; from_cloudonix: Record<string, unknown> } | null>(null);
   const [isSyncNeeded, setIsSyncNeeded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -182,12 +180,6 @@ export default function ExtensionsComplete() {
   const extensions = data?.data || [];
   const totalExtensions = data?.meta?.total || 0;
   const totalPages = data?.meta?.last_page || 1;
-
-  // Fetch users for assignment dropdown
-  const { data: usersData } = useQuery({
-    queryKey: [...queryKeys.users.all, { per_page: 100 }],
-    queryFn: () => usersService.getAll({ per_page: 100 }),
-  });
 
 
   // Dialog state
@@ -261,25 +253,7 @@ export default function ExtensionsComplete() {
 
   const ivrMenus = ivrMenusData?.data || [];
 
-  // Fetch AI Assistants for dropdown
-  const { data: aiAssistantsData } = useQuery({
-    queryKey: [...queryKeys.aiAssistants.all, { per_page: 100, status: 'active' }],
-    queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
-  });
 
-
-  // Fetch AI Load Balancers for dropdown
-  const { data: aiLoadBalancersData } = useQuery({
-    queryKey: [...queryKeys.aiLoadBalancers.all, { per_page: 100, status: 'active' }],
-    queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
-  });
-
-
-  // Fetch AI Assistant providers for detail view
-  const { data: aiProvidersData } = useQuery({
-    queryKey: ['aiAssistantProviders'],
-    queryFn: () => aiAssistantProvidersService.getAll(),
-  });
 
 
   // Fetch active DIDs for Default Caller ID selector

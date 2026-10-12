@@ -262,7 +262,7 @@ export default function DistributionListDetail() {
     );
   };
 
-  const handleDeleteDestination = (destinationId: number) => {
+  const handleDeleteDestination = (_destinationId: number) => {
     // TODO: Implement delete destination
     toast.info('Delete destination functionality coming soon');
   };

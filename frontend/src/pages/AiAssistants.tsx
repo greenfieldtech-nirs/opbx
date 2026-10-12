@@ -70,7 +70,7 @@ export default function AiAssistants() {
   const [sortField, setSortField] = useState<'name' | 'provider' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -78,7 +78,6 @@ export default function AiAssistants() {
   const [selectedAssistant, setSelectedAssistant] = useState<AiAssistant | null>(null);
 
   const [formData, setFormData] = useState<AssistantFormData>(emptyFormData);
-  const [visibleTokens, setVisibleTokens] = useState<Set<string>>(new Set());
 
   const canManageAssistants = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);

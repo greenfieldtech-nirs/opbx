@@ -86,7 +86,7 @@ export default function PhoneNumbers() {
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
   const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage] = useState(20);
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
