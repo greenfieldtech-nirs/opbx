@@ -83,7 +83,7 @@ frontend/
 ├── package.json
 ├── tsconfig.json             # TypeScript configuration (strict: false)
 ├── vite.config.ts            # Vite configuration with proxy and code splitting
-└── tailwind.config.js        # Tailwind CSS theme customization
+└── src/index.css             # Tailwind CSS 4 setup (@theme tokens, CSS variables)
 ```
 
 ## Development Setup

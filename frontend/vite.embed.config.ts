@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 // Standalone build for the Embedded Dialer widget. Produces a single,
@@ -7,7 +8,7 @@ import path from 'path'
 // the Laravel app under /embed/assets/ and loaded by the iframe document
 // (see EmbedDialerController::renderIframe).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

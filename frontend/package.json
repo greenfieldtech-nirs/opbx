@@ -61,6 +61,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/forms": "^0.5.9",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -70,19 +71,14 @@
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "@vitejs/plugin-react": "^4.3.2",
-    "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.12",
     "jsdom": "^26.1.0",
     "playwright": "^1.58.2",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.13",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.2",
     "vite": "^7.3.0",
     "vitest": "^4.1.11"
-  },
-  "overrides": {
-    "postcss-selector-parser": "^7.1.6"
   }
 }
