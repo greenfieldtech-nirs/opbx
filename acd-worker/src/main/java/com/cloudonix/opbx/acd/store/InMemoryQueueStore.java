@@ -97,7 +97,10 @@ public class InMemoryQueueStore implements QueueStore {
 
     @Override
     public synchronized Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId,
-            long doneTtlSeconds, Long answeredAt) {
+            long doneTtlSeconds, Long answeredAt, String eventKey, long eventTtlSeconds) {
+        if (eventKey != null && !flags.add(eventKey)) {
+            return Future.succeededFuture();
+        }
         flags.add(doneKey);
         if (answeredAt == null) {
             strings.put(doneKey, "1");

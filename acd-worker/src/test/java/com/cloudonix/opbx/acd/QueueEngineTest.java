@@ -377,6 +377,20 @@ class QueueEngineTest {
     }
 
     @Test
+    void replayedAnsweredAfterARequeueDoesNotDequeueTheCallAgain() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "e1").result();
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, "e2").result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "e1").result(); // Laravel replay
+
+        assertEquals(List.of("call-1"), waiting().stream().map(w -> w.get("callId")).toList());
+        assertEquals("AVAILABLE", agentHash("u1").get("state"));
+        assertEquals("dial", poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300).get("action"));
+    }
+
+    @Test
     void requeueAfterTheCallEndedDoesNotResurrectIt() {
         engine.enqueue("org1", "q1", "call-1").result();
         engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();

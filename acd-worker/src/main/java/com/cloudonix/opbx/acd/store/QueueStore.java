@@ -40,10 +40,11 @@ public interface QueueStore {
      * Atomically tombstone the call (doneKey, EX ttl), remove it from the queue and delete its hash.
      * With {@code answeredAt} set (an 'answered' dequeue) the tombstone keeps the call's queuedAt
      * (or answeredAt when the hash is gone) so {@link #requeue} can restore its place; any other
-     * dequeue marks the call as gone for good.
+     * dequeue marks the call as gone for good. A non-null {@code eventKey} is claimed first
+     * (SET NX EX): a replayed event changes nothing (e.g. an 'answered' replay after a requeue).
      */
     Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds,
-            Long answeredAt);
+            Long answeredAt, String eventKey, long eventTtlSeconds);
 
     /**
      * Atomically put an answered-then-dropped call back at its original FIFO place (by the queuedAt

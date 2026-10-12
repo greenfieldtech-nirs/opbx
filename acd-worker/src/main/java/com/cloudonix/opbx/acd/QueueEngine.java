@@ -172,8 +172,10 @@ public class QueueEngine {
                                 Map.of("state", AgentState.BUSY.name()), 0, 0, evtKey, EVENT_DEDUPE_TTL_SECONDS,
                                 doneKey(org, queue, callId)))
                         : Future.succeededFuture();
+                // Own dedupe key: a replay after a requeue must not dequeue the requeued call again.
                 yield markBusy.compose(v -> store.dequeue(queueKey(org, queue), callKey(org, queue, callId),
-                        doneKey(org, queue, callId), callId, DONE_TTL_SECONDS, time.nowMillis()));
+                        doneKey(org, queue, callId), callId, DONE_TTL_SECONDS, time.nowMillis(),
+                        evtKey != null ? evtKey + ":answered" : null, EVENT_DEDUPE_TTL_SECONDS));
             }
             case "ended" -> {
                 Future<Void> agentUpdate = agentUserId != null
@@ -422,7 +424,7 @@ public class QueueEngine {
 
     private Future<Void> dequeue(String org, String queue, String callId) {
         return store.dequeue(queueKey(org, queue), callKey(org, queue, callId), doneKey(org, queue, callId), callId,
-                DONE_TTL_SECONDS, null);
+                DONE_TTL_SECONDS, null, null, 0);
     }
 
     private void logEvent(String org, String queue, String callId, String msg, Map<String, Object> extra) {

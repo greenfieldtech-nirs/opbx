@@ -42,10 +42,12 @@ public class RedisQueueStore implements QueueStore {
             return 1
             """;
 
-    // KEYS: queue, call hash, done tombstone. ARGV: callId, tombstone ttl, answeredAt ('' = not answered).
+    // KEYS: queue, call hash, done tombstone, event key ('' = none). ARGV: callId, tombstone ttl,
+    // answeredAt ('' = not answered), event ttl. A replayed event (key already claimed) is a no-op.
     // Tombstone 'a:<queuedAt>' = answered (requeue restores that place), '1' = gone. A replayed
     // 'answered' (hash already gone) keeps the existing tombstone instead of losing queuedAt.
     private static final String DEQUEUE_LUA = """
+            if KEYS[4] ~= '' and not redis.call('SET', KEYS[4], '1', 'NX', 'EX', ARGV[4]) then return 0 end
             if ARGV[3] == '' then
               redis.call('SET', KEYS[3], '1', 'EX', ARGV[2])
             else
@@ -179,9 +181,10 @@ public class RedisQueueStore implements QueueStore {
 
     @Override
     public Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds,
-            Long answeredAt) {
-        return redis.eval(List.of(DEQUEUE_LUA, "3", queueKey, callKey, doneKey, callId, String.valueOf(doneTtlSeconds),
-                answeredAt == null ? "" : String.valueOf(answeredAt)))
+            Long answeredAt, String eventKey, long eventTtlSeconds) {
+        return redis.eval(List.of(DEQUEUE_LUA, "4", queueKey, callKey, doneKey, eventKey == null ? "" : eventKey,
+                callId, String.valueOf(doneTtlSeconds), answeredAt == null ? "" : String.valueOf(answeredAt),
+                String.valueOf(eventTtlSeconds)))
                 .mapEmpty();
     }
 
