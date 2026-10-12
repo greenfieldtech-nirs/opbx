@@ -383,8 +383,9 @@ export default function ExtensionsComplete() {
       toast.success('Extension deleted successfully');
     },
     onError: (error: Error | unknown) => {
-      const err = error as { response?: { data?: { error?: { message?: string } } } };
-      const message = err.response?.data?.error?.message || 'Failed to delete extension';
+      const err = error as { response?: { data?: { message?: string; error?: { message?: string } | string } } };
+      const data = err.response?.data;
+      const message = data?.message || (typeof data?.error === 'object' ? data.error?.message : undefined) || 'Failed to delete extension';
       toast.error(message);
     },
   });
