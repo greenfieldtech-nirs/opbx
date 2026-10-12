@@ -6,4 +6,3 @@
 
 export { ActionSelector } from './ActionSelector';
 export { WeeklyCalendarView } from './WeeklyCalendarView';
-export { ScheduleDetailSheet } from './ScheduleDetailSheet';

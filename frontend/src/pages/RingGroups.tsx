@@ -222,7 +222,6 @@ export default function RingGroups() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<Partial<ExtendedRingGroup>>({
@@ -810,10 +809,6 @@ export default function RingGroups() {
   };
 
   // Open detail sheet
-  const openDetailSheet = (group: RingGroup) => {
-    setSelectedGroup(group);
-    setIsDetailSheetOpen(true);
-  };
 
   // Member management functions
   const addMember = () => {
@@ -1717,109 +1712,6 @@ export default function RingGroups() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedGroup && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selectedGroup.name}</SheetTitle>
-                <SheetDescription>
-                  {selectedGroup.description || 'No description provided'}
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6 mt-6">
-                {/* Strategy */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Ring Strategy</h3>
-                  <div className="flex items-center gap-2">
-                    {getStrategyIcon(selectedGroup.strategy)}
-                    <Badge variant="outline">{getStrategyDisplayName(selectedGroup.strategy)}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {getStrategyDescription(selectedGroup.strategy)}
-                  </p>
-                </div>
-
-                {/* Timeout, Ring Turns & Status */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Extension Timeout</h3>
-                    <p className="text-sm">{selectedGroup.timeout} seconds</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Ring Turns</h3>
-                    <p className="text-sm">{selectedGroup.ring_turns} {selectedGroup.ring_turns === 1 ? 'turn' : 'turns'}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Status</h3>
-                    <Badge variant={selectedGroup.status === 'active' ? 'default' : 'secondary'}>
-                      {selectedGroup.status === 'active' ? 'Active' : 'Disabled'}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Fallback Action</h3>
-                  <div className="flex items-center gap-2">
-                    {getFallbackIcon(selectedGroup.fallback_action)}
-                    <span className="text-sm">
-                      {getFallbackDisplayText(
-                        selectedGroup as ExtendedRingGroup,
-                        ringGroups || [],
-                        availableIvrMenus || []
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Members */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">
-                    Members ({selectedGroup.members.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedGroup.members.map((member, index) => {
-                      // Look up the extension to get type and configuration
-                      const ext = availableExtensions.find((e) => e.id === member.extension_id);
-                      const isForward = ext?.type === 'forward';
-                      const forwardTo = ext?.configuration?.forward_to;
-
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              Ext {member.extension_number}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {isForward && forwardTo
-                                ? `Forward to ${forwardTo}`
-                                : (member.user_name || 'Unassigned')}
-                            </p>
-                          </div>
-                          {selectedGroup.strategy === 'sequential' && (
-                            <Badge variant="outline">Priority {member.priority}</Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Timestamps */}
-                <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
-                  <p>Created: {new Date(selectedGroup.created_at).toLocaleString()}</p>
-                  <p>Updated: {new Date(selectedGroup.updated_at).toLocaleString()}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div >
   );
 }

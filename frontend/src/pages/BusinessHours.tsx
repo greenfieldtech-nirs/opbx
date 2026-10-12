@@ -34,7 +34,6 @@ import {
   CreateEditScheduleDialog,
   ExceptionDialog,
   CopyHoursDialog,
-  ScheduleDetailSheet,
   getActionDisplayName,
   getActionDisplayNameSimple,
 } from './business-hours-components';
@@ -74,8 +73,6 @@ const BusinessHours: React.FC = () => {
     setIsCreateEditDialogOpen,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    isDetailSheetOpen,
-    setIsDetailSheetOpen,
     isExceptionDialogOpen,
     setIsExceptionDialogOpen,
     isCopyHoursDialogOpen,
@@ -109,7 +106,6 @@ const BusinessHours: React.FC = () => {
     handleSaveSchedule,
     handleOpenDelete,
     handleConfirmDelete,
-    handleOpenDetail,
     handleToggleStatus,
     setOpenHoursAction,
     setClosedHoursAction,
@@ -418,16 +414,6 @@ const BusinessHours: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Detail Sheet */}
-      <ScheduleDetailSheet
-        open={isDetailSheetOpen}
-        onOpenChange={setIsDetailSheetOpen}
-        schedule={selectedSchedule}
-        extensions={extensions}
-        ringGroups={ringGroups}
-        ivrMenus={ivrMenus}
-      />
     </div>
   );
 };

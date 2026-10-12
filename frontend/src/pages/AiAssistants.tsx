@@ -101,7 +101,6 @@ export default function AiAssistants() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<AiAssistant | null>(null);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   const [formData, setFormData] = useState<AssistantFormData>(emptyFormData);
   const [visibleTokens, setVisibleTokens] = useState<Set<string>>(new Set());
@@ -267,10 +266,6 @@ export default function AiAssistants() {
     setIsDeleteDialogOpen(true);
   };
 
-  const openDetailSheet = (assistant: AiAssistant) => {
-    setSelectedAssistant(assistant);
-    setIsDetailSheetOpen(true);
-  };
 
   const toggleTokenVisibility = (key: string) => {
     setVisibleTokens(prev => {
@@ -647,180 +642,6 @@ export default function AiAssistants() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          {selectedAssistant && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  {selectedAssistant.name}
-                </SheetTitle>
-                <SheetDescription>
-                  AI Assistant Details
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-6">
-                {/* Status */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Status</h3>
-                  <Badge variant={selectedAssistant.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedAssistant.status}
-                  </Badge>
-                </div>
-
-                {/* Description */}
-                {selectedAssistant.description && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Description</h3>
-                    <p className="text-sm text-muted-foreground">{selectedAssistant.description}</p>
-                  </div>
-                )}
-
-                {/* Provider Configuration */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Provider Configuration</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Provider:</span>
-                      <span className="text-sm font-medium">
-                        {providers.find((p: ProviderDefinition) => p.key === selectedAssistant.provider)?.name || selectedAssistant.provider}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Protocol:</span>
-                      <Badge variant={selectedAssistant.protocol === 'websocket' ? 'default' : selectedAssistant.protocol === 'dummy' ? 'outline' : 'secondary'}>
-                        {selectedAssistant.protocol === 'websocket' ? (
-                          <>
-                            <Wifi className="h-3 w-3 mr-1" />
-                            WebSocket
-                          </>
-                        ) : selectedAssistant.protocol === 'dummy' ? (
-                          <>
-                            <Bot className="h-3 w-3 mr-1" />
-                            Dummy
-                          </>
-                        ) : (
-                          <>
-                            <Phone className="h-3 w-3 mr-1" />
-                            SIP
-                          </>
-                        )}
-                      </Badge>
-                    </div>
-
-                    {/* Dynamic configuration display */}
-                    {Object.entries(selectedAssistant.configuration || {}).map(([key, value]) => {
-                      const isSensitive = key.includes('token') || key.includes('key') || key.includes('password');
-                      return (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground capitalize">
-                            {key.replace(/_/g, ' ')}:
-                          </span>
-                          {isSensitive ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-mono">
-                                {visibleTokens.has(key) ? value : '•'.repeat(16)}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleTokenVisibility(key)}
-                              >
-                                {visibleTokens.has(key) ? (
-                                  <EyeOff className="h-3 w-3" />
-                                ) : (
-                                  <Eye className="h-3 w-3" />
-                                )}
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-sm font-mono">{value}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Usage */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Usage</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Used by {selectedAssistant.usage_count || 0} extension(s)
-                  </p>
-                  {selectedAssistant.used_by_extensions && selectedAssistant.used_by_extensions.length > 0 && (
-                    <div className="space-y-2">
-                      {selectedAssistant.used_by_extensions.map((ext) => (
-                        <div key={ext.id} className="flex items-center gap-2 text-sm">
-                          <span className="font-mono">{ext.extension_number}</span>
-                          <Badge variant="outline">{ext.type}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Metadata */}
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-medium mb-3">Metadata</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedAssistant.created_by && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Created by:</span>
-                        <span>{selectedAssistant.created_by.name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Created at:</span>
-                      <span>{new Date(selectedAssistant.created_at).toLocaleString()}</span>
-                    </div>
-                    {selectedAssistant.updated_by && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Updated by:</span>
-                        <span>{selectedAssistant.updated_by.name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Updated at:</span>
-                      <span>{new Date(selectedAssistant.updated_at).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                {canManageAssistants && (
-                  <div className="pt-4 border-t flex gap-2">
-                    <Button
-                      className="flex-1"
-                      onClick={() => {
-                        openEditDialog(selectedAssistant);
-                        setIsDetailSheetOpen(false);
-                      }}
-                    >
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        openDeleteDialog(selectedAssistant);
-                        setIsDetailSheetOpen(false);
-                      }}
-                      disabled={(selectedAssistant.usage_count || 0) > 0}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

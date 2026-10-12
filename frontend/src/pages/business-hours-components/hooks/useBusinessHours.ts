@@ -35,7 +35,6 @@ export function useBusinessHours() {
   // Dialog states
   const [isCreateEditDialogOpen, setIsCreateEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<BusinessHoursSchedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<BusinessHoursSchedule | null>(null);
 
@@ -443,11 +442,6 @@ export function useBusinessHours() {
     deleteMutation.mutate(selectedSchedule.id);
   };
 
-  const handleOpenDetail = (schedule: BusinessHoursSchedule) => {
-    setSelectedSchedule(schedule);
-    setIsDetailSheetOpen(true);
-  };
-
   const handleToggleStatus = (schedule: BusinessHoursSchedule) => {
     if (toggleStatusMutation.isPending) return;
     const newStatus = schedule.status === 'active' ? 'inactive' : 'active';
@@ -489,8 +483,6 @@ export function useBusinessHours() {
     setIsCreateEditDialogOpen,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    isDetailSheetOpen,
-    setIsDetailSheetOpen,
     isExceptionDialogOpen,
     setIsExceptionDialogOpen,
     isCopyHoursDialogOpen,
@@ -538,7 +530,6 @@ export function useBusinessHours() {
     handleSaveSchedule,
     handleOpenDelete,
     handleConfirmDelete,
-    handleOpenDetail,
     handleToggleStatus,
     setOpenHoursAction,
     setClosedHoursAction,

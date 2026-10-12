@@ -325,7 +325,6 @@ export default function AiAssistantLoadBalancers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<FormData>(emptyFormData);
@@ -612,10 +611,6 @@ export default function AiAssistantLoadBalancers() {
   };
 
   // Open detail sheet
-  const openDetailSheet = (lb: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(lb);
-    setIsDetailSheetOpen(true);
-  };
 
   // Member management functions
   const addMember = () => {
@@ -1058,92 +1053,6 @@ export default function AiAssistantLoadBalancers() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedLoadBalancer && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selectedLoadBalancer.name}</SheetTitle>
-                <SheetDescription>
-                  {selectedLoadBalancer.description || 'No description provided'}
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6 mt-6">
-                {/* Strategy */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Load Balancing Strategy</h3>
-                  <div className="flex items-center gap-2">
-                    {getStrategyIcon(selectedLoadBalancer.strategy)}
-                    <Badge variant="outline">{getStrategyDisplayName(selectedLoadBalancer.strategy)}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {getStrategyDescription(selectedLoadBalancer.strategy)}
-                  </p>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Status</h3>
-                  <Badge variant={selectedLoadBalancer.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedLoadBalancer.status === 'active' ? 'Active' : 'Disabled'}
-                  </Badge>
-                </div>
-
-                {/* Fallback Action */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Fallback Action</h3>
-                  <div className="flex items-center gap-2">
-                    {getFallbackIcon(selectedLoadBalancer.fallback_action)}
-                    <span className="text-sm">
-                      {getFallbackDisplayText(
-                        selectedLoadBalancer as ExtendedAiAssistantLoadBalancer,
-                        loadBalancers || [],
-                        availableIvrMenus || []
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Members */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">
-                    AI Assistant Members ({selectedLoadBalancer.members.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedLoadBalancer.members.map((member, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-cyan-500" />
-                            <p className="font-medium">
-                              {member.ai_assistant_name}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Position: {member.position} | Priority: {member.priority} | Weight: {member.weight}
-                          </p>
-                        </div>
-                        <Badge variant="outline">{member.status}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Timestamps */}
-                <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
-                  <p>Created: {new Date(selectedLoadBalancer.created_at).toLocaleString()}</p>
-                  <p>Updated: {new Date(selectedLoadBalancer.updated_at).toLocaleString()}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
