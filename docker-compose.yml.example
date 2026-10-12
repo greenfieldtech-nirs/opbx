@@ -385,7 +385,8 @@ services:
     networks:
       - opbx
     healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:9601/ready']
+      # 127.0.0.1, not localhost: soketi listens on IPv4 only and localhost resolves to ::1 first.
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9601/ready']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -488,7 +489,8 @@ services:
     # The worker drains in-flight initiates for up to 45s on SIGTERM.
     stop_grace_period: 60s
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/webhooks/health"]
+      # GET, not --spider: the health route is GET-only and HEAD returns 404.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/webhooks/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -584,7 +586,7 @@ services:
   # listing, logs and events are allowed; every write endpoint is denied, so
   # Alloy no longer needs root or the raw socket.
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0
+    image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: opbx_docker_socket_proxy
     profiles: ["logs"]
     environment:
