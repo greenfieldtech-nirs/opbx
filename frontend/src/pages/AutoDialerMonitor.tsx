@@ -330,7 +330,7 @@ export default function AutoDialerMonitor() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_KEY);
     return saved ? parseInt(saved, 10) : 10000;
   });
-  const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
+  const [, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 

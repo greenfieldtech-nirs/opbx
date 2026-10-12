@@ -3,7 +3,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
-import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
 import { extensionsService } from '@/services/extensions.service';
@@ -13,16 +13,8 @@ import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock, Play, Pause } from 'lucide-react';
+import { Database, Download, Filter, X, Loader2, RefreshCw, Play, Pause } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
@@ -30,7 +22,6 @@ import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 // Loaded on demand: pulls in the syntax highlighter and JSON viewer.
 const CdrDetailsDialog = lazy(() =>
   import('@/components/cdr/CdrDetailsDialog').then((m) => ({ default: m.CdrDetailsDialog })),
@@ -222,7 +213,6 @@ export default function CallLogs() {
     }
   };
 
-  const handleRefresh = useCallback(() => refetchCdr(), [refetchCdr]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(refreshInterval, cdrIsFetching);

@@ -47,7 +47,6 @@ import {
   RefreshCw,
   Send,
   Check,
-  X,
   AlertCircle,
   Settings,
   Bug,

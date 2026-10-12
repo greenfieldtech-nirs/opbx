@@ -129,7 +129,7 @@ export default function AutoDialerCampaigns() {
   // Default: show all except archived
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'paused' | 'completed' | 'archived' | 'not-archived'>('not-archived');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   const [selectedCampaign, setSelectedCampaign] = useState<AutoDialerCampaign | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);

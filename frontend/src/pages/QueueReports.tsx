@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import {
   callQueuesService,
   queueReportsService,
-  type QueueCallDisposition,
   type QueueCallRow,
 } from '@/services/callQueues.service';
 import { cdrService } from '@/services/cdr.service';

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -40,9 +39,6 @@ import {
   useUpdateAutoDialerCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '@/services/autoDialerCampaignsApi';
-import aiAssistantsService from '@/services/aiAssistants.service';
-import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
-import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import { WeeklyCalendarView } from '@/pages/business-hours-components/components';
@@ -257,17 +253,6 @@ export default function AutoDialerCampaignForm() {
 
   const createMutation = useCreateAutoDialerCampaign();
   const updateMutation = useUpdateAutoDialerCampaign();
-
-  // Fetch AI Assistants and Load Balancers
-  const { data: aiAssistantsData } = useQuery({
-    queryKey: [...queryKeys.aiAssistants.all, { status: 'active' }],
-    queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  const { data: aiLoadBalancersData } = useQuery({
-    queryKey: [...queryKeys.aiLoadBalancers.all, { status: 'active' }],
-    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
-  });
 
 
   const {

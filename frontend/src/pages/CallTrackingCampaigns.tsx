@@ -303,7 +303,7 @@ export default function CallTrackingCampaigns() {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(campaign) => campaign.name}
-            getIdentitySecondary={(campaign) => 'Call Tracking Campaign'}
+            getIdentitySecondary={() => 'Call Tracking Campaign'}
             onIdentityClick={canManage ? (campaign) => navigate(`/ui/call-tracking/campaigns/${campaign.id}`) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
