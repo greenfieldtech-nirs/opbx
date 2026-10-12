@@ -164,9 +164,10 @@ public class QueueEngine {
             case "answered" -> {
                 Future<Void> markBusy = agentUserId != null
                         // A late 'answered' for a call already ended/abandoned (tombstoned) must not
-                        // mark the agent BUSY with no 'ended' left to release them.
+                        // mark the agent BUSY with no 'ended' left to release them. An agent who paused
+                        // (WRAP_UP) while ringing stays paused: no new offers; 'ended' still counts the call.
                         ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
-                                Set.of(AgentState.AVAILABLE.name()), null,
+                                Set.of(AgentState.AVAILABLE.name()), Set.of(), null,
                                 Map.of("state", AgentState.BUSY.name()), 0, 0, evtKey, EVENT_DEDUPE_TTL_SECONDS,
                                 doneKey(org, queue, callId)))
                         : Future.succeededFuture();
@@ -184,7 +185,7 @@ public class QueueEngine {
                 // (missing hash) or paused (WRAP_UP) agent stays as they are.
                 Future<Void> agentUpdate = agentUserId != null
                         ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
-                                Set.of(AgentState.BUSY.name()), null,
+                                Set.of(AgentState.BUSY.name()), Set.of(), null,
                                 Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0,
                                 evtKey, EVENT_DEDUPE_TTL_SECONDS, null))
                         : Future.succeededFuture();
@@ -279,7 +280,10 @@ public class QueueEngine {
                 });
     }
 
-    /** Counters and wrap-up apply only to an agent still BUSY on the call (not logged out or paused since). */
+    /**
+     * BUSY: counters, then wrap-up/AVAILABLE. Paused (WRAP_UP, e.g. paused while ringing or mid-call):
+     * counters only, the pause stays. Logged out (no hash): nothing.
+     */
     private Future<Void> onCallEnded(String org, String queue, String callId, String userId, long talkSeconds,
             long wrapUpSeconds, String evtKey) {
         Map<String, String> updates = wrapUpSeconds > 0
@@ -287,7 +291,8 @@ public class QueueEngine {
                         "wrapUpUntil", String.valueOf(time.nowMillis() + wrapUpSeconds * 1000))
                 : Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0");
         return transition(org, queue, callId, "ended", new AgentTransition(agentKey(org, queue, userId),
-                Set.of(AgentState.BUSY.name()), null, updates, talkSeconds, 1, evtKey, EVENT_DEDUPE_TTL_SECONDS,
+                Set.of(AgentState.BUSY.name()), Set.of(AgentState.WRAP_UP.name()), null, updates, talkSeconds, 1,
+                evtKey, EVENT_DEDUPE_TTL_SECONDS,
                 null));
     }
 
@@ -316,7 +321,7 @@ public class QueueEngine {
                 long wrapUpUntil = Long.parseLong(until);
                 if (wrapUpUntil > 0 && now >= wrapUpUntil) {
                     // Flip only the wrap-up we read: a logout (DEL) or a new pause in between wins.
-                    return store.transitionAgent(new AgentTransition(key, Set.of(AgentState.WRAP_UP.name()), until,
+                    return store.transitionAgent(new AgentTransition(key, Set.of(AgentState.WRAP_UP.name()), Set.of(), until,
                             Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0, null, 0, null))
                             .compose(outcome -> outcome == TransitionOutcome.APPLIED
                                     ? Future.succeededFuture(new AgentStateWithFields(AgentState.AVAILABLE, fields))

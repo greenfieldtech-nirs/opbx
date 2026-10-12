@@ -55,11 +55,13 @@ public interface QueueStore {
     /**
      * Conditional agent update: applies only when the hash exists, its state is in
      * {@code allowedFrom}, (if set) its wrapUpUntil equals {@code expectWrapUpUntil}, and
-     * (if set) {@code absentKey} does not exist.
+     * (if set) {@code absentKey} does not exist. A state in {@code countOnlyFrom} instead gets
+     * only the counter increments: fields and state are left as they are.
      * A non-null {@code eventKey} is claimed in the same atomic step (SET NX EX), so a
      * replayed event is reported as DUPLICATE and changes nothing.
      */
-    record AgentTransition(String agentKey, Set<String> allowedFrom, String expectWrapUpUntil,
+    record AgentTransition(String agentKey, Set<String> allowedFrom, Set<String> countOnlyFrom,
+            String expectWrapUpUntil,
             Map<String, String> fields, long incrTalkSeconds, long incrCalls,
             String eventKey, long eventTtlSeconds, String absentKey) {
     }

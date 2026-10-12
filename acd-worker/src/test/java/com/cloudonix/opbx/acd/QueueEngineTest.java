@@ -333,6 +333,41 @@ class QueueEngineTest {
     }
 
     @Test
+    void agentPausedWhileRingingStaysPausedButTheCallCounts() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, 100L, 2L, null).result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.WRAP_UP, null, null, null).result(); // pause while ringing
+
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+        assertEquals("WRAP_UP", agentHash("u1").get("state"));
+        engine.event("org1", "q1", "call-1", "ended", "u1", 30L, 20L, "e1").result();
+
+        Map<String, String> hash = agentHash("u1");
+        assertEquals("WRAP_UP", hash.get("state"));
+        assertEquals("0", hash.get("wrapUpUntil")); // still the sticky pause, not a post-call wrap-up
+        assertEquals("130", hash.get("talkSecondsTotal"));
+        assertEquals("3", hash.get("callsHandledTotal"));
+        engine.enqueue("org1", "q1", "call-2").result();
+        assertEquals("wait", poll("q1", "call-2", List.of(agent("u1")), "ring_all", 300).get("action"));
+    }
+
+    @Test
+    void replayedEndedForAPausedAgentCountsOnce() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, 100L, 2L, null).result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.WRAP_UP, null, null, null).result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "a1").result();
+        engine.event("org1", "q1", "call-1", "ended", "u1", 30L, 0L, "e1").result();
+
+        engine.event("org1", "q1", "call-1", "ended", "u1", 30L, 0L, "e1").result();
+
+        Map<String, String> hash = agentHash("u1");
+        assertEquals("WRAP_UP", hash.get("state"));
+        assertEquals("130", hash.get("talkSecondsTotal"));
+        assertEquals("3", hash.get("callsHandledTotal"));
+    }
+
+    @Test
     void dialFailedForALoggedOutAgentDoesNotRecreateTheHash() {
         engine.enqueue("org1", "q1", "call-1").result();
         engine.event("org1", "q1", "call-1", "dial_failed", "u1", null, null, null).result();

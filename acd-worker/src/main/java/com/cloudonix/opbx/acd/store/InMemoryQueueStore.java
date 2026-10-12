@@ -79,12 +79,15 @@ public class InMemoryQueueStore implements QueueStore {
             return Future.succeededFuture(TransitionOutcome.DUPLICATE);
         }
         Map<String, String> hash = hashes.get(t.agentKey());
+        boolean apply = hash != null && t.allowedFrom().contains(hash.get("state"));
         if (hash == null || (t.absentKey() != null && flags.contains(t.absentKey()))
-                || !t.allowedFrom().contains(hash.get("state"))
+                || !(apply || t.countOnlyFrom().contains(hash.get("state")))
                 || (t.expectWrapUpUntil() != null && !t.expectWrapUpUntil().equals(hash.get("wrapUpUntil")))) {
             return Future.succeededFuture(TransitionOutcome.SKIPPED);
         }
-        hash.putAll(t.fields());
+        if (apply) {
+            hash.putAll(t.fields());
+        }
         hash.merge("talkSecondsTotal", String.valueOf(t.incrTalkSeconds()),
                 (a, b) -> String.valueOf(Long.parseLong(a) + Long.parseLong(b)));
         hash.merge("callsHandledTotal", String.valueOf(t.incrCalls()),

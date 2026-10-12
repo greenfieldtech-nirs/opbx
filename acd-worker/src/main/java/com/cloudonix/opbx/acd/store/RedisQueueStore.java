@@ -26,15 +26,17 @@ public class RedisQueueStore implements QueueStore {
             """;
 
     // KEYS: agent hash, event key ('' = none), key that must be absent ('' = none). ARGV: allowed
-    // states (csv), expected wrapUpUntil ('' = any), event ttl, incr talk, incr calls, field/value
-    // pairs. Returns 1 applied, 0 skipped, -1 duplicate.
+    // states (csv), expected wrapUpUntil ('' = any), event ttl, incr talk, incr calls, count-only
+    // states (csv, '' = none), field/value pairs. Returns 1 applied, 0 skipped, -1 duplicate.
     private static final String TRANSITION_LUA = """
             if KEYS[2] ~= '' and not redis.call('SET', KEYS[2], '1', 'NX', 'EX', ARGV[3]) then return -1 end
             if KEYS[3] ~= '' and redis.call('EXISTS', KEYS[3]) == 1 then return 0 end
             local state = redis.call('HGET', KEYS[1], 'state')
-            if not state or not string.find(',' .. ARGV[1] .. ',', ',' .. state .. ',', 1, true) then return 0 end
+            if not state or state == '' then return 0 end
+            local apply = string.find(',' .. ARGV[1] .. ',', ',' .. state .. ',', 1, true)
+            if not apply and not string.find(',' .. ARGV[6] .. ',', ',' .. state .. ',', 1, true) then return 0 end
             if ARGV[2] ~= '' and redis.call('HGET', KEYS[1], 'wrapUpUntil') ~= ARGV[2] then return 0 end
-            if #ARGV > 5 then redis.call('HSET', KEYS[1], unpack(ARGV, 6)) end
+            if apply and #ARGV > 6 then redis.call('HSET', KEYS[1], unpack(ARGV, 7)) end
             if ARGV[4] ~= '0' then redis.call('HINCRBY', KEYS[1], 'talkSecondsTotal', ARGV[4]) end
             if ARGV[5] ~= '0' then redis.call('HINCRBY', KEYS[1], 'callsHandledTotal', ARGV[5]) end
             return 1
@@ -161,6 +163,7 @@ public class RedisQueueStore implements QueueStore {
         args.add(String.valueOf(t.eventTtlSeconds()));
         args.add(String.valueOf(t.incrTalkSeconds()));
         args.add(String.valueOf(t.incrCalls()));
+        args.add(String.join(",", t.countOnlyFrom()));
         t.fields().forEach((k, v) -> {
             args.add(k);
             args.add(v);
