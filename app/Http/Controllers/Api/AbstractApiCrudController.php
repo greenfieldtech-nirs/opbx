@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Controllers\Traits\HandlesApiErrors;
 use App\Http\Controllers\Traits\LogsOperations;
 use App\Services\ResourceReferenceChecker;
 use Illuminate\Contracts\Cache\Lock;
@@ -31,7 +30,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 abstract class AbstractApiCrudController extends Controller
 {
-    use ApiRequestHandler, HandlesApiErrors, LogsOperations;
+    use ApiRequestHandler, LogsOperations;
 
     // ============================================================================
     // CONTROLLER CONSTANTS
@@ -639,17 +638,7 @@ abstract class AbstractApiCrudController extends Controller
         $resourceClass = $this->getResourceClass();
         $collection = $resourceClass::collection($models);
 
-        return response()->json([
-            'data' => $collection->resolve(),
-            'meta' => [
-                'current_page' => $models->currentPage(),
-                'per_page' => $models->perPage(),
-                'total' => $models->total(),
-                'last_page' => $models->lastPage(),
-                'from' => $models->firstItem(),
-                'to' => $models->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($models, $collection->resolve(), withRange: true);
     }
 
     /**

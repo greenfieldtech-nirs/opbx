@@ -122,7 +122,7 @@ class AlbsFollowThroughController extends Controller
                 'current_assistant_id' => $failedAssistantId,
             ]);
 
-            return $this->errorResponse('Missing required parameters');
+            return $this->cxmlErrorResponse('Missing required parameters');
         }
 
         // Check if this status should trigger follow-through
@@ -172,7 +172,7 @@ class AlbsFollowThroughController extends Controller
                 'albs_status' => $albs?->status?->value,
             ]);
 
-            return $this->errorResponse('Load balancer not available');
+            return $this->cxmlErrorResponse('Load balancer not available');
         }
 
         // Check if follow_through is enabled on the ALB
@@ -364,7 +364,7 @@ class AlbsFollowThroughController extends Controller
                 'ai_assistant_id' => $aiAssistant->id,
             ]);
 
-            return $this->errorResponse('AI Assistant provider not configured');
+            return $this->cxmlErrorResponse('AI Assistant provider not configured');
         }
 
         $providerDef = $this->providerRegistry->getProvider($provider);
@@ -375,7 +375,7 @@ class AlbsFollowThroughController extends Controller
                 'provider' => $provider,
             ]);
 
-            return $this->errorResponse('Invalid AI Assistant provider configuration');
+            return $this->cxmlErrorResponse('Invalid AI Assistant provider configuration');
         }
 
         $cloudonixParams = [
@@ -408,7 +408,7 @@ class AlbsFollowThroughController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->errorResponse('AI Assistant configuration error');
+            return $this->cxmlErrorResponse('AI Assistant configuration error');
         }
     }
 
@@ -424,7 +424,7 @@ class AlbsFollowThroughController extends Controller
                 'ai_assistant_id' => $aiAssistant->id,
             ]);
 
-            return $this->errorResponse('AI Assistant configuration incomplete');
+            return $this->cxmlErrorResponse('AI Assistant configuration incomplete');
         }
 
         Log::info('ALBS Follow Through: Routing to SIP assistant', [
@@ -701,13 +701,13 @@ class AlbsFollowThroughController extends Controller
 
         if ($protocol === 'websocket') {
             if (! $provider) {
-                return $this->errorResponse('Fallback AI Assistant provider not configured');
+                return $this->cxmlErrorResponse('Fallback AI Assistant provider not configured');
             }
 
             $providerDef = $this->providerRegistry->getProvider($provider);
 
             if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
-                return $this->errorResponse('Invalid fallback AI Assistant provider');
+                return $this->cxmlErrorResponse('Invalid fallback AI Assistant provider');
             }
 
             $cloudonixParams = [
@@ -734,7 +734,7 @@ class AlbsFollowThroughController extends Controller
                     'error' => $e->getMessage(),
                 ]);
 
-                return $this->errorResponse('Fallback AI Assistant configuration error');
+                return $this->cxmlErrorResponse('Fallback AI Assistant configuration error');
             }
         }
 
@@ -746,7 +746,7 @@ class AlbsFollowThroughController extends Controller
         $phoneNumber = $config['phone_number'] ?? null;
 
         if (! $provider || ! $phoneNumber) {
-            return $this->errorResponse('Fallback AI Assistant configuration incomplete');
+            return $this->cxmlErrorResponse('Fallback AI Assistant configuration incomplete');
         }
 
         $headers = MetadataHelper::toSipHeaders($metadata);
@@ -761,7 +761,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Return error CXML response.
      */
-    private function errorResponse(string $message): Response
+    private function cxmlErrorResponse(string $message): Response
     {
         return response(
             CxmlBuilder::unavailable($message),
