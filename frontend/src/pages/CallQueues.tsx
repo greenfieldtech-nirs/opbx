@@ -4,6 +4,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
@@ -146,14 +147,14 @@ export default function CallQueues() {
 
   // Agents are users with an assigned extension.
   const { data: usersData } = useQuery({
-    queryKey: ['users', 'queue-agents'],
+    queryKey: queryKeys.users.queueAgents(),
     queryFn: () => usersService.getAll({ per_page: 100 }),
     enabled: canManage,
   });
 
   const agentUsers = (usersData?.data ?? []).filter((u: any) => u.extension?.extension_number);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.callQueues.all });
+  const invalidate = () => invalidateRoutingResources(queryClient);
 
   const createMutation = useMutation({
     mutationFn: callQueuesService.create,

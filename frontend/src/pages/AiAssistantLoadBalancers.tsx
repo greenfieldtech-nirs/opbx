@@ -4,6 +4,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useState, useEffect, useMemo } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -333,7 +334,7 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch load balancers with React Query
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', {
+    queryKey: [...queryKeys.aiLoadBalancers.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -364,7 +365,7 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available AI Assistants
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.aiAssistants.all, { status: 'active', per_page: 100 }],
     queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -372,13 +373,13 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available extensions
   const { data: extensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
   // Fetch all ring groups for fallback destinations
   const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
-    queryKey: ['ring-groups-all'],
+    queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }),
     staleTime: 60000,
   });
@@ -405,7 +406,7 @@ export default function AiAssistantLoadBalancers() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAiAssistantLoadBalancerRequest) => aiAssistantLoadBalancersService.create(data as any),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('AI Load Balancer created successfully');
@@ -421,7 +422,7 @@ export default function AiAssistantLoadBalancers() {
     mutationFn: ({ id, data }: { id: string; data: UpdateAiAssistantLoadBalancerRequest }) =>
       aiAssistantLoadBalancersService.update(id, data as any),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedLoadBalancer(null);
       setFormData(emptyFormData);
@@ -439,7 +440,7 @@ export default function AiAssistantLoadBalancers() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => aiAssistantLoadBalancersService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedLoadBalancer(null);
       toast.success('AI Load Balancer deleted successfully');

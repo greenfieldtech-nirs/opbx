@@ -32,6 +32,7 @@ export const queryKeys = {
       ['queues-dashboard', queueId, 'stats', timespan] as const,
   },
   dashboard: {
+    all: ['dashboard'] as const,
     supervisor: () => ['dashboard', 'supervisor'] as const,
     activeCalls: () => ['dashboard', 'active-calls'] as const,
     extensionsCount: () => ['dashboard', 'extensions-count'] as const,
@@ -54,6 +55,37 @@ export const queryKeys = {
     all: ['recordings'] as const,
     list: (params?: Params) => ['recordings', 'list', params ?? {}] as const,
   },
+  users: {
+    all: ['users'] as const,
+    queueAgents: () => ['users', 'queue-agents'] as const,
+  },
+  extensions: { all: ['extensions'] as const },
+  ringGroups: {
+    all: ['ring-groups'] as const,
+    // Unpaginated lookup and the call-queue picker inside the ring group form.
+    lookup: () => ['ring-groups-all'] as const,
+    formCallQueues: () => ['ring-groups-form', 'call-queues'] as const,
+  },
+  conferenceRooms: { all: ['conference-rooms'] as const },
+  businessHours: { all: ['business-hours'] as const },
+  aiAssistants: { all: ['ai-assistants'] as const },
+  aiLoadBalancers: { all: ['ai-assistant-load-balancers'] as const },
+  // Destination pickers (useDestinations) cache every routable resource under this root.
+  destinations: { all: ['destinations'] as const },
+  trunks: { all: ['trunks'] as const, outbound: () => ['outbound-trunks'] as const },
+  outboundWhitelist: { all: ['outbound-whitelist'] as const },
+  inboundBlacklist: { all: ['inbound-blacklist'] as const },
+  announcements: { all: ['announcements'] as const },
+  supervisorAssignments: {
+    all: ['supervisor-assignments'] as const,
+    forUser: (userId: string | number) => ['supervisor-assignments', userId] as const,
+  },
+  embedToken: { forUser: (userId: string | number | null | undefined) => ['embed-token', userId] as const },
+  myQueueMemberships: { all: ['my-queue-memberships'] as const },
+  callNotifications: {
+    settings: () => ['call-notifications-settings'] as const,
+  },
+  platform: { all: ['platform'] as const },
   cloudonix: {
     voices: () => ['cloudonix-voices'] as const,
     settings: () => ['cloudonix-settings'] as const,

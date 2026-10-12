@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -120,7 +122,7 @@ export default function AiAssistants() {
 
   // Fetch AI Assistants
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ai-assistants', {
+    queryKey: [...queryKeys.aiAssistants.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -157,7 +159,7 @@ export default function AiAssistants() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAiAssistantRequest) => aiAssistantsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('AI Assistant created successfully');
@@ -173,7 +175,7 @@ export default function AiAssistants() {
     mutationFn: ({ id, data }: { id: number; data: UpdateAiAssistantRequest }) =>
       aiAssistantsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedAssistant(null);
       setFormData(emptyFormData);
@@ -191,7 +193,7 @@ export default function AiAssistants() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => aiAssistantsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedAssistant(null);
       toast.success('AI Assistant deleted successfully');

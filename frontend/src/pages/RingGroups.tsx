@@ -4,6 +4,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useState, useEffect, useMemo } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -244,7 +245,7 @@ export default function RingGroups() {
 
   // Fetch ring groups with React Query
   const { data: ringGroupsData, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ring-groups', {
+    queryKey: [...queryKeys.ringGroups.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -274,18 +275,18 @@ export default function RingGroups() {
 
   // Fetch available extensions (type: user or forward, status: active)
   const { data: userExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
   const { data: forwardExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'forward', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'forward', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'forward', status: 'active', per_page: 100 }),
   });
 
   // Fetch available AI Assistants (type: ai_assistant, status: active)
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['extensions', { type: 'ai_assistant', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'ai_assistant', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
   });
 
@@ -297,7 +298,7 @@ export default function RingGroups() {
 
   // Fetch available AI Load Balancers (status: active)
   const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-load-balancers', { status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.aiLoadBalancers.all, { status: 'active', per_page: 100 }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -306,7 +307,7 @@ export default function RingGroups() {
   }, [aiLoadBalancersData]);
 
   const { data: callQueuesData } = useQuery({
-    queryKey: ['ring-groups-form', 'call-queues'],
+    queryKey: queryKeys.ringGroups.formCallQueues(),
     queryFn: () => callQueuesService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -316,7 +317,7 @@ export default function RingGroups() {
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
   const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
-    queryKey: ['ring-groups-all'],
+    queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
     staleTime: 60000, // 1 minute - keep fresh for form usage
   });
@@ -361,7 +362,7 @@ export default function RingGroups() {
   const createMutation = useMutation({
     mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data as Partial<RingGroup>),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('Ring group created successfully');
@@ -377,7 +378,7 @@ export default function RingGroups() {
     mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
       ringGroupsService.update(id, data as Partial<RingGroup>),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedGroup(null);
       resetForm();
@@ -394,7 +395,7 @@ export default function RingGroups() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ringGroupsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedGroup(null);
       toast.success('Ring group deleted successfully');

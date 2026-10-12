@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { queryKeys } from '@/lib/queryKeys';
 import { firstIvrMenuError, IVR_LIMITS } from '@/schemas/ivrMenu';
@@ -439,7 +440,7 @@ export default function IVRMenus() {
     mutationFn: (data: CreateIvrMenuRequest) => ivrMenusService.create(data),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('IVR menu created successfully');
@@ -455,7 +456,7 @@ export default function IVRMenus() {
       ivrMenusService.update(id, data),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedMenu(null);
       resetForm();
@@ -473,7 +474,7 @@ export default function IVRMenus() {
     mutationFn: (id: string) => ivrMenusService.delete(id),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedMenu(null);
       toast.success('IVR menu deleted successfully');
@@ -489,7 +490,7 @@ export default function IVRMenus() {
     mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
       api.patch(`/ivr-menus/${id}/toggle-status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
+      void invalidateRoutingResources(queryClient);
       toast.success('IVR menu status updated');
     },
     onError: (error: Error | unknown) => {

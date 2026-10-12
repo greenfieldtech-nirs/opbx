@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -162,7 +164,7 @@ export default function ConferenceRooms() {
 
   // Fetch conference rooms
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['conference-rooms', {
+    queryKey: [...queryKeys.conferenceRooms.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -188,7 +190,7 @@ export default function ConferenceRooms() {
   const createMutation = useMutation({
     mutationFn: (data: CreateConferenceRoomRequest) => conferenceRoomsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('Conference room created successfully');
@@ -204,7 +206,7 @@ export default function ConferenceRooms() {
     mutationFn: ({ id, data }: { id: string; data: UpdateConferenceRoomRequest }) =>
       conferenceRoomsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedRoom(null);
       setFormData(emptyFormData);
@@ -222,7 +224,7 @@ export default function ConferenceRooms() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => conferenceRoomsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedRoom(null);
       toast.success('Conference room deleted successfully');

@@ -1,4 +1,5 @@
 import React from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { Clock, Plus, Search, Filter, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -129,7 +130,7 @@ const BusinessHours: React.FC = () => {
               <p className="text-muted-foreground mb-4">
                 {error instanceof Error ? error.message : 'An error occurred while loading business hours'}
               </p>
-              <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['business-hours'] })} >
+              <Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.businessHours.all })} >
                 Try Again
               </Button>
             </div>

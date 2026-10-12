@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { queryKeys } from '@/lib/queryKeys';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -58,7 +59,7 @@ export function useBusinessHours() {
 
   // Fetch business hours schedules
   const { data: schedulesData, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['business-hours'],
+    queryKey: queryKeys.businessHours.all,
     queryFn: () => businessHoursService.getAll(),
   });
 
@@ -66,14 +67,14 @@ export function useBusinessHours() {
 
   // Fetch related data
   const { data: extensionsData } = useQuery({
-    queryKey: ['extensions'],
+    queryKey: queryKeys.extensions.all,
     queryFn: () => extensionsService.getAll({ per_page: 1000 }),
   });
 
   const extensions = extensionsData?.data || [];
 
   const { data: ringGroupsData } = useQuery({
-    queryKey: ['ring-groups'],
+    queryKey: queryKeys.ringGroups.all,
     queryFn: () => ringGroupsService.getAll({ per_page: 1000 }),
   });
 
@@ -87,7 +88,7 @@ export function useBusinessHours() {
   const ivrMenus = ivrMenusData?.data || [];
 
   const { data: conferenceRoomsData } = useQuery({
-    queryKey: ['conference-rooms'],
+    queryKey: queryKeys.conferenceRooms.all,
     queryFn: () => conferenceRoomsService.getAll({ per_page: 1000 }),
   });
 
@@ -142,7 +143,7 @@ export function useBusinessHours() {
     mutationFn: (data: { name: string; status: ScheduleStatus; open_hours_action: BusinessHoursAction; closed_hours_action: BusinessHoursAction; schedule: any; exceptions: any[]; timezone: string }) =>
       businessHoursService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been created successfully.');
       setIsCreateEditDialogOpen(false);
     },
@@ -155,7 +156,7 @@ export function useBusinessHours() {
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       businessHoursService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been updated successfully.');
       setIsCreateEditDialogOpen(false);
     },
@@ -169,7 +170,7 @@ export function useBusinessHours() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => businessHoursService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been deleted.');
       setIsDeleteDialogOpen(false);
     },
@@ -183,7 +184,7 @@ export function useBusinessHours() {
     mutationFn: ({ id, status }: { id: string; status: 'active' | 'inactive' }) =>
       api.patch(`/business-hours/${id}/toggle-status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule status updated');
     },
     onError: (error: Error | unknown) => {
