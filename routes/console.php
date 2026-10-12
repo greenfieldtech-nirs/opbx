@@ -71,3 +71,10 @@ Schedule::command('dialer:reconcile-cac')
     ->withoutOverlapping()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/auto-dialer-scheduler.log'));
+
+// Platform Status: probe every component and store history (pruned by model:prune, see retention.php).
+Schedule::command('platform:health-check')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/platform-health.log'));
