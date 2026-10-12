@@ -257,6 +257,14 @@ class PlatformUserController extends Controller
     }
 
     /**
+     * Preview what deleting this user changes (same code as destroy). Same route group/authorization as destroy.
+     */
+    public function deleteImpact(User $user): JsonResponse
+    {
+        return response()->json(['data' => app(UserDeletionImpactService::class)->preview($user)]);
+    }
+
+    /**
      * Delete a user.
      */
     public function destroy(

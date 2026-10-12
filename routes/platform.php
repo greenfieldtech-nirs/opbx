@@ -39,6 +39,7 @@ Route::prefix('v1/platform')
         Route::post('/organizations/{organization}/users', [PlatformUserController::class, 'store']);
         Route::get('/users/{user}', [PlatformUserController::class, 'show']);
         Route::put('/users/{user}', [PlatformUserController::class, 'update']);
+        Route::get('/users/{user}/delete-impact', [PlatformUserController::class, 'deleteImpact']);
         Route::delete('/users/{user}', [PlatformUserController::class, 'destroy']);
         Route::patch('/users/{user}/platform-manager', [PlatformUserController::class, 'setPlatformManager']);
         Route::patch('/users/{user}/password', [PlatformUserController::class, 'updatePassword']);
