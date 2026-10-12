@@ -249,6 +249,8 @@ services:
       # The directory is gitignored so it won't be committed.
       # Always backup before major changes: ./scripts/backup-database.sh
       - ./volumes/mysql:/var/lib/mysql
+      # Tuned server settings (buffer pool, connections, slow query log).
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/opbx.cnf:ro
     networks:
       - opbx
     # Restart policy ensures MySQL comes back up after host reboots
