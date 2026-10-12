@@ -163,7 +163,6 @@ export default function CallLogs() {
       isSupervisor
     ),
     refetchInterval: refreshInterval,
-    refetchIntervalInBackground: true,
     staleTime: 0,
   });
 

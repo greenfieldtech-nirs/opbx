@@ -75,7 +75,6 @@ export default function QueueReports() {
     queryKey: queryKeys.queueCalls.list(params),
     queryFn: () => queueReportsService.list(params),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
-    refetchIntervalInBackground: true,
   });
 
   const columns: Column<QueueCallRow>[] = [
