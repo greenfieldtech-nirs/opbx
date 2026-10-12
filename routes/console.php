@@ -22,6 +22,13 @@ Schedule::command('session-updates:cleanup', ['--force' => true])
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/session-updates-cleanup.log'));
 
+// Retention (config/retention.php): prune old rows daily.
+Schedule::command('model:prune', ['--model' => [\App\Models\SessionUpdate::class]])
+    ->dailyAt('03:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/model-prune.log'));
+
 // Auto Dialer campaign scheduler - checks for campaigns that should auto-start
 // Runs every minute to process scheduled campaigns
 Schedule::command('auto-dialer:check-campaigns')

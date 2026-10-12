@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\PrunesByRetention;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -48,7 +49,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ScopedBy([OrganizationScope::class])]
 class SessionUpdate extends Model
 {
-    use HasFactory;
+    use HasFactory, PrunesByRetention;
+
+    protected const RETENTION_KEY = 'session_updates_days';
+
+    protected const RETENTION_COLUMN = 'updated_at';
 
     /**
      * The attributes that are mass assignable.

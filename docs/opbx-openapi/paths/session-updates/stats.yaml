@@ -32,7 +32,7 @@ paths:
                             type: integer
                       by_direction:
                         type: object
-                        description: Currently always 0 for both directions.
+                        description: Active calls by direction (same 30-minute window as the live calls list).
                         properties:
                           incoming:
                             type: integer
