@@ -5,7 +5,6 @@
 import type {
   RingGroup,
   RingGroupStrategy,
-  RingGroupMember,
 } from '@/types';
 
 export type RingGroupStatus = 'active' | 'inactive';

@@ -84,7 +84,7 @@ export function useUpdateAutoDialerCampaign() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateCampaignRequest }) =>
       autoDialerCampaignsApi.update(id, data),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -108,7 +108,7 @@ export function useStartCampaign() {
 
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.start(id),
-    onSuccess: (_, id) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -119,7 +119,7 @@ export function usePauseCampaign() {
 
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.pause(id),
-    onSuccess: (_, id) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -130,7 +130,7 @@ export function useResumeCampaign() {
 
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.resume(id),
-    onSuccess: (_, id) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -156,7 +156,7 @@ export function useArchiveCampaign() {
 
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.archive(id),
-    onSuccess: (_, id) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -170,7 +170,7 @@ export function useUploadCampaignList() {
   return useMutation({
     mutationFn: ({ campaignId, file, name }: { campaignId: string; file: File; name?: string }) =>
       autoDialerCampaignsApi.uploadList(campaignId, file, name),
-    onSuccess: (_, { campaignId }) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });
@@ -181,7 +181,7 @@ export function useDeleteCampaignList() {
 
   return useMutation({
     mutationFn: (campaignId: string) => autoDialerCampaignsApi.deleteList(campaignId),
-    onSuccess: (_, campaignId) => {
+    onSuccess: (_) => {
       invalidateCampaigns(queryClient);
     },
   });

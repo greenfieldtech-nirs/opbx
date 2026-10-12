@@ -1,4 +1,3 @@
-import React from 'react';
 import JsonView from '@microlink/react-json-view';
 
 interface JsonViewerProps {

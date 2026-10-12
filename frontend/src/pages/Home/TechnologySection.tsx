@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cloud, Code, Github, Lock, Phone, Server, Shield, Zap } from 'lucide-react';
+import { Code, Github, Lock, Phone, Server, Shield, Zap } from 'lucide-react';
 
 const highlights = [
   {

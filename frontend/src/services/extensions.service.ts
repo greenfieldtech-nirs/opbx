@@ -9,8 +9,6 @@ import api from './api';
 import { extensionsService as baseExtensionsService } from './createResourceService';
 import type {
   Extension,
-  CreateExtensionRequest,
-  UpdateExtensionRequest,
 } from '@/types';
 
 export interface ExtensionPasswordResponse {

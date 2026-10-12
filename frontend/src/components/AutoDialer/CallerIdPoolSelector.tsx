@@ -276,7 +276,7 @@ export function CallerIdPoolSelector({
 
       {/* Selected items list */}
       <Card className="divide-y">
-        {selected.map((item, index) => (
+        {selected.map((item) => (
           <div
             key={item.did_id}
             className={cn(

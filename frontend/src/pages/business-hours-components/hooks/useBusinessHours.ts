@@ -8,7 +8,6 @@ import { businessHoursService } from '@/services/businessHours.service';
 import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService, ivrMenusService, conferenceRoomsService } from '@/services/createResourceService';
 import api from '@/services/api';
-import { useAuth } from '@/context/AuthContext';
 import type {
   BusinessHoursSchedule,
   ScheduleStatus,
@@ -20,7 +19,6 @@ import { createEmptyWeeklySchedule, getNextTimeRangeId, getNextExceptionId } fro
 
 export function useBusinessHours() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   // Get organization timezone, fallback to UTC
   const organizationTimezone = 'UTC';

@@ -30,7 +30,7 @@ export function DestinationTypeAndSelector({
     }
   };
 
-  const handleDestinationChange = (newDestination: string, option?: any) => {
+  const handleDestinationChange = (newDestination: string, _option?: any) => {
     if (typeValue) {
       onChange(typeValue, newDestination);
     }

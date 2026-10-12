@@ -17,7 +17,7 @@ import {
 export function formatExtensionLabel(
   extensionNumber: string,
   displayName?: string,
-  type?: string
+  _type?: string
 ): string {
   if (displayName && displayName !== 'Unassigned User') {
     return `Ext ${extensionNumber} - ${displayName}`;

@@ -83,7 +83,7 @@ export function useUploadList() {
       file: File;
       mapping: CsvMappingConfig;
     }) => distributionListsApi.uploadCsv(listId, file, mapping),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -138,7 +138,7 @@ export function useAddDestination() {
       listId: string | number;
       data: { phone_number: string; description?: string };
     }) => distributionListsApi.addDestination(listId, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -159,7 +159,7 @@ export function useAddDestinationsBatch() {
       listId: string | number;
       destinations: Array<{ phone_number: string; description?: string }>;
     }) => distributionListsApi.addDestinationsBatch(listId, destinations),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -201,7 +201,7 @@ export function useArchiveList() {
 
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.archive(listId),
-    onSuccess: (_, listId) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -251,7 +251,7 @@ export function useResetDialAttempts() {
       listId: string | number;
       destinationId: number;
     }) => distributionListsApi.resetDialAttempts(listId, destinationId),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -272,7 +272,7 @@ export function useBulkResetDialAttempts() {
       listId: string | number;
       destinationIds: number[];
     }) => distributionListsApi.bulkResetDialAttempts(listId, destinationIds),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
@@ -288,7 +288,7 @@ export function useResetPendingDestinations() {
   return useMutation({
     mutationFn: ({ listId }: { listId: string | number }) =>
       distributionListsApi.resetPendingDestinations(listId),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },

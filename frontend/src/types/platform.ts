@@ -4,7 +4,7 @@
  * TypeScript types for the platform management functionality.
  */
 
-import type { User, Organization } from './api.types';
+import type { User } from './api.types';
 
 export type OrganizationStatus = 'active' | 'suspended' | 'deleted';
 
