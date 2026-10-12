@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -177,6 +178,8 @@ export default function CallQueues() {
   });
 
   const { showIfInUse, inUseDialog } = useResourceInUse();
+
+  const [queueToDelete, setQueueToDelete] = useState<CallQueue | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: callQueuesService.delete,
@@ -353,6 +356,18 @@ export default function CallQueues() {
   return (
     <div className="space-y-6">
       {inUseDialog}
+      <ConfirmDialog
+        open={queueToDelete !== null}
+        onOpenChange={(open) => !open && setQueueToDelete(null)}
+        title="Delete call queue"
+        description={`Delete call queue "${queueToDelete?.name ?? ''}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (queueToDelete) deleteMutation.mutate(queueToDelete.id);
+          setDialogOpen(false);
+        }}
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Call Queues</h1>
@@ -386,11 +401,7 @@ export default function CallQueues() {
             canEdit={canManage}
             onEdit={(q) => openEdit(q)}
             canDelete={canManage}
-            onDelete={(q) => {
-              if (confirm(`Delete call queue "${q.name}"? This action cannot be undone.`)) {
-                deleteMutation.mutate(q.id);
-              }
-            }}
+            onDelete={(q) => setQueueToDelete(q)}
             emptyState={
               <EmptyState
                 icon={Users}
@@ -645,10 +656,7 @@ export default function CallQueues() {
             {editing && (
               <Button
                 variant="destructive"
-                onClick={() => {
-                  deleteMutation.mutate(editing.id);
-                  setDialogOpen(false);
-                }}
+                onClick={() => setQueueToDelete(editing)}
               >
                 Delete
               </Button>

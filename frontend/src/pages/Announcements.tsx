@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
@@ -144,6 +145,8 @@ export default function Announcements() {
     },
   });
 
+  const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null);
+
   // Delete announcement mutation
   const deleteAnnouncementMutation = useMutation({
     mutationFn: recordingsService.delete,
@@ -174,9 +177,7 @@ export default function Announcements() {
   };
 
   const handleDelete = (announcement: any) => {
-    if (confirm(`Are you sure you want to delete "${announcement.name}"? This action cannot be undone.`)) {
-      deleteAnnouncementMutation.mutate(announcement.id);
-    }
+    setAnnouncementToDelete(announcement);
   };
 
   const handlePlayback = async (announcement: Recording) => {
@@ -217,6 +218,17 @@ export default function Announcements() {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={announcementToDelete !== null}
+        onOpenChange={(open) => !open && setAnnouncementToDelete(null)}
+        title="Delete announcement"
+        description={`Are you sure you want to delete "${announcementToDelete?.name ?? ''}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (announcementToDelete) deleteAnnouncementMutation.mutate(announcementToDelete.id);
+        }}
+      />
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
