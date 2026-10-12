@@ -46,6 +46,8 @@ class JobTimeoutContractTest extends TestCase
         $defaults = (new ReflectionClass($class))->getDefaultProperties();
 
         if (in_array($class, self::DYNAMIC_TIMEOUT, true)) {
+            $this->addToAssertionCount(1); // timeout is set per dispatch; nothing static to check
+
             return;
         }
 

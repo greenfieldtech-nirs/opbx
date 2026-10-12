@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Http;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -29,6 +30,10 @@ abstract class TestCase extends BaseTestCase
         }
 
         parent::setUp();
+
+        // No test may reach a real host: unfaked HTTP calls fail loudly instead of
+        // hitting live Cloudonix/customer endpoints (and stay deterministic).
+        Http::preventStrayRequests();
 
         // Redis is shared with the live stack (db0 holds acd:*/dialer:* keys the
         // workers read), so tests must stay on the dedicated test DBs before any

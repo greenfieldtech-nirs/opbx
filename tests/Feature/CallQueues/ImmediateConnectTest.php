@@ -271,6 +271,8 @@ class ImmediateConnectTest extends TestCase
 
     public function test_enqueue_captures_session_token(): void
     {
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
+
         $request = Request::create('/voice/route', 'POST', [
             'CallSid' => self::CALL_ID,
             'Session' => self::SESSION_TOKEN,
