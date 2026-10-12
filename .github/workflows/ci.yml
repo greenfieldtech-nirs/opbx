@@ -30,7 +30,7 @@ jobs:
     # Ephemeral service containers: the suite never touches a real database or Redis.
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: ci-root
           MYSQL_DATABASE: opbx_test
