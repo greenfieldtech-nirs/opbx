@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { queryKeys } from '@/lib/queryKeys';
+import { firstIvrMenuError, IVR_LIMITS } from '@/schemas/ivrMenu';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
@@ -532,23 +533,8 @@ export default function IVRMenus() {
     });
   };
 
-  // Handle create
-  const handleCreate = () => {
-    if (!formData.name || !formData.options || formData.options.length === 0) {
-      toast.error('Name and at least one option are required');
-      return;
-    }
-
-    if (formData.options.length > 20) {
-      toast.error('Maximum 20 menu options allowed');
-      return;
-    }
-
-    if (formData.audio_file_path && formData.audio_file_path.length > 500) {
-      toast.error('Audio file path must be 500 characters or less');
-      return;
-    }
-
+  // Build the API payload from the form and validate it with the shared zod schema.
+  const buildRequest = (): CreateIvrMenuRequest | null => {
     const requestData: CreateIvrMenuRequest = {
       name: formData.name,
       audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
@@ -570,50 +556,25 @@ export default function IVRMenus() {
       })),
     };
 
-    createMutation.mutate(requestData);
+    const error = firstIvrMenuError(requestData);
+    if (error) {
+      toast.error(error);
+      return null;
+    }
+    return requestData;
+  };
+
+  // Handle create
+  const handleCreate = () => {
+    const requestData = buildRequest();
+    if (requestData) createMutation.mutate(requestData);
   };
 
   // Handle update
   const handleUpdate = () => {
     if (!selectedMenu) return;
-
-    if (!formData.name || !formData.options || formData.options.length === 0) {
-      toast.error('Name and at least one option are required');
-      return;
-    }
-
-    if (formData.options.length > 20) {
-      toast.error('Maximum 20 menu options allowed');
-      return;
-    }
-
-    if (formData.audio_file_path && formData.audio_file_path.length > 500) {
-      toast.error('Audio file path must be 500 characters or less');
-      return;
-    }
-
-    const requestData: UpdateIvrMenuRequest = {
-      name: formData.name,
-      audio_file_path: formData.useTTS ? undefined : (formData.recording_id ? undefined : formData.audio_file_path),
-      recording_id: formData.useTTS ? undefined : formData.recording_id,
-      tts_text: formData.useTTS ? formData.tts_text : undefined,
-      tts_voice: formData.useTTS ? formData.tts_voice : undefined,
-      max_timeout: formData.max_timeout,
-      inter_digit_timeout: formData.inter_digit_timeout,
-      max_turns: formData.max_turns,
-      failover_destination_type: formData.failover_destination_type as any,
-      failover_destination_id: formData.failover_destination_id,
-      status: formData.status as IvrMenuStatus,
-      options: formData.options.map((option, index) => ({
-        input_digits: option.input_digits,
-        description: option.description,
-        destination_type: option.destination_type,
-        destination_id: option.destination_id,
-        priority: index + 1,
-      })),
-    };
-
-    updateMutation.mutate({ id: selectedMenu.id, data: requestData });
+    const requestData = buildRequest();
+    if (requestData) updateMutation.mutate({ id: selectedMenu.id, data: requestData as UpdateIvrMenuRequest });
   };
 
   // Add new menu option
@@ -1022,9 +983,10 @@ export default function IVRMenus() {
                         onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
                         placeholder="Enter the text that will be converted to speech"
                         rows={4}
+                        maxLength={IVR_LIMITS.ttsText}
                       />
                       <p className="text-sm text-muted-foreground">
-                        Maximum 1000 characters. Use SSML tags for advanced formatting.
+                        {(formData.tts_text || '').length}/{IVR_LIMITS.ttsText} characters. Use SSML tags for advanced formatting.
                       </p>
                     </div>
                   </div>
@@ -1368,9 +1330,10 @@ export default function IVRMenus() {
                         onChange={(e) => setFormData({ ...formData, tts_text: e.target.value })}
                         placeholder="Enter the text that will be converted to speech"
                         rows={4}
+                        maxLength={IVR_LIMITS.ttsText}
                       />
                       <p className="text-sm text-muted-foreground">
-                        Maximum 1000 characters. Use SSML tags for advanced formatting.
+                        {(formData.tts_text || '').length}/{IVR_LIMITS.ttsText} characters. Use SSML tags for advanced formatting.
                       </p>
                     </div>
                   </div>
