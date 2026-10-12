@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
@@ -60,6 +61,9 @@ export default function Announcements() {
 
   // Fetch announcements with filters
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: announcementsData,
     isLoading: announcementsIsLoading,
     refetch: refetchAnnouncements,
@@ -214,6 +218,10 @@ export default function Announcements() {
         </div>
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load announcements" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

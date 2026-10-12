@@ -70,6 +70,7 @@ UpdateExtensionRequest,DIDNumber
 } from '@/types';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -156,7 +157,7 @@ export default function ExtensionsComplete() {
   }, []);
 
   // Fetch extensions
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.extensions.all, {
       page: currentPage,
       per_page: perPage,
@@ -1120,6 +1121,10 @@ export default function ExtensionsComplete() {
         </Card>
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load extensions" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

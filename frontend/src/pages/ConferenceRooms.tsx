@@ -50,6 +50,7 @@ import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import type { ConferenceRoom,CreateConferenceRoomRequest,UpdateConferenceRoomRequest,Status } from '@/types';
 import { cn } from '@/lib/utils';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type RoomFormData = {
   name: string;
@@ -125,7 +126,7 @@ export default function ConferenceRooms() {
   }, [searchQuery]);
 
   // Fetch conference rooms
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.conferenceRooms.all, {
       page: currentPage,
       per_page: perPage,
@@ -623,6 +624,10 @@ export default function ConferenceRooms() {
       </div>
     </div>
   );
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load conference rooms" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

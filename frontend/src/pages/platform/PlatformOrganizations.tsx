@@ -58,6 +58,7 @@ import {
   useUpdateOrganizationSettings,
 } from '@/hooks/platform';
 import type { PlatformOrganization, OrganizationStatus } from '@/types/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type SortField = 'id' | 'name' | 'status' | 'created_at' | 'users_count' | 'extensions_count' | 'dids_count';
 type SortDirection = 'asc' | 'desc' | null;
@@ -98,7 +99,7 @@ export default function PlatformOrganizations() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformOrganizations({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformOrganizations({
     page: currentPage,
     per_page: perPage,
     search: debouncedSearch || undefined,
@@ -272,6 +273,10 @@ export default function PlatformOrganizations() {
       ),
     },
   ];
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load organizations" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <PlatformLayout>

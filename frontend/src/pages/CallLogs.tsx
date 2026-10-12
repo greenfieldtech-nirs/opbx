@@ -22,6 +22,7 @@ import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 // Loaded on demand: pulls in the syntax highlighter and JSON viewer.
 const CdrDetailsDialog = lazy(() =>
   import('@/components/cdr/CdrDetailsDialog').then((m) => ({ default: m.CdrDetailsDialog })),
@@ -144,6 +145,9 @@ export default function CallLogs() {
 
   // CDR query
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: cdrData,
     isLoading: cdrIsLoading,
     isFetching: cdrIsFetching,
@@ -216,6 +220,10 @@ export default function CallLogs() {
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(refreshInterval, cdrIsFetching);
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call logs" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

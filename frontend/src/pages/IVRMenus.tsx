@@ -82,6 +82,7 @@ import {
 } from '@/components/design-system';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 // Voice selector component with search and advanced filters
 const VoiceSelector: React.FC<{
@@ -354,7 +355,7 @@ export default function IVRMenus() {
   };
 
   // Fetch IVR menus
-  const { data: ivrMenusData, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: ivrMenusData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.ivrMenus.list({
       page: currentPage,
       per_page: perPage,
@@ -595,6 +596,10 @@ export default function IVRMenus() {
     if (!selectedMenu) return;
     deleteMutation.mutate(selectedMenu.id);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load IVR menus" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

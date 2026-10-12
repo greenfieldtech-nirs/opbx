@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/services/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const TIMESPANS = [
   { value: '15m', label: 'Last 15 Minutes', minutes: 15 },
@@ -134,7 +135,7 @@ export default function QueuesDashboard() {
   const [cycleIndex, setCycleIndex] = useState(0);
   const [cycleTick, setCycleTick] = useState(ROTATE_SECONDS);
 
-  const { data: queuesData } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: queuesData } = useQuery({
     queryKey: queryKeys.callQueues.list({ per_page: 100 }),
     queryFn: () => callQueuesService.getAll({ per_page: 100 }),
     refetchInterval: 60000,
@@ -216,6 +217,10 @@ export default function QueuesDashboard() {
 
   const live = liveData?.data;
   const stats = statsData?.data;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call queues" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

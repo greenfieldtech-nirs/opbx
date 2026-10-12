@@ -57,6 +57,7 @@ import {
 import type { PlatformUser } from '@/types/platform';
 import { UserDeleteDialog } from '@/components/Users/UserDeleteDialog';
 import { platformApi } from '@/services/platformApi';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
 type SortDirection = 'asc' | 'desc' | null;
@@ -96,7 +97,7 @@ export default function PlatformUsers() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformUsers({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformUsers({
     page: currentPage,
     per_page: perPage,
     search: debouncedSearch || undefined,
@@ -291,6 +292,10 @@ export default function PlatformUsers() {
       cell: (user) => formatDate(user.created_at),
     },
   ];
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load users" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <PlatformLayout>

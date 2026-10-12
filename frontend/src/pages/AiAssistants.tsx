@@ -44,6 +44,7 @@ Column
 import type { AiAssistant,CreateAiAssistantRequest,UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 import { cn } from '@/lib/utils';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type AssistantFormData = {
   name: string;
@@ -93,7 +94,7 @@ export default function AiAssistants() {
   }, [searchQuery]);
 
   // Fetch AI Assistants
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.aiAssistants.all, {
       page: currentPage,
       per_page: perPage,
@@ -333,6 +334,10 @@ export default function AiAssistants() {
       )
     }
   ];
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load AI assistants" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

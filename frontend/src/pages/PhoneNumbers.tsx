@@ -70,6 +70,7 @@ import {
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function PhoneNumbers() {
   const queryClient = useQueryClient();
@@ -106,7 +107,7 @@ export default function PhoneNumbers() {
   }, [searchQuery]);
 
   // Fetch phone numbers with React Query
-  const { data: phoneNumbersResponse, isLoading, refetch, isPlaceholderData } = useQuery<{
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: phoneNumbersResponse, isLoading, refetch, isPlaceholderData } = useQuery<{
     data: DIDNumber[];
     meta: {
       total: number;
@@ -372,6 +373,10 @@ export default function PhoneNumbers() {
   };
 
   const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load phone numbers" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

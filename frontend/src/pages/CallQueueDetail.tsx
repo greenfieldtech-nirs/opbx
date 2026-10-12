@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const AGENT_STATE_LABELS: Record<QueueAgentState, string> = {
   AVAILABLE: 'Available',
@@ -62,7 +63,7 @@ export default function CallQueueDetail() {
     onError: () => toast.error('Failed to update agent state'),
   });
 
-  const { data: queueData } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: queueData } = useQuery({
     queryKey: queryKeys.callQueues.detail(id),
     queryFn: () => callQueuesService.getById(id!),
     enabled: Boolean(id),
@@ -95,6 +96,10 @@ export default function CallQueueDetail() {
         <EmptyState icon={Users} title="Queue not found" description="This call queue does not exist." />
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call queue" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

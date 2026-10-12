@@ -24,6 +24,7 @@ import { usePlatformDashboard } from '@/hooks/platform';
 import { OrganizationStatusBadge } from '@/components/platform';
 import { AuditLogEntry } from '@/components/platform';
 import type { PlatformOrganization } from '@/types/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function StatCard({
   title,
@@ -76,7 +77,7 @@ export default function PlatformDashboard() {
     refreshUser();
   }, [queryClient, refreshUser]);
 
-  const { data, isLoading, error } = usePlatformDashboard();
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, error } = usePlatformDashboard();
 
   if (isLoading) {
     return (
@@ -98,6 +99,10 @@ export default function PlatformDashboard() {
         </div>
       </PlatformLayout>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load platform dashboard" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

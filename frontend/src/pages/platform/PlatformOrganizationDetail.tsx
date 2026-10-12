@@ -17,11 +17,12 @@ import { usePlatformOrganization, useUpdateOrganizationSettings, useUpdateOrgani
 import { useOperateAs } from '@/context/OperateAsContext';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function PlatformOrganizationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: organization, isLoading } = usePlatformOrganization(id || '');
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: organization, isLoading } = usePlatformOrganization(id || '');
   const updateSettings = useUpdateOrganizationSettings();
   const updateStatus = useUpdateOrganizationStatus();
   const { enter: enterOperateAs } = useOperateAs();
@@ -98,6 +99,10 @@ export default function PlatformOrganizationDetail() {
         </div>
       </PlatformLayout>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load organization" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

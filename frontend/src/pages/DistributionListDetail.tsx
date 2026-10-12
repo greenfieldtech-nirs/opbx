@@ -66,6 +66,7 @@ import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDia
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-800',
@@ -132,7 +133,7 @@ export default function DistributionListDetail() {
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: listData, isLoading: isListLoading } = useDistributionList(id!);
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: listData, isLoading: isListLoading } = useDistributionList(id!);
   const { data: destinationsData, isLoading: isDestinationsLoading } = useListDestinations(
     id!,
     { page, per_page: 25, status: statusFilter !== 'all' ? statusFilter : undefined, search: search || undefined }
@@ -290,6 +291,10 @@ export default function DistributionListDetail() {
   const openCDRHistory = (phoneNumber: string) => {
     setCdrPhoneNumber(phoneNumber);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load distribution list" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">

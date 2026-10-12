@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const AGENT_RING_TIMEOUTS = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 const MAX_WAIT_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
@@ -127,7 +128,7 @@ export default function CallQueues() {
 
   const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading } = useQuery({
     queryKey: queryKeys.callQueues.list({ unprovisioned: unprovisionedOnly }),
     queryFn: () => callQueuesService.getAll(unprovisionedOnly ? { unprovisioned: 1 } : undefined),
   });
@@ -358,6 +359,10 @@ export default function CallQueues() {
 
   const set = <K extends keyof QueueFormState>(key: K, value: QueueFormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call queues" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

@@ -28,6 +28,7 @@ import {
 import { PlatformLayout } from '@/components/platform';
 import { AuditLogEntry } from '@/components/platform';
 import { usePlatformAuditLogs } from '@/hooks/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const actionTypes = [
   { value: 'all', label: 'All Actions' },
@@ -64,7 +65,7 @@ export default function PlatformAuditLog() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
     page: currentPage,
     per_page: perPage,
     platform_manager_user_id: platformManagerUserId || undefined,
@@ -82,6 +83,10 @@ export default function PlatformAuditLog() {
     setAction('all');
     setCurrentPage(1);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load audit log" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <PlatformLayout>

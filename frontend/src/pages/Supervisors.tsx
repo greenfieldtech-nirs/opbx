@@ -32,6 +32,7 @@ import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorA
 import { usersService } from '@/services/createResourceService';
 import { getSupervisorAssignments } from '@/services/supervisorAssignments.service';
 import type { User, UserStatus } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function Supervisors() {
   const { user: currentUser } = useAuth();
@@ -43,7 +44,7 @@ export default function Supervisors() {
 
   // Guard: only owner and pbx_admin can access this page
   const canAccess = currentUser?.role === 'owner' || currentUser?.role === 'pbx_admin';
-  const { data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.users.all,
     queryFn: () => usersService.getAll({ per_page: 1000 }),
     staleTime: 30000,
@@ -160,6 +161,10 @@ export default function Supervisors() {
 
   if (!canAccess) {
     return <Navigate to="/ui/dashboard" replace />;
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load supervisors" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

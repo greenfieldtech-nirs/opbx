@@ -53,6 +53,7 @@ import type {
   InboundBlacklistMatchType,
   InboundBlacklistRejectionStrategy,
 } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type BlacklistFormData = {
   caller_id_pattern: string;
@@ -112,6 +113,9 @@ const InboundBlacklistPage: React.FC = () => {
 
   // Fetch blacklist entries
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: blacklistData,
     isLoading,
   } = useQuery({
@@ -319,6 +323,10 @@ const InboundBlacklistPage: React.FC = () => {
       return { ...prev, did_number_ids: newIds };
     });
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load inbound blacklist" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

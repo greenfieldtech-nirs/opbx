@@ -58,6 +58,7 @@ import {
   autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useDistributionLists } from '@/hooks/useDistributionLists';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function getStatusBadge(status: string) {
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -120,7 +121,7 @@ export default function AutoDialerCampaignDetail() {
   const archiveMutation = useArchiveCampaign();
 
   // Fetch campaign data — poll every 10s when campaign is active
-  const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
 
   // Fetch distribution lists for this campaign
   const { data: distributionListsData, isLoading: isListsLoading } = useDistributionLists(
@@ -207,6 +208,10 @@ export default function AutoDialerCampaignDetail() {
         </div>
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load campaign" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

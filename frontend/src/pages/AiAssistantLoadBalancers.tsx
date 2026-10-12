@@ -63,6 +63,7 @@ import {
 arrayMove} from '@dnd-kit/sortable';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 
 
@@ -212,7 +213,7 @@ export default function AiAssistantLoadBalancers() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch load balancers with React Query
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.aiLoadBalancers.all, {
       page: currentPage,
       per_page: perPage,
@@ -634,6 +635,10 @@ export default function AiAssistantLoadBalancers() {
   };
 
   const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load AI assistant load balancers" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

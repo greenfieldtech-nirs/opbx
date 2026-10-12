@@ -45,6 +45,7 @@ import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
 import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
 import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest, DIDNumber } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type WhitelistFormData = {
   name: string;
@@ -93,6 +94,9 @@ const OutboundWhitelistPage: React.FC = () => {
 
   // Fetch outbound whitelist entries
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: whitelistData,
     isLoading,
   } = useQuery({
@@ -296,6 +300,10 @@ const OutboundWhitelistPage: React.FC = () => {
     setSearchQuery('');
     setCurrentPage(1);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load outbound whitelist" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

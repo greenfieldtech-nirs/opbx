@@ -63,6 +63,7 @@ import type {
   CallNotificationEvent,
   CallNotificationsRateLimitStatus,
 } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function CallNotificationsSettingsPage() {
   const { user } = useAuth();
@@ -90,7 +91,7 @@ export default function CallNotificationsSettingsPage() {
   const [selectedSessionToken, setSelectedSessionToken] = useState<string | null>(null);
 
   // Fetch settings
-  const { data: settingsData, isLoading: isLoadingSettings } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: settingsData, isLoading: isLoadingSettings } = useQuery({
     queryKey: queryKeys.callNotifications.settings(),
     queryFn: async () => {
       const response = await api.get('/call-notifications/settings');
@@ -218,6 +219,10 @@ export default function CallNotificationsSettingsPage() {
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call notification settings" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

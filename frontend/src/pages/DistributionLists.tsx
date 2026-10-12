@@ -60,6 +60,7 @@ import { DeleteListDialog } from './DistributionLists/components/DeleteListDialo
 import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
 import { toast } from 'sonner';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const statusColors: Record<DistributionListStatus, string> = {
   draft: 'bg-gray-100 text-gray-800',
@@ -88,7 +89,7 @@ export default function DistributionLists() {
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
   const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
-  const { data, isLoading, isFetching, error } = useDistributionLists({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isFetching, error } = useDistributionLists({
     page,
     per_page: 25,
     search: search || undefined,
@@ -195,6 +196,10 @@ export default function DistributionLists() {
 
   const lists = data?.data.filter(list => status !== 'active' || list.status !== 'archived') || [];
   const meta = data?.meta;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load distribution lists" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

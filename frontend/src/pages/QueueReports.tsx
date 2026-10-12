@@ -24,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const DISPOSITION_VARIANTS: Record<string, 'default' | 'destructive' | 'secondary'> = {
   answered: 'default',
@@ -70,7 +71,7 @@ export default function QueueReports() {
 
   const queueNameById = new Map((queuesData?.data ?? []).map((q) => [q.id, q.name]));
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isFetching, refetch } = useQuery({
     queryKey: queryKeys.queueCalls.list(params),
     queryFn: () => queueReportsService.list(params),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
@@ -104,6 +105,10 @@ export default function QueueReports() {
         ),
     },
   ];
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load queue report" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

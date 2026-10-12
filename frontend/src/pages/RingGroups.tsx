@@ -92,6 +92,7 @@ useSortable,
 import { CSS } from '@dnd-kit/utilities';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -216,7 +217,7 @@ export default function RingGroups() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch ring groups with React Query
-  const { data: ringGroupsData, isLoading, refetch, isRefetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: ringGroupsData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.ringGroups.all, {
       page: currentPage,
       per_page: perPage,
@@ -1338,6 +1339,10 @@ export default function RingGroups() {
       </DialogContent >
     );
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load ring groups" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

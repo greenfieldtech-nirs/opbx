@@ -19,6 +19,7 @@ import { formatPhoneNumber, formatTimeAgo, getDispositionColor } from '@/utils/f
 import { cn } from '@/lib/utils';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord } from '@/types/api.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -38,7 +39,7 @@ export default function Dashboard() {
   });
 
   // Fetch active calls count
-  const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching } = useQuery({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching } = useQuery({
     queryKey: queryKeys.dashboard.activeCalls(),
     queryFn: async () => {
       return await sessionUpdatesService.getActiveCalls();
@@ -201,6 +202,10 @@ export default function Dashboard() {
         </div>
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load dashboard data" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (
