@@ -134,6 +134,11 @@ export function getApiErrorMessage(error: unknown): string {
     const axiosError = error as AxiosError<APIError>;
     const errorData = axiosError.response?.data?.error;
 
+    // Some endpoints return { error: "text" }
+    if (typeof errorData === 'string' && errorData) {
+      return errorData;
+    }
+
     // Return validation errors if present (array format)
     if (errorData?.details && Array.isArray(errorData.details)) {
       const details = errorData.details;
@@ -151,6 +156,12 @@ export function getApiErrorMessage(error: unknown): string {
     // Return error message
     if (errorData?.message) {
       return errorData.message;
+    }
+
+    // Laravel's default envelope: { message, errors }
+    const topLevelMessage = (axiosError.response?.data as { message?: unknown } | undefined)?.message;
+    if (typeof topLevelMessage === 'string' && topLevelMessage) {
+      return topLevelMessage;
     }
 
     // Return generic network error

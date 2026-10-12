@@ -3,6 +3,7 @@
  * Manages webhook notification configuration for call events
  */
 
+import { getApiErrorMessage } from '@/services/api';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -159,7 +160,7 @@ export default function CallNotificationsSettingsPage() {
       toast.success('Notification settings created successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to create settings');
+      toast.error(getApiErrorMessage(error));
     },
   });
 
@@ -174,7 +175,7 @@ export default function CallNotificationsSettingsPage() {
       toast.success('Notification settings updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update settings');
+      toast.error(getApiErrorMessage(error));
     },
   });
 
@@ -188,7 +189,7 @@ export default function CallNotificationsSettingsPage() {
       toast.success('Test webhook sent successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Test webhook failed');
+      toast.error(getApiErrorMessage(error));
     },
   });
 

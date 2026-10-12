@@ -31,7 +31,7 @@ import type {
   UpdateRingGroupRequest,
 } from '@/types/api.types';
 import type { Extension, RingGroupMember } from '@/types';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -367,7 +367,7 @@ export default function RingGroups() {
       toast.success('Ring group created successfully');
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'Failed to create ring group';
+      const message = getApiErrorMessage(error) || 'Failed to create ring group';
       toast.error(message);
     },
   });
@@ -384,7 +384,7 @@ export default function RingGroups() {
       toast.success('Ring group updated successfully');
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'Failed to update ring group';
+      const message = getApiErrorMessage(error) || 'Failed to update ring group';
       toast.error(message);
     },
   });
@@ -401,7 +401,7 @@ export default function RingGroups() {
     },
     onError: (error: unknown) => {
       if (showIfInUse(error)) return;
-      const message = getErrorMessage(error) || 'Failed to delete ring group';
+      const message = getApiErrorMessage(error) || 'Failed to delete ring group';
       toast.error(message);
     },
   });

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getApiErrorMessage } from '@/services/api';
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,7 @@ export function CopyListDialog({ list, open, onOpenChange }: CopyListDialogProps
       }, 1500);
     } catch (err: any) {
       setCopyStage('idle');
-      const message = err?.response?.data?.error || err?.message || 'Failed to copy list';
+      const message = getApiErrorMessage(err);
       toast.error('Copy failed', { description: message });
     }
   };

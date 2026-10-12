@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -47,7 +48,7 @@ export function AssignCampaignDialog({
       setSelectedCampaignId('');
       onOpenChange(false);
     } catch (err: any) {
-      const message = err?.response?.data?.error || 'Failed to assign list to campaign';
+      const message = getApiErrorMessage(err);
       toast.error('Assignment failed', { description: message });
     }
   };

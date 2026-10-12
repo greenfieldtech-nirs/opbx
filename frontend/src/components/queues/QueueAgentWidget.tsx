@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 
 const STATE_ACTIONS: { state: QueueAgentStateInput; label: string }[] = [
   { state: 'available', label: 'Go Available' },
@@ -52,7 +52,7 @@ export function QueueAgentWidget() {
       queryClient.invalidateQueries({ queryKey: ['my-queue-memberships'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.callQueues.all });
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   if (!hasMemberships) {

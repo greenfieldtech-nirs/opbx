@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { StandardDataTable, Column, EmptyState, CallQueueStrategySelector } from '@/components/design-system';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -162,7 +162,7 @@ export default function CallQueues() {
       invalidate();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const updateMutation = useMutation({
@@ -173,13 +173,13 @@ export default function CallQueues() {
       invalidate();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const toggleStatusMutation = useMutation({
     mutationFn: callQueuesService.toggleStatus,
     onSuccess: () => invalidate(),
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const { showIfInUse, inUseDialog } = useResourceInUse();
@@ -193,7 +193,7 @@ export default function CallQueues() {
       invalidate();
     },
     onError: (error) => {
-      if (!showIfInUse(error)) toast.error(getErrorMessage(error));
+      if (!showIfInUse(error)) toast.error(getApiErrorMessage(error));
     },
   });
 

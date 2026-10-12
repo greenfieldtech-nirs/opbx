@@ -29,19 +29,6 @@ export function isApiError(error: unknown): error is ApiError {
 }
 
 /**
- * Extract a human-readable error message from an unknown error
- */
-export function getErrorMessage(error: unknown): string {
-  if (isApiError(error)) {
-    return error.response?.data?.message || 'An error occurred';
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return 'An unknown error occurred';
-}
-
-/**
  * Extract validation errors from an API error
  */
 export function getValidationErrors(error: unknown): Record<string, string[]> | undefined {

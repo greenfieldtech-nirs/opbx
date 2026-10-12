@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getApiErrorMessage } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -138,7 +139,7 @@ export default function DistributionLists() {
       await unassignMutation.mutateAsync(listId);
       toast.success('List unassigned from campaign successfully');
     } catch (err: any) {
-      const message = err?.response?.data?.error || 'Failed to unassign list from campaign';
+      const message = getApiErrorMessage(err);
       toast.error('Unassign failed', { description: message });
     }
   };

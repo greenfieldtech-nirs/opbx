@@ -60,7 +60,7 @@ import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import { WeeklyCalendarView } from '@/pages/business-hours-components/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
 import { cn } from '@/lib/utils';
@@ -517,7 +517,7 @@ export default function AutoDialerCampaignForm() {
       }
       navigate(-1);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
+      toast.error(getApiErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
     }
   };
 
