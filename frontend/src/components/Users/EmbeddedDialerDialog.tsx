@@ -153,7 +153,7 @@ export function EmbeddedDialerDialog({
                     type="color"
                     value={iconColor}
                     onChange={(e) => setIconColor(e.target.value)}
-                    className="h-9 w-12 cursor-pointer rounded border bg-background p-1"
+                    className="h-9 w-12 cursor-pointer rounded-sm border bg-background p-1"
                     aria-label="Icon background color"
                   />
                   <Input

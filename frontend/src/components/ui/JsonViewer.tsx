@@ -12,7 +12,7 @@ export function JsonViewer({ data, collapsed = false, className = '', light = fa
   const textColor = light ? '#1e293b' : '#e2e8f0';
 
   return (
-    <div className={`rounded border overflow-x-auto ${className}`} style={{ backgroundColor: bgColor }}>
+    <div className={`rounded-sm border overflow-x-auto ${className}`} style={{ backgroundColor: bgColor }}>
       <JsonView
         src={data}
         collapseStringsAfterLength={100}

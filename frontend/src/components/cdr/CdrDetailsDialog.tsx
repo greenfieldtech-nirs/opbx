@@ -151,13 +151,13 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
                             </div>
                             <div className="mb-2 min-w-0">
                               <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
-                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all overflow-wrap-anywhere max-w-full">
+                              <div className="text-xs font-mono bg-white p-2 rounded-sm border text-gray-800 break-all overflow-wrap-anywhere max-w-full">
                                 {execution.url}
                               </div>
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <div className="rounded border overflow-auto max-w-full">
+                              <div className="rounded-sm border overflow-auto max-w-full">
                                 <SyntaxHighlighter
                                   language="xml"
                                   style={vscDarkPlus}
@@ -194,7 +194,7 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
                   {cdr.raw_cdr ? (
                     <div className="min-w-0">
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <div className="border rounded overflow-x-auto bg-slate-900 max-w-full">
+                      <div className="border rounded-sm overflow-x-auto bg-slate-900 max-w-full">
                         <div className="p-4 min-w-0">
                           <JsonViewer data={cdr.raw_cdr} collapsed={1} />
                         </div>

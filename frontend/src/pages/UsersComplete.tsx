@@ -680,7 +680,7 @@ function UsersComplete() {
               {
                 header: 'Extension',
                 cell: (user) => user.extension ? (
-                  <code className="px-2 py-1 bg-gray-100 rounded text-sm group-hover:bg-gray-200">
+                  <code className="px-2 py-1 bg-gray-100 rounded-sm text-sm group-hover:bg-gray-200">
                     {user.extension.extension_number}
                   </code>
                 ) : (

@@ -49,7 +49,7 @@ function EndpointCard({ icon, title, url, hint }: EndpointCardProps) {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex items-center gap-2">
-          <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-xs">{url}</code>
+          <code className="flex-1 truncate rounded-sm bg-muted px-2 py-1 text-xs">{url}</code>
           <CopyButton value={url} label={`${title} URL`} />
         </div>
         <p className="text-xs text-muted-foreground">{hint}</p>

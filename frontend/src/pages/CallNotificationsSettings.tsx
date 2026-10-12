@@ -315,8 +315,8 @@ export default function CallNotificationsSettingsPage() {
                         disabled={!canManage}
                       />
                       {formData.webhook_url && formData.webhook_url.startsWith('http://') && (
-                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded-sm">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
                           <span>Warning: HTTP is insecure. Use HTTPS in production environments.</span>
                         </div>
                       )}
@@ -500,7 +500,7 @@ export default function CallNotificationsSettingsPage() {
                     {EVENT_OPTIONS.map((event) => (
                       <div
                         key={event.value}
-                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/50"
+                        className="flex items-start gap-2 p-2 rounded-sm hover:bg-muted/50"
                       >
                         <Switch
                           id={`event-${event.value}`}
@@ -679,7 +679,7 @@ export default function CallNotificationsSettingsPage() {
                         </TableCell>
                         <TableCell>
                           <div
-                            className={`flex items-center gap-1 w-fit px-2 py-1 rounded text-xs font-medium ${
+                            className={`flex items-center gap-1 w-fit px-2 py-1 rounded-sm text-xs font-medium ${
                               log.is_success
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'

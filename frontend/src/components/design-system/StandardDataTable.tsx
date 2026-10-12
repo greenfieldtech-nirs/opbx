@@ -171,7 +171,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                             onIdentityClick && "hover:underline"
                                         )}
                                     >
-                                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0", identityIconBg)}>
+                                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0", identityIconBg)}>
                                             <IdentityIcon className={cn("h-5 w-5", identityIconColor)} />
                                         </div>
                                         <div>

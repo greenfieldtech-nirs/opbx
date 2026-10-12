@@ -899,7 +899,7 @@ export function WebPhone({
                                   handleCall();
                                 }
                               }}
-                              className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
+                              className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-hidden focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
                               aria-label="Phone number"
                             />
                             {number && (
@@ -923,7 +923,7 @@ export function WebPhone({
                             key={key}
                             type="button"
                             onClick={() => appendDigit(key)}
-                            className="h-16 w-16 rounded-full bg-gray-100 text-xl font-medium text-gray-900 hover:bg-gray-200 active:scale-95 active:bg-gray-300 transition-all shadow-sm"
+                            className="h-16 w-16 rounded-full bg-gray-100 text-xl font-medium text-gray-900 hover:bg-gray-200 active:scale-95 active:bg-gray-300 transition-all shadow-xs"
                             aria-label={`Dial ${key}`}
                           >
                             {key}

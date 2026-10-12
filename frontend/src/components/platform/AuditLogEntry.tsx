@@ -83,7 +83,7 @@ function JsonDiff({ previous, current }: { previous: Record<string, unknown> | n
         if (isObject) {
           // For objects, show them in a more readable format
           return (
-            <div key={key} className="border rounded p-2 bg-muted/50">
+            <div key={key} className="border rounded-sm p-2 bg-muted/50">
               <div className="font-medium text-muted-foreground mb-1">{key}:</div>
               <div className="grid grid-cols-2 gap-2">
                 <div className={cn(hasChanged && 'opacity-50')}>
@@ -143,7 +143,7 @@ export function AuditLogEntry({ entry }: AuditLogEntryProps) {
         )}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
           <Icon className="h-4 w-4 text-primary" />
         </div>
 
@@ -168,7 +168,7 @@ export function AuditLogEntry({ entry }: AuditLogEntryProps) {
           </div>
         )}
 
-        <Button variant="ghost" size="sm" className="flex-shrink-0">
+        <Button variant="ghost" size="sm" className="shrink-0">
           {isExpanded ? (
             <ChevronUp className="h-4 w-4" />
           ) : (
@@ -188,7 +188,7 @@ export function AuditLogEntry({ entry }: AuditLogEntryProps) {
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                 Changes
               </h4>
-              <div className="bg-background rounded border p-3">
+              <div className="bg-background rounded-sm border p-3">
                 <JsonDiff
                   previous={entry.before_state}
                   current={entry.after_state}

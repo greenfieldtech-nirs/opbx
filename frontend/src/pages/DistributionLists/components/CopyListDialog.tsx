@@ -83,7 +83,7 @@ export function CopyListDialog({ list, open, onOpenChange }: CopyListDialogProps
       >
         {/* Full-screen overlay during copy */}
         {copyStage === 'copying' && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm rounded-lg">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xs rounded-lg">
             <div className="flex flex-col items-center gap-4 p-6">
               <div className="relative">
                 <div className="h-16 w-16 rounded-full border-4 border-muted flex items-center justify-center">
@@ -109,7 +109,7 @@ export function CopyListDialog({ list, open, onOpenChange }: CopyListDialogProps
 
         {/* Success overlay */}
         {copyStage === 'success' && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm rounded-lg">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xs rounded-lg">
             <div className="flex flex-col items-center gap-4 p-6">
               <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
                 <CheckCircle2 className="h-8 w-8 text-green-600" />

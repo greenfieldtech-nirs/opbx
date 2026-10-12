@@ -50,7 +50,7 @@ export function Pricing() {
                   MIT licensed. Run on your own infrastructure.
                 </p>
               </CardHeader>
-              <CardContent className="p-8 flex-grow flex flex-col">
+              <CardContent className="p-8 grow flex flex-col">
                 <ul className="space-y-3 mb-8">
                   {selfHostedFeatures.map((feature) => (
                     <li key={feature} className="flex items-center gap-3 text-xl text-muted-foreground">
@@ -93,7 +93,7 @@ export function Pricing() {
                   Managed OPBX instance, no ops overhead.
                 </p>
               </CardHeader>
-              <CardContent className="p-8 flex-grow flex flex-col">
+              <CardContent className="p-8 grow flex flex-col">
                 <ul className="space-y-3 mb-8">
                   {cloudFeatures.map((feature) => (
                     <li key={feature} className="flex items-center gap-3 text-xl text-muted-foreground">

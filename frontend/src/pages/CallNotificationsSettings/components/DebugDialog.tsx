@@ -85,7 +85,7 @@ export function DebugDialog({
                       </TableCell>
                       <TableCell className="text-xs">
                         <span
-                          className={`px-1 rounded text-xs ${
+                          className={`px-1 rounded-sm text-xs ${
                             log.is_success
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
@@ -135,7 +135,7 @@ export function DebugDialog({
                   {selectedLog.request_headers && (
                     <div>
                       <span className="font-semibold">Headers:</span>
-                      <pre className="mt-1 p-2 rounded border bg-muted text-foreground overflow-x-auto text-xs">
+                      <pre className="mt-1 p-2 rounded-sm border bg-muted text-foreground overflow-x-auto text-xs">
                         {JSON.stringify(selectedLog.request_headers, null, 2)}
                       </pre>
                     </div>
@@ -148,7 +148,7 @@ export function DebugDialog({
                           const { data, error } = safeParseJson(selectedLog.request_body);
                           if (error) {
                             return (
-                              <pre className="p-2 rounded border bg-muted text-foreground overflow-x-auto text-xs">
+                              <pre className="p-2 rounded-sm border bg-muted text-foreground overflow-x-auto text-xs">
                                 {selectedLog.request_body}
                               </pre>
                             );
@@ -192,7 +192,7 @@ export function DebugDialog({
                   {selectedLog.response_headers && (
                     <div>
                       <span className="font-semibold">Headers:</span>
-                      <pre className="mt-1 p-2 rounded border bg-muted text-foreground overflow-x-auto text-xs">
+                      <pre className="mt-1 p-2 rounded-sm border bg-muted text-foreground overflow-x-auto text-xs">
                         {JSON.stringify(selectedLog.response_headers, null, 2)}
                       </pre>
                     </div>
@@ -205,7 +205,7 @@ export function DebugDialog({
                           const { data, error } = safeParseJson(selectedLog.response_body);
                           if (error) {
                             return (
-                              <pre className="p-2 rounded border bg-muted text-foreground overflow-x-auto text-xs">
+                              <pre className="p-2 rounded-sm border bg-muted text-foreground overflow-x-auto text-xs">
                                 {selectedLog.response_body}
                               </pre>
                             );

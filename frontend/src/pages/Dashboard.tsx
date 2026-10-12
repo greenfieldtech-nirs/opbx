@@ -191,11 +191,11 @@ export default function Dashboard() {
           {(isSupervisor ? [1, 2, 3] : [1, 2, 3, 4]).map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-24 bg-gray-200 rounded" />
+                <div className="h-4 w-24 bg-gray-200 rounded-sm" />
                 <div className="h-10 w-10 bg-gray-200 rounded-lg" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-16 bg-gray-200 rounded" />
+                <div className="h-8 w-16 bg-gray-200 rounded-sm" />
               </CardContent>
             </Card>
           ))}
@@ -332,7 +332,7 @@ export default function Dashboard() {
                     {supervisorData.assigned_users.map((assignedUser) => (
                       <li
                         key={assignedUser.id}
-                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 -mx-2 rounded"
+                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 -mx-2 rounded-sm"
                       >
                         <span className="font-medium">{assignedUser.name}</span>
                         {assignedUser.extension_number && (
@@ -361,7 +361,7 @@ export default function Dashboard() {
                     {supervisorData.assigned_ring_groups.map((ringGroup) => (
                       <li
                         key={ringGroup.id}
-                        className="py-3 px-2 -mx-2 rounded hover:bg-gray-50 font-medium"
+                        className="py-3 px-2 -mx-2 rounded-sm hover:bg-gray-50 font-medium"
                       >
                         {ringGroup.name}
                       </li>

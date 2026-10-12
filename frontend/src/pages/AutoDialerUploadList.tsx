@@ -233,20 +233,20 @@ export default function AutoDialerUploadList() {
           <div>
             <h4 className="font-medium mb-2">Required Column</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><code className="bg-muted px-1 rounded">phone</code> or <code className="bg-muted px-1 rounded">phone_number</code> - Phone number in E.164 format</li>
+              <li><code className="bg-muted px-1 rounded-sm">phone</code> or <code className="bg-muted px-1 rounded-sm">phone_number</code> - Phone number in E.164 format</li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium mb-2">Optional Columns</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><code className="bg-muted px-1 rounded">name</code> - Contact name</li>
-              <li><code className="bg-muted px-1 rounded">description</code> - Contact description</li>
-              <li><code className="bg-muted px-1 rounded">priority</code> - Priority (1-10, higher = dialed first)</li>
+              <li><code className="bg-muted px-1 rounded-sm">name</code> - Contact name</li>
+              <li><code className="bg-muted px-1 rounded-sm">description</code> - Contact description</li>
+              <li><code className="bg-muted px-1 rounded-sm">priority</code> - Priority (1-10, higher = dialed first)</li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium mb-2">Example CSV</h4>
-            <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+            <pre className="bg-muted p-3 rounded-sm text-sm overflow-x-auto">
 {`phone,name,description,priority
 +14155551212,John Doe,Sales Lead,5
 +14155551213,Jane Smith,Customer,3

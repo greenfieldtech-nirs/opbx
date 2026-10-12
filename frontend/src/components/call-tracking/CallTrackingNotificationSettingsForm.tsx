@@ -103,7 +103,7 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
             <label
               key={option.value}
               htmlFor={`event-${option.value}`}
-              className="flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+              className="flex items-center gap-2 border rounded-sm px-3 py-2 cursor-pointer"
             >
               <Checkbox
                 id={`event-${option.value}`}

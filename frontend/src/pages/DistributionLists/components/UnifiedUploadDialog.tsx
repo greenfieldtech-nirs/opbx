@@ -306,7 +306,7 @@ export function UnifiedUploadDialog({
 
             <div className="space-y-2">
               <Label>Metadata columns</Label>
-              <div className="grid grid-cols-2 gap-2 border rounded p-3">
+              <div className="grid grid-cols-2 gap-2 border rounded-sm p-3">
                 {availableColumns.map((col) => (
                   <div key={col} className="flex items-center gap-2">
                     <Checkbox

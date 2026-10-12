@@ -447,7 +447,7 @@ export default function Profile() {
           <CardContent>
             {!isOwner && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800">
                   Only organization owners can edit these settings
                 </p>
@@ -609,7 +609,7 @@ export default function Profile() {
                          emptyText="No country found."
                          disabled={isUpdatingProfile}
                          buttonClassName="w-full"
-                         contentClassName="w-[--radix-popover-trigger-width]"
+                         contentClassName="w-(--radix-popover-trigger-width)"
                        />
                      )}
                   />
@@ -695,7 +695,7 @@ export default function Profile() {
                       )}
                     />
                     <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-xs text-amber-800">
                         Changing user roles affects their permissions. Be careful when modifying roles.
                       </p>
@@ -884,13 +884,13 @@ export default function Profile() {
                         variant="ghost"
                         size="sm"
                         onClick={handleCopyPassword}
-                        className="flex-shrink-0"
+                        className="shrink-0"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-start gap-1">
-                      <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
                       Make sure to save this password securely before submitting the form
                     </p>
                   </div>

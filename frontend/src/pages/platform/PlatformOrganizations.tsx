@@ -205,7 +205,7 @@ export default function PlatformOrganizations() {
       sortKey: 'name',
       cell: (org) => (
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-100">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 bg-blue-100">
             <Building2 className="h-5 w-5 text-blue-600" />
           </div>
           <div>

@@ -353,7 +353,7 @@ export default function Settings() {
       <div className="container mx-auto py-8 px-4 max-w-4xl relative">
         {/* Loading overlay during validation/save */}
         {isValidating && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center rounded-lg">
             <div className="bg-background border rounded-lg p-6 shadow-lg flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <div className="text-center">
@@ -587,7 +587,7 @@ export default function Settings() {
                       <p className="text-sm font-medium text-amber-900 mb-1">
                         New API Key Generated
                       </p>
-                      <div className="font-mono text-xs break-all text-amber-800 bg-white p-2 rounded">
+                      <div className="font-mono text-xs break-all text-amber-800 bg-white p-2 rounded-sm">
                         {generatedKey}
                       </div>
                     </div>
@@ -597,13 +597,13 @@ export default function Settings() {
                        size="sm"
                        onClick={() => handleCopyToClipboard(generatedKey, 'API Key')}
                        disabled={isValidating}
-                       className="flex-shrink-0"
+                       className="shrink-0"
                      >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-xs text-amber-800 flex items-start gap-1">
-                    <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
                     Save this key now - it will not be shown again after you save settings.
                   </p>
                 </div>

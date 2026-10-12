@@ -125,7 +125,7 @@ export function SupervisorAssignmentDialog({
                 multiple
                 defaultValue={selectedUserIds}
                 disabled={isLoadingAssignments}
-                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {selectableUsers.length === 0 ? (
                   <option disabled>No PBX users available</option>
@@ -152,7 +152,7 @@ export function SupervisorAssignmentDialog({
                 multiple
                 defaultValue={selectedRingGroupIds}
                 disabled={isLoadingAssignments}
-                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="w-full h-[300px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {ringGroups.length === 0 ? (
                   <option disabled>No ring groups available</option>
