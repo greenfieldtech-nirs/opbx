@@ -17,6 +17,7 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\QueueCall;
+use App\Models\SessionUpdate;
 use App\Models\User;
 use App\Services\CallQueue\ConferenceOfferService;
 use App\Services\CallQueue\ExtensionPresenceTracker;
@@ -522,5 +523,117 @@ class ConferenceRingAllTest extends TestCase
         ])->assertValid()->assertOk();
 
         $this->assertTrue($this->queue->refresh()->conference_ring_all);
+    }
+
+    public function test_overlapping_offers_originate_once(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+
+        // Another request is mid-origination: its lock exists, the offer hash does not yet.
+        Redis::set('acd:confoffer:lock:'.self::CALL_ID, '1', 'EX', 30, 'NX');
+
+        $this->assertTrue($offers->offer($this->queue, $queueCall, $this->agents()));
+
+        Http::assertNotSent(fn ($request) => ! str_contains($request->url(), '/sessions/')
+            && str_ends_with($request->url(), '/application'));
+        $this->assertFalse($offers->isOfferPending(self::CALL_ID));
+    }
+
+    public function test_failed_origination_releases_the_lock_so_the_next_poll_can_retry(): void
+    {
+        Http::fake(fn () => Http::response([], 200)); // no token: nothing originated
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+
+        $this->assertFalse($offers->offer($this->queue, $queueCall, $this->agents()));
+        $this->assertSame(0, Redis::exists('acd:confoffer:lock:'.self::CALL_ID));
+    }
+
+    public function test_claim_keeps_no_winner_when_the_bridge_write_fails(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+
+        $lifecycle = $this->createMock(QueueCallLifecycleService::class);
+        $lifecycle->method('markConferenceBridge')->willThrowException(new \RuntimeException('db down'));
+        $failing = new ConferenceOfferService(app(ExtensionPresenceTracker::class), $lifecycle);
+
+        try {
+            $failing->claim($this->queue, $queueCall, $this->owner->id, 'agent-tok-1');
+            $this->fail('the bridge failure must propagate');
+        } catch (\RuntimeException) {
+        }
+
+        $this->assertNull($offers->winnerOf(self::CALL_ID), 'a failed claim must not leave the call stuck as won');
+        $this->assertTrue($offers->claim($this->queue, $queueCall, $this->owner->id, 'agent-tok-1'), 'the leg can claim again');
+    }
+
+    public function test_claim_after_the_caller_left_cancels_the_offer_and_clears_the_winner(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+        QueueCall::withoutGlobalScopes()->whereKey($queueCall->id)->update(['disposition' => QueueCallDisposition::ABANDONED->value]);
+
+        $this->assertFalse($offers->claim($this->queue, $queueCall, $this->owner->id, 'agent-tok-1'));
+
+        $this->assertNull($offers->winnerOf(self::CALL_ID));
+        $this->assertFalse($offers->isOfferPending(self::CALL_ID));
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/sessions/agent-tok-2'));
+    }
+
+    public function test_winner_leg_ending_before_the_caller_joined_releases_the_winner_and_reoffers(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+        $this->assertSame($this->owner->id, $offers->winnerOf(self::CALL_ID));
+
+        // The winner hangs up before the caller was served the room join.
+        $leg = SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => 'agent-tok-1',
+            'status' => 'completed',
+        ]);
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($leg);
+        app(QueueCallLifecycleService::class)->handleSessionUpdate($leg); // duplicate delivery
+
+        $this->assertNull($offers->winnerOf(self::CALL_ID));
+        $queueCall->refresh();
+        $this->assertNull($queueCall->answered_at);
+        $this->assertNull($queueCall->agent_user_id);
+        $this->assertSame(1, Http::recorded(fn ($request) => str_contains($request->url(), 'acd-worker:8084/events')
+            && $request['type'] === 'requeue'
+            && $request['agentUserId'] === (string) $this->owner->id)->count());
+
+        // The next poll's offer is accepted again (lock and offer cleared).
+        $this->assertTrue($offers->offer($this->queue, $queueCall, $this->agents()));
+        $this->assertTrue($offers->isOfferPending(self::CALL_ID));
+    }
+
+    public function test_winner_leg_ending_after_the_caller_joined_is_an_ordinary_end_of_call(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+        $this->post($this->relative($offers->signedUrl('voice.queue-conference-join', $this->queue, $queueCall)));
+
+        app(QueueCallLifecycleService::class)->handleSessionUpdate(SessionUpdate::factory()->create([
+            'organization_id' => $this->organization->id,
+            'session_token' => 'agent-tok-1',
+            'status' => 'completed',
+        ]));
+
+        $this->assertSame($this->owner->id, $offers->winnerOf(self::CALL_ID));
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'acd-worker:8084/events') && $request['type'] === 'requeue');
     }
 }

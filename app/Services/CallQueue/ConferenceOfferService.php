@@ -8,6 +8,7 @@ use App\Enums\CallQueueStrategy;
 use App\Models\CallQueue;
 use App\Models\CloudonixSettings;
 use App\Models\QueueCall;
+use App\Scopes\OrganizationScope;
 use App\Services\CloudonixClient\CloudonixCallsClient;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -28,12 +29,21 @@ use Illuminate\Support\Facades\Redis;
  * Redis:
  *   acd:confoffer:{callId}   hash   agentUserId => agent session token (pending offer)
  *   acd:confwinner:{callId}  string winning agentUserId
+ *   acd:confoffer:lock:{callId} string offer-in-progress lock (SET NX; covers the origination window)
+ *   acd:confleg:{sessionToken}  string callId of the winning agent leg (to release the winner if it ends early)
+ *   acd:confjoined:{callId}  string set once the caller was served the room join
  */
 class ConferenceOfferService
 {
     private const OFFER_PREFIX = 'acd:confoffer:';
 
     private const WINNER_PREFIX = 'acd:confwinner:';
+
+    private const LOCK_PREFIX = 'acd:confoffer:lock:';
+
+    private const LEG_PREFIX = 'acd:confleg:';
+
+    private const JOINED_PREFIX = 'acd:confjoined:';
 
     private const WINNER_TTL_SECONDS = 2 * 60 * 60;
 
@@ -63,10 +73,51 @@ class ConferenceOfferService
      */
     public function offer(CallQueue $callQueue, QueueCall $queueCall, array $agents): bool
     {
-        if ($this->isOfferPending($queueCall->call_id)) {
+        if ($this->isOfferPending($queueCall->call_id) || $this->winnerOf($queueCall->call_id) !== null) {
             return true;
         }
 
+        // The offer hash only appears after origination: the lock closes that
+        // window so overlapping callers (poll + immediate connect) originate once.
+        $lockKey = self::LOCK_PREFIX.$queueCall->call_id;
+        if (! Redis::set($lockKey, '1', 'EX', $callQueue->agent_ring_timeout + self::OFFER_GRACE_SECONDS, 'NX')) {
+            return true;
+        }
+
+        try {
+            $sessions = $this->originate($callQueue, $queueCall, $agents);
+        } catch (\Throwable $e) {
+            Redis::del($lockKey);
+
+            throw $e;
+        }
+
+        Log::info('ConferenceOfferService: Offered call to agent sessions', [
+            'call_queue_id' => $callQueue->id,
+            'call_id' => $queueCall->call_id,
+            'offered' => count($agents),
+            'originated' => array_keys($sessions),
+        ]);
+
+        if ($sessions === []) {
+            Redis::del($lockKey);
+
+            return false;
+        }
+
+        $key = self::OFFER_PREFIX.$queueCall->call_id;
+        Redis::hmset($key, $sessions);
+        Redis::expire($key, $callQueue->agent_ring_timeout + self::OFFER_GRACE_SECONDS);
+
+        return true;
+    }
+
+    /**
+     * @param  array<int, array{userId: string|int, extensionNumber: string}>  $agents
+     * @return array<string, string> agentUserId => agent session token
+     */
+    private function originate(CallQueue $callQueue, QueueCall $queueCall, array $agents): array
+    {
         $client = $this->client($callQueue);
         $sessions = [];
 
@@ -90,22 +141,7 @@ class ConferenceOfferService
             }
         }
 
-        Log::info('ConferenceOfferService: Offered call to agent sessions', [
-            'call_queue_id' => $callQueue->id,
-            'call_id' => $queueCall->call_id,
-            'offered' => count($agents),
-            'originated' => array_keys($sessions),
-        ]);
-
-        if ($sessions === []) {
-            return false;
-        }
-
-        $key = self::OFFER_PREFIX.$queueCall->call_id;
-        Redis::hmset($key, $sessions);
-        Redis::expire($key, $callQueue->agent_ring_timeout + self::OFFER_GRACE_SECONDS);
-
-        return true;
+        return $sessions;
     }
 
     public function isOfferPending(string $callId): bool
@@ -141,9 +177,28 @@ class ConferenceOfferService
             return false;
         }
 
-        Redis::del($offerKey);
+        $winnerKey = self::WINNER_PREFIX.$queueCall->call_id;
 
-        $this->lifecycle->markConferenceBridge($queueCall, $agentUserId);
+        // The winner key must not outlive a failed bridge write, or the call
+        // would be stuck "won" with nobody connected.
+        try {
+            $bridged = $this->lifecycle->markConferenceBridge($queueCall, $agentUserId);
+        } catch (\Throwable $e) {
+            Redis::del($winnerKey);
+
+            throw $e;
+        }
+
+        if (! $bridged) {
+            // The caller left while the agent answered.
+            Redis::del($winnerKey);
+            $this->cancel($callQueue, $queueCall->call_id);
+
+            return false;
+        }
+
+        Redis::setex(self::LEG_PREFIX.$agentSessionToken, self::WINNER_TTL_SECONDS, $queueCall->call_id);
+        Redis::del($offerKey);
 
         $client = $this->client($callQueue);
 
@@ -180,7 +235,7 @@ class ConferenceOfferService
     {
         $offerKey = self::OFFER_PREFIX.$callId;
         $offered = Redis::hgetall($offerKey) ?: [];
-        Redis::del($offerKey);
+        Redis::del($offerKey, self::LOCK_PREFIX.$callId);
 
         if ($offered === []) {
             return;
@@ -197,6 +252,54 @@ class ConferenceOfferService
             'call_id' => $callId,
             'agent_user_ids' => array_keys($offered),
         ]);
+    }
+
+    /**
+     * The caller was served the room join: from here a winner hang-up is an
+     * ordinary end of call (endConferenceOnExit), not a failed pick-up.
+     */
+    public function markCallerJoined(string $callId): void
+    {
+        Redis::setex(self::JOINED_PREFIX.$callId, self::WINNER_TTL_SECONDS, '1');
+    }
+
+    /**
+     * A session ended. If it is the winning agent leg and the caller has not
+     * joined the room yet, the pick-up failed: release the winner, undo the
+     * bridge and let the next poll re-offer the call.
+     */
+    public function releaseWinnerIfUnjoined(int $organizationId, string $sessionToken): bool
+    {
+        $callId = Redis::get(self::LEG_PREFIX.$sessionToken);
+
+        if (! $callId || Redis::exists(self::JOINED_PREFIX.$callId)) {
+            return false;
+        }
+
+        // Exactly one releaser (duplicate deleted/completed updates race here).
+        if (Redis::del(self::LEG_PREFIX.$sessionToken) !== 1) {
+            return false;
+        }
+
+        $agentUserId = $this->winnerOf($callId);
+        Redis::del(self::WINNER_PREFIX.$callId, self::LOCK_PREFIX.$callId);
+
+        $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('call_id', $callId)
+            ->whereNull('disposition')
+            ->first();
+
+        if (! $queueCall || $agentUserId === null) {
+            return false;
+        }
+
+        Log::info('ConferenceOfferService: winner leg ended before the caller joined, re-offering', [
+            'call_id' => $callId,
+            'agent_user_id' => $agentUserId,
+        ]);
+
+        return $this->lifecycle->revertConferenceBridge($queueCall, $agentUserId);
     }
 
     /**

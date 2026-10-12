@@ -76,6 +76,8 @@ class QueueConferenceController extends Controller
      */
     public function joinResponse(CallQueue $callQueue, QueueCall $queueCall): Response
     {
+        $this->offers->markCallerJoined($queueCall->call_id);
+
         $recording = app(CallRecordingDecisionService::class)
             ->resolve($callQueue->organization_id, 'inbound');
 

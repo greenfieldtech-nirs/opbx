@@ -57,6 +57,10 @@ class QueueCallLifecycleService
             $sessionUpdate->action
         );
 
+        if ($sessionUpdate->session_token && ExtensionPresenceTracker::endsSession($sessionUpdate->status, $sessionUpdate->action)) {
+            app(ConferenceOfferService::class)->releaseWinnerIfUnjoined($sessionUpdate->organization_id, $sessionUpdate->session_token);
+        }
+
         // Session updates correlate by session token: call_ids holds SIP call
         // ids, while queue calls are keyed by the voice CallSid (= session token).
         $queueCall = $sessionUpdate->session_token
@@ -131,14 +135,14 @@ class QueueCallLifecycleService
      * (it claimed the call from its own session), so the bridge is confirmed
      * immediately and the CDR finalization credits the right agent.
      */
-    public function markConferenceBridge(QueueCall $queueCall, int $agentUserId): void
+    public function markConferenceBridge(QueueCall $queueCall, int $agentUserId): bool
     {
         // The call may have been finalized (caller hung up) while the agent answered.
         if (! $this->claimPending($queueCall, [
             'answered_at' => now(),
             'agent_user_id' => $agentUserId,
         ])) {
-            return;
+            return false;
         }
 
         Redis::setex("acd:bridge:{$queueCall->call_id}", self::DIAL_MARKER_TTL_SECONDS, $queueCall->answered_at->toIso8601String());
@@ -157,6 +161,38 @@ class QueueCallLifecycleService
             'answered',
             $agentUserId
         );
+
+        return true;
+    }
+
+    /**
+     * Undo a conference bridge whose winner never connected: the call is
+     * pending again, the agent is released and the call is put back in the
+     * worker queue so the next poll re-offers it.
+     */
+    public function revertConferenceBridge(QueueCall $queueCall, int $agentUserId): bool
+    {
+        $reverted = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->whereKey($queueCall->getKey())
+            ->whereNull('disposition')
+            ->where('agent_user_id', $agentUserId)
+            ->update(['answered_at' => null, 'agent_user_id' => null]);
+
+        if ($reverted !== 1) {
+            return false;
+        }
+
+        Redis::del("acd:bridge:{$queueCall->call_id}", "acd:dialresult:{$queueCall->call_id}");
+
+        $this->worker->event(
+            $queueCall->organization_id,
+            $queueCall->call_queue_id,
+            $queueCall->call_id,
+            'requeue',
+            $agentUserId
+        );
+
+        return true;
     }
 
     /**

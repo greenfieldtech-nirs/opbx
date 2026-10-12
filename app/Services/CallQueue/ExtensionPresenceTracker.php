@@ -29,6 +29,12 @@ class ExtensionPresenceTracker
         'congestion', 'congested', 'busy', 'completed', 'hangup', 'bye',
     ];
 
+    /** Whether a session update means the session is over (terminal status or deletion). */
+    public static function endsSession(string $status, ?string $action = null): bool
+    {
+        return $action === 'deleted' || in_array(strtolower($status), self::TERMINAL_STATUSES, true);
+    }
+
     public function handleSessionUpdate(int $organizationId, ?string $destination, string $status, ?string $action = null): void
     {
         if (! $destination) {
