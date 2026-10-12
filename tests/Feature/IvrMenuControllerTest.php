@@ -325,6 +325,19 @@ class IvrMenuControllerTest extends TestCase
     }
 
     /** @test */
+    public function it_filters_the_index_by_status(): void
+    {
+        $active = IvrMenu::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $inactive = IvrMenu::factory()->create(['organization_id' => $this->organization->id, 'status' => 'inactive']);
+
+        $ids = $this->actingAs($this->owner)->getJson('/api/v1/ivr-menus?status=inactive')
+            ->assertOk()->json('data.*.id');
+
+        $this->assertSame([$inactive->id], $ids);
+        $this->assertNotContains($active->id, $ids);
+    }
+
+    /** @test */
     public function it_ignores_organization_id_on_update(): void
     {
         $other = Organization::factory()->create();

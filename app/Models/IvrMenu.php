@@ -133,6 +133,14 @@ class IvrMenu extends Model
     }
 
     /**
+     * Scope query to IVR menus with a specific status (index `status` filter).
+     */
+    public function scopeWithStatus(Builder $query, IvrMenuStatus $status): Builder
+    {
+        return $query->where('status', $status->value);
+    }
+
+    /**
      * Scope query to IVR menus in a specific organization.
      */
     public function scopeForOrganization(Builder $query, int|string $organizationId): Builder
