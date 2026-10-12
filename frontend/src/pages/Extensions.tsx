@@ -26,8 +26,6 @@ Plus,
 Search,
 X,Phone,
 Copy,
-ChevronDown,
-ChevronUp,
 Eye,
 EyeOff,
 UserCheck,Users,
@@ -191,7 +189,6 @@ export default function ExtensionsComplete() {
     queryFn: () => usersService.getAll({ per_page: 100 }),
   });
 
-  const users = usersData?.data || [];
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -270,7 +267,6 @@ export default function ExtensionsComplete() {
     queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
   });
 
-  const aiAssistants = aiAssistantsData?.data || [];
 
   // Fetch AI Load Balancers for dropdown
   const { data: aiLoadBalancersData } = useQuery({
@@ -278,7 +274,6 @@ export default function ExtensionsComplete() {
     queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
   });
 
-  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   // Fetch AI Assistant providers for detail view
   const { data: aiProvidersData } = useQuery({
@@ -286,7 +281,6 @@ export default function ExtensionsComplete() {
     queryFn: () => aiAssistantProvidersService.getAll(),
   });
 
-  const aiProviders = aiProvidersData?.data?.providers || [];
 
   // Fetch active DIDs for Default Caller ID selector
   const { data: didsData } = useQuery({
@@ -435,13 +429,6 @@ export default function ExtensionsComplete() {
 
   // Check user permissions
   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const canEdit = (extension: Extension) => {
-    if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
-    if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
-    return false;
-  };
-  const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser.role);
 
   // Client-side assignment filter (backend doesn't expose this yet)
@@ -484,10 +471,6 @@ export default function ExtensionsComplete() {
   };
 
   // Get sort icon
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
-  };
 
   // Clear all filters
   const clearFilters = () => {

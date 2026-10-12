@@ -60,8 +60,6 @@ Search,
 Filter,
 Users,
 UserPlus,
-RotateCw,
-List,
 PhoneForwarded,
 PhoneOff,ChevronUp,
 ChevronDown,
@@ -72,7 +70,6 @@ GripVertical,
 Menu,
 Bot,
 Phone,
-ArrowRight,
 ListOrdered
 } from 'lucide-react';
 import {
@@ -219,7 +216,7 @@ export default function RingGroups() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch ring groups with React Query
-  const { data: ringGroupsData, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data: ringGroupsData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.ringGroups.all, {
       page: currentPage,
       per_page: perPage,
@@ -291,7 +288,7 @@ export default function RingGroups() {
   }, [callQueuesData]);
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
-  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
+  const { data: allRingGroupsData } = useQuery({
     queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
     staleTime: 60000, // 1 minute - keep fresh for form usage
@@ -395,112 +392,16 @@ export default function RingGroups() {
   };
 
   // Badge configuration for destination types
-  const getDestinationBadgeConfig = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension') => {
-    const configs = {
-      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Users },
-      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
-      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
-      extension: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
-    };
-    return configs[type] || configs.extension;
-  };
 
   // Get destination display name
-  const getDestinationDisplayName = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant', id: string, name?: string) => {
-    if (name) return name;
-    return `ID ${id}`;
-  };
 
   // Create formatted destination badge
-  const getDestinationBadge = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension', content: string) => {
-    const config = getDestinationBadgeConfig(type);
-    const Icon = config.icon;
-
-    return (
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
-          <Icon className="h-3.5 w-3.5" />
-          {content}
-        </Badge>
-      </div>
-    );
-  };
 
   // Strategy icon mapping
-  const getStrategyIcon = (strategy: RingGroupStrategy) => {
-    switch (strategy) {
-      case 'simultaneous':
-        return <Users className="h-4 w-4" />;
-      case 'round_robin':
-        return <RotateCw className="h-4 w-4" />;
-      case 'sequential':
-        return <List className="h-4 w-4" />;
-    }
-  };
 
   // Fallback icon mapping
-  const getFallbackIcon = (action: RingGroupFallbackAction) => {
-    switch (action) {
-      case 'extension':
-        return <PhoneForwarded className="h-4 w-4" />;
-      case 'ring_group':
-        return <ArrowRight className="h-4 w-4" />;
-      case 'ivr_menu':
-        return <Menu className="h-4 w-4" />;
-      case 'ai_assistant':
-        return <Bot className="h-4 w-4" />;
-      case 'hangup':
-        return <PhoneOff className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
-    }
-  };
 
   // Enhanced fallback display text with actual destination names
-  const getFallbackDisplayText = (
-    group: ExtendedRingGroup,
-    ringGroups: any[],
-    ivrMenus: any[]
-  ): string => {
-    switch (group.fallback_action) {
-      case 'extension':
-        return group.fallback_extension_number
-          ? `→ Extension: ${group.fallback_extension_number}`
-          : '→ Extension';
-
-      case 'ring_group':
-        if (group.fallback_ring_group_id) {
-          const targetRingGroup = ringGroups.find(rg => rg.id.toString() === group.fallback_ring_group_id);
-          return targetRingGroup ? `→ Ring Group: ${targetRingGroup.name}` : '→ Ring Group';
-        }
-        return '→ Ring Group';
-
-      case 'ivr_menu':
-        if (group.fallback_ivr_menu_id) {
-          const targetIvrMenu = ivrMenus.find(ivr => ivr.id.toString() === group.fallback_ivr_menu_id);
-          return targetIvrMenu ? `→ IVR Menu: ${targetIvrMenu.name}` : '→ IVR Menu';
-        }
-        return '→ IVR Menu';
-
-      case 'ai_assistant':
-        if (group.fallback_ai_assistant_id) {
-          const targetAiAssistant = availableExtensions.find(ext =>
-            ext.id === group.fallback_ai_assistant_id && ext.type === 'ai_assistant'
-          );
-          return targetAiAssistant ? `→ AI Assistant: ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
-        }
-        return '→ AI Assistant';
-
-      case 'hangup':
-        return 'Hangup';
-
-      case 'unavailable':
-        return 'Destination unavailable';
-
-      default:
-        return 'Unknown';
-    }
-  };
 
   // API handles filtering and sorting, so we use ringGroups directly
 

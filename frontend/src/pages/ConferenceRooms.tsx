@@ -125,7 +125,7 @@ export default function ConferenceRooms() {
   }, [searchQuery]);
 
   // Fetch conference rooms
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.conferenceRooms.all, {
       page: currentPage,
       per_page: perPage,
@@ -347,10 +347,6 @@ export default function ConferenceRooms() {
     setIsEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (room: ConferenceRoom) => {
-    setSelectedRoom(room);
-    setIsDeleteDialogOpen(true);
-  };
 
 
   const renderRoomForm = () => (
