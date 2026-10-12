@@ -14,9 +14,11 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\PlatformAuditService;
+use App\Services\UserDeletionImpactService;
 use Illuminate\Hashing\HashManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Platform User Controller
@@ -288,7 +290,10 @@ class PlatformUserController extends Controller
         $organizationId = $user->organization_id;
         $userId = $user->id;
 
-        $user->delete();
+        DB::transaction(function () use ($user): void {
+            app(UserDeletionImpactService::class)->apply($user);
+            $user->delete();
+        });
 
         // Audit log
         $auditService->log(

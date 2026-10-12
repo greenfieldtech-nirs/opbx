@@ -316,6 +316,8 @@ Route::prefix('v1')->group(function (): void {
 
         // Users
         Route::apiResource('users', UsersController::class);
+        Route::get('users/{user}/delete-impact', [UsersController::class, 'deleteImpact'])
+            ->name('users.delete-impact');
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
 

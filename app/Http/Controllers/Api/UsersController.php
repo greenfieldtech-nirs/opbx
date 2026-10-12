@@ -16,6 +16,7 @@ use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
+use App\Services\UserDeletionImpactService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -169,6 +170,10 @@ class UsersController extends AbstractApiCrudController
         assert($model instanceof User);
         $currentUser = $this->getAuthenticatedUser();
 
+        // Keep the user's extensions (unassigned), drop their group/queue memberships and switch every
+        // route that pointed at them to 'unavailable'. Runs in the delete's transaction (a later failure rolls it back).
+        app(UserDeletionImpactService::class)->apply($model);
+
         // Business logic: Cannot delete last owner in organization
         if ($model->role === UserRole::OWNER) {
             $this->preventLastOwnerDeletion($model, $currentUser);
@@ -184,6 +189,20 @@ class UsersController extends AbstractApiCrudController
                 'error' => $auditException->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Preview what deleting this user changes (same code as the delete itself). Same authorization as delete.
+     */
+    public function deleteImpact(User $user): JsonResponse
+    {
+        $this->authorize($this->getDeleteAbility(), $user);
+
+        if ($user->organization_id !== $this->getAuthenticatedUser()->organization_id) {
+            return response()->json(['error' => 'Not Found', 'message' => 'User not found.'], 404);
+        }
+
+        return response()->json(['data' => app(UserDeletionImpactService::class)->preview($user)]);
     }
 
     /**
