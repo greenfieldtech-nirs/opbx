@@ -31,10 +31,12 @@ paths:
           in: query
           schema:
             type: string
+          description: Number filter. Starts-with by default; `*` or `%` are wildcards for any characters (anywhere); `_` is literal.
         - name: to
           in: query
           schema:
             type: string
+          description: Number filter. Starts-with by default; `*` or `%` are wildcards for any characters (anywhere); `_` is literal.
         - name: disposition
           in: query
           schema:

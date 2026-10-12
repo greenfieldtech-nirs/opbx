@@ -165,16 +165,22 @@ class CallDetailRecordController extends AbstractApiCrudController
     }
 
     /**
-     * Prefix match on a phone-number column, with or without the leading '+',
-     * so cdr_org_from_idx / cdr_org_to_idx can serve it.
+     * Phone-number search, with or without the leading '+'. '*' and '%' are wildcards for any characters;
+     * a term without a wildcard is a prefix match (served by cdr_org_from_idx / cdr_org_to_idx). A leading
+     * wildcard (contains / ends-with) works but cannot use the index. '_' and '\' stay literal.
      */
     private function wherePhonePrefix(Builder $query, string $column, string $value): void
     {
-        $prefix = addcslashes(ltrim($value, '+'), '%_\\');
+        $pattern = str_replace(['*', '%'], '%', addcslashes(ltrim($value, '+'), '_\\'));
+        if (! str_contains($pattern, '%')) {
+            $pattern .= '%';
+        }
 
-        $query->where(function (Builder $q) use ($column, $prefix): void {
-            $q->where($column, 'like', $prefix.'%')
-                ->orWhere($column, 'like', '+'.$prefix.'%');
+        $query->where(function (Builder $q) use ($column, $pattern): void {
+            $q->where($column, 'like', $pattern);
+            if (! str_starts_with($pattern, '%')) {
+                $q->orWhere($column, 'like', '+'.$pattern);
+            }
         });
     }
 

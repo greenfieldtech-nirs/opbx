@@ -17,15 +17,33 @@ paths:
           required: false
           schema:
             type: string
-            format: date-time
-          description: Start of the date range (ISO 8601).
+          description: >-
+            Caller number filter. A term without a wildcard matches numbers that start with it (with or
+            without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere
+            (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal.
         - name: to
           in: query
           required: false
           schema:
             type: string
-            format: date-time
-          description: End of the date range (ISO 8601).
+          description: >-
+            Called number filter. A term without a wildcard matches numbers that start with it (with or
+            without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere
+            (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal.
+        - name: from_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: First day of the date range (inclusive).
+        - name: to_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Last day of the date range (inclusive).
         - name: extension_id
           in: query
           required: false

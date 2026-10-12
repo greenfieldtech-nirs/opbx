@@ -310,7 +310,7 @@ export default function CallLogs() {
                   <Label htmlFor="filter-from">From Number</Label>
                   <Input
                     id="filter-from"
-                    placeholder="e.g., +1415"
+                    placeholder="Starts with; * or % = any"
                     value={filterForm.from}
                     onChange={(e) => setFilterForm({ ...filterForm, from: e.target.value })}
                   />
@@ -319,7 +319,7 @@ export default function CallLogs() {
                   <Label htmlFor="filter-to">To Number</Label>
                   <Input
                     id="filter-to"
-                    placeholder="e.g., +1312"
+                    placeholder="Starts with; * or % = any"
                     value={filterForm.to}
                     onChange={(e) => setFilterForm({ ...filterForm, to: e.target.value })}
                   />

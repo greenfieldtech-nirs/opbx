@@ -76,8 +76,34 @@ final class CallDetailRecordFilterTest extends TestCase
         $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('from=1555'));
         $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('from=%2B1555'));
         $this->assertSame([$c->id], $this->ids('to=20'));
-        // A literal % is not a wildcard.
-        $this->assertSame([], $this->ids('from=%25'));
+    }
+
+    public function test_number_filters_support_star_and_percent_wildcards_anywhere(): void
+    {
+        $a = $this->cdr(['from' => '+15551234567']);
+        $b = $this->cdr(['from' => '15559999999']);
+        $c = $this->cdr(['from' => '+442071234567']);
+        $both = [$a->id, $b->id];
+
+        foreach (['*', '%25'] as $w) {
+            $this->assertEqualsCanonicalizing($both, $this->ids("from=1555{$w}"), 'trailing');
+            $this->assertEqualsCanonicalizing([$a->id, $c->id], $this->ids("from={$w}4567"), 'leading');
+            $this->assertSame([$a->id], $this->ids("from=1555{$w}67"), 'middle');
+            $this->assertSame([$b->id], $this->ids("from=15{$w}9999"), 'middle');
+            $this->assertEqualsCanonicalizing([$a->id, $b->id, $c->id], $this->ids("from={$w}"), 'only wildcard');
+            $this->assertEqualsCanonicalizing($both, $this->ids("from=%2B1555{$w}"), 'plus + trailing');
+        }
+    }
+
+    public function test_underscore_and_backslash_in_number_filters_are_literal(): void
+    {
+        $a = $this->cdr(['from' => '1a2']);
+        $b = $this->cdr(['from' => '1_2']);
+
+        $this->assertSame([$b->id], $this->ids('from=1_'));
+        $this->assertSame([$b->id], $this->ids('from=1_*'));
+        $this->assertSame([], $this->ids('from=1%5C'));
+        $this->assertNotContains($a->id, $this->ids('from=1_2'));
     }
 
     public function test_direction_filter_and_sort_use_the_stored_column(): void
