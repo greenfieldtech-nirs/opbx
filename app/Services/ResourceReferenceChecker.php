@@ -58,6 +58,22 @@ class ResourceReferenceChecker
         ['ai_assistant_load_balancers', 'fallback_ai_assistant_id', 'ai_assistant', 'ai_load_balancer', 'name', null, true],
         ['ring_group_members', 'extension_id', 'extension', 'ring_group', 'name', ['ring_groups', 'ring_group_id'], false],
         ['ai_assistant_load_balancer_members', 'ai_assistant_id', 'ai_assistant', 'ai_load_balancer', 'name', ['ai_assistant_load_balancers', 'load_balancer_id'], true],
+        // DID numbers assigned as configuration. History (call logs, CDRs, call tracking sessions,
+        // blocked call logs, auto-dialer sessions and caller-ID stats) never blocks.
+        ['extensions', 'default_caller_id_did_id', 'did_number', 'extension', 'extension_number', null, false],
+        ['outbound_whitelists', 'default_caller_id_did_id', 'did_number', 'outbound_whitelist', 'name', null, false],
+        ['call_tracking_numbers', 'did_number_id', 'did_number', 'call_tracking_campaign', 'name', ['call_tracking_campaigns', 'call_tracking_campaign_id'], false],
+        ['auto_dialer_campaign_caller_ids', 'did_number_id', 'did_number', 'auto_dialer_campaign', 'name', ['auto_dialer_campaigns', 'campaign_id'], false],
+        ['inbound_blacklist_did_number', 'did_number_id', 'did_number', 'inbound_blacklist', 'caller_id_pattern', ['inbound_blacklists', 'inbound_blacklist_id'], false],
+    ];
+
+    /** Detail text per "table.column" where the default (fallback / member) does not fit. */
+    private const DETAILS = [
+        'extensions.default_caller_id_did_id' => 'default caller ID',
+        'outbound_whitelists.default_caller_id_did_id' => 'default caller ID',
+        'call_tracking_numbers.did_number_id' => 'tracking number',
+        'auto_dialer_campaign_caller_ids.did_number_id' => 'caller ID pool',
+        'inbound_blacklist_did_number.did_number_id' => 'blocked DID',
     ];
 
     /**
@@ -108,7 +124,7 @@ class ResourceReferenceChecker
             }
             $query = DB::table("{$table} as t")->where("t.{$column}", $id);
             $owner = $this->scopeOwner($query, $parent, $soft, $orgId);
-            $found = [...$found, ...$this->rows($query, $owner, $nameColumn, $refType, $parent !== null ? 'member' : 'fallback')];
+            $found = [...$found, ...$this->rows($query, $owner, $nameColumn, $refType, self::DETAILS["{$table}.{$column}"] ?? ($parent !== null ? 'member' : 'fallback'))];
         }
 
         return $found;
