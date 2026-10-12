@@ -47,6 +47,7 @@ export function useCreateList() {
   return useMutation({
     mutationFn: (data: CreateListRequest) => distributionListsApi.create(data),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -83,9 +84,8 @@ export function useUploadList() {
       mapping: CsvMappingConfig;
     }) => distributionListsApi.uploadCsv(listId, file, mapping),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -139,12 +139,8 @@ export function useAddDestination() {
       data: { phone_number: string; description?: string };
     }) => distributionListsApi.addDestination(listId, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -164,12 +160,8 @@ export function useAddDestinationsBatch() {
       destinations: Array<{ phone_number: string; description?: string }>;
     }) => distributionListsApi.addDestinationsBatch(listId, destinations),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -195,6 +187,7 @@ export function useCopyList() {
     mutationFn: ({ listId, newName }: { listId: string | number; newName: string }) =>
       distributionListsApi.copy(listId, newName),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -209,10 +202,8 @@ export function useArchiveList() {
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.archive(listId),
     onSuccess: (_, listId) => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(listId),
-      });
     },
   });
 }
@@ -261,12 +252,8 @@ export function useResetDialAttempts() {
       destinationId: number;
     }) => distributionListsApi.resetDialAttempts(listId, destinationId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -286,12 +273,8 @@ export function useBulkResetDialAttempts() {
       destinationIds: number[];
     }) => distributionListsApi.bulkResetDialAttempts(listId, destinationIds),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -306,12 +289,8 @@ export function useResetPendingDestinations() {
     mutationFn: ({ listId }: { listId: string | number }) =>
       distributionListsApi.resetPendingDestinations(listId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -325,6 +304,7 @@ export function useDeleteList() {
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.delete(listId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -340,6 +320,7 @@ export function useAssignListToCampaign() {
     mutationFn: ({ listId, campaignId }: { listId: string | number; campaignId: number }) =>
       distributionListsApi.assignToCampaign(listId, campaignId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -354,6 +335,7 @@ export function useUnassignListFromCampaign() {
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.unassignFromCampaign(listId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });

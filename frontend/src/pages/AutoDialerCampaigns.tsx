@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { autoDialerKeys } from '@/hooks/useAutoDialerCampaigns';
+import { monitorKeys } from '@/hooks/useAutoDialerMonitor';
 import {
   Plus,
   Search,
@@ -149,7 +151,7 @@ export default function AutoDialerCampaigns() {
 
   // Fetch campaigns
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['auto-dialer-campaigns', {
+    queryKey: [...autoDialerKeys.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch || undefined,
@@ -181,7 +183,8 @@ export default function AutoDialerCampaigns() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign status updated');
     },
     onError: (error: any) => {
@@ -193,7 +196,8 @@ export default function AutoDialerCampaigns() {
   const archiveMutation = useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.archive(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign archived successfully');
     },
     onError: (error: any) => {
@@ -205,7 +209,8 @@ export default function AutoDialerCampaigns() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign deleted successfully');
       setIsDeleteDialogOpen(false);
     },

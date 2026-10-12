@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { callerIdPoolKeys } from '@/hooks/useCallerIdPool';
+import { monitorKeys } from '@/hooks/useAutoDialerMonitor';
 import { toast } from 'sonner';
 import { autoDialerCampaignsApi } from '@/services/autoDialerCampaignsApi';
 import type {
@@ -17,6 +19,16 @@ export const autoDialerKeys = {
   destinations: (campaignId: string) => [...autoDialerKeys.detail(campaignId), 'destinations'] as const,
   listUpload: (campaignId: string) => [...autoDialerKeys.detail(campaignId), 'list'] as const,
 };
+
+/**
+ * Campaign writes change the list page, the detail page and the live monitor (status, counts,
+ * CAC counter). The list page's key is a sibling of lists(), so invalidate the whole root.
+ */
+function invalidateCampaigns(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+  void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
+  void queryClient.invalidateQueries({ queryKey: callerIdPoolKeys.all }); // DIDs in use by a campaign
+}
 
 // Queries
 
@@ -61,7 +73,7 @@ export function useCreateAutoDialerCampaign() {
   return useMutation({
     mutationFn: (data: CreateCampaignRequest) => autoDialerCampaignsApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -73,8 +85,7 @@ export function useUpdateAutoDialerCampaign() {
     mutationFn: ({ id, data }: { id: string; data: UpdateCampaignRequest }) =>
       autoDialerCampaignsApi.update(id, data),
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -85,7 +96,7 @@ export function useDeleteAutoDialerCampaign() {
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -98,8 +109,7 @@ export function useStartCampaign() {
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.start(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -110,8 +120,7 @@ export function usePauseCampaign() {
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.pause(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -122,8 +131,7 @@ export function useResumeCampaign() {
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.resume(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -135,7 +143,7 @@ export function useResetCac() {
     mutationFn: (id: string) => autoDialerCampaignsApi.resetCac(id),
     onSuccess: (data) => {
       toast.success(`CAC counter reset (was ${data.previous_value}, now 0)`);
-      queryClient.invalidateQueries({ queryKey: ['monitor'] });
+      invalidateCampaigns(queryClient);
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to reset CAC counter');
@@ -149,8 +157,7 @@ export function useArchiveCampaign() {
   return useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.archive(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.lists() });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -164,8 +171,7 @@ export function useUploadCampaignList() {
     mutationFn: ({ campaignId, file, name }: { campaignId: string; file: File; name?: string }) =>
       autoDialerCampaignsApi.uploadList(campaignId, file, name),
     onSuccess: (_, { campaignId }) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.listUpload(campaignId) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(campaignId) });
+      invalidateCampaigns(queryClient);
     },
   });
 }
@@ -176,8 +182,7 @@ export function useDeleteCampaignList() {
   return useMutation({
     mutationFn: (campaignId: string) => autoDialerCampaignsApi.deleteList(campaignId),
     onSuccess: (_, campaignId) => {
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.listUpload(campaignId) });
-      queryClient.invalidateQueries({ queryKey: autoDialerKeys.detail(campaignId) });
+      invalidateCampaigns(queryClient);
     },
   });
 }

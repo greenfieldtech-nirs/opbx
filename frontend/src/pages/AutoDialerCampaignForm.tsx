@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -301,12 +302,12 @@ export default function AutoDialerCampaignForm() {
 
   // Fetch AI Assistants and Load Balancers
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { status: 'active' }],
+    queryKey: [...queryKeys.aiAssistants.all, { status: 'active' }],
     queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
   });
 
   const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', { status: 'active' }],
+    queryKey: [...queryKeys.aiLoadBalancers.all, { status: 'active' }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
