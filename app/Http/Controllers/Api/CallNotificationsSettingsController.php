@@ -268,30 +268,15 @@ class CallNotificationsSettingsController extends Controller
             ->selectRaw('MAX(id) as latest_id')
             ->groupBy('call_session_token');
 
-        $latestLogs = CallNotificationLog::forOrganization($user->organization_id)
+        $query = CallNotificationLog::forOrganization($user->organization_id)
             ->whereIn('id', $subquery)
-            ->orderBy('created_at', 'desc')
-            ->paginate($this->perPage($request, 50));
+            ->orderBy('created_at', 'desc');
 
-        // Apply filters if provided
         if ($request->has('status')) {
-            // For filtered view, we need to refetch with the filter
-            $filteredLogs = CallNotificationLog::forOrganization($user->organization_id)
-                ->whereIn('id', $subquery)
-                ->where('status', $request->input('status'))
-                ->orderBy('created_at', 'desc')
-                ->paginate($this->perPage($request, 50));
-
-            return response()->json([
-                'data' => CallNotificationLogResource::collection($filteredLogs->items()),
-                'meta' => [
-                    'current_page' => $filteredLogs->currentPage(),
-                    'last_page' => $filteredLogs->lastPage(),
-                    'per_page' => $filteredLogs->perPage(),
-                    'total' => $filteredLogs->total(),
-                ],
-            ]);
+            $query->where('status', $request->input('status'));
         }
+
+        $latestLogs = $query->paginate($this->perPage($request, 50));
 
         return response()->json([
             'data' => CallNotificationLogResource::collection($latestLogs->items()),
