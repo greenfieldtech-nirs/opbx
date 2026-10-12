@@ -11,6 +11,7 @@ use App\Models\CallQueueAgent;
 use App\Models\Organization;
 use App\Models\QueueCall;
 use App\Models\User;
+use App\Services\CallQueue\QueueDashboardDataService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -185,6 +186,28 @@ class QueueStatsAndAgentTest extends TestCase
             ->assertJsonPath('data.rolling.handled_60m', 2)
             ->assertJsonPath('data.rolling.abandoned_15m', 0)
             ->assertJsonPath('data.rolling.abandoned_24h', 1);
+    }
+
+    public function test_rolling_counts_use_a_single_query_on_queue_calls(): void
+    {
+        QueueCall::factory()->answered($this->agent)->create([
+            'organization_id' => $this->organization->id,
+            'call_queue_id' => $this->queue->id,
+            'entered_at' => now()->subMinutes(10),
+        ]);
+
+        $rolling = new \ReflectionMethod(QueueDashboardDataService::class, 'rollingCounts');
+        $service = app(QueueDashboardDataService::class);
+
+        \DB::enableQueryLog();
+        $counts = $rolling->invoke($service, $this->queue);
+        $queries = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        $this->assertCount(1, $queries);
+        $this->assertSame(1, $counts['handled_15m']);
+        $this->assertSame(0, $counts['abandoned_24h']);
+        $this->assertCount(8, $counts);
     }
 
     public function test_queue_calls_index_filters_and_paginates(): void

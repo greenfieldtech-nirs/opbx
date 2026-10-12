@@ -7,6 +7,8 @@ namespace App\Services\CallQueue;
 use App\Models\CallQueue;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -50,7 +52,7 @@ class QueueDashboardDataService
      *
      * @return array<string, mixed>
      */
-    public function statsPayload(CallQueue $callQueue, ?\Illuminate\Support\Carbon $from, ?\Illuminate\Support\Carbon $to): array
+    public function statsPayload(CallQueue $callQueue, ?Carbon $from, ?Carbon $to): array
     {
         $from ??= now()->subDay();
         $to ??= now();
@@ -145,25 +147,26 @@ class QueueDashboardDataService
      */
     private function rollingCounts(CallQueue $callQueue): array
     {
-        $counts = [];
+        $selects = [];
+        $bindings = [];
 
         foreach (self::ROLLING_WINDOWS as $label => $minutes) {
             $since = now()->subMinutes($minutes);
 
-            $counts["handled_{$label}"] = QueueCall::withoutGlobalScope(OrganizationScope::class)
-                ->where('call_queue_id', $callQueue->id)
-                ->where('disposition', 'answered')
-                ->where('entered_at', '>=', $since)
-                ->count();
-
-            $counts["abandoned_{$label}"] = QueueCall::withoutGlobalScope(OrganizationScope::class)
-                ->where('call_queue_id', $callQueue->id)
-                ->where('disposition', 'abandoned')
-                ->where('entered_at', '>=', $since)
-                ->count();
+            foreach (['handled' => 'answered', 'abandoned' => 'abandoned'] as $prefix => $disposition) {
+                $selects[] = "COALESCE(SUM(disposition = ? AND entered_at >= ?), 0) AS {$prefix}_{$label}";
+                array_push($bindings, $disposition, $since);
+            }
         }
 
-        return $counts;
+        $row = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $callQueue->id)
+            ->where('entered_at', '>=', now()->subMinutes(max(self::ROLLING_WINDOWS)))
+            ->selectRaw(implode(', ', $selects), $bindings)
+            ->toBase()
+            ->first();
+
+        return array_map('intval', (array) $row);
     }
 
     private function averageWaitingTime(CallQueue $callQueue): ?float
@@ -180,7 +183,7 @@ class QueueDashboardDataService
     /**
      * @return array{min: int|null, max: int|null, avg: float|null, stddev: float|null}
      */
-    private function durationStats(\Illuminate\Database\Eloquent\Builder $query, string $column): array
+    private function durationStats(Builder $query, string $column): array
     {
         $row = $query->selectRaw("MIN({$column}) as min_val, MAX({$column}) as max_val, AVG({$column}) as avg_val, STDDEV({$column}) as stddev_val")
             ->first();
