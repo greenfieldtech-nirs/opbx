@@ -3,7 +3,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
 import { extensionsService } from '@/services/extensions.service';
@@ -28,13 +28,14 @@ import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
-import { CdrDetailsDialog } from '@/components/cdr/CdrDetailsDialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { JsonViewer } from '@textea/json-viewer';
+// Loaded on demand: pulls in the syntax highlighter and JSON viewer.
+const CdrDetailsDialog = lazy(() =>
+  import('@/components/cdr/CdrDetailsDialog').then((m) => ({ default: m.CdrDetailsDialog })),
+);
+
 export default function CallLogs() {
   const { user: currentUser } = useAuth();
   const isPbxUser = currentUser?.role === 'pbx_user';
@@ -581,7 +582,11 @@ export default function CallLogs() {
         </CardContent>
       </Card>
 
-      <CdrDetailsDialog cdr={selectedCdr} open={showCdrDetails} onOpenChange={setShowCdrDetails} />
+      {showCdrDetails && (
+        <Suspense fallback={null}>
+          <CdrDetailsDialog cdr={selectedCdr} open={showCdrDetails} onOpenChange={setShowCdrDetails} />
+        </Suspense>
+      )}
     </div>
   );
 }
