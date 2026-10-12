@@ -19,6 +19,7 @@ import type {
   SetPlatformManagerRequest,
 } from '@/types/platform';
 import type { PaginatedResponse } from '@/types';
+import type { UserDeleteImpact } from './createResourceService';
 
 /**
  * Platform Dashboard API
@@ -88,6 +89,12 @@ export const platformUsersApi = {
     api
       .delete(`/platform/users/${id}`)
       .then((r) => r.data),
+
+  /** What deleting the user will change (same code as the delete itself). */
+  deleteImpact: (id: string | number) =>
+    api
+      .get<{ data: UserDeleteImpact }>(`/platform/users/${id}/delete-impact`)
+      .then((r) => r.data.data),
 
   setPlatformManager: (id: string, data: SetPlatformManagerRequest) =>
     api

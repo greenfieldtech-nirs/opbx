@@ -72,6 +72,8 @@ import {
   useUpdateUserPassword,
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
+import { UserDeleteDialog } from '@/components/Users/UserDeleteDialog';
+import { platformApi } from '@/services/platformApi';
 
 type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
 type SortDirection = 'asc' | 'desc' | null;
@@ -618,30 +620,17 @@ export default function PlatformUsers() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete User</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedUser?.name}? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Delete Confirmation (with impact preview) */}
+        <UserDeleteDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          scope="platform"
+          userId={selectedUser?.id}
+          userName={selectedUser?.name}
+          loadImpact={platformApi.users.deleteImpact}
+          onConfirm={handleDelete}
+          isPending={deleteMutation.isPending}
+        />
       </div>
     </PlatformLayout>
   );
