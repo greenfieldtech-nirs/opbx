@@ -10,11 +10,11 @@ describe('queryClient defaults', () => {
     expect(q.refetchIntervalInBackground).toBe(false);
   });
 
-  it('marks every cached query stale after any successful mutation', async () => {
+  it('does not invalidate unrelated queries after a successful mutation', async () => {
     queryClient.setQueryData(queryKeys.phoneNumbers.list({ page: 1 }), { data: [] });
     queryClient.setQueryData(queryKeys.ivrMenus.list({ per_page: 100 }), { data: [] });
     await queryClient.getMutationCache().build(queryClient, { mutationFn: async () => 'ok' }).execute(undefined);
-    expect(queryClient.getQueryState(queryKeys.phoneNumbers.list({ page: 1 }))?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(queryKeys.ivrMenus.list({ per_page: 100 }))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(queryKeys.phoneNumbers.list({ page: 1 }))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(queryKeys.ivrMenus.list({ per_page: 100 }))?.isInvalidated).toBe(false);
   });
 });
