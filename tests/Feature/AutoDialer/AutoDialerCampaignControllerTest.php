@@ -117,6 +117,33 @@ class AutoDialerCampaignControllerTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_index_excludes_status_server_side_with_correct_totals(): void
+    {
+        AutoDialerCampaign::factory()->count(3)->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::ARCHIVED->value,
+        ]);
+        AutoDialerCampaign::factory()->count(3)->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::ACTIVE->value,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns?exclude_status=archived&per_page=2&page=2');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 2);
+    }
+
+    public function test_index_rejects_invalid_exclude_status(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns?exclude_status=bogus')
+            ->assertUnprocessable();
+    }
+
     public function test_index_requires_authentication(): void
     {
         $response = $this->getJson('/api/v1/auto-dialer-campaigns');

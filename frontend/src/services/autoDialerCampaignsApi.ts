@@ -149,6 +149,7 @@ export interface CampaignDestination {
 
 export interface CampaignParams {
   status?: string;
+  exclude_status?: string;
   search?: string;
   per_page?: number;
   page?: number;

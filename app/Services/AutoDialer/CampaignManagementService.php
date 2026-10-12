@@ -34,6 +34,10 @@ class CampaignManagementService
             $query->where('status', $filters['status']);
         }
 
+        if (! empty($filters['exclude_status'])) {
+            $query->where('status', '!=', $filters['exclude_status']);
+        }
+
         // Apply search filter
         if (! empty($filters['search'])) {
             $search = $filters['search'];

@@ -22,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Validation\Rule;
 
 class AutoDialerCampaignController extends Controller
 {
@@ -41,8 +42,13 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
+        $request->validate([
+            'exclude_status' => ['nullable', Rule::enum(CampaignStatus::class)],
+        ]);
+
         $filters = [
             'status' => $request->status,
+            'exclude_status' => $request->input('exclude_status'),
             'search' => $request->search,
             'per_page' => $this->perPage($request, 25),
         ];
