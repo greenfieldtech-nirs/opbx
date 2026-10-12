@@ -5,6 +5,8 @@
  */
 
 import { useState } from 'react';
+import { invalidateAnnouncements } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw, Trash2 } from 'lucide-react';
@@ -64,7 +66,7 @@ export default function Announcements() {
     isLoading: announcementsIsLoading,
     refetch: refetchAnnouncements,
   } = useQuery({
-    queryKey: ['announcements', currentPage, filterForm],
+    queryKey: [...queryKeys.announcements.all, currentPage, filterForm],
     queryFn: () => recordingsService.getAll({
       ...filterForm,
       search: filterForm.search || undefined,
@@ -78,7 +80,7 @@ export default function Announcements() {
   const createAnnouncementMutation = useMutation({
     mutationFn: recordingsService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       setShowUploadDialog(false);
       setShowRemoteDialog(false);
       toast.success('Announcement created successfully');
@@ -151,7 +153,7 @@ export default function Announcements() {
   const deleteAnnouncementMutation = useMutation({
     mutationFn: recordingsService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       toast.success('Announcement deleted successfully');
     },
     onError: (error: any) => {
@@ -164,7 +166,7 @@ export default function Announcements() {
     mutationFn: ({ id, is_moh }: { id: number; is_moh: boolean }) =>
       recordingsService.update(id, { is_moh }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       toast.success(variables.is_moh ? 'Tagged as hold music' : 'Removed hold music tag');
     },
     onError: (error: any) => {

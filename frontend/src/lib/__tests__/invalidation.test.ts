@@ -1,6 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
-import { invalidatePhoneNumbers, invalidateRoutingResources } from '../invalidation';
+import {
+  invalidateAnnouncements,
+  invalidatePhoneNumbers,
+  invalidateQueueAgentState,
+  invalidateRoutingResources,
+} from '../invalidation';
 import { queryKeys } from '../queryKeys';
 
 function invalidatedKeys(fn: (qc: QueryClient) => unknown) {
@@ -36,5 +41,18 @@ describe('targeted invalidation helpers', () => {
     expect(keys).toContain(JSON.stringify(queryKeys.phoneNumbers.all));
     expect(keys).toContain(JSON.stringify(queryKeys.phoneNumbers.defaultCallerId()));
     expect(keys).not.toContain(JSON.stringify(queryKeys.ivrMenus.all));
+  });
+
+  it('announcement writes refresh the recordings pickers used by IVR and queues', () => {
+    const keys = invalidatedKeys(invalidateAnnouncements);
+    expect(keys).toContain(JSON.stringify(queryKeys.announcements.all));
+    expect(keys).toContain(JSON.stringify(queryKeys.recordings.all));
+  });
+
+  it('agent state changes refresh queue detail, memberships and the wallboard', () => {
+    const keys = invalidatedKeys(invalidateQueueAgentState);
+    expect(keys).toContain(JSON.stringify(queryKeys.callQueues.all));
+    expect(keys).toContain(JSON.stringify(queryKeys.myQueueMemberships.all));
+    expect(keys).toContain(JSON.stringify(queryKeys.queuesDashboard.all));
   });
 });

@@ -4,6 +4,7 @@
  */
 
 import { getApiErrorMessage } from '@/services/api';
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -91,7 +92,7 @@ export default function CallNotificationsSettingsPage() {
 
   // Fetch settings
   const { data: settingsData, isLoading: isLoadingSettings } = useQuery({
-    queryKey: ['call-notifications-settings'],
+    queryKey: queryKeys.callNotifications.settings(),
     queryFn: async () => {
       const response = await api.get('/call-notifications/settings');
       return response.data.data as CallNotificationsSettings | null;
@@ -156,7 +157,7 @@ export default function CallNotificationsSettingsPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-notifications-settings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.callNotifications.settings() });
       toast.success('Notification settings created successfully');
     },
     onError: (error: any) => {
@@ -171,7 +172,7 @@ export default function CallNotificationsSettingsPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-notifications-settings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.callNotifications.settings() });
       toast.success('Notification settings updated successfully');
     },
     onError: (error: any) => {

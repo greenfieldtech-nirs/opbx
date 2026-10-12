@@ -246,7 +246,9 @@ export default function LiveCalls() {
     mutationFn: (sessionId: number) => sessionUpdatesService.disconnectSession(sessionId),
     onSuccess: () => {
       toast.success('Session disconnected successfully');
-      queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cdrs.all });
     },
     onError: (error: any) => {
       const errorMessage =

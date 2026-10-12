@@ -4,6 +4,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateQueueAgentState } from '@/lib/invalidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, PhoneCall, Timer, Users } from 'lucide-react';
@@ -56,7 +57,7 @@ export default function CallQueueDetail() {
       userId: number;
     }) => queueAgentService.setState(queueId, state, userId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.callQueues.detail(id), 'live'] });
+      void invalidateQueueAgentState(queryClient);
     },
     onError: () => toast.error('Failed to update agent state'),
   });

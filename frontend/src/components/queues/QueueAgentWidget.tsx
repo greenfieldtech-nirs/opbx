@@ -6,6 +6,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateQueueAgentState } from '@/lib/invalidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Headset } from 'lucide-react';
@@ -37,7 +38,7 @@ export function QueueAgentWidget() {
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
-    queryKey: ['my-queue-memberships'],
+    queryKey: queryKeys.myQueueMemberships.all,
     queryFn: queueAgentService.myQueues,
     refetchInterval: 15000,
   });
@@ -49,8 +50,7 @@ export function QueueAgentWidget() {
     mutationFn: ({ queueId, state }: { queueId: number; state: QueueAgentStateInput }) =>
       queueAgentService.setState(queueId, state),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-queue-memberships'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.callQueues.all });
+      void invalidateQueueAgentState(queryClient);
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
   });

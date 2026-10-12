@@ -48,3 +48,21 @@ export function invalidateTrunks(queryClient: QueryClient): Promise<void[]> {
     ),
   );
 }
+
+/** Agent login/state changes: the agent's memberships, queue detail/live/stats and the wallboard. */
+export function invalidateQueueAgentState(queryClient: QueryClient): Promise<void[]> {
+  return Promise.all(
+    [queryKeys.myQueueMemberships.all, queryKeys.callQueues.all, queryKeys.queuesDashboard.all].map(
+      (queryKey) => queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
+}
+
+/** Announcements are the recordings shown in IVR / call queue pickers (greetings, hold music). */
+export function invalidateAnnouncements(queryClient: QueryClient): Promise<void[]> {
+  return Promise.all(
+    [queryKeys.announcements.all, queryKeys.recordings.all].map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
+}

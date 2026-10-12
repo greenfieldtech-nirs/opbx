@@ -26,6 +26,7 @@ export const queryKeys = {
     detail: (id: string | number | undefined) => ['call-queues', 'detail', id] as const,
   },
   queuesDashboard: {
+    all: ['queues-dashboard'] as const,
     link: () => ['queues-dashboard-link'] as const,
     live: (queueId: string | number | undefined) => ['queues-dashboard', queueId, 'live'] as const,
     stats: (queueId: string | number | undefined, timespan: string) =>
