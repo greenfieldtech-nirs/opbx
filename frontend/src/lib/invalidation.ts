@@ -39,3 +39,12 @@ export function invalidatePhoneNumbers(queryClient: QueryClient): Promise<void[]
     ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
   );
 }
+
+/** Trunk writes: trunk lists and the outbound-trunk dropdown used by the whitelist page. */
+export function invalidateTrunks(queryClient: QueryClient): Promise<void[]> {
+  return Promise.all(
+    [queryKeys.trunks.all, queryKeys.trunks.outbound()].map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
+}

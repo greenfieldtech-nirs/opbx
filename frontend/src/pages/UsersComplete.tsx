@@ -10,6 +10,8 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -184,7 +186,7 @@ function UsersComplete() {
 
   // Fetch users with React Query
   const { data: usersResponse, isLoading, isError, error, refetch, isRefetching } = useQuery({
-    queryKey: ['users', {
+    queryKey: [...queryKeys.users.all, {
       search: searchQuery || undefined,
       role: roleFilter !== 'all' ? roleFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -213,7 +215,7 @@ function UsersComplete() {
   const createUserMutation = useMutation({
     mutationFn: usersService.create,
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowCreateDialog(false);
       resetForm();
       toast.success('User created successfully');
@@ -234,7 +236,7 @@ function UsersComplete() {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => usersService.update(id, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowEditDialog(false);
       const updatedUserId = selectedUser?.id;
       setSelectedUser(null);
@@ -257,7 +259,7 @@ function UsersComplete() {
   const deleteUserMutation = useMutation({
     mutationFn: usersService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowDeleteDialog(false);
       setSelectedUser(null);
       toast.success('User deleted successfully');
@@ -505,7 +507,7 @@ function UsersComplete() {
               <p className="text-destructive font-medium mb-2">Failed to load users</p>
               <p className="text-muted-foreground text-sm">{error?.message || 'An error occurred'}</p>
               <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+                onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.users.all })}
                 className="mt-4"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -1301,7 +1303,7 @@ function UsersComplete() {
       <InviteUserDialog
         open={showInviteDialog}
         onOpenChange={setShowInviteDialog}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+        onSuccess={() => void invalidateRoutingResources(queryClient)}
       />
     </div >
   );

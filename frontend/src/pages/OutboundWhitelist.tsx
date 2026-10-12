@@ -107,7 +107,7 @@ const OutboundWhitelistPage: React.FC = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['outbound-whitelist', { search: searchQuery }],
+    queryKey: [...queryKeys.outboundWhitelist.all, { search: searchQuery }],
     queryFn: () => outboundWhitelistService.getAll({
       search: searchQuery || undefined,
       per_page: 50,
@@ -121,7 +121,7 @@ const OutboundWhitelistPage: React.FC = () => {
     error: trunksError,
     refetch: refetchTrunks,
   } = useQuery({
-    queryKey: ['outbound-trunks'],
+    queryKey: queryKeys.trunks.outbound(),
     queryFn: () => settingsService.getOutboundTrunks(),
   });
 
@@ -136,7 +136,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateOutboundWhitelistRequest) => outboundWhitelistService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       setFormErrors({});
@@ -159,7 +159,7 @@ const OutboundWhitelistPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: string; data: UpdateOutboundWhitelistRequest }) =>
       outboundWhitelistService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setIsEditDialogOpen(false);
       setEditingItem(null);
       setFormData(emptyFormData);
@@ -182,7 +182,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => outboundWhitelistService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setDeleteItem(null);
       toast.success('Outbound whitelist entry deleted successfully');
     },
@@ -195,7 +195,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const toggleStatusMutation = useMutation({
     mutationFn: (id: string) => outboundWhitelistService.toggleStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       toast.success('Status updated successfully');
     },
     onError: (error: any) => {

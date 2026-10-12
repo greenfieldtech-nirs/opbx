@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -42,7 +44,7 @@ export default function Supervisors() {
   // Guard: only owner and pbx_admin can access this page
   const canAccess = currentUser?.role === 'owner' || currentUser?.role === 'pbx_admin';
   const { data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['users'],
+    queryKey: queryKeys.users.all,
     queryFn: () => usersService.getAll({ per_page: 1000 }),
     staleTime: 30000,
   });
@@ -102,7 +104,7 @@ export default function Supervisors() {
       return usersService.patch(id, { status: newStatus });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Supervisor status updated');
     },
     onError: (error: any) => {
@@ -195,7 +197,7 @@ export default function Supervisors() {
               size="icon"
               onClick={() => {
                 refetch();
-                queryClient.invalidateQueries({ queryKey: ['supervisor-assignments'] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.supervisorAssignments.all });
               }}
               disabled={isRefetching}
               title="Refresh"

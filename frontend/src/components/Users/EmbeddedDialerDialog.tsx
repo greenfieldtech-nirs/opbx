@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Copy, RefreshCw, Loader2 } from 'lucide-react';
@@ -59,7 +60,7 @@ export function EmbeddedDialerDialog({
   const [snippet, setSnippet] = useState<string | null>(null);
 
   const { data: config, isLoading } = useQuery({
-    queryKey: ['embed-token', userId],
+    queryKey: queryKeys.embedToken.forUser(userId),
     queryFn: () => embedTokensService.get(userId!),
     enabled: open && userId != null,
   });
@@ -85,7 +86,7 @@ export function EmbeddedDialerDialog({
       }),
     onSuccess: () => {
       toast.success('Embedded dialer settings saved');
-      queryClient.invalidateQueries({ queryKey: ['embed-token', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.embedToken.forUser(userId) });
     },
     onError: () => toast.error('Failed to save settings'),
   });
@@ -95,7 +96,7 @@ export function EmbeddedDialerDialog({
     onSuccess: (res) => {
       setSnippet(res.snippet);
       toast.success('New embed token generated. Old token is now revoked.');
-      queryClient.invalidateQueries({ queryKey: ['embed-token', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.embedToken.forUser(userId) });
     },
     onError: () => toast.error('Failed to regenerate token'),
   });

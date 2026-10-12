@@ -127,7 +127,7 @@ const InboundBlacklistPage: React.FC = () => {
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ['inbound-blacklist', { search: searchQuery }],
+    queryKey: [...queryKeys.inboundBlacklist.all, { search: searchQuery }],
     queryFn: () => inboundBlacklistService.getAll({
       search: searchQuery || undefined,
       per_page: 100,
@@ -149,7 +149,7 @@ const InboundBlacklistPage: React.FC = () => {
   const toggleStatusMutation = useMutation({
     mutationFn: (id: number) => inboundBlacklistService.toggleStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       toast.success('Status updated successfully');
     },
     onError: (error: any) => {
@@ -161,7 +161,7 @@ const InboundBlacklistPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateInboundBlacklistRequest) => inboundBlacklistService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       setFormErrors({});
@@ -185,7 +185,7 @@ const InboundBlacklistPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: UpdateInboundBlacklistRequest }) =>
       inboundBlacklistService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setIsEditDialogOpen(false);
       setEditingItem(null);
       setFormData(emptyFormData);
@@ -209,7 +209,7 @@ const InboundBlacklistPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => inboundBlacklistService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setDeleteItem(null);
       toast.success('Blacklist entry deleted successfully');
     },

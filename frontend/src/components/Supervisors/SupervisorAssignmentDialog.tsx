@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -31,21 +32,21 @@ export function SupervisorAssignmentDialog({
   const queryClient = useQueryClient();
 
   const { data: usersResponse } = useQuery({
-    queryKey: ['users'],
+    queryKey: queryKeys.users.all,
     queryFn: () => usersService.getAll({ per_page: 1000 }),
     enabled: open && !!userId,
     staleTime: 60000,
   });
 
   const { data: ringGroupsResponse } = useQuery({
-    queryKey: ['ring-groups'],
+    queryKey: queryKeys.ringGroups.all,
     queryFn: () => ringGroupsService.getAll({ per_page: 1000 }),
     enabled: open && !!userId,
     staleTime: 60000,
   });
 
   const { data: assignmentsResponse, isLoading: isLoadingAssignments } = useQuery({
-    queryKey: ['supervisor-assignments', userId],
+    queryKey: queryKeys.supervisorAssignments.forUser(userId),
     queryFn: () => getSupervisorAssignments(userId as string),
     enabled: open && !!userId,
   });
@@ -72,7 +73,7 @@ export function SupervisorAssignmentDialog({
     mutationFn: (data: { user_ids: number[]; ring_group_ids: number[] }) =>
       updateSupervisorAssignments(userId as string, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['supervisor-assignments', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.supervisorAssignments.all });
       toast.success('Supervisor assignments updated');
       onOpenChange(false);
     },

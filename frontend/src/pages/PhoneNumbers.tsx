@@ -5,6 +5,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidatePhoneNumbers } from '@/lib/invalidation';
 import { useState, useEffect } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -159,7 +160,7 @@ export default function PhoneNumbers() {
   const createMutation = useMutation({
     mutationFn: (data: CreateDIDRequest) => phoneNumbersService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
+      void invalidatePhoneNumbers(queryClient);
       setIsCreateDialogOpen(false);
       toast.success('Phone number added successfully');
     },
@@ -174,7 +175,7 @@ export default function PhoneNumbers() {
     mutationFn: ({ id, data }: { id: string; data: UpdateDIDRequest }) =>
       phoneNumbersService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
+      void invalidatePhoneNumbers(queryClient);
       setIsEditDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number updated successfully');
@@ -191,7 +192,7 @@ export default function PhoneNumbers() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => phoneNumbersService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
+      void invalidatePhoneNumbers(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number deleted successfully');
@@ -226,14 +227,14 @@ export default function PhoneNumbers() {
   const defaultCallerIdMutation = useMutation({
     mutationFn: (didId: number | null) => setDefaultCallerId(didId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.defaultCallerId() });
+      void invalidatePhoneNumbers(queryClient);
       toast.success('Default outbound caller ID updated');
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update default caller ID';
       toast.error(message);
       // Reset the Select to the server value on failure
-      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.defaultCallerId() });
+      void invalidatePhoneNumbers(queryClient);
     },
   });
 

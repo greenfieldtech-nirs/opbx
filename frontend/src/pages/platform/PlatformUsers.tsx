@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -90,7 +91,7 @@ export default function PlatformUsers() {
     hasRefreshed.current = true;
 
     // Clear platform-related queries to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     // Refresh user data from server
     refreshUser();
   }, [queryClient, refreshUser]);

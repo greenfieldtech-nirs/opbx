@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { invalidateTrunks } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -142,7 +144,7 @@ const TrunksPage: React.FC = () => {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ['trunks'],
+    queryKey: queryKeys.trunks.all,
     queryFn: () => trunksService.listTrunks(),
   });
 
@@ -229,7 +231,7 @@ const TrunksPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateTrunkRequest) => trunksService.createTrunk(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trunks'] });
+      void invalidateTrunks(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       setFormErrors({});
@@ -242,7 +244,7 @@ const TrunksPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: UpdateTrunkRequest }) =>
       trunksService.updateTrunk(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trunks'] });
+      void invalidateTrunks(queryClient);
       setIsEditDialogOpen(false);
       setEditingTrunk(null);
       setFormData(emptyFormData);
@@ -255,7 +257,7 @@ const TrunksPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => trunksService.deleteTrunk(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trunks'] });
+      void invalidateTrunks(queryClient);
       setDeleteTrunk(null);
       setDeleteAcknowledged(false);
       toast.success('Trunk deleted successfully');

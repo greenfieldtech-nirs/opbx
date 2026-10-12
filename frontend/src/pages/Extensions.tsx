@@ -10,6 +10,7 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useState, useMemo, useEffect } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -199,7 +200,7 @@ export default function ExtensionsComplete() {
 
   // Fetch extensions
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['extensions', {
+    queryKey: [...queryKeys.extensions.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -225,7 +226,7 @@ export default function ExtensionsComplete() {
 
   // Fetch users for assignment dropdown
   const { data: usersData } = useQuery({
-    queryKey: ['users', { per_page: 100 }],
+    queryKey: [...queryKeys.users.all, { per_page: 100 }],
     queryFn: () => usersService.getAll({ per_page: 100 }),
   });
 
@@ -269,7 +270,7 @@ export default function ExtensionsComplete() {
 
   // Fetch conference rooms for table display
   const { data: conferenceRoomsData } = useQuery({
-    queryKey: ['conference-rooms', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.conferenceRooms.all, { per_page: 100, status: 'active' }],
     queryFn: () => conferenceRoomsService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -285,7 +286,7 @@ export default function ExtensionsComplete() {
 
   // Fetch ring groups for table display
   const { data: ringGroupsData } = useQuery({
-    queryKey: ['ring-groups', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.ringGroups.all, { per_page: 100, status: 'active' }],
     queryFn: () => ringGroupsService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -304,7 +305,7 @@ export default function ExtensionsComplete() {
 
   // Fetch AI Assistants for dropdown
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.aiAssistants.all, { per_page: 100, status: 'active' }],
     queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
   });
 
@@ -312,7 +313,7 @@ export default function ExtensionsComplete() {
 
   // Fetch AI Load Balancers for dropdown
   const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.aiLoadBalancers.all, { per_page: 100, status: 'active' }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -337,7 +338,7 @@ export default function ExtensionsComplete() {
   const createMutation = useMutation({
     mutationFn: (data: CreateExtensionRequest) => extensionsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension created successfully');
     },
     onError: (error: Error | unknown) => {
@@ -359,7 +360,7 @@ export default function ExtensionsComplete() {
     mutationFn: ({ id, data }: { id: string; data: UpdateExtensionRequest }) =>
       extensionsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension updated successfully');
     },
     onError: (error: Error | unknown) => {
@@ -382,7 +383,7 @@ export default function ExtensionsComplete() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => extensionsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension deleted successfully');
     },
     onError: (error: Error | unknown) => {
@@ -398,7 +399,7 @@ export default function ExtensionsComplete() {
   const resetPasswordMutation = useMutation({
     mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
     onSuccess: (data, extensionId) => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.extensions.all });
 
       // Store the new password temporarily for display
       setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
@@ -447,7 +448,7 @@ export default function ExtensionsComplete() {
       toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       setIsSyncNeeded(false);
       const toCreated = data.to_cloudonix?.created || 0;
       const fromCreated = data.from_cloudonix?.created || 0;
@@ -1193,7 +1194,7 @@ export default function ExtensionsComplete() {
               <p className="text-muted-foreground mb-4">
                 {error instanceof Error ? error.message : 'An error occurred while loading extensions'}
               </p>
-              <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['extensions'] })}>
+              <Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.extensions.all })}>
                 Try Again
               </Button>
             </div>
