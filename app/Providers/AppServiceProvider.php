@@ -59,8 +59,6 @@ use App\Services\Auth0\Auth0ProfileNormalizer;
 use App\Services\Auth0\Auth0Service;
 use App\Services\Auth0\Auth0StateStore;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
-use App\Services\CallRouting\CallRoutingService;
-use App\Services\CallStateManager\CallStateManager;
 use App\Services\CallTracking\CallTrackingDestinationResolver;
 use App\Services\Cloudonix\CloudonixVoiceService;
 use App\Services\CloudonixClient\CloudonixClient;
@@ -119,14 +117,6 @@ class AppServiceProvider extends ServiceProvider
                     requireCredentials: false
                 );
             }
-        );
-
-        $this->app->singleton(
-            CallStateManager::class
-        );
-
-        $this->app->singleton(
-            CallRoutingService::class
         );
 
         $this->app->singleton(

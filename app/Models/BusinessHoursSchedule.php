@@ -272,7 +272,7 @@ class BusinessHoursSchedule extends Model
     }
 
     /**
-     * Convert business hours action to routing format expected by CallRoutingService.
+     * Convert business hours action to routing format expected by the voice routing strategies.
      *
      * Parses target_id using the prefixed format (ext-13, rg-5, etc.) and extracts
      * the numeric ID for database lookups.
