@@ -26,6 +26,7 @@ use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -37,6 +38,8 @@ use Illuminate\Support\Facades\Redis;
  */
 class QueuePollController extends Controller
 {
+    private const RECONCILE_INTERVAL_SECONDS = 5;
+
     public function handle(QueueCallbackRequest $request): Response
     {
         Log::info('QueuePollController: hold-loop poll', [
@@ -141,11 +144,13 @@ class QueuePollController extends Controller
             }
         }
 
+        $roster = app(QueueDialOfferService::class)->roster($callQueue);
+
         $result = app(AcdWorkerClient::class)->poll(
             $callQueue->organization_id,
             $callQueue->id,
             $context['call_id'],
-            app(QueueDialOfferService::class)->roster($callQueue),
+            $roster,
             $callQueue->strategy->value,
             $callQueue->max_wait_seconds
         );
@@ -156,23 +161,26 @@ class QueuePollController extends Controller
         }
 
         // Reap ghost worker entries (ended calls never dequeued) so a stale
-        // head cannot block the queue, then re-check the decision once.
-        if (($result['action'] ?? 'wait') === 'wait') {
-            $dialOffer = app(QueueDialOfferService::class);
-            $roster = $dialOffer->roster($callQueue);
+        // head cannot block the queue, then re-check the decision once. Every
+        // waiting caller polls every few seconds: sweep at most once per
+        // RECONCILE_INTERVAL_SECONDS per queue, and re-poll only if a ghost was reaped.
+        if (($result['action'] ?? 'wait') === 'wait'
+            && Cache::add("acd:reconcile:{$callQueue->id}", 1, self::RECONCILE_INTERVAL_SECONDS)) {
             $waiting = app(AcdWorkerClient::class)->live($callQueue->organization_id, $callQueue->id, $roster);
 
-            app(QueueCallLifecycleService::class)
+            $reaped = app(QueueCallLifecycleService::class)
                 ->reconcileStaleCalls($callQueue, collect($waiting['waiting'] ?? [])->pluck('callId')->all());
 
-            $result = app(AcdWorkerClient::class)->poll(
-                $callQueue->organization_id,
-                $callQueue->id,
-                $context['call_id'],
-                $roster,
-                $callQueue->strategy->value,
-                $callQueue->max_wait_seconds
-            ) ?? $result;
+            if ($reaped !== []) {
+                $result = app(AcdWorkerClient::class)->poll(
+                    $callQueue->organization_id,
+                    $callQueue->id,
+                    $context['call_id'],
+                    $roster,
+                    $callQueue->strategy->value,
+                    $callQueue->max_wait_seconds
+                ) ?? $result;
+            }
         }
 
         // Per-caller max-wait enforcement (source of truth: queue_calls.entered_at).

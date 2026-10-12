@@ -9,6 +9,7 @@ use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\QueueCall;
 use App\Models\Recording;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -171,12 +172,13 @@ class QueueHoldLoopTest extends TestCase
         $this->assertArrayNotHasKey('moh_idx', $this->redirectSessionData($content));
     }
 
-    public function test_poll_endpoint_cycles_moh_index(): void
+    /**
+     * Seeds a pending queue call and returns a closure that fires one hold-loop poll.
+     */
+    private function pollHitter(): \Closure
     {
-        $this->fakeSegments(3);
-
         $token = (string) Str::random(32);
-        CloudonixSettings::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        CloudonixSettings::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $this->organization->id)
             ->first()
             ?->update([
@@ -211,6 +213,15 @@ class QueueHoldLoopTest extends TestCase
             ['Authorization' => "Bearer {$token}"],
         );
 
+        return $hit;
+    }
+
+    public function test_poll_endpoint_cycles_moh_index(): void
+    {
+        $this->fakeSegments(3);
+
+        $hit = $this->pollHitter();
+
         $first = $hit(0);
         $first->assertOk();
         $content = (string) $first->getContent();
@@ -222,5 +233,20 @@ class QueueHoldLoopTest extends TestCase
         $content = (string) $second->getContent();
         $this->assertStringContainsString('001.mp3', $content);
         $this->assertSame(2, $this->redirectSessionData($content)['moh_idx'] ?? null);
+    }
+
+    public function test_wait_poll_makes_at_most_two_worker_calls_and_reconcile_is_throttled(): void
+    {
+        $this->fakeSegments(3);
+        $hit = $this->pollHitter();
+        $workerCalls = fn () => Http::recorded(fn ($request) => str_contains($request->url(), 'acd-worker:8084'))->count();
+
+        $hit(0)->assertOk();
+        $this->assertLessThanOrEqual(2, $workerCalls(), 'poll + one ghost sweep');
+
+        // Inside the throttle window the sweep is skipped: a single poll call.
+        $before = $workerCalls();
+        $hit(1)->assertOk();
+        $this->assertSame(1, $workerCalls() - $before);
     }
 }

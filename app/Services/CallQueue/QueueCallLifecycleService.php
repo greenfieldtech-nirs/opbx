@@ -389,11 +389,12 @@ class QueueCallLifecycleService
      * forever - nothing ever polls them.
      *
      * @param  array<int, string>  $waitingCallIds
+     * @return array<int, string> the reaped ghost call ids
      */
-    public function reconcileStaleCalls(CallQueue $callQueue, array $waitingCallIds): void
+    public function reconcileStaleCalls(CallQueue $callQueue, array $waitingCallIds): array
     {
         if (empty($waitingCallIds)) {
-            return;
+            return [];
         }
 
         $pending = QueueCall::withoutGlobalScope(OrganizationScope::class)
@@ -403,7 +404,9 @@ class QueueCallLifecycleService
             ->pluck('call_id')
             ->all();
 
-        foreach (array_diff($waitingCallIds, $pending) as $ghostCallId) {
+        $ghosts = array_values(array_diff($waitingCallIds, $pending));
+
+        foreach ($ghosts as $ghostCallId) {
             Log::info('QueueCallLifecycleService: reaping ghost queue entry', [
                 'call_queue_id' => $callQueue->id,
                 'call_id' => $ghostCallId,
@@ -411,6 +414,8 @@ class QueueCallLifecycleService
 
             $this->worker->event($callQueue->organization_id, $callQueue->id, $ghostCallId, 'abandoned');
         }
+
+        return $ghosts;
     }
 
     /**

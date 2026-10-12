@@ -118,24 +118,28 @@ class ConferenceOfferService
      */
     private function originate(CallQueue $callQueue, QueueCall $queueCall, array $agents): array
     {
-        $client = $this->client($callQueue);
-        $sessions = [];
+        $payloads = [];
 
         foreach ($agents as $agent) {
-            $extension = (string) $agent['extensionNumber'];
-            $agentUserId = (int) $agent['userId'];
-
-            if ($this->presence->isBusy($callQueue->organization_id, $extension)) {
+            if ($this->presence->isBusy($callQueue->organization_id, (string) $agent['extensionNumber'])) {
                 continue;
             }
 
-            $result = $this->safely(fn () => $client?->originateApplicationCall([
-                'destination' => $extension,
+            $payloads[(int) $agent['userId']] = [
+                'destination' => (string) $agent['extensionNumber'],
                 'caller-id' => $queueCall->from_number,
-                'url' => $this->signedUrl('voice.queue-agent-connect', $callQueue, $queueCall, $agentUserId),
+                'url' => $this->signedUrl('voice.queue-agent-connect', $callQueue, $queueCall, (int) $agent['userId']),
                 'timeout' => $callQueue->agent_ring_timeout,
-            ]));
+            ];
+        }
 
+        // All legs start concurrently: the poll/webhook that triggered the
+        // offer waits for one origination round trip, not one per agent.
+        $client = $this->client($callQueue);
+        $results = $payloads === [] ? [] : ($this->safely(fn () => $client?->originateApplicationCalls($payloads)) ?? []);
+
+        $sessions = [];
+        foreach ($results as $agentUserId => $result) {
             if (! empty($result['token'])) {
                 $sessions[(string) $agentUserId] = (string) $result['token'];
             }

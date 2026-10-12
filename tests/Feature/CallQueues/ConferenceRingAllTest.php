@@ -636,4 +636,25 @@ class ConferenceRingAllTest extends TestCase
         $this->assertSame($this->owner->id, $offers->winnerOf(self::CALL_ID));
         Http::assertNotSent(fn ($request) => str_contains($request->url(), 'acd-worker:8084/events') && $request['type'] === 'requeue');
     }
+
+    public function test_one_failed_origination_still_offers_the_other_agents(): void
+    {
+        $originated = 0;
+        Http::fake(function ($request) use (&$originated) {
+            if (! str_contains($request->url(), '/sessions/') && str_ends_with($request->url(), '/application')) {
+                // The first agent's origination is rejected by Cloudonix.
+                return ++$originated === 1 ? Http::response([], 500) : Http::response(['token' => 'agent-tok-ok'], 200);
+            }
+
+            return Http::response([], 200);
+        });
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+
+        $this->assertTrue($offers->offer($this->queue, $queueCall, $this->agents()));
+
+        $this->assertSame(2, $originated, 'both legs were attempted');
+        $this->assertTrue($offers->isOfferPending(self::CALL_ID));
+        $this->assertSame(['agent-tok-ok'], array_values(Redis::hgetall('acd:confoffer:'.self::CALL_ID)));
+    }
 }

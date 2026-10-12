@@ -42,17 +42,19 @@ class ImmediateConnectService
         $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
 
         // Reap ghost entries (calls that ended without the worker being told)
-        // so a stale head cannot block immediate connect.
-        app(QueueCallLifecycleService::class)->reconcileStaleCalls(
+        // so a stale head cannot block immediate connect; the snapshot is
+        // filtered instead of fetched again.
+        $ghosts = app(QueueCallLifecycleService::class)->reconcileStaleCalls(
             $callQueue,
             collect($live['waiting'] ?? [])->pluck('callId')->all()
         );
 
-        $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
-
         // FIFO: only the head caller can be offered (worker semantics serialize
         // offers naturally — subsequent polls return wait for non-head calls).
-        $head = collect($live['waiting'] ?? [])->sortBy('position')->first();
+        $head = collect($live['waiting'] ?? [])
+            ->reject(fn (array $call) => in_array($call['callId'], $ghosts, true))
+            ->sortBy('position')
+            ->first();
         if (! $head) {
             return;
         }

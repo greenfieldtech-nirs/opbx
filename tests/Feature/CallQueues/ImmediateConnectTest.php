@@ -209,6 +209,9 @@ class ImmediateConnectTest extends TestCase
 
         // And the real caller was switched to the dial application.
         Http::assertSent(fn ($request) => str_contains($request->url(), '/sessions/'.self::SESSION_TOKEN.'/application'));
+
+        // One snapshot only: the ghost is filtered out of it, not re-fetched.
+        $this->assertSame(1, Http::recorded(fn ($request) => str_contains($request->url(), '/queue/live'))->count());
     }
 
     public function test_no_switch_when_toggle_disabled(): void

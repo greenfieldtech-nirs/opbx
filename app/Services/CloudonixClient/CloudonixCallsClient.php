@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\CloudonixClient;
 
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -368,6 +371,60 @@ class CloudonixCallsClient extends CloudonixBaseClient
             },
             cacheKey: null, // No caching for write operations
             fallbackValue: null
+        );
+    }
+
+    /**
+     * Originate several application calls concurrently (one HTTP round trip of
+     * latency instead of one per agent).
+     *
+     * @param  array<int, array<string, mixed>>  $payloads  callObjects
+     * @return array<int, array<string, mixed>|null> callObjectResult per payload (same keys), null where it failed
+     */
+    public function originateApplicationCalls(array $payloads): array
+    {
+        $this->requireDomainUuid();
+
+        if ($payloads === []) {
+            return [];
+        }
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($payloads) {
+                $path = "/calls/{$this->getDomainUuid()}/application";
+
+                $responses = Http::pool(fn (Pool $pool) => array_map(
+                    fn ($payload, $key) => $pool->as((string) $key)
+                        ->timeout($this->timeout)
+                        ->withToken($this->token)
+                        ->acceptJson()
+                        ->baseUrl($this->baseUrl)
+                        ->post($path, $payload),
+                    $payloads,
+                    array_keys($payloads)
+                ));
+
+                $results = [];
+                foreach ($payloads as $key => $payload) {
+                    $response = $responses[(string) $key] ?? null;
+
+                    if ($response instanceof Response && $response->successful()) {
+                        $results[$key] = $response->json();
+
+                        continue;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to originate application call', [
+                        'destination' => $payload['destination'] ?? null,
+                        'status' => $response instanceof Response ? $response->status() : null,
+                    ]);
+                    $results[$key] = null;
+                }
+
+                return $results;
+            },
+            cacheKey: null,
+            fallbackValue: array_fill_keys(array_keys($payloads), null)
         );
     }
 
