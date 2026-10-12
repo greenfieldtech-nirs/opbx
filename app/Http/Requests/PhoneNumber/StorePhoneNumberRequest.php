@@ -16,6 +16,7 @@ use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use App\Models\User;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -71,6 +72,7 @@ class StorePhoneNumberRequest extends FormRequest
                 'required',
                 'string',
                 Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu', 'call_queue', 'unavailable']),
+                new RejectUnavailableOnCreate,
             ],
             'routing_config' => [
                 $this->input('routing_type') === 'unavailable' ? 'present' : 'required', // {} is valid for 'unavailable'

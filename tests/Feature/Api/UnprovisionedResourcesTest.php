@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
+use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
 use App\Models\CallQueue;
@@ -52,70 +53,173 @@ final class UnprovisionedResourcesTest extends TestCase
         ];
     }
 
-    public function test_ivr_menu_saves_with_unavailable_options_and_failover(): void
+    private const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    /** @return array<string, mixed> */
+    private function hoursPayload(string $open, string $closed): array
     {
-        $id = $this->postJson('/api/v1/ivr-menus', $this->ivrPayload())->assertCreated()
-            ->assertJsonPath('data.is_unprovisioned', true)->json('data.id');
+        $day = ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]];
 
-        $this->assertDatabaseHas('ivr_menu_options', ['ivr_menu_id' => $id, 'destination_type' => 'unavailable', 'destination_id' => 0]);
+        return [
+            'name' => 'Hours', 'status' => 'active', 'timezone' => 'UTC',
+            'open_hours_action' => ['type' => $open, 'target_id' => $open],
+            'closed_hours_action' => ['type' => $closed, 'target_id' => $closed],
+            'schedule' => array_fill_keys(self::DAYS, $day),
+        ];
+    }
 
-        // Edit-and-save the unchanged route (the SPA sends the stale id back).
-        $this->putJson("/api/v1/ivr-menus/{$id}", $this->ivrPayload(['name' => 'Renamed', 'options' => [
+    /** @return array<string, mixed> */
+    private function ringGroupPayload(string $fallback, int $memberId, array $extra = []): array
+    {
+        return $extra + [
+            'name' => 'RG', 'strategy' => 'simultaneous', 'timeout' => 30, 'ring_turns' => 1, 'status' => 'active',
+            'fallback_action' => $fallback, 'members' => [['extension_id' => $memberId, 'priority' => 1]],
+        ];
+    }
+
+    // ---- IVR menus -------------------------------------------------------------------------------------------
+
+    public function test_ivr_menu_create_rejects_unavailable_failover_and_option(): void
+    {
+        $ext = Extension::factory()->create($this->o());
+        $ok = ['destination_type' => 'extension', 'destination_id' => $ext->id];
+
+        $this->postJson('/api/v1/ivr-menus', $this->ivrPayload(['name' => 'Ready', 'failover_destination_type' => 'hangup', 'options' => [
+            ['input_digits' => '1', 'priority' => 1] + $ok,
+        ]]) + [])->assertCreated();
+
+        $this->postJson('/api/v1/ivr-menus', $this->ivrPayload(['name' => 'A', 'failover_destination_type' => 'unavailable', 'options' => [
+            ['input_digits' => '1', 'priority' => 1] + $ok,
+        ]]))->assertUnprocessable()->assertJsonValidationErrors(['failover_destination_type']);
+
+        $this->postJson('/api/v1/ivr-menus', $this->ivrPayload(['name' => 'B', 'failover_destination_type' => 'hangup', 'options' => [
+            ['input_digits' => '1', 'destination_type' => 'unavailable', 'priority' => 1],
+        ]]))->assertUnprocessable()->assertJsonValidationErrors(['options.0.destination_type']);
+
+        $this->assertDatabaseMissing('ivr_menus', ['name' => 'A']);
+        $this->assertDatabaseMissing('ivr_menus', ['name' => 'B']);
+    }
+
+    public function test_ivr_menu_update_accepts_unavailable_kept_switched_and_new(): void
+    {
+        $ext = Extension::factory()->create($this->o());
+        $menu = IvrMenu::factory()->create($this->o() + ['failover_destination_type' => 'unavailable']);
+        DB::table('ivr_menu_options')->insert(['ivr_menu_id' => $menu->id, 'input_digits' => '1', 'destination_type' => 'unavailable', 'destination_id' => 0, 'priority' => 1, 'created_at' => now(), 'updated_at' => now()]);
+
+        // Keep the stale unavailable option + failover, add a connected one.
+        $this->putJson("/api/v1/ivr-menus/{$menu->id}", $this->ivrPayload(['name' => 'Renamed', 'options' => [
             ['input_digits' => '1', 'destination_type' => 'unavailable', 'destination_id' => 0, 'priority' => 1],
+            ['input_digits' => '2', 'destination_type' => 'extension', 'destination_id' => $ext->id, 'priority' => 2],
         ]]))->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+
+        // Switch a connected option and the failover to unavailable, and add a brand-new unavailable option.
+        $this->putJson("/api/v1/ivr-menus/{$menu->id}", $this->ivrPayload(['options' => [
+            ['input_digits' => '2', 'destination_type' => 'unavailable', 'priority' => 1],
+            ['input_digits' => '3', 'destination_type' => 'unavailable', 'priority' => 2],
+        ]]))->assertOk();
+        $this->assertDatabaseHas('ivr_menu_options', ['ivr_menu_id' => $menu->id, 'input_digits' => '3', 'destination_type' => 'unavailable']);
     }
 
     public function test_ivr_menu_with_only_an_unavailable_option_is_unprovisioned(): void
     {
         $ext = Extension::factory()->create($this->o());
-        $this->postJson('/api/v1/ivr-menus', $this->ivrPayload([
-            'failover_destination_type' => 'extension', 'failover_destination_id' => $ext->id,
-            'options' => [['input_digits' => '1', 'destination_type' => 'unavailable', 'priority' => 1]],
-        ]))->assertCreated()->assertJsonPath('data.is_unprovisioned', true);
+        $menu = IvrMenu::factory()->create($this->o() + ['failover_destination_type' => 'extension', 'failover_destination_id' => $ext->id]);
+        DB::table('ivr_menu_options')->insert(['ivr_menu_id' => $menu->id, 'input_digits' => '1', 'destination_type' => 'unavailable', 'destination_id' => 0, 'priority' => 1, 'created_at' => now(), 'updated_at' => now()]);
+        $ready = IvrMenu::factory()->create($this->o() + ['failover_destination_type' => 'extension', 'failover_destination_id' => $ext->id]);
 
-        $this->postJson('/api/v1/ivr-menus', $this->ivrPayload([
-            'name' => 'Ready', 'failover_destination_type' => 'extension', 'failover_destination_id' => $ext->id,
-            'options' => [['input_digits' => '1', 'destination_type' => 'extension', 'destination_id' => $ext->id, 'priority' => 1]],
-        ]))->assertCreated()->assertJsonPath('data.is_unprovisioned', false);
+        $this->getJson("/api/v1/ivr-menus/{$menu->id}")->assertJsonPath('data.is_unprovisioned', true);
+        $this->getJson("/api/v1/ivr-menus/{$ready->id}")->assertJsonPath('data.is_unprovisioned', false);
     }
 
-    public function test_did_saves_with_unavailable_routing_create_and_update(): void
+    // ---- DIDs ------------------------------------------------------------------------------------------------
+
+    public function test_did_create_rejects_unavailable_and_update_accepts_it(): void
     {
-        $id = $this->postJson('/api/v1/phone-numbers', [
+        $this->postJson('/api/v1/phone-numbers', [
             'phone_number' => '+12125559901', 'routing_type' => 'unavailable', 'routing_config' => [], 'status' => 'active',
-        ])->assertCreated()->assertJsonPath('data.is_unprovisioned', true)->json('data.id');
+        ])->assertUnprocessable()->assertJsonValidationErrors(['routing_type']);
 
-        $this->putJson("/api/v1/phone-numbers/{$id}", ['friendly_name' => 'Soon', 'routing_type' => 'unavailable', 'routing_config' => []])
+        $ext = Extension::factory()->create($this->o());
+        $did = DidNumber::factory()->routeToExtension($ext)->create($this->o());
+
+        // Switch connected -> unavailable, then re-save the unchanged unavailable route.
+        $this->putJson("/api/v1/phone-numbers/{$did->id}", ['routing_type' => 'unavailable', 'routing_config' => []])
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+        $this->putJson("/api/v1/phone-numbers/{$did->id}", ['friendly_name' => 'Soon', 'routing_type' => 'unavailable', 'routing_config' => []])
             ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
     }
 
-    public function test_call_tracking_campaign_saves_with_unavailable_destination_create_and_update(): void
+    // ---- Call tracking campaigns -----------------------------------------------------------------------------
+
+    public function test_call_tracking_campaign_create_rejects_unavailable_and_update_accepts_it(): void
     {
-        $id = $this->postJson('/api/v1/call-tracking-campaigns', [
+        $this->postJson('/api/v1/call-tracking-campaigns', [
             'name' => 'Later', 'destination_type' => 'unavailable', 'destination_config' => [],
-        ])->assertCreated()->assertJsonPath('data.is_unprovisioned', true)->json('data.id');
+        ])->assertUnprocessable()->assertJsonValidationErrors(['destination_type']);
 
-        $this->putJson("/api/v1/call-tracking-campaigns/{$id}", ['name' => 'Later 2', 'destination_type' => 'unavailable', 'destination_config' => []])
+        $ext = Extension::factory()->create($this->o());
+        $campaign = CallTrackingCampaign::factory()->toExtension($ext->id)->create($this->o());
+
+        $this->putJson("/api/v1/call-tracking-campaigns/{$campaign->id}", ['name' => 'Later 2', 'destination_type' => 'unavailable', 'destination_config' => []])
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+        $this->putJson("/api/v1/call-tracking-campaigns/{$campaign->id}", ['name' => 'Later 3', 'destination_type' => 'unavailable', 'destination_config' => []])
             ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
     }
 
-    public function test_ring_group_queue_albs_and_business_hours_accept_unavailable(): void
+    // ---- Ring groups / queues / AI load balancers / business hours --------------------------------------------
+
+    public function test_ring_group_create_rejects_unavailable_and_update_accepts_it(): void
     {
         $member = Extension::factory()->create($this->o());
-        $this->postJson('/api/v1/ring-groups', [
-            'name' => 'RG', 'strategy' => 'simultaneous', 'timeout' => 30, 'ring_turns' => 1, 'status' => 'active',
-            'fallback_action' => 'unavailable', 'members' => [['extension_id' => $member->id, 'priority' => 1]],
-        ])->assertCreated()->assertJsonPath('data.is_unprovisioned', true);
+
+        $this->postJson('/api/v1/ring-groups', $this->ringGroupPayload('unavailable', $member->id))
+            ->assertUnprocessable()->assertJsonValidationErrors(['fallback_action']);
+
+        $id = $this->postJson('/api/v1/ring-groups', $this->ringGroupPayload('hangup', $member->id))->assertCreated()->json('data.id');
+        $this->putJson("/api/v1/ring-groups/{$id}", $this->ringGroupPayload('unavailable', $member->id, ['name' => 'RG']))
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+        $this->putJson("/api/v1/ring-groups/{$id}", $this->ringGroupPayload('unavailable', $member->id, ['name' => 'RG2']))
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+    }
+
+    public function test_call_queue_create_rejects_unavailable_and_update_accepts_it(): void
+    {
+        $agent = User::factory()->create($this->o());
+        Extension::factory()->create($this->o() + ['user_id' => $agent->id]);
+        $queue = CallQueue::factory()->create($this->o() + ['fallback_action' => 'hangup']);
+        $payload = fn (string $fallback) => ['name' => 'Q'.$fallback, 'strategy' => 'ring_all', 'status' => 'active', 'fallback_action' => $fallback, 'agents' => [$agent->id]];
+
+        $this->postJson('/api/v1/call-queues', $payload('unavailable') + ['max_wait_seconds' => 60])
+            ->assertUnprocessable()->assertJsonValidationErrors(['fallback_action']);
+
+        $this->putJson("/api/v1/call-queues/{$queue->id}", $payload('unavailable') + ['max_wait_seconds' => 60])
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+    }
+
+    public function test_albs_create_rejects_unavailable_and_update_accepts_it(): void
+    {
+        $this->postJson('/api/v1/ai-assistant-load-balancers', [
+            'name' => 'LB', 'strategy' => 'round_robin', 'status' => 'active', 'fallback_action' => 'unavailable',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['fallback_action']);
+
+        $lb = AiAssistantLoadBalancer::factory()->create($this->o() + ['fallback_action' => 'hangup']);
+        $assistant = AiAssistant::factory()->create($this->o());
+        $this->putJson("/api/v1/ai-assistant-load-balancers/{$lb->id}", ['fallback_action' => 'unavailable', 'members' => [['ai_assistant_id' => $assistant->id, 'priority' => 1]]])
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+    }
+
+    public function test_business_hours_create_rejects_unavailable_and_update_accepts_it(): void
+    {
+        $this->postJson('/api/v1/business-hours', $this->hoursPayload('unavailable', 'hangup'))
+            ->assertUnprocessable()->assertJsonValidationErrors(['open_hours_action.type']);
+        $this->postJson('/api/v1/business-hours', $this->hoursPayload('hangup', 'unavailable'))
+            ->assertUnprocessable()->assertJsonValidationErrors(['closed_hours_action.type']);
 
         $hours = BusinessHoursSchedule::factory()->create($this->o());
-        $day = ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]];
-        $payload = [
-            'name' => 'Renamed', 'status' => 'active', 'timezone' => 'UTC',
-            'open_hours_action' => ['type' => 'unavailable', 'target_id' => 'unavailable'],
-            'closed_hours_action' => ['type' => 'unavailable', 'target_id' => 'unavailable'],
-            'schedule' => array_fill_keys(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], $day),
-        ];
-        $this->putJson("/api/v1/business-hours/{$hours->id}", $payload)->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+        $this->putJson("/api/v1/business-hours/{$hours->id}", $this->hoursPayload('unavailable', 'unavailable'))
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
+        $this->putJson("/api/v1/business-hours/{$hours->id}", ['name' => 'Again'] + $this->hoursPayload('unavailable', 'unavailable'))
+            ->assertOk()->assertJsonPath('data.is_unprovisioned', true);
     }
 
     /** One unprovisioned + one ready + one in another tenant per type; the filter returns only the first. */

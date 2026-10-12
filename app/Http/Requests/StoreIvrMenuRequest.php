@@ -13,6 +13,7 @@ use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\Recording;
 use App\Models\RingGroup;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -67,7 +68,7 @@ class StoreIvrMenuRequest extends FormRequest
             'max_timeout' => 'required|integer|min:1|max:30',
             'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup,unavailable',
+            'failover_destination_type' => ['required', 'string', 'in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup,unavailable', new RejectUnavailableOnCreate],
             // Self-references (failover or an option back to this menu) are allowed: repeat-menu
             // loops are bounded by max_turns at runtime (owner decision, 2026-10-11).
             'failover_destination_id' => [
@@ -85,7 +86,7 @@ class StoreIvrMenuRequest extends FormRequest
             'options' => 'required|array|min:1|max:20',
             'options.*.input_digits' => 'required|string|max:10',
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,unavailable',
+            'options.*.destination_type' => ['required', 'string', 'in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,unavailable', new RejectUnavailableOnCreate],
             'options.*.destination_id' => [
                 'required',
                 function ($attribute, $value, $fail) {

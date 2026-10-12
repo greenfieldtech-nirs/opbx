@@ -7,6 +7,7 @@ namespace App\Http\Requests\BusinessHours;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -72,6 +73,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                 'required',
                 'string',
                 new Enum(BusinessHoursActionType::class),
+                new RejectUnavailableOnCreate,
             ],
             'open_hours_action.target_id' => [
                 'required',
@@ -86,6 +88,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                 'required',
                 'string',
                 new Enum(BusinessHoursActionType::class),
+                new RejectUnavailableOnCreate,
             ],
             'closed_hours_action.target_id' => [
                 'required',

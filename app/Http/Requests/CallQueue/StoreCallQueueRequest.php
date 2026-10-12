@@ -15,6 +15,7 @@ use App\Models\IvrMenu;
 use App\Models\Recording;
 use App\Models\RingGroup;
 use App\Models\User;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -115,6 +116,7 @@ class StoreCallQueueRequest extends FormRequest
             'fallback_action' => [
                 'required',
                 new Enum(RingGroupFallbackAction::class),
+                new RejectUnavailableOnCreate,
             ],
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),

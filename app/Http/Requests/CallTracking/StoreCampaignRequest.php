@@ -7,6 +7,7 @@ namespace App\Http\Requests\CallTracking;
 use App\Enums\CallTrackingCampaignStatus;
 use App\Enums\CallTrackingDestinationType;
 use App\Models\CallTrackingCampaign;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -46,7 +47,7 @@ class StoreCampaignRequest extends FormRequest
             'medium' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'status' => ['required', new Enum(CallTrackingCampaignStatus::class)],
-            'destination_type' => ['required', new Enum(CallTrackingDestinationType::class)],
+            'destination_type' => ['required', new Enum(CallTrackingDestinationType::class), new RejectUnavailableOnCreate],
             'destination_config' => [$this->input('destination_type') === 'unavailable' ? 'present' : 'required', 'array'],
             'conversion_rule' => ['nullable', 'array'],
             'conversion_rule.min_answered_duration_seconds' => ['nullable', 'integer', 'min:0'],
