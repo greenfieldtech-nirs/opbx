@@ -178,6 +178,8 @@ export interface Extension {
 
 // DID Number
 export interface DIDNumber {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   phone_number: string;
@@ -225,6 +227,8 @@ export interface RingGroupMember {
 
 // Ring Group
 export interface RingGroup {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -263,6 +267,8 @@ export interface AiAssistantLoadBalancerMember {
 
 // AI Assistant Load Balancer
 export interface AiAssistantLoadBalancer {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -760,6 +766,8 @@ export interface BusinessHoursAction {
 }
 
 export interface BusinessHoursSchedule {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -1385,6 +1393,8 @@ export interface IvrMenuOption {
 }
 
 export interface IvrMenu {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;

@@ -104,6 +104,8 @@ import {
   Column,
   EmptyState
 } from '@/components/design-system';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 // Voice selector component with search and advanced filters
 const VoiceSelector: React.FC<{
@@ -288,6 +290,7 @@ export default function IVRMenus() {
   // UI State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<IvrMenuStatus | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -491,6 +494,7 @@ export default function IVRMenus() {
       per_page: perPage,
       search: searchQuery || undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }],
@@ -499,6 +503,7 @@ export default function IVRMenus() {
       per_page: perPage,
       search: searchQuery || undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }),
@@ -829,6 +834,7 @@ export default function IVRMenus() {
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
           </div>
         </CardContent>
       </Card>
@@ -911,8 +917,8 @@ export default function IVRMenus() {
               <EmptyState
                 icon={Phone}
                 title="No IVR menus found"
-                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Create your first IVR menu to get started'}
-                action={!searchQuery && statusFilter === 'all' ? {
+                description={searchQuery || statusFilter !== 'all' || unprovisionedOnly ? 'Try adjusting your filters' : 'Create your first IVR menu to get started'}
+                action={!searchQuery && statusFilter === 'all' && !unprovisionedOnly ? {
                   label: 'Create IVR Menu',
                   onClick: () => setIsCreateDialogOpen(true)
                 } : undefined}
@@ -1314,7 +1320,7 @@ export default function IVRMenus() {
       < Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} >
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit IVR Menu</DialogTitle>
+            <DialogTitle>Edit IVR Menu{selectedMenu?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
             <DialogDescription>
               Update the IVR menu configuration
             </DialogDescription>

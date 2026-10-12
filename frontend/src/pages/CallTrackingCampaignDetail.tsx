@@ -22,6 +22,7 @@ import {
 import { CallTrackingNumbersList } from '@/components/call-tracking/CallTrackingNumbersList';
 import { CallTrackingNotificationSettingsForm } from '@/components/call-tracking/CallTrackingNotificationSettingsForm';
 import { CallTrackingNotificationLogsTable } from '@/components/call-tracking/CallTrackingNotificationLogsTable';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 export default function CallTrackingCampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -138,6 +139,7 @@ export default function CallTrackingCampaignDetail() {
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Target className="h-8 w-8" />
                 {campaign.name}
+                {campaign.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
               </h1>
               {isReadOnly && (
                 <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">

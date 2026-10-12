@@ -76,10 +76,10 @@ export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 
 export type RingGroupStatus = Status;
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue' | 'unavailable';
 
 // IVR Destination Type (for menu options; hangup is allowed only on failover)
-export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours';
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'unavailable';
 
 // IVR Failover Destination Type (options + hangup)
 export type IvrFailoverDestinationType = IvrDestinationType | 'hangup';
@@ -204,6 +204,8 @@ export interface UpdateExtensionRequest {
 // ============================================================================
 
 export interface DIDNumber {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   phone_number: string;
@@ -298,6 +300,8 @@ export interface RingGroupMember {
 }
 
 export interface RingGroup {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -361,6 +365,8 @@ export interface IvrMenuOption {
 }
 
 export interface IvrMenu {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;

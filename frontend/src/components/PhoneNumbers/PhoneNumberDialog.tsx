@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 interface PhoneNumberDialogProps {
   open: boolean;
@@ -120,7 +121,7 @@ export function PhoneNumberDialog({
     }
 
     // Target validation
-    if (!formData.target_id) {
+    if (!formData.target_id && formData.routing_type !== 'unavailable') {
       errors.target_id = 'Please select a destination';
     }
 
@@ -190,6 +191,7 @@ export function PhoneNumberDialog({
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? `Edit Phone Number` : 'Add Phone Number'}
+            {phoneNumber?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
           </DialogTitle>
           <DialogDescription>
             {isEditMode

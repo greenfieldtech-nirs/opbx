@@ -109,6 +109,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
@@ -276,6 +278,7 @@ export default function AiAssistantLoadBalancers() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<AlbsStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -336,6 +339,7 @@ export default function AiAssistantLoadBalancers() {
       search: debouncedSearch,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }],
@@ -345,6 +349,7 @@ export default function AiAssistantLoadBalancers() {
       search: debouncedSearch || undefined,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }),
@@ -766,7 +771,7 @@ export default function AiAssistantLoadBalancers() {
     return (
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title}{isEdit && selectedLoadBalancer?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -807,7 +812,7 @@ export default function AiAssistantLoadBalancers() {
     );
   };
 
-  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
 
   return (
     <div className="space-y-6">
@@ -888,6 +893,7 @@ export default function AiAssistantLoadBalancers() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
           </div>
         </CardContent>
       </Card>

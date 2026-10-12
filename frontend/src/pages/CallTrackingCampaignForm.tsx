@@ -29,7 +29,7 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   source: z.string().optional(),
   medium: z.string().optional(),
-  destination_type: z.enum(['forward', 'extension', 'ring_group']),
+  destination_type: z.enum(['forward', 'extension', 'ring_group', 'unavailable']),
   destination_config: z.object({
     forward_to: z.string().optional(),
     extension_id: z.number().optional(),

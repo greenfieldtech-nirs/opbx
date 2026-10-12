@@ -27,6 +27,7 @@ import {
 } from '@/hooks/useCallTrackingCampaigns';
 import { cn } from '@/lib/utils';
 import type { CallTrackingCampaign } from '@/types/callTracking';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 
 export default function CallTrackingCampaigns() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function CallTrackingCampaigns() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'status' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +57,7 @@ export default function CallTrackingCampaigns() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useCallTrackingCampaigns({
     search: debouncedSearch || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
+    unprovisioned: unprovisionedOnly ? 1 : undefined,
     page: currentPage,
     per_page: perPage,
     sort_by: sortField,
@@ -68,7 +71,7 @@ export default function CallTrackingCampaigns() {
   const deleteMutation = useDeleteCallTrackingCampaign();
   const updateMutation = useUpdateCallTrackingCampaign();
 
-  const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all';
+  const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all' || unprovisionedOnly;
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -100,6 +103,7 @@ export default function CallTrackingCampaigns() {
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setUnprovisionedOnly(false);
     setCurrentPage(1);
   };
 
@@ -276,6 +280,8 @@ export default function CallTrackingCampaigns() {
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
+
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={(v) => { setUnprovisionedOnly(v); setCurrentPage(1); }} />
 
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>

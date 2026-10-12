@@ -89,7 +89,7 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
     defaultValues: {
       phone_number: did?.phone_number || '',
       friendly_name: did?.friendly_name || '',
-      routing_type: did?.routing_type || 'extension',
+      routing_type: (did?.routing_type as DIDFormData['routing_type']) || 'extension',
       routing_config: {
         extension_id: did?.routing_config?.extension_id || '',
         ai_assistant_id: did?.routing_config?.ai_assistant_id || '',
@@ -181,7 +181,7 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
         <Select
           value={routingType}
           onValueChange={(value) => {
-            setValue('routing_type', value as RoutingType);
+            setValue('routing_type', value as DIDFormData['routing_type']);
             // Clear routing config when changing type
             setValue('routing_config', {});
           }}

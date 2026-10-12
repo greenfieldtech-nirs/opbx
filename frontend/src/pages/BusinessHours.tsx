@@ -38,6 +38,8 @@ import {
   getActionDisplayName,
   getActionDisplayNameSimple,
 } from './business-hours-components';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
@@ -64,6 +66,8 @@ const BusinessHours: React.FC = () => {
     setSearchQuery,
     statusFilter,
     setStatusFilter,
+    unprovisionedOnly,
+    setUnprovisionedOnly,
     sortBy,
     setSortBy,
     isCreateEditDialogOpen,
@@ -203,6 +207,8 @@ const BusinessHours: React.FC = () => {
               </SelectContent>
             </Select>
 
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
+
             <Select value={sortBy} onValueChange={(value: string) => setSortBy(value as 'status' | 'name' | 'created_at' | 'updated_at')}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by" />
@@ -299,8 +305,8 @@ const BusinessHours: React.FC = () => {
               <EmptyState
                 icon={Clock}
                 title="No business hours found"
-                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first business hours schedule'}
-                action={canManage && !searchQuery && statusFilter === 'all' ? {
+                description={searchQuery || statusFilter !== 'all' || unprovisionedOnly ? 'Try adjusting your filters' : 'Get started by creating your first business hours schedule'}
+                action={canManage && !searchQuery && statusFilter === 'all' && !unprovisionedOnly ? {
                   label: "Create Schedule",
                   onClick: () => setIsCreateEditDialogOpen(true)
                 } : undefined}
@@ -351,6 +357,7 @@ const BusinessHours: React.FC = () => {
         open={isCreateEditDialogOpen}
         onOpenChange={setIsCreateEditDialogOpen}
         editing={!!editingSchedule}
+        unprovisioned={editingSchedule?.is_unprovisioned}
         formData={formData}
         formErrors={formErrors}
         onFormChange={handleFormChange}

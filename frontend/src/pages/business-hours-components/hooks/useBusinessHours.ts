@@ -26,6 +26,7 @@ export function useBusinessHours() {
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleStatus>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name');
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(10);
@@ -109,6 +110,10 @@ export function useBusinessHours() {
       filtered = filtered.filter((schedule) => schedule.status === statusFilter);
     }
 
+    if (unprovisionedOnly) {
+      filtered = filtered.filter((schedule) => schedule.is_unprovisioned);
+    }
+
     filtered = [...filtered].sort((a, b) => {
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
@@ -123,7 +128,7 @@ export function useBusinessHours() {
     });
 
     return filtered;
-  }, [allSchedules, searchQuery, statusFilter, sortBy]);
+  }, [allSchedules, searchQuery, statusFilter, unprovisionedOnly, sortBy]);
 
   const totalPages = Math.ceil(filteredSchedules.length / perPage);
   const schedules = useMemo(() => {
@@ -473,6 +478,8 @@ export function useBusinessHours() {
     setSearchQuery,
     statusFilter,
     setStatusFilter,
+    unprovisionedOnly,
+    setUnprovisionedOnly,
     sortBy,
     setSortBy,
 

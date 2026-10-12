@@ -78,6 +78,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 
 export default function PhoneNumbers() {
   const queryClient = useQueryClient();
@@ -92,6 +93,7 @@ export default function PhoneNumbers() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [routingTypeFilter, setRoutingTypeFilter] = useState<RoutingType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [sortField, setSortField] = useState<string | null>(null);
@@ -132,6 +134,7 @@ export default function PhoneNumbers() {
         search: debouncedSearch,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
         sort_field: sortField,
         sort_direction: sortDirection,
       },
@@ -143,6 +146,7 @@ export default function PhoneNumbers() {
         search: debouncedSearch || undefined,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
         sort_field: sortField || undefined,
         sort_direction: sortDirection,
       }),
@@ -377,12 +381,13 @@ export default function PhoneNumbers() {
     setSearchQuery('');
     setRoutingTypeFilter('all');
     setStatusFilter('all');
+    setUnprovisionedOnly(false);
     setCurrentPage(1);
     setSortField(null);
     setSortDirection('asc');
   };
 
-  const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
 
   return (
     <div className="space-y-6">
@@ -504,6 +509,7 @@ export default function PhoneNumbers() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
 
             {/* Clear Filters */}
             {hasActiveFilters && (

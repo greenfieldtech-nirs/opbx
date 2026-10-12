@@ -1,3 +1,4 @@
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 import React, { ReactNode } from 'react';
 import {
     Table,
@@ -174,7 +175,10 @@ export function StandardDataTable<T extends { id: string | number }>({
                                             <IdentityIcon className={cn("h-5 w-5", identityIconColor)} />
                                         </div>
                                         <div>
-                                            <div className="font-medium text-primary">{getIdentityPrimary(item)}</div>
+                                            <div className="font-medium text-primary">
+                                                {getIdentityPrimary(item)}
+                                                {(item as { is_unprovisioned?: boolean }).is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
+                                            </div>
                                             <div className="text-xs text-muted-foreground capitalize">
                                                 {getIdentitySecondary(item)}
                                             </div>

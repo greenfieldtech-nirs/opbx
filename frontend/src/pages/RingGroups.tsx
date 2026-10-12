@@ -124,6 +124,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
@@ -173,6 +175,7 @@ export default function RingGroups() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<RingGroupStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'members' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -247,6 +250,7 @@ export default function RingGroups() {
       search: debouncedSearch,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }],
@@ -256,6 +260,7 @@ export default function RingGroups() {
       search: debouncedSearch || undefined,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }),
@@ -940,7 +945,7 @@ export default function RingGroups() {
     return (
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title}{isEdit && selectedGroup?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -1540,6 +1545,7 @@ export default function RingGroups() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
           </div>
         </CardContent>
       </Card>
@@ -1640,8 +1646,8 @@ export default function RingGroups() {
               <EmptyState
                 icon={Users}
                 title="No ring groups found"
-                description={searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first ring group'}
-                action={canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' ? {
+                description={searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly ? 'Try adjusting your filters' : 'Get started by creating your first ring group'}
+                action={canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' && !unprovisionedOnly ? {
                   label: "Create Ring Group",
                   onClick: openCreateDialog
                 } : undefined}

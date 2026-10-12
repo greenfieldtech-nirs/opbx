@@ -38,11 +38,13 @@ import type {
 import { applyScheduleTemplate } from '../utils/helpers';
 import { HolidayImportButton } from './HolidayImportButton';
 import { formatExceptionDate } from '@/utils/businessHours';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 interface CreateEditScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: boolean;
+  unprovisioned?: boolean;
   formData: Partial<BusinessHoursSchedule>;
   formErrors: Record<string, string>;
   onFormChange: (field: string, value: unknown) => void;
@@ -69,6 +71,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
   open,
   onOpenChange,
   editing,
+  unprovisioned,
   formData,
   formErrors,
   onFormChange,
@@ -109,7 +112,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Schedule' : 'Create Schedule'}{unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>
             {editing
               ? 'Update the business hours schedule configuration.'

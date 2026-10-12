@@ -32,6 +32,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 const AGENT_RING_TIMEOUTS = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 const MAX_WAIT_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
@@ -121,9 +123,11 @@ export default function CallQueues() {
   const [editing, setEditing] = useState<CallQueue | null>(null);
   const [form, setForm] = useState<QueueFormState>(emptyForm);
 
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['call-queues'],
-    queryFn: () => callQueuesService.getAll(),
+    queryKey: ['call-queues', { unprovisioned: unprovisionedOnly }],
+    queryFn: () => callQueuesService.getAll(unprovisionedOnly ? { unprovisioned: 1 } : undefined),
   });
 
   const { data: recordingsData } = useQuery({
@@ -383,6 +387,10 @@ export default function CallQueues() {
         )}
       </div>
 
+      <div className="flex justify-end">
+        <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
+      </div>
+
       <Card>
         <CardContent className="pt-6">
           <StandardDataTable
@@ -416,7 +424,7 @@ export default function CallQueues() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Call Queue' : 'New Call Queue'}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Call Queue' : 'New Call Queue'}{editing?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6">

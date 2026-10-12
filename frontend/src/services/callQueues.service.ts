@@ -13,6 +13,8 @@ export interface CallQueueAgent {
 }
 
 export interface CallQueue {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: number;
   organization_id: number;
   name: string;
