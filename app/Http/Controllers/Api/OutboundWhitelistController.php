@@ -165,17 +165,7 @@ class OutboundWhitelistController extends AbstractApiCrudController
 
         $resourceClass = $this->getResourceClass();
 
-        return response()->json([
-            'data' => $resourceClass::collection($models->items()),
-            'meta' => [
-                'current_page' => $models->currentPage(),
-                'per_page' => $models->perPage(),
-                'total' => $models->total(),
-                'last_page' => $models->lastPage(),
-                'from' => $models->firstItem(),
-                'to' => $models->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($models, $resourceClass::collection($models->items()), withRange: true);
     }
 
     /**

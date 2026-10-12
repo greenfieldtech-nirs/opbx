@@ -38,14 +38,6 @@ class PlatformCdrArchiveController extends Controller
 
         $paginator = $query->paginate(min($this->perPage($request, 25), 100));
 
-        return response()->json([
-            'data' => CallDetailRecordResource::collection($paginator)->resolve(),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return $this->paginatedResponse($paginator, CallDetailRecordResource::collection($paginator)->resolve());
     }
 }

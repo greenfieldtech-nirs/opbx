@@ -61,17 +61,7 @@ class CallTrackingCampaignController extends Controller
 
         $campaigns = $query->paginate($perPage);
 
-        return response()->json([
-            'data' => CallTrackingCampaignResource::collection($campaigns)->resolve(),
-            'meta' => [
-                'current_page' => $campaigns->currentPage(),
-                'per_page' => $campaigns->perPage(),
-                'total' => $campaigns->total(),
-                'last_page' => $campaigns->lastPage(),
-                'from' => $campaigns->firstItem(),
-                'to' => $campaigns->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($campaigns, CallTrackingCampaignResource::collection($campaigns)->resolve(), withRange: true);
     }
 
     /**

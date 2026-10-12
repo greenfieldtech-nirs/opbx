@@ -41,17 +41,7 @@ class CallTrackingSessionController extends Controller
 
         $sessions = $query->paginate($perPage);
 
-        return response()->json([
-            'data' => CallTrackingSessionResource::collection($sessions)->resolve(),
-            'meta' => [
-                'current_page' => $sessions->currentPage(),
-                'per_page' => $sessions->perPage(),
-                'total' => $sessions->total(),
-                'last_page' => $sessions->lastPage(),
-                'from' => $sessions->firstItem(),
-                'to' => $sessions->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($sessions, CallTrackingSessionResource::collection($sessions)->resolve(), withRange: true);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
@@ -45,15 +46,7 @@ class QueueCallController extends Controller
 
         $rows = $query->paginate((int) $request->input('per_page', 20));
 
-        return response()->json([
-            'data' => $rows->map(fn (QueueCall $call) => $this->row($call))->values(),
-            'meta' => [
-                'current_page' => $rows->currentPage(),
-                'per_page' => $rows->perPage(),
-                'total' => $rows->total(),
-                'last_page' => $rows->lastPage(),
-            ],
-        ]);
+        return $this->paginatedResponse($rows, $rows->map(fn (QueueCall $call) => $this->row($call))->values());
     }
 
     /**
@@ -119,7 +112,7 @@ class QueueCallController extends Controller
 
         abort_unless(
             $role->canManageConfiguration() || $role->canViewReports()
-                || $role === \App\Enums\UserRole::PBX_USER,
+                || $role === UserRole::PBX_USER,
             403
         );
     }
