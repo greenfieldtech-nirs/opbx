@@ -147,7 +147,7 @@ export default function LiveCalls() {
   }, [recentlyDisconnected]);
 
   // Initial data fetch via HTTP with configurable refresh
-  const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
+  const { data: initialData, isLoading, isFetching, error } = useQuery({
     queryKey: queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
@@ -387,7 +387,6 @@ export default function LiveCalls() {
     connected: liveCalls.filter((c) => c.status === CallStatus.CONNECTED).length,
   };
 
-  const handleRefresh = useCallback(() => refetch(), [refetch]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(refreshInterval, isFetching);

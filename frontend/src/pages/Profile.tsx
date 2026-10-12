@@ -144,7 +144,6 @@ export default function Profile() {
     formState: { errors: profileErrors },
     reset: resetProfile,
     control: controlProfile,
-    setValue: setProfileValue,
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -160,7 +159,6 @@ export default function Profile() {
     formState: { errors: passwordErrors },
     reset: resetPassword,
     setValue: setPasswordValue,
-    watch: watchPassword,
   } = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
   });

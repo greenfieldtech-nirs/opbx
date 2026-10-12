@@ -5,7 +5,6 @@
  */
 
 import { queryKeys } from '@/lib/queryKeys';
-import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { extensionsService } from '@/services/extensions.service';
@@ -39,7 +38,7 @@ export default function Dashboard() {
   });
 
   // Fetch active calls count
-  const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching, refetch: refetchActiveCalls } = useQuery({
+  const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching } = useQuery({
     queryKey: queryKeys.dashboard.activeCalls(),
     queryFn: async () => {
       return await sessionUpdatesService.getActiveCalls();
@@ -52,7 +51,7 @@ export default function Dashboard() {
   const activeCalls = activeCallsResponse?.meta.total_active_calls || 0;
 
   // Fetch extensions count
-  const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching, refetch: refetchExtensions } = useQuery({
+  const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching } = useQuery({
     queryKey: queryKeys.dashboard.extensionsCount(),
     queryFn: async () => {
       const response = await extensionsService.getAll({ per_page: 1 });
@@ -64,7 +63,7 @@ export default function Dashboard() {
   });
 
   // Fetch conference rooms count
-  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching, refetch: refetchConferenceRooms } = useQuery({
+  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching } = useQuery({
     queryKey: queryKeys.dashboard.conferenceRoomsCount(),
     queryFn: async () => {
       const response = await conferenceRoomsService.getAll({ per_page: 1 });
@@ -76,7 +75,7 @@ export default function Dashboard() {
   });
 
   // Fetch phone numbers count
-  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching, refetch: refetchPhoneNumbers } = useQuery({
+  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching } = useQuery({
     queryKey: queryKeys.dashboard.phoneNumbersCount(),
     queryFn: async () => {
       const response = await phoneNumbersService.getAll({ per_page: 1 });
@@ -88,7 +87,7 @@ export default function Dashboard() {
   });
 
   // Fetch last 10 CDR records
-  const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching, refetch: refetchLastCalls } = useQuery({
+  const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching } = useQuery({
     queryKey: queryKeys.dashboard.lastCalls(),
     queryFn: async () => {
       const response = await cdrService.getAll({ per_page: 10 });
@@ -106,16 +105,6 @@ export default function Dashboard() {
     ? supervisorFetching
     : activeCallsFetching || extensionsFetching || conferenceRoomsFetching || phoneNumbersFetching || lastCallsFetching;
 
-  const handleRefresh = useCallback(() => {
-    if (isSupervisor) {
-      return;
-    }
-    refetchActiveCalls();
-    refetchExtensions();
-    refetchConferenceRooms();
-    refetchPhoneNumbers();
-    refetchLastCalls();
-  }, [isSupervisor, refetchActiveCalls, refetchExtensions, refetchConferenceRooms, refetchPhoneNumbers, refetchLastCalls]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(isSupervisor ? 30000 : 15000, isRefreshing);

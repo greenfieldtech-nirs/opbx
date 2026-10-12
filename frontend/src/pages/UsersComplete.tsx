@@ -159,7 +159,6 @@ function UsersComplete() {
   });
 
   const users = usersResponse?.data || [];
-  const totalUsers = usersResponse?.meta?.total || 0;
   const totalPages = usersResponse?.meta?.last_page || 1;
 
   // Create user mutation
@@ -362,13 +361,6 @@ function UsersComplete() {
   };
 
   // Handle toggle status
-  const handleToggleStatus = (user: User) => {
-    const newStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
-    updateUserMutation.mutate({
-      id: user.id,
-      data: { status: newStatus },
-    });
-  };
 
   // Reset form
   const resetForm = () => {
