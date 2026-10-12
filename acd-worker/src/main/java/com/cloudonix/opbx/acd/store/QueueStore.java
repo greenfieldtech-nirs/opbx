@@ -36,8 +36,24 @@ public interface QueueStore {
     Future<EnqueueResult> enqueueIfAbsent(String queueKey, String callKey, String doneKey, String callId,
             long queuedAt);
 
-    /** Atomically tombstone the call (doneKey, EX ttl), remove it from the queue and delete its hash. */
-    Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds);
+    /**
+     * Atomically tombstone the call (doneKey, EX ttl), remove it from the queue and delete its hash.
+     * With {@code answeredAt} set (an 'answered' dequeue) the tombstone keeps the call's queuedAt
+     * (or answeredAt when the hash is gone) so {@link #requeue} can restore its place; any other
+     * dequeue marks the call as gone for good.
+     */
+    Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds,
+            Long answeredAt);
+
+    /**
+     * Atomically put an answered-then-dropped call back at its original FIFO place (by the queuedAt
+     * kept in its tombstone), clearing the tombstone. {@code callKeyPrefix + id} is each queued call's
+     * hash. A non-null {@code eventKey} is claimed (SET NX EX) so a replay changes nothing.
+     * Returns the 1-based position, 0 when the call is gone (ended/abandoned/overflowed) or -1 for a
+     * replayed event. Without a tombstone (expired) it is appended with {@code now}.
+     */
+    Future<Integer> requeue(String queueKey, String callKey, String callKeyPrefix, String doneKey, String callId,
+            String eventKey, long eventTtlSeconds, long now);
 
     /**
      * Round-robin over the full roster: the first available agent after the one offered last

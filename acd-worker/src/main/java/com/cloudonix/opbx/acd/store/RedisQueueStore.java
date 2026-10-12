@@ -42,12 +42,50 @@ public class RedisQueueStore implements QueueStore {
             return 1
             """;
 
-    // KEYS: queue, call hash, done tombstone. ARGV: callId, tombstone ttl.
+    // KEYS: queue, call hash, done tombstone. ARGV: callId, tombstone ttl, answeredAt ('' = not answered).
+    // Tombstone 'a:<queuedAt>' = answered (requeue restores that place), '1' = gone. A replayed
+    // 'answered' (hash already gone) keeps the existing tombstone instead of losing queuedAt.
     private static final String DEQUEUE_LUA = """
-            redis.call('SET', KEYS[3], '1', 'EX', ARGV[2])
+            if ARGV[3] == '' then
+              redis.call('SET', KEYS[3], '1', 'EX', ARGV[2])
+            else
+              local at = redis.call('HGET', KEYS[2], 'queuedAt')
+              if at then
+                redis.call('SET', KEYS[3], 'a:' .. at, 'EX', ARGV[2])
+              elseif not redis.call('SET', KEYS[3], 'a:' .. ARGV[3], 'NX', 'EX', ARGV[2]) then
+                redis.call('EXPIRE', KEYS[3], ARGV[2])
+              end
+            end
             redis.call('LREM', KEYS[1], 0, ARGV[1])
             redis.call('DEL', KEYS[2])
             return 1
+            """;
+
+    // KEYS: queue, call hash, done tombstone, event key ('' = none). ARGV: callId, event ttl,
+    // call-hash prefix, now. Inserts before the first queued call enqueued later than this one.
+    // shortcut: reads other calls' hashes by prefix (not in KEYS), fine on standalone Redis; a
+    // ZSET by queuedAt is needed for Redis Cluster.
+    private static final String REQUEUE_LUA = """
+            if KEYS[4] ~= '' and not redis.call('SET', KEYS[4], '1', 'NX', 'EX', ARGV[2]) then return -1 end
+            local pos = redis.call('LPOS', KEYS[1], ARGV[1])
+            if pos then return pos + 1 end
+            local done = redis.call('GET', KEYS[3])
+            local at = ARGV[4]
+            if done then
+              if string.sub(done, 1, 2) ~= 'a:' then return 0 end
+              at = string.sub(done, 3)
+              redis.call('DEL', KEYS[3])
+            end
+            redis.call('HSET', KEYS[2], 'queuedAt', at)
+            local ids = redis.call('LRANGE', KEYS[1], 0, -1)
+            for i, id in ipairs(ids) do
+              local other = redis.call('HGET', ARGV[3] .. id, 'queuedAt')
+              if other and tonumber(other) > tonumber(at) then
+                redis.call('LINSERT', KEYS[1], 'BEFORE', id, ARGV[1])
+                return i
+              end
+            end
+            return redis.call('RPUSH', KEYS[1], ARGV[1])
             """;
 
     // KEYS: cursor. ARGV: roster ids in order, each prefixed '+' (available) or '-'.
@@ -140,9 +178,19 @@ public class RedisQueueStore implements QueueStore {
     }
 
     @Override
-    public Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds) {
-        return redis.eval(List.of(DEQUEUE_LUA, "3", queueKey, callKey, doneKey, callId, String.valueOf(doneTtlSeconds)))
+    public Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds,
+            Long answeredAt) {
+        return redis.eval(List.of(DEQUEUE_LUA, "3", queueKey, callKey, doneKey, callId, String.valueOf(doneTtlSeconds),
+                answeredAt == null ? "" : String.valueOf(answeredAt)))
                 .mapEmpty();
+    }
+
+    @Override
+    public Future<Integer> requeue(String queueKey, String callKey, String callKeyPrefix, String doneKey,
+            String callId, String eventKey, long eventTtlSeconds, long now) {
+        return redis.eval(List.of(REQUEUE_LUA, "4", queueKey, callKey, doneKey, eventKey == null ? "" : eventKey,
+                callId, String.valueOf(eventTtlSeconds), callKeyPrefix, String.valueOf(now)))
+                .map(Response::toInteger);
     }
 
     @Override

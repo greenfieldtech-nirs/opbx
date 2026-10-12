@@ -97,14 +97,55 @@ public class InMemoryQueueStore implements QueueStore {
 
     @Override
     public synchronized Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId,
-            long doneTtlSeconds) {
+            long doneTtlSeconds, Long answeredAt) {
         flags.add(doneKey);
+        if (answeredAt == null) {
+            strings.put(doneKey, "1");
+        } else {
+            String at = hashes.getOrDefault(callKey, Map.of()).get("queuedAt");
+            if (at != null) {
+                strings.put(doneKey, "a:" + at);
+            } else {
+                strings.putIfAbsent(doneKey, "a:" + answeredAt);
+            }
+        }
         List<String> list = lists.get(queueKey);
         if (list != null) {
             list.remove(callId);
         }
         hashes.remove(callKey);
         return Future.succeededFuture();
+    }
+
+    @Override
+    public synchronized Future<Integer> requeue(String queueKey, String callKey, String callKeyPrefix,
+            String doneKey, String callId, String eventKey, long eventTtlSeconds, long now) {
+        if (eventKey != null && !flags.add(eventKey)) {
+            return Future.succeededFuture(-1);
+        }
+        List<String> list = lists.computeIfAbsent(queueKey, k -> new ArrayList<>());
+        if (list.contains(callId)) {
+            return Future.succeededFuture(list.indexOf(callId) + 1);
+        }
+        String done = strings.get(doneKey);
+        long at = now;
+        if (flags.contains(doneKey)) {
+            if (done == null || !done.startsWith("a:")) {
+                return Future.succeededFuture(0);
+            }
+            at = Long.parseLong(done.substring(2));
+            del(doneKey);
+        }
+        hashes.computeIfAbsent(callKey, k -> new HashMap<>()).put("queuedAt", String.valueOf(at));
+        for (int i = 0; i < list.size(); i++) {
+            String other = hashes.getOrDefault(callKeyPrefix + list.get(i), Map.of()).get("queuedAt");
+            if (other != null && Long.parseLong(other) > at) {
+                list.add(i, callId);
+                return Future.succeededFuture(i + 1);
+            }
+        }
+        list.add(callId);
+        return Future.succeededFuture(list.size());
     }
 
     @Override

@@ -326,6 +326,70 @@ class QueueEngineTest {
         assertEquals("BUSY", agentHash("u2").get("state"));
     }
 
+    private List<Map<String, Object>> waiting() {
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> waiting = (List<Map<String, Object>>) engine.live("org1", "q1", List.of()).result()
+                .get("waiting");
+        return waiting;
+    }
+
+    @Test
+    void requeueRestoresTheOriginalPlaceAndWaitTime() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        fakeTime.advance(10_000);
+        engine.enqueue("org1", "q1", "call-2").result();
+        fakeTime.advance(10_000);
+        engine.enqueue("org1", "q1", "call-3").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+
+        // call-2 (middle) is answered, then the winner drops before the caller joined.
+        engine.event("org1", "q1", "call-2", "answered", "u1", null, null, "e1").result();
+        fakeTime.advance(30_000);
+        engine.event("org1", "q1", "call-2", "requeue", "u1", null, null, "e2").result();
+
+        List<Map<String, Object>> waiting = waiting();
+        assertEquals(List.of("call-1", "call-2", "call-3"), waiting.stream().map(w -> w.get("callId")).toList());
+        assertEquals(40L, waiting.get(1).get("waitedSeconds"), "wait time counts from the original enqueue");
+
+        // The head call too: it goes back to the head, not the tail.
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "e3").result();
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, "e4").result();
+        assertEquals(List.of("call-1", "call-2", "call-3"), waiting().stream().map(w -> w.get("callId")).toList());
+    }
+
+    @Test
+    void replayedRequeueIsIgnoredEvenAfterTheCallWasAnsweredAgain() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        fakeTime.advance(1_000);
+        engine.enqueue("org1", "q1", "call-2").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        engine.setAgentState("org1", "q1", "u2", AgentState.AVAILABLE, null, null, null).result();
+
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, "e1").result();
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, "e2").result();
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, "e2").result();
+        assertEquals(List.of("call-1", "call-2"), waiting().stream().map(w -> w.get("callId")).toList());
+
+        engine.event("org1", "q1", "call-1", "answered", "u2", null, null, "e3").result();
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, "e2").result();
+        assertEquals(List.of("call-2"), waiting().stream().map(w -> w.get("callId")).toList());
+        assertEquals("BUSY", agentHash("u2").get("state"));
+    }
+
+    @Test
+    void requeueAfterTheCallEndedDoesNotResurrectIt() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
+        engine.event("org1", "q1", "call-1", "abandoned", null, null, null, null).result();
+
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, null).result();
+
+        assertTrue(waiting().isEmpty());
+        // Tombstone kept: a late poll does not re-enqueue the ghost either.
+        assertEquals("wait", poll("q1", "call-1", List.of(), "ring_all", 300).get("action"));
+        assertTrue(waiting().isEmpty());
+    }
+
     @Test
     void endedAfterLogoutDoesNotLogTheAgentBackIn() {
         engine.enqueue("org1", "q1", "call-1").result();

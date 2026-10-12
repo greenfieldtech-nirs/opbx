@@ -24,7 +24,8 @@ import io.vertx.core.Future;
  *   acd:call:{org}:{queue}:{callId}      hash   queuedAt (epoch ms)
  *   acd:agent:{org}:{queue}:{userId}     hash   state, wrapUpUntil, talkSecondsTotal, callsHandledTotal
  *   acd:rr:{org}:{queue}                 string round-robin cursor (userId offered last)
- *   acd:done:{org}:{queue}:{callId}      string dequeued-call tombstone (10 min): a late poll must not re-enqueue it
+ *   acd:done:{org}:{queue}:{callId}      string dequeued-call tombstone (10 min): a late poll must not re-enqueue it;
+ *                                               'a:{queuedAt}' after 'answered' (requeue restores that place), '1' = gone
  *   acd:evt:{org}:{eventId}              string seen lifecycle event (dedupes Laravel replays)
  *
  * Agent hash transitions are conditional and atomic (store Lua): an event never
@@ -171,7 +172,8 @@ public class QueueEngine {
                                 Map.of("state", AgentState.BUSY.name()), 0, 0, evtKey, EVENT_DEDUPE_TTL_SECONDS,
                                 doneKey(org, queue, callId)))
                         : Future.succeededFuture();
-                yield markBusy.compose(v -> dequeue(org, queue, callId));
+                yield markBusy.compose(v -> store.dequeue(queueKey(org, queue), callKey(org, queue, callId),
+                        doneKey(org, queue, callId), callId, DONE_TTL_SECONDS, time.nowMillis()));
             }
             case "ended" -> {
                 Future<Void> agentUpdate = agentUserId != null
@@ -194,17 +196,24 @@ public class QueueEngine {
             }
             case "requeue" -> {
                 // The winning agent never connected after 'answered' dequeued the call: release the
-                // agent (as dial_failed) and put the call back so the next poll re-offers it. The
-                // tombstone is cleared first, or a second 'answered' could not mark the next winner BUSY.
+                // agent (as dial_failed) and put the call back at its ORIGINAL place (queuedAt kept in
+                // the tombstone), clearing the tombstone so the next winner can be marked BUSY.
                 Future<Void> agentUpdate = agentUserId != null
                         ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
                                 Set.of(AgentState.BUSY.name()), Set.of(), null,
                                 Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0,
                                 evtKey, EVENT_DEDUPE_TTL_SECONDS, null))
                         : Future.succeededFuture();
-                yield agentUpdate.compose(v -> store.del(doneKey(org, queue, callId)))
-                        .compose(v -> enqueue(org, queue, callId))
-                        .mapEmpty();
+                // Own dedupe key: a retry after a partial failure still requeues though the agent part ran.
+                yield agentUpdate.compose(v -> store.requeue(queueKey(org, queue), callKey(org, queue, callId),
+                        callKey(org, queue, ""), doneKey(org, queue, callId), callId,
+                        evtKey != null ? evtKey + ":requeue" : null, EVENT_DEDUPE_TTL_SECONDS, time.nowMillis()))
+                        .map(position -> {
+                            logEvent(org, queue, callId, position > 0 ? "call requeued at its original place"
+                                    : position == 0 ? "requeue ignored: call already gone" : "requeue replay ignored",
+                                    Map.of("position", position));
+                            return null;
+                        });
             }
             case "abandoned", "overflow" -> dequeue(org, queue, callId);
             default -> Future.failedFuture("Unknown event type: " + type);
@@ -413,7 +422,7 @@ public class QueueEngine {
 
     private Future<Void> dequeue(String org, String queue, String callId) {
         return store.dequeue(queueKey(org, queue), callKey(org, queue, callId), doneKey(org, queue, callId), callId,
-                DONE_TTL_SECONDS);
+                DONE_TTL_SECONDS, null);
     }
 
     private void logEvent(String org, String queue, String callId, String msg, Map<String, Object> extra) {
