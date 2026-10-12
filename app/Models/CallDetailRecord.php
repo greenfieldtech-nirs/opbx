@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Call Detail Record (CDR) Model
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
  * @property string|null $session_token
  * @property string $from
  * @property string $to
+ * @property string|null $direction incoming|outgoing|internal|application, copied from the session update at ingest
  * @property string $disposition
  * @property int $duration Total call duration in seconds
  * @property int $billsec Connected/billable duration in seconds
@@ -90,6 +92,7 @@ class CallDetailRecord extends Model
         'sell_cost',
         'vapp_server',
         'session_id',
+        'direction',
         'call_start_time',
         'call_end_time',
         'call_answer_time',
@@ -223,8 +226,34 @@ class CallDetailRecord extends Model
             return self::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $organizationId)
                 ->where('call_id', $attributes['call_id'])
-                ->first() ?? self::create($attributes);
+                ->first() ?? self::create($attributes + self::directionAttribute($organizationId, $attributes['session_id']));
         });
+    }
+
+    /**
+     * Direction reported by the session-update webhooks for this CDR's session.
+     * The synthetic cdr_final_status row (always 'incoming') is created after the CDR, so it is ignored.
+     *
+     * @return array<string, string|null>
+     */
+    private static function directionAttribute(int $organizationId, mixed $sessionId): array
+    {
+        // shortcut: hasColumn guard lets this code run before the direction migration has been applied; remove after deploy.
+        static $hasColumn = null;
+        $hasColumn ??= Schema::hasColumn('call_detail_records', 'direction');
+
+        if (! $hasColumn) {
+            return [];
+        }
+
+        $direction = $sessionId === null ? null : SessionUpdate::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('session_id', $sessionId)
+            ->where(fn ($q) => $q->whereNull('action')->orWhere('action', '!=', 'cdr_final_status'))
+            ->orderByDesc('id')
+            ->value('direction');
+
+        return ['direction' => $direction];
     }
 
     /**

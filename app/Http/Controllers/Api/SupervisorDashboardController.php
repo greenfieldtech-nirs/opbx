@@ -50,7 +50,7 @@ final class SupervisorDashboardController extends Controller
     private function getRecentCallsForSupervisor(?array $identifiers)
     {
         $query = CallDetailRecord::query()
-            ->with(['extension.user:id,name', 'sessionUpdate'])
+            ->with(['extension.user:id,name'])
             ->orderByDesc('session_timestamp')
             ->limit(5);
 

@@ -58,17 +58,16 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
-        $query->with(['extension.user:id,name', 'sessionUpdate']);
+        $query->with(['extension.user:id,name']);
 
-        // Sorting by the assigned user's name or call direction requires joining
-        // through to tables that aren't directly on call_detail_records. The
-        // joined subqueries deliberately avoid selecting `organization_id` -
-        // joining the raw `extensions`/`session_updates` tables would pull an
-        // ambiguous `organization_id` column into scope and break the
-        // unqualified `organization_id` predicate Eloquent's OrganizationScope
-        // adds elsewhere in the query. Matching on `cloudonix_uuid`/`session_id`
-        // alone is safe since both are Cloudonix-assigned, platform-wide unique
-        // identifiers, not values scoped per organization.
+        // Sorting by the assigned user's name requires joining through to a table
+        // that isn't directly on call_detail_records. The joined subquery
+        // deliberately avoids selecting `organization_id` - joining the raw
+        // `extensions` table would pull an ambiguous `organization_id` column into
+        // scope and break the unqualified `organization_id` predicate Eloquent's
+        // OrganizationScope adds elsewhere in the query. Matching on
+        // `cloudonix_uuid` alone is safe since it is Cloudonix-assigned and
+        // platform-wide unique, not scoped per organization.
         $sortBy = $request->input('sort_by');
         $organizationId = $request->user()?->organization_id;
 
@@ -84,30 +83,11 @@ class CallDetailRecordController extends AbstractApiCrudController
                 })
                 ->addSelect('extension_users.user_name as user_full_name');
         }
-
-        if ($sortBy === 'direction') {
-            $latestSessionUpdates = DB::table('session_updates')
-                ->where('organization_id', $organizationId)
-                ->select('session_id', DB::raw('MAX(id) as max_id'))
-                ->groupBy('session_id');
-
-            $callDirections = DB::table('session_updates')
-                ->joinSub($latestSessionUpdates, 'latest_session_updates', function ($join): void {
-                    $join->on('session_updates.id', '=', 'latest_session_updates.max_id');
-                })
-                ->select('session_updates.session_id', 'session_updates.direction');
-
-            $query->select('call_detail_records.*')
-                ->leftJoinSub($callDirections, 'call_directions', function ($join): void {
-                    $join->on('call_directions.session_id', '=', 'call_detail_records.session_id');
-                })
-                ->addSelect('call_directions.direction as direction');
-        }
     }
 
     protected function afterShow(Model $model, Request $request): void
     {
-        $model->loadMissing(['extension.user:id,name', 'sessionUpdate']);
+        $model->loadMissing(['extension.user:id,name']);
     }
 
     protected function applyCustomFilters(Builder $query, Request $request): void
@@ -119,12 +99,12 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         // Filter by caller number (from)
         if ($request->filled('from')) {
-            $query->where('from', 'like', '%'.$request->input('from').'%');
+            $this->wherePhonePrefix($query, 'from', (string) $request->input('from'));
         }
 
         // Filter by called number (to)
         if ($request->filled('to')) {
-            $query->where('to', 'like', '%'.$request->input('to').'%');
+            $this->wherePhonePrefix($query, 'to', (string) $request->input('to'));
         }
 
         // Filter by disposition
@@ -146,21 +126,41 @@ class CallDetailRecordController extends AbstractApiCrudController
         }
 
         // Filter by call direction (incoming/outgoing/internal/application),
-        // as reported by the session-update webhooks for this CDR's session.
+        // stored on the CDR at ingest from the session-update webhooks.
         if ($request->filled('direction')) {
-            $direction = $request->input('direction');
-            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
-                $q->where('direction', $direction);
-            });
+            $query->where('direction', $request->input('direction'));
         }
 
-        // Filter by date range
-        if ($request->filled('from_date')) {
-            $query->whereDate('session_timestamp', '>=', $request->input('from_date'));
+        // Filter by date range (sargable: plain comparisons on session_timestamp)
+        if ($request->filled('from_date') && ($start = $this->parseDay((string) $request->input('from_date'))) !== null) {
+            $query->where('session_timestamp', '>=', $start->startOfDay());
         }
 
-        if ($request->filled('to_date')) {
-            $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
+        if ($request->filled('to_date') && ($end = $this->parseDay((string) $request->input('to_date'))) !== null) {
+            $query->where('session_timestamp', '<=', $end->endOfDay());
+        }
+    }
+
+    /**
+     * Prefix match on a phone-number column, with or without the leading '+',
+     * so cdr_org_from_idx / cdr_org_to_idx can serve it.
+     */
+    private function wherePhonePrefix(Builder $query, string $column, string $value): void
+    {
+        $prefix = addcslashes(ltrim($value, '+'), '%_\\');
+
+        $query->where(function (Builder $q) use ($column, $prefix): void {
+            $q->where($column, 'like', $prefix.'%')
+                ->orWhere($column, 'like', '+'.$prefix.'%');
+        });
+    }
+
+    private function parseDay(string $value): ?Carbon
+    {
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
         }
     }
 
@@ -234,40 +234,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         // Apply Supervisor-scoped filter
         $this->applySupervisorFilter($query, $user);
 
-        // Apply filters
-        if ($request->filled('from')) {
-            $query->where('from', 'like', '%'.$request->input('from').'%');
-        }
-
-        if ($request->filled('to')) {
-            $query->where('to', 'like', '%'.$request->input('to').'%');
-        }
-
-        if ($request->filled('disposition')) {
-            $query->where('disposition', $request->input('disposition'));
-        }
-
-        if ($request->filled('user')) {
-            $search = $request->input('user');
-            $query->whereHas('extension.user', function ($q) use ($search): void {
-                $q->where('name', 'like', '%'.$search.'%');
-            });
-        }
-
-        if ($request->filled('direction')) {
-            $direction = $request->input('direction');
-            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
-                $q->where('direction', $direction);
-            });
-        }
-
-        if ($request->filled('from_date')) {
-            $query->whereDate('session_timestamp', '>=', $request->input('from_date'));
-        }
-
-        if ($request->filled('to_date')) {
-            $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
-        }
+        $this->applyCustomFilters($query, $request);
 
         // Order by timestamp desc
         $query->orderBy('session_timestamp', 'desc');
