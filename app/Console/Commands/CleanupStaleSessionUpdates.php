@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\SessionUpdate;
+use App\Scopes\OrganizationScope;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,18 @@ class CleanupStaleSessionUpdates extends Command
 {
     protected $signature = 'session-updates:cleanup 
                             {--hours=2 : Hours of inactivity before marking as stale}
-                            {--dry-run : Show what would be deleted without actually deleting}';
+                            {--dry-run : Show what would be deleted without actually deleting}
+                            {--force : Skip the confirmation prompt (required for the scheduler)}';
 
     protected $description = 'Cleanup stale session update records that are stuck in active states';
 
     public function handle(): int
+    {
+        // Console has no authenticated user, so the tenant scope would match zero rows.
+        return OrganizationScope::bypass(fn (): int => $this->cleanup());
+    }
+
+    private function cleanup(): int
     {
         $hours = (int) $this->option('hours');
         $dryRun = $this->option('dry-run');
@@ -61,7 +69,7 @@ class CleanupStaleSessionUpdates extends Command
             return self::SUCCESS;
         }
 
-        if (!$this->confirm('Do you want to mark these records as deleted?', false)) {
+        if (! $this->option('force') && ! $this->confirm('Do you want to mark these records as deleted?', false)) {
             $this->info('Operation cancelled.');
             return self::SUCCESS;
         }

@@ -8,6 +8,7 @@ use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Models\Extension;
 use App\Models\Organization;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -368,7 +369,8 @@ class CloudonixSubscriberService
             $query->where('cloudonix_synced', false);
         }
 
-        $extensions = $query->get();
+        // The org filter above is the tenant filter; the scope has no user in console.
+        $extensions = OrganizationScope::bypass(fn () => $query->get());
 
         foreach ($extensions as $extension) {
             if ($this->syncToCloudnonix($extension, $forceUpdate)) {

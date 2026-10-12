@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Extension;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Console\Command;
 
@@ -37,6 +38,12 @@ class DiagnoseExtensionConfiguration extends Command
      * Execute the console command.
      */
     public function handle()
+    {
+        // Console has no authenticated user, so the tenant scope would match zero rows.
+        OrganizationScope::bypass(fn () => $this->diagnose());
+    }
+
+    private function diagnose(): void
     {
         $organizationId = $this->option('organization-id');
         $extensionNumber = $this->option('extension-number');

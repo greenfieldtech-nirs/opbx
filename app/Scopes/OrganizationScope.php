@@ -64,6 +64,12 @@ class OrganizationScope implements Scope
         if ($organizationId !== null) {
             $builder->where($model->getTable().'.organization_id', $organizationId);
         } else {
+            if (app()->runningInConsole()) {
+                \Illuminate\Support\Facades\Log::warning('OrganizationScope: console query without bypass matches zero rows', [
+                    'model' => $model::class,
+                ]);
+            }
+
             // SECURITY: Force zero results when unauthenticated
             // This prevents unauthorized access to any organization's data
             $builder->whereRaw('1 = 0');

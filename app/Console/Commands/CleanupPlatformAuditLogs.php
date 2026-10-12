@@ -17,7 +17,8 @@ class CleanupPlatformAuditLogs extends Command
 {
     protected $signature = 'opbx:cleanup-audit-logs 
                             {--days=14 : Number of days to retain (default: 14)} 
-                            {--dry-run : Show what would be deleted without deleting}';
+                            {--dry-run : Show what would be deleted without deleting}
+                            {--force : Skip the confirmation prompt (required for the scheduler)}';
 
     protected $description = 'Clean up platform audit logs older than the retention period (default: 14 days)';
 
@@ -45,7 +46,7 @@ class CleanupPlatformAuditLogs extends Command
             return self::SUCCESS;
         }
 
-        if (! $this->confirm('Do you want to delete these records?')) {
+        if (! $this->option('force') && ! $this->confirm('Do you want to delete these records?')) {
             $this->info('Operation cancelled.');
 
             return self::SUCCESS;

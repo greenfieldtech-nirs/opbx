@@ -22,6 +22,12 @@ class SeedDemoUsers extends Command
 
     public function handle(): int
     {
+        if (app()->isProduction()) {
+            $this->error('Refusing to create demo data in production.');
+
+            return self::FAILURE;
+        }
+
         $count = (int) $this->argument('count');
 
         $organizationIds = Organization::pluck('id')->all();

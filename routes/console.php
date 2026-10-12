@@ -9,11 +9,18 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Schedule platform audit log cleanup daily (14-day retention)
-Schedule::command('opbx:cleanup-audit-logs')
+Schedule::command('opbx:cleanup-audit-logs', ['--force' => true])
     ->daily()
     ->at('02:00')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/audit-cleanup.log'));
+
+// Mark session_updates stuck in an active state as deleted (no CDR/delete webhook arrived).
+Schedule::command('session-updates:cleanup', ['--force' => true])
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/session-updates-cleanup.log'));
 
 // Auto Dialer campaign scheduler - checks for campaigns that should auto-start
 // Runs every minute to process scheduled campaigns

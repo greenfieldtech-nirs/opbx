@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -25,7 +26,8 @@ class EnforcePasswordPolicy extends Command
      */
     protected $signature = 'password:enforce-policy
                             {--max-age=90 : Maximum password age in days before reset is required}
-                            {--dry-run : Show what would be done without making changes}';
+                            {--dry-run : Show what would be done without making changes}
+                            {--force : Skip the confirmation prompt}';
 
     /**
      * The console command description.
@@ -38,6 +40,12 @@ class EnforcePasswordPolicy extends Command
      * Execute the console command.
      */
     public function handle(): int
+    {
+        // Console has no authenticated user, so the tenant scope would match zero rows.
+        return OrganizationScope::bypass(fn (): int => $this->enforce());
+    }
+
+    private function enforce(): int
     {
         $maxAge = (int) $this->option('max-age');
         $dryRun = $this->option('dry-run');
@@ -92,7 +100,7 @@ class EnforcePasswordPolicy extends Command
             return Command::SUCCESS;
         }
 
-        if (! $this->confirm("Flag {$count} user(s) for password reset?")) {
+        if (! $this->option('force') && ! $this->confirm("Flag {$count} user(s) for password reset?")) {
             $this->info('Operation cancelled.');
 
             return Command::SUCCESS;

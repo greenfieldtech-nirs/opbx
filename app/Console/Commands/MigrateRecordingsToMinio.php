@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Recording;
+use App\Scopes\OrganizationScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -44,7 +45,7 @@ class MigrateRecordingsToMinio extends Command
             $this->info("Migrating recordings for organization ID: {$organizationId}");
         }
 
-        $recordings = $query->get();
+        $recordings = OrganizationScope::bypass(fn () => $query->get());
 
         if ($recordings->isEmpty()) {
             $this->info('No recordings found to migrate.');

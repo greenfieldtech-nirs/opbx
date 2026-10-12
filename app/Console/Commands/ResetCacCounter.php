@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Support\Facades\Redis;
 
 /**
@@ -15,12 +16,14 @@ use Illuminate\Support\Facades\Redis;
  */
 class ResetCacCounter extends Command
 {
+    use ConfirmableTrait;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'campaign:reset-cac {campaign : Campaign ID}';
+    protected $signature = 'campaign:reset-cac {campaign : Campaign ID} {--force : Skip the production confirmation}';
 
     /**
      * The console command description.
@@ -34,6 +37,10 @@ class ResetCacCounter extends Command
      */
     public function handle(): int
     {
+        if (! $this->confirmToProceed()) {
+            return self::FAILURE;
+        }
+
         $campaignId = $this->argument('campaign');
 
         try {
