@@ -382,7 +382,6 @@ services:
     networks:
       - opbx
 
-  # Auto Dialer Worker - Go-based service for outbound campaigns (polls Laravel; no inbound webhooks)
   acd-worker:
     build:
       context: ./acd-worker
@@ -411,8 +410,7 @@ services:
     networks:
       - opbx
 
-  # Auto Dialer Worker - Go-based service for outbound campaigns
-  # Receives CDR events from Laravel via webhook at /webhooks/cdr
+  # Auto Dialer Worker - Go-based service for outbound campaigns (polls Laravel; no inbound webhooks)
   dialer-worker:
     build:
       context: ./dialer-worker
