@@ -60,9 +60,9 @@ class IvrMenuOption extends Model
             IvrDestinationType::RING_GROUP => $this->belongsTo(RingGroup::class, 'destination_id'),
             IvrDestinationType::CONFERENCE_ROOM => $this->belongsTo(ConferenceRoom::class, 'destination_id'),
             IvrDestinationType::IVR_MENU => $this->belongsTo(IvrMenu::class, 'destination_id'),
-            IvrDestinationType::AI_ASSISTANT => $this->belongsTo(\App\Models\AiAssistant::class, 'destination_id'),
+            IvrDestinationType::AI_ASSISTANT => $this->belongsTo(AiAssistant::class, 'destination_id'),
             IvrDestinationType::AI_LOAD_BALANCER => $this->belongsTo(AiAssistantLoadBalancer::class, 'destination_id'),
-            IvrDestinationType::BUSINESS_HOURS => $this->belongsTo(\App\Models\BusinessHoursSchedule::class, 'destination_id'),
+            IvrDestinationType::BUSINESS_HOURS => $this->belongsTo(BusinessHoursSchedule::class, 'destination_id'),
             default => null,
         };
     }
@@ -89,7 +89,7 @@ class IvrMenuOption extends Model
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::AI_ASSISTANT => \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::AI_ASSISTANT => AiAssistant::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
@@ -97,7 +97,7 @@ class IvrMenuOption extends Model
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::CALL_QUEUE => \App\Models\CallQueue::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::CALL_QUEUE => CallQueue::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
@@ -109,11 +109,11 @@ class IvrMenuOption extends Model
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::AI_LOAD_BALANCER => \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::AI_LOAD_BALANCER => AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
-            IvrDestinationType::BUSINESS_HOURS => \App\Models\BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::BUSINESS_HOURS => BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
                 ->where('organization_id', $orgId)
                 ->where('id', $this->destination_id)
                 ->first(),
@@ -126,6 +126,10 @@ class IvrMenuOption extends Model
      */
     public function getDestinationName(): string
     {
+        if ($this->destination_type === IvrDestinationType::UNAVAILABLE) {
+            return 'Destination unavailable';
+        }
+
         $destination = $this->destination()->first();
 
         if (! $destination) {

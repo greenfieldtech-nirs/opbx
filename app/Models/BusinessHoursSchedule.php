@@ -232,7 +232,7 @@ class BusinessHoursSchedule extends Model
      * Validates and extracts the target type and numeric ID from prefixed strings
      * like "ext-13", "rg-5", "conf-1", or "ivr-1".
      *
-     * @param string $targetId The target ID in prefixed format (e.g., "ext-13")
+     * @param  string  $targetId  The target ID in prefixed format (e.g., "ext-13")
      * @return array|null Returns ['type' => string, 'id' => int] or null if invalid
      *
      * @see BusinessHoursActionType for valid target type prefixes
@@ -262,7 +262,7 @@ class BusinessHoursSchedule extends Model
     /**
      * Validate that a target ID is in the correct prefixed format.
      *
-     * @param string $targetId The target ID to validate
+     * @param  string  $targetId  The target ID to validate
      * @return bool True if valid, false otherwise
      */
     public static function isValidTargetId(string $targetId): bool
@@ -280,6 +280,10 @@ class BusinessHoursSchedule extends Model
      */
     private function convertActionToRoutingFormat(array $action, BusinessHoursActionType $actionType): array
     {
+        if ($actionType === BusinessHoursActionType::UNAVAILABLE) {
+            return ['type' => 'unavailable', 'config' => []];
+        }
+
         $targetId = $action['target_id'] ?? null;
 
         if (! $targetId) {

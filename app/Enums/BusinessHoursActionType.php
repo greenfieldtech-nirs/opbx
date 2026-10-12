@@ -18,6 +18,8 @@ enum BusinessHoursActionType: string
     case AI_ASSISTANT = 'ai_assistant';
     case AI_LOAD_BALANCER = 'ai_load_balancer';
     case CALL_QUEUE = 'call_queue';
+    /** Set when the target (a deleted user's extension) is gone: says "Destination doesn't exist" and hangs up. */
+    case UNAVAILABLE = 'unavailable';
 
     /**
      * Get human-readable label for the action type.
@@ -32,6 +34,7 @@ enum BusinessHoursActionType: string
             self::AI_ASSISTANT => 'AI Assistant',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
             self::CALL_QUEUE => 'Call Queue',
+            self::UNAVAILABLE => 'Destination unavailable',
         };
     }
 
@@ -47,6 +50,7 @@ enum BusinessHoursActionType: string
             self::IVR_MENU => 'Route calls to an interactive voice response menu',
             self::AI_ASSISTANT => 'Route calls to an AI-powered assistant',
             self::AI_LOAD_BALANCER => 'Route calls to an AI load balancer for distribution across multiple assistants',
+            self::UNAVAILABLE => 'Tell the caller the destination does not exist, then hang up',
         };
     }
 

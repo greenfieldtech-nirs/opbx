@@ -416,6 +416,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::AI_LOAD_BALANCER => $this->handleFallbackAiLoadBalancer($ringGroup, $request),
             RingGroupFallbackAction::CALL_QUEUE => $this->handleFallbackCallQueue($ringGroup, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($ringGroup),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->handleFallbackHangup($ringGroup), // Default to hangup for unknown actions
         };
     }

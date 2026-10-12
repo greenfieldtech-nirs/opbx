@@ -15,6 +15,8 @@ enum IvrDestinationType: string
     case AI_LOAD_BALANCER = 'ai_load_balancer';
     case CALL_QUEUE = 'call_queue';
     case HANGUP = 'hangup';
+    /** Set when the target (a deleted user's extension) is gone: says "Destination doesn't exist" and hangs up. */
+    case UNAVAILABLE = 'unavailable';
 
     public function label(): string
     {
@@ -28,6 +30,7 @@ enum IvrDestinationType: string
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
             self::CALL_QUEUE => 'Call Queue',
             self::HANGUP => 'Hang Up',
+            self::UNAVAILABLE => 'Destination unavailable',
         };
     }
 
@@ -43,6 +46,7 @@ enum IvrDestinationType: string
             self::AI_LOAD_BALANCER => 'Route to an AI load balancer',
             self::CALL_QUEUE => 'Route to a call queue with agents',
             self::HANGUP => 'End the call',
+            self::UNAVAILABLE => 'Tell the caller the destination does not exist, then hang up',
         };
     }
 
@@ -58,6 +62,7 @@ enum IvrDestinationType: string
             self::AI_LOAD_BALANCER => 'scale',
             self::CALL_QUEUE => 'list-ordered',
             self::HANGUP => 'phone-off',
+            self::UNAVAILABLE => 'phone-off',
         };
     }
 }

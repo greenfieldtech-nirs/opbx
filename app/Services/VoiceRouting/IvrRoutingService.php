@@ -247,6 +247,10 @@ class IvrRoutingService
             'destination_type' => $option->destination_type->value,
         ]);
 
+        if ($option->destination_type === IvrDestinationType::UNAVAILABLE) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         try {
             $validatedDestination = $option->getValidatedDestination($ivrMenu);
 
@@ -490,6 +494,7 @@ class IvrRoutingService
             BusinessHoursActionType::IVR_MENU => $this->routeBusinessHoursToIvrMenu($request, $targetId, $organizationId),
             BusinessHoursActionType::AI_ASSISTANT => $this->routeBusinessHoursToAiAssistant($request, $targetId, $organizationId),
             BusinessHoursActionType::AI_LOAD_BALANCER => $this->routeBusinessHoursToAiLoadBalancer($request, $targetId, $organizationId),
+            BusinessHoursActionType::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->createErrorResponse('Business hours routing not available.'),
         };
     }
@@ -753,6 +758,10 @@ class IvrRoutingService
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
+        if ($ivrMenu->failover_destination_type === IvrDestinationType::UNAVAILABLE) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         return $this->routeToDestination(
             $request,
             $ivrMenu->failover_destination_type,
@@ -781,6 +790,10 @@ class IvrRoutingService
             'destination_type' => $destinationType->value,
             'destination_id' => $destinationId,
         ]);
+
+        if ($destinationType === IvrDestinationType::UNAVAILABLE) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
 
         $validatedDestination = $this->resolveDestination($destinationType, $destinationId, $ivrMenu->organization_id);
 

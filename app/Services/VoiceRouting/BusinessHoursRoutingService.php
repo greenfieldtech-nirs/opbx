@@ -116,6 +116,7 @@ class BusinessHoursRoutingService
             'call_queue' => $this->routeToCallQueue($config['call_queue_id'] ?? null, $organizationId, $callSid, $request),
             'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'application/xml']),
             'hangup' => response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']),
+            'unavailable' => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => response(
                 CxmlBuilder::unavailable('Business hours action not configured'),
                 200,

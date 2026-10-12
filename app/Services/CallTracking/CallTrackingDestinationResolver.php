@@ -39,6 +39,7 @@ class CallTrackingDestinationResolver
             CallTrackingDestinationType::IVR_MENU => $this->resolveIvrMenu($campaign),
             CallTrackingDestinationType::AI_ASSISTANT => $this->resolveAiAssistant($campaign),
             CallTrackingDestinationType::AI_LOAD_BALANCER => $this->resolveAiLoadBalancer($campaign),
+            CallTrackingDestinationType::UNAVAILABLE => null,
         };
     }
 
@@ -264,6 +265,7 @@ class CallTrackingDestinationResolver
             'ivr_menu' => $this->resolveBusinessHoursIvrMenu($campaign, $schedule, $targetId),
             'ai_assistant' => $this->resolveBusinessHoursAiAssistant($campaign, $schedule, $targetId),
             'ai_load_balancer' => $this->resolveBusinessHoursAiLoadBalancer($campaign, $schedule, $targetId),
+            'unavailable' => ['type' => null, 'unavailable' => true],
             default => [
                 'type' => null,
                 'business_hours' => $schedule,

@@ -275,7 +275,7 @@ class QueuePollController extends Controller
 
         // Reassure the caller before routing (not for hangup — the hangup
         // fallback speaks its own goodbye).
-        if ($callQueue->fallback_action !== RingGroupFallbackAction::HANGUP) {
+        if (! in_array($callQueue->fallback_action, [RingGroupFallbackAction::HANGUP, RingGroupFallbackAction::UNAVAILABLE], true)) {
             $response = $this->prependSay(
                 $response,
                 "We're sorry, but no one is available to take your call. "
@@ -326,6 +326,7 @@ class QueuePollController extends Controller
             RingGroupFallbackAction::IVR_MENU => $this->fallbackToIvrMenu($callQueue, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->fallbackToAiAssistant($callQueue, $request),
             RingGroupFallbackAction::AI_LOAD_BALANCER => $this->fallbackToAiLoadBalancer($callQueue, $request),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => response(CxmlBuilder::unavailable('No agents available. Goodbye.'), 200, ['Content-Type' => 'application/xml']),
         };
     }

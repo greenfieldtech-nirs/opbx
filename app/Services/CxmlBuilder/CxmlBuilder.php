@@ -417,6 +417,14 @@ class CxmlBuilder
     }
 
     /**
+     * Say that the routing target no longer exists, then hang up (deleted user's extension).
+     */
+    public static function destinationUnavailable(): string
+    {
+        return self::sayWithHangup("Destination doesn't exist.", true);
+    }
+
+    /**
      * Build a simple dial response.
      *
      * @param  string  $destination  The destination to dial

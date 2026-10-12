@@ -343,6 +343,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($aiLoadBalancer, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($aiLoadBalancer, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($aiLoadBalancer),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->handleFallbackHangup($aiLoadBalancer),
         };
     }

@@ -453,6 +453,7 @@ class AlbsFollowThroughController extends Controller
 
         return match ($fallbackAction) {
             RingGroupFallbackAction::HANGUP => $this->hangupResponse(),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             RingGroupFallbackAction::EXTENSION => $this->routeToExtension($albs, $request),
             RingGroupFallbackAction::RING_GROUP => $this->routeToRingGroup($albs, $request),
             RingGroupFallbackAction::IVR_MENU => $this->routeToIvrMenu($albs, $request),

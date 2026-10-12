@@ -13,6 +13,8 @@ enum RingGroupFallbackAction: string
     case AI_LOAD_BALANCER = 'ai_load_balancer';
     case CALL_QUEUE = 'call_queue';
     case HANGUP = 'hangup';
+    /** Set when the target (a deleted user's extension) is gone: says "Destination doesn't exist" and hangs up. */
+    case UNAVAILABLE = 'unavailable';
 
     public function label(): string
     {
@@ -24,6 +26,7 @@ enum RingGroupFallbackAction: string
             self::AI_LOAD_BALANCER => 'Forward to AI Load Balancer',
             self::CALL_QUEUE => 'Forward to Call Queue',
             self::HANGUP => 'Hangup',
+            self::UNAVAILABLE => 'Destination unavailable',
         };
     }
 
@@ -37,6 +40,7 @@ enum RingGroupFallbackAction: string
             self::AI_LOAD_BALANCER => 'Forward call to an AI load balancer',
             self::CALL_QUEUE => 'Forward call to a call queue',
             self::HANGUP => 'End the call',
+            self::UNAVAILABLE => 'Tell the caller the destination does not exist, then hang up',
         };
     }
 }

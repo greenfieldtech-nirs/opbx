@@ -14,6 +14,8 @@ enum CallTrackingDestinationType: string
     case IVR_MENU = 'ivr_menu';
     case AI_ASSISTANT = 'ai_assistant';
     case AI_LOAD_BALANCER = 'ai_load_balancer';
+    /** Set when the target (a deleted user's extension) is gone: says "Destination doesn't exist" and hangs up. */
+    case UNAVAILABLE = 'unavailable';
 
     public function label(): string
     {
@@ -26,6 +28,7 @@ enum CallTrackingDestinationType: string
             self::IVR_MENU => 'IVR Menu',
             self::AI_ASSISTANT => 'AI Assistant',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
+            self::UNAVAILABLE => 'Destination unavailable',
         };
     }
 
@@ -39,7 +42,7 @@ enum CallTrackingDestinationType: string
             self::IVR_MENU => ExtensionType::IVR,
             self::AI_ASSISTANT => ExtensionType::AI_ASSISTANT,
             self::AI_LOAD_BALANCER => ExtensionType::AI_LOAD_BALANCER,
-            self::BUSINESS_HOURS => null,
+            self::BUSINESS_HOURS, self::UNAVAILABLE => null,
         };
     }
 
