@@ -17,6 +17,7 @@ class TierCdrs extends Command
     {
         try {
             $this->info('hot -> warm: '.$tiering->hotToWarm().' rows');
+            $this->info('warm -> cold: '.$tiering->warmToCold().' files');
         } catch (\Throwable $e) {
             report($e);
             $this->error($e->getMessage());
