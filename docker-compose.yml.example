@@ -312,12 +312,18 @@ services:
       # redis-cli reads the password from here, so it does not show up in the
       # healthcheck's process arguments.
       REDISCLI_AUTH: ${REDIS_PASSWORD}
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-      --bind 0.0.0.0
-      --protected-mode yes
+    # The password is written to a root-only config file inside the container
+    # (from REDISCLI_AUTH) instead of being passed as --requirepass, so it never
+    # appears in `docker inspect` command args or in `ps`. It may contain any
+    # characters (backslash and double quote are escaped).
+    command:
+      - sh
+      - -c
+      - |
+        umask 077
+        esc=$$(printf '%s' "$$REDISCLI_AUTH" | sed 's/[\\"]/\\&/g')
+        printf 'requirepass "%s"\nappendonly yes\nbind 0.0.0.0\nprotected-mode yes\n' "$$esc" > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG || exit 1"]
       interval: 10s

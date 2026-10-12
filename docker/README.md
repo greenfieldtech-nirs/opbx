@@ -199,7 +199,7 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 
 - **Image**: `redis:7-alpine`
 - **Persistence**: AOF enabled (`appendonly yes`)
-- **Authentication**: Password-protected (`--requirepass`)
+- **Authentication**: Password-protected. The container start command writes `requirepass` from `REDIS_PASSWORD` (passed as `REDISCLI_AUTH`) into `/tmp/redis.conf`, so the password is not in `docker inspect` command args or `ps`. The healthcheck's `redis-cli` reads `REDISCLI_AUTH` too.
 - **Persistence**: Named volume `redis_data`
 
 ### MinIO Configuration

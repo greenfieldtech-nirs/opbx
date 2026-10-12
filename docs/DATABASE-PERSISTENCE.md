@@ -98,18 +98,22 @@ The bind-mounted directory stores all table data, indexes, user accounts, and sc
 | **Restart Policy** | No explicit restart policy set |
 | **Persistence Mode** | AOF (Append-Only File) |
 
-**Command-line flags**:
+**Start command**: the password is not passed as `--requirepass` (that would expose it in `docker inspect` and `ps`). The command writes a root-only config file from the `REDISCLI_AUTH` environment variable (set to `${REDIS_PASSWORD}`) and starts Redis from it:
 
 ```yaml
-command: >
-  redis-server
-  --appendonly yes
-  --requirepass ${REDIS_PASSWORD}
-  --bind 0.0.0.0
-  --protected-mode yes
+command:
+  - sh
+  - -c
+  - |
+    umask 077
+    esc=$$(printf '%s' "$$REDISCLI_AUTH" | sed 's/[\\"]/\\&/g')
+    printf 'requirepass "%s"\nappendonly yes\nbind 0.0.0.0\nprotected-mode yes\n' "$$esc" > /tmp/redis.conf
+    exec redis-server /tmp/redis.conf
 ```
 
-With `--appendonly yes`, Redis writes every mutating operation to an append-only file (`/data/appendonly.aof`). On restart, Redis replays this file to reconstruct the dataset. This provides durable persistence comparable to a write-ahead log.
+The config lives in the container's `/tmp`, not on the data volume. The password is still an environment variable of the container (needed by `redis-cli` in the healthcheck).
+
+With `appendonly yes`, Redis writes every mutating operation to an append-only file (`/data/appendonly.aof`). On restart, Redis replays this file to reconstruct the dataset. This provides durable persistence comparable to a write-ahead log.
 
 ### MinIO
 
