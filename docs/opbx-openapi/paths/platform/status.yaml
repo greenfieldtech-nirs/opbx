@@ -1,0 +1,44 @@
+paths:
+  /v1/platform/status:
+    get:
+      tags:
+        - Platform
+      summary: Platform component status
+      description: >-
+        Latest health result for every platform component plus the last 24 hours of history
+        (5-minute buckets, worst status per bucket). Written every minute by `platform:health-check`.
+        Platform managers only.
+      operationId: getPlatformStatus
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Component statuses
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/PlatformStatus.yaml'
+        '403':
+          description: Platform manager access required
+  /v1/platform/status/check:
+    post:
+      tags:
+        - Platform
+      summary: Run all health checks now
+      description: Runs and stores every check, then returns the same payload as GET. Throttled to 6 requests per minute.
+      operationId: runPlatformStatusCheck
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Fresh component statuses
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/PlatformStatus.yaml'
+        '403':
+          description: Platform manager access required
+        '429':
+          description: Too many requests

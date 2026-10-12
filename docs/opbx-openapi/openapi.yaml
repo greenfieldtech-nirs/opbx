@@ -583,6 +583,12 @@ paths:
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
 
+  /v1/platform/status:
+    $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status'
+
+  /v1/platform/status/check:
+    $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status~1check'
+
   /v1/platform/operate-as:
     $ref: './paths/platform/operate-as.yaml#/paths/~1v1~1platform~1operate-as'
 

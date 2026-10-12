@@ -1,0 +1,33 @@
+type: object
+properties:
+  data:
+    type: object
+    properties:
+      checked_at: {type: string, format: date-time, nullable: true}
+      summary:
+        type: object
+        description: Component counts per status
+        properties:
+          ok: {type: integer}
+          degraded: {type: integer}
+          down: {type: integer}
+          unknown: {type: integer}
+      components:
+        type: array
+        items:
+          type: object
+          properties:
+            component: {type: string, example: redis}
+            label: {type: string}
+            optional: {type: boolean}
+            status: {type: string, enum: [ok, degraded, down, unknown]}
+            latency_ms: {type: integer, nullable: true}
+            detail: {type: string}
+            checked_at: {type: string, format: date-time, nullable: true}
+            history:
+              type: array
+              items:
+                type: object
+                properties:
+                  checked_at: {type: string, format: date-time}
+                  status: {type: string, enum: [ok, degraded, down, unknown]}

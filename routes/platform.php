@@ -7,6 +7,7 @@ use App\Http\Controllers\Platform\PlatformCdrArchiveController;
 use App\Http\Controllers\Platform\PlatformDashboardController;
 use App\Http\Controllers\Platform\PlatformOperateAsController;
 use App\Http\Controllers\Platform\PlatformOrganizationController;
+use App\Http\Controllers\Platform\PlatformStatusController;
 use App\Http\Controllers\Platform\PlatformUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,10 @@ Route::prefix('v1/platform')
 
         // Warm-tier CDR archive (6-12 months old), all organisations
         Route::get('/cdr-archive', [PlatformCdrArchiveController::class, 'index']);
+
+        // Platform Status (component health + 24h history)
+        Route::get('/status', [PlatformStatusController::class, 'index']);
+        Route::post('/status/check', [PlatformStatusController::class, 'check'])->middleware('throttle:6,1');
 
         // Operate As Organization (platform-owner impersonation)
         Route::post('/operate-as/{organization}', [PlatformOperateAsController::class, 'start']);

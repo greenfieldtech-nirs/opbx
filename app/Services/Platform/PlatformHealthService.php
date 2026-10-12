@@ -7,6 +7,7 @@ namespace App\Services\Platform;
 use App\Enums\PlatformHealthStatus as S;
 use App\Models\PlatformHealthCheck;
 use Aws\S3\S3Client;
+use Carbon\Carbon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -86,6 +87,52 @@ class PlatformHealthService
         ], array_values($results)));
 
         return $results;
+    }
+
+    /**
+     * Latest stored result per component plus the last 24h as 5-minute buckets (worst status per bucket).
+     *
+     * @return array{checked_at: string|null, summary: array<string, int>, components: list<array<string, mixed>>}
+     */
+    public function snapshot(): array
+    {
+        $since = now()->subDay();
+        $buckets = [];
+        PlatformHealthCheck::where('checked_at', '>=', $since)->orderBy('checked_at')
+            ->toBase()->select(['component', 'status', 'checked_at'])
+            ->each(function ($row) use (&$buckets) {
+                $t = (string) $row->checked_at; // 'Y-m-d H:i:s' in app timezone
+                $key = substr($t, 0, 14).str_pad((string) (intdiv((int) substr($t, 14, 2), 5) * 5), 2, '0', STR_PAD_LEFT).':00';
+                $cur = $buckets[$row->component][$key] ?? null;
+                if ($cur === null || S::from($row->status)->severity() > S::from($cur)->severity()) {
+                    $buckets[$row->component][$key] = $row->status;
+                }
+            });
+
+        $summary = ['ok' => 0, 'degraded' => 0, 'down' => 0, 'unknown' => 0];
+        $components = [];
+        $latestAt = null;
+        foreach (self::COMPONENTS as $component => [$label, $optional]) {
+            $latest = PlatformHealthCheck::where('component', $component)->orderByDesc('checked_at')->first();
+            $status = $latest?->status ?? S::UNKNOWN->value;
+            $summary[$status]++;
+            $latestAt = max($latestAt, $latest?->checked_at);
+            $components[] = [
+                'component' => $component,
+                'label' => $label,
+                'optional' => $optional,
+                'status' => $status,
+                'latency_ms' => $latest?->latency_ms,
+                'detail' => $latest ? ($latest->detail['message'] ?? '') : 'No check recorded yet',
+                'checked_at' => $latest?->checked_at?->toIso8601String(),
+                'history' => collect($buckets[$component] ?? [])->map(fn (string $st, string $at) => [
+                    'checked_at' => Carbon::parse($at)->toIso8601String(),
+                    'status' => $st,
+                ])->values()->all(),
+            ];
+        }
+
+        return ['checked_at' => $latestAt?->toIso8601String(), 'summary' => $summary, 'components' => $components];
     }
 
     /** @return array{0: S, 1: string} */
