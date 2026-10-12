@@ -7,7 +7,7 @@ paths:
       description: >-
         Warm-tier CDRs (older than 6 months, up to 12 months) across all organisations.
         Platform managers only. Older CDRs are gzip CSV files in the private cdr-archive
-        MinIO bucket and are not served by the API.
+        private S3 bucket and are not served by the API.
       operationId: listPlatformCdrArchive
       security:
         - bearerAuth: []

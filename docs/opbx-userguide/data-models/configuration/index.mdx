@@ -88,18 +88,20 @@ This page documents the environment variables and configuration values used by O
 | `VITE_WS_PORT` | `6001` | WebSocket port |
 | `VITE_WS_SCHEME` | `http` | WebSocket scheme |
 
-### MinIO / S3 Storage
+### S3 Storage (SeaweedFS)
+
+The `MINIO_*` variable names are kept for the S3 client. The S3 store is SeaweedFS; on AWS, point the endpoint and keys at real S3.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MINIO_ACCESS_KEY` | `minioadmin` | MinIO root user |
-| `MINIO_SECRET_KEY` | `minioadmin` | MinIO root password |
+| `MINIO_ACCESS_KEY` | `minioadmin` | S3 access key (SeaweedFS identity). Must not be a weak value; the container entrypoint rejects them. |
+| `MINIO_SECRET_KEY` | `minioadmin` | S3 secret key. Same rule as the access key. |
 | `MINIO_REGION` | `us-east-1` | |
 | `MINIO_BUCKET` | `recordings` | Default bucket |
-| `MINIO_ENDPOINT` | `http://minio:9000` | |
+| `MINIO_ENDPOINT` | `http://seaweedfs:8333` | S3 API endpoint |
 | `MINIO_USE_PATH_STYLE` | `true` | |
-| `MINIO_EXPOSE_PORT` | — | Expose MinIO API port (dev only) |
-| `MINIO_CONSOLE_EXPOSE_PORT` | — | Expose MinIO console port (dev only) |
+| `MINIO_EXPOSE_PORT` | — | Expose the S3 API on loopback port 8333 (dev only, needs `docker-compose.ports.yml`) |
+| `MINIO_CONSOLE_EXPOSE_PORT` | — | Expose the SeaweedFS master UI on loopback port 9333 (dev only, needs `docker-compose.ports.yml`) |
 
 ### Cloudonix CPaaS
 
@@ -230,9 +232,9 @@ Provider-specific variables are in `.env.example` for Mailgun, Mailjet, MailerLi
 | `app` | `opbx_app` | Laravel PHP-FPM |
 | `nginx` | `opbx_nginx` | Reverse proxy |
 | `frontend` | `opbx_frontend` | Vite dev server |
-| `mysql` | `opbx_mysql` | MySQL 8 |
+| `mysql` | `opbx_mysql` | MySQL 8.4 LTS |
 | `redis` | `opbx_redis` | Cache, sessions, queues |
-| `minio` | `opbx_minio` | Object storage |
+| `seaweedfs` | `opbx_seaweedfs` | Object storage (SeaweedFS) |
 | `soketi` | `opbx_websocket` | WebSocket server |
 | `queue-worker` | `opbx_queue_worker` | Queue worker |
 | `scheduler` | `opbx_scheduler` | Task scheduler |

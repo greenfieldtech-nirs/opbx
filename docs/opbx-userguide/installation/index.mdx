@@ -99,9 +99,9 @@ This command builds images and starts the following services:
 | `app` | `opbx_app` | Laravel PHP-FPM backend | 9000 (internal) |
 | `nginx` | `opbx_nginx` | Reverse proxy and static file server | `APP_PORT` (default 80) |
 | `frontend` | `opbx_frontend` | React Vite dev server | `FRONTEND_PORT` (default 3000) |
-| `mysql` | `opbx_mysql` | MySQL 8 database | *(internal by default)* |
+| `mysql` | `opbx_mysql` | MySQL 8.4 LTS database | *(internal by default)* |
 | `redis` | `opbx_redis` | Cache, sessions, queues, locks | *(internal by default)* |
-| `minio` | `opbx_minio` | S3-compatible object storage | *(internal by default)* |
+| `seaweedfs` | `opbx_seaweedfs` | S3-compatible object storage (SeaweedFS) | *(internal by default)* |
 | `soketi` | `opbx_websocket` | WebSocket server | 6001 |
 | `queue-worker` | `opbx_queue_worker` | Laravel queue worker | — |
 | `scheduler` | `opbx_scheduler` | Laravel task scheduler | — |
@@ -247,9 +247,9 @@ Database and object-storage data are persisted in `./volumes/` bind mounts. Thes
 For production environments, consider these additional steps:
 
 1. Use a reverse proxy (nginx, traefik) with SSL termination
-2. Configure automated backups for MySQL (`./scripts/backup-database.sh`) and MinIO data
+2. Configure automated backups for MySQL (`./scripts/backup-database.sh`) and SeaweedFS data (`./volumes/seaweedfs`)
 3. Set strong passwords for all services and rotate tokens regularly
-4. Do not expose MySQL, Redis, or MinIO ports publicly
+4. Do not expose MySQL, Redis, or SeaweedFS ports publicly
 5. Enable Redis persistence (already enabled via AOF in the example compose file)
 6. Configure log aggregation
 7. Set up monitoring and alerting
@@ -257,5 +257,5 @@ For production environments, consider these additional steps:
 9. Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domain
 
 :::danger Security Notice
-Never expose the MySQL, Redis, or MinIO ports to the public internet. Use Docker networks or private IPs for inter-service communication.
+Never expose the MySQL, Redis, or SeaweedFS ports to the public internet. Use Docker networks or private IPs for inter-service communication.
 :::

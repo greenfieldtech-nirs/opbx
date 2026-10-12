@@ -131,9 +131,9 @@ graph TB
     end
 
     subgraph "Data Layer"
-        MYSQL[(MySQL 8.0<br/>Port 3306)]
+        MYSQL[(MySQL 8.4 LTS<br/>Port 3306)]
         REDIS[(Redis 7<br/>Port 6379)]
-        MINIO[(MinIO S3<br/>Ports 9000/9001)]
+        SEAWEEDFS[(SeaweedFS S3<br/>Port 8333)]
     end
 
     subgraph "Real-Time"
@@ -156,7 +156,7 @@ graph TB
     VRM --> IVR
     APP --> MYSQL
     APP --> REDIS
-    APP --> MINIO
+    APP --> SEAWEEDFS
     APP --> SOKETI
     APP --> CX
     GOWORKER -->|Poll API| APP
@@ -242,7 +242,7 @@ sequenceDiagram
 | [PHP](https://php.net) | 8.4+ | Server-side language |
 | [Go](https://go.dev) | 1.21+ | Dialer worker microservice |
 | [Java](https://openjdk.org) | 21 | AMD & ACD (call queue) workers (Vert.x 5) |
-| [MySQL](https://mysql.com) | 8.0 | Relational database |
+| [MySQL](https://mysql.com) | 8.4 LTS | Relational database |
 | [Redis](https://redis.io) | 7 | Cache, queues, CAC counters |
 | [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
 
@@ -262,7 +262,7 @@ sequenceDiagram
 | [Docker](https://docker.com) | Containerization |
 | [nginx](https://nginx.org) | Web server / reverse proxy |
 | [Soketi](https://soketi.app) | WebSocket server (Laravel Echo compatible) |
-| [MinIO](https://min.io) | S3-compatible object storage for recordings |
+| [SeaweedFS](https://github.com/seaweedfs/seaweedfs) | S3-compatible object storage for recordings and the CDR archive |
 | [ngrok](https://ngrok.com) | Webhook tunneling for local development |
 | [Grafana Loki](https://grafana.com/oss/loki/) | Log aggregation store (optional, `logs` profile) |
 | [Grafana](https://grafana.com) | Log viewer at `/logs/` (optional, `logs` profile) |
@@ -323,11 +323,11 @@ sequenceDiagram
    - **Frontend**: http://localhost:3000
    - **API**: http://localhost/api/v1
    - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
-   - **MinIO Console**: http://localhost:9001 (requires `-f docker-compose.ports.yml`)
+   - **SeaweedFS master UI**: http://localhost:9333 (requires `-f docker-compose.ports.yml`)
 
 ### ⚠️ Database Persistence
 
-MySQL data is stored in a Docker named volume (`mysql_data`) that **survives container restarts and recreation**. However, it **will be deleted** if you run:
+MySQL data is stored in the host bind mount `./volumes/mysql` that **survives container restarts and recreation**. However, it **will be deleted** if you run:
 
 ```bash
 # NEVER run this unless you want to erase all data!
@@ -377,9 +377,9 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `amd-worker` | Java/Vert.x AMD worker | - |
 | `acd-worker` | Java/Vert.x call queue worker | 8084 |
 | `mcp-server` | MCP server for AI agents ([docs](mcp-server/README.md)) | 8080 |
-| `mysql` | MySQL 8.0 database | 3306 |
+| `mysql` | MySQL 8.4 LTS database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
-| `minio` | S3-compatible storage | 9000, 9001 |
+| `seaweedfs` | S3-compatible storage (SeaweedFS) | 8333, 9333 (loopback, opt-in) |
 | `soketi` | WebSocket server | 6001 |
 | `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |

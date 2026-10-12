@@ -42,9 +42,9 @@ graph TB
     Nginx --> Frontend[Vite Dev Server]
     Nginx --> Soketi[Soketi WebSocket /app/]
     Nginx --> AMD[AMD Worker /ws/amd/]
-    Laravel --> MySQL[(MySQL 8)]
+    Laravel --> MySQL[(MySQL 8.4)]
     Laravel --> Redis[(Redis 7)]
-    Laravel --> MinIO[(MinIO Storage)]
+    Laravel --> SeaweedFS[(SeaweedFS Storage)]
     Laravel --> Cloudonix[Cloudonix CPaaS]
     GoWorker[Go Dialer Worker] --> Laravel
     GoWorker --> Redis
@@ -52,7 +52,7 @@ graph TB
     Cloudonix --> |Audio Stream| AMD
 ```
 
-The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in MinIO. Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, and the Java AMD worker analyzes audio streams for voicemail detection.
+The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in SeaweedFS (S3-compatible). Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, and the Java AMD worker analyzes audio streams for voicemail detection.
 
 ## Technology Stack
 
@@ -60,9 +60,9 @@ The browser interacts with a React single-page application served through Nginx.
 |-----------|------------|---------|
 | Backend | Laravel 12 (PHP 8.4) | REST API and business logic |
 | Frontend | React 18 + TypeScript | User interface |
-| Database | MySQL 8 | Persistent data storage |
+| Database | MySQL 8.4 LTS | Persistent data storage |
 | Cache/Queue | Redis 7 | Caching, sessions, job queues, locks |
-| Storage | MinIO | S3-compatible object storage for recordings |
+| Storage | SeaweedFS | S3-compatible object storage for recordings |
 | Real-time | Soketi WebSocket | Live updates and notifications |
 | VoIP | Cloudonix CPaaS | Call handling and SIP services |
 | Dialer | Go Worker | Outbound campaign execution |

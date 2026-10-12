@@ -25,7 +25,7 @@ A menu must have exactly one audio source:
 
 | Source | Description |
 |--------|-------------|
-| Recording | Audio file uploaded to MinIO |
+| Recording | Audio file uploaded to S3 storage (SeaweedFS) |
 | Remote URL | External audio file URL |
 | Text-to-Speech | Plain text rendered by Cloudonix TTS |
 
@@ -82,7 +82,7 @@ Use the status toggle to enable or disable a menu. Disabled menus are not used f
 | `id` | bigint | Primary key |
 | `organization_id` | FK | Tenant scope |
 | `name` | string | Menu name |
-| `audio_file_path` | string nullable | Audio URL or MinIO path |
+| `audio_file_path` | string nullable | Audio URL or S3 object path |
 | `tts_text` | string nullable | TTS content (max 1000) |
 | `tts_voice` | string nullable | Voice identifier |
 | `max_timeout` | integer | Wait for first input (1-30s) |

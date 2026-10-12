@@ -14,7 +14,7 @@ The Recordings module manages audio files for IVR prompts, announcements, and ot
 
 Use this module to:
 
-- Upload audio files to MinIO storage
+- Upload audio files to S3 storage (SeaweedFS)
 - Reference external audio URLs
 - Manage file metadata
 - Generate secure download links
@@ -23,7 +23,7 @@ Use this module to:
 
 | Type | Storage | Access |
 |------|---------|--------|
-| Upload | MinIO bucket (`recordings/{org_id}/{random}_{name}.{ext}`) | Encrypted token or HMAC-signed URL |
+| Upload | S3 bucket (`recordings/{org_id}/{random}_{name}.{ext}`) | Encrypted token or HMAC-signed URL |
 | Remote | External URL reference | Direct URL |
 
 ## Upload Security
@@ -75,7 +75,7 @@ Recordings are generally Owner/Admin-only.
 | `organization_id` | FK | Tenant scope |
 | `name` | string | Display name |
 | `type` | enum | upload, remote |
-| `file_path` | string nullable | MinIO path |
+| `file_path` | string nullable | S3 object path |
 | `original_url` | string nullable | Remote URL |
 | `mime_type` | string nullable | |
 | `size` | integer nullable | Bytes |
