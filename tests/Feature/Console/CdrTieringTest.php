@@ -8,6 +8,7 @@ use App\Models\CallDetailRecord;
 use App\Models\Organization;
 use App\Services\Cdr\CdrTiering;
 use Carbon\Carbon;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -195,5 +196,18 @@ class CdrTieringTest extends TestCase
         $this->artisan('cdr:tier')->expectsOutputToContain('cold expiry: 2 files deleted')->assertSuccessful();
 
         $this->assertEqualsCanonicalizing(['1/2019/10/12/2019-10-12-12.csv.gz', '2/2026/01/01/2026-01-01-00.csv.gz'], $disk->allFiles());
+    }
+
+    public function test_tiering_and_recording_expiry_are_scheduled_daily_off_peak(): void
+    {
+        $events = collect($this->app->make(Schedule::class)->events());
+
+        foreach (['cdr:tier' => '0 4 * * *', 'recordings:expire' => '30 4 * * *'] as $command => $expression) {
+            $event = $events->first(fn ($e) => str_contains($e->command, $command));
+            $this->assertNotNull($event, $command);
+            $this->assertSame($expression, $event->expression);
+            $this->assertTrue($event->onOneServer);
+            $this->assertTrue($event->withoutOverlapping);
+        }
     }
 }

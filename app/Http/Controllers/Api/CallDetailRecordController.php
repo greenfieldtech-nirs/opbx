@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\CallDetailRecordResource;
 use App\Models\ApiKey;
+use App\Models\ArchivedCallDetailRecord;
 use App\Models\CallDetailRecord;
 use App\Models\User;
 use App\Services\Supervisor\SupervisorFilterService;
@@ -28,7 +29,18 @@ class CallDetailRecordController extends AbstractApiCrudController
 {
     protected function getModelClass(): string
     {
-        return CallDetailRecord::class;
+        return $this->wantsArchive() ? ArchivedCallDetailRecord::class : CallDetailRecord::class;
+    }
+
+    /**
+     * ?archive=1 switches the index to the warm tier (6-12 months old). Only organisation
+     * API keys may; for the SPA (session users, incl. org Owners) the flag is ignored.
+     */
+    private function wantsArchive(): bool
+    {
+        $request = request();
+
+        return $request->boolean('archive') && $request->user() instanceof ApiKey;
     }
 
     protected function getResourceClass(): string
@@ -43,6 +55,11 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function getAllowedSortFields(): array
     {
+        // user_full_name needs a join to extensions/users on the main connection, which the warm tier is not on.
+        if ($this->wantsArchive()) {
+            return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'direction'];
+        }
+
         return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
     }
 
@@ -71,7 +88,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         $sortBy = $request->input('sort_by');
         $organizationId = $request->user()?->organization_id;
 
-        if ($sortBy === 'user_full_name') {
+        if ($sortBy === 'user_full_name' && ! $this->wantsArchive()) {
             $extensionUsers = DB::table('extensions')
                 ->join('users', 'users.id', '=', 'extensions.user_id')
                 ->where('extensions.organization_id', $organizationId)
@@ -118,7 +135,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         }
 
         // Filter by the extension's assigned user (partial name match)
-        if ($request->filled('user')) {
+        if ($request->filled('user') && ! $this->wantsArchive()) {
             $search = $request->input('user');
             $query->whereHas('extension.user', function ($q) use ($search): void {
                 $q->where('name', 'like', '%'.$search.'%');

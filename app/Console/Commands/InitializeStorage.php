@@ -76,6 +76,19 @@ class InitializeStorage extends Command
 
             $this->info('✓ Storage write/read verified successfully');
 
+            // Cold CDR tier: the bucket is created by ops (private); only verify it is reachable and writable.
+            $archive = Storage::disk('cdr_archive');
+            $archiveBucket = config('filesystems.disks.cdr_archive.bucket');
+            $this->info("Verifying CDR archive bucket '{$archiveBucket}'...");
+            $archive->put($testFile, $testContent);
+            if ($archive->get($testFile) !== $testContent) {
+                $this->error('✗ CDR archive bucket verification failed: content mismatch');
+
+                return Command::FAILURE;
+            }
+            $archive->delete($testFile);
+            $this->info("✓ Bucket '{$archiveBucket}' is writable");
+
             if ($this->option('verify')) {
                 $this->newLine();
                 $this->info('Storage Configuration:');

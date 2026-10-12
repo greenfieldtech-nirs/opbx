@@ -577,6 +577,9 @@ paths:
   /v1/platform/audit-logs:
     $ref: './paths/platform/audit-logs.yaml#/paths/~1v1~1platform~1audit-logs'
 
+  /v1/platform/cdr-archive:
+    $ref: './paths/platform/cdr-archive.yaml#/paths/~1v1~1platform~1cdr-archive'
+
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
 

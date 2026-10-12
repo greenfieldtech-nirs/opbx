@@ -15,7 +15,7 @@ Schedule::command('session-updates:cleanup', ['--force' => true])
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/session-updates-cleanup.log'));
 
-// Retention (config/retention.php): prune old rows daily. CDRs are not pruned here.
+// Retention (config/retention.php): prune old rows daily. CDRs are tiered by cdr:tier instead.
 Schedule::command('model:prune', ['--model' => [
     \App\Models\SessionUpdate::class,
     \App\Models\CallNotificationLog::class,
@@ -30,6 +30,19 @@ Schedule::command('model:prune', ['--model' => [
     ->withoutOverlapping()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/model-prune.log'));
+
+// Tiered CDR storage (hot -> warm -> cold) and recording expiry, daily off-peak (UTC; model:prune is 03:00).
+Schedule::command('cdr:tier')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/cdr-tier.log'));
+
+Schedule::command('recordings:expire')
+    ->dailyAt('04:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/cdr-tier.log'));
 
 // Auto Dialer campaign scheduler - checks for campaigns that should auto-start
 // Runs every minute to process scheduled campaigns

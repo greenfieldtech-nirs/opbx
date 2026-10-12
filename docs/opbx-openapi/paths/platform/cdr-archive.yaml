@@ -1,0 +1,46 @@
+paths:
+  /v1/platform/cdr-archive:
+    get:
+      tags:
+        - Platform
+      summary: Search archived CDRs
+      description: >-
+        Warm-tier CDRs (older than 6 months, up to 12 months) across all organisations.
+        Platform managers only. Older CDRs are gzip CSV files in the private cdr-archive
+        MinIO bucket and are not served by the API.
+      operationId: listPlatformCdrArchive
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: organization_id
+          in: query
+          schema:
+            type: integer
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: disposition
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Page of archived CDRs
+        '403':
+          description: Platform manager access required

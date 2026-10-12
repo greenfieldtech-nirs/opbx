@@ -32,6 +32,17 @@ paths:
           schema:
             type: integer
           description: Filter by destination extension.
+        - name: archive
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: >-
+            Search the warm archive (CDRs older than 6 months and up to 12 months) instead of the
+            live table. Honoured only for requests authenticated with an organisation API key;
+            ignored for session (browser) users. Archived rows have no extension user, and the
+            `user` filter and `user_full_name` sort are not available. CDRs older than the warm
+            period are stored as files and are not available through the API.
       responses:
         '200':
           description: List of Call Detail Records
