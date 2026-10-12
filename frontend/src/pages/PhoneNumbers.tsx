@@ -22,9 +22,7 @@ import type {
   Status,
   RoutingType,
   CreateDIDRequest,
-  UpdateDIDRequest,
-  PaginatedResponse
-} from '@/types';
+  UpdateDIDRequest} from '@/types';
 import { PhoneNumberDialog } from '@/components/PhoneNumbers/PhoneNumberDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,14 +43,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -63,7 +53,6 @@ import {
 import { cn } from '@/lib/utils';
 import {
   StandardDataTable,
-  Column,
   EmptyState
 } from '@/components/design-system';
 import {
@@ -117,7 +106,7 @@ export default function PhoneNumbers() {
   }, [searchQuery]);
 
   // Fetch phone numbers with React Query
-  const { data: phoneNumbersResponse, isLoading, error, refetch, isPlaceholderData } = useQuery<{
+  const { data: phoneNumbersResponse, isLoading, refetch, isPlaceholderData } = useQuery<{
     data: DIDNumber[];
     meta: {
       total: number;
@@ -247,10 +236,6 @@ export default function PhoneNumbers() {
     setIsCreateDialogOpen(true);
   };
 
-  const handleEditClick = (phoneNumber: DIDNumber) => {
-    setSelectedPhoneNumber(phoneNumber);
-    setIsEditDialogOpen(true);
-  };
 
   const handleDeleteClick = (phoneNumber: DIDNumber) => {
     setSelectedPhoneNumber(phoneNumber);

@@ -12,10 +12,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
-import aiAssistantsService from '@/services/aiAssistants.service';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
-import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
 import { cn } from '@/lib/utils';
@@ -57,20 +55,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import {
   DestinationTypeAndSelector,
-  DestinationBadge,
-  useDestinations,
 } from '@/components/destinations';
 import { Combobox } from '@/components/ui/combobox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -84,22 +72,12 @@ import {
   Search,
   Filter,
   Phone,
-  Edit,
   Trash2,
-  ArrowUpDown,
   RefreshCw,
-  X,
   ChevronDown,
-  ArrowRight,
-  Users,
-  Menu,
-  Bot,
-  Scale,
-  UserCheck,
 } from 'lucide-react';
 import {
   StandardDataTable,
-  Column,
   EmptyState
 } from '@/components/design-system';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
@@ -338,38 +316,6 @@ export default function IVRMenus() {
   });
 
   // Helper to render destination badge (matches Extensions page format)
-  const renderDestinationBadge = (type: string, label: string, extType?: string) => {
-    const configs: Record<string, { color: string; icon: LucideIcon }> = {
-      user: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
-      forward: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: ArrowRight },
-      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Phone },
-      conference: { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Users },
-      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
-      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
-      ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Scale },
-    };
-
-    // For extensions, use the extension type; otherwise use the destination type
-    const configKey = type === 'extension' && extType ? extType : type === 'conference_room' ? 'conference' : type;
-    const config = configs[configKey] || configs.user;
-    const Icon = config.icon;
-
-    return (
-      <div className="flex items-center gap-1.5">
-        <Badge variant="outline" className={cn('flex items-center gap-1 px-1.5 py-0.5 text-xs', config.color)}>
-          <Icon className="h-3 w-3" />
-          {type === 'extension' && extType === 'user' && 'User'}
-          {type === 'extension' && extType === 'forward' && 'Forward'}
-          {type === 'ring_group' && 'Ring Group'}
-          {type === 'conference_room' && 'Conference'}
-          {type === 'ivr_menu' && 'IVR'}
-          {type === 'ai_assistant' && 'AI Assistant'}
-          {type === 'ai_load_balancer' && 'AI Load Balancer'}
-        </Badge>
-        <span className="text-sm">{label}</span>
-      </div>
-    );
-  };
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
@@ -408,7 +354,7 @@ export default function IVRMenus() {
   };
 
   // Fetch IVR menus
-  const { data: ivrMenusData, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data: ivrMenusData, isLoading, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.ivrMenus.list({
       page: currentPage,
       per_page: perPage,
