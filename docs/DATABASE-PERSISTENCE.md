@@ -22,9 +22,9 @@ OPBX uses Docker Compose to run its services. Three services store state that mu
 
 | Service | Technology | Purpose |
 |---------|-----------|---------|
-| **MySQL** | MySQL 8.0 | Primary relational database for all application data |
+| **MySQL** | MySQL 8.4 LTS | Primary relational database for all application data |
 | **Redis** | Redis 7 (Alpine) | Caching, queues, sessions, real-time state |
-| **MinIO** | MinIO (latest) | S3-compatible object storage for call recordings and files |
+| **SeaweedFS** | SeaweedFS 4.47 | S3-compatible object storage for call recordings, files, and the CDR archive (replaces MinIO) |
 
 Each service uses a different persistence strategy. Understanding these strategies is essential for operating OPBX in production and avoiding accidental data loss.
 
@@ -38,7 +38,7 @@ flowchart TB
         subgraph HostBindMounts["Host Bind Mounts"]
             mysql_data[("./volumes/mysql\n/var/lib/mysql")]
             redis_data[("./volumes/redis\n/data")]
-            minio_data[("./volumes/minio\n/data")]
+            seaweedfs_data[("./volumes/seaweedfs\n/data")]
         end
         subgraph Backups["Backups (Host Filesystem)"]
             backup_files["./backups/*.sql.gz"]
@@ -46,21 +46,21 @@ flowchart TB
     end
 
     subgraph Containers["Docker Containers"]
-        mysql["MySQL 8.0\nopbx_mysql"]
+        mysql["MySQL 8.4\nopbx_mysql"]
         redis["Redis 7\nopbx_redis"]
-        minio["MinIO\nopbx_minio"]
+        seaweedfs["SeaweedFS\nopbx_seaweedfs"]
     end
 
     mysql_data -->|"mounted at"| mysql
     redis_data -->|"mounted at"| redis
-    minio_data -->|"mounted at"| minio
+    seaweedfs_data -->|"mounted at"| seaweedfs
     backup_files -.->|"restore from"| mysql
     mysql -.->|"backup to"| backup_files
 ```
 
 ### Key Design Decisions
 
-1. **MySQL, Redis, and MinIO all use host bind mounts** (`./volumes/mysql`, `./volumes/redis`, `./volumes/minio`). Bind mounts make data directly visible on the host filesystem, simplifying backups, debugging, and recovery. The `volumes/` directory is gitignored so it is never committed.
+1. **MySQL, Redis, and SeaweedFS all use host bind mounts** (`./volumes/mysql`, `./volumes/redis`, `./volumes/seaweedfs`). Bind mounts make data directly visible on the host filesystem, simplifying backups, debugging, and recovery. The `volumes/` directory is gitignored so it is never committed.
 
 2. **Redis AOF persistence** is enabled (`--appendonly yes`) so Redis data survives normal container restarts. Treat Redis as operational cache/queue storage rather than a primary source of truth.
 
@@ -74,16 +74,20 @@ flowchart TB
 
 | Attribute | Value |
 |-----------|-------|
-| **Image** | `mysql:8.0` |
+| **Image** | `mysql:8.4` (LTS) |
 | **Container Name** | `opbx_mysql` |
 | **Volume Type** | Host bind mount |
 | **Host Path** | `./volumes/mysql` |
 | **Container Path** | `/var/lib/mysql` |
 | **Port Exposure** | Not exposed by default (`DB_EXPOSE_PORT` is empty) |
 | **Restart Policy** | `unless-stopped` |
-| **Custom Config** | `docker/mysql/my.cnf` |
+| **Custom Config** | `docker/mysql/my.cnf` (mounted read-only) |
 
 The bind-mounted directory stores all table data, indexes, user accounts, and schema definitions. It resides in your project directory, so it is included in normal filesystem backups (but excluded from git).
+
+`my.cnf` sets `mysql_native_password=ON` because MySQL 8.4 removed `default-authentication-plugin`. New accounts default to `caching_sha2_password`; the legacy plugin stays available for older clients. The file also sets `innodb_buffer_pool_size=256M`, `max_connections=100`, and the slow query log. The container has a 1G memory limit.
+
+An existing MySQL 8.0 data directory is upgraded in place on the first start of 8.4. Back up before the first start (see [Migration Safety](#migration-safety)).
 
 ### Redis
 
@@ -115,19 +119,21 @@ The config lives in the container's `/tmp`, not on the data volume. The password
 
 With `appendonly yes`, Redis writes every mutating operation to an append-only file (`/data/appendonly.aof`). On restart, Redis replays this file to reconstruct the dataset. This provides durable persistence comparable to a write-ahead log.
 
-### MinIO
+### SeaweedFS
 
 | Attribute | Value |
 |-----------|-------|
-| **Image** | `minio/minio:latest` |
-| **Container Name** | `opbx_minio` |
+| **Image** | `chrislusf/seaweedfs:4.47` |
+| **Container Name** | `opbx_seaweedfs` |
 | **Volume Type** | Host bind mount |
-| **Host Path** | `./volumes/minio` |
+| **Host Path** | `./volumes/seaweedfs` |
 | **Container Path** | `/data` |
-| **Port Exposure** | Not exposed by default (`MINIO_EXPOSE_PORT`, `MINIO_CONSOLE_EXPOSE_PORT` are empty) |
+| **Port Exposure** | Not published by default. Opt-in loopback ports (S3 API `8333`, master UI `9333`) via `docker-compose.ports.yml` (`MINIO_EXPOSE_PORT`, `MINIO_CONSOLE_EXPOSE_PORT`) |
 | **Restart Policy** | `unless-stopped` |
 
-MinIO stores objects as regular files on disk inside the bind-mounted directory. This makes it trivial to browse, back up, or archive object data using standard host filesystem tools.
+SeaweedFS runs as a single `weed server` process (master, volume server, and S3 API). The S3 identity is written inside the container at start from `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`. The app still reads the `MINIO_*` variables, which are only the S3 endpoint and keys. On AWS, point them at real S3 instead.
+
+SeaweedFS packs objects into volume files inside the bind-mounted directory. Browse objects through an S3 client, not the host filesystem. Back up the whole directory while the container is stopped.
 
 ---
 
@@ -155,9 +161,9 @@ Redis supports fast, transient state. AOF persistence survives normal restarts, 
 - Distributed locks (`lock:call:{call_id}`)
 - IVR call state and dialer CAC counters (`dialer:cac:{campaign_id}:active`)
 
-### MinIO — Object Storage
+### SeaweedFS — Object Storage
 
-MinIO stores binary objects:
+SeaweedFS stores binary objects in two private buckets, `recordings` and `cdr-archive`:
 
 - Call recordings
 - IVR prompts and announcements
@@ -171,8 +177,8 @@ External access to recordings is gated through HMAC-signed URLs generated by the
 
 ### Data Survives
 
-| Event | MySQL | Redis | MinIO |
-|-------|-------|-------|-------|
+| Event | MySQL | Redis | SeaweedFS |
+|-------|-------|-------|-----------|
 | Container restart (`docker compose restart`) | Yes | Yes | Yes |
 | Container recreation (`docker compose up --force-recreate`) | Yes | Yes | Yes |
 | Host reboot | Yes | Yes | Yes |
@@ -182,12 +188,12 @@ External access to recordings is gated through HMAC-signed URLs generated by the
 
 ### Data Is Lost
 
-| Event | MySQL | Redis | MinIO |
-|-------|-------|-------|-------|
+| Event | MySQL | Redis | SeaweedFS |
+|-------|-------|-------|-----------|
 | `docker compose down -v` | **Lost** | **Lost** | **Lost** |
 | `rm -rf ./volumes/mysql` | **Lost** | N/A | N/A |
 | `rm -rf ./volumes/redis` | N/A | **Lost** | N/A |
-| `rm -rf ./volumes/minio` | N/A | N/A | **Lost** |
+| `rm -rf ./volumes/seaweedfs` | N/A | N/A | **Lost** |
 | Docker Desktop "Clean / Purge Data" | **Lost** | **Lost** | **Lost** |
 | Deleting the project directory | **Lost** | **Lost** | **Lost** |
 
@@ -237,16 +243,24 @@ This overwrites `./backups/opbx-weekly.sql.gz`.
 6. Prints table row counts for confirmation
 7. Cleans up old timestamped backups (keeps last 10)
 
-### Backing Up MinIO Object Storage
+### Backing Up SeaweedFS Object Storage
 
-Because MinIO uses a host bind mount, you can back it up with standard tools:
+Stop the container first so volume files are not written mid-copy:
 
 ```bash
-# Full archive
-tar czf minio-backup-$(date +%Y%m%d).tar.gz ./volumes/minio
+docker compose stop seaweedfs
+tar czf seaweedfs-backup-$(date +%Y%m%d).tar.gz ./volumes/seaweedfs
+docker compose start seaweedfs
 
-# Or sync to remote storage
-rsync -avz ./volumes/minio/ user@backup-server:/backups/opbx-minio/
+# Or sync the stopped directory to remote storage
+rsync -avz ./volumes/seaweedfs/ user@backup-server:/backups/opbx-seaweedfs/
+```
+
+Alternatively, mirror the buckets with an S3 client while the stack runs (requires `docker-compose.ports.yml`; use the `MINIO_*` keys from `.env`):
+
+```bash
+aws s3 sync s3://recordings ./backups/recordings --endpoint-url http://127.0.0.1:8333
+aws s3 sync s3://cdr-archive ./backups/cdr-archive --endpoint-url http://127.0.0.1:8333
 ```
 
 ### Backing Up Redis
@@ -303,20 +317,19 @@ gunzip < backups/opbx-backup-YYYYMMDD_HHMMSS.sql.gz | \
 docker compose exec -T mysql mysql -u root -p'YOUR_ROOT_PASSWORD' < backup.sql
 ```
 
-### Restoring MinIO Object Storage
+### Restoring SeaweedFS Object Storage
 
 ```bash
+# Stop SeaweedFS so nothing writes during the restore
+docker compose stop seaweedfs
+
 # Extract archive
-tar xzf minio-backup-YYYYMMDD.tar.gz -C ./volumes/
+tar xzf seaweedfs-backup-YYYYMMDD.tar.gz -C ./volumes/
 
 # Or sync from remote
-rsync -avz user@backup-server:/backups/opbx-minio/ ./volumes/minio/
-```
+rsync -avz user@backup-server:/backups/opbx-seaweedfs/ ./volumes/seaweedfs/
 
-Restart the MinIO container if it was running during the restore:
-
-```bash
-docker compose restart minio
+docker compose start seaweedfs
 ```
 
 ### Restoring Redis
@@ -360,17 +373,18 @@ Always create a backup before:
 1. On the old host:
    ```bash
    ./scripts/backup-database.sh
-   tar czf minio-backup.tar.gz ./volumes/minio
+   docker compose stop seaweedfs
+   tar czf seaweedfs-backup.tar.gz ./volumes/seaweedfs
    tar czf redis-backup.tar.gz -C ./volumes/redis .
    ```
 
-2. Transfer `./backups/`, `minio-backup.tar.gz`, and `redis-backup.tar.gz` to the new host.
+2. Transfer `./backups/`, `seaweedfs-backup.tar.gz`, and `redis-backup.tar.gz` to the new host.
 
 3. On the new host:
    ```bash
-   docker compose up -d mysql redis minio
+   docker compose up -d mysql redis seaweedfs
    ./scripts/restore-database.sh backups/opbx-backup-YYYYMMDD_HHMMSS.sql.gz
-   tar xzf minio-backup.tar.gz -C ./volumes/
+   tar xzf seaweedfs-backup.tar.gz -C ./volumes/
    tar xzf redis-backup.tar.gz -C ./volumes/redis
    ```
 
@@ -409,16 +423,17 @@ Expected output:
 
 If AOF is disabled, data was stored only in memory and is lost on restart. Re-enable it in `docker-compose.yml` and restart.
 
-### MinIO Data Not Visible
+### SeaweedFS Data Not Visible
 
 **Symptom**: Buckets or objects are missing.
 
-**Check the bind mount**:
+**Check the bind mount and the buckets**:
 ```bash
-ls -la ./volumes/minio/
+ls -la ./volumes/seaweedfs/
+echo "s3.bucket.list" | docker compose exec -T seaweedfs weed shell
 ```
 
-If the directory is empty, the bind mount may not be working. Verify the path in `docker-compose.yml` and ensure the directory exists on the host before starting MinIO.
+If the directory is empty after uploads, the bind mount may not be working. Verify the path in `docker-compose.yml` and ensure the directory exists on the host before starting SeaweedFS. If a bucket is missing, create it as described in [docker/README.md](../docker/README.md#creating-the-buckets).
 
 ### "Data Loss Warning" on Startup
 
@@ -444,7 +459,7 @@ Because the current compose file uses bind mounts, `docker volume ls` will not s
 ```bash
 ls -la ./volumes/mysql
 ls -la ./volumes/redis
-ls -la ./volumes/minio
+ls -la ./volumes/seaweedfs
 ```
 
 ---
@@ -460,13 +475,13 @@ ls -la ./volumes/minio
    ```
 3. **Recreate containers**:
    ```bash
-   docker compose up -d mysql redis minio
+   docker compose up -d mysql redis seaweedfs
    ```
 4. **Restore MySQL**:
    ```bash
    ./scripts/restore-database.sh backups/opbx-daily.sql.gz
    ```
-5. **Restore MinIO** from your latest archive.
+5. **Restore SeaweedFS** from your latest archive.
 6. **Restore Redis** from your latest AOF backup (or accept loss of transient cache/queue data).
 7. **Verify application functionality**.
 
@@ -500,7 +515,7 @@ ls -la ./volumes/minio
 1. **Isolate the affected host** from the network.
 2. **Assess backup integrity**: verify backups were not also compromised.
 3. **Restore from the most recent clean backup** to a new, clean host.
-4. **Rotate all credentials** (database passwords, API tokens, MinIO keys).
+4. **Rotate all credentials** (database passwords, API tokens, `MINIO_*` S3 keys).
 5. **Review access logs** and patch any vulnerabilities.
 
 ### Recovery Time Objectives (RTO) and Recovery Point Objectives (RPO)
@@ -509,12 +524,12 @@ ls -la ./volumes/minio
 |---------|-----------|-----------|----------|
 | MySQL | 24 hours (daily backups) | 1 hour | Daily automated backups + manual restore |
 | Redis | Best effort (AOF) | 15 minutes | AOF persistence + periodic directory backups |
-| MinIO | 24 hours | 1 hour | Host bind mount + periodic `tar` archives |
+| SeaweedFS | 24 hours | 1 hour | Host bind mount + periodic `tar` archives |
 
 For stricter RPO/RTO requirements, consider:
 - **MySQL**: Binary log replication to a secondary instance
 - **Redis**: Redis Sentinel or Cluster for high availability
-- **MinIO**: MinIO erasure coding or bucket replication
+- **SeaweedFS**: Mirror buckets to a second S3 endpoint, or use AWS S3 (set `MINIO_ENDPOINT` and keys) with its replication features
 
 ---
 
@@ -524,7 +539,7 @@ For stricter RPO/RTO requirements, consider:
 - Foreign keys follow the `{singular_table}_id` convention.
 - MySQL is the source of truth for schema state; run migrations with `docker compose exec app php artisan migrate`.
 - Redis does not require schema migrations, but changes to key formats between application versions may temporarily coexist during rolling updates.
-- MinIO bucket creation is handled by `app/Console/Commands/InitializeStorage.php` on startup when `RUN_MIGRATIONS=true`.
+- The `recordings` and `cdr-archive` buckets are created by ops (see [docker/README.md](../docker/README.md#creating-the-buckets)). On startup with `RUN_MIGRATIONS=true`, `storage:initialize` (`app/Console/Commands/InitializeStorage.php`) verifies both buckets are reachable and writable.
 
 ---
 
@@ -535,7 +550,7 @@ For stricter RPO/RTO requirements, consider:
 | Back up database (timestamped) | `./scripts/backup-database.sh` |
 | Back up database (daily) | `./scripts/backup-database.sh daily` |
 | Restore database | `./scripts/restore-database.sh <file.sql.gz>` |
-| Back up MinIO | `tar czf minio-backup-$(date +%Y%m%d).tar.gz ./volumes/minio` |
+| Back up SeaweedFS | `docker compose stop seaweedfs && tar czf seaweedfs-backup-$(date +%Y%m%d).tar.gz ./volumes/seaweedfs && docker compose start seaweedfs` |
 | Back up Redis | `tar czf redis-backup-$(date +%Y%m%d).tar.gz -C ./volumes/redis .` |
 | View MySQL logs | `docker compose logs mysql` |
 | View Redis logs | `docker compose logs redis` |
