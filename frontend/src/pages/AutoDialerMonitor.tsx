@@ -17,7 +17,6 @@ import {
   RefreshCw,
   Pause,
   Play,
-  AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,

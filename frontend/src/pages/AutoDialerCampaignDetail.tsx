@@ -58,7 +58,6 @@ import {
   autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useDistributionLists } from '@/hooks/useDistributionLists';
-import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
 
 function getStatusBadge(status: string) {
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {

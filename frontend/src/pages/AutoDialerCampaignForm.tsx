@@ -9,14 +9,6 @@ import {
   Save,
   Loader2,
   Phone,
-  Bot,
-  Clock,
-  Calendar,
-  Globe,
-  Mic,
-  Settings,
-  AlertCircle,
-  Users,
   Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,12 +33,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   useAutoDialerCampaign,
@@ -64,7 +50,6 @@ import type { WeeklySchedule, DayOfWeek } from '@/types';
 import { getApiErrorMessage } from '@/services/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
-import { cn } from '@/lib/utils';
 import {
   StrategySelector,
   type CallerIdStrategy,
@@ -117,15 +102,6 @@ const campaignSchema = z.object({
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-const daysOfWeek = [
-  { id: 'monday', label: 'Monday' },
-  { id: 'tuesday', label: 'Tuesday' },
-  { id: 'wednesday', label: 'Wednesday' },
-  { id: 'thursday', label: 'Thursday' },
-  { id: 'friday', label: 'Friday' },
-  { id: 'saturday', label: 'Saturday' },
-  { id: 'sunday', label: 'Sunday' },
-];
 
 const timezoneGroups = getTimezonesByRegion();
 const regionOrder = ['Americas', 'Europe', 'Asia', 'Africa', 'Australia', 'Pacific', 'UTC'];
@@ -164,24 +140,6 @@ function convertCampaignToWeeklySchedule(daysActive: string[], startTime: number
   return schedule;
 }
 
-function convertWeeklyScheduleToCampaign(schedule: WeeklySchedule): { daysActive: string[]; startTime: number; endTime: number } {
-  const daysActive: string[] = [];
-  let startTime = 9;
-  let endTime = 17;
-
-  (Object.keys(schedule) as DayOfWeek[]).forEach((day) => {
-    const daySchedule = schedule[day];
-    if (daySchedule.enabled && daySchedule.time_ranges.length > 0) {
-      daysActive.push(day);
-      // Use the first time range to determine start/end times
-      const firstRange = daySchedule.time_ranges[0];
-      startTime = parseInt(firstRange.start_time.split(':')[0]);
-      endTime = parseInt(firstRange.end_time.split(':')[0]);
-    }
-  });
-
-  return { daysActive, startTime, endTime };
-}
 
 // Helper to convert legacy caller_id to pool format
 function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPoolItem[] {
@@ -311,8 +269,6 @@ export default function AutoDialerCampaignForm() {
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
-  const aiAssistants = aiAssistantsData?.data || [];
-  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   const {
     register,
@@ -352,9 +308,6 @@ export default function AutoDialerCampaignForm() {
   });
 
   // Watch values for conditional fields
-  const routingType = watch('routing_destination_type');
-  const startTime = watch('start_time');
-  const endTime = watch('end_time');
   const callerIdPool = watch('caller_id_pool');
   const callerIdStrategy = watch('caller_id_strategy');
 
