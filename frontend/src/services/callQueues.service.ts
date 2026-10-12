@@ -193,11 +193,17 @@ export const queueReportsService = {
     return response.data;
   },
 
-  exportCsvUrl: (params?: Record<string, unknown>): string => {
-    const search = new URLSearchParams(
-      Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== '') as [string, string][],
-    ).toString();
-    return `/api/v1/queue-calls/export${search ? `?${search}` : ''}`;
+  /** Fetches the CSV through the authenticated client (Bearer + operate-as) and saves it. */
+  exportCsv: async (params?: Record<string, unknown>): Promise<void> => {
+    const response = await api.get('/queue-calls/export', { params, responseType: 'blob' });
+    const url = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'queue-calls.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   },
 };
 

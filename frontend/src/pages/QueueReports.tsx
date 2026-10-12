@@ -136,11 +136,14 @@ export default function QueueReports() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button asChild variant="outline">
-            <a href={queueReportsService.exportCsvUrl(params)} download>
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </a>
+          <Button
+            variant="outline"
+            onClick={() =>
+              queueReportsService.exportCsv(params).catch(() => toast.error('Failed to export CSV'))
+            }
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
           </Button>
         </div>
       </div>
