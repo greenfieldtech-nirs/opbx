@@ -787,6 +787,7 @@ export default function AiAssistantLoadBalancers() {
           onRemoveMember={removeMember}
           onUpdateMember={updateMemberAssistant}
           onDragEnd={handleDragEnd}
+          allowDisconnect={isEdit}
         />
 
         <DialogFooter>

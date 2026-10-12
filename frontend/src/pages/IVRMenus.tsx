@@ -1514,6 +1514,7 @@ export default function IVRMenus() {
                             </div>
                             <div className="flex-1 min-w-0 w-full">
                               <DestinationTypeAndSelector
+                                allowDisconnect
                                 typeValue={option.destination_type}
                                 destinationValue={option.destination_id}
                                 onChange={(type, destId) => {
@@ -1629,6 +1630,7 @@ export default function IVRMenus() {
                     </div>
 
                     <DestinationTypeAndSelector
+                      allowDisconnect
                       typeValue={formData.failover_destination_type}
                       destinationValue={formData.failover_destination_id || ''}
                       onChange={(type, destId) => {

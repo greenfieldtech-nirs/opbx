@@ -282,6 +282,7 @@ export function PhoneNumberDialog({
 
             {/* Unified Destination Selector */}
             <DestinationTypeAndSelector
+              allowDisconnect={isEditMode}
               typeValue={formData.routing_type as DestinationType}
               destinationValue={formData.target_id}
               onChange={(type, destId) => {

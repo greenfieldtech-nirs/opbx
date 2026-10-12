@@ -236,8 +236,10 @@ export default function CallTrackingCampaignForm() {
                         <SelectItem value="forward">Forward to Number</SelectItem>
                         <SelectItem value="extension">Extension</SelectItem>
                         <SelectItem value="ring_group">Ring Group</SelectItem>
-                        {(field.value as string) === 'unavailable' && (
+                        {(field.value as string) === 'unavailable' ? (
                           <SelectItem value="unavailable" disabled>Destination unavailable</SelectItem>
+                        ) : isEdit && (
+                          <SelectItem value="unavailable">Disconnect</SelectItem>
                         )}
                       </SelectContent>
                     </Select>

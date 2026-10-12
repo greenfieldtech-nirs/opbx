@@ -47,6 +47,7 @@ export function DestinationTypeSelector({
   disabled = false,
   allowedTypes,
   includeHangup = false,
+  allowDisconnect = false,
   showDescriptions = false,
   className,
 }: DestinationTypeSelectorProps) {
@@ -57,6 +58,9 @@ export function DestinationTypeSelector({
   // The server can set 'unavailable' (deleted user's extension): show it as the current value so admins can find and fix it
   if (value === 'unavailable') {
     typeConfigs.push(getDestinationTypeConfig('unavailable'));
+  } else if (allowDisconnect) {
+    // Edit forms only: lets the admin deliberately disconnect a route
+    typeConfigs.push({ ...getDestinationTypeConfig('unavailable'), label: 'Disconnect' });
   }
 
   // Handle selection change

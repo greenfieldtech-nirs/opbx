@@ -117,6 +117,8 @@ interface LoadBalancerFormProps {
   onRemoveMember: (assistantId: string) => void;
   onUpdateMember: (index: number, assistantId: string) => void;
   onDragEnd: (event: any) => void;
+  /** Edit dialog only: offer "Disconnect" for the fallback */
+  allowDisconnect?: boolean;
 }
 
 const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5);
@@ -142,6 +144,7 @@ export function LoadBalancerForm({
   onRemoveMember,
   onUpdateMember,
   onDragEnd,
+  allowDisconnect = false,
 }: LoadBalancerFormProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -430,6 +433,7 @@ export function LoadBalancerForm({
           Fallback Action <span className="text-red-500">*</span>
         </Label>
         <DestinationTypeAndSelector
+          allowDisconnect={allowDisconnect}
           typeValue={formData.fallback_action as DestinationType}
           destinationValue={
             formData.fallback_action === 'extension'

@@ -1248,11 +1248,11 @@ export default function RingGroups() {
                         <span>Hangup</span>
                       </div>
                     </SelectItem>
-                    {formData.fallback_action === 'unavailable' && (
-                      <SelectItem value="unavailable" disabled>
+                    {(formData.fallback_action === 'unavailable' || isEdit) && (
+                      <SelectItem value="unavailable" disabled={formData.fallback_action === 'unavailable'}>
                         <div className="flex items-center gap-2">
                           <AlertCircle className="h-4 w-4" />
-                          <span>Destination unavailable</span>
+                          <span>{formData.fallback_action === 'unavailable' ? 'Destination unavailable' : 'Disconnect'}</span>
                         </div>
                       </SelectItem>
                     )}

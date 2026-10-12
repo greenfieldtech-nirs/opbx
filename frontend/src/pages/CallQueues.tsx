@@ -623,6 +623,7 @@ export default function CallQueues() {
               <div className="min-w-0 space-y-2">
                 <Label>Overflow Fallback</Label>
                 <DestinationTypeAndSelector
+                  allowDisconnect={!!editing}
                   layout="horizontal"
                   typeClassName="min-w-0"
                   destinationClassName="min-w-0"

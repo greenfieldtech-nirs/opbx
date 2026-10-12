@@ -95,6 +95,8 @@ export interface DestinationTypeSelectorProps {
   allowedTypes?: DestinationType[];
   /** Include 'hangup' option (typically for failover) */
   includeHangup?: boolean;
+  /** Edit forms only: offer "Disconnect" (sets the route to 'unavailable'). Never on create forms. */
+  allowDisconnect?: boolean;
   /** Show descriptions under each option */
   showDescriptions?: boolean;
   /** Size variant */
@@ -155,6 +157,8 @@ export interface DestinationTypeAndSelectorProps {
   allowedTypes?: DestinationType[];
   /** Include 'hangup' option */
   includeHangup?: boolean;
+  /** Edit forms only: offer "Disconnect" (sets the route to 'unavailable'). Never on create forms. */
+  allowDisconnect?: boolean;
   /** Layout arrangement */
   layout?: 'horizontal' | 'vertical' | 'grid';
   /** Grid column widths (when layout='grid') */

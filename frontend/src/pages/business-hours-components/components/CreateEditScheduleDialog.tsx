@@ -143,6 +143,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
             <div className="grid grid-cols-2 gap-4">
               <Card className="p-4">
                 <DestinationTypeAndSelector
+                  allowDisconnect={editing}
                   typeValue={(openHoursAction?.type as DestinationType) || null}
                   destinationValue={(() => {
                     if (!openHoursAction?.target_id) return '';
@@ -176,6 +177,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
 
               <Card className="p-4">
                 <DestinationTypeAndSelector
+                  allowDisconnect={editing}
                   typeValue={(closedHoursAction?.type as DestinationType) || null}
                   destinationValue={(() => {
                     if (!closedHoursAction?.target_id) return '';

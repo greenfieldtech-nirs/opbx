@@ -14,6 +14,7 @@ export function DestinationTypeAndSelector({
   disabled = false,
   allowedTypes,
   includeHangup = false,
+  allowDisconnect = false,
   layout = 'grid',
   gridColumns = { type: 3, destination: 8 },
   extensionTypes,
@@ -53,6 +54,7 @@ export function DestinationTypeAndSelector({
           disabled={disabled}
           allowedTypes={allowedTypes}
           includeHangup={includeHangup}
+          allowDisconnect={allowDisconnect}
           showDescriptions={showDescriptions}
         />
       </div>
