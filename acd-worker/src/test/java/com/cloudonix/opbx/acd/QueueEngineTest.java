@@ -307,6 +307,26 @@ class QueueEngineTest {
     }
 
     @Test
+    void requeueReleasesTheWinnerAndPutsTheCallBackWithItsTombstoneCleared() {
+        engine.enqueue("org1", "q1", "call-1").result();
+        engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, null, null, null).result();
+        engine.setAgentState("org1", "q1", "u2", AgentState.AVAILABLE, null, null, null).result();
+
+        // u1 won the conference claim ('answered' dequeued the call) but never connected.
+        engine.event("org1", "q1", "call-1", "answered", "u1", null, null, null).result();
+        assertEquals("BUSY", agentHash("u1").get("state"));
+
+        engine.event("org1", "q1", "call-1", "requeue", "u1", null, null, null).result();
+
+        assertEquals("AVAILABLE", agentHash("u1").get("state"));
+        assertEquals("dial", poll("q1", "call-1", List.of(agent("u1")), "ring_all", 300).get("action"));
+
+        // The next winner must be marked BUSY: the tombstone from the first 'answered' is gone.
+        engine.event("org1", "q1", "call-1", "answered", "u2", null, null, null).result();
+        assertEquals("BUSY", agentHash("u2").get("state"));
+    }
+
+    @Test
     void endedAfterLogoutDoesNotLogTheAgentBackIn() {
         engine.enqueue("org1", "q1", "call-1").result();
         engine.setAgentState("org1", "q1", "u1", AgentState.AVAILABLE, 0L, 0L, null).result();

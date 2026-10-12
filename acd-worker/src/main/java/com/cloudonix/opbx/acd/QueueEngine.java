@@ -151,7 +151,7 @@ public class QueueEngine {
     /**
      * Handle a lifecycle event for a queued call.
      *
-     * @param type        answered | ended | abandoned | overflow | dial_failed
+     * @param type        answered | ended | abandoned | overflow | dial_failed | requeue
      * @param agentUserId agent involved (answered/ended/dial_failed), may be null
      * @param talkSeconds talk duration for "ended" (0 for dial_failed), may be null
      * @param wrapUpSeconds post-call wrap-up duration from queue config (0 = none), may be null
@@ -191,6 +191,20 @@ public class QueueEngine {
                         : Future.succeededFuture();
                 // Call stays queued (not dequeued) so the next poll can re-offer it.
                 yield agentUpdate;
+            }
+            case "requeue" -> {
+                // The winning agent never connected after 'answered' dequeued the call: release the
+                // agent (as dial_failed) and put the call back so the next poll re-offers it. The
+                // tombstone is cleared first, or a second 'answered' could not mark the next winner BUSY.
+                Future<Void> agentUpdate = agentUserId != null
+                        ? transition(org, queue, callId, type, new AgentTransition(agentKey(org, queue, agentUserId),
+                                Set.of(AgentState.BUSY.name()), Set.of(), null,
+                                Map.of("state", AgentState.AVAILABLE.name(), "wrapUpUntil", "0"), 0, 0,
+                                evtKey, EVENT_DEDUPE_TTL_SECONDS, null))
+                        : Future.succeededFuture();
+                yield agentUpdate.compose(v -> store.del(doneKey(org, queue, callId)))
+                        .compose(v -> enqueue(org, queue, callId))
+                        .mapEmpty();
             }
             case "abandoned", "overflow" -> dequeue(org, queue, callId);
             default -> Future.failedFuture("Unknown event type: " + type);
