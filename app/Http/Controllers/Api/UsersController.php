@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Traits\AppliesFilters;
-use App\Http\Controllers\Traits\ValidatesTenantScope;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
@@ -34,7 +33,6 @@ use Illuminate\Support\Facades\Log;
 class UsersController extends AbstractApiCrudController
 {
     use AppliesFilters;
-    use ValidatesTenantScope;
 
     /**
      * Lock key prefix for owner deletion protection.

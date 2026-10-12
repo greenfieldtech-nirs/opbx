@@ -343,7 +343,24 @@ abstract class AbstractApiCrudController extends Controller
             return $modelClass::forOrganization($currentUser->organization_id)->findOrFail($key);
         }
 
-        return $modelClass::findOrFail($key);
+        $model = $modelClass::findOrFail($key);
+
+        // Unscoped models: refuse another tenant's row with the same 404 shape.
+        if ($currentUser && $model->organization_id !== $currentUser->organization_id) {
+            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($this->getLoggingContext(), [
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_'.$this->getResourceKey().'_id' => $model->id,
+                'target_organization_id' => $model->organization_id,
+            ]));
+
+            throw new HttpResponseException(response()->json([
+                'error' => 'Not Found',
+                'message' => ucfirst($this->getResourceKey()).' not found.',
+            ], 404));
+        }
+
+        return $model;
     }
 
     /**
@@ -735,22 +752,6 @@ abstract class AbstractApiCrudController extends Controller
         $model = $this->resolveModel($request);
         $this->authorize($this->getViewAbility(), $model);
 
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
         $this->logDetailsRetrieved($this->getResourceKey(), [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
@@ -777,22 +778,6 @@ abstract class AbstractApiCrudController extends Controller
 
         $model = $this->resolveModel($request);
         $this->authorize($this->getUpdateAbility(), $model);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' update attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
 
         // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
         $formRequestClass = $this->getUpdateRequestClass()
@@ -892,22 +877,6 @@ abstract class AbstractApiCrudController extends Controller
 
         $model = $this->resolveModel($request);
         $this->authorize($this->getDeleteAbility(), $model);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' deletion attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
 
         // Log will be handled by success/failure methods below
 
