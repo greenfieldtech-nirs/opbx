@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -80,7 +81,7 @@ export function useBusinessHours() {
   const ringGroups = ringGroupsData?.data || [];
 
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus'],
+    queryKey: queryKeys.ivrMenus.list({ per_page: 1000 }),
     queryFn: () => ivrMenusService.getAll({ per_page: 1000 }),
   });
 

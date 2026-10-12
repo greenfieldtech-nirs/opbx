@@ -3,6 +3,7 @@
  * CRUD with agents, strategy, MOH, position announcements, and fallback destination.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
@@ -126,18 +127,18 @@ export default function CallQueues() {
   const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['call-queues', { unprovisioned: unprovisionedOnly }],
+    queryKey: queryKeys.callQueues.list({ unprovisioned: unprovisionedOnly }),
     queryFn: () => callQueuesService.getAll(unprovisionedOnly ? { unprovisioned: 1 } : undefined),
   });
 
   const { data: recordingsData } = useQuery({
-    queryKey: ['recordings', 'moh'],
+    queryKey: queryKeys.recordings.list({ moh: 1, per_page: 100 }),
     queryFn: () => recordingsService.getAll({ moh: 1, per_page: 100 }),
   });
 
   // TTS languages for position announcements (same source as IVR Menus).
   const { data: voicesData } = useQuery({
-    queryKey: ['cloudonix-voices'],
+    queryKey: queryKeys.cloudonix.voices(),
     queryFn: () => cloudonixService.getVoices(),
     staleTime: 30 * 24 * 60 * 60 * 1000,
   });
@@ -152,7 +153,7 @@ export default function CallQueues() {
 
   const agentUsers = (usersData?.data ?? []).filter((u: any) => u.extension?.extension_number);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['call-queues'] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.callQueues.all });
 
   const createMutation = useMutation({
     mutationFn: callQueuesService.create,

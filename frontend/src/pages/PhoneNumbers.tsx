@@ -4,6 +4,7 @@
  * Manage inbound phone numbers (DIDs) and their routing configuration
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useEffect } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -126,9 +127,7 @@ export default function PhoneNumbers() {
       to?: number;
     };
   }>({
-    queryKey: [
-      'phone-numbers',
-      {
+    queryKey: queryKeys.phoneNumbers.list({
         page: currentPage,
         per_page: perPage,
         search: debouncedSearch,
@@ -137,8 +136,7 @@ export default function PhoneNumbers() {
       unprovisioned: unprovisionedOnly ? 1 : undefined,
         sort_field: sortField,
         sort_direction: sortDirection,
-      },
-    ],
+    }),
     queryFn: () =>
       phoneNumbersService.getAll({
         page: currentPage,
@@ -161,7 +159,7 @@ export default function PhoneNumbers() {
   const createMutation = useMutation({
     mutationFn: (data: CreateDIDRequest) => phoneNumbersService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
       setIsCreateDialogOpen(false);
       toast.success('Phone number added successfully');
     },
@@ -176,7 +174,7 @@ export default function PhoneNumbers() {
     mutationFn: ({ id, data }: { id: string; data: UpdateDIDRequest }) =>
       phoneNumbersService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
       setIsEditDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number updated successfully');
@@ -193,7 +191,7 @@ export default function PhoneNumbers() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => phoneNumbersService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.all });
       setIsDeleteDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number deleted successfully');
@@ -210,7 +208,7 @@ export default function PhoneNumbers() {
 
   // Fetch org's active DIDs independently of page filters/pagination
   const { data: activeDidsResponse } = useQuery<{ data: DIDNumber[] }>({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
     queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids = activeDidsResponse?.data || [];
@@ -219,7 +217,7 @@ export default function PhoneNumbers() {
   const { data: defaultCallerIdResponse, isLoading: isDefaultLoading } = useQuery<{
     data: DefaultCallerId | null;
   }>({
-    queryKey: ['default-caller-id'],
+    queryKey: queryKeys.phoneNumbers.defaultCallerId(),
     queryFn: getDefaultCallerId,
   });
   const defaultCallerId = defaultCallerIdResponse?.data ?? null;
@@ -228,14 +226,14 @@ export default function PhoneNumbers() {
   const defaultCallerIdMutation = useMutation({
     mutationFn: (didId: number | null) => setDefaultCallerId(didId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.defaultCallerId() });
       toast.success('Default outbound caller ID updated');
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update default caller ID';
       toast.error(message);
       // Reset the Select to the server value on failure
-      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.phoneNumbers.defaultCallerId() });
     },
   });
 

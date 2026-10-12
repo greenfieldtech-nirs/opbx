@@ -4,6 +4,7 @@
  * Form for creating and editing DID numbers with routing configuration
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -74,7 +75,7 @@ export function DIDForm({ did, onSubmit, onCancel, isLoading }: DIDFormProps) {
 
   // Fetch IVR menus for routing options
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus'],
+    queryKey: queryKeys.ivrMenus.list({ per_page: 100 }),
     queryFn: () => ivrMenusService.getAll({ per_page: 100 }),
   });
 

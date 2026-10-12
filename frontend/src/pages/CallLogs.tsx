@@ -2,6 +2,7 @@
  * Call Logs Page
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
@@ -156,7 +157,7 @@ export default function CallLogs() {
     isFetching: cdrIsFetching,
     refetch: refetchCdr,
   } = useQuery({
-    queryKey: ['cdrs', cdrPage, cdrFilters, sortField, sortDirection, isSupervisor ? 'supervisor' : 'all'],
+    queryKey: queryKeys.cdrs.list(cdrPage, cdrFilters, sortField, sortDirection, isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => cdrService.getAll(
       { ...cdrFilters, page: cdrPage, sort_by: sortField, sort_order: sortDirection },
       isSupervisor

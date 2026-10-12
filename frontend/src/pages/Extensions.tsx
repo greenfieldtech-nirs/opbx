@@ -9,6 +9,7 @@
  * - Role-based UI (Owner/PBX Admin/PBX User/Reporter)
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useMemo, useEffect } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -277,7 +278,7 @@ export default function ExtensionsComplete() {
 
   // Fetch call queues for table display
   const { data: callQueuesData } = useQuery({
-    queryKey: ['call-queues', { per_page: 100, status: 'active' }],
+    queryKey: queryKeys.callQueues.list({ per_page: 100, status: 'active' }),
     queryFn: () => callQueuesService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -296,7 +297,7 @@ export default function ExtensionsComplete() {
 
   // Fetch IVR menus for table display
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { per_page: 100, status: 'active' }],
+    queryKey: queryKeys.ivrMenus.list({ per_page: 100, status: 'active' }),
     queryFn: () => ivrMenusService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -328,8 +329,8 @@ export default function ExtensionsComplete() {
 
   // Fetch active DIDs for Default Caller ID selector
   const { data: didsData } = useQuery({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
-    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids: DIDNumber[] = didsData?.data ?? [];
 

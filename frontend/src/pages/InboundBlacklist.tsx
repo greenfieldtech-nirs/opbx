@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -138,7 +139,7 @@ const InboundBlacklistPage: React.FC = () => {
     data: phoneNumbersData,
     refetch: refetchPhoneNumbers,
   } = useQuery({
-    queryKey: ['phone-numbers'],
+    queryKey: queryKeys.phoneNumbers.list({ per_page: 100 }),
     queryFn: () => phoneNumbersService.getAll({ per_page: 100 }),
   });
 

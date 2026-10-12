@@ -5,15 +5,12 @@
 
 import { useState } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
-import { extensionsService } from '@/services/extensions.service';
-import { ringGroupsService } from '@/services/createResourceService';
-import { conferenceRoomsService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
 import aiAssistantsService from '@/services/aiAssistants.service';
-import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { settingsService } from '@/services/settings.service';
 import type { LucideIcon } from 'lucide-react';
@@ -33,7 +30,6 @@ import type {
   CloudonixVoice,
   CloudonixVoiceFilters,
   CloudonixVoiceLanguage,
-  Extension,
   Recording,
 } from '@/types';
 
@@ -339,84 +335,6 @@ export default function IVRMenus() {
     options: [],
   });
 
-  // Available destinations for dropdowns - using existing API endpoints
-  const { data: extensionsData, isLoading: extensionsLoading, error: extensionsError } = useQuery({
-    queryKey: ['ivr-extensions'],
-    queryFn: () => extensionsService.getAll({ status: 'active', per_page: 100, with: 'user' }),
-  });
-
-  const { data: ringGroupsData, isLoading: ringGroupsLoading, error: ringGroupsError } = useQuery({
-    queryKey: ['ivr-ring-groups'],
-    queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  const { data: conferenceRoomsData, isLoading: conferenceRoomsLoading, error: conferenceRoomsError } = useQuery({
-    queryKey: ['ivr-conference-rooms'],
-    queryFn: () => conferenceRoomsService.getAll({ per_page: 100 }),
-  });
-
-  const { data: ivrMenusList, isLoading: ivrMenusLoading, error: ivrMenusError } = useQuery({
-    queryKey: ['ivr-menus-list'],
-    queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  const { data: aiAssistantsData, isLoading: aiAssistantsLoading, error: aiAssistantsError } = useQuery({
-    queryKey: ['ivr-ai-assistants'],
-    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
-  });
-
-  const { data: aiLoadBalancersData, isLoading: aiLoadBalancersLoading, error: aiLoadBalancersError } = useQuery({
-    queryKey: ['ivr-ai-load-balancers'],
-    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  // Helper to get display label for an extension (matches Ring Groups format)
-  const getExtensionDisplayLabel = (ext: Extension) => {
-    if (ext.type === 'forward') {
-      const forwardTo = ext.configuration?.forward_to;
-      return forwardTo ? `Forward to ${forwardTo}` : 'Forward Extension';
-    }
-    return ext.user?.name || 'Unassigned User';
-  };
-
-  // Combine all destinations
-  const availableDestinations = {
-    // Only show 'user' and 'forward' type extensions (matching Ring Groups behavior)
-    extensions: extensionsData?.data
-      ?.filter(ext => ext.type === 'user' || ext.type === 'forward')
-      ?.map(ext => ({
-        id: String(ext.id),
-        extension_number: ext.extension_number,
-        type: ext.type,
-        label: `Ext ${ext.extension_number} - ${getExtensionDisplayLabel(ext)}`,
-        displayLabel: getExtensionDisplayLabel(ext)
-      })) || [],
-    ring_groups: ringGroupsData?.data?.map(rg => ({
-      id: String(rg.id),
-      label: `Ring Group: ${rg.name}`
-    })) || [],
-    conference_rooms: conferenceRoomsData?.data?.map(cr => ({
-      id: String(cr.id),
-      label: `Conference: ${cr.name}`
-    })) || [],
-    ivr_menus: ivrMenusList?.data?.map(menu => ({
-      id: String(menu.id),
-      label: `IVR Menu: ${menu.name}`
-    })) || [],
-    ai_assistants: aiAssistantsData?.data?.filter(ext => ext.type === 'ai_assistant')?.map(ext => ({
-      id: String(ext.id),
-      extension_number: ext.extension_number,
-      label: `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || 'AI Assistant'}`
-    })) || [],
-    ai_load_balancers: aiLoadBalancersData?.data?.map(alb => ({
-      id: String(alb.id),
-      label: `${alb.name}`
-    })) || []
-  };
-
-  const destinationsLoading = extensionsLoading || ringGroupsLoading || conferenceRoomsLoading || ivrMenusLoading || aiAssistantsLoading || aiLoadBalancersLoading;
-  const destinationsError = extensionsError || ringGroupsError || conferenceRoomsError || ivrMenusError || aiAssistantsError || aiLoadBalancersError;
-
   // Helper to render destination badge (matches Extensions page format)
   const renderDestinationBadge = (type: string, label: string, extType?: string) => {
     const configs: Record<string, { color: string; icon: LucideIcon }> = {
@@ -453,13 +371,13 @@ export default function IVRMenus() {
 
   // Available recordings for audio selection
   const { data: recordingsData } = useQuery({
-    queryKey: ['recordings'],
+    queryKey: queryKeys.recordings.list({ per_page: 100 }),
     queryFn: () => recordingsService.getAll({ per_page: 100 }),
   });
 
   // Cloudonix voices for TTS (cached for 30 days)
   const { data: voicesData, refetch: refetchVoices } = useQuery({
-    queryKey: ['cloudonix-voices'],
+    queryKey: queryKeys.cloudonix.voices(),
     queryFn: () => cloudonixService.getVoices(),
     staleTime: 30 * 24 * 60 * 60 * 1000, // 30 days
     gcTime: 30 * 24 * 60 * 60 * 1000, // 30 days (gcTime replaces cacheTime in newer versions)
@@ -470,7 +388,7 @@ export default function IVRMenus() {
 
   // Fetch Cloudonix settings to check package tier
   const { data: cloudonixSettings } = useQuery({
-    queryKey: ['cloudonix-settings'],
+    queryKey: queryKeys.cloudonix.settings(),
     queryFn: () => settingsService.getCloudonixSettings(),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -489,7 +407,7 @@ export default function IVRMenus() {
 
   // Fetch IVR menus
   const { data: ivrMenusData, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ivr-menus', {
+    queryKey: queryKeys.ivrMenus.list({
       page: currentPage,
       per_page: perPage,
       search: searchQuery || undefined,
@@ -497,7 +415,7 @@ export default function IVRMenus() {
       unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
-    }],
+    }),
     queryFn: () => ivrMenusService.getAll({
       page: currentPage,
       per_page: perPage,
@@ -520,8 +438,7 @@ export default function IVRMenus() {
     mutationFn: (data: CreateIvrMenuRequest) => ivrMenusService.create(data),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('IVR menu created successfully');
@@ -537,8 +454,7 @@ export default function IVRMenus() {
       ivrMenusService.update(id, data),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
       setIsEditDialogOpen(false);
       setSelectedMenu(null);
       resetForm();
@@ -556,8 +472,7 @@ export default function IVRMenus() {
     mutationFn: (id: string) => ivrMenusService.delete(id),
     onSuccess: () => {
       // Invalidate all IVR menu queries including those with parameters
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
       setIsDeleteDialogOpen(false);
       setSelectedMenu(null);
       toast.success('IVR menu deleted successfully');
@@ -573,8 +488,7 @@ export default function IVRMenus() {
     mutationFn: ({ id, status }: { id: string; status: IvrMenuStatus }) =>
       api.patch(`/ivr-menus/${id}/toggle-status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['ivr-menus-list'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ivrMenus.all });
       toast.success('IVR menu status updated');
     },
     onError: (error: Error | unknown) => {

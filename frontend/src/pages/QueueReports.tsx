@@ -3,6 +3,7 @@
  * Per-call history rows across all queues with filters and CSV export.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, PhoneCall, RefreshCw } from 'lucide-react';
@@ -64,14 +65,14 @@ export default function QueueReports() {
   };
 
   const { data: queuesData } = useQuery({
-    queryKey: ['call-queues'],
+    queryKey: queryKeys.callQueues.list({ per_page: 100 }),
     queryFn: () => callQueuesService.getAll({ per_page: 100 }),
   });
 
   const queueNameById = new Map((queuesData?.data ?? []).map((q) => [q.id, q.name]));
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['queue-calls', params],
+    queryKey: queryKeys.queueCalls.list(params),
     queryFn: () => queueReportsService.list(params),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
     refetchIntervalInBackground: true,

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -126,8 +127,8 @@ const OutboundWhitelistPage: React.FC = () => {
 
   // Fetch active DIDs for Default Caller ID selector
   const { data: didsData } = useQuery({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
-    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids: DIDNumber[] = didsData?.data ?? [];
 

@@ -5,6 +5,7 @@
  * agent of and toggles their presence state (Available / Wrap-up / Log out).
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Headset } from 'lucide-react';
@@ -49,7 +50,7 @@ export function QueueAgentWidget() {
       queueAgentService.setState(queueId, state),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-queue-memberships'] });
-      queryClient.invalidateQueries({ queryKey: ['call-queues'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.callQueues.all });
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });

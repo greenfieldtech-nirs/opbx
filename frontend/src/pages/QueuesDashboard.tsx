@@ -6,6 +6,7 @@
  * configured queues, 30 seconds each.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Clock, Copy, ExternalLink, Link2, PhoneCall, RefreshCw, Timer, Users } from 'lucide-react';
@@ -65,14 +66,14 @@ function PublicLinkCard() {
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
-    queryKey: ['queues-dashboard-link'],
+    queryKey: queryKeys.queuesDashboard.link(),
     queryFn: async () => (await api.get('/queues-dashboard/link')).data,
   });
 
   const regenerateMutation = useMutation({
     mutationFn: async () => (await api.post('/queues-dashboard/link/regenerate')).data,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queues-dashboard-link'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.queuesDashboard.link() });
       toast.success('Public link regenerated - the old link no longer works');
     },
     onError: () => toast.error('Failed to regenerate link'),
@@ -134,7 +135,7 @@ export default function QueuesDashboard() {
   const [cycleTick, setCycleTick] = useState(ROTATE_SECONDS);
 
   const { data: queuesData } = useQuery({
-    queryKey: ['call-queues'],
+    queryKey: queryKeys.callQueues.list({ per_page: 100 }),
     queryFn: () => callQueuesService.getAll({ per_page: 100 }),
     refetchInterval: 60000,
   });
@@ -173,7 +174,7 @@ export default function QueuesDashboard() {
   const queueId = activeQueue?.id;
 
   const { data: liveData } = useQuery({
-    queryKey: ['queues-dashboard', queueId, 'live'],
+    queryKey: queryKeys.queuesDashboard.live(queueId),
     queryFn: () => queueStatsService.live(queueId!),
     enabled: queueId !== undefined,
     refetchInterval: 5000,
@@ -181,7 +182,7 @@ export default function QueuesDashboard() {
 
   // Agent names come from the queue detail (live only carries user/extension).
   const { data: queueDetailData } = useQuery({
-    queryKey: ['call-queues', queueId],
+    queryKey: queryKeys.callQueues.detail(queueId),
     queryFn: () => callQueuesService.getById(queueId!),
     enabled: queueId !== undefined,
     staleTime: 60000,
@@ -192,7 +193,7 @@ export default function QueuesDashboard() {
   );
 
   const { data: statsData } = useQuery({
-    queryKey: ['queues-dashboard', queueId, 'stats', timespan],
+    queryKey: queryKeys.queuesDashboard.stats(queueId, timespan),
     queryFn: () => queueStatsService.stats(queueId!, new Date(Date.now() - minutes * 60000).toISOString()),
     enabled: queueId !== undefined,
     refetchInterval: 30000,

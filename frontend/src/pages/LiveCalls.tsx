@@ -5,6 +5,7 @@
  * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService, getCoachTarget } from '@/services/sessionUpdates.service';
@@ -147,7 +148,7 @@ export default function LiveCalls() {
 
   // Initial data fetch via HTTP with configurable refresh
   const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['active-calls', isSupervisor ? 'supervisor' : 'all'],
+    queryKey: queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
     refetchIntervalInBackground: true,
@@ -246,7 +247,7 @@ export default function LiveCalls() {
     mutationFn: (sessionId: number) => sessionUpdatesService.disconnectSession(sessionId),
     onSuccess: () => {
       toast.success('Session disconnected successfully');
-      queryClient.invalidateQueries({ queryKey: ['active-calls'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
     },
     onError: (error: any) => {
       const errorMessage =
@@ -347,7 +348,7 @@ export default function LiveCalls() {
     // Clear local state and query cache immediately for instant feedback
     setLiveCalls([]);
     clearActiveCalls();
-    queryClient.setQueryData(['active-calls', isSupervisor ? 'supervisor' : 'all'], { data: [] });
+    queryClient.setQueryData(queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'), { data: [] });
 
     // Remove call IDs from the recently-disconnected set after a grace
     // period so that genuinely new calls with the same ID can still appear.

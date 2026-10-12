@@ -3,6 +3,7 @@
  * Live snapshot, agents, and history statistics for a single queue.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, PhoneCall, Timer, Users } from 'lucide-react';
@@ -55,26 +56,26 @@ export default function CallQueueDetail() {
       userId: number;
     }) => queueAgentService.setState(queueId, state, userId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-queues', id, 'live'] });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.callQueues.detail(id), 'live'] });
     },
     onError: () => toast.error('Failed to update agent state'),
   });
 
   const { data: queueData } = useQuery({
-    queryKey: ['call-queues', id],
+    queryKey: queryKeys.callQueues.detail(id),
     queryFn: () => callQueuesService.getById(id!),
     enabled: Boolean(id),
   });
 
   const { data: liveData } = useQuery({
-    queryKey: ['call-queues', id, 'live'],
+    queryKey: [...queryKeys.callQueues.detail(id), 'live'],
     queryFn: () => queueStatsService.live(id!),
     enabled: Boolean(id),
     refetchInterval: 5000,
   });
 
   const { data: statsData } = useQuery({
-    queryKey: ['call-queues', id, 'stats'],
+    queryKey: [...queryKeys.callQueues.detail(id), 'stats'],
     queryFn: () => queueStatsService.stats(id!),
     enabled: Boolean(id),
     refetchInterval: 30000,

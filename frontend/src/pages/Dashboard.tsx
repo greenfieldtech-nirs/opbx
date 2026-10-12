@@ -4,6 +4,7 @@
  * Main dashboard with statistics and recent activity
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -31,7 +32,7 @@ export default function Dashboard() {
     isLoading: supervisorLoading,
     isFetching: supervisorFetching,
   } = useQuery({
-    queryKey: ['dashboard', 'supervisor'],
+    queryKey: queryKeys.dashboard.supervisor(),
     queryFn: getSupervisorDashboard,
     refetchInterval: 30000,
     enabled: isSupervisor,
@@ -39,7 +40,7 @@ export default function Dashboard() {
 
   // Fetch active calls count
   const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching, refetch: refetchActiveCalls } = useQuery({
-    queryKey: ['active-calls-dashboard'],
+    queryKey: queryKeys.dashboard.activeCalls(),
     queryFn: async () => {
       return await sessionUpdatesService.getActiveCalls();
     },
@@ -52,7 +53,7 @@ export default function Dashboard() {
 
   // Fetch extensions count
   const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching, refetch: refetchExtensions } = useQuery({
-    queryKey: ['extensions-count'],
+    queryKey: queryKeys.dashboard.extensionsCount(),
     queryFn: async () => {
       const response = await extensionsService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -64,7 +65,7 @@ export default function Dashboard() {
 
   // Fetch conference rooms count
   const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching, refetch: refetchConferenceRooms } = useQuery({
-    queryKey: ['conference-rooms-count'],
+    queryKey: queryKeys.dashboard.conferenceRoomsCount(),
     queryFn: async () => {
       const response = await conferenceRoomsService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -76,7 +77,7 @@ export default function Dashboard() {
 
   // Fetch phone numbers count
   const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching, refetch: refetchPhoneNumbers } = useQuery({
-    queryKey: ['phone-numbers-count'],
+    queryKey: queryKeys.dashboard.phoneNumbersCount(),
     queryFn: async () => {
       const response = await phoneNumbersService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -88,7 +89,7 @@ export default function Dashboard() {
 
   // Fetch last 10 CDR records
   const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching, refetch: refetchLastCalls } = useQuery({
-    queryKey: ['last-calls'],
+    queryKey: queryKeys.dashboard.lastCalls(),
     queryFn: async () => {
       const response = await cdrService.getAll({ per_page: 10 });
       return response.data;

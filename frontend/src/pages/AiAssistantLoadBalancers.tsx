@@ -3,6 +3,7 @@
  * Full CRUD operations with backend API integration
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useEffect, useMemo } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -394,7 +395,7 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available IVR menus
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
+    queryKey: queryKeys.ivrMenus.list({ status: 'active', per_page: 100 }),
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
