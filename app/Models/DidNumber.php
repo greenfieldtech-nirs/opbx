@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ScopedBy([OrganizationScope::class])]
 class DidNumber extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     /**
      * The attributes that are mass assignable.
@@ -165,7 +166,7 @@ class DidNumber extends Model
             return $this->attributes['_extension'];
         }
 
-        return Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return Extension::withoutGlobalScope(OrganizationScope::class)
             ->with('aiAssistant')
             ->where('id', $extensionId)
             ->where('organization_id', $this->organization_id)
@@ -190,7 +191,7 @@ class DidNumber extends Model
             return $this->attributes['_ring_group'];
         }
 
-        return RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return RingGroup::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $ringGroupId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -201,7 +202,7 @@ class DidNumber extends Model
      *
      * Note: This is not a true Eloquent relationship due to JSON field limitation.
      */
-    public function getCallQueueAttribute(): ?\App\Models\CallQueue
+    public function getCallQueueAttribute(): ?CallQueue
     {
         $callQueueId = $this->getTargetCallQueueId();
         if ($callQueueId === null) {
@@ -212,7 +213,7 @@ class DidNumber extends Model
             return $this->attributes['_call_queue'];
         }
 
-        return \App\Models\CallQueue::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $callQueueId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -236,7 +237,7 @@ class DidNumber extends Model
             return $this->attributes['_business_hours_schedule'];
         }
 
-        return BusinessHoursSchedule::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $scheduleId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -260,7 +261,7 @@ class DidNumber extends Model
             return $this->attributes['_conference_room'];
         }
 
-        return ConferenceRoom::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return ConferenceRoom::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $conferenceRoomId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -284,7 +285,7 @@ class DidNumber extends Model
             return $this->attributes['_ai_assistant'];
         }
 
-        return AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -308,7 +309,7 @@ class DidNumber extends Model
             return $this->attributes['_ivr_menu'];
         }
 
-        return IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return IvrMenu::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $ivrMenuId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -332,7 +333,7 @@ class DidNumber extends Model
             return $this->attributes['_ai_load_balancer'];
         }
 
-        return AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        return AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $this->organization_id)
             ->first();
@@ -392,5 +393,11 @@ class DidNumber extends Model
     public function setAiLoadBalancer(?AiAssistantLoadBalancer $aiLoadBalancer): void
     {
         $this->attributes['_ai_load_balancer'] = $aiLoadBalancer;
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['routing_type'];
     }
 }

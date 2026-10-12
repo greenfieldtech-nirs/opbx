@@ -12,6 +12,7 @@ paths:
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
           description: List of Business Hours Schedules

@@ -84,6 +84,10 @@ class PhoneNumberController extends Controller
             }
         }
 
+        if ($request->filled('unprovisioned')) {
+            $query->unprovisioned($request->input('unprovisioned'));
+        }
+
         // Apply search filter
         if ($request->has('search') && $request->filled('search')) {
             $search = $request->input('search');

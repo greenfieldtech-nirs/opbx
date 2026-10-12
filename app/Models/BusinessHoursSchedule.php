@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\DayOfWeek;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -50,7 +51,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class BusinessHoursSchedule extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUnprovisionedState, SoftDeletes;
 
     /**
      * The table associated with the model.
@@ -414,5 +415,11 @@ class BusinessHoursSchedule extends Model
         return $this->isCurrentlyOpen($dateTime)
             ? $this->getOpenHoursTargetId()
             : $this->getClosedHoursTargetId();
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['open_hours_action_type', 'closed_hours_action_type'];
     }
 }

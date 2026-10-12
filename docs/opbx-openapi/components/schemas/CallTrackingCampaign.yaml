@@ -1,6 +1,10 @@
 type: object
 description: Call tracking campaign for attributing inbound calls to marketing sources
 properties:
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when any route of this resource is `unavailable` (saved for future use).
   id:
     type: integer
     description: Unique campaign identifier
@@ -53,6 +57,7 @@ properties:
     - ivr_menu
     - ai_assistant
     - ai_load_balancer
+    - unavailable
     description: Type of destination for incoming tracked calls
     example: forward
   destination_config:

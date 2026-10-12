@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CallTrackingCampaignStatus;
 use App\Enums\CallTrackingDestinationType;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[ScopedBy([OrganizationScope::class])]
 class CallTrackingCampaign extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     protected $fillable = [
         'organization_id',
@@ -108,5 +109,11 @@ class CallTrackingCampaign extends Model
         return isset($this->destination_config[$key])
             ? (int) $this->destination_config[$key]
             : null;
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['destination_type'];
     }
 }

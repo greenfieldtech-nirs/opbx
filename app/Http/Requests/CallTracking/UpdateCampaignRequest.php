@@ -53,7 +53,7 @@ class UpdateCampaignRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'required', new Enum(CallTrackingCampaignStatus::class)],
             'destination_type' => ['sometimes', 'required', new Enum(CallTrackingDestinationType::class)],
-            'destination_config' => ['sometimes', 'required', 'array'],
+            'destination_config' => ['sometimes', $this->input('destination_type') === 'unavailable' ? 'present' : 'required', 'array'],
             'conversion_rule' => ['sometimes', 'nullable', 'array'],
             'conversion_rule.min_answered_duration_seconds' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'conversion_rule.requires_answered_disposition' => ['sometimes', 'nullable', 'boolean'],
@@ -87,6 +87,11 @@ class UpdateCampaignRequest extends FormRequest
 
         $type = CallTrackingDestinationType::tryFrom($destinationType);
         if ($type === null) {
+            return;
+        }
+
+        // 'unavailable' = provisioned for future use: nothing to validate.
+        if ($type === CallTrackingDestinationType::UNAVAILABLE) {
             return;
         }
 

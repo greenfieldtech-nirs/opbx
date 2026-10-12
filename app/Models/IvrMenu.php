@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\IvrDestinationType;
 use App\Enums\IvrMenuStatus;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[ScopedBy([OrganizationScope::class])]
 class IvrMenu extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     /**
      * The attributes that are mass assignable.
@@ -86,7 +87,7 @@ class IvrMenu extends Model
             IvrDestinationType::RING_GROUP => RingGroup::find($this->failover_destination_id),
             IvrDestinationType::CONFERENCE_ROOM => ConferenceRoom::find($this->failover_destination_id),
             IvrDestinationType::IVR_MENU => self::find($this->failover_destination_id),
-            IvrDestinationType::CALL_QUEUE => \App\Models\CallQueue::find($this->failover_destination_id),
+            IvrDestinationType::CALL_QUEUE => CallQueue::find($this->failover_destination_id),
             default => null,
         };
     }
@@ -148,5 +149,28 @@ class IvrMenu extends Model
             $q->where('name', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%");
         });
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['failover_destination_type'];
+    }
+
+    protected function unprovisionedExtraConstraint(Builder $query): void
+    {
+        $query->orWhereHas('options', fn (Builder $o) => $o->where('destination_type', self::UNPROVISIONED_VALUE));
+    }
+
+    protected function hasUnprovisionedRelatedRoute(): bool
+    {
+        // withExists() on the list query avoids a query per row.
+        if (array_key_exists('has_unavailable_option', $this->attributes)) {
+            return (bool) $this->attributes['has_unavailable_option'];
+        }
+
+        return $this->relationLoaded('options')
+            ? $this->options->contains(fn ($o) => $o->destination_type === IvrDestinationType::UNAVAILABLE)
+            : $this->options()->where('destination_type', self::UNPROVISIONED_VALUE)->exists();
     }
 }

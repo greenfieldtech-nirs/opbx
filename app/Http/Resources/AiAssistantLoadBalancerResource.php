@@ -29,6 +29,7 @@ class AiAssistantLoadBalancerResource extends JsonResource
             'strategy' => $this->strategy->value,
             'follow_through' => $this->follow_through,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'fallback_action' => $this->fallback_action->value,
             'fallback_extension_id' => $this->fallback_extension_id,
             'fallback_ring_group_id' => $this->fallback_ring_group_id,

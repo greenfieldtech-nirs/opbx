@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Requests\PhoneNumber;
 
 use App\Enums\AiAssistantStatus;
+use App\Enums\AlbsStatus;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating an existing phone number (DID).
@@ -60,11 +64,11 @@ class UpdatePhoneNumberRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu', 'call_queue']),
+                Rule::in(['extension', 'ring_group', 'business_hours', 'conference_room', 'ai_assistant', 'ai_load_balancer', 'ivr_menu', 'call_queue', 'unavailable']),
             ],
             'routing_config' => [
                 'sometimes',
-                'required',
+                $this->input('routing_type') === 'unavailable' ? 'present' : 'required', // {} is valid for 'unavailable'
                 'array',
             ],
             'status' => [
@@ -101,7 +105,7 @@ class UpdatePhoneNumberRequest extends FormRequest
      * Performs custom validation for routing configuration based on routing_type.
      * Validates that target resources exist, are active, and belong to the same organization.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -144,8 +148,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate extension routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateExtensionRouting($validator, $user, array $routingConfig): void
@@ -190,8 +194,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate ring group routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateRingGroupRouting($validator, $user, array $routingConfig): void
@@ -247,8 +251,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate call queue routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateCallQueueRouting($validator, $user, array $routingConfig): void
@@ -262,7 +266,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             return;
         }
 
-        $callQueue = \App\Models\CallQueue::find($routingConfig['call_queue_id']);
+        $callQueue = CallQueue::find($routingConfig['call_queue_id']);
 
         if (! $callQueue || $callQueue->organization_id !== $user->organization_id) {
             $validator->errors()->add(
@@ -284,8 +288,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate business hours routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateBusinessHoursRouting($validator, $user, array $routingConfig): void
@@ -330,8 +334,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate conference room routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateConferenceRoomRouting($validator, $user, array $routingConfig): void
@@ -376,8 +380,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate AI assistant routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateAiAssistantRouting($validator, $user, array $routingConfig): void
@@ -422,8 +426,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate AI load balancer routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateAiLoadBalancerRouting($validator, $user, array $routingConfig): void
@@ -457,7 +461,7 @@ class UpdatePhoneNumberRequest extends FormRequest
             return;
         }
 
-        if ($albs->status !== \App\Enums\AlbsStatus::ACTIVE) {
+        if ($albs->status !== AlbsStatus::ACTIVE) {
             $validator->errors()->add(
                 'routing_config.ai_load_balancer_id',
                 'The selected AI load balancer must be active. AI load balancer "'.$albs->name.'" is currently '.$albs->status->value.'.'
@@ -468,8 +472,8 @@ class UpdatePhoneNumberRequest extends FormRequest
     /**
      * Validate IVR menu routing configuration.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
-     * @param  \App\Models\User  $user
+     * @param  Validator  $validator
+     * @param  User  $user
      * @param  array<string, mixed>  $routingConfig
      */
     private function validateIvrMenuRouting($validator, $user, array $routingConfig): void

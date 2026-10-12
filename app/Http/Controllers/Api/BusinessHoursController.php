@@ -50,7 +50,7 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function getAllowedFilters(): array
     {
-        return ['status', 'search'];
+        return ['status', 'search', 'unprovisioned'];
     }
 
     /**
@@ -79,6 +79,10 @@ class BusinessHoursController extends AbstractApiCrudController
             if ($status) {
                 $query->withStatus($status);
             }
+        }
+
+        if ($request->filled('unprovisioned')) {
+            $query->unprovisioned($request->input('unprovisioned'));
         }
     }
 

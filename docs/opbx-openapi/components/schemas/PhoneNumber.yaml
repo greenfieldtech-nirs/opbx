@@ -1,6 +1,10 @@
 type: object
 description: Phone Number (DID)
 properties:
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when any route of this resource is `unavailable` (saved for future use).
   id:
     type: integer
   organization_id:
@@ -24,6 +28,7 @@ properties:
     - extension
     - ring_group
     - ivr_menu
+    - unavailable
     - ai_assistant
   routing_target_id:
     type:

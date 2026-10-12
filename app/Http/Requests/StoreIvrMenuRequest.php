@@ -67,14 +67,14 @@ class StoreIvrMenuRequest extends FormRequest
             'max_timeout' => 'required|integer|min:1|max:30',
             'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup',
+            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup,unavailable',
             // Self-references (failover or an option back to this menu) are allowed: repeat-menu
             // loops are bounded by max_turns at runtime (owner decision, 2026-10-11).
             'failover_destination_id' => [
                 'nullable',
                 'integer',
                 function ($attribute, $value, $fail) {
-                    if ($value && $this->input('failover_destination_type') !== 'hangup') {
+                    if ($value && ! in_array($this->input('failover_destination_type'), ['hangup', 'unavailable'], true)) {
                         if (! $this->destinationExists($this->input('failover_destination_type'), $value)) {
                             $fail('The selected failover destination does not exist.');
                         }
@@ -85,7 +85,7 @@ class StoreIvrMenuRequest extends FormRequest
             'options' => 'required|array|min:1|max:20',
             'options.*.input_digits' => 'required|string|max:10',
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue',
+            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,unavailable',
             'options.*.destination_id' => [
                 'required',
                 function ($attribute, $value, $fail) {
@@ -96,6 +96,11 @@ class StoreIvrMenuRequest extends FormRequest
                         $options = $this->input('options', []);
                         if (isset($options[$index]['destination_type'])) {
                             $destinationType = $options[$index]['destination_type'];
+
+                            // 'unavailable' = provisioned for future use: no destination to check.
+                            if ($destinationType === 'unavailable') {
+                                return;
+                            }
 
                             // For all destination types, destination_id should be an integer (model ID)
                             if (! is_int($value) && ! ctype_digit((string) $value)) {
@@ -114,6 +119,21 @@ class StoreIvrMenuRequest extends FormRequest
             ],
             'options.*.priority' => 'required|integer|min:1|max:20',
         ];
+    }
+
+    /** An 'unavailable' option has no target; the NOT NULL destination_id column gets 0. */
+    protected function prepareForValidation(): void
+    {
+        $options = $this->input('options');
+        if (! is_array($options)) {
+            return;
+        }
+        foreach ($options as $i => $option) {
+            if (is_array($option) && ($option['destination_type'] ?? null) === 'unavailable' && empty($option['destination_id'])) {
+                $options[$i]['destination_id'] = 0;
+            }
+        }
+        $this->merge(['options' => $options]);
     }
 
     /**

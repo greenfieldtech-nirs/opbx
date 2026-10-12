@@ -47,7 +47,7 @@ class StoreCampaignRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'status' => ['required', new Enum(CallTrackingCampaignStatus::class)],
             'destination_type' => ['required', new Enum(CallTrackingDestinationType::class)],
-            'destination_config' => ['required', 'array'],
+            'destination_config' => [$this->input('destination_type') === 'unavailable' ? 'present' : 'required', 'array'],
             'conversion_rule' => ['nullable', 'array'],
             'conversion_rule.min_answered_duration_seconds' => ['nullable', 'integer', 'min:0'],
             'conversion_rule.requires_answered_disposition' => ['nullable', 'boolean'],
@@ -82,6 +82,11 @@ class StoreCampaignRequest extends FormRequest
 
         $type = CallTrackingDestinationType::tryFrom($destinationType);
         if ($type === null) {
+            return;
+        }
+
+        // 'unavailable' = provisioned for future use: nothing to validate.
+        if ($type === CallTrackingDestinationType::UNAVAILABLE) {
             return;
         }
 

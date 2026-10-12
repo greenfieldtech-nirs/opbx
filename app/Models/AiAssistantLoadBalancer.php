@@ -8,6 +8,7 @@ use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +22,7 @@ use Illuminate\Support\Collection;
 #[ScopedBy([OrganizationScope::class])]
 class AiAssistantLoadBalancer extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUnprovisionedState, SoftDeletes;
 
     /**
      * Default field list for lazy loading minimal relationships in CRUD operations.
@@ -221,5 +222,11 @@ class AiAssistantLoadBalancer extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', AlbsStatus::ACTIVE->value);
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['fallback_action'];
     }
 }

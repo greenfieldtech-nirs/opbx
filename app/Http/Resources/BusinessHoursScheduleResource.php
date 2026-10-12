@@ -88,6 +88,7 @@ class BusinessHoursScheduleResource extends JsonResource
             'organization_id' => (string) $this->organization_id,
             'name' => $this->name,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'timezone' => $this->timezone ?? 'UTC',
             'schedule' => $schedule,
             'exceptions' => $exceptions,

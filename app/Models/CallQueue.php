@@ -8,6 +8,7 @@ use App\Enums\CallQueueStatus;
 use App\Enums\CallQueueStrategy;
 use App\Enums\RingGroupFallbackAction;
 use App\Jobs\SegmentQueueMohJob;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\MohSegmentationService;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[ScopedBy([OrganizationScope::class])]
 class CallQueue extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     /**
      * The attributes that are mass assignable.
@@ -199,5 +200,11 @@ class CallQueue extends Model
             $q->where('name', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%");
         });
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['fallback_action'];
     }
 }

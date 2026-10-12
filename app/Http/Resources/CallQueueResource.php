@@ -41,6 +41,7 @@ class CallQueueResource extends JsonResource
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
             'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'agents' => $this->whenLoaded('agents', function () {
                 return $this->agents->map(function ($agent) {
                     return [

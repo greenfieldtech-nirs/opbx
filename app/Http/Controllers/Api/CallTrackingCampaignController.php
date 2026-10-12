@@ -253,6 +253,11 @@ class CallTrackingCampaignController extends Controller
                 'type' => 'search',
                 'scope' => 'search',
             ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
+            ],
         ];
     }
 }

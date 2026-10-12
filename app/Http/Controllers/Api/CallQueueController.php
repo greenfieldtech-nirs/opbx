@@ -15,6 +15,7 @@ use App\Models\CallQueueAgent;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -45,7 +46,7 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['strategy', 'status', 'search'];
+        return ['strategy', 'status', 'search', 'unprovisioned'];
     }
 
     protected function getAllowedSortFields(): array
@@ -94,7 +95,7 @@ class CallQueueController extends AbstractApiCrudController
     /**
      * Toggle the queue between active and inactive.
      */
-    public function toggleStatus(Request $request): \Illuminate\Http\JsonResponse
+    public function toggleStatus(Request $request): JsonResponse
     {
         $model = $this->resolveModel($request);
         $this->authorize($this->getUpdateAbility(), $model);
@@ -137,6 +138,11 @@ class CallQueueController extends AbstractApiCrudController
             'search' => [
                 'type' => 'search',
                 'scope' => 'search',
+            ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
             ],
         ];
     }

@@ -45,7 +45,7 @@ class RingGroupController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['strategy', 'status', 'search'];
+        return ['strategy', 'status', 'search', 'unprovisioned'];
     }
 
     protected function getAllowedSortFields(): array
@@ -132,6 +132,11 @@ class RingGroupController extends AbstractApiCrudController
             'search' => [
                 'type' => 'search',
                 'scope' => 'search',
+            ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
             ],
         ];
     }

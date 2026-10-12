@@ -28,6 +28,7 @@ class RingGroupResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'strategy' => $this->strategy->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'timeout' => $this->timeout,
             'ring_turns' => $this->ring_turns,
             'fallback_action' => $this->fallback_action->value,

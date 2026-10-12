@@ -85,7 +85,7 @@ class IvrMenuController extends AbstractApiCrudController
      */
     protected function getAllowedFilters(): array
     {
-        return ['status', 'search'];
+        return ['status', 'search', 'unprovisioned'];
     }
 
     /**
@@ -129,6 +129,11 @@ class IvrMenuController extends AbstractApiCrudController
                 'type' => 'search',
                 'scope' => 'search',
             ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
+            ],
         ];
     }
 
@@ -137,7 +142,7 @@ class IvrMenuController extends AbstractApiCrudController
      */
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Filters are applied via AppliesFilters trait
+        $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
     /**
@@ -147,6 +152,8 @@ class IvrMenuController extends AbstractApiCrudController
     {
         // For dropdown requests (per_page=100), don't load options to improve performance
         $isDropdownRequest = $request->input('per_page') == 100;
+
+        $query->withExists(['options as has_unavailable_option' => fn ($q) => $q->where('destination_type', IvrMenu::UNPROVISIONED_VALUE)]);
 
         if (! $isDropdownRequest) {
             $query->with([
@@ -204,7 +211,7 @@ class IvrMenuController extends AbstractApiCrudController
                 'input_digits' => $optionData['input_digits'],
                 'description' => $optionData['description'] ?? null,
                 'destination_type' => $optionData['destination_type'],
-                'destination_id' => $optionData['destination_id'],
+                'destination_id' => $optionData['destination_id'] ?? 0,
                 'priority' => $optionData['priority'],
             ]);
         }
@@ -254,7 +261,7 @@ class IvrMenuController extends AbstractApiCrudController
                 'input_digits' => $optionData['input_digits'],
                 'description' => $optionData['description'] ?? null,
                 'destination_type' => $optionData['destination_type'],
-                'destination_id' => $optionData['destination_id'],
+                'destination_id' => $optionData['destination_id'] ?? 0,
                 'priority' => $optionData['priority'],
             ]);
         }
