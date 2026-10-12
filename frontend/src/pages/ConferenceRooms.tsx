@@ -1,92 +1,54 @@
-import { useState, useEffect } from 'react';
+import { useState,useEffect } from 'react';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Users,
-  Lock,
-  Mic,
-  Video,
-  ChevronDown,
-  RefreshCw,
-  Eye,
+Plus,
+Search,
+Filter,Users,
+Lock,
+Mic,
+Video,
+ChevronDown,
+RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+Card,
+CardContent
 } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
+Collapsible,
+CollapsibleContent,
+CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
-import type { ConferenceRoom, CreateConferenceRoomRequest, UpdateConferenceRoomRequest, Status } from '@/types';
+import type { ConferenceRoom,CreateConferenceRoomRequest,UpdateConferenceRoomRequest,Status } from '@/types';
 import { cn } from '@/lib/utils';
 
 type RoomFormData = {

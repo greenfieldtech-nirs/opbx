@@ -9,103 +9,54 @@
  * - Role-based UI
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState,useMemo } from 'react';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { queryKeys } from '@/lib/queryKeys';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Plus,
-  Search,
-  Filter,
-  X,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Users,
-  UserCheck,
-  Mail,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  KeyRound,
-  UserX,
-  UserCog,
-  Phone,
-  MapPin,
-  Calendar,
-  Shield,
-  Activity,
-  RefreshCw,
-  Code2,
+Plus,
+Search,
+Filter,
+X,Users,
+UserCheck,
+Mail,
+Copy,
+ChevronDown,
+ChevronUp,KeyRound,
+UserX,RefreshCw,
+Code2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTimeAgo, getRoleColor, getRoleDisplayName, getStatusColor } from '@/utils/formatters';
+import { formatDate,getRoleColor,getRoleDisplayName,getStatusColor } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { useAuth } from '@/hooks/useAuth';
-import type { User, UserRole, UserStatus } from '@/types';
-import { usersService, ringGroupsService } from '@/services/createResourceService';
-import {
-  getSupervisorAssignments,
-  updateSupervisorAssignments,
-} from '@/services/supervisorAssignments.service';
+import type { User,UserRole,UserStatus } from '@/types';
+import { usersService } from '@/services/createResourceService';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
 import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
 import { EmbeddedDialerDialog } from '@/components/Users/EmbeddedDialerDialog';

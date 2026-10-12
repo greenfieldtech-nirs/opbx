@@ -1,74 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState,useEffect } from 'react';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Bot,
-  Phone,
-  Wifi,
-  ChevronDown,
-  RefreshCw,
-  Eye,
-  EyeOff,
+Plus,
+Search,
+Filter,Bot,
+Phone,
+Wifi,RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+Card,
+CardContent
 } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import { useAuth } from '@/hooks/useAuth';
 import { AiAssistantForm } from './AiAssistants/components/AiAssistantForm';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,
+Column
 } from '@/components/design-system';
-import type { AiAssistant, CreateAiAssistantRequest, UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
+import type { AiAssistant,CreateAiAssistantRequest,UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 import { cn } from '@/lib/utils';
 

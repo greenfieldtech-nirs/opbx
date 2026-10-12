@@ -11,106 +11,67 @@
 
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
-import { useState, useMemo, useEffect } from 'react';
+import { useState,useMemo,useEffect } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService, phoneNumbersService } from '@/services/createResourceService';
+import { usersService,conferenceRoomsService,ringGroupsService,ivrMenusService,aiAssistantLoadBalancersService,phoneNumbersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  Plus,
-  Search,
-  X,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Phone,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  UserCheck,
-  UserX,
-  Users,
-  Menu,
-  Bot,
-  ArrowRight,
-  Check,
-  Activity,
-  RefreshCw,
-  Key,
-  Wifi,
-  Scale,
-  ListOrdered,
+Plus,
+Search,
+X,Phone,
+Copy,
+ChevronDown,
+ChevronUp,
+Eye,
+EyeOff,
+UserCheck,Users,
+Menu,
+Bot,
+ArrowRight,RefreshCw,Scale,
+ListOrdered
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
+import { getStatusColor } from '@/utils/formatters';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,
+Column,
+EmptyState
 } from '@/components/design-system';
 import type {
-  Extension,
-  ExtensionType,
-  Status,
-  CreateExtensionRequest,
-  UpdateExtensionRequest,
-  RingGroupMember,
-  IvrMenuOption,
-  DIDNumber
+Extension,
+ExtensionType,
+Status,
+CreateExtensionRequest,
+UpdateExtensionRequest,DIDNumber
 } from '@/types';
-import type { ProviderDefinition } from '@/types/aiAssistant';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 

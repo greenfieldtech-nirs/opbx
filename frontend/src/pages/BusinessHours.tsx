@@ -1,45 +1,42 @@
 import React from 'react';
 import { queryKeys } from '@/lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { Clock,Plus,Search,Filter,RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import {
-  StandardDataTable,
-  EmptyState
+StandardDataTable,
+EmptyState
 } from '@/components/design-system';
-import type { BusinessHoursSchedule, ScheduleStatus } from '@/types';
+import type { BusinessHoursSchedule,ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
 import {
-  useBusinessHours,
-  CreateEditScheduleDialog,
-  ExceptionDialog,
-  CopyHoursDialog,
-  getActionDisplayName,
-  getActionDisplayNameSimple,
+useBusinessHours,
+CreateEditScheduleDialog,
+ExceptionDialog,
+CopyHoursDialog,getActionDisplayNameSimple
 } from './business-hours-components';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
-import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();

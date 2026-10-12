@@ -5,34 +5,96 @@
 
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState,useEffect,useMemo } from 'react';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
-import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { ringGroupsService,aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
 import { extensionsService } from '@/services/extensions.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState,
-  RingGroupStrategySelector,
+StandardDataTable,EmptyState,
+RingGroupStrategySelector
 } from '@/components/design-system';
 import type {
-  RingGroup,
-  RingGroupStrategy,
-  RingGroupFallbackAction,
-  Status
+RingGroup,
+RingGroupStrategy,
+RingGroupFallbackAction,
+Status
 } from '@/types';
 import type {
-  CreateRingGroupRequest,
-  UpdateRingGroupRequest,
+CreateRingGroupRequest,
+UpdateRingGroupRequest,
 } from '@/types/api.types';
-import type { Extension, RingGroupMember } from '@/types';
+import type { Extension,RingGroupMember } from '@/types';
 import { getApiErrorMessage } from '@/services/api';
+import { cn } from '@/lib/utils';
+import { Card,CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from '@/components/ui/select';
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Alert,AlertDescription } from '@/components/ui/alert';
+import {
+AlertCircle,
+Plus,
+Search,
+Filter,
+Users,
+UserPlus,
+RotateCw,
+List,
+PhoneForwarded,
+PhoneOff,ChevronUp,
+ChevronDown,
+X,
+Info,
+RefreshCw,
+GripVertical,
+Menu,
+Bot,
+Phone,
+ArrowRight,
+ListOrdered
+} from 'lucide-react';
+import {
+DndContext,
+closestCenter,
+KeyboardSensor,
+PointerSensor,
+useSensor,
+useSensors,
+} from '@dnd-kit/core';
+import {
+arrayMove,
+SortableContext,
+sortableKeyboardCoordinates,
+verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -41,93 +103,6 @@ interface ExtendedRingGroup extends RingGroup {
   fallback_ai_assistant_id?: string;
   fallback_ai_load_balancer_id?: string;
 }
-import {
-  getStrategyDisplayName,
-  getStrategyDescription,
-  getFallbackDisplayText,
-} from '@/utils/ringGroups';
-import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import {
-  AlertCircle,
-  Plus,
-  Search,
-  Filter,
-  Users,
-  UserPlus,
-  RotateCw,
-  List,
-  PhoneForwarded,
-  PhoneOff,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  X,
-  Info,
-  RefreshCw,
-  GripVertical,
-  Menu,
-  Bot,
-  Phone,
-  ArrowRight,
-  ListOrdered,
-} from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
-import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
