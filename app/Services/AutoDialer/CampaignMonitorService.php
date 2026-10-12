@@ -11,6 +11,8 @@ use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -83,7 +85,7 @@ class CampaignMonitorService
      */
     public function getMonitorSummary(int $organizationId): array
     {
-        $cacheKey = "monitor:summary:org:{$organizationId}";
+        $cacheKey = self::summaryCacheKey($organizationId);
 
         return Cache::remember($cacheKey, self::SUMMARY_CACHE_TTL, function () use ($organizationId): array {
             $campaigns = AutoDialerCampaign::forOrganization($organizationId)
@@ -138,7 +140,7 @@ class CampaignMonitorService
      */
     public function getMonitorDetail(AutoDialerCampaign $campaign): array
     {
-        $cacheKey = "monitor:detail:campaign:{$campaign->id}";
+        $cacheKey = self::detailCacheKey($campaign->id);
 
         $data = Cache::remember($cacheKey, self::DETAIL_CACHE_TTL, function () use ($campaign): array {
             $activeCalls = $this->getWorkerActiveCalls($campaign->id);
@@ -194,8 +196,18 @@ class CampaignMonitorService
      */
     public function bustMonitorCache(int $organizationId, int $campaignId): void
     {
-        Cache::forget("monitor:summary:{$organizationId}");
-        Cache::forget("monitor:detail:{$campaignId}");
+        Cache::forget(self::summaryCacheKey($organizationId));
+        Cache::forget(self::detailCacheKey($campaignId));
+    }
+
+    private static function summaryCacheKey(int $organizationId): string
+    {
+        return "monitor:summary:org:{$organizationId}";
+    }
+
+    private static function detailCacheKey(int $campaignId): string
+    {
+        return "monitor:detail:campaign:{$campaignId}";
     }
 
     /**
@@ -372,7 +384,7 @@ class CampaignMonitorService
      * Clean up stale dialing destinations.
      *
      * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  \Illuminate\Support\Collection  $listIds  The list IDs
+     * @param  Collection  $listIds  The list IDs
      */
     private function cleanupStaleDialing(AutoDialerCampaign $campaign, $listIds): void
     {
@@ -403,7 +415,7 @@ class CampaignMonitorService
      * Clean up stale pending destinations that have exhausted retry attempts.
      *
      * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  \Illuminate\Support\Collection  $listIds  The list IDs
+     * @param  Collection  $listIds  The list IDs
      */
     private function cleanupStalePending(AutoDialerCampaign $campaign, $listIds): void
     {
@@ -583,7 +595,7 @@ class CampaignMonitorService
         }
 
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
+            /** @var Response $response */
             $response = Http::timeout(5)->get($healthUrl);
 
             if ($response->ok()) {

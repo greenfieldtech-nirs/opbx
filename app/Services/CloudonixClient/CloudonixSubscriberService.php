@@ -29,7 +29,7 @@ class CloudonixSubscriberService
      *
      * @param Extension $extension The extension to sync
      * @param bool $forceUpdate Force update even if already synced
-     * @return array{success: bool, error?: string, details?: array} Sync result with error details
+     * @return array{success: bool, skipped?: bool, error?: string, details?: array} Sync result with error details
      */
     public function syncToCloudnonix(Extension $extension, bool $forceUpdate = false): array
     {
@@ -41,7 +41,7 @@ class CloudonixSubscriberService
                 'type' => $extension->type->value,
             ]);
 
-            return ['success' => true]; // Not an error, just not applicable
+            return ['success' => true, 'skipped' => true]; // Not an error, just not applicable
         }
 
         try {
@@ -373,11 +373,13 @@ class CloudonixSubscriberService
         $extensions = OrganizationScope::bypass(fn () => $query->get());
 
         foreach ($extensions as $extension) {
-            if ($this->syncToCloudnonix($extension, $forceUpdate)) {
-                $stats['success']++;
-            } else {
-                $stats['failed']++;
-            }
+            $result = $this->syncToCloudnonix($extension, $forceUpdate);
+
+            match (true) {
+                ! empty($result['skipped']) => $stats['skipped']++,
+                ! empty($result['success']) => $stats['success']++,
+                default => $stats['failed']++,
+            };
         }
 
         Log::info('Bulk sync completed', [
