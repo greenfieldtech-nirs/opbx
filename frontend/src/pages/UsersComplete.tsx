@@ -253,6 +253,16 @@ function UsersComplete() {
     },
   });
 
+  // What the delete will change; shown in the confirmation dialog before anything happens
+  const deleteImpactQuery = useQuery({
+    queryKey: ['users', 'delete-impact', selectedUser?.id],
+    queryFn: () => usersService.deleteImpact(selectedUser!.id),
+    enabled: showDeleteDialog && !!selectedUser,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  const deleteImpact = deleteImpactQuery.data;
+
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: usersService.delete,
@@ -1237,6 +1247,49 @@ function UsersComplete() {
               cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {deleteImpactQuery.isLoading && <p className="text-sm text-muted-foreground">Checking what this will change...</p>}
+          {deleteImpactQuery.isError && (
+            <p className="text-sm text-destructive">Could not load the list of changes. Close this dialog and try again.</p>
+          )}
+          {deleteImpact && (
+            <div className="max-h-80 space-y-3 overflow-y-auto text-sm">
+              {deleteImpact.extensions.length > 0 && (
+                <p>
+                  Extension {deleteImpact.extensions.map((e) => e.extension_number).join(', ')} will be kept and left
+                  unassigned, so it can be given to a new user.
+                </p>
+              )}
+              {deleteImpact.memberships.length > 0 && (
+                <div>
+                  <p className="font-medium">Removed as a member of:</p>
+                  <ul className="mt-1 space-y-1">
+                    {deleteImpact.memberships.map((m) => (
+                      <li key={`${m.type}-${m.id}`} className="rounded-md border p-2">
+                        {m.name} <span className="text-muted-foreground">· {m.type === 'ring_group' ? 'ring group' : 'call queue'}</span>
+                        {m.becomes_empty && <span className="ml-2 font-medium text-destructive">Will become EMPTY (no members left)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {deleteImpact.routes.length > 0 && (
+                <div>
+                  <p className="font-medium">These routes will be switched to "Destination unavailable" (callers hear "Destination doesn't exist" and the call ends):</p>
+                  <ul className="mt-1 space-y-1">
+                    {deleteImpact.routes.map((r) => (
+                      <li key={`${r.type}-${r.id}-${r.detail}`} className="rounded-md border p-2">
+                        <span className="font-medium">{r.name}</span>
+                        <span className="text-muted-foreground"> · {r.type.replace(/ivr_menu/g, 'IVR menu').replace(/ai_/g, 'AI ').replace(/_/g, ' ')} · {r.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {!deleteImpact.has_changes && deleteImpact.extensions.length === 0 && (
+                <p className="text-muted-foreground">No routing is affected.</p>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -1248,7 +1301,7 @@ function UsersComplete() {
             >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser} disabled={deleteUserMutation.isPending}>
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={deleteUserMutation.isPending || !deleteImpact}>
               {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
             </Button>
           </DialogFooter>

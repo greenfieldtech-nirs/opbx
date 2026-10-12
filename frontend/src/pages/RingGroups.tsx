@@ -513,6 +513,9 @@ export default function RingGroups() {
       case 'hangup':
         return 'Hangup';
 
+      case 'unavailable':
+        return 'Destination unavailable';
+
       default:
         return 'Unknown';
     }
@@ -1240,6 +1243,14 @@ export default function RingGroups() {
                         <span>Hangup</span>
                       </div>
                     </SelectItem>
+                    {formData.fallback_action === 'unavailable' && (
+                      <SelectItem value="unavailable" disabled>
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>Destination unavailable</span>
+                        </div>
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

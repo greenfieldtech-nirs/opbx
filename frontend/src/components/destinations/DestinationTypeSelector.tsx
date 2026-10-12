@@ -16,6 +16,7 @@ import {
 import type { DestinationTypeSelectorProps } from './types/destination.types';
 import {
   getAllDestinationTypeConfigs,
+  getDestinationTypeConfig,
   sortDestinationTypes,
 } from './utils/destination-config';
 
@@ -53,6 +54,10 @@ export function DestinationTypeSelector({
   const typeConfigs = sortDestinationTypes(
     getAllDestinationTypeConfigs(allowedTypes, includeHangup)
   );
+  // The server can set 'unavailable' (deleted user's extension): show it as the current value so admins can find and fix it
+  if (value === 'unavailable') {
+    typeConfigs.push(getDestinationTypeConfig('unavailable'));
+  }
 
   // Handle selection change
   const handleChange = (selectedValue: string) => {

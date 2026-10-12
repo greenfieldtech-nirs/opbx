@@ -22,7 +22,9 @@ export type DestinationType =
   | 'ai_assistant'
   | 'ai_load_balancer'
   | 'call_queue'
-  | 'hangup';
+  | 'hangup'
+  /** Set by the server when the target (a deleted user's extension) is gone. Display-only, never offered as a choice. */
+  | 'unavailable';
 
 /**
  * Category for grouping destination types in UI

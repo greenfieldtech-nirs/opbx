@@ -273,6 +273,8 @@ export default function CallQueues() {
         return q.fallback_ai_load_balancer?.name ?? '—';
       case 'hangup':
         return 'Hang Up';
+      case 'unavailable':
+        return 'Destination unavailable';
       default:
         return q.fallback_action;
     }

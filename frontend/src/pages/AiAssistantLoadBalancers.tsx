@@ -748,6 +748,9 @@ export default function AiAssistantLoadBalancers() {
       case 'hangup':
         return 'Hangup';
 
+      case 'unavailable':
+        return 'Destination unavailable';
+
       default:
         return 'Unknown';
     }

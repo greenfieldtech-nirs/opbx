@@ -72,6 +72,15 @@ export function DestinationTypeAndSelector({
         </div>
       )}
 
+      {typeValue === 'unavailable' && (
+        <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
+          <Label className="mb-2 block">{destinationLabel}</Label>
+          <div className="h-10 flex items-center px-3 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+            The destination was removed (deleted user). Choose a new type to fix this route.
+          </div>
+        </div>
+      )}
+
       {typeValue === 'hangup' && (
         <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
           <Label className="mb-2 block">{destinationLabel}</Label>

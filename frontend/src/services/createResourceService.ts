@@ -83,9 +83,22 @@ export function createResourceService<T>(resource: string): ServiceInstance<T> {
  */
 export const extensionsService = createResourceService<Extension>('extensions');
 
+export interface UserDeleteImpact {
+  extensions: { id: number; extension_number: string }[];
+  memberships: { type: 'ring_group' | 'call_queue'; id: number; name: string; becomes_empty: boolean }[];
+  routes: { type: string; id: number; name: string; detail: string }[];
+  empty_groups: number;
+  has_changes: boolean;
+}
+
 // Users service with additional password update method
 export const usersService = {
   ...createResourceService<User>('users'),
+  /** What deleting the user will change (same code as the delete itself). */
+  deleteImpact: async (id: string | number): Promise<UserDeleteImpact> => {
+    const response = await api.get<{ data: UserDeleteImpact }>(`/users/${id}/delete-impact`);
+    return response.data.data;
+  },
   updatePassword: async (id: string | number, data: { password: string; password_confirmation: string }) => {
     const response = await api.patch<{ success: boolean; message: string; data: { id: string } }>(`/users/${id}/password`, data);
     return response.data;

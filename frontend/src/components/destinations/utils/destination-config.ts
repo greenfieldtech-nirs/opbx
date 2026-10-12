@@ -121,6 +121,14 @@ export const DESTINATION_TYPE_CONFIG: Record<DestinationType, TypeMetadata> = {
     category: 'termination',
     requiresDestination: false,
   },
+  unavailable: {
+    value: 'unavailable',
+    label: 'Destination unavailable',
+    description: "Tells the caller the destination doesn't exist, then hangs up",
+    icon: PhoneOff,
+    category: 'termination',
+    requiresDestination: false,
+  },
 };
 
 /**
@@ -149,6 +157,9 @@ export function getAllDestinationTypeConfigs(
   if (!includeHangup) {
     types = types.filter((config) => config.value !== 'hangup');
   }
+
+  // 'unavailable' is only ever set by the server; it is shown for the current value, never offered
+  types = types.filter((config) => config.value !== 'unavailable');
 
   return types;
 }
@@ -200,6 +211,7 @@ export const DESTINATION_BADGE_CONFIG: Record<string, { color: string; icon: str
   ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'Scale' },
   call_queue: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: 'ListOrdered' },
   hangup: { color: 'bg-red-100 text-red-800 border-red-200', icon: 'PhoneOff' },
+  unavailable: { color: 'bg-red-100 text-red-800 border-red-200', icon: 'PhoneOff' },
 };
 
 /**
@@ -252,6 +264,7 @@ export const DEFAULT_EMPTY_MESSAGES: Record<DestinationType, string> = {
   ai_load_balancer: 'No AI load balancers available',
   call_queue: 'No call queues available',
   hangup: '',
+  unavailable: '',
 };
 
 /**
