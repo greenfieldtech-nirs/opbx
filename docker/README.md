@@ -28,9 +28,9 @@ graph TB
         end
 
         subgraph "Data Tier"
-            MySQL[("mysql<br/>(MySQL 8.0)")]
+            MySQL[("mysql<br/>(MySQL 8.4 LTS)")]
             Redis[("redis<br/>(Redis 7)")]
-            MinIO[("minio<br/>(S3-compatible)")]
+            SeaweedFS[("seaweedfs<br/>(S3-compatible)")]
         end
 
         subgraph "Real-Time Tier"
@@ -57,7 +57,7 @@ graph TB
 
     App -->|SQL| MySQL
     App -->|Cache/Queue| Redis
-    App -->|S3 API| MinIO
+    App -->|S3 API| SeaweedFS
 
     Queue -->|SQL| MySQL
     Queue -->|Redis Queue| Redis
@@ -79,7 +79,7 @@ graph TB
     style Frontend fill:#e8f5e9
     style MySQL fill:#fce4ec
     style Redis fill:#fce4ec
-    style MinIO fill:#fce4ec
+    style SeaweedFS fill:#fce4ec
     style Soketi fill:#f3e5f5
     style Dialer fill:#e0f2f1
     style AMD fill:#e0f2f1
@@ -97,9 +97,9 @@ graph TB
 | 3 | **scheduler** | Same as `app` | Runs Laravel's task scheduler every 60 seconds | None |
 | 4 | **frontend** | `frontend/Dockerfile.dev` (React/Vite) | React SPA development server with HMR | `3000` |
 | 5 | **nginx** | `nginx:alpine` | Reverse proxy and static file server; routes traffic to appropriate backend | `80` |
-| 6 | **mysql** | `mysql:8.0` | Primary relational database for all tenant data | `3306` (loopback-only via `docker-compose.ports.yml`) |
+| 6 | **mysql** | `mysql:8.4` (LTS) | Primary relational database for all tenant data | `3306` (loopback-only via `docker-compose.ports.yml`) |
 | 7 | **redis** | `redis:7-alpine` | Caching, session store, queue backend, and pub/sub | `6379` (loopback-only via `docker-compose.ports.yml`) |
-| 8 | **minio** | `minio/minio:latest` | S3-compatible object storage for call recordings | `9000`, `9001` (loopback-only via `docker-compose.ports.yml`) |
+| 8 | **seaweedfs** | `chrislusf/seaweedfs:4.47` | S3-compatible object storage for call recordings and the CDR archive (replaces MinIO) | None by default; S3 API `8333` and master UI `9333` loopback-only via `docker-compose.ports.yml` |
 | 9 | **soketi** | `quay.io/soketi/soketi:latest-16-alpine` | WebSocket server for real-time frontend updates | `6001`, `9601` |
 | 10 | **dialer-worker** | `dialer-worker/Dockerfile` (Go) | Outbound campaign dialer; polls for jobs and handles CDR webhooks | `8081` |
 | 11 | **amd-worker** | `amd-worker/Dockerfile` (Java/Vert.x 5) | Stream-based voicemail/beep detection via WebSocket | Internal only |
@@ -123,7 +123,7 @@ docker/
 │   └── conf.d/
 │       └── default.conf    # Virtual host: routing rules for /api/, /app/, /ws/amd/, /
 ├── mysql/
-│   └── my.cnf              # MySQL 8.0 performance and auth settings
+│   └── my.cnf              # MySQL 8.4 performance and auth settings
 ├── scripts/
 │   └── validate-env.sh     # Security validation for critical environment variables
 └── README.md               # This file
@@ -190,10 +190,13 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 
 ### MySQL Configuration
 
-- **Image**: `mysql:8.0`
-- **Authentication**: `mysql_native_password` for compatibility
-- **Performance**: `innodb_buffer_pool_size=256M`, `max_connections=100`
-- **Persistence**: Named volume `mysql_data`
+- **Image**: `mysql:8.4` (LTS)
+- **Config file**: `docker/mysql/my.cnf`, mounted read-only at `/etc/mysql/conf.d/opbx.cnf`
+- **Authentication**: `mysql_native_password=ON` is set in `my.cnf` for older clients (MySQL 8.4 removed `default-authentication-plugin`). New accounts default to `caching_sha2_password`.
+- **Performance**: `innodb_buffer_pool_size=256M`, `max_connections=100`, slow query log on (`long_query_time=1`)
+- **Memory**: limit 1G, reservation 512M
+- **Upgrading from 8.0**: back up first (see [Backup Recommendations](#backup-recommendations)); an 8.0 data directory is upgraded in place on the first 8.4 start.
+- **Persistence**: Bind mount `./volumes/mysql`
 
 ### Redis Configuration
 
@@ -202,12 +205,31 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 - **Authentication**: Password-protected. The container start command writes `requirepass` from `REDIS_PASSWORD` (passed as `REDISCLI_AUTH`) into `/tmp/redis.conf`, so the password is not in `docker inspect` command args or `ps`. The healthcheck's `redis-cli` reads `REDISCLI_AUTH` too.
 - **Persistence**: Named volume `redis_data`
 
-### MinIO Configuration
+### SeaweedFS Configuration
 
-- **Image**: `minio/minio:latest`
-- **Buckets**: `recordings` (auto-initialized by Laravel on startup)
-- **Path-style URLs**: Enabled for local compatibility
-- **Persistence**: Bind mount `./volumes/minio`
+SeaweedFS replaces MinIO as the S3-compatible store. The app still reads the `MINIO_*` variables; they are only the S3 endpoint and keys. On AWS, point `MINIO_ENDPOINT` and the keys at real S3 instead.
+
+- **Image**: `chrislusf/seaweedfs:4.47` (single `weed server` process: master, volume, and S3 API)
+- **S3 endpoint** (inside the network): `http://seaweedfs:8333`, path-style URLs
+- **Credentials**: `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` from `.env`. The container writes them into an identity file inside the container at start, so they do not appear in command args. Weak values such as `minioadmin` are rejected by `entrypoint.sh`.
+- **Persistence**: Bind mount `./volumes/seaweedfs` (mounted at `/data`)
+- **Memory**: limit 512M, reservation 128M
+
+#### Creating the Buckets
+
+The app expects two private buckets: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold CDR tier). Ops creates them; `storage:initialize` on startup only verifies they are reachable and writable.
+
+```bash
+# Option 1: SeaweedFS shell inside the container
+echo "s3.bucket.create -name recordings" | docker compose exec -T seaweedfs weed shell
+echo "s3.bucket.create -name cdr-archive" | docker compose exec -T seaweedfs weed shell
+
+# Option 2: any S3 client via the loopback port (requires docker-compose.ports.yml)
+aws s3 mb s3://recordings --endpoint-url http://127.0.0.1:8333
+aws s3 mb s3://cdr-archive --endpoint-url http://127.0.0.1:8333
+```
+
+Option 2 uses the `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` values from `.env` as the AWS credentials. Do not add a public-read policy to either bucket.
 
 ---
 
@@ -244,7 +266,7 @@ By default, **no database or internal service ports are exposed externally**:
 |---------|-----------------|-------------------|
 | MySQL | Disabled | `DB_EXPOSE_PORT` |
 | Redis | Disabled | `REDIS_EXPOSE_PORT` |
-| MinIO | Disabled | `MINIO_EXPOSE_PORT`, `MINIO_CONSOLE_EXPOSE_PORT` |
+| SeaweedFS | Disabled | `MINIO_EXPOSE_PORT` (S3 API, 8333), `MINIO_CONSOLE_EXPOSE_PORT` (master UI, 9333) |
 
 Only `nginx` (port 80), `frontend` (port 3000), `soketi` (port 6001), `dialer-worker` (port 8081), and `ngrok` (port 4040) are exposed by default.
 
@@ -271,9 +293,9 @@ The following volumes persist data across container restarts. **Data loss will o
 
 | Volume | Mount Point | Service | Data Stored |
 |--------|-------------|---------|-------------|
-| `mysql_data` | `/var/lib/mysql` | MySQL | All tenant databases, users, call records |
+| `./volumes/mysql` | `/var/lib/mysql` | MySQL | All tenant databases, users, call records |
 | `redis_data` | `/data` | Redis | Sessions, cache, queue jobs |
-| `./volumes/minio` | `/data` | MinIO | Call recordings, uploaded files |
+| `./volumes/seaweedfs` | `/data` | SeaweedFS | Call recordings, uploaded files, CDR archive |
 
 ### Dangerous Commands
 
@@ -298,8 +320,10 @@ Before any destructive operation, create a backup:
 # Backup the database
 ./scripts/backup-database.sh
 
-# Backup MinIO data
-cp -r ./volumes/minio ./volumes/minio-backup-$(date +%Y%m%d)
+# Backup SeaweedFS data: stop the container so files are not written mid-copy
+docker compose stop seaweedfs
+tar czf seaweedfs-backup-$(date +%Y%m%d).tar.gz ./volumes/seaweedfs
+docker compose start seaweedfs
 ```
 
 ### Volume Inspection
@@ -326,7 +350,7 @@ All critical services define Docker health checks:
 | `app` | `pgrep php-fpm` | 10s | 5s | 5 |
 | `mysql` | `mysqladmin ping` | 10s | 5s | 5 |
 | `redis` | `redis-cli ping` | 10s | 5s | 5 |
-| `minio` | `curl /minio/health/live` | 30s | 10s | 3 |
+| `seaweedfs` | `wget http://localhost:9333/cluster/status` | 30s | 10s | 3 |
 | `soketi` | `wget /ready` | 10s | 5s | 3 |
 | `amd-worker` | `wget /health` | 30s | 10s | 3 |
 | `dialer-worker` | `wget /webhooks/health` | 30s | 5s | 3 |
@@ -344,7 +368,8 @@ Memory limits are configured for select services to prevent container resource e
 | `app` | 512M | 256M |
 | `queue-worker` | 512M | 256M |
 | `scheduler` | 256M | 128M |
-| `minio` | 512M | 256M |
+| `mysql` | 1G | 512M |
+| `seaweedfs` | 512M | 128M |
 
 ---
 
