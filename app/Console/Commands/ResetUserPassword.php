@@ -23,7 +23,6 @@ class ResetUserPassword extends Command
      */
     protected $signature = 'user:reset-password
                             {email : Email address of the user}
-                            {password : New password to set}
                             {--force : Skip confirmation prompt}';
 
     /**
@@ -39,7 +38,6 @@ class ResetUserPassword extends Command
     public function handle(): int
     {
         $email = $this->argument('email');
-        $password = $this->argument('password');
         $force = $this->option('force');
 
         // Find the user
@@ -71,6 +69,15 @@ class ResetUserPassword extends Command
 
                 return Command::SUCCESS;
             }
+        }
+
+        // Prompted, never an argument: a CLI argument lands in shell history and `ps`.
+        $password = (string) $this->secret('New password');
+
+        if ($password === '' || $password !== (string) $this->secret('Confirm new password')) {
+            $this->error('Passwords are empty or do not match. Nothing changed.');
+
+            return Command::FAILURE;
         }
 
         // Reset the password
