@@ -7,7 +7,6 @@ import {
   Download,
   Archive,
   Trash2,
-  FileSpreadsheet,
   Phone,
   Clock,
   BarChart3,
@@ -67,7 +66,6 @@ import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDia
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
-import type { AutoDialerList, ListDestination } from '@/types';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-800',

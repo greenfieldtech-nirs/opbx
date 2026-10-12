@@ -15,7 +15,6 @@ import { Progress } from '@/components/ui/progress';
 import { useCopyList } from '@/hooks/useDistributionLists';
 import { toast } from 'sonner';
 import { Copy, Loader2, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { AutoDialerList } from '@/types';
 
 interface CopyListDialogProps {

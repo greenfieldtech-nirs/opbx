@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { distributionListsApi } from '@/services/distributionListsApi';
-import type { CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams } from '@/types';
+import type { CreateListRequest, CsvMappingConfig, DistributionListParams } from '@/types';
 
 // Query keys
 export const distributionListKeys = {
