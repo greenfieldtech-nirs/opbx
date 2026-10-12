@@ -249,7 +249,7 @@ class IvrMenuControllerTest extends TestCase
             ->assertJsonStructure([
                 'error',
                 'message',
-                'references' => ['ivr_menus'],
+                'references' => [['type', 'id', 'name', 'detail']],
             ]);
 
         $this->assertDatabaseHas('ivr_menus', ['id' => $referencedMenu->id]);

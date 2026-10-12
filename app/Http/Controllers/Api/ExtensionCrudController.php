@@ -398,6 +398,8 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
+        $this->checkResourceReferencesBeforeDelete('extension', $extension->id, $extension->organization_id);
+
         // Unsync from Cloudonix if USER type extension
         if ($extension->type === ExtensionType::USER) {
             $unsyncResult = $this->subscriberService->unsyncFromCloudonix($extension);

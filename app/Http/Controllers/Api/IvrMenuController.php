@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\IvrMenuStatus;
-use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\StoreIvrMenuRequest;
@@ -18,7 +17,6 @@ use App\Services\Cloudonix\CloudonixVoiceService;
 use App\ValueObjects\IvrAudioConfig;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -275,36 +273,7 @@ class IvrMenuController extends AbstractApiCrudController
      */
     protected function beforeDestroy(Model $model, Request $request): void
     {
-        /** @var IvrMenu $model */
-        try {
-            $this->checkResourceReferencesBeforeDelete('ivr_menu', $model->id, $model->organization_id);
-        } catch (ResourceInUseException $e) {
-            // Keep the legacy 409 shape the UI relies on (the base destroy would turn this into a 500).
-            $references = [];
-            foreach ($e->references as $type => $items) {
-                $references += match ($type) {
-                    'ivr_menu_options' => ['ivr_menus' => array_map(fn ($item) => [
-                        'id' => $item['ivr_menu_id'],
-                        'name' => $item['ivr_menu_name'],
-                    ], $items)],
-                    'ivr_failovers' => ['failover_menus' => array_map(fn ($item) => [
-                        'id' => $item['id'],
-                        'name' => $item['ivr_menu_name'],
-                    ], $items)],
-                    'did_numbers' => ['phone_numbers' => array_map(fn ($item) => [
-                        'id' => $item['id'],
-                        'phone_number' => $item['phone_number'],
-                    ], $items)],
-                    default => [],
-                };
-            }
-
-            throw new HttpResponseException(response()->json([
-                'error' => 'Cannot delete IVR menu',
-                'message' => 'This IVR menu is being used and cannot be deleted. Please remove all references first.',
-                'references' => $references,
-            ], 409));
-        }
+        $this->checkResourceReferencesBeforeDelete('ivr_menu', $model->id, $model->organization_id);
     }
 
     /**

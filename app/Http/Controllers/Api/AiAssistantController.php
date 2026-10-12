@@ -303,6 +303,8 @@ class AiAssistantController extends AbstractApiCrudController
     protected function beforeDestroy(Model $model, Request $request): void
     {
         /** @var AiAssistant $model */
+        $this->checkResourceReferencesBeforeDelete('ai_assistant', $model->id, $model->organization_id);
+
         if ($model->isInUse()) {
             $count = $model->usage_count;
             throw new \Exception(
