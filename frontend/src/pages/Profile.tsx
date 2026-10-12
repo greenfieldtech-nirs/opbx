@@ -144,6 +144,7 @@ export default function Profile() {
     formState: { errors: profileErrors },
     reset: resetProfile,
     control: controlProfile,
+    setValue: setProfileValue,
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -159,11 +160,15 @@ export default function Profile() {
     formState: { errors: passwordErrors },
     reset: resetPassword,
     setValue: setPasswordValue,
+    watch: watchPassword,
   } = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
   });
 
 
+
+  // Live confirm-match state for the new password fields
+  const [watchedNewPassword, watchedConfirmPassword] = watchPassword(['new_password', 'new_password_confirmation']);
 
   // Load profile data on mount
   useEffect(() => {
@@ -301,6 +306,11 @@ export default function Profile() {
 
       const updatedProfile = await profileService.updateProfile(updateData);
       setProfileData(updatedProfile);
+
+      // Re-sync the form with what the server stored (it may normalise values), keeping it clean
+      (['name', 'email', 'phone', 'street_address', 'city', 'state_province', 'postal_code', 'country'] as const).forEach((key) =>
+        setProfileValue(key, updatedProfile[key] || '', { shouldDirty: false }),
+      );
 
       // Refresh user context
       await refreshUser();
@@ -828,6 +838,14 @@ export default function Profile() {
                 {passwordErrors.new_password_confirmation && (
                   <p className="text-sm text-destructive">
                     {passwordErrors.new_password_confirmation.message}
+                  </p>
+                )}
+                {!passwordErrors.new_password_confirmation && watchedConfirmPassword && (
+                  <p
+                    className={`text-sm ${watchedNewPassword === watchedConfirmPassword ? 'text-green-600' : 'text-destructive'}`}
+                    aria-live="polite"
+                  >
+                    {watchedNewPassword === watchedConfirmPassword ? 'Passwords match' : "Passwords don't match"}
                   </p>
                 )}
               </div>
