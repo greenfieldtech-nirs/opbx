@@ -1,5 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Models\AutoDialerCallSession;
+use App\Models\BlockedCallLog;
+use App\Models\CallNotificationLog;
+use App\Models\CallTrackingSession;
+use App\Models\EmailLog;
+use App\Models\PlatformAuditLog;
+use App\Models\QueueCall;
+use App\Models\SessionUpdate;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -17,14 +27,14 @@ Schedule::command('session-updates:cleanup', ['--force' => true])
 
 // Retention (config/retention.php): prune old rows daily. CDRs are tiered by cdr:tier instead.
 Schedule::command('model:prune', ['--model' => [
-    \App\Models\SessionUpdate::class,
-    \App\Models\CallNotificationLog::class,
-    \App\Models\EmailLog::class,
-    \App\Models\BlockedCallLog::class,
-    \App\Models\QueueCall::class,
-    \App\Models\CallTrackingSession::class,
-    \App\Models\AutoDialerCallSession::class,
-    \App\Models\PlatformAuditLog::class,
+    SessionUpdate::class,
+    CallNotificationLog::class,
+    EmailLog::class,
+    BlockedCallLog::class,
+    QueueCall::class,
+    CallTrackingSession::class,
+    AutoDialerCallSession::class,
+    PlatformAuditLog::class,
 ]])
     ->dailyAt('03:00')
     ->withoutOverlapping()
