@@ -3,7 +3,7 @@ import JsonView from '@microlink/react-json-view';
 
 interface JsonViewerProps {
   data: any;
-  collapsed?: boolean;
+  collapsed?: boolean | number;
   className?: string;
   light?: boolean;
 }

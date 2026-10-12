@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { JsonViewer } from '@textea/json-viewer';
+import { JsonViewer } from '@/components/ui/JsonViewer';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import type { CallDetailRecord } from '@/types/api.types';
@@ -196,21 +196,7 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
                       <div className="border rounded overflow-x-auto bg-slate-900 max-w-full">
                         <div className="p-4 min-w-0">
-                          <JsonViewer
-                            value={cdr.raw_cdr}
-                            theme="dark"
-                            defaultInspectDepth={1}
-                            enableClipboard={true}
-                            displayDataTypes={false}
-                            quotesOnKeys={false}
-                            style={{
-                              backgroundColor: '#0f172a',
-                              fontSize: '0.875rem',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'break-word',
-                              maxWidth: '100%',
-                            }}
-                          />
+                          <JsonViewer data={cdr.raw_cdr} collapsed={1} />
                         </div>
                       </div>
                     </div>
