@@ -97,10 +97,14 @@ class QueueCallLifecycleService
         // agent is credited rather than the wrong one.
         $agentUserId = $this->attributedAgentId($queueCall->call_id);
 
-        $queueCall->update([
+        // Claim-first: concurrent 'answer' updates (and the conference claim)
+        // must produce exactly one 'answered' event.
+        if (! $this->claimPending($queueCall, [
             'answered_at' => $sessionUpdate->session_modified_at ?? $sessionUpdate->created_at ?? now(),
             'agent_user_id' => $agentUserId,
-        ]);
+        ], unansweredOnly: true)) {
+            return;
+        }
 
         // Candidate bridge timestamp, confirmed later by the dial action
         // callback result (Cloudonix also emits spurious 'answer' updates at
@@ -129,10 +133,13 @@ class QueueCallLifecycleService
      */
     public function markConferenceBridge(QueueCall $queueCall, int $agentUserId): void
     {
-        $queueCall->update([
+        // The call may have been finalized (caller hung up) while the agent answered.
+        if (! $this->claimPending($queueCall, [
             'answered_at' => now(),
             'agent_user_id' => $agentUserId,
-        ]);
+        ])) {
+            return;
+        }
 
         Redis::setex("acd:bridge:{$queueCall->call_id}", self::DIAL_MARKER_TTL_SECONDS, $queueCall->answered_at->toIso8601String());
         $this->recordDialResult($queueCall->call_id, 'answered');
@@ -267,14 +274,18 @@ class QueueCallLifecycleService
 
             $agentUserId = $this->attributedAgentId($queueCall->call_id);
 
-            $queueCall->update([
+            // Claim-first: a duplicate CDR / reconcile job finds the row already
+            // finalized and must not emit a second 'ended' event.
+            if (! $this->claimPending($queueCall, [
                 'answered_at' => $answerAt,
                 'ended_at' => $endAt,
                 'agent_user_id' => $queueCall->agent_user_id ?? $agentUserId,
                 'waiting_seconds' => $waitingSeconds,
                 'handling_seconds' => $handlingSeconds,
                 'disposition' => QueueCallDisposition::ANSWERED,
-            ]);
+            ])) {
+                return;
+            }
 
             $this->worker->event(
                 $queueCall->organization_id,
@@ -289,13 +300,15 @@ class QueueCallLifecycleService
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($endAt));
             $demotedAgentId = $queueCall->agent_user_id ?? $this->attributedAgentId($queueCall->call_id);
 
-            $queueCall->update([
+            if (! $this->claimPending($queueCall, [
                 'answered_at' => null,
                 'agent_user_id' => null,
                 'abandoned_at' => $endAt,
                 'waiting_seconds' => $waitingSeconds,
                 'disposition' => QueueCallDisposition::ABANDONED,
-            ]);
+            ])) {
+                return;
+            }
 
             $this->worker->event(
                 $queueCall->organization_id,
@@ -405,7 +418,9 @@ class QueueCallLifecycleService
      */
     public function markOverflowed(QueueCall $queueCall): void
     {
-        $queueCall->update(['disposition' => QueueCallDisposition::OVERFLOW]);
+        if (! $this->claimPending($queueCall, ['disposition' => QueueCallDisposition::OVERFLOW])) {
+            return;
+        }
 
         $this->worker->event(
             $queueCall->organization_id,
@@ -421,6 +436,42 @@ class QueueCallLifecycleService
         if ($callQueue) {
             app(ConferenceOfferService::class)->cancel($callQueue, $queueCall->call_id);
         }
+    }
+
+    /**
+     * Conditional UPDATE ... WHERE disposition IS NULL: true only for the one
+     * caller that changed the row. On success the model mirrors the write.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @param  bool  $unansweredOnly  also require answered_at IS NULL (first answer wins)
+     */
+    private function claimPending(QueueCall $queueCall, array $attributes, bool $unansweredOnly = false): bool
+    {
+        $query = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->whereKey($queueCall->getKey())
+            ->whereNull('disposition');
+
+        if ($unansweredOnly) {
+            $query->whereNull('answered_at');
+        }
+
+        $values = array_map(
+            fn ($value) => $value instanceof \BackedEnum ? $value->value : $value,
+            $attributes
+        );
+
+        if ($query->update($values) !== 1) {
+            Log::info('Queue call already claimed, skipping duplicate transition', [
+                'queue_call_id' => $queueCall->id,
+                'call_id' => $queueCall->call_id,
+            ]);
+
+            return false;
+        }
+
+        $queueCall->forceFill($attributes)->syncOriginal();
+
+        return true;
     }
 
     private function findPendingQueueCall(int $organizationId, array $callIds): ?QueueCall
