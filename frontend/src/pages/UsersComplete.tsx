@@ -50,7 +50,7 @@ DialogHeader,
 DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import {
 StandardDataTable,EmptyState
 } from '@/components/design-system';
@@ -111,6 +111,7 @@ function UsersComplete() {
   const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
   const [embedUser, setEmbedUser] = useState<User | null>(null);
   const [showEmbedDialog, setShowEmbedDialog] = useState(false);
+  const [statusUser, setStatusUser] = useState<User | null>(null);
 
   // Password form state
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
@@ -337,7 +338,6 @@ function UsersComplete() {
       name: formData.name,
       email: formData.email,
       role: formData.role,
-      status: formData.status,
       phone: formData.phone || undefined,
       street_address: formData.street_address || undefined,
       city: formData.city || undefined,
@@ -360,7 +360,20 @@ function UsersComplete() {
     deleteUserMutation.mutate(selectedUser.id);
   };
 
-  // Handle toggle status
+  // Toggle status directly (after confirmation), sending only the status field
+  const toggleStatusMutation = useMutation({
+    mutationFn: (u: User) =>
+      usersService.update(u.id, { status: u.status === 'active' ? 'inactive' : 'active' }),
+    onSuccess: () => {
+      void invalidateRoutingResources(queryClient);
+      toast.success('User status updated');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update user status', {
+        description: error.response?.data?.message || error.message,
+      });
+    },
+  });
 
   // Reset form
   const resetForm = () => {
@@ -685,11 +698,26 @@ function UsersComplete() {
               },
               {
                 header: 'Status',
-                cell: (user) => (
-                  <Badge className={cn('text-xs', getStatusColor(user.status))}>
-                    {user.status}
-                  </Badge>
-                )
+                cell: (user) => {
+                  const badge = (
+                    <Badge className={cn('text-xs', getStatusColor(user.status))}>
+                      {user.status}
+                    </Badge>
+                  );
+                  if (isReadOnly || user.role === 'owner') return badge;
+                  return (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStatusUser(user);
+                      }}
+                      title={user.status === 'active' ? 'Deactivate user' : 'Activate user'}
+                      aria-label={`${user.status === 'active' ? 'Deactivate' : 'Activate'} ${user.name}`}
+                    >
+                      {badge}
+                    </button>
+                  );
+                }
               },
               ...(canCreateUsers ? [{
                 header: 'Embed',
@@ -1005,28 +1033,6 @@ function UsersComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Status Toggle at top */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <Label>Account Status</Label>
-                <p className="text-sm text-muted-foreground">
-                  {formData.status === 'active' ? 'User can access system' : 'User access disabled'}
-                </p>
-              </div>
-              <Switch
-                checked={formData.status === 'active'}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                }
-                disabled={selectedUser?.role === 'owner'}
-              />
-            </div>
-            {selectedUser?.role === 'owner' && (
-              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                Cannot change status of organization owner
-              </p>
-            )}
-
             {/* Same form fields as Create */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1169,6 +1175,16 @@ function UsersComplete() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={statusUser !== null}
+        onOpenChange={(open) => { if (!open) setStatusUser(null); }}
+        title={statusUser?.status === 'active' ? 'Deactivate User' : 'Activate User'}
+        description={`Are you sure you want to ${statusUser?.status === 'active' ? 'deactivate' : 'activate'} ${statusUser?.name ?? 'this user'}?`}
+        confirmLabel={statusUser?.status === 'active' ? 'Deactivate' : 'Activate'}
+        variant={statusUser?.status === 'active' ? 'danger' : 'default'}
+        onConfirm={() => statusUser ? toggleStatusMutation.mutateAsync(statusUser).catch(() => undefined) : undefined}
+      />
+
       <UserDeleteDialog
         open={showDeleteDialog}
         onOpenChange={(open) => {
