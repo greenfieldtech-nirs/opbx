@@ -108,7 +108,7 @@ class ImmediateConnectService
     {
         $dialUrl = $this->signedDialUrl($callQueue, $queueCall);
 
-        $settings = CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($callQueue->organization_id);
         $client = new CloudonixCallsClient($settings);
 
         if ($client->switchVoiceApplication($queueCall->session_token, $dialUrl)) {
@@ -140,7 +140,7 @@ class ImmediateConnectService
             'exp' => now()->addSeconds(self::SIGNATURE_TTL_SECONDS)->getTimestamp(),
         ]);
 
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::forOrganization($callQueue->organization_id);
         $baseUrl = rtrim($cloudonixSettings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return $baseUrl.route('voice.queue-dial', [

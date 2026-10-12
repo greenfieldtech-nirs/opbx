@@ -47,7 +47,7 @@ class SimulateOutboundCall extends Command
         $this->info("   Caller ID: {$campaign->caller_id}");
 
         // Get or create Cloudonix settings
-        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($campaign->organization_id);
 
         if (! $settings) {
             $this->warn("⚠️  No Cloudonix settings found for organization {$campaign->organization_id}");

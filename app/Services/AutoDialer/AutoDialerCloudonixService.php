@@ -543,7 +543,7 @@ class AutoDialerCloudonixService
         AiAssistant $currentAssistant,
         AutoDialerCampaign $campaign
     ): string {
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::forOrganization($campaign->organization_id);
 
         $baseUrl = $cloudonixSettings
             ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
@@ -876,7 +876,7 @@ class AutoDialerCloudonixService
         // or use a specific dialer application
 
         // Get the organization's default voice application
-        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($campaign->organization_id);
 
         if ($settings && $settings->voice_application_id) {
             return $settings->voice_application_id;
@@ -956,7 +956,7 @@ XML;
      */
     private function buildAmdStreamUrl(AutoDialerCampaign $campaign): ?string
     {
-        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($campaign->organization_id);
         if (! $settings) {
             return null;
         }

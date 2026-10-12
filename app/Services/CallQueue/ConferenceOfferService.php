@@ -287,6 +287,6 @@ class ConferenceOfferService
 
     private function settings(CallQueue $callQueue): ?CloudonixSettings
     {
-        return CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        return CloudonixSettings::forOrganization($callQueue->organization_id);
     }
 }

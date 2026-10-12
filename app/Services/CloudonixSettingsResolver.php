@@ -33,7 +33,7 @@ class CloudonixSettingsResolver
         $this->resetForNewRequest();
 
         if (! array_key_exists($organizationId, $this->byOrganization)) {
-            $this->byOrganization[$organizationId] = CloudonixSettings::where('organization_id', $organizationId)->first();
+            $this->byOrganization[$organizationId] = CloudonixSettings::forOrganization($organizationId);
         }
 
         return $this->byOrganization[$organizationId];

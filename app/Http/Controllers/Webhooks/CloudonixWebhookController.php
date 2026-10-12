@@ -578,7 +578,7 @@ class CloudonixWebhookController extends Controller
             return response()->json(['message' => 'No matching call detail record found'], 200);
         }
 
-        $settings = CloudonixSettings::where('organization_id', $cdr->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($cdr->organization_id);
         $auth = $settings
             ? app(VerifyCloudonixSignature::class)->authenticateRequest($request, $settings)
             : ['success' => false, 'reason' => 'No Cloudonix settings for organization'];
@@ -653,7 +653,7 @@ class CloudonixWebhookController extends Controller
     private function identifyOrganizationFromDomain(string $domain): ?int
     {
         // Find organization by domain name
-        $settings = CloudonixSettings::where('domain_name', $domain)->first();
+        $settings = CloudonixSettings::forDomain('domain_name', $domain);
 
         return $settings?->organization_id;
     }

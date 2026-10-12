@@ -272,7 +272,7 @@ final class WebPhoneConfigControllerTest extends TestCase
             'status' => 'active',
         ]);
 
-        CloudonixSettings::where('organization_id', $this->organization->id)->delete();
+        CloudonixSettings::withoutGlobalScopes()->where('organization_id', $this->organization->id)->delete();
 
         Sanctum::actingAs($owner);
 

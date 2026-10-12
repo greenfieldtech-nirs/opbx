@@ -131,7 +131,7 @@ class VerifyCloudonixSignature
     private function findOrganizationByDomain(string $domain, array $payload): ?CloudonixSettings
     {
         // Try domain_name match first
-        $settings = CloudonixSettings::where('domain_name', $domain)->first();
+        $settings = CloudonixSettings::forDomain('domain_name', $domain);
 
         if ($settings) {
             return $settings;
@@ -139,7 +139,7 @@ class VerifyCloudonixSignature
 
         // Try domain_uuid match (if domain looks like a UUID)
         if ($this->isUuid($domain)) {
-            $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
+            $settings = CloudonixSettings::forDomain('domain_uuid', $domain);
 
             if ($settings) {
                 return $settings;
@@ -148,7 +148,7 @@ class VerifyCloudonixSignature
 
         // Also check owner.domain.uuid if present (for CDR)
         if (! empty($payload['owner']['domain']['uuid'])) {
-            $settings = CloudonixSettings::where('domain_uuid', $payload['owner']['domain']['uuid'])->first();
+            $settings = CloudonixSettings::forDomain('domain_uuid', $payload['owner']['domain']['uuid']);
 
             if ($settings) {
                 return $settings;

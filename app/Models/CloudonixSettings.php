@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\OrganizationScope;
 use App\Services\ApplicationConfig;
 use App\Services\WebhookUrlResolver;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,9 +35,33 @@ use Illuminate\Support\Carbon;
  * @property Carbon $updated_at
  * @property-read Organization $organization
  */
+#[ScopedBy([OrganizationScope::class])]
 class CloudonixSettings extends Model
 {
     use HasFactory;
+
+    /**
+     * Webhook-auth lookup by Cloudonix domain (`domain_name` or `domain_uuid`): the caller
+     * is not authenticated yet, so the tenant scope is bypassed on purpose.
+     */
+    public static function forDomain(string $column, string $value): ?self
+    {
+        assert(in_array($column, ['domain_name', 'domain_uuid'], true));
+
+        return OrganizationScope::bypass(fn () => static::where($column, $value)->first());
+    }
+
+    /**
+     * Settings of an explicit organization, for contexts with no authenticated user
+     * (voice webhooks, queue jobs, workers, console). Callers pass the organization id
+     * they already trust, so the tenant scope is bypassed on purpose.
+     */
+    public static function forOrganization(?int $organizationId): ?self
+    {
+        return $organizationId === null
+            ? null
+            : OrganizationScope::bypass(fn () => static::where('organization_id', $organizationId)->first());
+    }
 
     /**
      * The table associated with the model.

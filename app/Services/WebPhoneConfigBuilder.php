@@ -34,7 +34,7 @@ final class WebPhoneConfigBuilder
                 return null;
             }
 
-            $cloudonixSettings = CloudonixSettings::where('organization_id', $user->organization_id)->first();
+            $cloudonixSettings = CloudonixSettings::forOrganization($user->organization_id);
             if (! $cloudonixSettings || ! $cloudonixSettings->domain_name) {
                 return null;
             }

@@ -113,7 +113,7 @@ class QueueDialOfferService
             'callback_type' => 'queue_dial_callback',
         ]);
 
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::forOrganization($callQueue->organization_id);
         $baseUrl = rtrim($cloudonixSettings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return $baseUrl.route('voice.queue-dial-callback', ['session_data' => $sessionData], false);

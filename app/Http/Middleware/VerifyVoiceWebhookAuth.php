@@ -136,11 +136,11 @@ class VerifyVoiceWebhookAuth
         ?string $fromNumber
     ): array {
         // Find CloudonixSettings by domain
-        $settings = CloudonixSettings::where('domain_name', $domain)->first();
+        $settings = CloudonixSettings::forDomain('domain_name', $domain);
 
         if (! $settings) {
             // Try to find by domain UUID
-            $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
+            $settings = CloudonixSettings::forDomain('domain_uuid', $domain);
         }
 
         if (! $settings) {
