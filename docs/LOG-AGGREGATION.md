@@ -9,7 +9,7 @@ structured logs from all services into one searchable store.
 |---------|------|
 | **Loki** | Log store. 7-day retention (compactor), filesystem storage in the `loki_data` volume. |
 | **Grafana** | Viewer, proxied by nginx at `<APP_URL>/logs/`. |
-| **Alloy** | Collector. Tails OPBX containers over the Docker socket (opt-in label `logging.opbx/collect=true`), parses the JSON contract, pushes to Loki. |
+| **Alloy** | Collector. Tails OPBX containers through a read-only `docker-socket-proxy` (opt-in label `logging.opbx/collect=true`), parses the JSON contract, pushes to Loki. |
 
 ## Enabling
 
@@ -85,8 +85,9 @@ by `App\Logging\MaskCredentialsProcessor` before records leave Laravel.
 
 ## Notes
 
-- Rootless Podman needs `security_opt: label=disable` on the alloy service
-  (already in compose) for Docker-socket access; harmless on Docker.
+- Alloy never touches the Docker socket: the `docker-socket-proxy` service mounts it
+  read-only and exposes only container list/logs/events. Rootless Podman needs
+  `security_opt: label=disable` on that proxy (already in compose); harmless on Docker.
 - nginx `/logs/` uses lazy upstream resolution, so the main app is unaffected
   when the profile is off (`/logs/` then 502s).
 

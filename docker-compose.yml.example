@@ -574,22 +574,38 @@ services:
       - opbx
     restart: unless-stopped
 
+  # Read-only, filtered view of the Docker API for Alloy. Only container
+  # listing, logs and events are allowed; every write endpoint is denied, so
+  # Alloy no longer needs root or the raw socket.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: opbx_docker_socket_proxy
+    profiles: ["logs"]
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Rootless Podman (SELinux) blocks socket access without this; harmless on Docker.
+    security_opt:
+      - label=disable
+    networks:
+      - opbx
+    restart: unless-stopped
+
   alloy:
     image: grafana/alloy:v1.8.3
     container_name: opbx_alloy
-    # Root required to read container logs via the Docker socket.
-    user: root
-    # Rootless Podman (SELinux) blocks socket access without this; harmless
-    # on Docker.
-    security_opt:
-      - label=disable
     profiles: ["logs"]
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy /etc/alloy/config.alloy
     volumes:
       - ./docker/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       loki:
+        condition: service_started
+      docker-socket-proxy:
         condition: service_started
     # No healthcheck: the alloy image is distroless (no wget/curl/shell).
     networks:
