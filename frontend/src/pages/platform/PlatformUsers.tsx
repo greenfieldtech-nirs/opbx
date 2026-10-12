@@ -5,9 +5,8 @@
  * Design aligned with Extensions page.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { queryKeys } from '@/lib/queryKeys';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -15,26 +14,18 @@ import {
   Search,
   X,
   RefreshCw,
-  MoreVertical,
-  Edit,
-  Trash2,
   Shield,
-  UserX,
-  UserCheck,
   Mail,
   Building2,
-  ChevronDown,
-  ChevronUp,
-  Plus,
   Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDate, getStatusColor } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -50,13 +41,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { PlatformLayout } from '@/components/platform';
 import {
@@ -68,8 +52,6 @@ import {
   usePlatformUsers,
   useSetPlatformManager,
   useDeletePlatformUser,
-  useCreatePlatformUser,
-  useUpdatePlatformUser,
   useUpdateUserPassword,
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
@@ -80,7 +62,6 @@ type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'c
 type SortDirection = 'asc' | 'desc' | null;
 
 export default function PlatformUsers() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
   const hasRefreshed = useRef(false);
@@ -226,20 +207,6 @@ export default function PlatformUsers() {
   };
 
   // Get role badge
-  const getRoleBadge = (role: string) => {
-    const configs: Record<string, { label: string; color: string }> = {
-      owner: { label: 'Owner', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-      pbx_admin: { label: 'Admin', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-      pbx_user: { label: 'User', color: 'bg-green-100 text-green-800 border-green-200' },
-      reporter: { label: 'Reporter', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-    };
-    const config = configs[role] || configs.pbx_user;
-    return (
-      <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
-        {config.label}
-      </Badge>
-    );
-  };
 
   // Get status badge
   const getStatusBadge = (status: string) => {
