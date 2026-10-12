@@ -27,14 +27,14 @@ class CorsTest extends TestCase
         }
     }
 
-    public function test_loopback_and_docs_origins_are_not_allowed_outside_local(): void
+    public function test_loopback_origins_are_not_allowed_outside_local_but_docs_origins_are(): void
     {
         $origins = $this->cors('production')['allowed_origins'];
 
         $this->assertNotContains('http://localhost', $origins);
         $this->assertNotContains('http://127.0.0.1:3000', $origins);
-        $this->assertNotContains('https://developers.cloudonix.com', $origins);
-        $this->assertNotContains('https://developers.staging.cloudonix.com', $origins);
+        $this->assertContains('https://developers.cloudonix.com', $origins);
+        $this->assertContains('https://developers.staging.cloudonix.com', $origins);
         $this->assertContains('https://opbx.cloudonix.cloud', $origins);
     }
 
@@ -44,6 +44,6 @@ class CorsTest extends TestCase
 
         $this->assertContains('http://localhost:3000', $origins);
         $this->assertContains('http://127.0.0.1', $origins);
-        $this->assertNotContains('https://developers.cloudonix.com', $origins);
+        $this->assertContains('https://developers.cloudonix.com', $origins);
     }
 }

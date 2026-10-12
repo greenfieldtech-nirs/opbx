@@ -26,6 +26,9 @@ return [
             env('FRONTEND_URL', 'http://localhost:3000'),
             'https://cloudonix.cloud',
             'https://opbx.cloudonix.cloud',
+            // Cloudonix developer docs "try it out" calls the API cross-origin.
+            'https://developers.cloudonix.com',
+            'https://developers.staging.cloudonix.com',
         ],
         // Loopback origins carry credentials, so they are only allowed in local development.
         env('APP_ENV', 'production') === 'local'
