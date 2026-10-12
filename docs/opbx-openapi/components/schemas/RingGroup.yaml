@@ -4,7 +4,7 @@ properties:
   is_unprovisioned:
     type: boolean
     readOnly: true
-    description: True when any route of this resource is `unavailable` (saved for future use).
+    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
     readOnly: true
