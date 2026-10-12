@@ -58,6 +58,7 @@ class ResourceReferenceChecker
         ['ai_assistant_load_balancers', 'fallback_ai_assistant_id', 'ai_assistant', 'ai_load_balancer', 'name', null, true],
         ['ring_group_members', 'extension_id', 'extension', 'ring_group', 'name', ['ring_groups', 'ring_group_id'], false],
         ['ai_assistant_load_balancer_members', 'ai_assistant_id', 'ai_assistant', 'ai_load_balancer', 'name', ['ai_assistant_load_balancers', 'load_balancer_id'], true],
+        ['extensions', 'ai_assistant_id', 'ai_assistant', 'extension', 'extension_number', null, false],
         // DID numbers assigned as configuration. History (call logs, CDRs, call tracking sessions,
         // blocked call logs, auto-dialer sessions and caller-ID stats) never blocks.
         ['extensions', 'default_caller_id_did_id', 'did_number', 'extension', 'extension_number', null, false],
@@ -69,6 +70,7 @@ class ResourceReferenceChecker
 
     /** Detail text per "table.column" where the default (fallback / member) does not fit. */
     private const DETAILS = [
+        'extensions.ai_assistant_id' => 'AI assistant extension',
         'extensions.default_caller_id_did_id' => 'default caller ID',
         'outbound_whitelists.default_caller_id_did_id' => 'default caller ID',
         'call_tracking_numbers.did_number_id' => 'tracking number',

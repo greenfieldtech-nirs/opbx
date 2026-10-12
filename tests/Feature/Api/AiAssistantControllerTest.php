@@ -455,7 +455,8 @@ class AiAssistantControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/v1/ai-assistants/{$assistant->id}");
 
-        $response->assertStatus(422);
+        $response->assertStatus(409)
+            ->assertJsonFragment(['type' => 'extension', 'detail' => 'AI assistant extension']);
 
         $this->assertDatabaseHas('ai_assistants', [
             'id' => $assistant->id,

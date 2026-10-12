@@ -142,7 +142,7 @@ class AiAssistantController extends AbstractApiCrudController
     /**
      * Remove the specified AI assistant.
      *
-     * Returns 422 if the assistant is still referenced by extensions.
+     * Rejected with the shared 409 usage list while extensions or routing config still point at it.
      */
     public function destroy(Request $request): JsonResponse
     {
@@ -163,16 +163,6 @@ class AiAssistantController extends AbstractApiCrudController
                 'error' => 'Not Found',
                 'message' => 'Ai assistant not found.',
             ], 404);
-        }
-
-        /** @var AiAssistant $model */
-        if ($model->isInUse()) {
-            return $this->errorResponse(
-                'Cannot delete AI Assistant that is in use. Please reassign these extensions first.',
-                422,
-                'AI_ASSISTANT_IN_USE',
-                ['usage_count' => $model->usage_count]
-            );
         }
 
         return parent::destroy($request);
@@ -304,14 +294,6 @@ class AiAssistantController extends AbstractApiCrudController
     {
         /** @var AiAssistant $model */
         $this->checkResourceReferencesBeforeDelete('ai_assistant', $model->id, $model->organization_id);
-
-        if ($model->isInUse()) {
-            $count = $model->usage_count;
-            throw new \Exception(
-                "Cannot delete AI Assistant that is in use by {$count} extension(s). ".
-                'Please reassign these extensions first.'
-            );
-        }
     }
 
     /**
