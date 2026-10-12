@@ -31,6 +31,9 @@ services:
     # spec override tag) so no dev-only settings leak into production.
     expose: !reset
       - "80"
+    # The base file publishes the Vite dev port (3000); the static image listens
+    # on 80 and is reached only through the nginx reverse proxy.
+    ports: !reset []
     # Drop the dev bind mounts (./frontend:/app + node_modules) so the built
     # image's compiled assets are served, not the host source tree.
     volumes: !reset []

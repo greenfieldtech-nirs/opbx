@@ -322,7 +322,7 @@ sequenceDiagram
 5. **Access the application**
    - **Frontend**: http://localhost:3000
    - **API**: http://localhost/api/v1
-   - **ngrok Dashboard**: http://localhost:4040
+   - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
    - **MinIO Console**: http://localhost:9001 (requires `-f docker-compose.ports.yml`)
 
 ### ⚠️ Database Persistence
@@ -381,7 +381,7 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `minio` | S3-compatible storage | 9000, 9001 |
 | `soketi` | WebSocket server | 6001 |
-| `ngrok` | Webhook tunnel | 4040 |
+| `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |
 | `alloy` | Log collector — *profile `logs`* | - |
 | `grafana` | Log viewer via nginx at `/logs/` — *profile `logs`* | - |

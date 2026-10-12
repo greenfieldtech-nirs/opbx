@@ -457,6 +457,9 @@ services:
   ngrok:
     image: ngrok/ngrok:3-alpine
     container_name: opbx_ngrok
+    # Dev-only tunnel: start it explicitly with `docker compose --profile dev up -d ngrok`.
+    # Never part of a plain `up`, so production hosts do not publish a tunnel.
+    profiles: ["dev"]
     # Use a shell command to conditionally add --url when NGROK_DOMAIN is set
     entrypoint: ["/bin/sh", "-c"]
     command:
