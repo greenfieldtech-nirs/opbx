@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -88,25 +88,12 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
   closedHoursAction,
   onOpenHoursActionChange,
   onClosedHoursActionChange,
-  extensions,
-  ringGroups,
-  ivrMenus,
-  conferenceRooms,
 }) => {
   const handleApplyTemplate = (template: string) => {
     const newSchedule = applyScheduleTemplate(template);
     onFormChange('schedule', newSchedule);
   };
 
-  const days: { key: DayOfWeek; label: string }[] = [
-    { key: 'monday', label: 'Monday' },
-    { key: 'tuesday', label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday', label: 'Thursday' },
-    { key: 'friday', label: 'Friday' },
-    { key: 'saturday', label: 'Saturday' },
-    { key: 'sunday', label: 'Sunday' },
-  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

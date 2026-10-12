@@ -8,8 +8,6 @@ import api from './api';
 import { businessHoursService as baseBusinessHoursService } from './createResourceService';
 import type {
   BusinessHours,
-  CreateBusinessHoursRequest,
-  UpdateBusinessHoursRequest,
 } from '@/types/api.types';
 
 export interface BusinessHoursFilters {

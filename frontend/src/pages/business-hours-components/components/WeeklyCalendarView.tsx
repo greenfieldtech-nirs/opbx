@@ -114,8 +114,6 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
         rangesToModify.sort((a, b) => b.index - a.index);
         rangesToModify.forEach(({ index, action }) => {
           const range = daySchedule.time_ranges[index];
-          const clickStart = parseInt(hourStart.split(':')[0]);
-          const clickEnd = parseInt(hourEnd.split(':')[0]);
 
           switch (action) {
             case 'remove':

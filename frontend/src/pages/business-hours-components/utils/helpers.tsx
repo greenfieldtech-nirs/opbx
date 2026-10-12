@@ -4,11 +4,10 @@
  * Utility functions for displaying and formatting business hours data.
  */
 
-import React from 'react';
 import { Phone, Users, Menu, Bot, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek, TimeRange } from '@/types';
+import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek } from '@/types';
 import type { Extension, RingGroup, IvrMenu } from '@/types';
 
 let timeRangeIdCounter = 0;
