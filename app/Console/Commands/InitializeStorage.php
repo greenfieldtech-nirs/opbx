@@ -22,7 +22,7 @@ class InitializeStorage extends Command
      *
      * @var string
      */
-    protected $description = 'Initialize MinIO/S3 storage buckets for recordings';
+    protected $description = 'Initialize S3 storage (SeaweedFS) buckets for recordings';
 
     /**
      * Execute the console command.
@@ -36,7 +36,7 @@ class InitializeStorage extends Command
             $bucket = config('filesystems.disks.recordings.bucket', 'recordings');
 
             // Check if we can connect to storage
-            $this->info('Checking connection to MinIO/S3...');
+            $this->info('Checking connection to S3 storage...');
 
             // Try to check if bucket exists by attempting to list files
             try {
@@ -110,10 +110,10 @@ class InitializeStorage extends Command
             $this->error('✗ Storage initialization failed: '.$e->getMessage());
             $this->newLine();
             $this->warn('Troubleshooting tips:');
-            $this->line('  1. Check MinIO container is running: docker compose ps minio');
-            $this->line('  2. Verify MinIO credentials in .env file');
-            $this->line('  3. Check MinIO endpoint is accessible: '.config('filesystems.disks.recordings.endpoint'));
-            $this->line('  4. Review logs: docker compose logs minio');
+            $this->line('  1. Check the S3 container is running: docker compose ps seaweedfs');
+            $this->line('  2. Verify the MINIO_ACCESS_KEY/MINIO_SECRET_KEY S3 credentials in .env');
+            $this->line('  3. Check the S3 endpoint is accessible: '.config('filesystems.disks.recordings.endpoint'));
+            $this->line('  4. Review logs: docker compose logs seaweedfs');
 
             return Command::FAILURE;
         }

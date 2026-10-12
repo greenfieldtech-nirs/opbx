@@ -171,6 +171,7 @@ reports/
 # ============================================================================
 /backups/
 /volumes/minio/
+/volumes/seaweedfs/
 /volumes/mysql/
 /volumes/redis/
 # Older bind-mount paths still used by some local docker-compose.yml files.

@@ -96,7 +96,7 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       - MINIO_REGION=us-east-1
       - MINIO_BUCKET=recordings
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://seaweedfs:8333
       - MINIO_USE_PATH_STYLE=true
       - MCP_PORT=${MCP_PORT:-8080}
       # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
@@ -330,38 +330,42 @@ services:
       timeout: 5s
       retries: 5
 
-  minio:
-    # MinIO pulled their images from Docker Hub (docker.io/minio/minio is gone).
-    # bitnamilegacy is Broadcom's frozen archive of the Bitnami build — same binary.
-    # user: root required: image defaults to uid 1001 which can't write the bind mount.
-    image: bitnamilegacy/minio:2025.5.24
-    user: root
-    container_name: opbx_minio
-    # SECURITY: MinIO ports are disabled by default for security
-    # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
-    # MinIO remains accessible within the Docker network
+  seaweedfs:
+    # S3-compatible object storage for call recordings and the cold CDR archive.
+    # Replaces MinIO, whose community edition stopped shipping images (2025) and
+    # was archived. The app still uses the MINIO_* env names (they are just the
+    # S3 endpoint and keys); on AWS, point MINIO_ENDPOINT/keys at real S3 instead.
+    image: chrislusf/seaweedfs:4.47
+    container_name: opbx_seaweedfs
     # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_REGION: ${MINIO_REGION:-us-east-1}
-      MINIO_SCANNER: "off"  # Disable scanner to reduce memory usage
+      S3_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
     volumes:
-      - ./volumes/minio:/data
+      - ./volumes/seaweedfs:/data
     networks:
       - opbx
-    command: server /data --console-address ":9001"
+    # The S3 identity file is written inside the container from the env vars,
+    # so the keys never appear in command args. JSON special chars are escaped.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        esc() { printf '%s' "$$1" | sed 's/[\\"]/\\&/g'; }
+        printf '{"identities":[{"name":"opbx","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","List","Tagging","Write"]}]}' "$$(esc "$$S3_ACCESS_KEY")" "$$(esc "$$S3_SECRET_KEY")" > /tmp/s3.json
+        exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024 -volume.max=0
     deploy:
       resources:
         limits:
-          memory: 512M  # Limit memory usage
+          memory: 512M
         reservations:
-          memory: 256M  # Reserve minimum memory
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9333/cluster/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   soketi:
