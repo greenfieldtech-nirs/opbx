@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { AlbsStrategySelector } from '@/components/design-system';
@@ -25,12 +24,6 @@ import {
   X,
   Info,
   GripVertical,
-  Bot,
-  PhoneForwarded,
-  Users,
-  Menu,
-  PhoneOff,
-  Phone,
   Bot as BotIcon,
 } from 'lucide-react';
 import {
@@ -123,22 +116,11 @@ interface LoadBalancerFormProps {
 
 const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5);
 
-function getStrategyDescription(strategy: AlbsStrategy): string {
-  const descriptions: Record<AlbsStrategy, string> = {
-    round_robin: 'Distribute calls evenly across AI assistants in sequential order.',
-    priority: 'Route calls to AI assistants in priority order using drag and drop.',
-    percentage: 'Route calls based on configured weight percentages.',
-  };
-  return descriptions[strategy] || '';
-}
 
 export function LoadBalancerForm({
   formData,
   formErrors,
   availableAiAssistants,
-  availableExtensions,
-  availableRingGroups,
-  availableIvrMenus,
   onChange,
   onAddMember,
   onRemoveMember,

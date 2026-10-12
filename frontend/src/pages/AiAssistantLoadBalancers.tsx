@@ -51,84 +51,23 @@ DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import {
-AlertCircle,
 Plus,
 Search,
 Filter,RotateCw,
-PhoneForwarded,
-PhoneOff,RefreshCw,Menu,
-Bot,ArrowRight,
+RefreshCw,
+Bot,
 Scale,
 Target
 } from 'lucide-react';
 import {
-KeyboardSensor,
-PointerSensor,
-useSensor,
-useSensors
-} from '@dnd-kit/core';
-import {
-arrayMove,sortableKeyboardCoordinates
-} from '@dnd-kit/sortable';
-import {
-useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+arrayMove} from '@dnd-kit/sortable';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
-// Sortable item component for drag-and-drop
-interface SortableItemProps {
-  id: string;
-  children: (dragHandleProps: any) => React.ReactNode;
-}
 
-function SortableItem({ id, children }: SortableItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const dragHandleProps = {
-    ...attributes,
-    ...listeners,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style}>
-      {children(dragHandleProps)}
-    </div>
-  );
-}
 
 // Helper functions
-function getStrategyDisplayName(strategy: AlbsStrategy): string {
-  const names: Record<AlbsStrategy, string> = {
-    round_robin: 'Round Robin',
-    priority: 'Priority Based',
-    percentage: 'Percentage Based',
-  };
-  return names[strategy] || strategy;
-}
 
-function getStrategyDescription(strategy: AlbsStrategy): string {
-  const descriptions: Record<AlbsStrategy, string> = {
-    round_robin: 'Distribute calls evenly across AI assistants in sequential order.',
-    priority: 'Route calls to AI assistants in priority order using drag and drop.',
-    percentage: 'Route calls based on configured weight percentages.',
-  };
-  return descriptions[strategy] || '';
-}
 
 // Strategy icon mapping
 function getStrategyIcon(strategy: AlbsStrategy) {
@@ -145,22 +84,6 @@ function getStrategyIcon(strategy: AlbsStrategy) {
 }
 
 // Fallback icon mapping
-function getFallbackIcon(action: RingGroupFallbackAction) {
-  switch (action) {
-    case 'extension':
-      return <PhoneForwarded className="h-4 w-4" />;
-    case 'ring_group':
-      return <ArrowRight className="h-4 w-4" />;
-    case 'ivr_menu':
-      return <Menu className="h-4 w-4" />;
-    case 'ai_assistant':
-      return <Bot className="h-4 w-4" />;
-    case 'hangup':
-      return <PhoneOff className="h-4 w-4" />;
-    default:
-      return <AlertCircle className="h-4 w-4" />;
-  }
-}
 
 // Extended AiAssistantLoadBalancer type with additional fallback fields
 // Note: follow_through is inherited from base AiAssistantLoadBalancer interface
@@ -179,7 +102,6 @@ interface MemberFormData {
 }
 
 // Generate weight options for percentage strategy (0% to 100% in 5% increments)
-const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5); // [0, 5, 10, ..., 100]
 
 // Helper to build fallback fields based on action
 const buildFallbackFields = (formData: FormData): Record<string, string | null | undefined> => {
@@ -258,12 +180,6 @@ export default function AiAssistantLoadBalancers() {
   }, [searchQuery]);
 
   // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   // Handle drag end for member ordering
   const handleDragEnd = (event: any) => {
@@ -296,7 +212,7 @@ export default function AiAssistantLoadBalancers() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch load balancers with React Query
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.aiLoadBalancers.all, {
       page: currentPage,
       per_page: perPage,
@@ -341,7 +257,7 @@ export default function AiAssistantLoadBalancers() {
   });
 
   // Fetch all ring groups for fallback destinations
-  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
+  const { data: allRingGroupsData } = useQuery({
     queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }),
     staleTime: 60000,
@@ -658,68 +574,12 @@ export default function AiAssistantLoadBalancers() {
     });
   };
 
-  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
-    const currentMembers = formData.members || [];
-    const usedAssistantIds = currentMembers
-      .map((m) => m.ai_assistant_id)
-      .filter((id) => id !== currentMemberAssistantId);
-    return availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
-  };
 
   // Calculate total weight for percentage strategy
-  const totalWeight = useMemo(() => {
-    return formData.members.reduce((sum, m) => sum + (m.weight || 0), 0);
-  }, [formData.members]);
 
   // Get available AI assistants not already in members
-  const availableAiAssistantsForMembers = useMemo(() => {
-    const currentMemberIds = new Set(formData.members.map(m => m.ai_assistant_id));
-    return availableAiAssistants.filter(a => !currentMemberIds.has(String(a.id)));
-  }, [availableAiAssistants, formData.members]);
 
   // Enhanced fallback display text with actual destination names
-  const getFallbackDisplayText = (
-    lb: ExtendedAiAssistantLoadBalancer,
-    ringGroups: any[],
-    ivrMenus: any[]
-  ): string => {
-    switch (lb.fallback_action) {
-      case 'extension':
-        return lb.fallback_extension_id
-          ? `→ Extension: ${lb.fallback_extension_id}`
-          : '→ Extension';
-
-      case 'ring_group':
-        if (lb.fallback_ring_group_id) {
-          const targetGroup = ringGroups.find(rg => rg.id.toString() === lb.fallback_ring_group_id);
-          return targetGroup ? `→ Ring Group: ${targetGroup.name}` : '→ Ring Group';
-        }
-        return '→ Ring Group';
-
-      case 'ivr_menu':
-        if (lb.fallback_ivr_menu_id) {
-          const targetIvr = ivrMenus.find(ivr => ivr.id.toString() === lb.fallback_ivr_menu_id);
-          return targetIvr ? `→ IVR Menu: ${targetIvr.name}` : '→ IVR Menu';
-        }
-        return '→ IVR Menu';
-
-      case 'ai_assistant':
-        if (lb.fallback_ai_assistant_id) {
-          const targetAi = availableAiAssistants.find(a => String(a.id) === lb.fallback_ai_assistant_id);
-          return targetAi ? `→ AI Assistant: ${targetAi.name}` : '→ AI Assistant';
-        }
-        return '→ AI Assistant';
-
-      case 'hangup':
-        return 'Hangup';
-
-      case 'unavailable':
-        return 'Destination unavailable';
-
-      default:
-        return 'Unknown';
-    }
-  };
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {

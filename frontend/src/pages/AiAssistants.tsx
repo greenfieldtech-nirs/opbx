@@ -94,7 +94,7 @@ export default function AiAssistants() {
   }, [searchQuery]);
 
   // Fetch AI Assistants
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: [...queryKeys.aiAssistants.all, {
       page: currentPage,
       per_page: perPage,
@@ -236,23 +236,8 @@ export default function AiAssistants() {
     setIsEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (assistant: AiAssistant) => {
-    setSelectedAssistant(assistant);
-    setIsDeleteDialogOpen(true);
-  };
 
 
-  const toggleTokenVisibility = (key: string) => {
-    setVisibleTokens(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
 
 
 
@@ -471,7 +456,7 @@ export default function AiAssistants() {
             onSort={handleSort}
             canView={false}
             canEdit={false}
-            onDelete={canManageAssistants ? ((assistant, e) => {
+            onDelete={canManageAssistants ? ((assistant) => {
               setSelectedAssistant(assistant);
               setIsDeleteDialogOpen(true);
             }) : undefined}
