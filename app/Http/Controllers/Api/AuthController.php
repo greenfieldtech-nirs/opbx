@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
@@ -38,79 +37,6 @@ class AuthController extends Controller
      * Token expiration time in minutes (24 hours).
      */
     private const TOKEN_EXPIRATION_MINUTES = 1440;
-
-    /**
-     * Token abilities for scoped access control.
-     *
-     * Security: Using scoped tokens instead of wildcard ['*'] to limit
-     * the damage if a token is compromised.
-     *
-     * Note: Using string keys (enum values) instead of enum instances
-     * because PHP constants cannot have enum instances as array keys.
-     */
-    private const TOKEN_ABILITIES = [
-        // Owner: Full access to all resources
-        'owner' => [
-            'extension:*',
-            'user:*',
-            'ring-group:*',
-            'did-number:*',
-            'recording:*',
-            'settings:*',
-            'business-hours:*',
-            'conference:*',
-            'ivr:*',
-            'voice-agent:*',
-            'call-log:*',
-            'outbound-whitelist:*',
-            'recording-download:*',
-        ],
-        // PBX Admin: Full access except user management and sensitive settings
-        'pbx_admin' => [
-            'extension:*',
-            'user:read',
-            'user:update',
-            'ring-group:*',
-            'did-number:*',
-            'recording:read',
-            'business-hours:*',
-            'conference:*',
-            'ivr:*',
-            'call-log:*',
-        ],
-        // PBX User: Read access to most, can update own extension
-        'pbx_user' => [
-            'extension:read',
-            'extension:update:own',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-        ],
-        // Reporter: Read-only access
-        'reporter' => [
-            'extension:read',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-            'business-hours:read',
-        ],
-        // Supervisor: Read-only access to assigned resources plus supervisor features
-        'supervisor' => [
-            'extension:read',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-            'business-hours:read',
-            'supervisor:view',
-            'supervisor:assignments',
-        ],
-    ];
 
     /**
      * Authenticate user and issue authentication credentials.
@@ -231,7 +157,7 @@ class AuthController extends Controller
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
+        $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
         $token = $user->createToken(
             'api-token',
             $abilities,
@@ -283,42 +209,6 @@ class AuthController extends Controller
 
         // Default to token-based for backward compatibility
         return false;
-    }
-
-    /**
-     * Platform manager abilities added to tokens for PM users.
-     */
-    private const PLATFORM_ABILITIES = [
-        'platform:read',
-        'platform:write',
-        'platform:manage-users',
-        'platform:manage-organizations',
-        'platform:audit-logs',
-    ];
-
-    /**
-     * Get token abilities based on user role.
-     *
-     * Security: Returns role-specific abilities instead of wildcard ['*']
-     * to limit token scope and reduce impact of token compromise.
-     *
-     * If the user is a platform manager, platform abilities are merged in.
-     *
-     * @param  UserRole  $role  User's role
-     * @param  bool  $isPlatformManager  Whether user has platform manager flag
-     * @return array Token abilities
-     */
-    private function getTokenAbilities(UserRole $role, bool $isPlatformManager = false): array
-    {
-        $roleValue = $role->value;
-        $abilities = self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
-
-        // Add platform abilities for platform managers
-        if ($isPlatformManager) {
-            $abilities = array_merge($abilities, self::PLATFORM_ABILITIES);
-        }
-
-        return $abilities;
     }
 
     /**
@@ -467,7 +357,7 @@ class AuthController extends Controller
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
+        $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
         $token = $user->createToken(
             'api-token',
             $abilities,

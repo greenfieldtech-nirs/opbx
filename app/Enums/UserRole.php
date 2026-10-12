@@ -23,6 +23,86 @@ enum UserRole: string
         };
     }
 
+    /**
+     * Sanctum token abilities for this role (single source for password login,
+     * Auth0 login and registration). Platform managers also get the platform:* set.
+     *
+     * @return array<int, string>
+     */
+    public function tokenAbilities(bool $isPlatformManager = false): array
+    {
+        $abilities = match ($this) {
+            self::OWNER => [
+                'extension:*',
+                'user:*',
+                'ring-group:*',
+                'did-number:*',
+                'recording:*',
+                'settings:*',
+                'business-hours:*',
+                'conference:*',
+                'ivr:*',
+                'voice-agent:*',
+                'call-log:*',
+                'outbound-whitelist:*',
+                'recording-download:*',
+            ],
+            self::PBX_ADMIN => [
+                'extension:*',
+                'user:read',
+                'user:update',
+                'ring-group:*',
+                'did-number:*',
+                'recording:read',
+                'business-hours:*',
+                'conference:*',
+                'ivr:*',
+                'call-log:*',
+            ],
+            self::PBX_USER => [
+                'extension:read',
+                'extension:update:own',
+                'user:read',
+                'ring-group:read',
+                'did-number:read',
+                'recording:read',
+                'call-log:read',
+            ],
+            self::REPORTER => [
+                'extension:read',
+                'user:read',
+                'ring-group:read',
+                'did-number:read',
+                'recording:read',
+                'call-log:read',
+                'business-hours:read',
+            ],
+            self::SUPERVISOR => [
+                'extension:read',
+                'user:read',
+                'ring-group:read',
+                'did-number:read',
+                'recording:read',
+                'call-log:read',
+                'business-hours:read',
+                'supervisor:view',
+                'supervisor:assignments',
+            ],
+        };
+
+        if ($isPlatformManager) {
+            $abilities = array_merge($abilities, [
+                'platform:read',
+                'platform:write',
+                'platform:manage-users',
+                'platform:manage-organizations',
+                'platform:audit-logs',
+            ]);
+        }
+
+        return $abilities;
+    }
+
     public function canManageOrganization(): bool
     {
         return $this === self::OWNER;
