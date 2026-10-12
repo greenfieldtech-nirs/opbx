@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
@@ -158,6 +159,8 @@ export function useBusinessHours() {
     },
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => businessHoursService.delete(id),
     onSuccess: () => {
@@ -166,6 +169,7 @@ export function useBusinessHours() {
       setIsDeleteDialogOpen(false);
     },
     onError: (error: Error | unknown) => {
+      if (showIfInUse(error)) return;
       toast.error((error as any).response?.data?.message || 'Failed to delete business hours schedule.');
     },
   });
@@ -505,6 +509,7 @@ export function useBusinessHours() {
     createMutation,
     updateMutation,
     deleteMutation,
+    inUseDialog,
     toggleStatusMutation,
 
     // Handlers

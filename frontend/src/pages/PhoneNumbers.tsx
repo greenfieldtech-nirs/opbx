@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -183,6 +184,8 @@ export default function PhoneNumbers() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => phoneNumbersService.delete(id),
     onSuccess: () => {
@@ -192,6 +195,7 @@ export default function PhoneNumbers() {
       toast.success('Phone number deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) return;
       const message = error.response?.data?.message || 'Failed to delete phone number';
       toast.error(message);
     },
@@ -382,6 +386,7 @@ export default function PhoneNumbers() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>

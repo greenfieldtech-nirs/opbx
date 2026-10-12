@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -186,6 +187,8 @@ export default function AiAssistants() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => aiAssistantsService.delete(id),
     onSuccess: () => {
@@ -195,6 +198,7 @@ export default function AiAssistants() {
       toast.success('AI Assistant deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) return;
       const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete AI Assistant';
       toast.error(message);
     },
@@ -378,6 +382,7 @@ export default function AiAssistants() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
@@ -497,10 +502,6 @@ export default function AiAssistants() {
             canView={false}
             canEdit={false}
             onDelete={canManageAssistants ? ((assistant, e) => {
-              if ((assistant.usage_count || 0) > 0) {
-                toast.error(`Cannot delete AI Assistant in use by ${assistant.usage_count} extension(s)`);
-                return;
-              }
               setSelectedAssistant(assistant);
               setIsDeleteDialogOpen(true);
             }) : undefined}
@@ -638,7 +639,7 @@ export default function AiAssistants() {
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleteMutation.isPending || (selectedAssistant && (selectedAssistant.usage_count || 0) > 0)}
+              disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>

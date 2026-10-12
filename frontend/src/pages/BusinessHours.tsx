@@ -109,6 +109,7 @@ const BusinessHours: React.FC = () => {
     handleToggleStatus,
     setOpenHoursAction,
     setClosedHoursAction,
+    inUseDialog,
   } = useBusinessHours();
 
   if (error) {
@@ -140,6 +141,7 @@ const BusinessHours: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>

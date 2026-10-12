@@ -10,6 +10,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
@@ -376,6 +377,8 @@ export default function ExtensionsComplete() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => extensionsService.delete(id),
     onSuccess: () => {
@@ -383,6 +386,7 @@ export default function ExtensionsComplete() {
       toast.success('Extension deleted successfully');
     },
     onError: (error: Error | unknown) => {
+      if (showIfInUse(error)) return;
       const err = error as { response?: { data?: { message?: string; error?: { message?: string } | string } } };
       const data = err.response?.data;
       const message = data?.message || (typeof data?.error === 'object' ? data.error?.message : undefined) || 'Failed to delete extension';
@@ -1201,6 +1205,7 @@ export default function ExtensionsComplete() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>

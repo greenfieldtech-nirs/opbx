@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
@@ -428,6 +429,8 @@ export default function AiAssistantLoadBalancers() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => aiAssistantLoadBalancersService.delete(id),
     onSuccess: () => {
@@ -437,6 +440,7 @@ export default function AiAssistantLoadBalancers() {
       toast.success('AI Load Balancer deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) return;
       const message = error.response?.data?.message || 'Failed to delete AI Load Balancer';
       toast.error(message);
     },
@@ -804,6 +808,7 @@ export default function AiAssistantLoadBalancers() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>

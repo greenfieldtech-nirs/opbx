@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -175,13 +176,17 @@ export default function CallQueues() {
     onError: (error) => toast.error(getErrorMessage(error)),
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: callQueuesService.delete,
     onSuccess: () => {
       toast.success('Call queue deleted');
       invalidate();
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => {
+      if (!showIfInUse(error)) toast.error(getErrorMessage(error));
+    },
   });
 
   const openCreate = () => {
@@ -345,6 +350,7 @@ export default function CallQueues() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Call Queues</h1>

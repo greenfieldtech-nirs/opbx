@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
@@ -544,6 +545,8 @@ export default function IVRMenus() {
     },
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ivrMenusService.delete(id),
     onSuccess: () => {
@@ -555,6 +558,7 @@ export default function IVRMenus() {
       toast.success('IVR menu deleted successfully');
     },
     onError: (error: Error | unknown) => {
+      if (showIfInUse(error)) return;
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to delete IVR menu');
     },
@@ -767,6 +771,7 @@ export default function IVRMenus() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>

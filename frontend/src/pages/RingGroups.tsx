@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
@@ -383,6 +384,8 @@ export default function RingGroups() {
     },
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ringGroupsService.delete(id),
     onSuccess: () => {
@@ -392,6 +395,7 @@ export default function RingGroups() {
       toast.success('Ring group deleted successfully');
     },
     onError: (error: unknown) => {
+      if (showIfInUse(error)) return;
       const message = getErrorMessage(error) || 'Failed to delete ring group';
       toast.error(message);
     },
@@ -1448,6 +1452,7 @@ export default function RingGroups() {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
