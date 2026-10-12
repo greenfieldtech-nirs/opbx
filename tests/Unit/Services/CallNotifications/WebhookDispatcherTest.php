@@ -77,7 +77,7 @@ class WebhookDispatcherTest extends TestCase
         $this->assertTrue($result);
 
         // Verify log was created
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertTrue($log->is_success);
         $this->assertEquals(200, $log->response_status_code);
@@ -92,7 +92,7 @@ class WebhookDispatcherTest extends TestCase
         $this->dispatcher->dispatch($this->settings->fresh(), ['event_type' => 'call.status_update'], 'event-redact', 'tok');
 
         Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer super-secret-value'));
-        $log = CallNotificationLog::where('event_id', 'event-redact')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-redact')->first();
         $this->assertSame('[redacted]', $log->request_headers['Authorization']);
         $this->assertStringNotContainsString('super-secret-value', json_encode($log->getAttributes()));
     }
@@ -121,7 +121,7 @@ class WebhookDispatcherTest extends TestCase
         $this->assertFalse($result);
 
         // Verify no log was created when rate limited
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNull($log);
     }
 
@@ -152,7 +152,7 @@ class WebhookDispatcherTest extends TestCase
 
         $this->assertFalse($result);
 
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertFalse($log->is_success);
         $this->assertEquals(500, $log->response_status_code);
@@ -215,7 +215,7 @@ class WebhookDispatcherTest extends TestCase
         $this->assertFalse($result);
 
         // Only one attempt should be made for 4xx errors
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertEquals(1, $log->attempt_number);
     }
@@ -273,7 +273,7 @@ class WebhookDispatcherTest extends TestCase
             'session-token-abc'
         );
 
-        $log = CallNotificationLog::where('event_id', 'unique-event-id')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'unique-event-id')->first();
 
         $this->assertNotNull($log);
         $this->assertEquals($this->organization->id, $log->organization_id);

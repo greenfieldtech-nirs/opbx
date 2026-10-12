@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\PrunesByRetention;
+use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * Tracks webhook delivery attempts for call notifications.
  */
+#[ScopedBy([OrganizationScope::class])]
 class CallNotificationLog extends Model
 {
     use HasFactory, PrunesByRetention;
