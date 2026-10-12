@@ -7,7 +7,6 @@ namespace Tests\Feature\Console;
 use App\Enums\DestinationStatus;
 use App\Models\AutoDialerDestination;
 use App\Models\Organization;
-use App\Models\PlatformAuditLog;
 use App\Models\SessionUpdate;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
@@ -31,18 +30,6 @@ class MaintenanceCommandsTest extends TestCase
 
         $this->assertSame('deleted', DB::table('session_updates')->where('id', $stale->id)->value('action'));
         $this->assertNotSame('deleted', DB::table('session_updates')->where('id', $fresh->id)->value('action'));
-    }
-
-    public function test_audit_cleanup_deletes_rows_older_than_14_days(): void
-    {
-        $old = PlatformAuditLog::factory()->create();
-        $recent = PlatformAuditLog::factory()->create();
-        DB::table('platform_audit_logs')->where('id', $old->id)->update(['created_at' => now()->subDays(15)]);
-
-        $this->artisan('opbx:cleanup-audit-logs', ['--force' => true, '--no-interaction' => true])->assertSuccessful();
-
-        $this->assertDatabaseMissing('platform_audit_logs', ['id' => $old->id]);
-        $this->assertDatabaseHas('platform_audit_logs', ['id' => $recent->id]);
     }
 
     public function test_password_policy_flags_users(): void
@@ -83,12 +70,11 @@ class MaintenanceCommandsTest extends TestCase
         $this->assertSame(0, Organization::withoutGlobalScope(OrganizationScope::class)->count());
     }
 
-    public function test_scheduler_runs_session_updates_cleanup_and_audit_cleanup_with_force(): void
+    public function test_scheduler_runs_session_updates_cleanup_with_force(): void
     {
         $commands = collect($this->app->make(Schedule::class)->events())->pluck('command')->implode("\n");
 
         $this->assertStringContainsString('session-updates:cleanup', $commands);
-        $this->assertStringContainsString('opbx:cleanup-audit-logs', $commands);
         $this->assertStringContainsString('--force', $commands);
     }
 }

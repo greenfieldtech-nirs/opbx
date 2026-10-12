@@ -8,13 +8,6 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// Schedule platform audit log cleanup daily (14-day retention)
-Schedule::command('opbx:cleanup-audit-logs', ['--force' => true])
-    ->daily()
-    ->at('02:00')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/audit-cleanup.log'));
-
 // Mark session_updates stuck in an active state as deleted (no CDR/delete webhook arrived).
 Schedule::command('session-updates:cleanup', ['--force' => true])
     ->everyFifteenMinutes()
@@ -22,8 +15,17 @@ Schedule::command('session-updates:cleanup', ['--force' => true])
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/session-updates-cleanup.log'));
 
-// Retention (config/retention.php): prune old rows daily.
-Schedule::command('model:prune', ['--model' => [\App\Models\SessionUpdate::class]])
+// Retention (config/retention.php): prune old rows daily. CDRs are not pruned here.
+Schedule::command('model:prune', ['--model' => [
+    \App\Models\SessionUpdate::class,
+    \App\Models\CallNotificationLog::class,
+    \App\Models\EmailLog::class,
+    \App\Models\BlockedCallLog::class,
+    \App\Models\QueueCall::class,
+    \App\Models\CallTrackingSession::class,
+    \App\Models\AutoDialerCallSession::class,
+    \App\Models\PlatformAuditLog::class,
+]])
     ->dailyAt('03:00')
     ->withoutOverlapping()
     ->onOneServer()

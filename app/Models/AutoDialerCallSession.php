@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\PrunesByRetention;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerCallSession extends Model
 {
-    use HasFactory;
+    use HasFactory, PrunesByRetention;
+
+    protected const RETENTION_KEY = 'auto_dialer_call_sessions_days';
+
+    protected const RETENTION_COLUMN = 'created_at';
 
     /**
      * The attributes that are mass assignable.

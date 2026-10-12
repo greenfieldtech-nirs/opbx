@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\PrunesByRetention;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +17,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PlatformAuditLog extends Model
 {
-    use HasFactory;
+    use HasFactory, PrunesByRetention;
+
+    protected const RETENTION_KEY = 'platform_audit_logs_days';
+
+    protected const RETENTION_COLUMN = 'created_at';
 
     /**
      * The attributes that are mass assignable.
