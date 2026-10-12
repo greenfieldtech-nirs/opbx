@@ -66,6 +66,33 @@ class CdrTiering
         return $files;
     }
 
+    /** Delete cold hour files older than CDR_COLD_RETENTION_YEARS. Returns the number deleted. */
+    public function expireCold(): int
+    {
+        $cutoff = $this->cutoff(12 * (int) config('retention.cdr_cold_retention_years'));
+        $disk = Storage::disk('cdr_archive');
+        $deleted = 0;
+
+        foreach ($disk->directories() as $orgDir) {
+            foreach ($disk->directories($orgDir) as $yearDir) {
+                if ((int) basename($yearDir) > $cutoff->year) {
+                    continue;
+                }
+
+                foreach ($disk->allFiles($yearDir) as $file) {
+                    // {org}/YYYY/MM/DD/YYYY-MM-DD-HH.csv.gz
+                    if (preg_match('/(\d{4})-(\d{2})-(\d{2})-(\d{2})\.csv\.gz$/', $file, $m)
+                        && CarbonImmutable::create((int) $m[1], (int) $m[2], (int) $m[3], (int) $m[4], 0, 0, 'UTC') < $cutoff) {
+                        $disk->delete($file);
+                        $deleted++;
+                    }
+                }
+            }
+        }
+
+        return $deleted;
+    }
+
     private function archiveHour(int $orgId, CarbonImmutable $hour, CarbonImmutable $cutoff): void
     {
         $rows = $this->warm()->where('organization_id', $orgId)

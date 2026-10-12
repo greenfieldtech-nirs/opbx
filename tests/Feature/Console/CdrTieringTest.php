@@ -183,4 +183,17 @@ class CdrTieringTest extends TestCase
         $this->assertSame([(string) $first->id, (string) $late->id], array_column($rows, 'id'));
         $this->assertSame([], $this->warmIds());
     }
+
+    public function test_cold_files_older_than_seven_years_are_deleted(): void
+    {
+        $disk = Storage::disk('cdr_archive');
+        $disk->put('1/2019/10/12/2019-10-12-11.csv.gz', 'old');
+        $disk->put('1/2019/10/12/2019-10-12-12.csv.gz', 'keep: exactly at the cutoff hour');
+        $disk->put('1/2018/01/01/2018-01-01-00.csv.gz', 'older year');
+        $disk->put('2/2026/01/01/2026-01-01-00.csv.gz', 'recent');
+
+        $this->artisan('cdr:tier')->expectsOutputToContain('cold expiry: 2 files deleted')->assertSuccessful();
+
+        $this->assertEqualsCanonicalizing(['1/2019/10/12/2019-10-12-12.csv.gz', '2/2026/01/01/2026-01-01-00.csv.gz'], $disk->allFiles());
+    }
 }
