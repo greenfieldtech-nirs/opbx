@@ -8,6 +8,7 @@ use App\Models\CallNotificationLog;
 use App\Models\CallTrackingSession;
 use App\Models\EmailLog;
 use App\Models\PlatformAuditLog;
+use App\Models\PlatformHealthCheck;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use Illuminate\Foundation\Inspiring;
@@ -35,6 +36,7 @@ Schedule::command('model:prune', ['--model' => [
     CallTrackingSession::class,
     AutoDialerCallSession::class,
     PlatformAuditLog::class,
+    PlatformHealthCheck::class,
 ]])
     ->dailyAt('03:00')
     ->withoutOverlapping()

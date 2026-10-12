@@ -23,6 +23,8 @@ return [
     'call_tracking_sessions_days' => $days('RETENTION_CALL_TRACKING_SESSIONS_DAYS', 183),
     'auto_dialer_call_sessions_days' => $days('RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS', 183),
     'platform_audit_logs_days' => $days('RETENTION_PLATFORM_AUDIT_LOGS_DAYS', 365),
+    // Platform Status history, in HOURS (model:prune runs daily, so rows may live up to a day longer).
+    'platform_health_checks_hours' => $days('PLATFORM_HEALTH_RETENTION_HOURS', 24),
 
     // Tiered CDR storage (cdr:tier), anchored on session_timestamp in UTC.
     'cdr_hot_months' => (int) env('CDR_HOT_MONTHS', 6),
