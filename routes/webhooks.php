@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Http\Controllers\Webhooks\AutoDialerWebhookController;
 use App\Http\Controllers\Webhooks\CloudonixWebhookController;
 use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
-use Illuminate\Cache\RedisStore;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -142,15 +141,3 @@ Route::prefix('webhooks/auto-dialer')->group(function (): void {
 Route::post('/webhooks/cloudonix/dialer', [DialerWebhookProxyController::class, 'handleCloudonixWebhook'])
     ->middleware(['webhook.signature', 'webhook.idempotency'])
     ->name('webhooks.cloudonix.dialer');
-
-// Health check endpoint
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'healthy',
-        'timestamp' => now()->toIso8601String(),
-        'services' => [
-            'database' => DB::connection()->getDatabaseName() ? 'connected' : 'disconnected',
-            'redis' => Cache::getStore() instanceof RedisStore ? 'connected' : 'disconnected',
-        ],
-    ]);
-})->name('health');
