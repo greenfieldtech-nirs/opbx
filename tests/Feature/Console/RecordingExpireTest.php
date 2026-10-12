@@ -53,6 +53,8 @@ class RecordingExpireTest extends TestCase
             'organization_id' => $org->id,
             'session_timestamp' => $ts,
             'recording_status' => 'available',
+            'recording_mime_type' => 'audio/mpeg',
+            'recording_duration' => 42,
         ]);
         $oldHot = $make('2026-01-01 00:00:00');
         $newHot = $make('2026-01-02 00:00:00');
@@ -83,8 +85,8 @@ class RecordingExpireTest extends TestCase
         $this->assertTrue($disk->exists("{$org->id}/call-recordings/{$newHot->id}.mp3"));
         $this->assertTrue($disk->exists("{$org->id}/prompts/greeting.mp3"));
 
-        $this->assertDatabaseHas('call_detail_records', ['id' => $oldHot->id, 'recording_status' => 'none', 'recording_stored_path' => null]);
-        $this->assertDatabaseHas('call_detail_records', ['id' => $newHot->id, 'recording_status' => 'available']);
-        $this->assertDatabaseHas('archived_call_detail_records', ['id' => $oldWarm->id, 'recording_status' => 'none', 'recording_stored_path' => null], 'cdr_archive');
+        $this->assertDatabaseHas('call_detail_records', ['id' => $oldHot->id, 'recording_status' => 'none', 'recording_stored_path' => null, 'recording_mime_type' => null, 'recording_duration' => null]);
+        $this->assertDatabaseHas('call_detail_records', ['id' => $newHot->id, 'recording_status' => 'available', 'recording_mime_type' => 'audio/mpeg', 'recording_duration' => 42]);
+        $this->assertDatabaseHas('archived_call_detail_records', ['id' => $oldWarm->id, 'recording_status' => 'none', 'recording_stored_path' => null, 'recording_mime_type' => null, 'recording_duration' => null], 'cdr_archive');
     }
 }

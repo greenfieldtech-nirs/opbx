@@ -52,7 +52,7 @@ class RecordingExpiry
 
     private function resetCdrs(int $orgId, string $relativePath): void
     {
-        $reset = ['recording_status' => 'none', 'recording_stored_path' => null];
+        $reset = ['recording_status' => 'none', 'recording_stored_path' => null, 'recording_mime_type' => null, 'recording_duration' => null];
 
         foreach ([DB::table('call_detail_records'), DB::connection('cdr_archive')->table('archived_call_detail_records')] as $table) {
             $table->where('organization_id', $orgId)->where('recording_stored_path', $relativePath)->update($reset);
