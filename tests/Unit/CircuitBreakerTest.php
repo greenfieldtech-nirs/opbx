@@ -143,7 +143,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals('open', $cb->getState());
 
         // Wait for retry period
-        sleep(2);
+        $this->travel(2)->seconds();
 
         // Next call should transition to half-open and execute
         $result = $cb->call(fn () => 'test success');
@@ -171,7 +171,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals('open', $cb->getState());
 
         // Wait for retry period
-        sleep(2);
+        $this->travel(2)->seconds();
 
         // Successful call should close circuit
         $cb->call(fn () => 'success');
@@ -197,7 +197,7 @@ class CircuitBreakerTest extends TestCase
         }
 
         // Wait for retry period
-        sleep(2);
+        $this->travel(2)->seconds();
 
         // Failed call should reopen circuit
         try {
