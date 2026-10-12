@@ -171,3 +171,25 @@ export function usePlatformAuditLogs(params?: PlatformAuditLogsParams) {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
+
+/**
+ * Platform Status (polls every 30s; react-query pauses polling while the tab is hidden)
+ */
+export function usePlatformStatus() {
+  return useQuery({
+    queryKey: queryKeys.platform.status(),
+    queryFn: () => platformApi.status.get(),
+    refetchInterval: 30 * 1000,
+  });
+}
+
+export function useRunPlatformStatusCheck() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => platformApi.status.checkNow(),
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(queryKeys.platform.status(), snapshot);
+    },
+  });
+}

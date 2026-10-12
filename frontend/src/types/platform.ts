@@ -135,3 +135,26 @@ export interface UpdateOrganizationSettingsRequest {
 export interface SetPlatformManagerRequest {
   is_platform_manager: boolean;
 }
+
+/**
+ * Platform Status
+ */
+export type PlatformHealthStatus = 'ok' | 'degraded' | 'down' | 'unknown';
+
+export interface PlatformComponentStatus {
+  component: string;
+  label: string;
+  optional: boolean;
+  status: PlatformHealthStatus;
+  latency_ms: number | null;
+  detail: string;
+  checked_at: string | null;
+  /** Last 24h in 5-minute buckets, worst status per bucket. */
+  history: { checked_at: string; status: PlatformHealthStatus }[];
+}
+
+export interface PlatformStatusSnapshot {
+  checked_at: string | null;
+  summary: Record<PlatformHealthStatus, number>;
+  components: PlatformComponentStatus[];
+}

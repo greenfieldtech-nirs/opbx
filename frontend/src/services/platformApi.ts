@@ -11,6 +11,7 @@ import type {
   PlatformOrganizationDetail,
   PlatformUser,
   PlatformAuditLogEntry,
+  PlatformStatusSnapshot,
   PlatformOrganizationsParams,
   PlatformUsersParams,
   PlatformAuditLogsParams,
@@ -143,7 +144,16 @@ export const platformAuditLogsApi = {
 /**
  * Combined Platform API export
  */
+/**
+ * Platform Status API
+ */
+export const platformStatusApi = {
+  get: () => api.get<{ data: PlatformStatusSnapshot }>('/platform/status').then((r) => r.data.data),
+  checkNow: () => api.post<{ data: PlatformStatusSnapshot }>('/platform/status/check').then((r) => r.data.data),
+};
+
 export const platformApi = {
+  status: platformStatusApi,
   dashboard: platformDashboardApi,
   organizations: platformOrganizationsApi,
   users: platformUsersApi,

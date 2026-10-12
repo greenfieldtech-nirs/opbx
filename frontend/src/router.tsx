@@ -68,6 +68,7 @@ const PlatformOrganizations = trackedLazy(() => import('@/pages/platform/Platfor
 const PlatformOrganizationDetail = trackedLazy(() => import('@/pages/platform/PlatformOrganizationDetail'));
 const PlatformUsers = trackedLazy(() => import('@/pages/platform/PlatformUsers'));
 const PlatformAuditLog = trackedLazy(() => import('@/pages/platform/PlatformAuditLog'));
+const PlatformStatus = trackedLazy(() => import('@/pages/platform/PlatformStatus'));
 
 
 // Unified router - NO basename, handles all routes
@@ -359,6 +360,14 @@ export const router = createBrowserRouter([
         element: (
           <PlatformManagerRoute>
             <PlatformAuditLog />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/status',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformStatus />
           </PlatformManagerRoute>
         ),
       },

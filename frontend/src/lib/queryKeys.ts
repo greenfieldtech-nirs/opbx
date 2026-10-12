@@ -86,7 +86,7 @@ export const queryKeys = {
   callNotifications: {
     settings: () => ['call-notifications-settings'] as const,
   },
-  platform: { all: ['platform'] as const },
+  platform: { all: ['platform'] as const, status: () => ['platform', 'status'] as const },
   cloudonix: {
     voices: () => ['cloudonix-voices'] as const,
     settings: () => ['cloudonix-settings'] as const,

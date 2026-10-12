@@ -144,6 +144,7 @@ const platformSection: SidebarSection = {
     { name: 'Organizations', href: '/ui/platform/organizations', icon: 'codicon-organization' },
     { name: 'Users', href: '/ui/platform/users', icon: 'codicon-account' },
     { name: 'Audit Log', href: '/ui/platform/audit-log', icon: 'codicon-output' },
+    { name: 'Platform Status', href: '/ui/platform/status', icon: 'codicon-pulse' },
   ],
 };
 
