@@ -103,4 +103,38 @@ class CdrArchiveAccessTest extends TestCase
         $this->actingAs($owner)->getJson('/api/v1/platform/cdr-archive')->assertForbidden();
         $this->withToken($this->key($this->orgA))->getJson('/api/v1/platform/cdr-archive')->assertForbidden();
     }
+
+    public function test_api_key_archive_flag_also_applies_to_export_show_and_statistics(): void
+    {
+        $token = $this->key($this->orgA);
+
+        $csv = $this->withToken($token)->get('/api/v1/call-detail-records/export?archive=1')->assertOk()->streamedContent();
+        $this->assertStringContainsString('warm-a', $csv);
+        $this->assertStringNotContainsString('hot-a', $csv);
+        $this->assertStringNotContainsString('warm-b', $csv);
+
+        $hotCsv = $this->withToken($token)->get('/api/v1/call-detail-records/export')->assertOk()->streamedContent();
+        $this->assertStringContainsString('hot-a', $hotCsv);
+        $this->assertStringNotContainsString('warm-a', $hotCsv);
+
+        $this->withToken($token)->getJson('/api/v1/call-detail-records/900?archive=1')->assertOk()->assertJsonPath('data.from', 'warm-a');
+        $this->withToken($token)->getJson('/api/v1/call-detail-records/900')->assertNotFound();
+        $this->withToken($token)->getJson('/api/v1/call-detail-records/901?archive=1')->assertNotFound();
+
+        $range = 'from_date=2026-01-01&to_date=2026-03-01';
+        $this->withToken($token)->getJson("/api/v1/call-detail-records/statistics?archive=1&{$range}")->assertOk()->assertJsonPath('total_calls', 1);
+        $this->withToken($token)->getJson("/api/v1/call-detail-records/statistics?{$range}")->assertOk()->assertJsonPath('total_calls', 0);
+    }
+
+    public function test_org_owner_session_never_gets_warm_rows_from_export_show_or_statistics(): void
+    {
+        $owner = User::factory()->for($this->orgA)->create(['role' => UserRole::OWNER->value]);
+
+        $csv = $this->actingAs($owner)->get('/api/v1/call-detail-records/export?archive=1')->assertOk()->streamedContent();
+        $this->assertStringNotContainsString('warm-a', $csv);
+
+        $this->actingAs($owner)->getJson('/api/v1/call-detail-records/900?archive=1')->assertNotFound();
+        $this->actingAs($owner)->getJson('/api/v1/call-detail-records/statistics?archive=1&from_date=2026-01-01&to_date=2026-03-01')
+            ->assertOk()->assertJsonPath('total_calls', 0);
+    }
 }

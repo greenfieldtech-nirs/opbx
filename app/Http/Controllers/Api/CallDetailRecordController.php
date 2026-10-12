@@ -33,7 +33,7 @@ class CallDetailRecordController extends AbstractApiCrudController
     }
 
     /**
-     * ?archive=1 switches the index to the warm tier (6-12 months old). Only organisation
+     * ?archive=1 switches index, show, export and statistics to the warm tier (6-12 months old). Only organisation
      * API keys may; for the SPA (session users, incl. org Owners) the flag is ignored.
      */
     private function wantsArchive(): bool
@@ -41,6 +41,12 @@ class CallDetailRecordController extends AbstractApiCrudController
         $request = request();
 
         return $request->boolean('archive') && $request->user() instanceof ApiKey;
+    }
+
+    /** The route parameter is the same for both tiers (the archived model would otherwise snake to another name). */
+    protected function getRouteParameterName(): string
+    {
+        return 'call_detail_record';
     }
 
     protected function getResourceClass(): string
@@ -249,7 +255,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         $user = $this->getAuthenticatedUser();
 
         // Build query with same filters as index
-        $query = CallDetailRecord::forOrganization($user->organization_id);
+        $query = $this->getModelClass()::forOrganization($user->organization_id);
 
         // Apply Supervisor-scoped filter
         $this->applySupervisorFilter($query, $user);
@@ -352,7 +358,7 @@ class CallDetailRecordController extends AbstractApiCrudController
      */
     private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate): Builder
     {
-        $query = CallDetailRecord::forOrganization($user->organization_id)
+        $query = $this->getModelClass()::forOrganization($user->organization_id)
             ->whereDate('session_timestamp', '>=', $fromDate)
             ->whereDate('session_timestamp', '<=', $toDate);
 

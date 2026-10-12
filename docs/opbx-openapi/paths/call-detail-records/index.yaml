@@ -122,7 +122,11 @@ paths:
       tags:
         - Call Detail Records
       summary: Get Call Detail Record
-      description: Retrieve a single CDR by ID.
+      description: >-
+        Retrieve a single CDR by ID. With an organisation API key, `archive=1` looks the CDR up in
+        the warm archive instead of the live table.
+      parameters:
+        - $ref: '../../components/parameters/query/CdrArchive.yaml'
       operationId: getCallDetailRecord
       security:
         - bearerAuth: []

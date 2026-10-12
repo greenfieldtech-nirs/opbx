@@ -8,6 +8,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/CdrArchive.yaml'
       responses:
         '200':
           description: CDR statistics
