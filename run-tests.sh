@@ -54,6 +54,7 @@ docker compose exec \
     -e DB_HOST=mysql \
     -e DB_PORT=3306 \
     -e DB_DATABASE=opbx_test \
+    -e DB_CDR_ARCHIVE_DATABASE=opbx_test \
     -e DB_USERNAME=opbx \
     -e DB_PASSWORD \
     -e CACHE_STORE=array \

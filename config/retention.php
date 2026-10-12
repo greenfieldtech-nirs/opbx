@@ -5,7 +5,7 @@ declare(strict_types=1);
 /*
 | Retention windows in days, consumed by model:prune (see App\Models\Concerns\PrunesByRetention).
 | Set an env var to an empty value to disable pruning for that table.
-| CDR retention is deliberately absent: it is handled by the tiered CDR storage task.
+| CDRs are tiered, not pruned: hot (main DB) -> warm (cdr_archive DB) -> cold (gzip CSV on the cdr_archive disk).
 */
 $days = static function (string $key, int $default): ?int {
     $value = env($key, $default);
@@ -23,4 +23,11 @@ return [
     'call_tracking_sessions_days' => $days('RETENTION_CALL_TRACKING_SESSIONS_DAYS', 183),
     'auto_dialer_call_sessions_days' => $days('RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS', 183),
     'platform_audit_logs_days' => $days('RETENTION_PLATFORM_AUDIT_LOGS_DAYS', 365),
+
+    // Tiered CDR storage (cdr:tier), anchored on session_timestamp in UTC.
+    'cdr_hot_months' => (int) env('CDR_HOT_MONTHS', 6),
+    'cdr_warm_months' => (int) env('CDR_WARM_MONTHS', 12),
+    'cdr_cold_retention_years' => (int) env('CDR_COLD_RETENTION_YEARS', 7),
+    // Empty = equal to the CDR cold retention; larger values are clamped to it (recordings:expire).
+    'recording_retention_months' => $days('RECORDING_RETENTION_MONTHS', 0) ?: null,
 ];

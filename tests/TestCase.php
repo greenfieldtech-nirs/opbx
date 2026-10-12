@@ -19,7 +19,10 @@ abstract class TestCase extends BaseTestCase
                 'bootstrap/cache/config.php exists: cached config ignores test env overrides. Run "php artisan config:clear" before testing.'
             );
         }
-        foreach ([$_SERVER['DB_DATABASE'] ?? null, $_ENV['DB_DATABASE'] ?? null, getenv('DB_DATABASE') ?: null] as $db) {
+        foreach ([
+            $_SERVER['DB_DATABASE'] ?? null, $_ENV['DB_DATABASE'] ?? null, getenv('DB_DATABASE') ?: null,
+            $_SERVER['DB_CDR_ARCHIVE_DATABASE'] ?? null, $_ENV['DB_CDR_ARCHIVE_DATABASE'] ?? null, getenv('DB_CDR_ARCHIVE_DATABASE') ?: null,
+        ] as $db) {
             if ($db !== null && $db !== '' && $db !== 'opbx_test') {
                 throw new \RuntimeException("Refusing to run tests against non-test database [{$db}].");
             }
@@ -36,6 +39,22 @@ abstract class TestCase extends BaseTestCase
             || (string) $redis['dialer']['database'] !== '15'
             || ! str_starts_with((string) $redis['options']['prefix'], 'opbx-test-')) {
             throw new \RuntimeException('Refusing to run tests against non-test Redis databases; see phpunit.xml.dist REDIS_* overrides.');
+        }
+    }
+
+    /**
+     * Runs after the app boots (config resolved incl. .env) and before RefreshDatabase migrates:
+     * the cdr_archive connection must also point at opbx_test, never the live archive schema.
+     */
+    protected function refreshApplication(): void
+    {
+        parent::refreshApplication();
+
+        foreach (['mysql', 'cdr_archive'] as $connection) {
+            $db = config("database.connections.{$connection}.database");
+            if ($db !== 'opbx_test') {
+                throw new \RuntimeException("Refusing to run tests: connection [{$connection}] points at [{$db}], not opbx_test.");
+            }
         }
     }
 

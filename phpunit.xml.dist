@@ -38,6 +38,7 @@
         <env name="DB_PORT" value="3306" force="true"/>
         <env name="DB_DATABASE" value="opbx_test" force="true"/>
         <env name="DB_USERNAME" value="opbx" force="true"/>
+        <env name="DB_CDR_ARCHIVE_DATABASE" value="opbx_test" force="true"/>
         <env name="DB_PASSWORD" value=""/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
@@ -55,6 +56,7 @@
         <server name="DB_PORT" value="3306" force="true"/>
         <server name="DB_DATABASE" value="opbx_test" force="true"/>
         <server name="DB_USERNAME" value="opbx" force="true"/>
+        <server name="DB_CDR_ARCHIVE_DATABASE" value="opbx_test" force="true"/>
         <server name="MAIL_MAILER" value="array" force="true"/>
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <server name="SESSION_DRIVER" value="array" force="true"/>
