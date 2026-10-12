@@ -29,14 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -50,7 +42,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import api from '@/services/api';
 import { inboundBlacklistService } from '@/services/inboundBlacklist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -61,8 +52,6 @@ import type {
   UpdateInboundBlacklistRequest,
   InboundBlacklistMatchType,
   InboundBlacklistRejectionStrategy,
-  DIDNumber,
-  Status,
 } from '@/types';
 
 type BlacklistFormData = {
@@ -125,7 +114,6 @@ const InboundBlacklistPage: React.FC = () => {
   const {
     data: blacklistData,
     isLoading,
-    refetch,
   } = useQuery({
     queryKey: [...queryKeys.inboundBlacklist.all, { search: searchQuery }],
     queryFn: () => inboundBlacklistService.getAll({

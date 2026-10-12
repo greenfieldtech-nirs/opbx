@@ -4,14 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
-  Filter,
   Shield,
   RefreshCw,
   CheckCircle2,
   XCircle,
   Loader2,
 } from 'lucide-react';
-import { getCountryOptions, getCountryByCode, type CountryOption } from '@/utils/countries';
+import { getCountryOptions, getCountryByCode } from '@/utils/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,14 +26,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -50,7 +41,7 @@ import {
 import { toast } from 'sonner';
 import { outboundWhitelistService } from '@/services/outboundWhitelist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
-import { settingsService, type CloudonixTrunk } from '@/services/settings.service';
+import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
 import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
 import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest, DIDNumber } from '@/types';
@@ -104,8 +95,6 @@ const OutboundWhitelistPage: React.FC = () => {
   const {
     data: whitelistData,
     isLoading,
-    error,
-    refetch,
   } = useQuery({
     queryKey: [...queryKeys.outboundWhitelist.all, { search: searchQuery }],
     queryFn: () => outboundWhitelistService.getAll({
@@ -118,7 +107,6 @@ const OutboundWhitelistPage: React.FC = () => {
   const {
     data: trunks = [],
     isLoading: trunksLoading,
-    error: trunksError,
     refetch: refetchTrunks,
   } = useQuery({
     queryKey: queryKeys.trunks.outbound(),
