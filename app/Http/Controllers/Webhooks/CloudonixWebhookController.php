@@ -28,6 +28,7 @@ use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
+use App\Services\CallQueue\ExtensionPresenceTracker;
 use App\Services\CallQueue\QueueCallLifecycleService;
 use App\Services\CallTracking\CallTrackingAdPlatformDispatcher;
 use App\Services\CallTracking\CallTrackingEventDispatcher;
@@ -253,6 +254,8 @@ class CloudonixWebhookController extends Controller
                 'congestion', 'congested',               // Maps to 'congestion' event
             ];
             if (! in_array($validated['status'], $allowedStatuses)) {
+                $this->endPresenceForTerminalUpdate($validated);
+
                 Log::info('Session update ignored - status not in allowed list', [
                     'request_id' => $requestId,
                     'session_id' => $validated['id'],
@@ -367,6 +370,37 @@ class CloudonixWebhookController extends Controller
                 'error' => 'Session update processing failed',
                 'message' => 'An internal error occurred.',
             ], 500);
+        }
+    }
+
+    /**
+     * Terminal statuses outside the notification allow-list ('completed', 'hangup',
+     * 'bye') and deletions are not stored, but they must still clear extension presence.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function endPresenceForTerminalUpdate(array $validated): void
+    {
+        if (! ExtensionPresenceTracker::endsSession($validated['status'], $validated['action'] ?? null)) {
+            return;
+        }
+
+        try {
+            $organizationId = $this->identifyOrganizationFromDomain($validated['domain']);
+            if (! $organizationId) {
+                return;
+            }
+
+            app(QueueCallLifecycleService::class)->handleSessionEnd(
+                $organizationId,
+                $this->phoneNumberService->normalizeToE164($validated['destination']),
+                $validated['status'],
+                $validated['action'] ?? null,
+                $validated['token'] ?? null,
+                Carbon::parse($validated['modifiedAt'])->getTimestampMs()
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Terminal session update: presence cleanup failed', ['error' => $e->getMessage()]);
         }
     }
 

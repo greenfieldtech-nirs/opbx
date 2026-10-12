@@ -50,16 +50,14 @@ class QueueCallLifecycleService
      */
     public function handleSessionUpdate(SessionUpdate $sessionUpdate): void
     {
-        $this->presence->handleSessionUpdate(
+        $this->trackSessionState(
             $sessionUpdate->organization_id,
             $sessionUpdate->destination,
             $sessionUpdate->status,
-            $sessionUpdate->action
+            $sessionUpdate->action,
+            $sessionUpdate->session_token,
+            $sessionUpdate->session_modified_at?->getTimestampMs()
         );
-
-        if ($sessionUpdate->session_token && ExtensionPresenceTracker::endsSession($sessionUpdate->status, $sessionUpdate->action)) {
-            app(ConferenceOfferService::class)->releaseWinnerIfUnjoined($sessionUpdate->organization_id, $sessionUpdate->session_token);
-        }
 
         // Session updates correlate by session token: call_ids holds SIP call
         // ids, while queue calls are keyed by the voice CallSid (= session token).
@@ -128,6 +126,25 @@ class QueueCallLifecycleService
             'answered',
             $agentUserId
         );
+    }
+
+    /**
+     * A terminal or deleted session update that the webhook does not store
+     * (its status is outside the notification allow-list, e.g. 'completed'):
+     * it must still end presence and release an unjoined conference winner.
+     */
+    public function handleSessionEnd(int $organizationId, ?string $destination, string $status, ?string $action, ?string $sessionToken, ?int $modifiedAtMs): void
+    {
+        $this->trackSessionState($organizationId, $destination, $status, $action, $sessionToken, $modifiedAtMs);
+    }
+
+    private function trackSessionState(int $organizationId, ?string $destination, string $status, ?string $action, ?string $sessionToken, ?int $modifiedAtMs): void
+    {
+        $this->presence->handleSessionUpdate($organizationId, $destination, $status, $action, $modifiedAtMs);
+
+        if ($sessionToken && ExtensionPresenceTracker::endsSession($status, $action)) {
+            app(ConferenceOfferService::class)->releaseWinnerIfUnjoined($organizationId, $sessionToken);
+        }
     }
 
     /**

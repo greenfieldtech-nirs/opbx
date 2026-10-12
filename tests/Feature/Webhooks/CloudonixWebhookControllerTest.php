@@ -8,6 +8,7 @@ use App\Models\CallDetailRecord;
 use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
+use App\Services\CallQueue\ExtensionPresenceTracker;
 use App\Services\PhoneNumberService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -158,6 +159,22 @@ class CloudonixWebhookControllerTest extends TestCase
             ->assertJson(['message' => 'Status not processed']);
 
         $this->assertSame(0, SessionUpdate::withoutGlobalScopes()->count());
+    }
+
+    public function test_completed_session_update_clears_extension_presence_even_though_it_is_not_stored(): void
+    {
+        // The webhook E.164-normalises the destination, so the presence key is '+1001'.
+        $presence = app(ExtensionPresenceTracker::class);
+        $connected = ['status' => 'connected', 'destination' => '1001', 'modifiedAt' => '2026-10-11T10:00:05Z'] + $this->sessionPayload('evt-c');
+        $completed = ['status' => 'completed', 'destination' => '1001', 'modifiedAt' => '2026-10-11T10:01:00Z'] + $this->sessionPayload('evt-d');
+
+        $this->postJson('/api/webhooks/cloudonix/session-update', $connected, $this->auth())->assertOk();
+        $this->assertTrue($presence->isBusy($this->org->id, '+1001'));
+
+        $this->postJson('/api/webhooks/cloudonix/session-update', $completed, $this->auth())->assertOk();
+
+        $this->assertFalse($presence->isBusy($this->org->id, '+1001'));
+        $this->assertSame(1, SessionUpdate::withoutGlobalScopes()->count(), 'the terminal update itself is still not stored');
     }
 
     public function test_call_status_happy_path_is_accepted(): void
