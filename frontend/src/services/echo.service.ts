@@ -8,6 +8,8 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import logger from '@/utils/logger';
+import api from '@/services/api';
+import { storage } from '@/utils/storage';
 
 // Make Pusher available globally for Laravel Echo
 window.Pusher = Pusher;
@@ -74,10 +76,23 @@ export interface CallPresenceCallbacks {
   onConnectionError?: (error: Error) => void;
 }
 
-  /**
-   * Create Echo instance with configuration
-   */
-export const createEchoInstance = (authToken: string): Echo<any> => {
+/**
+ * Channel authorizer. Goes through the shared axios client so every auth request carries the
+ * current Bearer token and operate-as header, not the ones captured when the socket was created.
+ */
+export const channelAuthorizer = (channel: { name: string }) => ({
+  authorize: (socketId: string, callback: (error: Error | null, data?: unknown) => void) => {
+    api
+      .post('/broadcasting/auth', { socket_id: socketId, channel_name: channel.name })
+      .then((response) => callback(null, response.data))
+      .catch((error) => callback(error instanceof Error ? error : new Error('Channel authorization failed')));
+  },
+});
+
+/**
+ * Create Echo instance with configuration
+ */
+export const createEchoInstance = (): Echo<any> => {
   logger.debug('[Echo] Creating Echo instance with config:', {
     host: WS_CONFIG.wsHost,
     port: WS_CONFIG.wsPort,
@@ -97,13 +112,7 @@ export const createEchoInstance = (authToken: string): Echo<any> => {
     disableStats: true,
     enabledTransports: ['ws', 'wss'],
     cluster: WS_CONFIG.cluster,
-    authEndpoint: `${WS_CONFIG.apiBaseUrl}/broadcasting/auth`,
-    auth: {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        Accept: 'application/json',
-      },
-    },
+    authorizer: channelAuthorizer,
   });
 };
 
@@ -150,7 +159,7 @@ export class EchoService {
     });
 
     try {
-      this.echo = createEchoInstance(token);
+      this.echo = createEchoInstance();
 
       // Listen to connection events from Pusher
       const pusher = (this.echo as any).connector.pusher;
@@ -346,6 +355,23 @@ export class EchoService {
     this.connectionState = 'disconnected';
     this.connectionError = null;
     this.retryCount = 0;
+  }
+
+  /**
+   * Drop the socket and reconnect (e.g. after entering/exiting operate-as) so the connection
+   * and its channel subscriptions are re-authorized as the current identity.
+   */
+  reconnect(): void {
+    const token = storage.getToken();
+    if (!this.echo || !token) return;
+
+    const organizationId = this.currentOrganizationId;
+    const callbacks = this.callbacks;
+    this.disconnect();
+    this.connect(token);
+    if (organizationId) {
+      this.subscribeToOrganization(organizationId, callbacks);
+    }
   }
 
   /**
