@@ -36,6 +36,7 @@ class DistributionListController extends Controller
         $lists = AutoDialerList::where('organization_id', Auth::user()->organization_id)
             ->where('is_latest_version', true) // Only show latest versions
             ->with(['campaign', 'usedByCampaign'])
+            ->withExists('versions as has_versions')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
             ->when($request->search, function ($q, $search) {

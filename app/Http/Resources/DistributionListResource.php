@@ -38,7 +38,7 @@ class DistributionListResource extends JsonResource
             'has_versions' => $this->when(
                 $request->routeIs('*versions*'),
                 false,
-                fn () => $this->versions()->exists()
+                fn () => (bool) ($this->has_versions ?? $this->versions()->exists())
             ),
 
             // Flags
