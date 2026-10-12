@@ -25,7 +25,7 @@ export function PlatformManagerRoute({ children }: PlatformManagerRouteProps) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/ui/login" replace />;
   }
 
   if (!user?.is_platform_manager) {

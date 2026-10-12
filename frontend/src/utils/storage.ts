@@ -28,7 +28,14 @@ export const storage = {
   // User management
   getUser<T>(): T | null {
     const user = localStorage.getItem(USER_KEY);
-    return user ? JSON.parse(user) : null;
+    if (!user) return null;
+    try {
+      return JSON.parse(user) as T;
+    } catch {
+      // Corrupt value: drop it so it cannot crash every page load
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
   },
 
   setUser<T>(user: T): void {
@@ -46,6 +53,7 @@ export const storage = {
     try {
       return JSON.parse(value) as OperateAsOrg;
     } catch {
+      localStorage.removeItem(OPERATE_AS_KEY);
       return null;
     }
   },
