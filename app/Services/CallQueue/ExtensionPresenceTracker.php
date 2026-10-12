@@ -88,6 +88,7 @@ class ExtensionPresenceTracker
 
     private static function key(int $organizationId, string $extensionNumber): string
     {
-        return self::KEY_PREFIX.$organizationId.':'.$extensionNumber;
+        // Webhook destinations arrive E.164-normalised (+1001) while extensions are stored as 1001.
+        return self::KEY_PREFIX.$organizationId.':'.ltrim($extensionNumber, '+');
     }
 }

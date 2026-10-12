@@ -22,6 +22,18 @@ class ExtensionPresenceTrackerTest extends TestCase
         Redis::del('acd:presence:'.self::ORG.':1001');
     }
 
+    public function test_e164_destination_marks_the_plain_extension_busy(): void
+    {
+        // Session updates carry the destination E.164-normalised (+1001); extensions are stored as 1001.
+        $this->presence->handleSessionUpdate(self::ORG, '+1001', 'connected', null, 1000);
+
+        $this->assertTrue($this->presence->isBusy(self::ORG, '1001'));
+        $this->assertTrue($this->presence->isBusy(self::ORG, '+1001'));
+
+        $this->presence->handleSessionUpdate(self::ORG, '+1001', 'completed', null, 2000);
+        $this->assertFalse($this->presence->isBusy(self::ORG, '1001'));
+    }
+
     protected function tearDown(): void
     {
         Redis::del('acd:presence:'.self::ORG.':1001');
