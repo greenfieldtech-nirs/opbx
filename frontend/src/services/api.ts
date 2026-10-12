@@ -61,7 +61,7 @@ api.interceptors.response.use(
   (error: AxiosError<APIError>) => {
     // Handle 401 Unauthorized - token expired or invalid
     if (error.response?.status === 401) {
-      console.log('[API] 401 Unauthorized received', {
+      logger.debug('[API] 401 Unauthorized received', {
         url: error.config?.url,
         pathname: window.location.pathname
       });
@@ -69,7 +69,7 @@ api.interceptors.response.use(
       // Don't redirect for login requests - show error toast instead
       const isLoginRequest = error.config?.url?.includes('/auth/login');
       if (isLoginRequest) {
-        console.log('[API] Login request failed, showing error');
+        logger.debug('[API] Login request failed, showing error');
         return Promise.reject(error);
       }
 
@@ -80,13 +80,13 @@ api.interceptors.response.use(
                           window.location.pathname === '/ui/invite';
       
       if (isPublicPage) {
-        console.log('[API] 401 on public page, not redirecting');
+        logger.debug('[API] 401 on public page, not redirecting');
         // Clear storage but don't redirect
         storage.clearAll();
         return Promise.reject(error);
       }
 
-      console.log('[API] Clearing storage and redirecting to login');
+      logger.debug('[API] Clearing storage and redirecting to login');
       storage.clearAll();
       // Redirect to login if not already there (respect /ui basename)
       if (!window.location.pathname.includes('/login')) {

@@ -6,7 +6,7 @@
  * configured queues, 30 seconds each.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Clock, Copy, ExternalLink, Link2, PhoneCall, RefreshCw, Timer, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -169,7 +169,6 @@ export default function QueuesDashboard() {
   }, [cycling, queues.length]);
 
   const minutes = TIMESPANS.find((t) => t.value === timespan)?.minutes ?? 60;
-  const fromIso = useMemo(() => new Date(Date.now() - minutes * 60000).toISOString(), [minutes]);
 
   const queueId = activeQueue?.id;
 
@@ -194,7 +193,7 @@ export default function QueuesDashboard() {
 
   const { data: statsData } = useQuery({
     queryKey: ['queues-dashboard', queueId, 'stats', timespan],
-    queryFn: () => queueStatsService.stats(queueId!, fromIso),
+    queryFn: () => queueStatsService.stats(queueId!, new Date(Date.now() - minutes * 60000).toISOString()),
     enabled: queueId !== undefined,
     refetchInterval: 30000,
   });
