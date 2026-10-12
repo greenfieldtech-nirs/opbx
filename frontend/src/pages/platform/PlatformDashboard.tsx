@@ -14,7 +14,6 @@ import {
   Users,
   Phone,
   Globe,
-  TrendingUp,
   Activity,
   ScrollText,
 } from 'lucide-react';

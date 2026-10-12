@@ -5,7 +5,7 @@
  * Design aligned with Extensions page.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,29 +13,24 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOperateAs } from '@/context/OperateAsContext';
 import {
   Building2,
-  Plus,
   Search,
   X,
   RefreshCw,
-  MoreVertical,
-  Edit,
   Trash2,
   PauseCircle,
   Play,
   Users,
   Phone,
   Globe,
-  ChevronDown,
-  ChevronUp,
   LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDate, getStatusColor } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -51,13 +46,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { PlatformLayout } from '@/components/platform';
 import {
   StandardDataTable,
