@@ -115,6 +115,8 @@ class CampaignLifecycleManager
             'completed_at' => now(),
         ]);
 
+        $campaign->clearRedisKeys();
+
         Log::info('Campaign completed', [
             'campaign_id' => $campaign->id,
         ]);
@@ -133,6 +135,8 @@ class CampaignLifecycleManager
         $campaign->update([
             'status' => CampaignStatus::ARCHIVED,
         ]);
+
+        $campaign->clearRedisKeys();
 
         Log::info('Campaign archived', [
             'campaign_id' => $campaign->id,

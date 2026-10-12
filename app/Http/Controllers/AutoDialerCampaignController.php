@@ -182,6 +182,7 @@ class AutoDialerCampaignController extends Controller
         $this->authorize('delete', $campaign);
 
         $campaign->delete();
+        $campaign->clearRedisKeys();
 
         return response()->json([
             'message' => 'Campaign deleted successfully',

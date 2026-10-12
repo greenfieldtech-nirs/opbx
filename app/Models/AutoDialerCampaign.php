@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerCampaign extends Model
@@ -215,6 +217,19 @@ class AutoDialerCampaign extends Model
         return $query->where('status', CampaignStatus::ACTIVE)
             ->whereDate('start_date', '<=', now()->addDay())
             ->whereDate('end_date', '>=', now()->subDay());
+    }
+
+    /**
+     * Delete this campaign's keys on the dialer Redis (CAC counter, caller-id cycle index).
+     * Call when the campaign completes, is archived or is deleted. Best effort.
+     */
+    public function clearRedisKeys(): void
+    {
+        try {
+            Redis::connection('dialer')->del("dialer:cac:{$this->id}:active", "campaign:{$this->id}:caller_id_index");
+        } catch (\Throwable $e) {
+            Log::warning('Failed to clear campaign Redis keys', ['campaign_id' => $this->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

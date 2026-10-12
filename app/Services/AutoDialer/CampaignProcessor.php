@@ -147,6 +147,8 @@ class CampaignProcessor
             'completed_at' => now(),
         ]);
 
+        $campaign->clearRedisKeys();
+
         Log::info('Campaign completed', [
             'campaign_id' => $campaign->id,
             'total_destinations' => $campaign->total_destinations,

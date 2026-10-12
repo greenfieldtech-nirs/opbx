@@ -163,20 +163,6 @@ class IvrStateService
     }
 
     /**
-     * Get statistics for monitoring.
-     *
-     * @return array
-     */
-    public function getStats(): array
-    {
-        // This could be implemented to track active calls, completion rates, etc.
-        return [
-            'active_call_states' => $this->countKeys('ivr:call:*'),
-            'recent_events' => $this->countKeys('ivr:idempotency:*'),
-        ];
-    }
-
-    /**
      * Create a new call state structure.
      *
      * @param int $ivrMenuId
@@ -213,27 +199,5 @@ class IvrStateService
     private function getIdempotencyKey(string $eventId): string
     {
         return "ivr:idempotency:{$eventId}";
-    }
-
-    /**
-     * Count keys matching a pattern (approximate).
-     *
-     * @param string $pattern
-     * @return int
-     */
-    private function countKeys(string $pattern): int
-    {
-        // Note: This is an approximation since Redis SCAN is not synchronous
-        // In production, you might want to use a more sophisticated approach
-        try {
-            $keys = Redis::keys($pattern);
-            return count($keys);
-        } catch (\Exception $e) {
-            Log::warning('IVR State: Failed to count keys', [
-                'pattern' => $pattern,
-                'error' => $e->getMessage()
-            ]);
-            return 0;
-        }
     }
 }
