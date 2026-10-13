@@ -4,11 +4,12 @@ import OPBXLogo from '@/assets/opbx_logo.png';
 import { Menu, X, Github, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-const navLinks = [
-  { href: '#features', label: 'Features' },
-  { href: '#how-it-works', label: 'How It Works' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
+const navLinks: { href: string; label: string; external?: boolean; internal?: boolean }[] = [
+  { href: '/#features', label: 'Features' },
+  { href: '/#how-it-works', label: 'How It Works' },
+  { href: '/#pricing', label: 'Pricing' },
+  { href: '/#faq', label: 'FAQ' },
+  { href: '/status', label: 'Status', internal: true },
   { href: 'https://developers.cloudonix.com/opbx', label: 'Docs', external: true },
 ];
 
@@ -63,7 +64,15 @@ export function HomeHeader() {
 
         <nav className="hidden md:flex items-center gap-8 text-xl">
           {navLinks.map((link) =>
-            link.external ? (
+            link.internal ? (
+              <Link
+                key={link.href}
+                to={link.href}
+                className="font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {link.label}
+              </Link>
+            ) : link.external ? (
               <a
                 key={link.href}
                 href={link.href}
@@ -123,7 +132,16 @@ export function HomeHeader() {
           <div className="container mx-auto px-4 py-6">
             <nav className="flex flex-col gap-4 mb-6">
               {navLinks.map((link) =>
-                link.external ? (
+                link.internal ? (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="text-2xl font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ) : link.external ? (
                   <a
                     key={link.href}
                     href={link.href}
