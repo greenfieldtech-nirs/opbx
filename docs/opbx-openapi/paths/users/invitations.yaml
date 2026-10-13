@@ -56,7 +56,7 @@ paths:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '../../components/responses/ValidationError.yaml'
+                  - $ref: '../../components/schemas/ValidationError.yaml'
                   - $ref: '../../components/schemas/Error.yaml'
               examples:
                 userAlreadyExists:

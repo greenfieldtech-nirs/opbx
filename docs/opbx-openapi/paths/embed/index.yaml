@@ -1,5 +1,41 @@
 paths:
   /v1/embed/config:
+    options:
+      tags:
+        - Embedded Dialer
+      summary: CORS preflight for embed config
+      description: |
+        Answers the browser CORS preflight for the embedded dialer. Reflects the request
+        `Origin` and allows the `Authorization` and `Content-Type` headers, with a 600 second
+        max age. Not token-authenticated, because preflight requests cannot carry the bearer
+        token. The real GET enforces the token and the origin allowlist (`embed_allowed_domains`).
+      operationId: embedConfigPreflight
+      security: []
+      responses:
+        '204':
+          description: Preflight accepted
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              description: Echo of the request `Origin`.
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: GET, OPTIONS
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: Authorization, Content-Type
+            Access-Control-Max-Age:
+              schema:
+                type: string
+                example: '600'
+            Vary:
+              schema:
+                type: string
+                example: Origin
+
     get:
       tags:
         - Embedded Dialer

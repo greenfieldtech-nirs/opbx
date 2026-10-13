@@ -4,7 +4,7 @@ properties:
     type: object
     properties:
       status: {type: string, enum: [ok, degraded, down, unknown], description: Worst group status}
-      updated_at: {type: string, format: date-time, nullable: true}
+      updated_at: {type: [string, 'null'], format: date-time}
       groups:
         type: array
         items:

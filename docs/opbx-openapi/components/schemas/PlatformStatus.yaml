@@ -3,7 +3,7 @@ properties:
   data:
     type: object
     properties:
-      checked_at: {type: string, format: date-time, nullable: true}
+      checked_at: {type: [string, 'null'], format: date-time}
       summary:
         type: object
         description: Component counts per status
@@ -21,9 +21,9 @@ properties:
             label: {type: string}
             optional: {type: boolean}
             status: {type: string, enum: [ok, degraded, down, unknown]}
-            latency_ms: {type: integer, nullable: true}
+            latency_ms: {type: [integer, 'null']}
             detail: {type: string}
-            checked_at: {type: string, format: date-time, nullable: true}
+            checked_at: {type: [string, 'null'], format: date-time}
             history:
               type: array
               items:
