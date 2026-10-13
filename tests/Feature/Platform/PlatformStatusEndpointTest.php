@@ -58,6 +58,8 @@ class PlatformStatusEndpointTest extends TestCase
         $this->assertSame('ok', $redis['status']);
         $this->assertSame('back', $redis['detail']);
         $this->assertSame(['down', 'ok'], array_column($redis['history'], 'status'));
+        // The bar carries the time of the check that set its status (the 'down' check, not the earlier 'ok').
+        $this->assertSame($t->copy()->addMinutes(2)->toIso8601String(), $redis['history'][0]['check_at']);
         $loki = collect($data['components'])->firstWhere('component', 'loki');
         $this->assertTrue($loki['optional']);
         $this->assertSame('unknown', $loki['status']);

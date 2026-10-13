@@ -133,9 +133,10 @@ class PlatformHealthService
                 'latency_ms' => $latest?->latency_ms,
                 'detail' => $detail,
                 'checked_at' => $latest?->checked_at?->toIso8601String(),
-                'history' => collect($buckets[$component] ?? [])->map(fn (string $st, string $at) => [
+                'history' => collect($buckets[$component] ?? [])->map(fn (array $b, string $at) => [
                     'checked_at' => Carbon::parse($at)->toIso8601String(),
-                    'status' => $st,
+                    'status' => $b['status'],
+                    'check_at' => Carbon::parse($b['check_at'])->toIso8601String(),
                 ])->values()->all(),
             ];
         }
@@ -158,16 +159,17 @@ class PlatformHealthService
             $status = $this->worst(array_map(fn (string $m) => $latest[$m] ?? S::UNKNOWN->value, $members));
             $history = [];
             foreach (array_merge(...array_map(fn (string $m) => array_keys($buckets[$m] ?? []), $members)) as $at) {
-                $history[$at] = $this->worst(array_filter(array_map(fn (string $m) => $buckets[$m][$at] ?? null, $members)));
+                $history[$at] = $this->worstBucket(array_filter(array_map(fn (string $m) => $buckets[$m][$at] ?? null, $members)));
             }
             ksort($history);
             $groups[] = [
                 'key' => $key,
                 'name' => $name,
                 'status' => $status,
-                'history' => array_map(fn (string $at, string $st) => [
+                'history' => array_map(fn (string $at, array $b) => [
                     'at' => Carbon::parse($at)->toIso8601String(),
-                    'status' => $st,
+                    'status' => $b['status'],
+                    'check_at' => Carbon::parse($b['check_at'])->toIso8601String(),
                 ], array_keys($history), array_values($history)),
             ];
         }
@@ -190,6 +192,19 @@ class PlatformHealthService
      *
      * @return array{0: array<string, array<string, string>>, 1: array<string, string>, 2: string|null} buckets, latest status per component, latest check time
      */
+    /**
+     * Worst of several members' buckets (latest check among equals).
+     *
+     * @param  array<int, array{status: string, check_at: string}>  $buckets
+     * @return array{status: string, check_at: string}
+     */
+    private function worstBucket(array $buckets): array
+    {
+        return array_reduce($buckets, fn (?array $w, array $b) => $w === null
+            || S::from($b['status'])->severity() > S::from($w['status'])->severity()
+            || ($b['status'] === $w['status'] && $b['check_at'] > $w['check_at']) ? $b : $w);
+    }
+
     private function bucketedHistory(Carbon $since): array
     {
         $buckets = [];
@@ -200,9 +215,10 @@ class PlatformHealthService
             ->each(function ($row) use (&$buckets, &$latest, &$updatedAt) {
                 $t = (string) $row->checked_at; // 'Y-m-d H:i:s' in app timezone
                 $key = substr($t, 0, 14).str_pad((string) (intdiv((int) substr($t, 14, 2), 5) * 5), 2, '0', STR_PAD_LEFT).':00';
+                // Keep the worst status per bucket and the time of the latest check with that status.
                 $cur = $buckets[$row->component][$key] ?? null;
-                if ($cur === null || S::from($row->status)->severity() > S::from($cur)->severity()) {
-                    $buckets[$row->component][$key] = $row->status;
+                if ($cur === null || S::from($row->status)->severity() >= S::from($cur['status'])->severity()) {
+                    $buckets[$row->component][$key] = ['status' => $row->status, 'check_at' => $t];
                 }
                 $latest[$row->component] = $row->status;
                 $updatedAt = $t;
