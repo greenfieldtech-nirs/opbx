@@ -343,7 +343,9 @@ export function IvrMenuForm({
   // Jump to the first tab that holds an error (the errors argument is fresh; the render-time ones are not).
   const onInvalid = (e: typeof errors) => {
     if (e.tts_text || e.audio_file_path || e.recording_id || e.tts_voice) setTab('audio');
-    else if (e.options || e.failover_destination_id) setTab('options');
+    else if (e.options || e.failover_destination_id || e.max_timeout || e.inter_digit_timeout || e.max_turns) setTab('options');
+    // Menu Settings is collapsed by default; open it so its errors are visible.
+    if (e.failover_destination_id || e.max_timeout || e.inter_digit_timeout || e.max_turns) setIsMenuSettingsOpen(true);
   };
 
   return (

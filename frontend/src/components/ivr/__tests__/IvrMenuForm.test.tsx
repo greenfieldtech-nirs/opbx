@@ -52,6 +52,15 @@ describe('IvrMenuForm', () => {
     expect(await screen.findByText('At least one menu option is required')).toBeInTheDocument();
   });
 
+  it('opens the collapsed Menu Settings when one of its fields is invalid', async () => {
+    renderForm({ name: 'Main', useTTS: true, tts_text: 'Hello', options: [option], max_turns: 0 });
+    expect(screen.queryByText('Maximum Turns')).not.toBeInTheDocument();
+    submit();
+    // The section opens on its own and the invalid field shows its message.
+    expect(await screen.findByText('Maximum Turns')).toBeInTheDocument();
+    expect(screen.getByLabelText('Maximum Turns')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('shows the TTS length error and a live counter', async () => {
     renderForm({ name: 'Main', useTTS: true, tts_text: 'x', options: [option] });
     fireEvent.change(screen.getByLabelText('Text to Speak'), { target: { value: 'a'.repeat(1001) } });
