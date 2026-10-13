@@ -51,6 +51,13 @@ if [ ! -d "$SRC_DIR" ] || [ -z "$(ls -A "$SRC_DIR" 2>/dev/null | grep -v '^\.min
     exit 0
 fi
 
+# Two MinIO servers must never share one data directory.
+if [ "$(docker inspect -f '{{.State.Running}}' opbx_minio 2>/dev/null)" = "true" ]; then
+    echo "❌ The old MinIO container (opbx_minio) is still running on ./volumes/minio. Stop it first:"
+    echo "   docker compose stop minio   (or: docker stop opbx_minio)"
+    exit 1
+fi
+
 cleanup() { docker rm -f "$TMP_CONTAINER" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
