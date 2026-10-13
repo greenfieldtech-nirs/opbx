@@ -155,6 +155,10 @@ export function Sidebar() {
 
   // Selected section state
   const [selectedSectionId, setSelectedSectionId] = useState<string>('dashboards');
+  // Settings and Profile belong to no section: highlight none until the user picks one on that page.
+  const [pickedOnAccountPage, setPickedOnAccountPage] = useState(false);
+  const onAccountPage = /^\/ui\/(settings|profile)(\/|$)/.test(location.pathname);
+  useEffect(() => setPickedOnAccountPage(false), [location.pathname]);
 
   // Width state for the sidebar (not including activity bar)
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -336,7 +340,7 @@ export function Sidebar() {
           {/* Activity Icons */}
           <div className="flex-1 py-3 space-y-2">
             {baseSections.map(section => {
-              const isSelected = selectedSectionId === section.id;
+              const isSelected = selectedSectionId === section.id && (!onAccountPage || pickedOnAccountPage);
 
               if (section.roles && (!user?.role || !section.roles.includes(user.role))) {
                 return null;
@@ -351,6 +355,7 @@ export function Sidebar() {
                   key={section.id}
                   onClick={() => {
                     setSelectedSectionId(section.id);
+                    setPickedOnAccountPage(true);
                     if (section.id === 'dashboards') {
                       navigate('/ui/dashboard');
                     }
