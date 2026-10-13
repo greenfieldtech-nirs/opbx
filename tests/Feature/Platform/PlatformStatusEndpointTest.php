@@ -9,7 +9,9 @@ use App\Enums\UserStatus;
 use App\Models\Organization;
 use App\Models\PlatformHealthCheck;
 use App\Models\User;
+use App\Services\Platform\PlatformHealthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -61,6 +63,20 @@ class PlatformStatusEndpointTest extends TestCase
         $this->assertSame('unknown', $loki['status']);
         $this->assertSame(15, count($data['components']));
         $this->assertSame(15, array_sum($data['summary']));
+    }
+
+    public function test_scheduler_status_is_evaluated_when_read_so_a_stopped_scheduler_turns_red(): void
+    {
+        Sanctum::actingAs($this->user(true));
+        // The last stored scheduler row says ok, but the heartbeat is 10 minutes old.
+        $this->check('scheduler', 'ok', now()->subMinutes(10), 'Last scheduled run 0 s ago');
+        Cache::put(PlatformHealthService::HEARTBEAT_KEY, time() - 600);
+
+        $scheduler = collect($this->getJson('/api/v1/platform/status')->assertOk()->json('data.components'))
+            ->firstWhere('component', 'scheduler');
+
+        $this->assertSame('down', $scheduler['status']);
+        $this->assertSame('Last scheduled run 10 min ago', $scheduler['detail']);
     }
 
     public function test_check_now_runs_stores_and_returns_snapshot(): void

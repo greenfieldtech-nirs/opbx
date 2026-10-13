@@ -103,7 +103,7 @@ class PlatformHealthServiceTest extends TestCase
     {
         $this->assertSame('unknown', $this->probe()['scheduler']['status']);
 
-        foreach ([[60, 'ok'], [5 * 60, 'degraded'], [11 * 60, 'down']] as [$age, $expected]) {
+        foreach ([[30, 'ok'], [59, 'ok'], [60, 'degraded'], [179, 'degraded'], [180, 'down'], [11 * 60, 'down']] as [$age, $expected]) {
             Cache::put(PlatformHealthService::HEARTBEAT_KEY, time() - $age);
             $this->assertSame($expected, $this->probe()['scheduler']['status'], "age {$age}s");
         }

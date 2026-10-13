@@ -115,6 +115,12 @@ class PlatformHealthService
         foreach (self::COMPONENTS as $component => [$label, $optional]) {
             $latest = PlatformHealthCheck::where('component', $component)->orderByDesc('checked_at')->first();
             $status = $latest?->status ?? S::UNKNOWN->value;
+            $detail = $latest ? ($latest->detail['message'] ?? '') : 'No check recorded yet';
+            if ($component === 'scheduler') {
+                // Evaluated at read time: a stopped scheduler stores no new rows, so its last stored row would stay green.
+                [$live, $detail] = $this->scheduler();
+                $status = $live->value;
+            }
             $summary[$status]++;
             $latestAt = max($latestAt, $latest?->checked_at);
             $components[] = [
@@ -123,7 +129,7 @@ class PlatformHealthService
                 'optional' => $optional,
                 'status' => $status,
                 'latency_ms' => $latest?->latency_ms,
-                'detail' => $latest ? ($latest->detail['message'] ?? '') : 'No check recorded yet',
+                'detail' => $detail,
                 'checked_at' => $latest?->checked_at?->toIso8601String(),
                 'history' => collect($buckets[$component] ?? [])->map(fn (string $st, string $at) => [
                     'checked_at' => Carbon::parse($at)->toIso8601String(),
@@ -196,15 +202,17 @@ class PlatformHealthService
         if ($last === null) {
             return [S::UNKNOWN, 'No scheduled run recorded yet'];
         }
-        $minutes = max(0, (time() - (int) $last) / 60);
+        $seconds = max(0, time() - (int) $last);
         $cfg = config('platform_status.scheduler');
         $status = match (true) {
-            $minutes < $cfg['ok_minutes'] => S::OK,
-            $minutes < $cfg['degraded_minutes'] => S::DEGRADED,
+            $seconds < $cfg['ok_seconds'] => S::OK,
+            $seconds < $cfg['degraded_seconds'] => S::DEGRADED,
             default => S::DOWN,
         };
 
-        return [$status, sprintf('Last scheduled run %d min ago', (int) floor($minutes))];
+        return [$status, $seconds < 60
+            ? sprintf('Last scheduled run %d s ago', $seconds)
+            : sprintf('Last scheduled run %d min ago', intdiv($seconds, 60))];
     }
 
     /** @return array{0: S, 1: string} */

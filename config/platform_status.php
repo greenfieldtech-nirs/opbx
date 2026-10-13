@@ -28,6 +28,6 @@ return [
         'failed_degraded' => (int) env('PLATFORM_STATUS_QUEUE_FAILED', 50),
     ],
 
-    // Scheduler heartbeat age (minutes): ok below, degraded below, otherwise down.
-    'scheduler' => ['ok_minutes' => 3, 'degraded_minutes' => 10],
+    // Scheduler heartbeat age (seconds): ok below, degraded below, otherwise down (owner: <1 min green, <3 min amber).
+    'scheduler' => ['ok_seconds' => 60, 'degraded_seconds' => 180],
 ];
