@@ -25,7 +25,7 @@ OPBX ships an optional **MCP (Model Context Protocol) server**, `opbx-mcp`. It g
 
 Open **API Keys** (Owner). The **MCP Server** card at the top of the page shows the URL to give to MCP clients, with a copy button. It is the OPBX address followed by `/mcp`, for example `https://pbx.example.com/mcp`. nginx forwards `/mcp` to the MCP container, so no extra port is needed.
 
-{/* SCREENSHOT: mcp-server-endpoint-card — the REST API and MCP Server endpoint cards on the API Keys page, with the MCP URL ending in /mcp and its copy button */}
+![The REST API and MCP Server endpoint cards on the API Keys page, with the MCP URL ending in /mcp and its copy button](../img/screens/api-keys-list.jpg)
 
 For local development only, the container's port can be published on the loopback interface by starting the stack with `-f docker-compose.ports.yml` (`http://127.0.0.1:8080/mcp`, port from `MCP_PORT`).
 

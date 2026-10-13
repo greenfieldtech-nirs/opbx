@@ -71,9 +71,9 @@ Only an API key can read the archive tier of call detail records (records 6 to 1
 
 The key starts with `opbxk_` followed by 40 random characters. Only a SHA-256 hash is stored, so the key can never be shown again. If it is lost, revoke it and create a new one.
 
-{/* SCREENSHOT: api-keys-list — API Keys page with the REST API and MCP Server endpoint cards on top and two keys: "Reporting Dashboard" (call-detail-records:read, dashboard:read) and "CRM Integration" (users:read, extensions:write, phone-numbers:read), both Active with a last-used date */}
+![API Keys page with the REST API and MCP Server endpoint cards on top and two keys: Reporting Dashboard (call-detail-records:read, dashboard:read) and CRM Integration (extensions:write, phone-numbers:read, users:read), both Active with a last-used date](../img/screens/api-keys-list.jpg)
 
-{/* SCREENSHOT: api-keys-create-dialog — Create API Key dialog with the name "CI pipeline", the three bulk buttons and per-resource selectors, Call Detail Records set to Read */}
+![Create API Key dialog with the name CI pipeline, the three bulk buttons and per-resource selectors, Call Detail Records set to Read](../img/screens/api-keys-create-dialog.jpg)
 
 {/* SCREENSHOT: api-keys-reveal-dialog — API Key Created dialog with a placeholder key (opbxk_ followed by Xs) and the Copy button */}
 
@@ -112,7 +112,7 @@ The page has no edit dialog. To rename a key or replace its permissions, use `PU
 
 The key stops working immediately: requests with it answer `401` "Unauthenticated." Revoked keys stay in the list, dimmed, with the **Revoked** badge. Revoking cannot be undone and a revoked key cannot be deleted.
 
-{/* SCREENSHOT: api-keys-revoke-dialog — Revoke API key? confirmation for "Reporting Dashboard" */}
+![Revoke API key? confirmation for Reporting Dashboard](../img/screens/api-keys-revoke-dialog.jpg)
 
 ## Common errors
 
