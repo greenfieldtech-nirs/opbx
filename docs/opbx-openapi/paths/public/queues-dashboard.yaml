@@ -1,0 +1,199 @@
+paths:
+  /v1/public/queues-dashboard/{token}/queues:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        description: Organization's public queues dashboard token (from `GET /v1/queues-dashboard/link`).
+        schema:
+          type: string
+
+    get:
+      tags:
+        - Public
+      summary: List queues (wallboard)
+      description: |
+        Public, unauthenticated wallboard endpoint keyed by the organization's dashboard token.
+        Rate limited to 120 requests per minute per client. Returns 404 for an unknown token.
+      operationId: getPublicQueuesDashboardQueues
+      security: []
+      responses:
+        '200':
+          description: Queues of the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        strategy:
+                          type: string
+                        status:
+                          type: string
+                          enum: [active, inactive]
+        '404':
+          description: Invalid dashboard link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/live:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: queue
+        in: path
+        required: true
+        description: Queue ID
+        schema:
+          type: integer
+
+    get:
+      tags:
+        - Public
+      summary: Live queue snapshot (wallboard)
+      description: Current waiting callers, agent states and rolling counts for one queue of the token's organization. Rate limited to 120 requests per minute per client.
+      operationId: getPublicQueuesDashboardLive
+      security: []
+      responses:
+        '200':
+          description: Live snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      call_queue_id:
+                        type: integer
+                      call_queue_name:
+                        type: string
+                      waiting:
+                        type: array
+                        items:
+                          type: object
+                          description: Waiting caller (number, enter time, wait so far).
+                      agents:
+                        type: array
+                        items:
+                          type: object
+                          description: Agent state in the queue.
+                      rolling:
+                        type: object
+                        description: Rolling counts for the queue.
+                      waiting_time_avg_seconds:
+                        type: [number, 'null']
+        '404':
+          description: Invalid dashboard link or queue not in the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/stats:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: queue
+        in: path
+        required: true
+        description: Queue ID
+        schema:
+          type: integer
+      - name: from
+        in: query
+        required: false
+        description: Start of the period (ISO 8601). Defaults to 24 hours ago.
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        description: End of the period (ISO 8601). Defaults to now.
+        schema:
+          type: string
+          format: date-time
+
+    get:
+      tags:
+        - Public
+      summary: Queue statistics (wallboard)
+      description: Handled, abandoned and overflowed totals plus waiting and handling time statistics for one queue over a period. Rate limited to 120 requests per minute per client.
+      operationId: getPublicQueuesDashboardStats
+      security: []
+      responses:
+        '200':
+          description: Queue statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      call_queue_id:
+                        type: integer
+                      from:
+                        type: string
+                        format: date-time
+                      to:
+                        type: string
+                        format: date-time
+                      waiting_time:
+                        type: object
+                        description: min, max, avg and stddev of waiting time in seconds.
+                      handling_time:
+                        type: object
+                        description: min, max, avg and stddev of handling time in seconds.
+                      totals:
+                        type: object
+                        properties:
+                          handled:
+                            type: integer
+                          abandoned:
+                            type: integer
+                          overflowed:
+                            type: integer
+        '404':
+          description: Invalid dashboard link or queue not in the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
