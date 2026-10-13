@@ -28,7 +28,7 @@ UserX,RefreshCw,
 Code2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { canActOnRole } from '@/utils/roleHelpers';
+import { canActOnRole, getRoleLabel } from '@/utils/roleHelpers';
 import { formatDate,getRoleColor,getRoleDisplayName,getStatusColor } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -657,7 +657,7 @@ function UsersComplete() {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(user) => user.name}
-            getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : 'PBX User'}
+            getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : getRoleLabel(user.role)}
             onIdentityClick={(u) => canActOnRole(user?.role, u.role) && openEditDialog(u)}
             sortField={sortField}
             sortDirection={sortDirection}
