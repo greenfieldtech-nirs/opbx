@@ -919,8 +919,12 @@ components:
       $ref: './components/schemas/PhoneNumberInput.yaml'
     AiAssistant:
       $ref: './components/schemas/AiAssistant.yaml'
+    AiAssistantInput:
+      $ref: './components/schemas/AiAssistantInput.yaml'
     AiAssistantLoadBalancer:
       $ref: './components/schemas/AiAssistantLoadBalancer.yaml'
+    AiAssistantLoadBalancerInput:
+      $ref: './components/schemas/AiAssistantLoadBalancerInput.yaml'
     CallDetailRecord:
       $ref: './components/schemas/CallDetailRecord.yaml'
     Recording:

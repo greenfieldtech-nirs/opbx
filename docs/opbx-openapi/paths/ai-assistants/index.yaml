@@ -13,6 +13,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -43,6 +45,7 @@ paths:
           enum:
           - sip
           - websocket
+          - dummy
       - name: provider
         in: query
         schema:
@@ -80,47 +83,19 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: AI assistant name
-                  example: Support Bot
-                description:
-                  type:
-                  - string
-                  - 'null'
-                  example: Customer support AI assistant
-                provider:
-                  type: string
-                  description: Provider key (e.g., openai, anthropic)
-                  example: openai
-                protocol:
-                  type:
-                  - string
-                  - 'null'
-                  enum:
-                  - sip
-                  - websocket
-                  description: Auto-detected from provider if not specified
-                  example: websocket
-                configuration:
-                  type: object
-                  description: Provider-specific configuration
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
-                  default: active
-              required:
-              - name
-              - provider
+              allOf:
+                - $ref: '../../components/schemas/AiAssistantInput.yaml'
+                - required:
+                    - name
+                    - provider
+                    - configuration
       responses:
         '201':
           description: AI assistant created
@@ -154,6 +129,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:read
       responses:
         '200':
           description: AI assistant details
@@ -177,33 +154,14 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type:
-                  - string
-                  - 'null'
-                provider:
-                  type: string
-                protocol:
-                  type: string
-                  enum:
-                  - sip
-                  - websocket
-                configuration:
-                  type: object
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
+              $ref: '../../components/schemas/AiAssistantInput.yaml'
       responses:
         '200':
           description: AI assistant updated
@@ -231,33 +189,14 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type:
-                  - string
-                  - 'null'
-                provider:
-                  type: string
-                protocol:
-                  type: string
-                  enum:
-                  - sip
-                  - websocket
-                configuration:
-                  type: object
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
+              $ref: '../../components/schemas/AiAssistantInput.yaml'
       responses:
         '200':
           description: AI assistant updated
@@ -287,6 +226,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistants:write
       responses:
         '204':
           description: AI assistant deleted

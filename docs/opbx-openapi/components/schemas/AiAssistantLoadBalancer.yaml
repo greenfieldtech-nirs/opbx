@@ -1,10 +1,6 @@
 type: object
 description: AI Assistant Load Balancer
 properties:
-  is_unprovisioned:
-    type: boolean
-    readOnly: true
-    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
   organization_id:
@@ -12,16 +8,78 @@ properties:
   name:
     type: string
     example: Support Load Balancer
+  description:
+    type:
+      - string
+      - 'null'
   strategy:
     type: string
-    enum: [round_robin, priority, weighted, least_connections]
+    enum: [round_robin, priority, percentage]
     example: round_robin
-  members:
-    type: array
-    description: Load balancer members
+  follow_through:
+    type:
+      - boolean
+      - 'null'
   status:
     type: string
     enum: [active, inactive]
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+  fallback_action:
+    type: string
+    enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
+  fallback_extension_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ring_group_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ivr_menu_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  members:
+    type: array
+    description: Members ordered by position (present when loaded)
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        ai_assistant_id:
+          type: integer
+        ai_assistant_name:
+          type:
+            - string
+            - 'null'
+        priority:
+          type: integer
+        weight:
+          type: integer
+        position:
+          type: integer
+        status:
+          type: string
+  members_count:
+    type: integer
+  active_members_count:
+    type: integer
+  fallback_extension:
+    $ref: '#/$defs/Ref'
+  fallback_ring_group:
+    $ref: '#/$defs/Ref'
+  fallback_ivr_menu:
+    $ref: '#/$defs/Ref'
+  fallback_ai_assistant:
+    $ref: '#/$defs/Ref'
   created_at:
     type: string
     format: date-time
@@ -34,3 +92,16 @@ required:
   - name
   - strategy
   - status
+$defs:
+  Ref:
+    type:
+      - object
+      - 'null'
+    description: Fallback target summary (present when loaded); `name` or `extension_number`
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      extension_number:
+        type: string

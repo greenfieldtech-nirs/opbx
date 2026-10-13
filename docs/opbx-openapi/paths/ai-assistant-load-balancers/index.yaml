@@ -13,6 +13,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -36,8 +38,7 @@ paths:
           enum:
           - round_robin
           - priority
-          - weighted
-          - least_connections
+          - percentage
       - name: status
         in: query
         schema:
@@ -78,88 +79,21 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: Support Load Balancer
-                description:
-                  type:
-                  - string
-                  - 'null'
-                strategy:
-                  type: string
-                  enum:
-                  - round_robin
-                  - priority
-                  - weighted
-                  - least_connections
-                  example: round_robin
-                timeout:
-                  type: integer
-                  default: 30
-                fallback_action:
-                  type: string
-                  enum:
-                  - hangup
-                  - extension
-                  - ring_group
-                  - ivr_menu
-                  - ai_assistant
-                  default: hangup
-                fallback_extension_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ring_group_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ivr_menu_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
-                  default: active
-                members:
-                  type: array
-                  description: Load balancer members
-                  items:
-                    type: object
-                    properties:
-                      ai_assistant_id:
-                        type: integer
-                      priority:
-                        type: integer
-                        default: 0
-                      weight:
-                        type: integer
-                        default: 100
-                      position:
-                        type: integer
-                        default: 0
-                      status:
-                        type: string
-                        enum:
-                        - active
-                        - inactive
-                        default: active
-              required:
-              - name
-              - strategy
+              allOf:
+                - $ref: '../../components/schemas/AiAssistantLoadBalancerInput.yaml'
+                - required:
+                    - name
+                    - strategy
+                    - fallback_action
+                    - status
+                    - members
       responses:
         '201':
           description: Load balancer created
@@ -192,6 +126,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:read
       responses:
         '200':
           description: Load balancer details
@@ -219,73 +155,14 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                strategy:
-                  type: string
-                  enum:
-                  - round_robin
-                  - priority
-                  - weighted
-                  - least_connections
-                timeout:
-                  type: integer
-                fallback_action:
-                  type: string
-                  enum:
-                  - hangup
-                  - extension
-                  - ring_group
-                  - ivr_menu
-                  - ai_assistant
-                fallback_extension_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ring_group_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ivr_menu_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
-                members:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      ai_assistant_id:
-                        type: integer
-                      priority:
-                        type: integer
-                      weight:
-                        type: integer
-                      position:
-                        type: integer
-                      status:
-                        type: string
-                        enum:
-                        - active
-                        - inactive
+              $ref: '../../components/schemas/AiAssistantLoadBalancerInput.yaml'
       responses:
         '200':
           description: Load balancer updated
@@ -326,73 +203,14 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                strategy:
-                  type: string
-                  enum:
-                  - round_robin
-                  - priority
-                  - weighted
-                  - least_connections
-                timeout:
-                  type: integer
-                fallback_action:
-                  type: string
-                  enum:
-                  - hangup
-                  - extension
-                  - ring_group
-                  - ivr_menu
-                  - ai_assistant
-                fallback_extension_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ring_group_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ivr_menu_id:
-                  type:
-                  - integer
-                  - 'null'
-                fallback_ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
-                status:
-                  type: string
-                  enum:
-                  - active
-                  - inactive
-                members:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      ai_assistant_id:
-                        type: integer
-                      priority:
-                        type: integer
-                      weight:
-                        type: integer
-                      position:
-                        type: integer
-                      status:
-                        type: string
-                        enum:
-                        - active
-                        - inactive
+              $ref: '../../components/schemas/AiAssistantLoadBalancerInput.yaml'
       responses:
         '200':
           description: Load balancer updated
@@ -429,6 +247,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: ai-assistant-load-balancers:write
       responses:
         '204':
           description: Load balancer deleted

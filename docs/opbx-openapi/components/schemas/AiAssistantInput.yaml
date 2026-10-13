@@ -1,0 +1,26 @@
+type: object
+description: AI assistant create/update request. `protocol` is not accepted; it is derived from the provider.
+properties:
+  name:
+    type: string
+    maxLength: 255
+    description: Unique within the organization
+  description:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  status:
+    type:
+      - string
+      - 'null'
+    enum: [active, inactive, null]
+    description: Defaults to active on create (null allowed on create only)
+  provider:
+    type: string
+    maxLength: 100
+    description: Provider key (see `GET /v1/ai-assistant/providers`)
+  configuration:
+    type: object
+    description: Provider-specific configuration. Required (may be empty) on create.
+    additionalProperties: true

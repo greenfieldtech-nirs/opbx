@@ -8,14 +8,71 @@ properties:
   name:
     type: string
     example: Support Bot
-  provider:
-    type: string
-    example: openai
-  configuration:
-    type: object
+  description:
+    type:
+      - string
+      - 'null'
   status:
     type: string
     enum: [active, inactive]
+  provider:
+    type: string
+    description: Provider key from the provider registry
+    example: openai
+  protocol:
+    type:
+      - string
+      - 'null'
+    enum: [sip, websocket, dummy, null]
+    description: Derived from the provider
+  configuration:
+    type:
+      - object
+      - 'null'
+    description: Provider-specific configuration
+    additionalProperties: true
+  usage_count:
+    type: integer
+    description: Number of extensions using the assistant (present when extensions are loaded or counted)
+  used_by_extensions:
+    type: array
+    description: Extensions using the assistant (show endpoint, when non-empty)
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        extension_number:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+  created_by:
+    type: object
+    description: Present when the creator is loaded
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+  updated_by:
+    type: object
+    description: Present when the updater is loaded
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
   created_at:
     type: string
     format: date-time
