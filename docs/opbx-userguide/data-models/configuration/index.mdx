@@ -102,6 +102,9 @@ The `MINIO_*` variable names are kept for the S3 client. The S3 store is Seaweed
 | `MINIO_USE_PATH_STYLE` | `true` | |
 | `MINIO_EXPOSE_PORT` | — | Expose the S3 API on loopback port 8333 (dev only, needs `docker-compose.ports.yml`) |
 | `MINIO_CONSOLE_EXPOSE_PORT` | — | Expose the SeaweedFS master UI on loopback port 9333 (dev only, needs `docker-compose.ports.yml`) |
+| `CDR_ARCHIVE_BUCKET` | `cdr-archive` | Private bucket for the cold call-record archive. Same credentials as above |
+
+The `MINIO_*` names are kept for compatibility. Existing installations that used MinIO move their objects with `scripts/migrate-minio-to-seaweedfs.sh`. The upgrade steps are in `docs/DATABASE-PERSISTENCE.md` in the repository.
 
 ### Cloudonix CPaaS
 
@@ -215,6 +218,49 @@ Provider-specific variables are in `.env.example` for Mailgun, Mailjet, MailerLi
 | `LOG_CHANNEL` | `stack` | |
 | `LOG_LEVEL` | `info` | |
 
+## Data Retention
+
+Retention periods are set in days (or hours where noted) and enforced by the scheduler. Set a variable to an empty value to turn pruning off for that data. The pruning runs daily at 03:00 (`model:prune`); the CDR tiers and recording expiry run at 04:00 and 04:30 UTC.
+
+| Variable | Default | Data |
+|----------|---------|------|
+| `RETENTION_SESSION_UPDATES_DAYS` | `30` | Live call-state updates |
+| `RETENTION_CALL_NOTIFICATION_LOGS_DAYS` | `90` | Call notification delivery logs |
+| `RETENTION_EMAIL_LOGS_DAYS` | `90` | Email logs |
+| `RETENTION_BLOCKED_CALL_LOGS_DAYS` | `90` | Blocked-call logs |
+| `RETENTION_QUEUE_CALLS_DAYS` | `183` | Call-queue call records (deleted, not archived) |
+| `RETENTION_CALL_TRACKING_SESSIONS_DAYS` | `183` | Call-tracking sessions (deleted) |
+| `RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS` | `183` | Auto-dialer call sessions (deleted) |
+| `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` | `365` | Platform audit log |
+| `PLATFORM_HEALTH_RETENTION_HOURS` | `24` | Platform Status history, in **hours** |
+
+### Call detail records (tiered)
+
+Call records are not pruned. They move through three tiers, by session time in UTC:
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `CDR_HOT_MONTHS` | `6` | Months kept in the main database |
+| `CDR_WARM_MONTHS` | `12` | Age at which a record leaves the warm archive table and is written to a cold archive file |
+| `CDR_COLD_RETENTION_YEARS` | `7` | Years a cold (compressed CSV) archive file is kept |
+| `RECORDING_RETENTION_MONTHS` | empty | Months a call recording is kept. Empty means the cold retention period. A larger value is reduced to the cold retention period |
+
+The warm tier lives in a separate database schema, configured with `DB_CDR_ARCHIVE_DATABASE` (and optional `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`). Each falls back to the main database setting. The cold tier is written to the bucket named by `CDR_ARCHIVE_BUCKET` (default `cdr-archive`). See [Call Logs](/modules/call-logs#retention-and-archive).
+
+## Platform Status
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `PLATFORM_STATUS_TIMEOUT` | `2.5` | Seconds before a component probe fails |
+| `PLATFORM_STATUS_SLOW_MS` | `1500` | Responses slower than this are degraded |
+| `PLATFORM_STATUS_QUEUE_PENDING` | `500` | Pending jobs above this are degraded |
+| `PLATFORM_STATUS_QUEUE_FAILED` | `50` | Failed jobs at or above this are degraded |
+| `PLATFORM_STATUS_CLOUDONIX_SLOW_MS` | `3000` | Cloudonix answers slower than this count as slow |
+| `PLATFORM_STATUS_CLOUDONIX_TIMEOUT` | `5` | Seconds before a Cloudonix check counts as no answer |
+| `PLATFORM_STATUS_CLOUDONIX_CONSECUTIVE` | `3` | Consecutive bad checks before the status changes |
+
+Each probe URL can be overridden with `PLATFORM_STATUS_*_URL`. See [Platform Management](/administration/platform-management#platform-status).
+
 ## Health Check Endpoints
 
 | Endpoint | Purpose |
@@ -232,15 +278,28 @@ Provider-specific variables are in `.env.example` for Mailgun, Mailjet, MailerLi
 | `app` | `opbx_app` | Laravel PHP-FPM |
 | `nginx` | `opbx_nginx` | Reverse proxy |
 | `frontend` | `opbx_frontend` | Vite dev server |
-| `mysql` | `opbx_mysql` | MySQL 8.4 LTS |
+| `mysql` | `opbx_mysql` | MySQL 8.4 LTS (`mysql_native_password` enabled for compatibility) |
 | `redis` | `opbx_redis` | Cache, sessions, queues |
-| `seaweedfs` | `opbx_seaweedfs` | Object storage (SeaweedFS) |
+| `seaweedfs` | `opbx_seaweedfs` | S3-compatible object storage (SeaweedFS 4.47) for recordings, IVR audio and the cold CDR archive |
 | `soketi` | `opbx_websocket` | WebSocket server |
 | `queue-worker` | `opbx_queue_worker` | Queue worker |
+| `queue-worker-long` | `opbx_queue_worker_long` | Queue worker for long-running jobs |
 | `scheduler` | `opbx_scheduler` | Task scheduler |
-| `dialer-worker` | `opbx_dialer_worker` | Go dialer worker |
+| `dialer-worker` | `opbx_dialer_worker` | Go dialer worker (single replica) |
 | `amd-worker` | `opbx_amd_worker` | Java AMD worker |
-| `ngrok` | `opbx_ngrok` | Webhook tunnel (dev) |
+| `acd-worker` | `opbx_acd_worker` | Java call-queue (ACD) worker |
+| `mcp-server` | `opbx_mcp` | MCP server for AI assistants |
+| `ngrok` | `opbx_ngrok` | Webhook tunnel. Profile `dev` only |
+| `loki`, `alloy`, `grafana`, `docker-socket-proxy` | `opbx_loki`, `opbx_alloy`, `opbx_grafana`, `opbx_docker_socket_proxy` | Log stack. Profile `logs` only |
+
+Services are started with `docker compose up -d`. Optional services need a profile:
+
+| Profile | Starts |
+|---------|--------|
+| `dev` | ngrok tunnel for local webhook testing |
+| `logs` | Loki, Alloy, Grafana and the docker-socket-proxy. See [Centralized Logs](/administration/centralized-logs) |
+
+Host ports for the database, Redis and SeaweedFS are not published by default. `docker-compose.ports.yml` adds loopback ports for development.
 
 ## Related Documentation
 

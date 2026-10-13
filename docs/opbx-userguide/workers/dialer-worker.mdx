@@ -18,7 +18,7 @@ The worker handles:
 - Fetching pending destinations from Laravel
 - Enforcing CAC (Concurrent Active Calls) and CPS (Calls Per Second) limits
 - Initiating calls via the Laravel API
-- Receiving CDR webhooks from Laravel
+- Serving a health endpoint for the platform status page
 - Managing retry queues in Redis
 - Selecting Caller IDs from pools
 
@@ -106,12 +106,11 @@ make run
 | `REDIS_DB` | `0` | No | Redis database |
 | `WORKER_ID` | `worker-1` | Yes | Unique worker identifier |
 | `POLL_INTERVAL` | `10s` | No | Campaign polling interval |
-| `WEBHOOK_PORT` | `8081` | Yes | HTTP server port for CDR webhooks and health checks (container-internal; published to the host as 8181 by default, see `DIALER_WEBHOOK_HOST_PORT`) |
+| `WEBHOOK_PORT` | `8081` | Yes | HTTP port of the worker's health endpoint (container-internal; published to the host as 8181 by default, see `DIALER_WEBHOOK_HOST_PORT`) |
 
 :::note
-The worker exposes a single HTTP server on `WEBHOOK_PORT`. Health checks are available at `GET /webhooks/health` on this port.
+The worker has no webhook endpoints. Call results come to Laravel from Cloudonix, and the worker only serves `GET /webhooks/health` on `WEBHOOK_PORT`. The old CDR webhook on the worker was removed, and `WEBHOOK_SECRET` is no longer read.
 :::
-| `WEBHOOK_SECRET` | — | No | HMAC-SHA256 secret for CDR webhooks |
 
 :::note
 Laravel uses a dedicated `dialer` Redis connection with **no key prefix** for all keys shared with the Go worker. This ensures both services read and write the same keys.
@@ -124,8 +123,8 @@ Laravel uses a dedicated `dialer` Redis connection with **no key prefix** for al
 3. It fetches pending destinations: `GET /campaigns/{id}/destinations/pending`
 4. For each destination, it acquires a Redis lock, checks CAC, selects a Caller ID, and calls `POST /calls/initiate`
 5. On successful initiation, it increments the active call counter
-6. When Laravel receives a CDR webhook, it decrements the counter and the worker receives a relayed CDR event
-7. The worker updates call status and schedules retries if needed
+6. Laravel receives the call result from Cloudonix and owns the active-call count; it decrements the count when the call ends
+7. Retries are scheduled from the result as well (see the Laravel retry timing in the campaign documentation)
 
 ## Redis Key Patterns
 
@@ -138,15 +137,9 @@ Laravel uses a dedicated `dialer` Redis connection with **no key prefix** for al
 | `dialer:worker:{id}` | Worker heartbeat |
 | `dialer:idem:{key}` | Webhook idempotency |
 
-## Horizontal Scaling
+## Replicas
 
-Multiple worker instances can run concurrently:
-
-```bash
-docker compose up -d --scale dialer-worker=3
-```
-
-Each instance polls independently and uses Redis for distributed locking and shared state.
+Run **one** dialer-worker replica. The compose file pins `replicas: 1`. The CPS (calls-per-second) limiter is held in the worker's memory and is not shared between replicas, so a second replica would double the rate. Do not scale this service with `--scale`.
 
 ## Troubleshooting
 
@@ -154,8 +147,7 @@ Each instance polls independently and uses Redis for distributed locking and sha
 |-------|----------|
 | Worker not dialing | Check `LARAVEL_API_URL` and `LARAVEL_API_TOKEN`; verify campaign status is `ACTIVE` |
 | Health check unreachable | Check `WEBHOOK_PORT` and query `GET /webhooks/health` on that port |
-| CAC counter drift | The worker reconciles the counter against live call state on each poll cycle |
-| Webhook auth failures | Ensure `WEBHOOK_SECRET` matches the value used by Laravel |
+| CAC counter drift | Laravel reconciles the counter every minute (`dialer:reconcile-cac`, scheduled) |
 | High memory usage | Reduce `POLL_INTERVAL` or scale horizontally |
 
 ## Related Modules
