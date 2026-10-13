@@ -106,4 +106,56 @@ final class ExtensionPasswordControllerTest extends TestCase
         $response->assertStatus(502);
         $response->assertJsonPath('error', 'Password sync failed');
     }
+
+    private function userWithRole(UserRole $role, string $email): User
+    {
+        return User::create([
+            'organization_id' => $this->organization->id,
+            'name' => $role->value,
+            'email' => $email,
+            'password' => Hash::make('password123'),
+            'role' => $role,
+            'status' => 'active',
+        ]);
+    }
+
+    private function extFor(User $user, string $number): Extension
+    {
+        return Extension::create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $user->id,
+            'extension_number' => $number,
+            'password' => 'sip-secret',
+            'type' => ExtensionType::USER,
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_get_password_per_role(): void
+    {
+        $owner = $this->createOwner();
+        $ownerExt = $this->extFor($owner, '2000');
+        $admin = $this->userWithRole(UserRole::PBX_ADMIN, 'a@example.com');
+        $adminExt = $this->extFor($admin, '2001');
+        $other = $this->userWithRole(UserRole::PBX_USER, 'o@example.com');
+        $otherExt = $this->extFor($other, '2002');
+
+        $selfOnly = [UserRole::PBX_USER, UserRole::SUPERVISOR, UserRole::REPORTER];
+
+        // Owner reads anyone's; PBX Admin reads anyone's except an Owner's.
+        Sanctum::actingAs($owner);
+        $this->getJson("/api/v1/extensions/{$otherExt->id}/password")->assertOk();
+        Sanctum::actingAs($admin);
+        $this->getJson("/api/v1/extensions/{$otherExt->id}/password")->assertOk();
+        $this->getJson("/api/v1/extensions/{$ownerExt->id}/password")->assertForbidden();
+
+        foreach ($selfOnly as $i => $role) {
+            $actor = $this->userWithRole($role, "r{$i}@example.com");
+            $own = $this->extFor($actor, '300'.$i);
+            Sanctum::actingAs($actor);
+            $this->getJson("/api/v1/extensions/{$own->id}/password")->assertOk()->assertJsonPath('data.password', 'sip-secret');
+            $this->getJson("/api/v1/extensions/{$otherExt->id}/password")->assertForbidden();
+            $this->getJson("/api/v1/extensions/{$adminExt->id}/password")->assertForbidden();
+        }
+    }
 }

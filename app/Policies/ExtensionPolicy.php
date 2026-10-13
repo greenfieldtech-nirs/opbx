@@ -134,11 +134,20 @@ class ExtensionPolicy
     }
 
     /**
-     * Reading the SIP credentials of an extension: view, but never an Owner's extension for a non-Owner.
+     * Reading the SIP credentials: Owner and PBX Admin read any extension's (a PBX Admin never an Owner's);
+     * every other role reads only the extension linked to their own user.
      */
     public function viewPassword(User $user, Extension $extension): bool
     {
-        return $this->view($user, $extension) && ! $this->belongsToOwnerOutOfReach($user, $extension);
+        if ($user->organization_id !== $extension->organization_id) {
+            return false;
+        }
+
+        if ($user->isOwner() || $user->isPBXAdmin()) {
+            return ! $this->belongsToOwnerOutOfReach($user, $extension);
+        }
+
+        return $extension->user_id !== null && $extension->user_id === $user->id;
     }
 
     /**

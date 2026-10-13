@@ -408,6 +408,9 @@ export default function ExtensionsComplete() {
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser.role);
   // An Owner's extension (credentials included) can only be changed by an Owner
   const canActOnExtension = (ext: Extension) => canActOnRole(currentUser.role, ext.user?.role);
+  // Owner/PBX Admin: any (within role reach); every other role: only their own extension.
+  const canSeePassword = (ext: Extension) =>
+    ext.type === 'user' && (canCreate ? canActOnExtension(ext) : ext.user_id === currentUser.id);
 
   // Client-side assignment filter (backend doesn't expose this yet)
   const displayedExtensions = useMemo(() => {
@@ -1302,10 +1305,10 @@ export default function ExtensionsComplete() {
             canDelete={canCreate}
             canDeleteItem={canActOnExtension}
             columns={[
-              ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{
+              ...(displayedExtensions.some(canSeePassword) ? [{
                 header: 'Password',
                 cell: (extension: Extension) => (
-                  extension.type === 'user' && canActOnExtension(extension) ? (
+                  canSeePassword(extension) ? (
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">
                         {visiblePasswords.has(extension.id)
