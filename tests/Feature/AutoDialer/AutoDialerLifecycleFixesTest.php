@@ -55,4 +55,17 @@ final class AutoDialerLifecycleFixesTest extends TestCase
         AutoDialerList::factory()->assignedToCampaign($campaign)->create(['status' => ListStatus::ARCHIVED]);
         $this->actingAs($this->user)->patchJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/start")->assertStatus(422);
     }
+
+    public function test_assigning_a_list_leaves_a_draft_campaign_draft(): void
+    {
+        $campaign = $this->draftCampaign();
+        $list = AutoDialerList::factory()->ready()->create(['organization_id' => $this->org->id]);
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/auto-dialer-campaigns/lists/{$list->id}/assign", ['campaign_id' => $campaign->id])
+            ->assertOk();
+
+        $this->assertSame(CampaignStatus::DRAFT, $campaign->fresh()->status);
+        $this->assertSame(ListStatus::IN_USE, $list->fresh()->status);
+    }
 }

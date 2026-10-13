@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
-use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Events\AutoDialer\ListAssignedToCampaign;
@@ -559,13 +558,6 @@ class ListManagementService
             'used_by_campaign_id' => $campaignId,
             'used_at' => now(),
         ]);
-
-        // Update campaign status if it's in draft
-        if ($campaign->status === CampaignStatus::DRAFT) {
-            $campaign->update([
-                'status' => CampaignStatus::ACTIVE,
-            ]);
-        }
 
         // Dispatch event
         event(new ListAssignedToCampaign($list, $campaign, Auth::id()));
