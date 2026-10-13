@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\CallTrackingCampaignStatus;
+use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\CallTracking\StoreCampaignRequest;
 use App\Http\Requests\CallTracking\UpdateCampaignRequest;
 use App\Http\Resources\CallTrackingCampaignResource;
 use App\Models\CallTrackingCampaign;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -190,6 +192,12 @@ class CallTrackingCampaignController extends Controller
                 'error' => 'Not Found',
                 'message' => 'Call tracking campaign not found.',
             ], 404);
+        }
+
+        // Reject while DIDs still route to the campaign (sessions are history and never block).
+        $check = app(ResourceReferenceChecker::class)->checkReferences('call_tracking_campaign', $callTrackingCampaign->id, $callTrackingCampaign->organization_id);
+        if ($check['has_references']) {
+            throw new ResourceInUseException('call_tracking_campaign', $check['references']);
         }
 
         try {

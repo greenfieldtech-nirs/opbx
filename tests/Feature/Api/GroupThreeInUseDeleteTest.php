@@ -6,10 +6,15 @@ namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
 use App\Models\CallQueue;
+use App\Models\CallTrackingCampaign;
+use App\Models\CallTrackingNumber;
+use App\Models\CallTrackingSession;
+use App\Models\DidNumber;
 use App\Models\IvrMenu;
 use App\Models\Organization;
 use App\Models\Recording;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -51,5 +56,24 @@ final class GroupThreeInUseDeleteTest extends TestCase
 
         $queue->update(['moh_recording_id' => null]);
         $this->deleteJson("/api/v1/recordings/{$recording->id}")->assertSuccessful();
+    }
+
+    public function test_call_tracking_campaign_with_routed_did_is_blocked_and_keeps_sessions(): void
+    {
+        $campaign = CallTrackingCampaign::factory()->create($this->o());
+        $did = DidNumber::factory()->create($this->o());
+        $number = CallTrackingNumber::factory()->create($this->o() + ['call_tracking_campaign_id' => $campaign->id, 'did_number_id' => $did->id]);
+        // The factory builds its own number in another organization, which the tenant scope hides.
+        $session = OrganizationScope::bypass(fn () => CallTrackingSession::factory()->forCampaignAndNumber($campaign, $number)->create());
+
+        $this->deleteJson("/api/v1/call-tracking-campaigns/{$campaign->id}")
+            ->assertStatus(409)
+            ->assertJsonFragment(['type' => 'did_number', 'id' => $did->id, 'name' => $did->phone_number, 'detail' => 'tracking number']);
+        $this->assertDatabaseHas('call_tracking_campaigns', ['id' => $campaign->id]);
+        $this->assertDatabaseHas('call_tracking_sessions', ['id' => $session->id]);
+
+        // Sessions are history: once no DID routes to the campaign, the delete goes through.
+        $number->delete();
+        $this->deleteJson("/api/v1/call-tracking-campaigns/{$campaign->id}")->assertNoContent();
     }
 }
