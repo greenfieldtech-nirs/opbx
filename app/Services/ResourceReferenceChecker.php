@@ -66,6 +66,9 @@ class ResourceReferenceChecker
         ['call_tracking_numbers', 'did_number_id', 'did_number', 'call_tracking_campaign', 'name', ['call_tracking_campaigns', 'call_tracking_campaign_id'], false],
         ['auto_dialer_campaign_caller_ids', 'did_number_id', 'did_number', 'auto_dialer_campaign', 'name', ['auto_dialer_campaigns', 'campaign_id'], false],
         ['inbound_blacklist_did_number', 'did_number_id', 'did_number', 'inbound_blacklist', 'caller_id_pattern', ['inbound_blacklists', 'inbound_blacklist_id'], false],
+        // Recordings used as configuration (created_by and other history never blocks).
+        ['ivr_menus', 'recording_id', 'recording', 'ivr_menu', 'name', null, false],
+        ['call_queues', 'moh_recording_id', 'recording', 'call_queue', 'name', null, false],
     ];
 
     /** Detail text per "table.column" where the default (fallback / member) does not fit. */
@@ -76,6 +79,8 @@ class ResourceReferenceChecker
         'call_tracking_numbers.did_number_id' => 'tracking number',
         'auto_dialer_campaign_caller_ids.did_number_id' => 'caller ID pool',
         'inbound_blacklist_did_number.did_number_id' => 'blocked DID',
+        'ivr_menus.recording_id' => 'greeting',
+        'call_queues.moh_recording_id' => 'hold music',
     ];
 
     /**

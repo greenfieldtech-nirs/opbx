@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\StoreRecordingRequest;
@@ -17,6 +18,7 @@ use App\Services\CallQueue\MohSegmentationService;
 use App\Services\Recording\RecordingAccessService;
 use App\Services\Recording\RecordingRemoteService;
 use App\Services\Recording\RecordingUploadService;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -358,6 +360,12 @@ class RecordingsController extends Controller
         // Check if user has permission to delete recordings
         $this->authorize('delete', $recording);
 
+        // Reject while an IVR greeting or queue hold music still uses it (before anything is logged or removed).
+        $check = app(ResourceReferenceChecker::class)->checkReferences('recording', $recording->id, $recording->organization_id);
+        if ($check['has_references']) {
+            throw new ResourceInUseException('recording', $check['references']);
+        }
+
         // Log the deletion attempt
         $this->accessService->logFileAccess($recording, $user->id, 'deleted', [
             'ip_address' => $request->ip(),
@@ -379,8 +387,7 @@ class RecordingsController extends Controller
             }
         }
 
-        // Queues referencing this recording are nulled by the FK (nullOnDelete,
-        // no model events), so drop any MOH segments derived from it here.
+        // Drop any MOH segments derived from this recording.
         app(MohSegmentationService::class)->invalidate($recording);
 
         $recording->delete();
