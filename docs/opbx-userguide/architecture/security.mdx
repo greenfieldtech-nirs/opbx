@@ -104,16 +104,16 @@ OPBX has several rate limiters.
 
 `App\Http\Middleware\RateLimitPerOrganization` (alias `rate_limit_org`) enforces limits per organization using Redis counters.
 
-Configured in `config/rate-limiting.php`:
+Configured in the `organization` section of `config/rate_limiting.php`:
 
-| Type | Env Var | Code default | `.env.example` |
-|------|---------|--------------|----------------|
-| Voice routing | `RATE_LIMIT_VOICE` / `RATE_LIMIT_VOICE_MINUTES` | 100 / 1 min | 1000 |
-| Webhooks | `RATE_LIMIT_WEBHOOKS` / `RATE_LIMIT_WEBHOOKS_MINUTES` | 200 / 1 min | 100 |
-| API | `RATE_LIMIT_API` / `RATE_LIMIT_API_MINUTES` | 60 / 1 min | 60 |
-| Default | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min | not set |
+| Type | Env Var | Default |
+|------|---------|---------|
+| API | `RATE_LIMIT_API` / `RATE_LIMIT_API_MINUTES` | 60 / 1 min |
+| Default (fallback) | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min |
 
-The code default applies only when the variable is missing from `.env`. Only the `api` limit is applied to routes today (`rate_limit_org:api` on the authenticated API); the voice and webhook limits are defined but no route uses them.
+Only the `api` limit is applied to routes (`rate_limit_org:api` on the authenticated API).
+
+**Cloudonix webhooks and voice callbacks are intentionally not rate-limited.** With many organisations Cloudonix sends hundreds of events per second; throttling them would drop calls and CDRs. Those routes rely on signature / bearer authentication and idempotency keys instead.
 
 Additional env vars in `.env.example`:
 

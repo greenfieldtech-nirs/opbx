@@ -289,7 +289,7 @@ openssl rand -base64 32
 
 The `validate-env.sh` script checks for:
 
-- Empty or placeholder values in `DB_PASSWORD`, `APP_KEY`, `GRAFANA_ADMIN_PASSWORD`, `PUSHER_APP_SECRET`, `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`
+- Empty or placeholder values in `DB_PASSWORD`, `APP_KEY`, `PUSHER_APP_SECRET`, `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, plus `GRAFANA_ADMIN_PASSWORD` only when the log stack is in use (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`)
 - `APP_DEBUG=true` in production mode
 - Weak passwords (fewer than 8 characters)
 - Redis port exposure in production
@@ -429,7 +429,7 @@ docker compose logs app | head -n 50
 ```
 
 Common causes:
-- Weak/default passwords or S3 keys in `.env` (the shipped `minioadmin` is rejected)
+- Weak/default passwords or S3 keys in `.env` (`minioadmin` is rejected; `.env.example` ships the S3 keys empty and `generate-secrets.sh` fills them)
 - Missing required environment variables
 - Missing `vendor/` on the host (run `composer install`; the repository is bind-mounted over the image)
 - MySQL not ready (health check failure)

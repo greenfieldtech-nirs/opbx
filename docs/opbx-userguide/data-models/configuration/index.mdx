@@ -94,8 +94,8 @@ The `MINIO_*` variable names are kept for the S3 client. The S3 store is Seaweed
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MINIO_ACCESS_KEY` | `minioadmin` | S3 access key (SeaweedFS identity). Must not be a weak value; the container entrypoint rejects them. |
-| `MINIO_SECRET_KEY` | `minioadmin` | S3 secret key. Same rule as the access key. |
+| `MINIO_ACCESS_KEY` | empty (generated) | S3 access key (SeaweedFS identity). Must not be a weak value; the container entrypoint rejects them. |
+| `MINIO_SECRET_KEY` | empty (generated) | S3 secret key. Same rule as the access key. |
 | `MINIO_REGION` | `us-east-1` | |
 | `MINIO_BUCKET` | `recordings` | Default bucket |
 | `MINIO_ENDPOINT` | `http://seaweedfs:8333` | S3 API endpoint |
@@ -123,15 +123,14 @@ Per-organization credentials, including the webhook key, are stored in `cloudoni
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RATE_LIMIT_API` | `60` | API requests per minute per organization |
-| `RATE_LIMIT_WEBHOOKS` | `100` | Webhook requests per minute. Defined, but no route applies a webhook rate limit |
-| `RATE_LIMIT_VOICE` | `1000` | Voice requests per minute. Defined, but no route applies a voice rate limit |
 | `RATE_LIMIT_SENSITIVE` | `10` | Sensitive operations per minute |
 | `RATE_LIMIT_SENSITIVE_ADMIN` | `60` | Admin sensitive operations |
 | `RATE_LIMIT_AUTH` | `5` | Auth attempts per minute |
 | `WEBHOOK_IDEMPOTENCY_TTL` | `86400` | Seconds a webhook idempotency key (`idem:webhook:{key}`) is kept |
 | `WEBHOOK_MAX_CACHE_SIZE` | `102400` | Largest response (bytes) cached for a duplicate webhook |
 | `WEBHOOK_REPLAY_MAX_AGE` | `300` | Webhooks with an older `timestamp` are rejected (CDRs are accepted with a log line) |
-| `CLOUDONIX_CDR_AUTH_KEY` | — | Read into `config/webhooks.php` but not used by any code |
+
+Cloudonix webhook and voice routing routes are intentionally **not rate-limited**: with many organisations Cloudonix sends hundreds of events per second, and throttling them would drop calls and CDRs. They are protected by authentication and idempotency instead. All rate limits live in `config/rate_limiting.php`.
 
 See [Webhooks](/architecture/webhooks) for the authentication flow.
 
@@ -142,13 +141,12 @@ See [Webhooks](/architecture/webhooks) for the authentication flow.
 | `VOICE_CACHE_EXTENSION_TTL` | `1800` | Extension routing cache TTL (seconds) |
 | `VOICE_CACHE_BUSINESS_HOURS_TTL` | `900` | Business hours routing cache TTL (seconds) |
 
-`VOICE_LOCK_TIMEOUT`, `VOICE_LOCK_BLOCK`, `VOICE_MAX_RETRIES`, `VOICE_IDEMPOTENCY_TTL` and `VOICE_NO_ANSWER_TIMEOUT` are in `.env.example` and `config/voice_routing.php` but are not read by any code. The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`.
+The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`.
 
 ### Circuit Breaker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CIRCUIT_BREAKER_ENABLED` | `true` | Read into config, but the Cloudonix client applies the breaker regardless |
 | `CIRCUIT_BREAKER_CLOUDONIX_THRESHOLD` | `5` | Failure threshold |
 | `CIRCUIT_BREAKER_CLOUDONIX_TIMEOUT` | `30` | Timeout (seconds) |
 | `CIRCUIT_BREAKER_CLOUDONIX_RETRY_AFTER` | `60` | Retry after (seconds) |

@@ -19,7 +19,7 @@ The `CallNotificationsSettings` model stores per-organization webhook notificati
 | `id` | bigint unsigned | No | auto | Primary key |
 | `organization_id` | bigint unsigned | No | - | Singleton per org |
 | `webhook_url` | varchar(2048) | No | - | Target URL |
-| `auth_method` | enum | No | none | `none`, `bearer_token`, `basic_auth`. The column also allows `hmac_sha256`, which the API does not accept |
+| `auth_method` | enum | No | none | `none`, `bearer_token`, `basic_auth`. The column enum still lists `hmac_sha256` (not accepted by the API); the DB default is `none` and migration `2026_10_14_100000` converted old `hmac_sha256` rows to `none` |
 | `auth_secret` | text | Yes | null | Encrypted secret |
 | `auth_username` | string | Yes | null | For basic auth |
 | `retry_attempts` | int | No | 3 | Max retries |

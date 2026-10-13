@@ -12,7 +12,7 @@ paths:
         - Cost information
         - Recording URL (if available)
         
-        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+        Middleware: webhook.signature, webhook.idempotency
       operationId: cdrWebhook
       security:
         - webhookBearer: []

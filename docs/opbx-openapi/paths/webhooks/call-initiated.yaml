@@ -15,7 +15,7 @@ paths:
         2. Dispatches job to create CallLog record
         3. Triggers real-time frontend events
         
-        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+        Middleware: webhook.signature, webhook.idempotency
       operationId: callInitiatedWebhook
       security:
         - webhookBearer: []

@@ -210,7 +210,6 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
   - Updates `AutoDialerCallSession` and `AutoDialerDestination`.
   - Updates campaign counters.
   - Decrements the Redis CAC counter using the `dialer` connection (raw key `dialer:cac:{campaign_id}:active`). Laravel owns this count, and `dialer:reconcile-cac` heals drift every minute.
-  - Publishes the CDR event to the Redis Pub/Sub channel `cdr:completed`. No OPBX service subscribes to it any more; the dialer worker no longer receives CDRs.
 
 ---
 

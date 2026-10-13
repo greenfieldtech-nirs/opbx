@@ -18,7 +18,7 @@ paths:
         - `current_assistant_id`: ID of the AI assistant that just failed
 
 
-        Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+        Middleware: voice.webhook.auth
 
 
         Authentication: Bearer token (per-organization domain_requests_api_key)

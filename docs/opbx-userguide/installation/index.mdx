@@ -73,7 +73,7 @@ Fill in the shared secrets the workers, Soketi and Grafana need. The script writ
 docker/scripts/generate-secrets.sh
 ```
 
-It sets `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET` and `GRAFANA_ADMIN_PASSWORD`.
+It sets `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET`, `GRAFANA_ADMIN_PASSWORD`, `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY`.
 
 Then edit `.env` and set the rest by hand:
 
@@ -84,10 +84,8 @@ Then edit `.env` and set the rest by hand:
 | `DB_PASSWORD` | MySQL `opbx` user password | `openssl rand -base64 32` |
 | `DB_ROOT_PASSWORD` | MySQL root password | `openssl rand -base64 32` |
 | `REDIS_PASSWORD` | Redis password | `openssl rand -base64 32` |
-| `MINIO_ACCESS_KEY` | S3 (SeaweedFS) access key | `openssl rand -hex 16` |
-| `MINIO_SECRET_KEY` | S3 (SeaweedFS) secret key | `openssl rand -hex 32` |
 
-The `.env.example` ships `minioadmin` for both S3 keys. The app container refuses to start with `minioadmin` (or `secret`, `password`, `rootsecret`, `admin`, `123456`) as a database password or S3 key, and its environment check refuses empty or placeholder values for `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET`, `GRAFANA_ADMIN_PASSWORD` and the three worker tokens. Compose itself refuses to start while the worker tokens, `PUSHER_APP_SECRET` or the S3 keys are unset.
+The `.env.example` ships the S3 keys empty (the script above generates them). The app container refuses to start with `minioadmin` (or `secret`, `password`, `rootsecret`, `admin`, `123456`) as a database password or S3 key, and its environment check refuses empty or placeholder values for `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET` and the three worker tokens (and `GRAFANA_ADMIN_PASSWORD` when the log stack is enabled: `LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`). Compose itself refuses to start while the worker tokens, `PUSHER_APP_SECRET` or the S3 keys are unset.
 
 Optional but commonly configured variables:
 

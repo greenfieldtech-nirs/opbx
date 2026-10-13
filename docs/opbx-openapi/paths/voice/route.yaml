@@ -10,7 +10,7 @@ paths:
         Returns CXML (Cloudonix XML) document instructing the platform
         how to route the call based on organizational configuration.
         
-        Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+        Middleware: voice.webhook.auth
         
         Authentication: Bearer token (per-organization domain_requests_api_key)
       operationId: voiceRoute

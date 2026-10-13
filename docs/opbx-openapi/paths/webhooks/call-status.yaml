@@ -9,7 +9,7 @@ paths:
         
         Updates call log with current status, duration, etc.
         
-        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+        Middleware: webhook.signature, webhook.idempotency
       operationId: callStatusWebhook
       security:
         - webhookBearer: []

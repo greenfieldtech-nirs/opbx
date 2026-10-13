@@ -347,7 +347,6 @@ See `routes/api.php` for the full `/api/v1/dialer/worker/*` route group.
 | `WEBHOOK_IDEMPOTENCY_TTL` | No | `86400` | Idempotency key TTL in seconds (24h) |
 | `WEBHOOK_MAX_CACHE_SIZE` | No | `102400` | Max response cache size in bytes (100 KB) |
 | `WEBHOOK_REPLAY_MAX_AGE` | No | `300` | Max webhook age in seconds (5 min) |
-| `CLOUDONIX_CDR_AUTH_KEY` | No | *(empty)* | Optional global CDR auth key (legacy) |
 
 ### Per-Organization Settings
 
