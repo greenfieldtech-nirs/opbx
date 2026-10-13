@@ -170,6 +170,14 @@ class StoreConferenceRoomRequest extends FormRequest
                 );
             }
 
+            // Waiting for a host needs a host PIN so the host can identify themselves
+            if ($this->input('wait_for_host') && ! $this->filled('host_pin')) {
+                $validator->errors()->add(
+                    'host_pin',
+                    'A host PIN is required when waiting for the host is enabled.'
+                );
+            }
+
             // If talk detection is enabled, ensure webhook URL is provided
             if ($this->input('talk_detection_enabled') && ! $this->filled('talk_detection_webhook_url')) {
                 $validator->errors()->add(

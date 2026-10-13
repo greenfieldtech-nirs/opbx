@@ -97,11 +97,27 @@ class ConferenceRoomSettingsTest extends TestCase
         $this->assertStringContainsString('https://example.com/api/webhooks/cloudonix/recording-status', $xml);
     }
 
-    public function test_recording_enabled_without_auto_start_does_not_record(): void
+    public function test_recording_enabled_records_even_without_auto_start(): void
     {
         $xml = $this->route($this->room(['recording_enabled' => true, 'recording_auto_start' => false]));
 
+        $this->assertStringContainsString('record="record-from-start"', $xml);
+    }
+
+    public function test_recording_disabled_does_not_record(): void
+    {
+        $xml = $this->route($this->room(['recording_enabled' => false, 'recording_auto_start' => true]));
+
         $this->assertStringNotContainsString('record=', $xml);
+    }
+
+    public function test_only_the_host_ends_the_room_on_exit(): void
+    {
+        $room = $this->room(['pin_required' => true, 'pin' => '1234', 'host_pin' => '5678']);
+
+        $this->assertStringContainsString('endConferenceOnExit="true"', $this->pin($room, '5678'));
+        $this->assertStringContainsString('endConferenceOnExit="false"', $this->pin($room, '1234'));
+        $this->assertStringContainsString('endConferenceOnExit="false"', $this->route($this->room()));
     }
 
     public function test_pin_required_prompts_instead_of_joining(): void

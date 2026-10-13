@@ -139,7 +139,7 @@ class ConferenceRoutingStrategy implements RoutingStrategy
     {
         // Waiting for a host only makes sense when a host can identify themselves.
         $waitForHost = $room->wait_for_host && filled($room->host_pin);
-        $record = $room->recording_enabled && $room->recording_auto_start;
+        $record = (bool) $room->recording_enabled;
 
         $builder->dialConferenceRoom(
             sprintf('conf_%d', $room->id),
@@ -152,6 +152,7 @@ class ConferenceRoutingStrategy implements RoutingStrategy
             recordingStatusCallback: $record
                 ? app(CloudonixSettingsResolver::class)->webhookBaseUrl((int) $room->organization_id).'/api/webhooks/cloudonix/recording-status'
                 : null,
+            endOnExit: $host,
         );
     }
 

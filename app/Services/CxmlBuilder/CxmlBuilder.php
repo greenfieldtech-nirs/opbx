@@ -293,6 +293,7 @@ class CxmlBuilder
      * @param  bool  $holdMusic  Play hold music while alone / waiting
      * @param  bool  $prompts  Voice prompts when participants join or leave
      * @param  bool  $record  Record the conference from its start
+     * @param  bool  $endOnExit  Ending the conference when this participant leaves (the host)
      */
     public function dialConferenceRoom(
         string $room,
@@ -302,13 +303,14 @@ class CxmlBuilder
         bool $holdMusic = true,
         bool $prompts = false,
         bool $record = false,
-        ?string $recordingStatusCallback = null
+        ?string $recordingStatusCallback = null,
+        bool $endOnExit = false
     ): self {
         $dial = $this->document->createElement('Dial');
 
         $conference = $this->document->createElement('Conference', htmlspecialchars($room, self::XML_ENCODING, 'UTF-8'));
         $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
-        $conference->setAttribute('endConferenceOnExit', 'false');
+        $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
         $conference->setAttribute('muted', $muted ? 'true' : 'false');
         $conference->setAttribute('holdMusic', $holdMusic ? 'true' : 'false');
         $conference->setAttribute('prompts', $prompts ? 'true' : 'false');

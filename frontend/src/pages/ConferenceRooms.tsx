@@ -226,6 +226,12 @@ export default function ConferenceRooms() {
       return;
     }
 
+    // Waiting for a host needs a host PIN
+    if (formData.wait_for_host && !formData.host_pin.trim()) {
+      toast.error('A host PIN is required when Wait for Host is enabled');
+      return;
+    }
+
     // Validate talk detection webhook URL if enabled
     if (formData.talk_detection_enabled && !formData.talk_detection_webhook_url.trim()) {
       toast.error('Webhook URL is required when talk detection is enabled');
@@ -271,6 +277,12 @@ export default function ConferenceRooms() {
     // Validate PIN if required
     if (formData.pin_required && !formData.pin.trim()) {
       toast.error('PIN is required when PIN protection is enabled');
+      return;
+    }
+
+    // Waiting for a host needs a host PIN
+    if (formData.wait_for_host && !formData.host_pin.trim()) {
+      toast.error('A host PIN is required when Wait for Host is enabled');
       return;
     }
 
@@ -424,7 +436,7 @@ export default function ConferenceRooms() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="host_pin">Host PIN (Optional)</Label>
+                <Label htmlFor="host_pin">Host PIN{formData.wait_for_host ? ' (Required)' : ' (Optional)'}</Label>
                 <Input
                   id="host_pin"
                   type="text"
@@ -433,7 +445,7 @@ export default function ConferenceRooms() {
                   onChange={(e) => setFormData({ ...formData, host_pin: e.target.value })}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Separate PIN for hosts with additional controls
+                  Hosts identify themselves with this PIN. The room ends when the host leaves.
                 </p>
               </div>
 
@@ -441,12 +453,13 @@ export default function ConferenceRooms() {
                 <div className="space-y-0.5">
                   <Label htmlFor="wait_for_host">Wait for Host</Label>
                   <p className="text-sm text-muted-foreground">
-                    Conference starts only after host joins
+                    Conference starts only after host joins (requires a host PIN)
                   </p>
                 </div>
                 <Switch
                   id="wait_for_host"
                   checked={formData.wait_for_host}
+                  disabled={!formData.wait_for_host && !formData.host_pin.trim()}
                   onCheckedChange={(checked) =>
                     setFormData({ ...formData, wait_for_host: checked })
                   }
@@ -545,22 +558,6 @@ export default function ConferenceRooms() {
 
               {formData.recording_enabled && (
                 <div className="space-y-4 pl-4 border-l-2 border-muted ml-1">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="recording_auto_start">Auto-Start Recording</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Begin recording automatically when conference starts
-                      </p>
-                    </div>
-                    <Switch
-                      id="recording_auto_start"
-                      checked={formData.recording_auto_start}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, recording_auto_start: checked })
-                      }
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="recording_webhook_url">Recording Webhook URL (Optional)</Label>
                     <Input
