@@ -87,6 +87,15 @@ final class AiLoadBalancerQueueAndBalancerFallbackTest extends TestCase
         $this->assertNull($fresh->fallback_call_queue_id);
     }
 
+    public function test_status_only_update_keeps_members(): void
+    {
+        $lb = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id, 'status' => 'active']);
+
+        $this->putJson("/api/v1/ai-assistant-load-balancers/{$lb->id}", ['status' => 'inactive'])->assertOk();
+
+        $this->assertSame('inactive', $lb->fresh()->status->value);
+    }
+
     public function test_in_use_queue_and_balancer_deletes_are_blocked_by_the_fallback(): void
     {
         $queue = CallQueue::factory()->create(['organization_id' => $this->org->id]);

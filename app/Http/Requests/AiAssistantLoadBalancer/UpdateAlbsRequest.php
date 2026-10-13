@@ -203,6 +203,12 @@ class UpdateAlbsRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        // A partial update (e.g. the status toggle) sends no members: leave the key absent
+        // instead of merging an empty list, which `min:1` would reject.
+        if (! $this->has('members')) {
+            return;
+        }
+
         // Set default position for members if not provided
         $members = $this->input('members', []);
         foreach ($members as $index => &$member) {
