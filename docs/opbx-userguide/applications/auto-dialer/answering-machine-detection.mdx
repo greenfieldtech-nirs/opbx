@@ -39,8 +39,6 @@ Use AMD to avoid spending an AI conversation on voicemail boxes, to count how ma
 | If Detection Unclear | Hang up, Continue to destination | **Continue to destination** | No beep within the detection window |
 | Retry on Voicemail | On or off | Off | A beep is heard and the number has attempts left |
 
-The form also shows a **Remote CXML URL** choice and URL boxes for each action. The server accepts only **Hang up** and **Continue**; a URL is refused when you save.
-
 An action left empty is treated as **Continue**.
 
 ## What happens on a call
@@ -86,7 +84,6 @@ Switching **Enable Detection** off in the edit form does **not** clear the actio
 | Voicemail is never detected | The AMD worker is down, or the webhook base URL is not set | Check the worker's health and the Cloudonix settings |
 | A real beep is missed | The beep came within the first 2 seconds, or the greeting was longer than the window | Raise `AMD_DEFAULT_TIMEOUT_SECONDS`; lower `AMD_MIN_BEEP_START_MS` with care |
 | Calls are hung up on a ringback or tone at answer | A steady tone after the 2-second gate | Raise `AMD_MIN_BEEP_START_MS` |
-| Saving fails with "The selected voicemail action is invalid" | A Remote CXML URL was entered | Use Hang up or Continue |
 
 ## Related pages
 

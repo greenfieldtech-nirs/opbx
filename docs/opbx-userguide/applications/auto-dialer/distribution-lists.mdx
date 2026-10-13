@@ -22,7 +22,7 @@ Use **Distribution Lists** to:
 ## Prerequisites
 
 - You are the **Owner** or a **PBX Admin**.
-- A CSV file with a **header row** and one column of phone numbers.
+- A CSV file with one column of phone numbers (with or without a header row).
 
 ## The Distribution Lists page
 
@@ -65,7 +65,7 @@ phone_number,name,batch_identifier,company
 2025550142,Noah Bennett,batch-b,Example Co
 ```
 
-- The **first row is always read as the header**. The column names are what you map. The "File has a header row" switch only changes the preview.
+- With **File has a header row** on, the first row holds the column names you map. With it off, every row is data and the columns are named `column_1`, `column_2`, and so on.
 - Numbers are checked with the international phone-number rules and stored in E.164 format. A number without a leading `+` is read as a **US** number, so `2025550142` becomes `+12025550142`.
 - The same number twice in one file is kept once.
 - Blank rows and rows with an empty phone cell are skipped.
@@ -97,7 +97,7 @@ On a list's detail page, **Upload** on a Ready or Used list **replaces** its num
 2. Choose the campaign. Only campaigns that are **Draft**, **Paused**, or **Active but outside their schedule window** are offered.
 3. Confirm.
 
-The list becomes **In Use**. A **Draft** campaign becomes **Active** at once and starts dialing as soon as its schedule allows. A campaign that is currently dialing is refused: "Pause the campaign first, then assign the list."
+The list becomes **In Use**. The campaign's status does not change: a **Draft** campaign stays Draft until you start it (or auto-start does). A campaign that is currently dialing is refused: "Pause the campaign first, then assign the list."
 
 {/* SCREENSHOT: auto-dialer-lists-assign-dialog — Assign to Campaign dialog with the campaign picker open */}
 
@@ -161,7 +161,7 @@ A PBX Admin may see **Delete** on other lists in the row menu, but the server re
 
 | Message (summary) | What it means | What to do |
 |-------------------|---------------|-----------|
-| CSV must contain a column mapped to phone_number | The phone column was not mapped, or the file has no header row | Add a header row and map the phone column |
+| CSV must contain a column mapped to phone_number | The phone column was not mapped | Map the phone column (use the header-row switch to match your file) |
 | Cannot upload to list in status: In Use | The list is assigned | Unassign it, or copy it and upload to the copy |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
 | Cannot assign list … because it is currently running. Pause the campaign first | The campaign is dialing | Pause the campaign, assign, then resume |

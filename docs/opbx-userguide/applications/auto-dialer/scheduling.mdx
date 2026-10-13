@@ -65,10 +65,10 @@ Campaign: `America/New_York`, 1 to 31 October 2026, Monday to Friday 09:00 to 17
 
 The **Auto-start** option (Advanced tab) lets OPBX start a **Draft** campaign by itself. Every minute the scheduler looks for Draft campaigns with auto-start on and a **Ready** list linked to them, and starts each one whose window is open.
 
-:::caution Auto-start is rarely reached, and uses the older schedule fields
-- Assigning a list through **Distribution Lists** already turns a Draft campaign **Active** and the list **In Use**, so a campaign set up that way never waits for auto-start.
-- The auto-start check reads the older single daily window (the first enabled range's start and end hour, and the enabled weekdays), not every range in the grid, and it does not start a campaign on its end date.
-- A campaign started by auto-start is also processed by a second, older dialing path in the OPBX queue workers. That path is the only one that marks campaigns **Completed**.
+:::caution Auto-start uses the older schedule fields
+- Assigning a list through **Distribution Lists** leaves the campaign in **Draft** (the list becomes **In Use**), so auto-start can pick it up.
+- The auto-start check reads the older single daily window (the first enabled range's start and end hour, and the enabled weekdays), not every range in the grid. The end date itself is a valid day.
+- An auto-started campaign is dialed by the dialer worker, exactly like one you start by hand. There is no second dialing path.
 
 Treat auto-start as a convenience for simple Monday-to-Friday style windows, and verify on the [Real-Time Monitor](/applications/auto-dialer/real-time-monitor) that the campaign behaves as expected.
 :::

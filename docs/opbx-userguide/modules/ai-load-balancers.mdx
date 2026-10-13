@@ -97,7 +97,7 @@ A call counts as failed when the provider leg ends **busy**, **no answer**, **fa
 | IVR Menu | Plays the menu |
 | AI Assistant | Connects one more assistant, without Follow Through. It cannot be a member of the same load balancer ("Circular reference detected") |
 | Call Queue | Puts the caller in the call queue |
-| AI Load Balancer | Hands the call to another load balancer's selection. It cannot be the same load balancer; a chain that loops back ends the call |
+| AI Load Balancer | Hands the call to another load balancer's selection. Saving is refused (422) if the chain of AI Load Balancer fallbacks would ever return to this balancer: A to A, A to B to A, A to B to C to A and so on. The message names the loop. If a loop still exists at call time, the call ends |
 | Hangup | Ends the call |
 
 Call Queue and AI Load Balancer need a target: saving without one is refused. The fallback target must belong to your organization and be **active** when you save.

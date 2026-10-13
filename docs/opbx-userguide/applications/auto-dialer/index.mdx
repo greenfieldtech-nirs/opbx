@@ -61,7 +61,7 @@ The dialer worker has no schedule logic of its own: OPBX decides which campaigns
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> Active: Start (needs a list), or a list is assigned
+    Draft --> Active: Start (needs a list)
     Active --> Paused: Pause
     Paused --> Active: Resume
     Active --> Completed: every number finished
@@ -76,18 +76,18 @@ stateDiagram-v2
 | Draft | Draft | New campaign. Can be deleted | Yes |
 | Active | Running | Dials whenever the schedule allows | No. Pause first |
 | Paused | Paused | No new calls | Yes |
-| Completed | Completed | Every number reached a final state (set automatically only for auto-started campaigns; see [Managing Campaigns](/applications/auto-dialer/campaigns#start-pause-resume)) | No |
+| Completed | Completed | Every number reached a final state (set automatically within a minute of the last number finishing; see [Managing Campaigns](/applications/auto-dialer/campaigns#start-pause-resume)) | No |
 | Archived | Archived | Kept for history, hidden by the default filter | No |
 
-:::caution Assigning a list starts a Draft campaign
-When you assign a distribution list to a campaign that is in **Draft**, the campaign switches to **Active** straight away. If its schedule window is open, the dialer starts calling within one poll. Finish the campaign settings before you assign the list.
+:::note Assigning a list does not start the campaign
+Assigning a distribution list leaves a **Draft** campaign in Draft. Start it when the settings are final.
 :::
 
 ## Quick start
 
 1. **Create the campaign.** **Campaign Manager**, then **Create Campaign**. Choose the routing destination and at least one caller ID, set the schedule, rate limits and (optionally) voicemail detection. The campaign is saved as **Draft**.
 2. **Create the list.** **Distribution Lists**, then **Create List**, then **Upload Destinations** with a CSV file. Wait until the list shows **Ready**.
-3. **Assign the list.** On the list row, click **Assign Campaign** and choose your campaign. The campaign becomes **Active**.
+3. **Assign the list and start.** On the list row, click **Assign Campaign** and choose your campaign, then press **Start** on the campaign. It becomes **Active**.
 4. **Watch it.** Open **Real Time Monitor**.
 
 ![Campaign Manager with the paused campaign Fall Webinar Follow-up routed to an AI assistant](../../img/screens/auto-dialer-campaign-list.jpg)

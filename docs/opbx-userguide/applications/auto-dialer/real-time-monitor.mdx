@@ -85,7 +85,7 @@ Click **Pause** or **Resume** on a card or in the drill-down. The effect is the 
 |--------------|-----------------------|-----------|
 | Active Calls stays at the CAC limit | The destination is the bottleneck, or calls are long | Raise CAC only if the assistant can take more calls |
 | Running, 0 active calls, pending numbers left | Outside the schedule window, or numbers are waiting for their retry time | Check the [schedule](/applications/auto-dialer/scheduling) |
-| Running, 0 pending, 0 active calls | The list is finished | Pause or archive the campaign (see [Managing Campaigns](/applications/auto-dialer/campaigns#start-pause-resume)) |
+| Running, 0 pending, 0 active calls | The list is finished | The campaign switches to Completed within a minute; archive it if you like (see [Managing Campaigns](/applications/auto-dialer/campaigns#start-pause-resume)) |
 | Many Failed quickly | Calls are being refused (caller ID, trunk) or the destination is missing | Check [Call Logs](/modules/call-logs) and the [routing](/applications/auto-dialer/routing-destinations) |
 | Worker Health offline | The dialer worker is down | Check the worker. See [Dialer Worker](/workers/dialer-worker) |
 

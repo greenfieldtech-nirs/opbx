@@ -50,7 +50,7 @@ Open **Auto Dialer → Campaign Manager**. Each row shows the campaign name, sta
 2. Fill in the four tabs described below: **Basic Info**, **Schedule**, **Answering Machine Detection** and **Advanced**.
 3. Click **Create Campaign** at the bottom.
 
-On save the campaign is stored in **Draft** status and you land on its detail page. Nothing is dialed yet. To dial, assign a Ready distribution list (this makes a Draft campaign **Active** at once) or press **Start** after a list is assigned.
+On save the campaign is stored in **Draft** status and you land on its detail page. Nothing is dialed yet. To dial, assign a Ready distribution list (the campaign stays **Draft**), then press **Start**, or turn on **Auto-start**.
 
 ![Create Campaign form, Basic Info tab, with routing destination AI Assistant Aria - Front Desk Receptionist and one caller ID selected in the pool](../../img/screens/auto-dialer-campaign-create-basic.jpg)
 
@@ -105,7 +105,7 @@ See [Campaign Scheduling](/applications/auto-dialer/scheduling) for how the wind
 With the defaults, a call where no beep is heard is **hung up** when the detection window ends, which includes calls answered by a person. Read [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) and set **If Detection Unclear** to **Continue to destination** unless you really want that.
 :::
 
-The form also offers **Remote CXML URL** for each action. The server accepts only **Hang up** and **Continue**; a URL is refused when you save.
+Each action offers **Hang up** or **Continue to destination**. When you turn detection off on the edit form, the saved actions are cleared.
 
 ### Advanced tab
 
@@ -140,7 +140,7 @@ If Cloudonix refuses the call, the number goes back to pending and is tried agai
 
 | Action | Where | Allowed from | What happens |
 |--------|-------|--------------|--------------|
-| **Start** | Status badge on a Draft row, or **Start** on the detail page | Draft or Paused | Needs a Ready list assigned. Status becomes Active (Running). The concurrent-call counter is reset |
+| **Start** | Status badge on a Draft row, or **Start** on the detail page | Draft or Paused | Needs a list assigned (Ready or In Use). Status becomes Active (Running). The concurrent-call counter is reset |
 | **Pause** | Running badge, **Pause** on the detail page, or the monitor | Active | No new calls. Calls still recorded as in progress are closed as cancelled and the concurrent-call counter is reset. OPBX does not hang up calls that are already connected |
 | **Resume** | Paused badge, **Resume** on the detail page, or the monitor | Paused | Status becomes Active. The counter is reset |
 
@@ -148,11 +148,7 @@ On the detail page each action asks for confirmation first.
 
 An Active campaign only dials inside its schedule. Outside the window it stays **Running** but places no calls.
 
-A campaign becomes **Completed** when every number on its list is in a final state (completed, failed or invalid). Today that check runs only for campaigns started by [auto-start](/applications/auto-dialer/scheduling#auto-start). A campaign started any other way stays **Running** after its last number is finished; it simply has nothing left to dial. Pause or archive it yourself.
-
-:::caution Known issue: Start on a Draft campaign
-The server's Start check compares the list status in a way that never matches, so **Start** on a Draft campaign is currently refused with "Cannot start campaign without a destination list", even when a list is assigned. In practice, assigning a Ready list starts a Draft campaign (it becomes Active), and **Resume** works for Paused campaigns. This is reported as a bug.
-:::
+A campaign becomes **Completed** by itself, within a minute, once nothing is left to dial: every number is completed, failed or invalid, or pending with no attempts left, and no call is in progress. This applies however the campaign was started. A completed campaign can be archived.
 
 ## Edit a campaign
 
@@ -219,7 +215,7 @@ Below the cards: the full configuration (routing, caller ID strategy and pool, d
 | The start date must be a date after or equal to today | Start date in the past on create | Pick today or later |
 | Cannot modify an active campaign. Please pause it first | Edit sent while Running | Pause, then edit |
 | Cannot modify Caller ID pool on an active campaign | Pool change while Running | Pause first |
-| Cannot start campaign without a destination list | No Ready list, or the known issue above | Assign a Ready list |
+| Cannot start campaign without a destination list | No list assigned, or the list is archived, used or failed | Assign a Ready list |
 | This action is unauthorized | A PBX Admin tried to archive or delete, or the campaign is not Draft | Ask the Owner, or archive instead of delete |
 
 ## Related pages
