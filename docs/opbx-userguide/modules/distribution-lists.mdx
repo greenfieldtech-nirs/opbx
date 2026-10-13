@@ -3,145 +3,139 @@ sidebar_position: 17
 slug: /modules/distribution-lists
 sidebar_class_name: cxGuidesSidebar
 title: "Distribution Lists"
-description: "Manage contact lists for auto-dialer campaigns"
+description: "Lists of numbers for auto-dialer campaigns: statuses, limits, permissions, data and API reference"
 ---
 
 # Distribution Lists
 
-Distribution Lists contain the phone numbers that auto-dialer campaigns call. They support CSV upload, manual entry, versioning, copying, and archiving.
+A distribution list holds the phone numbers an [auto-dialer campaign](/modules/auto-dialer-campaigns) dials, with an optional name, batch identifier and metadata per number. This page is the reference. The step-by-step walk-through is [Distribution Lists](/applications/auto-dialer/distribution-lists) in the Auto Dialer guide.
 
 ## Purpose
 
 Use this module to:
 
-- Create lists of phone numbers
-- Upload numbers via CSV
-- Add single numbers or batches
-- Version lists for tracking changes
-- Assign lists to campaigns
+- create lists and upload numbers from CSV;
+- assign a list to a campaign and take it back;
+- reset numbers so they are dialed again;
+- copy, download, archive and delete lists.
 
-## List Status Lifecycle
+## Prerequisites
 
-```
-DRAFT --[first dest added]--> READY
-DRAFT --[CSV upload]--> PROCESSING --[success]--> READY
-                                      --[failure]--> FAILED
-READY --[assign to campaign]--> IN_USE --[campaign done]--> USED
-READY|FAILED|USED --[archive]--> ARCHIVED
-READY|USED --[create version]--> new version (DRAFT)
-```
+- **Owner** or **PBX Admin** role.
+- A CSV file with a header row and a phone-number column.
 
-## CSV Upload
+{/* SCREENSHOT: distribution-lists-module-list — Distribution Lists page with "Fall Webinar Leads" (20 destinations) assigned to "Fall Webinar Follow-up" */}
 
-1. Navigate to a distribution list
-2. Click **Upload CSV**
-3. Select a CSV file
-4. The system validates each row for E.164 format and deduplicates
-5. Processing runs asynchronously; view progress with the job ID
+## Limits
 
-Lists up to 100,000 rows use `ProcessListUploadJob`. Larger lists use `ProcessLargeListJob`.
+| Item | Limit |
+|------|-------|
+| List name | Required, up to 255 characters |
+| Description | Up to 1000 characters |
+| CSV file | `.csv` or `.txt`, up to 50 MB, first row is the header |
+| Numbers per list | 100,000. Larger files are split into "*name* (Part 2)", "(Part 3)" and so on |
+| Numbers per API batch add | 1000 |
+| Phone numbers | Validated with international numbering rules, stored as E.164. Numbers without `+` are read as US numbers. Duplicates in a file or list are skipped |
+| Copy name | Unique among your lists that are not archived |
 
-## Versioning
+## Statuses
 
-Each list can have a version chain:
+| Status | Meaning |
+|--------|---------|
+| `draft` | Created, no numbers yet |
+| `pending` | Numbers removed for a re-upload, waiting to be processed |
+| `processing` | An upload is being processed |
+| `ready` | Has valid numbers; can be assigned |
+| `failed` | No valid number, or processing failed. Errors can be viewed |
+| `in_use` | Assigned to a campaign |
+| `used` | A campaign has finished with it |
+| `archived` | Kept for history |
 
-- `parent_list_id` links a list to its previous version
-- Creating a new version archives the current list and creates a child with an incremented version number
-- The version history traverses the parent chain to the root
+Assigning a list to a **Draft** campaign also makes that campaign **Active**. See [Assign a list](/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
+
+## Number statuses
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Waiting to be dialed (or waiting for its retry time) |
+| `dialing` | A call is being placed |
+| `connected` | The call is in progress |
+| `completed` | The call was answered |
+| `failed` | Not reached after its attempts, or refused 3 times in a row |
+| `invalid` | Not a dialable number |
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View distribution lists | Yes | Yes | Yes | Yes |
-| Create distribution lists | Yes | Yes | No | No |
-| Update distribution lists | Yes | Yes | No | No |
-| Delete distribution lists | Yes | Yes | No | No |
-| Assign to campaign | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See the page and list lists | Yes | Yes | No | No | No |
+| Create, upload, copy, download | Yes | Yes | No | No | No |
+| Assign and unassign | Yes | Yes | No | No | No |
+| Reset dial attempts | Yes | Yes | No | No | No |
+| Archive (Ready or Used) | Yes | Yes | No | No | No |
+| Delete a Failed list | Yes | Yes | No | No | No |
+| Delete any other list | Yes | No | No | No | No |
 
-## UI Workflow
+Deleting removes the list and all its numbers and asks for confirmation first.
 
-### Create a List
+## Key data fields
 
-1. Navigate to **Auto Dialer** > **Distribution Lists**
-2. Click **Create List**
-3. Enter a name and optional description
-4. Save
+### `auto_dialer_lists`
 
-### Add Destinations
+| Column | Notes |
+|--------|-------|
+| `id`, `organization_id` | Key and tenant scope |
+| `campaign_id` | The campaign the list is assigned to, or empty |
+| `name`, `description` | |
+| `version_number`, `parent_list_id`, `is_latest_version` | Versioning. Only latest versions appear on the page |
+| `status` | See [Statuses](#statuses) |
+| `used_by_campaign_id`, `used_at` | Last assignment |
+| `original_filename`, `total_rows`, `valid_rows`, `invalid_rows`, `validation_errors` | Upload results |
+| `processed_at`, `archived_at` | Timestamps |
 
-1. Open the list
-2. Click **Add Destination** or **Upload CSV**
-3. Enter phone numbers in E.164 format
-4. Save
+### `auto_dialer_destinations`
 
-### Assign to a Campaign
+| Column | Notes |
+|--------|-------|
+| `id`, `organization_id`, `list_id` | Keys |
+| `phone_number` | E.164 |
+| `name`, `batch_identifier`, `metadata` | From the CSV mapping. `metadata` is passed to the AI assistant on the call |
+| `status` | See [Number statuses](#number-statuses) |
+| `dial_attempts`, `consecutive_initiate_failures`, `next_retry_at` | Attempts and retry timing |
+| `last_dialed_at`, `last_disposition`, `last_error`, `duration`, `billsec`, `total_duration` | Last result |
+| `last_session_token`, `last_call_id`, `last_cdr_id` | Links to the call |
 
-1. Open the list
-2. Click **Assign to Campaign**
-3. Select a campaign
-4. Confirm
-
-The list status changes to `IN_USE`.
-
-## Key Data Fields
-
-### `auto_dialer_lists` Table
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `campaign_id` | FK nullable | Currently assigned campaign |
-| `name` | string | |
-| `description` | string nullable | |
-| `version_number` | integer | |
-| `parent_list_id` | FK nullable | Previous version |
-| `is_latest_version` | boolean | |
-| `status` | enum | DRAFT, PENDING, PROCESSING, READY, FAILED, IN_USE, USED, ARCHIVED |
-| `total_rows` | integer | |
-| `valid_rows` | integer | |
-| `invalid_rows` | integer | |
-| `validation_errors` | JSON | |
-| `archived_at` | datetime nullable | |
-
-### `auto_dialer_destinations` Table
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `list_id` | FK | Parent list |
-| `phone_number` | string | E.164 format |
-| `description` | string nullable | |
-| `status` | enum | DestinationStatus |
-| `dial_attempts` | integer | |
-| `next_retry_at` | datetime nullable | |
-| `last_disposition` | string | |
-| `duration` | integer | |
-| `billsec` | integer | |
-
-## Related API Endpoints
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST | `/v1/auto-dialer-campaigns/lists` | List/create lists |
-| GET | `/v1/auto-dialer-campaigns/lists/{list}` | Show list |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/upload` | CSV upload |
+| GET | `/v1/auto-dialer-campaigns/lists` | List lists (filters: `status`, `campaign_id`, `search`) |
+| POST | `/v1/auto-dialer-campaigns/lists` | Create |
+| GET | `/v1/auto-dialer-campaigns/lists/example-csv` | Example CSV |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}` | One list |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/preview-csv` | Headers and first 5 rows of a file |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/upload` | Upload a CSV with a column `mapping` |
 | GET | `/v1/auto-dialer-campaigns/lists/upload-progress/{jobId}` | Upload progress |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations` | Add single destination |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/batch` | Add batch (max 1000) |
-| GET | `/v1/auto-dialer-campaigns/lists/{list}/destinations` | List destinations |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations` | Add one number |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/batch` | Add up to 1000 numbers |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/destinations` | Numbers (filters: `status`, `search`) |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts` | Reset one number |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts` | Reset selected numbers |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations` | Reset every pending number |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/versions` | Version history |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/copy` | Copy list |
-| PATCH | `/v1/auto-dialer-campaigns/lists/{list}/archive` | Archive list |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/validation-errors` | Errors of a Failed list |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/copy` | Copy |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/download` | CSV export |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to campaign |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Unassign from campaign |
+| PATCH | `/v1/auto-dialer-campaigns/lists/{list}/archive` | Archive |
+| DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to a campaign (`campaign_id`) |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign |
+
+**Scoped API keys** use the `distribution-lists` resource. The **MCP server** offers tools such as `list_distribution_lists`, `create_distribution_list`, `add_distribution_list_destinations`, `assign_distribution_list` and `unassign_distribution_list`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Lists belong to campaigns
-- [Outbound Whitelist](/modules/outbound-whitelist) — Trunk matching for validation
+- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — lists are assigned to campaigns
+- [Campaign Routing](/applications/auto-dialer/routing-destinations) — how list metadata reaches the assistant

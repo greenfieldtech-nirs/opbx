@@ -3,174 +3,155 @@ sidebar_position: 16
 slug: /modules/auto-dialer-campaigns
 sidebar_class_name: cxGuidesSidebar
 title: "Auto Dialer Campaigns"
-description: "Run outbound calling campaigns"
+description: "Outbound calling campaigns: fields, statuses, permissions, data and API reference"
 ---
 
 # Auto Dialer Campaigns
 
-The Auto Dialer manages outbound calling campaigns for sales, surveys, notifications, and other use cases.
+An auto-dialer campaign dials every number on its [distribution list](/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference. The step-by-step walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/applications/auto-dialer).
 
 ## Purpose
 
 Use this module to:
 
-- Create and manage outbound campaigns
-- Assign distribution lists
-- Configure rate limiting (CAC and CPS)
-- Set schedules and retry logic
-- Choose routing destinations for answered calls
-- Monitor campaign progress in real time
+- create and edit outbound campaigns;
+- choose the routing destination and the caller-ID pool;
+- set the schedule, rate limits, attempts and voicemail detection;
+- start, pause, resume, archive or delete campaigns;
+- follow progress on the [Real-Time Monitor](/applications/auto-dialer/real-time-monitor).
 
-## Campaign Status Lifecycle
+## Prerequisites
 
-```
-DRAFT --[start]--> ACTIVE --[pause]--> PAUSED --[resume]--> ACTIVE
-                       |
-                       +--[all done]--> COMPLETED
+- **Owner** or **PBX Admin** role.
+- An [AI assistant](/modules/ai-assistants) or [AI load balancer](/modules/ai-load-balancers), unless you route to Hangup for testing.
+- At least one **active** [phone number](/modules/phone-numbers) for the caller ID.
+- The [dialer worker](/workers/dialer-worker) running (single replica), and the [AMD worker](/workers/amd-worker) for voicemail detection.
 
-ANY --[archive]--> ARCHIVED  (pauses first if ACTIVE)
-```
+## Walk-through
 
-| Status | Description |
-|--------|-------------|
-| Draft | Initial configuration state |
-| Active | Currently dialing |
-| Paused | Temporarily stopped |
-| Completed | All destinations processed |
-| Archived | Soft-deleted, no longer editable |
+| Task | Guide |
+|------|-------|
+| Create, edit, start, pause, resume, archive, delete | [Managing Campaigns](/applications/auto-dialer/campaigns) |
+| Upload and assign the numbers | [Distribution Lists](/applications/auto-dialer/distribution-lists) |
+| Dates, weekly hours, timezone, auto-start | [Campaign Scheduling](/applications/auto-dialer/scheduling) |
+| CAC, CPS, attempts, retries | [Rate Limiting](/applications/auto-dialer/rate-limiting) |
+| Voicemail detection | [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
+| Where answered calls go | [Campaign Routing](/applications/auto-dialer/routing-destinations) |
+| Live view | [Real-Time Monitor](/applications/auto-dialer/real-time-monitor) |
 
-## Rate Limiting
+{/* SCREENSHOT: auto-dialer-campaigns-module-list — Campaign Manager with "Fall Webinar Follow-up" (Paused, AI Assistant routing) */}
 
-| Parameter | Description | Range |
-|-----------|-------------|-------|
-| CAC (Concurrent Active Calls) | Maximum simultaneous active calls | 1-50 |
-| CPS (Calls Per Second) | Maximum call initiation rate | 1-5 in UI, 1-30 clamped in worker |
+## Fields at a glance
 
-The Go worker calculates the batch size per poll cycle as `min(CPS × poll_interval_seconds, CAC)`.
+| Field | Limits and default |
+|-------|--------------------|
+| Name | Required, up to 255 characters |
+| Description | Up to 1000 characters (API only; the form does not show it) |
+| Routing destination | AI Assistant, AI Load Balancer or Hangup. A destination ID is required except for Hangup |
+| Caller ID | Required, E.164. The form uses the first number of the pool |
+| Caller-ID pool | 1 to 100 active numbers of your organization; weight 1 to 100 per number (API only, default 1) |
+| Caller-ID strategy | Round Robin (default), Random, Least Recently Used |
+| Timezone | Required, IANA name |
+| Start and end date | Required. Start today or later on create; end on or after start |
+| Weekly schedule | Per weekday: enabled, and time ranges `HH:MM` to `HH:MM` (end may be `24:00`) |
+| Dial timeout | 1 to 300 seconds. Form default: 60 |
+| Connect when | Call Connected or Immediately. Stored; not used by the current dialer |
+| Time limit | 30 to 14400 seconds. Default: 3600 |
+| Concurrent active calls (CAC) | 1 to 50 |
+| Calls per second (CPS) | 1 to 30. Default: 1 |
+| Max dial attempts | 1 to 5 |
+| Record calls | Off by default |
+| Voicemail, human and unknown actions | `HANGUP` or `CONTINUE`, or empty (treated as Continue). Empty on all three means no detection |
+| Retry on voicemail | Off by default |
+| Auto-start | Off by default |
 
-## Routing Destinations
+## Statuses
 
-When a call is answered, it can be routed to:
+| Status | Shown as | Meaning |
+|--------|----------|---------|
+| `draft` | Draft | New. Editable and deletable |
+| `active` | Running | Dials whenever the schedule allows. Not editable |
+| `paused` | Paused | No new calls. Editable |
+| `completed` | Completed | Every number finished. Set automatically only for auto-started campaigns |
+| `archived` | Archived | Kept for history |
 
-| Destination | Description |
-|-------------|-------------|
-| AI Assistant | Connect to an AI assistant |
-| AI Load Balancer | Distribute across AI assistants |
-| Hangup | Disconnect the call |
-
-## AMD Actions
-
-When AMD is enabled, the campaign defines actions for each detection result:
-
-| Result | Action Options |
-|--------|----------------|
-| Human | `HANGUP`, `CONTINUE`, or a CXML URL |
-| Voicemail | `HANGUP`, `CONTINUE`, or a CXML URL |
-| Unknown | `HANGUP`, `CONTINUE`, or a CXML URL |
-
-## Scheduling
-
-A campaign is runnable when:
-
-- Status is `ACTIVE`
-- Current date is within `start_date` and `end_date`
-- Current day and time are within the configured weekly schedule
-
-## Retry Logic
-
-Retryable dispositions: `busy`, `no-answer`, `cancelled`.
-
-Backoff interval: `5 × 2^(attempt-1)` minutes, capped at 60 minutes.
+A Draft campaign becomes **Active** when a Ready list is assigned to it.
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View campaigns | Yes | Yes | Yes | Yes |
-| Create campaigns | Yes | Yes | No | No |
-| Update campaigns | Yes | Yes | Draft/Paused only | No |
-| Start/pause/resume/archive | Yes | Yes | No | No |
-| View monitor | Yes | Yes | Yes | Yes |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See the Auto Dialer pages | Yes | Yes | No | No | No |
+| List campaigns and the monitor | Yes | Yes | No | No | No |
+| Create, edit, start, pause, resume | Yes | Yes | No | No | No |
+| Archive | Yes | No | No | No | No |
+| Delete (Draft only) | Yes | No | No | No | No |
 
-## UI Workflow
+## What a campaign blocks
 
-### Create a Campaign
+- A **phone number** in a campaign's caller-ID pool cannot be deleted ("caller ID pool" in the in-use dialog).
+- An **AI assistant** or **AI load balancer** that a campaign routes to cannot be deleted ("routing" in the in-use dialog), whatever the campaign's status.
 
-1. Navigate to **Auto Dialer** > **Campaigns** in the sidebar
-2. Click **Create Campaign**
-3. Enter name, schedule, and rate limits
-4. Choose the routing destination
-5. Configure AMD actions if needed
-6. Save as Draft
+Remove the reference from the campaign first. See [Phone Numbers](/modules/phone-numbers#delete) and [Campaign Routing](/applications/auto-dialer/routing-destinations#deleting-a-destination-that-a-campaign-uses).
 
-### Assign a Distribution List
+## Key data fields
 
-1. Open the campaign detail
-2. Click **Assign List**
-3. Select or upload a distribution list
-4. Save
+### `auto_dialer_campaigns`
 
-### Start a Campaign
+| Column | Notes |
+|--------|-------|
+| `id`, `organization_id` | Key and tenant scope |
+| `name`, `description` | |
+| `status` | `draft`, `active`, `paused`, `completed`, `archived` |
+| `auto_start` | Boolean |
+| `routing_destination_type`, `routing_destination_id` | `ai_assistant`, `ai_load_balancer` or `hangup`, and the target id |
+| `caller_id`, `caller_id_strategy`, `caller_id_pool_enabled` | Main caller ID and pool settings |
+| `dial_timeout`, `time_limit`, `destination_connect`, `record_calls` | Call settings |
+| `max_dial_attempts`, `concurrent_active_calls`, `calls_per_second` | Limits |
+| `timezone`, `start_date`, `end_date`, `schedule` | The schedule. `schedule` is the weekly JSON that the dialer reads |
+| `days_active`, `start_time`, `end_time` | Older single-window fields derived from `schedule`; used by auto-start |
+| `action_voicemail`, `action_human`, `action_unknown`, `retry_on_voicemail` | Voicemail detection |
+| `total_destinations`, `completed_calls`, `failed_calls`, `pending_calls`, `voicemail_calls` | Counters |
+| `started_at`, `completed_at` | Timestamps |
 
-1. Open the campaign detail or list
-2. Click **Start**
-3. The campaign status changes to `ACTIVE`
-4. The Go dialer worker begins polling and initiating calls
+### `auto_dialer_campaign_caller_ids`
 
-### Monitor a Campaign
+The caller-ID pool: `campaign_id`, `did_number_id`, `weight`.
 
-1. Navigate to **Auto Dialer** > **Monitor**
-2. View the bird's-eye summary of all active and paused campaigns
-3. Click a campaign card for drill-down statistics, active calls, and disposition charts
+### `auto_dialer_call_sessions`
 
-## Key Data Fields
+One row per call attempt: campaign, destination, session token, status, disposition, duration, AMD result and confidence, and the start, answer and end times.
 
-### `auto_dialer_campaigns` Table
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | |
-| `status` | enum | CampaignStatus |
-| `routing_destination_type` | enum | ai_assistant, ai_load_balancer, hangup |
-| `routing_destination_id` | integer nullable | |
-| `dial_timeout` | integer | |
-| `caller_id` | string | Default caller ID |
-| `max_dial_attempts` | integer | |
-| `concurrent_active_calls` | integer | CAC limit |
-| `calls_per_second` | integer | CPS limit |
-| `days_active` | JSON | Active days |
-| `start_time` / `end_time` | time | Daily window |
-| `start_date` / `end_date` | date | Campaign window |
-| `timezone` | string | IANA timezone |
-| `schedule` | JSON | Weekly schedule |
-| `action_voicemail` | string | AMD action |
-| `action_human` | string | AMD action |
-| `action_unknown` | string | AMD action |
-
-## Related API Endpoints
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/auto-dialer-campaigns[/{campaign}]` | Standard CRUD |
-| PATCH | `/v1/auto-dialer-campaigns/{campaign}/start` | Start campaign |
-| PATCH | `/v1/auto-dialer-campaigns/{campaign}/pause` | Pause campaign |
-| PATCH | `/v1/auto-dialer-campaigns/{campaign}/resume` | Resume campaign |
-| PATCH | `/v1/auto-dialer-campaigns/{campaign}/archive` | Archive campaign |
-| GET | `/v1/auto-dialer-campaigns/{campaign}/destinations` | List destinations |
-| GET | `/v1/auto-dialer-campaigns/{campaign}/concurrency` | Real-time CAC |
-| GET | `/v1/auto-dialer-campaigns/monitor/summary` | Bird's-eye monitor |
-| GET | `/v1/auto-dialer-campaigns/{campaign}/monitor/detail` | Campaign drill-down |
-| GET | `/v1/auto-dialer-campaigns/available-caller-ids` | Available DIDs for caller ID pooling |
-| GET | `/v1/auto-dialer-campaigns/{campaign}/caller-id-stats` | Per-DID usage statistics |
-| POST | `/v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle` | Reset round-robin position |
+| GET | `/v1/auto-dialer-campaigns` | List (filters: `status`, `exclude_status`, `search`) |
+| POST | `/v1/auto-dialer-campaigns` | Create (status Draft) |
+| GET | `/v1/auto-dialer-campaigns/{campaign}` | One campaign, with its caller-ID pool |
+| PUT | `/v1/auto-dialer-campaigns/{campaign}` | Update (refused while Active) |
+| DELETE | `/v1/auto-dialer-campaigns/{campaign}` | Delete (Owner, Draft only) |
+| PATCH | `/v1/auto-dialer-campaigns/{campaign}/start` | Start |
+| PATCH | `/v1/auto-dialer-campaigns/{campaign}/pause` | Pause |
+| PATCH | `/v1/auto-dialer-campaigns/{campaign}/resume` | Resume |
+| PATCH | `/v1/auto-dialer-campaigns/{campaign}/archive` | Archive (Owner) |
+| POST | `/v1/auto-dialer-campaigns/{campaign}/reset-cac` | Reset the concurrent-call counter |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/destinations` | Numbers of the campaign's lists |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/concurrency` | Live CAC use |
+| GET | `/v1/auto-dialer-campaigns/monitor/summary` | Monitor overview |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/monitor/detail` | Monitor drill-down |
+| GET | `/v1/auto-dialer-campaigns/available-caller-ids` | Active numbers that can join a pool |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/caller-id-stats` | Per-number usage |
+| POST | `/v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle` | Restart round robin (Paused only) |
+
+**Scoped API keys** use the `auto-dialer-campaigns` resource. The **MCP server** offers tools such as `list_campaigns`, `get_campaign`, `create_campaign`, `update_campaign` and `get_campaigns_monitor_summary`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Distribution Lists](/modules/distribution-lists) — Contact lists for campaigns
-- [AI Assistants](/modules/ai-assistants) — Campaign routing destinations
-- [AI Load Balancers](/modules/ai-load-balancers) — Campaign routing destinations
-- [Dialer Worker](/workers/dialer-worker) — Go service that executes campaigns
+- [Distribution Lists](/modules/distribution-lists) — the numbers a campaign dials
+- [AI Assistants](/modules/ai-assistants) and [AI Load Balancers](/modules/ai-load-balancers) — routing destinations
+- [Phone Numbers](/modules/phone-numbers) — caller IDs
+- [Outbound Whitelist](/modules/outbound-whitelist) — trunk selection for campaign calls
+- [Dialer Worker](/workers/dialer-worker) and [AMD Worker](/workers/amd-worker)
