@@ -37,16 +37,20 @@ From `docker-compose.yml.example`:
 
 ```yaml
 soketi:
-  image: 'quay.io/soketi/soketi:latest-16-alpine'
+  image: 'quay.io/soketi/soketi:1.6-16-alpine'
   ports:
     - "${SOKETI_PORT:-6001}:6001"
     - "${SOKETI_METRICS_PORT:-9601}:9601"
   environment:
     SOKETI_DEFAULT_APP_ID: '${PUSHER_APP_ID:-app-id}'
     SOKETI_DEFAULT_APP_KEY: '${PUSHER_APP_KEY:-pbxappkey}'
-    SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:-pbxappsecret}'
+    SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:?set PUSHER_APP_SECRET}'
     SOKETI_DEFAULT_APP_MAX_CONNECTIONS: '10000'
+  healthcheck:
+    test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9601/ready']
 ```
+
+`PUSHER_APP_SECRET` has no default: Compose refuses to start until it is set (generate one with `openssl rand -hex 32`).
 
 ### Frontend Connection
 
@@ -56,7 +60,7 @@ The frontend uses the environment variables:
 |----------|---------|
 | `VITE_PUSHER_APP_KEY` | Soketi app key |
 | `VITE_WS_HOST` | WebSocket host |
-| `VITE_WS_PORT` | WebSocket port (usually `80` when proxied through Nginx) |
+| `VITE_WS_PORT` | WebSocket port (the compose file defaults to `80`, proxied through Nginx) |
 | `VITE_WS_SCHEME` | `http` or `https` |
 
 When Nginx proxies WebSockets, the browser connects to `ws://your-domain/app/` on port 80/443, not directly to port 6001.
@@ -69,13 +73,13 @@ Channel authorization is defined in `routes/channels.php`.
 
 | Channel | Type | Authorization |
 |---------|------|---------------|
-| `org.{organizationId}` | Presence | User belongs to the organization. Returns `{id, name, email, role}`. |
+| `org.{organizationId}` | Presence | User belongs to the organization and is an Owner or PBX Admin. Supervisors are denied (their live view is filtered by assignment instead). Returns `{id, name, email, role}`. |
 | `user.{userId}` | Private | User ID matches the channel ID. |
 | `extension.{extensionId}` | Private | User's organization matches the extension's organization. |
 
 ### Presence Channel
 
-The organization presence channel is the primary channel for live call updates. All users in the same organization receive the same call events and can see each other's online presence.
+The organization presence channel is the primary channel for live call updates. All Owners and PBX Admins in the same organization receive the same call events and can see each other's online presence.
 
 ---
 
@@ -97,7 +101,7 @@ Events are dispatched from webhook handlers and jobs as call state changes occur
 
 ### Features
 
-- Bearer auth for `/broadcasting/auth`
+- Bearer auth for `/api/v1/broadcasting/auth`
 - Auto-retry with exponential backoff (initial 1s, max 30s, max 5 attempts)
 - 10-second connection timeout
 - Subscribes to organization presence channels
@@ -124,13 +128,13 @@ Events are dispatched from webhook handlers and jobs as call state changes occur
 
 ## Broadcasting Authentication
 
-Laravel's broadcasting auth route is registered in `routes/api.php`:
+Laravel's broadcasting auth route is registered inside the `v1` group of `routes/api.php`, so its path is `/api/v1/broadcasting/auth`:
 
 ```php
 Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 ```
 
-To subscribe to a private or presence channel, the client must first authenticate. Soketi forwards the auth request to `/broadcasting/auth`, where Sanctum validates the session or Bearer token and `EnsureTenantScope` validates the organization.
+To subscribe to a private or presence channel, the client must first authenticate. The Echo client posts the auth request to `/api/v1/broadcasting/auth`, where Sanctum validates the session or Bearer token and `EnsureTenantScope` validates the organization.
 
 ---
 
@@ -183,13 +187,13 @@ For larger deployments, scale Soketi horizontally or tune these limits.
 1. Confirm Soketi is healthy: `docker compose ps soketi`
 2. Check the frontend is using the Nginx-proxied path (`/app/`) and the correct port.
 3. Verify `PUSHER_APP_KEY` matches between the Soketi container and the frontend build.
-4. Check browser dev tools for auth failures on `/broadcasting/auth`.
+4. Check browser dev tools for auth failures on `/api/v1/broadcasting/auth`.
 
 ### No Live Call Updates
 
 1. Confirm the `CallInitiated` / `CallAnswered` / `CallEnded` events are dispatched from the webhook handlers.
 2. Verify the user is subscribed to `org.{organizationId}`.
-3. Check that the organization channel authorization returns `true` or user data.
+3. Check that the organization channel authorization returns user data. It returns nothing for Reporters, PBX Users and Supervisors.
 
 ---
 

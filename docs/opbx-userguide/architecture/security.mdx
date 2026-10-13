@@ -55,9 +55,9 @@ Token abilities are derived from the user's role:
 |------|-------------------|
 | Owner | `extension:*`, `user:*`, `settings:*`, `recording-download:*`, `platform:*` (if PM) |
 | PBX Admin | `extension:*`, `user:read`, `user:update`, `ring-group:*`, `did-number:*` |
-| Supervisor | `call-log:read`, `session-update:read` (scoped to assigned users/ring groups) |
+| Supervisor | Reporter abilities plus `supervisor:view`, `supervisor:assignments` (data scoped to assigned users and ring groups) |
 | PBX User | `extension:read`, `extension:update:own`, `user:read`, `call-log:read` |
-| Reporter | `extension:read`, `user:read`, `ring-group:read`, `call-log:read` |
+| Reporter | `extension:read`, `user:read`, `ring-group:read`, `call-log:read`, `business-hours:read` |
 
 ---
 
@@ -106,12 +106,14 @@ OPBX has several rate limiters.
 
 Configured in `config/rate-limiting.php`:
 
-| Type | Env Var | Default |
-|------|---------|---------|
-| Voice routing | `RATE_LIMIT_VOICE` / `RATE_LIMIT_VOICE_MINUTES` | 100 / 1 min |
-| Webhooks | `RATE_LIMIT_WEBHOOKS` / `RATE_LIMIT_WEBHOOKS_MINUTES` | 200 / 1 min |
-| API | `RATE_LIMIT_API` / `RATE_LIMIT_API_MINUTES` | 60 / 1 min |
-| Default | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min |
+| Type | Env Var | Code default | `.env.example` |
+|------|---------|--------------|----------------|
+| Voice routing | `RATE_LIMIT_VOICE` / `RATE_LIMIT_VOICE_MINUTES` | 100 / 1 min | 1000 |
+| Webhooks | `RATE_LIMIT_WEBHOOKS` / `RATE_LIMIT_WEBHOOKS_MINUTES` | 200 / 1 min | 100 |
+| API | `RATE_LIMIT_API` / `RATE_LIMIT_API_MINUTES` | 60 / 1 min | 60 |
+| Default | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min | not set |
+
+The code default applies only when the variable is missing from `.env`.
 
 Additional env vars in `.env.example`:
 
@@ -136,7 +138,7 @@ Standard Laravel `throttle` middleware is used for auth, registration, email val
 See [Webhooks](./webhooks) for endpoint details. Highlights:
 
 - Voice routing webhooks require a Bearer token (`VerifyVoiceWebhookAuth`) and return CXML on errors.
-- Status/CDR webhooks conditionally require a Bearer token (`VerifyCloudonixSignature`) and return JSON on errors.
+- Status/CDR webhooks conditionally require a Bearer token (`VerifyCloudonixSignature`) and return JSON on errors. `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true` makes the token mandatory.
 - Token comparisons use `hash_equals()` to prevent timing attacks.
 - Per-organization keys are encrypted at rest.
 - Failed attempts are logged with IP, path, organization ID, and reason (never the token).
@@ -148,11 +150,14 @@ See [Webhooks](./webhooks) for endpoint details. Highlights:
 The `CloudonixSettings` model casts sensitive fields as encrypted:
 
 ```php
-protected $casts = [
-    'domain_api_key' => 'encrypted',
-    'domain_requests_api_key' => 'encrypted',
-    'domain_cdr_auth_key' => 'encrypted',
-];
+protected function casts(): array
+{
+    return [
+        'domain_api_key' => 'encrypted',
+        'domain_requests_api_key' => 'encrypted',
+        // ...
+    ];
+}
 ```
 
 These values are encrypted with the Laravel `APP_KEY`. They are masked in API responses (only the last four characters are shown) and excluded from logs.
@@ -206,10 +211,12 @@ Token-based clients are not affected by CSRF because they authenticate with a Be
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Permissions-Policy` | Disables geolocation, microphone, camera, payment, USB, etc. |
+| `Permissions-Policy` | Disables geolocation, camera, payment, USB and motion sensors. Microphone is allowed for the same origin (the web phone needs it). |
 | `Strict-Transport-Security` | Added in production (max-age from `HSTS_MAX_AGE`, default 1 year). |
 
-CSP connect-src allows `self`, `ws:`, `wss:`, and the configured Cloudonix API domain. Additional domains can be added via `CSP_CONNECT_DOMAINS`.
+CSP connect-src allows `self`, `ws:`, `wss:`, and the configured Cloudonix API domain. Additional domains can be added via `CSP_CONNECT_DOMAINS`. HSTS is tuned with `HSTS_MAX_AGE`, `HSTS_INCLUDE_SUBDOMAINS` and `HSTS_PRELOAD`.
+
+The `/embed/*` routes (the embeddable dialer) are excluded from these headers, because they are meant to be framed by other sites.
 
 ---
 
@@ -236,7 +243,22 @@ Sensitive fields are redacted from exception context and logs. The excluded keys
 
 ### AMD Worker
 
-The AMD worker authenticates to `/api/voice/amd-action` using `AMD_WORKER_API_TOKEN`.
+The AMD worker authenticates to `/api/voice/amd-session` and `/api/voice/amd-action` using `AMD_WORKER_API_TOKEN`. Audio streams for sessions that are not active auto-dialer calls are closed.
+
+### ACD Worker
+
+Laravel authenticates to the ACD worker with `ACD_WORKER_API_TOKEN` (Bearer, constant-time comparison). The ACD and AMD workers refuse to start when their token is empty or still a shipped placeholder.
+
+---
+
+## Container Hardening
+
+- Docker Compose refuses to start without the shared secrets (`DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`; Grafana in the `logs` profile also needs `GRAFANA_ADMIN_PASSWORD`). `docker/scripts/generate-secrets.sh` fills in missing ones without printing them.
+- The app container entrypoint rejects weak values (`secret`, `password`, `rootsecret`, `minioadmin`, `admin`, `123456`) for the database password, root password and S3 keys.
+- MySQL, Redis and SeaweedFS publish no host ports. `docker-compose.ports.yml` adds loopback-only (`127.0.0.1`) ports for local tools.
+- The Redis password and the SeaweedFS S3 keys are written to files inside their containers, so they do not appear in `docker inspect` or `ps`.
+- The dialer, AMD and ACD worker images run as a non-root user (uid 10001).
+- In the `logs` profile, Alloy reads container logs through a read-only Docker socket proxy instead of the raw socket.
 
 ---
 
@@ -245,9 +267,9 @@ The AMD worker authenticates to `/api/voice/amd-action` using `AMD_WORKER_API_TO
 For production deployments:
 
 - Set strong `APP_KEY`, database passwords, Redis password, and Pusher secret.
-- Rotate `DIALER_WORKER_API_TOKEN` and `AMD_WORKER_API_TOKEN` regularly.
+- Rotate `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` and `ACD_WORKER_API_TOKEN` regularly.
 - Configure `domain_requests_api_key` per organization in Settings → Cloudonix.
-- Do not expose MySQL, Redis, or SeaweedFS ports publicly.
+- Do not expose MySQL, Redis, or SeaweedFS ports publicly. Never use `docker-compose.ports.yml` in production.
 - Run HTTPS in production so Sanctum cookies and HSTS are effective.
 - Keep `APP_DEBUG=false` in production.
 - Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domains.
