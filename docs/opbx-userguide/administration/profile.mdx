@@ -2,91 +2,106 @@
 sidebar_position: 3
 slug: /administration/profile
 sidebar_class_name: cxGuidesSidebar
-title: Profile Settings
-description: Managing your personal profile and organization settings
+title: "Profile"
+description: "Edit your own name, email and contact details, change your password, link social accounts, and (Owner) rename the organization"
 ---
 
-# Profile Settings
+# Profile
 
-Access your profile by clicking your name or avatar in the top-right corner, then selecting **Profile**.
+The Profile page is where every signed-in user manages their own account: name, email and contact details, password, and linked social accounts. The Owner also edits the organization's name and time zone here.
 
-## Personal Profile
+Open it from the user menu: click your name at the top right and choose **Profile**.
 
-The Personal Profile section contains your account information.
+## Permissions
 
-### Editable Fields
+| Section | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|---------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| Organization Details: view | Yes | Yes | Yes | Yes | Yes |
+| Organization Details: edit | Yes | No | No | No | No |
+| Profile Information: edit your own | Yes | Yes | Yes | Yes | Yes |
+| Change Password | Yes | Yes | Yes | Yes | Yes |
+| Linked Accounts (when Auth0 is configured) | Yes | Yes | Yes | Yes | Yes |
 
-| Field | Editable | Notes |
-|-------|----------|-------|
-| Name | Yes | Display name shown throughout OPBX |
-| Email | No | Contact your administrator to change email |
-| Phone Number | Yes | Contact number for notifications |
-| Street Address | Yes | Organization address line 1 |
-| City | Yes | City name |
-| State/Province | Yes | State or province |
-| Postal Code | Yes | ZIP or postal code |
-| Country | Yes | Country selection |
+For everyone except the Owner, the Organization Details fields are disabled and the card says "Only organization owners can edit these settings".
 
-### Email Address
+{/* SCREENSHOT: profile-page — Profile page for Alice Johnson (Owner) with Organization Details (Acme Corp (Demo), time zone), Profile Information and Change Password cards */}
 
-Your email address is tied to authentication and cannot be changed through the profile page. To change your email:
+## Organization Details (Owner)
 
-1. Contact your organization administrator
-2. Or contact platform support if you are the owner
+| Field | Limits | Notes |
+|-------|--------|-------|
+| Organization Name | 2 to 255 characters | The name shown for the organization |
+| Timezone | A valid time zone; the list has 56 entries grouped by Africa, Americas, Asia, Australia, Europe, Pacific and UTC | The organization's default time zone |
 
-## Password Change
+Click **Save Organization**. If nothing changed, the toast says "Organization is already up to date".
 
-Change your password from the Password section. You must provide:
+Business-hours schedules and auto-dialer campaigns have their own time zone setting; changing the organization's time zone does not change them.
 
-- Current password (for verification)
-- New password (must meet complexity requirements)
-- Confirm new password
+## Profile Information
 
-:::note
-After changing your password, you will be logged out of all devices and need to log in again with the new password.
+| Field | Required | Limits | Notes |
+|-------|----------|--------|-------|
+| Full Name | Yes | 2 to 255 characters | |
+| Email Address | Yes | Valid email, up to 255 characters, not used by any other account | Used to sign in. If you link social accounts, they must use the same email |
+| Phone Number (Optional) | No | Up to 20 characters | |
+| Country (Optional) | No | Picked from a searchable list | |
+| Street Address (Optional) | No | Up to 500 characters | |
+| City (Optional) | No | Up to 100 characters | |
+| State/Province (Optional) | No | Up to 100 characters | |
+| Postal Code (Optional) | No | Up to 20 characters | |
+| Role | — | — | Shown as a badge with "Contact your organization owner to change your role". The Owner sees a role selector instead (see below) |
+
+Click **Save Profile**. Only changed fields are sent; if nothing changed, the toast says "Profile is already up to date". After a save the form shows the values the server stored.
+
+:::caution The Owner's role selector
+The Owner's profile shows a **Role** selector, but nobody can change their own role: saving a different role is refused (`403`) and nothing is saved. To change roles, use the [Users](/modules/user-management) page for other users.
 :::
 
-Password requirements:
+## Change Password
 
-- Minimum 8 characters
-- At least one uppercase letter
-- At least one lowercase letter
-- At least one number
-- At least one special character
+1. Enter your **Current Password**.
+2. Enter the **New Password** and repeat it in **Confirm New Password**. Under the confirmation field, "Passwords match" or "Passwords don't match" updates as you type.
+3. Optionally click **Generate Strong Password**. It fills both fields with a random 16-character password and shows it with a copy button: "Make sure to save this password securely before submitting the form".
+4. Click **Change Password**.
 
-## Organization Settings
+The new password must have at least 8 characters, upper- and lower-case letters, a number and a symbol. The form only checks the length; the other rules are checked when you submit.
 
-The Organization Settings section appears only for organization owners. It contains settings that affect the entire organization.
+On success every API token of your account is revoked, so scripts or other sessions that use a token must sign in again.
 
-### Organization Name
+| Message | Meaning |
+|---------|---------|
+| The current password is incorrect. | Wrong current password |
+| Password confirmation does not match. | The two new-password fields differ |
+| The new password must contain… | A missing upper/lower case letter, number or symbol |
 
-The display name for your organization. This appears in:
+{/* SCREENSHOT: profile-change-password — Change Password card with a generated password shown with its copy button and "Passwords match" under the confirmation field */}
 
-- The browser tab title
-- Email notifications
-- Platform management interfaces
+Accounts created through a social sign-in or an invitation have no password you know. Use **Linked Accounts** to sign in, or ask an administrator to set a password on the Users page.
 
-### Timezone
+## Linked Accounts
 
-Select your organization's primary timezone from over 65 options. Timezones are grouped by region:
+When Auth0 sign-in is configured for the deployment, a **Linked Accounts** card lists each configured provider (for example Google or Microsoft):
 
-| Region | Example Timezones |
-|--------|-------------------|
-| Americas | America/New_York, America/Los_Angeles, America/Chicago |
-| Europe | Europe/London, Europe/Paris, Europe/Berlin |
-| Asia | Asia/Tokyo, Asia/Singapore, Asia/Dubai |
-| Africa | Africa/Johannesburg, Africa/Cairo, Africa/Lagos |
-| Australia | Australia/Sydney, Australia/Melbourne, Australia/Perth |
-| Pacific | Pacific/Auckland, Pacific/Fiji, Pacific/Honolulu |
-| UTC | UTC, UTC+0, UTC+1 through UTC+14 |
+- **Connect** sends you to the provider; sign in with the same email as your OPBX account. You come back to the profile with the provider linked.
+- **Disconnect** unlinks it ("Account unlinked."). Your account and password are not affected.
 
-The selected timezone affects:
+See [Auth0 Syndicated Authentication](/modules/auth0-syndicated-auth) for the rules and error messages.
 
-- Call history timestamps
-- Report generation
-- Scheduled operations
-- Business hours calculations
+{/* SCREENSHOT: profile-linked-accounts — Linked Accounts card with one provider connected (Disconnect) and one not (Connect) */}
 
-:::tip
-Choose the timezone where most of your users are located. You can view call times in other timezones through reporting features.
-:::
+## Related API endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/v1/profile` | Your profile, linked accounts and organization |
+| PUT | `/v1/profile` | Update your name, email and contact details |
+| PUT | `/v1/profile/password` | Change your password (stricter rate limit) |
+| PUT | `/v1/profile/organization` | Update the organization name and time zone (Owner; stricter rate limit) |
+
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
+
+## Related pages
+
+- [User Management](/modules/user-management) — roles and other users' accounts
+- [Auth0 Syndicated Authentication](/modules/auth0-syndicated-auth) — social sign-in and linking
+- [Navigating the Interface](/administration/navigating-the-interface) — the user menu
