@@ -23,6 +23,7 @@ use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -235,7 +236,10 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->expectsJson()) {
                 return response()->json([
                     'error' => class_basename(get_class($e)),
-                    'message' => $e->getMessage() ?: 'An error occurred.',
+                    // Laravel turns ModelNotFoundException into a 404 whose message names the model class.
+                    'message' => $e->getPrevious() instanceof ModelNotFoundException
+                        ? 'Resource not found.'
+                        : ($e->getMessage() ?: 'An error occurred.'),
                     'status' => $statusCode,
                 ], $statusCode);
             }

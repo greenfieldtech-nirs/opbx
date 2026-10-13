@@ -83,6 +83,8 @@ final class OperateAsRouteBindingTest extends TestCase
         foreach ($this->singleRecordRoutes() as $label => [$method, $uri]) {
             $response = $this->json($method, $uri)->assertNotFound();
             $this->assertStringNotContainsString('could not be found', (string) $response->getContent(), "{$label}: route missing");
+            $this->assertStringNotContainsString('No query results', (string) $response->getContent(), $label);
+            $this->assertStringNotContainsString('Models', (string) $response->getContent(), $label);
         }
     }
 
