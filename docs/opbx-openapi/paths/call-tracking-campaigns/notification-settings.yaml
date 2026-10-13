@@ -19,6 +19,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:read
       responses:
         '200':
           description: Notification settings retrieved
@@ -48,6 +50,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -148,6 +152,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         content:
           application/json:

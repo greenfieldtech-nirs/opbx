@@ -12,6 +12,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-tracking-ad-platform-integrations:read
       responses:
         '200':
           description: Integration settings
@@ -38,6 +40,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-tracking-ad-platform-integrations:write
       requestBody:
         required: true
         content:

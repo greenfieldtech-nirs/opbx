@@ -11,9 +11,42 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: sort_by
+        in: query
+        schema:
+          type: string
+          enum: [name, status, source, medium, created_at, updated_at]
+          default: created_at
+      - name: sort_order
+        in: query
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: desc
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [active, inactive]
+      - name: source
+        in: query
+        schema:
+          type: string
+        description: Exact source match
+      - name: medium
+        in: query
+        schema:
+          type: string
+        description: Exact medium match
+      - name: search
+        in: query
+        schema:
+          type: string
       - $ref: ../../components/parameters/query/Unprovisioned.yaml
       responses:
         '200':
@@ -44,6 +77,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -81,7 +116,6 @@ paths:
                   enum:
                   - active
                   - inactive
-                  default: active
                   description: Campaign status
                   example: active
                 destination_type:
@@ -95,8 +129,8 @@ paths:
                   - ivr_menu
                   - ai_assistant
                   - ai_load_balancer
-                  default: forward
-                  description: Destination type for incoming calls
+                  - unavailable
+                  description: Destination type for incoming calls (`unavailable` is rejected on create with 422)
                   example: forward
                 destination_config:
                   type: object
@@ -174,6 +208,8 @@ paths:
                   example: false
               required:
               - name
+              - status
+              - destination_type
               - destination_config
       responses:
         '201':
@@ -213,6 +249,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:read
       responses:
         '200':
           description: Campaign details
@@ -240,6 +278,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -290,7 +330,8 @@ paths:
                   - ivr_menu
                   - ai_assistant
                   - ai_load_balancer
-                  description: Destination type for incoming calls
+                  - unavailable
+                  description: Destination type for incoming calls (`unavailable` is accepted on update)
                   example: forward
                 destination_config:
                   type: object
@@ -391,6 +432,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -441,13 +484,75 @@ paths:
                   - ivr_menu
                   - ai_assistant
                   - ai_load_balancer
-                  description: Destination type for incoming calls
+                  - unavailable
+                  description: Destination type for incoming calls (`unavailable` is accepted on update)
                   example: forward
                 destination_config:
                   type: object
                   description: |
                     Destination configuration. Required field depends on `destination_type`.
-              additionalProperties: true
+                  properties:
+                    forward_to:
+                      type: string
+                      maxLength: 50
+                      description: External number to forward to
+                      example: '+14155551212'
+                    extension_id:
+                      type: integer
+                      description: Extension ID
+                      example: 5
+                    ring_group_id:
+                      type: integer
+                      description: Ring group ID
+                      example: 3
+                    business_hours_schedule_id:
+                      type: integer
+                      description: Business hours schedule ID
+                      example: 2
+                    conference_room_id:
+                      type: integer
+                      description: Conference room ID
+                      example: 4
+                    ivr_menu_id:
+                      type: integer
+                      description: IVR menu ID
+                      example: 6
+                    ai_assistant_id:
+                      type: integer
+                      description: AI assistant ID
+                      example: 7
+                    ai_load_balancer_id:
+                      type: integer
+                      description: AI assistant load balancer ID
+                      example: 8
+                conversion_rule:
+                  type:
+                  - object
+                  - 'null'
+                  description: Conversion rule configuration
+                  properties:
+                    min_answered_duration_seconds:
+                      type: integer
+                      minimum: 0
+                      description: Minimum answered duration in seconds
+                      example: 30
+                    requires_answered_disposition:
+                      type: boolean
+                      description: Whether answered disposition is required
+                      example: false
+                    conversion_value:
+                      type: number
+                      minimum: 0
+                      description: Monetary value for each conversion
+                      example: 25.5
+                google_ads_upload_enabled:
+                  type: boolean
+                  description: Enable Google Ads conversion upload
+                  example: false
+                meta_upload_enabled:
+                  type: boolean
+                  description: Enable Meta conversion upload
+                  example: false
       responses:
         '200':
           description: Campaign updated successfully
@@ -478,6 +583,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       responses:
         '204':
           description: Campaign deleted successfully

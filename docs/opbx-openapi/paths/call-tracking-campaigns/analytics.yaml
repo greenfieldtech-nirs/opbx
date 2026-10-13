@@ -12,6 +12,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-analytics:read
       parameters:
       - name: start_date
         in: query
@@ -92,6 +94,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-analytics:read
       parameters:
       - name: start_date
         in: query
@@ -146,12 +150,11 @@ paths:
         example: day
       responses:
         '200':
-          description: Analytics export file
+          description: Analytics export (CSV attachment)
           content:
-            application/octet-stream:
+            text/csv:
               schema:
                 type: string
-                format: binary
           headers:
             Content-Disposition:
               schema:

@@ -19,6 +19,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -54,6 +56,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -131,6 +135,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -185,6 +191,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       requestBody:
         required: true
         content:
@@ -237,6 +245,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: call-tracking-campaigns:write
       responses:
         '204':
           description: Tracking number removed successfully
