@@ -13,6 +13,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Monitor summary data
@@ -53,6 +55,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Campaign monitor detail

@@ -23,6 +23,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Campaign list details
@@ -56,6 +58,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
         required: true
         content:
@@ -108,6 +112,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: List deleted successfully

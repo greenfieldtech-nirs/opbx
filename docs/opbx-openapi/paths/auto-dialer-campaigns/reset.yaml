@@ -23,6 +23,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: CAC counter reset successfully
@@ -76,6 +78,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Caller ID cycle reset successfully

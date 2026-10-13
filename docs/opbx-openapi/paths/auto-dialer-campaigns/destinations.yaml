@@ -13,16 +13,16 @@ paths:
       tags:
       - Auto Dialer Campaigns
       summary: List campaign destinations
-      description: 'Get a paginated list of destinations for a campaign.
-
-
-        Supports filtering by status and searching by phone number.
-
-        '
+      description: >-
+        Paginated destinations of a campaign (per_page defaults to 50). `data` is the raw
+        Laravel paginator: the rows are in `data.data`, with `current_page`, `per_page`,
+        `total`, `last_page` and the page URLs next to them.
       operationId: listCampaignDestinations
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -34,15 +34,11 @@ paths:
           enum:
           - pending
           - dialing
-          - completed
+          - connected
           - failed
+          - completed
+          - invalid
         description: Filter by destination status
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-        description: Search by phone number
       responses:
         '200':
           description: List of destinations
@@ -52,44 +48,63 @@ paths:
                 type: object
                 properties:
                   data:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        phone_number:
-                          type: string
-                          example: '+14155551212'
-                        description:
-                          type:
-                          - string
-                          - 'null'
-                          example: John Doe - Sales Lead
-                        status:
-                          type: string
-                          enum:
-                          - pending
-                          - dialing
-                          - completed
-                          - failed
-                          example: pending
-                        dial_attempts:
-                          type: integer
-                          example: 0
-                        last_dialed_at:
-                          type:
-                          - string
-                          - 'null'
-                          format: date-time
-                          example: null
-                        created_at:
-                          type: string
-                          format: date-time
-                          example: '2024-01-10 08:00:00'
-                  meta:
-                    $ref: ../../components/schemas/PaginationMeta.yaml
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                      per_page:
+                        type: integer
+                      total:
+                        type: integer
+                      last_page:
+                        type: integer
+                      from:
+                        type:
+                        - integer
+                        - 'null'
+                      to:
+                        type:
+                        - integer
+                        - 'null'
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              example: 1
+                            phone_number:
+                              type: string
+                              example: '+14155551212'
+                            description:
+                              type:
+                              - string
+                              - 'null'
+                              example: John Doe - Sales Lead
+                            status:
+                              type: string
+                              enum:
+                              - pending
+                              - dialing
+                              - connected
+                              - failed
+                              - completed
+                              - invalid
+                              example: pending
+                            dial_attempts:
+                              type: integer
+                              example: 0
+                            last_dialed_at:
+                              type:
+                              - string
+                              - 'null'
+                              format: date-time
+                              example: null
+                            created_at:
+                              type: string
+                              format: date-time
+                              example: '2024-01-10T08:00:00.000000Z'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -122,6 +137,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Concurrency information

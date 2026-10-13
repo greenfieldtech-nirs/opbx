@@ -340,41 +340,30 @@ properties:
     type: boolean
     description: Whether to record calls
     example: true
-  amd_enabled:
+  action_voicemail:
+    type:
+    - string
+    - 'null'
+    enum: [HANGUP, CONTINUE, null]
+    description: What to do when the AMD worker detects a voicemail
+  action_human:
+    type:
+    - string
+    - 'null'
+    enum: [HANGUP, CONTINUE, null]
+    description: What to do when a human answers
+  action_unknown:
+    type:
+    - string
+    - 'null'
+    enum: [HANGUP, CONTINUE, null]
+    description: What to do when detection is inconclusive
+  retry_on_voicemail:
     type: boolean
-    description: Whether answering machine detection is enabled
-    example: true
-  amd_mode:
-    type: string
-    enum:
-    - Enabled
-    - DetectMessageEnd
-    description: AMD detection mode
-    example: DetectMessageEnd
-  amd_timeout:
-    type:
-    - integer
-    - 'null'
-    description: AMD timeout in seconds
-    example: 30
-  amd_speech_threshold:
-    type:
-    - integer
-    - 'null'
-    description: AMD speech threshold in milliseconds
-    example: 2500
-  amd_speech_end_threshold:
-    type:
-    - integer
-    - 'null'
-    description: AMD speech end threshold in milliseconds
-    example: 2500
-  amd_silence_timeout:
-    type:
-    - integer
-    - 'null'
-    description: AMD silence timeout in milliseconds
-    example: 2500
+    description: Retry the destination when a voicemail was detected
+  lists_count:
+    type: integer
+    description: Number of distribution lists assigned (0 when not loaded)
   statistics:
     type: object
     description: Campaign statistics

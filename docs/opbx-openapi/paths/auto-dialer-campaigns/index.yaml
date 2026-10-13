@@ -13,6 +13,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -34,9 +36,21 @@ paths:
         schema:
           type: string
         description: Search in campaign name
+      - name: exclude_status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - active
+          - paused
+          - completed
+          - archived
+        description: Exclude campaigns with this status
       responses:
         '200':
-          description: List of campaigns
+          description: List of campaigns (per_page defaults to 25; meta has no from/to)
           content:
             application/json:
               schema:
@@ -68,6 +82,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
         required: true
         content:
@@ -149,7 +165,6 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 5
-                  default: 1
                   description: Maximum number of dial attempts per destination
                   example: 3
                 concurrent_active_calls:
@@ -161,7 +176,7 @@ paths:
                 calls_per_second:
                   type: integer
                   minimum: 1
-                  maximum: 5
+                  maximum: 30
                   description: Calls per second rate (CPS)
                   example: 1
                 schedule:
@@ -270,55 +285,53 @@ paths:
                   type: boolean
                   description: Whether to record calls
                   example: true
-                amd_enabled:
+                action_voicemail:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when the AMD worker detects a voicemail
+                action_human:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when a human answers
+                action_unknown:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when detection is inconclusive
+                retry_on_voicemail:
                   type: boolean
-                  description: Whether answering machine detection is enabled
-                  example: true
-                amd_mode:
-                  type: string
-                  enum:
-                  - Enabled
-                  - DetectMessageEnd
-                  description: AMD detection mode (required if amd_enabled is true)
-                  example: DetectMessageEnd
-                amd_timeout:
+                  description: Retry the destination when a voicemail was detected
+                days_active:
+                  type:
+                  - array
+                  - 'null'
+                  description: Legacy schedule field (use `schedule`)
+                start_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 5
-                  maximum: 120
-                  description: AMD timeout in seconds
-                  example: 30
-                amd_speech_threshold:
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
+                end_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  description: AMD speech threshold in milliseconds
-                  example: 2500
-                amd_speech_end_threshold:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  description: AMD speech end threshold in milliseconds
-                  example: 2500
-                amd_silence_timeout:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 10000
-                  description: AMD silence timeout in milliseconds
-                  example: 2500
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
               required:
               - name
               - routing_destination_type
               - dial_timeout
               - destination_connect
               - caller_id
+              - max_dial_attempts
               - concurrent_active_calls
               - schedule
               - start_date
@@ -362,6 +375,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Campaign details
@@ -394,6 +409,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
         required: true
         content:
@@ -480,43 +497,46 @@ paths:
                 record_calls:
                   type: boolean
                   example: true
-                amd_enabled:
+                action_voicemail:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when the AMD worker detects a voicemail
+                action_human:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when a human answers
+                action_unknown:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when detection is inconclusive
+                retry_on_voicemail:
                   type: boolean
-                  example: true
-                amd_mode:
-                  type: string
-                  enum:
-                  - Enabled
-                  - DetectMessageEnd
-                  example: DetectMessageEnd
-                amd_timeout:
+                  description: Retry the destination when a voicemail was detected
+                days_active:
+                  type:
+                  - array
+                  - 'null'
+                  description: Legacy schedule field (use `schedule`)
+                start_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 5
-                  maximum: 120
-                  example: 30
-                amd_speech_threshold:
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
+                end_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  example: 2500
-                amd_speech_end_threshold:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  example: 2500
-                amd_silence_timeout:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 10000
-                  example: 2500
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
       responses:
         '200':
           description: Campaign updated successfully
@@ -554,6 +574,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
         required: true
         content:
@@ -640,43 +662,46 @@ paths:
                 record_calls:
                   type: boolean
                   example: true
-                amd_enabled:
+                action_voicemail:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when the AMD worker detects a voicemail
+                action_human:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when a human answers
+                action_unknown:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [HANGUP, CONTINUE, null]
+                  description: What to do when detection is inconclusive
+                retry_on_voicemail:
                   type: boolean
-                  example: true
-                amd_mode:
-                  type: string
-                  enum:
-                  - Enabled
-                  - DetectMessageEnd
-                  example: DetectMessageEnd
-                amd_timeout:
+                  description: Retry the destination when a voicemail was detected
+                days_active:
+                  type:
+                  - array
+                  - 'null'
+                  description: Legacy schedule field (use `schedule`)
+                start_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 5
-                  maximum: 120
-                  example: 30
-                amd_speech_threshold:
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
+                end_time:
                   type:
                   - integer
                   - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  example: 2500
-                amd_speech_end_threshold:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 5000
-                  example: 2500
-                amd_silence_timeout:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 500
-                  maximum: 10000
-                  example: 2500
+                  minimum: 0
+                  maximum: 23
+                  description: Legacy schedule field (hour)
       responses:
         '200':
           description: Campaign updated successfully
@@ -714,6 +739,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '204':
           description: Campaign deleted successfully
@@ -747,6 +774,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       parameters:
       - name: exclude_campaign_id
         in: query
@@ -815,6 +844,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Caller ID statistics
@@ -896,6 +927,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Cycle reset successfully
