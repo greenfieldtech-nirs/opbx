@@ -3,50 +3,67 @@ sidebar_position: 3
 slug: /administration/centralized-logs
 sidebar_class_name: cxGuidesSidebar
 title: "Centralized Logs"
-description: "Optional Loki + Grafana log aggregation with per-call audit trails"
+description: "Optional Loki and Grafana log stack with per-call audit trails"
 ---
 
 # Centralized Logs
 
-OPBX ships an optional log aggregation stack (Grafana Loki + Grafana + Alloy) that collects structured logs from every service into one searchable location. It is **off by default** and intended for platform admins and developers.
+OPBX can collect the structured logs of its services into one searchable store (Grafana Loki), viewed in Grafana. The stack is **off by default** and is meant for platform operators and developers. Without it, the same logs are still written to the container output (`docker compose logs`).
 
-## What You Get
+## What you get
 
-- **Platform Logs** — everything not related to call processing (UI actions, configuration changes, provisioning)
-- **Call Flow Logs** — voice webhooks, CXML routing decisions, queue/dialer/AMD activity — with a **per-call audit trail**: paste a Cloudonix session token and see every log entry for that call across all services
+- **Platform logs**: UI actions, configuration changes and provisioning.
+- **Call flow logs**: voice webhooks, CXML routing decisions, queue, dialer and AMD activity. Every call-related line carries the Cloudonix **session token**, so you can follow one call across all services.
 
-Call-related entries are rendered with the session token as a prefix, e.g.:
+Call-related entries are shown with the session token as a prefix:
 
 ```
 [19461556-42] {"ts":"...","msg":"CDR created successfully","disposition":"ANSWER",...}
 ```
 
-## Enabling
+## Prerequisites
 
-```bash
-# .env
-LOG_STACK_ENABLED=true
-GRAFANA_ADMIN_PASSWORD=<pick-a-password>
-```
+- The stack is started with Docker Compose. The `logs` profile adds the Loki, Grafana, Alloy and docker-socket-proxy services.
+- Port 80 (the nginx proxy) is reachable from your browser, because Grafana is served at `/logs/`.
+- You can edit `.env`.
 
-```bash
-docker compose --profile logs up -d
-```
+## Enable the stack
 
-Then open **`http://localhost/logs/`** and log in with `admin` / your `GRAFANA_ADMIN_PASSWORD`. Two dashboards are pre-provisioned: **OPBX Call Flow Logs** (with session-token audit-trail filter) and **OPBX Platform Logs**. Both offer a free-text search box, and clicking any log row shows the parsed entry as key/value pairs in a details panel below the list.
+1. Set the Grafana password in `.env`. It is required; there is no default.
+
+   ```bash
+   LOG_STACK_ENABLED=true
+   GRAFANA_ADMIN_PASSWORD=<a long random value, for example from: openssl rand -hex 32>
+   ```
+
+2. Start the profile:
+
+   ```bash
+   docker compose --profile logs up -d
+   ```
+
+3. Open `http://localhost/logs/` (or your public URL plus `/logs/`) and log in as `admin` with `GRAFANA_ADMIN_PASSWORD`.
+
+Two dashboards are provisioned: **OPBX Call Flow Logs** (with the session-token audit-trail filter) and **OPBX Platform Logs**. Both have a free-text search box. Click a log row to see its parsed fields in the details panel.
+
+{/* SCREENSHOT: logs-call-flow-dashboard — OPBX Call Flow Logs dashboard with a session-token filter applied and one log row selected showing its parsed fields */}
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_STACK_ENABLED` | `false` | Feature flag documenting intent (the compose profile is the switch) |
-| `GRAFANA_ADMIN_USER` | `admin` | Grafana admin username |
-| `GRAFANA_ADMIN_PASSWORD` | — | Grafana admin password (required) |
-| `LOKI_RETENTION_HOURS` | `168` | Log retention in hours (default 7 days) |
+| `LOG_STACK_ENABLED` | `false` | Documents intent only. The `logs` profile is what starts the stack |
+| `GRAFANA_ADMIN_USER` | `admin` | Grafana admin user name |
+| `GRAFANA_ADMIN_PASSWORD` | none | Grafana admin password. Required |
+| `GRAFANA_ROOT_URL` | `http://localhost/logs/` | Must match the URL your browser uses. A mismatch makes Grafana refuse dashboard queries with "origin not allowed" |
+| `GRAFANA_CSRF_TRUSTED_ORIGINS` | empty | Extra hostnames that reach the UI (for example an ngrok or second domain). Space-separated, no scheme |
+| `LOKI_RETENTION_HOURS` | `168` | How long logs are kept (7 days) |
 
-## Example Queries
+Restart Grafana after changing these: `docker compose --profile logs up -d --force-recreate grafana`.
 
-In Grafana → **Explore** with the **Loki** datasource:
+## Example queries
+
+In Grafana, open **Explore** and choose the **Loki** data source:
 
 ```logql
 # Full audit trail for one call
@@ -62,25 +79,31 @@ In Grafana → **Explore** with the **Loki** datasource:
 {service="acd-worker"} |~ "offering to agents"
 ```
 
-## Exporting to a File
+## Exporting to a file
 
-- **CSV**: open the panel menu (⋮) → **Inspect → Data → Download CSV** — exports exactly what your filters show.
-- **Plain text** (on the host):
+- **CSV**: in the panel menu (⋮), choose **Inspect → Data → Download CSV**. The export contains exactly what your filters show.
+- **Plain text, on the host**:
 
-```bash
-./scripts/export-logs.sh --session sess-abc123 call-audit.txt
-```
+  ```bash
+  ./scripts/export-logs.sh --session sess-abc123 call-audit.txt
+  ```
 
-See `./scripts/export-logs.sh --help` for all filters (type, text, time window, sessions-only toggle).
+  Run `./scripts/export-logs.sh --help` for all filters (type, text, time window, sessions only).
 
-## How It Works
+## How it works
 
-- All services emit single-line JSON to stdout with a shared contract (`ts`, `level`, `msg`, `service`, `log_type`, plus `org_id` / `session_token` / `call_id` when known)
-- An Alloy collector tails the OPBX containers over the Docker socket and pushes to Loki — no application code changes are needed for new services beyond emitting the JSON contract
-- Credentials (API keys, passwords, bearer tokens) are masked before logs leave Laravel; `session_token` is deliberately **not** masked, since it is the audit-trail key
-- Grafana is proxied by nginx at `/logs/`, so no extra ports are exposed
-- When the profile is off, the same structured JSON still goes to stdout (`docker compose logs -f app`), just without aggregation
+- Every service writes one JSON object per line to stdout. The shared fields are `ts`, `level`, `msg`, `service` and `log_type`. `org_id`, `session_token` and `call_id` are added when known.
+- **Alloy** reads the logs of containers that carry the label `logging.opbx/collect=true`, and sends them to Loki. It does not mount the Docker socket itself: a **docker-socket-proxy** service holds a read-only view of the Docker API and Alloy talks to that.
+- Credentials (API keys, passwords, bearer tokens and signed-URL signatures) are masked before logs leave Laravel. `session_token` is deliberately **not** masked because it is the audit-trail key.
+- Grafana is served through the nginx proxy at `/logs/`. No extra port is published.
+- With the profile off, nothing is collected. The container output is unchanged.
 
-:::caution Platform admins only
-The log viewer has full visibility across all tenants. Access is protected by the Grafana admin login — treat those credentials accordingly.
+:::caution Platform operators only
+The log viewer shows every tenant's call traffic. Protect the Grafana admin password, and do not share the dashboards outside the operations team.
 :::
+
+## Related
+
+- [Platform Management](/administration/platform-management) — the Platform Status page shows whether Loki and Grafana are running
+- [Configuration Reference](/data-models/configuration/index) — all environment variables
+- [Call Queues](/modules/call-queues#troubleshooting) — tracing a queued caller with the session token

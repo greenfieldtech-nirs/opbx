@@ -3,225 +3,201 @@ sidebar_position: 2
 slug: /administration/platform-management
 sidebar_class_name: cxGuidesSidebar
 title: Platform Management
-description: Managing multiple organizations as a platform manager
+description: Managing organizations, users, audit logs and platform health as a platform manager
 ---
 
 # Platform Management
 
 :::danger Platform Owners/Operators Only
-This section applies exclusively to **platform owners and operators** who manage the OPBX deployment itself. Regular organization users (Owner, PBX Admin, PBX User, Reporter) do not have access to Platform Management features. If you are an organization administrator, refer to [Organization Settings](/administration) instead.
+This section applies only to people who operate the OPBX deployment. Organization users (Owner, PBX Admin, PBX User, Reporter, Supervisor) cannot open Platform Management. If you administer one organization, see [Organization Settings](/administration) instead.
 :::
 
-Platform Management provides a cross-tenant administrative interface for service providers who host and operate OPBX for multiple customer organizations.
+Platform Management is a cross-tenant console for the team that hosts OPBX for one or more customer organizations. It appears in the sidebar as **Platform Management** for platform managers only.
+
+## Pages
+
+| Sidebar item | Path | What it is for |
+|--------------|------|----------------|
+| Dashboard | `/ui/platform/dashboard` | Counts across all organizations (organizations by status, users, extensions, active calls) |
+| Organizations | `/ui/platform/organizations` | List, open, edit, suspend, reactivate and delete organizations; **Operate As** |
+| Users | `/ui/platform/users` | Users in every organization; create, edit, platform-manager flag, password, delete |
+| Audit Log | `/ui/platform/audit-log` | Record of platform actions |
+| Platform Status | `/ui/platform/status` | Health of every OPBX component, with a 24-hour history |
+
+The public status page at `/status` is separate. It needs no login and shows only coarse group health. See [Public status page](#public-status-page).
 
 ## Access Requirements
 
-Platform Management requires the `platform_manager` flag on your user account. This is a system-level privilege that is separate from the organization role hierarchy. The flag can only be set by:
+The `is_platform_manager` flag on a user account grants access. It is separate from the organization role.
 
-- Direct database modification by a system administrator
-- Another existing platform manager
+The flag is set with the `opbx:set-platform-manager {email}` command on the server, or by an existing platform manager through the Users page. `opbx:revoke-platform-manager {email}` removes it.
 
-This privilege is intended for the team that operates the OPBX platform, not for end-user organizations.
+:::caution
+The last platform manager cannot be revoked. Create and confirm a second one first.
+:::
 
-## Platform Dashboard
+## Organizations
 
-The Platform Dashboard displays aggregate statistics across all organizations:
+### Viewing and creating
 
-| Metric | Description |
-|--------|-------------|
-| Total Organizations | Number of organizations on the platform |
-| Total Users | Combined user count across all organizations |
-| Total Extensions | Total extensions configured |
-| Active Calls | Currently active calls across all tenants |
+The Organizations list shows every organization with its status and details. The platform console has **no** action to create an organization. New organizations are created by self-registration or Auth0 sign-up, and the first platform manager can be created with `opbx:create-platform-manager`.
 
-## Organization Management
+### Status: Active, Suspended, Deleted
 
-### Viewing Organizations
+| Status | Effect |
+|--------|--------|
+| **Active** | Normal operation |
+| **Suspended** | Every request from that organization's users (API and web) is refused with HTTP 403 "Your organization has been suspended." Data is kept. Platform managers are not blocked, so they can still open and reactivate the organization |
+| **Deleted** | The organization is removed with its data (see below) |
 
-The Organizations list shows all organizations with key details:
+To suspend or reactivate, use the status control on the organization. Suspended organizations can be reactivated at any time.
 
-- Organization name and ID
-- Owner information
-- Status (Active, Suspended)
-- Creation date
-- User and extension counts
+{/* SCREENSHOT: platform-org-status — Organizations list with one Suspended row (yellow status badge) and the status control open */}
 
-### Creating Organizations
+### Deleting an organization
 
-Click **Create Organization** to add a new organization. You will need to specify:
+Deleting an organization removes its configuration and data, including extensions, ring groups, business hours, phone numbers and call logs, and revokes the users' API tokens. The delete is refused in these cases:
 
-- Organization name
-- Owner email address
-- Owner name
-
-OPBX creates the organization and sends an invitation email to the owner.
-
-### Suspending Organizations
-
-Suspended organizations prevent all user login and API access. Use suspension for:
-
-- Non-payment situations
-- Policy violations
-- Temporary service pauses
-
-Suspended organizations retain all data and can be reactivated.
-
-### Deleting Organizations
-
-Deleting an organization permanently removes ALL data including:
-
-- Users and authentication records
-- Extensions and devices
-- Call records and history
-- Recordings and voicemails
-- Configuration and routing rules
+- **Any user in the organization is a platform manager.** Revoke their platform-manager flag first. The error names the rule.
 
 :::danger
-Deleting an organization permanently removes ALL data including users, extensions, call records, recordings, and configuration. This action cannot be undone.
+Deleting an organization cannot be undone. Suspend first, take a database backup, and confirm with the customer.
 :::
 
-### Organization Status
+{/* SCREENSHOT: platform-org-delete-blocked — Organization delete refused because one user is a platform manager */}
 
-Organizations transition through states based on platform manager actions:
+### Operate As an organization
 
-```mermaid
-stateDiagram-v2
-    [*] --> Active
-    Active --> Suspended: Suspend
-    Suspended --> Active: Activate
-    Suspended --> Deleted: Delete
-    Active --> Deleted: Delete
-```
+Platform managers can act as the **Owner** of an active organization, to reproduce a customer's problem without their password.
 
-## User Management
+1. Open **Platform Management → Organizations**.
+2. Click **Operate As** on the organization's row. You can enter a reason, which is stored on the audit entry.
+3. Work as that organization's Owner. A yellow banner stays at the top of every page.
+4. Click **Exit organization** in the banner to return to your own platform identity.
 
-### Viewing Users
+How it works:
 
-The Users list displays all users across all organizations with:
+- The SPA attaches an `X-Operate-As-Organization` header to every API call during the session. There is no server-side session to time out; the session ends when you exit, log out, or your token expires.
+- Only a real platform manager can start a session. API keys and ordinary users are refused.
+- Only **active** organizations can be targeted. Suspended or deleted organizations are refused.
+- Starting and stopping are both written to the platform audit log as `operate_as.started` and `operate_as.stopped`.
 
-- User name and email
-- Organization membership
-- Role (Owner, Admin, User)
-- Platform manager status
-- Last login time
-
-### Creating Users
-
-Create users in any organization by specifying:
-
-- Organization (dropdown selection)
-- Name
-- Email address
-- Role
-- Password (or send invitation)
-
-### Editing Users
-
-Modify user details including:
-
-- Name and contact information
-- Role assignment
-- Password resets
-- Platform manager flag
-
-### Platform Manager Access
-
-Grant or revoke platform manager access for any user. When you revoke platform manager access:
-
-- All active tokens for that user are immediately invalidated
-- The user must log in again
-- Access to Platform Management is removed
-
-:::warning
-Revoking platform manager access immediately invalidates all tokens and forces re-login.
+:::warning Full Owner access
+While operating as an organization you can change anything its Owner can, including users, routing and Cloudonix settings. Exit as soon as you are done.
 :::
 
-## Operating as an Organization
+## Users
 
-Platform managers can temporarily act **as the Owner** of any active
-organization directly from the Organizations list — useful for
-troubleshooting a customer's configuration or reproducing a support ticket
-without needing the customer's own credentials.
+The Users page lists users across all organizations. Platform managers can:
 
-### Starting a session
+- create a user in a chosen organization;
+- edit a user, including the platform-manager flag;
+- set a user's password;
+- preview and delete a user.
 
-1. Open **Platform → Organizations**.
-2. Click **Operate As** on the row for the target organization.
+### Deleting a user
 
-You are immediately switched into that organization with **Owner**
-permissions. Every screen — dashboard, extensions, ring groups, settings,
-and so on — reflects the target organization's data, exactly as that
-organization's own Owner would see it.
+Before the delete is sent, a **Delete User** dialog shows what it will change. The same impact preview is used by organization admins (see [User Management](/modules/user-management)): the user's extensions are kept but unassigned, memberships are removed, and routes that pointed at those extensions become "Destination unavailable". Confirm only after reading the list.
 
-A persistent yellow banner is shown at the top of every page for the
-duration of the session:
+Platform-level guards:
 
-> ⚠️ Operating as **{Organization Name}** — you are acting as an organization admin. [Exit organization]
+| Guard | Result |
+|-------|--------|
+| Deleting your own account | Refused: "You cannot delete your own account." |
+| Deleting the last owner of an organization | Refused: "Cannot delete the last owner of an organization." |
+| Revoking the last platform manager | Refused: "Cannot revoke the last platform manager." |
 
-### Ending a session
+{/* SCREENSHOT: platform-user-delete-preview — platform Users page, Delete User dialog listing kept extensions and a route that becomes Destination unavailable */}
 
-Click **Exit organization** in the banner. This restores your real
-platform-manager identity and returns you to **Platform → Organizations**.
-The session also ends automatically if you log out or your token expires —
-there is no server-side session to time out separately.
+## Platform Status
 
-### How it works
+The Platform Status page shows every OPBX component, its current status, and what happened over the last 24 hours.
 
-- The switch is driven entirely by an `X-Operate-As-Organization` request
-  header the SPA attaches to every API call while a session is active. Start
-  and stop are lightweight validate-and-audit calls — they do not themselves
-  hold any server-side session state.
-- Only a **real platform-manager user** can trigger a switch. API keys and
-  non-platform-manager users are rejected with a `403` even if they somehow
-  send the header.
-- Only **active** organizations can be targeted — suspended or deleted
-  organizations return a `403`.
-- While operating as an organization, you cannot accidentally modify your own
-  platform-owner user record (e.g. via **Profile**) — the effective identity
-  used for the session exists only in memory for the duration of each
-  request and is never saved.
-- Entering or exiting a session clears the SPA's cached data so nothing from
-  the previous context (real or impersonated) leaks into the new view.
+{/* SCREENSHOT: platform-status-overview — Platform Status page: component cards (green/amber/red) and 24h status strips */}
 
-### Audit trail
+### Components
 
-Every start and stop is recorded in the [platform audit log](#audit-logs) as
-`operate_as.started` / `operate_as.stopped`, attributed to your real
-platform-manager user id and the target organization. Starting a session
-accepts an optional free-text reason (e.g. "Investigating ticket #1234") that
-is stored on the audit entry.
+| Component | What is checked |
+|-----------|-----------------|
+| API / app | Application is answering; PHP and Laravel versions |
+| MySQL (main) and MySQL (CDR archive) | Query and server version. The archive is the warm CDR tier |
+| Redis | Ping and memory use |
+| SeaweedFS | Both buckets reachable (recordings and CDR archive) |
+| Queue | Pending and failed jobs across the queues |
+| Scheduler | Age of the heartbeat written by the scheduled health check |
+| ACD worker, AMD worker, Dialer worker | Their health endpoints |
+| Soketi (real-time updates) | Readiness endpoint |
+| MCP server | Health endpoint |
+| Loki, Grafana | Only when the `logs` profile is running |
+| Cloudonix API | A lightweight request to the Cloudonix API |
 
-:::warning Treat this as full Owner access
-While operating as an organization you can view and change anything that
-organization's own Owner could — including billing-adjacent settings, user
-management, and call routing. Use it deliberately and exit as soon as you're
-done.
-:::
+Each check reports **ok** (green), **degraded** (amber) or **down** (red), with the latency and a short detail.
+
+### How status is decided
+
+Thresholds come from `config/platform_status.php`:
+
+| Check | Degraded (amber) | Down (red) |
+|-------|------------------|------------|
+| HTTP probes (workers, Soketi, MCP, SeaweedFS, Loki, Grafana) | Response slower than 1500 ms | Unreachable (timeout or refused) or an error HTTP status. An optional service that is not running (Loki, Grafana without the `logs` profile) shows "unknown" instead |
+| Queue | More than 500 pending jobs, or 50 or more failed jobs | Never; the queue check reports degraded at most |
+| Scheduler heartbeat | Last run 1 to 3 minutes ago | Last run more than 3 minutes ago (also when it has never run) |
+| Cloudonix API | Three consecutive checks with no fast answer (slow or no answer), not all of them lost | Three consecutive checks with no answer at all |
+
+A Cloudonix answer counts as slow when it takes longer than 3000 ms. A check fails when no answer arrives within 5 s.
+
+Cloudonix is an external Internet service, so a single slow or lost request never changes its status. Only the third consecutive bad check does.
+
+The scheduler check is the only one that depends on the schedule itself. It stays "unknown" until the first scheduled run after installation. A manual **Check now** does not refresh the scheduler heartbeat.
+
+### History and checks
+
+- The checks run every minute from the scheduler and are stored.
+- The page shows a 24-hour strip per component. Hover a segment to see its time and status.
+- The page refreshes every 30 seconds while the tab is visible.
+- **Check now** runs every check immediately. It is rate-limited to 6 requests per minute.
+- History is kept for `PLATFORM_HEALTH_RETENTION_HOURS` (default 24) and pruned by the daily `model:prune` run.
+
+No email or other notification is sent. Someone must watch the page.
+
+## Public status page
+
+`/status` is a public page that needs no login. It is linked from the public home page navigation and the footer.
+
+It shows six groups, each the worst status of its components:
+
+| Group | Components |
+|-------|------------|
+| Web portal & API | API, MySQL (main), Redis |
+| Call routing | API, Cloudonix |
+| Call queues | ACD worker, queue |
+| Auto dialer & voicemail detection | Dialer worker, AMD worker |
+| Recordings & storage | SeaweedFS, MySQL (CDR archive) |
+| Real-time updates | Soketi |
+
+The banner reads **All systems operational**, **Partial outage** or **Major outage**. The page shows a six-hour strip per group.
+
+Internal components (scheduler, Loki, Grafana, MCP server) and all details (versions, latency, hostnames, error messages) are never shown on the public page. The data comes from `GET /api/v1/public/status`, cached for 30 seconds.
 
 ## Audit Logs
 
-Every platform management action is logged with:
+Every platform action is recorded with:
 
 | Field | Description |
 |-------|-------------|
-| Timestamp | When the action occurred |
-| Actor | Who performed the action |
-| Action | What was done |
-| Target | Which organization or user was affected |
-| Before State | Previous values (for updates) |
-| After State | New values (for updates) |
+| Timestamp | When it happened |
+| Actor | The platform manager who did it |
+| Action | For example `operate_as.started` or `operate_as.stopped` |
+| Target | The organization or user affected |
 
-Review audit logs to track changes and investigate issues.
+Audit entries are kept for `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) and then pruned. See [Data retention](/data-models/configuration/index#data-retention).
 
-## Safety Guards
+## Cross-tenant call data
 
-Platform Management includes safety guards to prevent accidental damage:
+The Platform API has a read-only **CDR archive** endpoint that lists warm-tier call records (6 to 12 months old) for all organizations. The web console does not show it. See [Call Logs](/modules/call-logs#retention-and-archive).
 
-| Guard | Behavior |
-|-------|----------|
-| Last Owner Protection | Cannot delete the last owner of an organization |
-| Self-Protection | Cannot delete your own user account |
-| Last Platform Manager | Cannot revoke the last platform manager access |
-| Cascade Warnings | Confirm before deleting organizations |
+## Related
 
-These guards protect against accidental lockouts and data loss.
+- [Navigating the Admin Interface](/administration/navigating-the-interface)
+- [Centralized Logs](/administration/centralized-logs)
+- [Configuration Reference](/data-models/configuration/index)
