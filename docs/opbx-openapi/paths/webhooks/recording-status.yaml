@@ -1,0 +1,47 @@
+paths:
+  /webhooks/cloudonix/recording-status:
+    post:
+      tags:
+        - Webhooks
+      summary: Recording status webhook
+      description: |
+        Receives Cloudonix recording status callbacks and queues the recording for download.
+        The payload has no `domain`, so the organization is found from the matching call
+        detail record (by `CallSid`, then by session token). The organization's webhook
+        authentication (Bearer or HMAC-SHA256) is checked before any write.
+        Idempotent via `webhook.idempotency`. Not gated by the `webhook.signature` middleware.
+      operationId: cloudonixRecordingStatusWebhook
+      security:
+        - webhookBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/webhooks/RecordingStatusPayload.yaml'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '../../components/schemas/webhooks/RecordingStatusPayload.yaml'
+      responses:
+        '200':
+          description: Accepted. Also returned when no matching call detail record exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: No recording to download
+        '401':
+          description: Webhook authentication failed for the matched organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
