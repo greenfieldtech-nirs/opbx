@@ -652,6 +652,8 @@ class SeedDocsDemo extends Command
     private function calls(): void
     {
         $ext = ['1001', '1002', '1005', '1006', '1007', '1008', '1009', '1010'];
+        // CDR.subscriber carries the extension's Cloudonix UUID (the CallDetailRecord::extension() key), not its number.
+        $uuids = Extension::withoutGlobalScopes()->where('organization_id', $this->org)->pluck('cloudonix_uuid', 'extension_number');
         $dids = ['+12025550100', '+12025550101', '+12025550102', '+12025550104', '+12025550107'];
         $dispositions = ['CONNECTED', 'CONNECTED', 'CONNECTED', 'CONNECTED', 'CONNECTED', 'NO_ANSWER', 'NO_ANSWER', 'BUSY', 'FAILED'];
 
@@ -671,7 +673,7 @@ class SeedDocsDemo extends Command
                 'direction' => $incoming ? 'incoming' : 'outgoing', 'disposition' => $disposition,
                 'duration' => $billsec + ($disposition === 'CONNECTED' ? random_int(2, 12) : random_int(5, 45)),
                 'billsec' => $billsec, 'call_id' => (string) Str::uuid(), 'domain' => self::DOMAIN,
-                'subscriber' => $mine, 'session_id' => 700000 + $i, 'raw_cdr' => [],
+                'subscriber' => $uuids[$mine] ?? null, 'session_id' => 700000 + $i, 'raw_cdr' => [],
             ]);
         }
 
