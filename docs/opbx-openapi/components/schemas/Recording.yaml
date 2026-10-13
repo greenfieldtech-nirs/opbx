@@ -1,26 +1,76 @@
 type: object
-description: Recording
+description: Recording (uploaded audio file or remote URL)
 properties:
   id:
     type: integer
   organization_id:
     type: integer
-  call_log_id:
-    type: integer
-  filename:
+  name:
     type: string
-  duration:
-    type: integer
-    description: Duration in seconds
+  type:
+    type: string
+    enum: [upload, remote]
+  file_path:
+    type:
+      - string
+      - 'null'
+  remote_url:
+    type:
+      - string
+      - 'null'
+  original_filename:
+    type:
+      - string
+      - 'null'
   file_size:
-    type: integer
+    type:
+      - integer
+      - 'null'
     description: Size in bytes
-  storage_path:
+  formatted_file_size:
+    type:
+      - string
+      - 'null'
+  mime_type:
+    type:
+      - string
+      - 'null'
+  duration_seconds:
+    type:
+      - integer
+      - 'null'
+  formatted_duration:
+    type:
+      - string
+      - 'null'
+  status:
     type: string
+    enum: [active, inactive]
+  is_moh:
+    type: boolean
+    description: Usable as music on hold
+  public_url:
+    type:
+      - string
+      - 'null'
+    description: Kept for backward compatibility
+  playback_url:
+    type: string
+    description: Tokenized playback URL (present when the requesting user is known)
+  created_by:
+    type: string
+    description: Creator name, or `Unknown`
+  updated_by:
+    type: string
+    description: Last updater name, or `Unknown`
   created_at:
+    type: string
+    format: date-time
+  updated_at:
     type: string
     format: date-time
 required:
   - id
   - organization_id
-  - filename
+  - name
+  - type

@@ -4,14 +4,30 @@ paths:
       tags:
         - Recordings
       summary: List Recordings
-      description: Get paginated list of Recordings
       operationId: listRecordings
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
+      description: Paginated list (20 per page, newest first). Returned as a Laravel resource collection (top-level `links`).
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: moh
+          in: query
+          schema:
+            type: boolean
+          description: Only music-on-hold recordings
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Partial name match
       responses:
         '200':
           description: List of Recordings
@@ -24,8 +40,10 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/Recording.yaml'
+                  links:
+                    $ref: '../../components/schemas/PaginationLinks.yaml'
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: '../../components/schemas/ResourceCollectionMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
@@ -37,20 +55,47 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
+      description: Requires a user token; API keys get 403.
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 name:
                   type: string
+                  maxLength: 255
+                type:
+                  type: string
+                  enum: [upload, remote]
+                file:
+                  type: string
+                  format: binary
+                  description: Required when type is `upload`. mp3 or wav, max 5 MB.
+                remote_url:
+                  type: string
+                  format: uri
+                  description: Required when type is `remote`. http(s) URL.
+              required: [name, type]
       responses:
         '201':
           description: Recording created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -70,9 +115,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
       responses:
         '200':
           description: Recording details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -86,15 +140,35 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                status:
+                  type: string
+                  enum: [active, inactive]
+                is_moh:
+                  type: boolean
       responses:
         '200':
           description: Recording updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -109,15 +183,35 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                status:
+                  type: string
+                  enum: [active, inactive]
+                is_moh:
+                  type: boolean
       responses:
         '200':
           description: Recording updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -133,9 +227,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       responses:
-        '204':
+        '200':
           description: Recording deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':

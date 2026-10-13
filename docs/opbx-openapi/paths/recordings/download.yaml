@@ -5,12 +5,35 @@ paths:
         - Recordings
       summary: Download recording with token
       operationId: downloadRecordingWithToken
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
+      description: >-
+        Streams (or downloads) a recording using the access token issued by
+        `GET /v1/recordings/{recording}/download`. The token is sent as
+        `Authorization: Bearer <token>` (preferred) or `?token=`. No Sanctum session is required.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+          description: Recording access token (alternative to the Authorization header)
       responses:
         '200':
-          description: Recording downloaded
+          description: Audio file (inline when the request accepts audio, otherwise as an attachment)
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: No token supplied
+        '403':
+          description: Access denied or token expired
+        '404':
+          description: File not found
 
   /v1/recordings/{recording}/download:
     get:
@@ -21,6 +44,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
       parameters:
         - name: recording
           in: path
@@ -29,4 +54,30 @@ paths:
             type: integer
       responses:
         '200':
-          description: Recording downloaded
+          description: >-
+            A 30-minute access token for `GET /v1/recordings/download` (uploaded recordings only).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  download_endpoint:
+                    type: string
+                    example: /api/v1/recordings/download
+                  token:
+                    type: string
+                  filename:
+                    type: string
+                  expires_in:
+                    type: integer
+                    example: 1800
+                  authorization_header:
+                    type: string
+                  security_note:
+                    type: string
+        '400':
+          description: Only uploaded recordings can be downloaded
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

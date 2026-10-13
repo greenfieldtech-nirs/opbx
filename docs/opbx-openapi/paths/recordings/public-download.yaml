@@ -6,12 +6,36 @@ paths:
       summary: Public recording download with HMAC
       operationId: publicRecordingDownload
       security: []
+      description: Serves a stored recording through a signed, expiring URL (HMAC signature).
       parameters:
         - name: path
           in: path
           required: true
           schema:
             type: string
+        - name: expires
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Unix expiry timestamp
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+          description: HMAC signature
       responses:
         '200':
-          description: Recording downloaded
+          description: Recording file
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid path format
+        '403':
+          description: Missing/invalid signature or URL expired
+        '404':
+          description: File not found
