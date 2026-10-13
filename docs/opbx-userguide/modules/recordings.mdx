@@ -60,9 +60,9 @@ Uploaded files are stored in the deployment's S3-compatible storage (SeaweedFS i
 
 The URL must start with `http://` or `https://`. If the deployment sets `RECORDINGS_ALLOWED_DOMAINS`, the host must be on that list, or the recording is refused with "Domain not allowed. Please contact administrator." OPBX does not copy the file; callers hear whatever the URL serves when the recording is played.
 
-{/* SCREENSHOT: recordings-list — Announcements list with Welcome Greeting, After Hours Message and Hold Music - Smooth Jazz (Remote type), the Hold Music switch on for the last one, and the Upload File and Remote URL buttons */}
+![Announcements list with Welcome Greeting, After Hours Message and Hold Music - Smooth Jazz (Remote type), the Hold Music switch on for the last one, and the Upload File and Remote URL buttons](../img/screens/recordings-list.jpg)
 
-{/* SCREENSHOT: recordings-upload-dialog — Upload Announcement dialog with a name entered and an MP3 file chosen */}
+![Upload Announcement dialog with a name entered and the audio file picker](../img/screens/recordings-upload-dialog.jpg)
 
 ## The list
 
@@ -105,7 +105,7 @@ The uploaded file is removed from storage and the recording is deleted.
 Unlike routing resources, a recording is deleted even while it is used. An IVR menu that played it loses its greeting, and a call queue that used it as hold music loses its hold music. Check your IVR menus and queues before you delete.
 :::
 
-{/* SCREENSHOT: recordings-delete-dialog — "Delete announcement" confirmation for Welcome Greeting */}
+![Delete announcement confirmation for Welcome Greeting](../img/screens/recordings-delete-dialog.jpg)
 
 ## Common errors
 
