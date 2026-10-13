@@ -8,6 +8,24 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:read
       responses:
         '200':
-          description: Rate limit info
+          description: Current webhook rate-limit window
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      limit:
+                        type: integer
+                      current:
+                        type: integer
+                      remaining:
+                        type: integer
+                      reset_in_seconds:
+                        type: integer

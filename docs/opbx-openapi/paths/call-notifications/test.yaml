@@ -8,6 +8,23 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:write
       responses:
         '200':
-          description: Test completed
+          description: Test webhook delivered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  webhook_url:
+                    type: string
+        '400':
+          description: Settings not configured
+        '502':
+          description: Delivery failed (the receiver did not accept the test event)
+        '500':
+          description: Delivery raised an error

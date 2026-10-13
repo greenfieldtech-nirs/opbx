@@ -8,6 +8,56 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:read
+      description: >-
+        By default returns the latest delivery per call session (only `status` filters).
+        With `show_all=true` returns every delivery and honours all filters.
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: show_all
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: session_token
+          in: query
+          schema:
+            type: string
+          description: show_all only
+        - name: success
+          in: query
+          schema:
+            type: boolean
+          description: show_all only
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: show_all only
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: show_all only
       responses:
         '200':
-          description: Logs retrieved
+          description: Delivery log page (per_page defaults to 50)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/CallNotificationLog.yaml'
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'

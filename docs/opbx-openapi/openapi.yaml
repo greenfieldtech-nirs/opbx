@@ -939,6 +939,10 @@ components:
       $ref: './components/schemas/CloudonixSettings.yaml'
     CallNotificationsSettings:
       $ref: './components/schemas/CallNotificationsSettings.yaml'
+    CallNotificationsSettingsInput:
+      $ref: './components/schemas/CallNotificationsSettingsInput.yaml'
+    CallNotificationLog:
+      $ref: './components/schemas/CallNotificationLog.yaml'
     SessionUpdate:
       $ref: './components/schemas/SessionUpdate.yaml'
     SupervisorAssignment:

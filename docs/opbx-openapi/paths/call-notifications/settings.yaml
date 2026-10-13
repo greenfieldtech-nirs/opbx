@@ -8,9 +8,22 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:read
       responses:
         '200':
-          description: Settings retrieved
+          description: Settings, or `data` null with a message when none are configured
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    oneOf:
+                      - $ref: '../../components/schemas/CallNotificationsSettings.yaml'
+                      - type: 'null'
+                  message:
+                    type: string
     
     post:
       tags:
@@ -20,9 +33,35 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '../../components/schemas/CallNotificationsSettingsInput.yaml'
+                - required:
+                    - webhook_url
+                    - auth_method
+                    - enabled_events
       responses:
         '201':
           description: Settings created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/CallNotificationsSettings.yaml'
+        '409':
+          description: Settings already exist (use PUT)
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
     
     put:
       tags:
@@ -32,9 +71,30 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/CallNotificationsSettingsInput.yaml'
       responses:
         '200':
           description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/CallNotificationsSettings.yaml'
+        '404':
+          description: No settings yet (use POST)
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
     
     delete:
       tags:
@@ -44,6 +104,17 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:write
       responses:
-        '204':
+        '200':
           description: Settings deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          description: No settings to delete
