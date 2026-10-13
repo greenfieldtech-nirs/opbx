@@ -16,6 +16,7 @@ import Auth0Callback from '@/pages/Auth0Callback';
 import Auth0Onboarding from '@/pages/Auth0Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
+import PublicStatus from '@/pages/PublicStatus';
 
 // Lazy load pages for code splitting. trackedLazy() is React.lazy() plus a
 // signal to the global page loading indicator while the chunk downloads.
@@ -77,6 +78,11 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <Home />,
+  },
+  // Public platform status page
+  {
+    path: '/status',
+    element: <PublicStatus />,
   },
   // Public auth routes (under /ui for consistency with existing setup)
   {
