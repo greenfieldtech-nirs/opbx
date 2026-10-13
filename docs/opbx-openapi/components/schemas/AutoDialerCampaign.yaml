@@ -361,6 +361,14 @@ properties:
   retry_on_voicemail:
     type: boolean
     description: Retry the destination when a voicemail was detected
+  retry_on_busy_no_answer:
+    type: boolean
+    description: Redial busy and no-answer destinations after the retry delay, within max_dial_attempts (default false). Cancelled and failed calls are never retried.
+  retry_delay_minutes:
+    type: integer
+    minimum: 1
+    maximum: 1440
+    description: Minutes to wait before redialing a busy / no-answer destination (default 15)
   lists_count:
     type: integer
     description: Number of distribution lists assigned (0 when not loaded)

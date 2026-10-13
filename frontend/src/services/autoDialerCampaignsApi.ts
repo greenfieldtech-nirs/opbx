@@ -43,6 +43,8 @@ export interface AutoDialerCampaign {
   action_human?: 'HANGUP' | 'CONTINUE' | string;
   action_unknown?: 'HANGUP' | 'CONTINUE' | string;
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   statistics: {
     total_destinations: number;
     completed_calls: number;
@@ -88,6 +90,8 @@ export interface CreateCampaignRequest {
   action_human?: 'HANGUP' | 'CONTINUE' | string;
   action_unknown?: 'HANGUP' | 'CONTINUE' | string;
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   auto_start?: boolean;
 }
 
@@ -121,6 +125,8 @@ export interface UpdateCampaignRequest {
   action_human?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   action_unknown?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   auto_start?: boolean;
 }
 

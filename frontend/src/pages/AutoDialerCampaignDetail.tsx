@@ -428,6 +428,12 @@ export default function AutoDialerCampaignDetail() {
                     <span className="font-medium">{campaign.max_dial_attempts}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Retry on busy / no-answer</span>
+                    <span className="font-medium">
+                      {campaign.retry_on_busy_no_answer ? `Yes, after ${campaign.retry_delay_minutes ?? 15} min` : 'No'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Concurrent Active Calls</span>
                     <span className="font-medium">{campaign.concurrent_active_calls}</span>
                   </div>

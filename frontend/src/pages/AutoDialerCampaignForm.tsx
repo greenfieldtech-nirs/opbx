@@ -94,6 +94,8 @@ const campaignSchema = z.object({
   action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
   action_unknown: z.enum(['HANGUP', 'CONTINUE']).optional(),
   retry_on_voicemail: z.boolean().nullish().transform(v => v ?? false),
+  retry_on_busy_no_answer: z.boolean().default(false),
+  retry_delay_minutes: z.number().min(1).max(1440).default(15),
   auto_start: z.boolean().nullish().transform(v => v ?? false),
 });
 
@@ -221,6 +223,8 @@ export default function AutoDialerCampaignForm() {
       action_human: undefined,
       action_unknown: undefined,
       retry_on_voicemail: false,
+      retry_on_busy_no_answer: false,
+      retry_delay_minutes: 15,
       auto_start: false,
     },
   });
@@ -274,6 +278,8 @@ export default function AutoDialerCampaignForm() {
         action_human: (existingCampaign as any).action_human || undefined,
         action_unknown: (existingCampaign as any).action_unknown || undefined,
         retry_on_voicemail: (existingCampaign as any).retry_on_voicemail ?? false,
+        retry_on_busy_no_answer: existingCampaign.retry_on_busy_no_answer ?? false,
+        retry_delay_minutes: existingCampaign.retry_delay_minutes ?? 15,
         auto_start: existingCampaign.auto_start ?? false,
       });
       // Use schedule from campaign if available, otherwise convert from legacy format
@@ -330,6 +336,8 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
+          retry_on_busy_no_answer: data.retry_on_busy_no_answer,
+          retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
           ...(data.amd_enabled ? {
             action_voicemail: data.action_voicemail,
@@ -376,6 +384,8 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
+          retry_on_busy_no_answer: data.retry_on_busy_no_answer,
+          retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
           ...(data.amd_enabled ? {
             action_voicemail: data.action_voicemail,
@@ -800,6 +810,34 @@ export default function AutoDialerCampaignForm() {
                       />
                       <p className="text-sm text-muted-foreground">Maximum retry attempts per destination</p>
                     </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="retry_on_busy_no_answer">Retry on busy / no-answer</Label>
+                        <Switch
+                          id="retry_on_busy_no_answer"
+                          checked={watch('retry_on_busy_no_answer')}
+                          onCheckedChange={(checked) => setValue('retry_on_busy_no_answer', checked)}
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Redial busy and unanswered destinations, up to Max Dial Attempts. Cancelled and failed calls are never retried.
+                      </p>
+                    </div>
+
+                    {watch('retry_on_busy_no_answer') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="retry_delay_minutes">Retry delay (minutes)</Label>
+                        <Input
+                          id="retry_delay_minutes"
+                          type="number"
+                          {...register('retry_delay_minutes', { valueAsNumber: true })}
+                          min={1}
+                          max={1440}
+                        />
+                        <p className="text-sm text-muted-foreground">Wait before redialing (1–1440)</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Record Calls */}
