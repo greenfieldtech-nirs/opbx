@@ -80,7 +80,7 @@ by `App\Logging\MaskCredentialsProcessor` before records leave Laravel.
 | Env var | Default | Purpose |
 |---------|---------|---------|
 | `LOG_STACK_ENABLED` | `false` | Documented flag; the real switch is the compose profile |
-| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / none | Grafana login. The password is required: compose refuses to start Grafana without it, and the app's environment check rejects an empty or placeholder value when the log stack is enabled (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`); `docker/scripts/generate-secrets.sh` sets one |
+| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / none | Grafana login. The password is required: compose refuses to start the stack without it, even when the `logs` profile is off, and the app's environment check rejects an empty or placeholder value when the log stack is enabled (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`); `docker/scripts/generate-secrets.sh` sets one |
 | `GRAFANA_ROOT_URL` | `http://localhost/logs/` | **Must match the URL the browser uses** (`<APP_URL>/logs/`) |
 | `GRAFANA_CSRF_TRUSTED_ORIGINS` | (empty) | Extra hostnames reaching the UI (ngrok, second domain); space-separated, no scheme |
 | `LOKI_RETENTION_HOURS` | `168` (7d) | Loki compactor retention |

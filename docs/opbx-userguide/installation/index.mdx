@@ -85,7 +85,7 @@ Then edit `.env` and set the rest by hand:
 | `DB_ROOT_PASSWORD` | MySQL root password | `openssl rand -base64 32` |
 | `REDIS_PASSWORD` | Redis password | `openssl rand -base64 32` |
 
-The `.env.example` ships the S3 keys empty (the script above generates them). The app container refuses to start with `minioadmin` (or `secret`, `password`, `rootsecret`, `admin`, `123456`) as a database password or S3 key, and its environment check refuses empty or placeholder values for `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET` and the three worker tokens (and `GRAFANA_ADMIN_PASSWORD` when the log stack is enabled: `LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`). Compose itself refuses to start while the worker tokens, `PUSHER_APP_SECRET` or the S3 keys are unset.
+The `.env.example` ships the S3 keys empty (the script above generates them). The app container refuses to start with `minioadmin` (or `secret`, `password`, `rootsecret`, `admin`, `123456`) as a database password or S3 key, and its environment check refuses empty or placeholder values for `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET` and the three worker tokens (and `GRAFANA_ADMIN_PASSWORD` when the log stack is enabled: `LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`). Compose itself refuses to start the stack (any service, any profile) while the worker tokens, `PUSHER_APP_SECRET`, the S3 keys or `GRAFANA_ADMIN_PASSWORD` are unset.
 
 Optional but commonly configured variables:
 
