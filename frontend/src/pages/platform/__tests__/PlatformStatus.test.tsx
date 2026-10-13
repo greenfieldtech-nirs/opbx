@@ -65,13 +65,25 @@ describe('PlatformStatus page', () => {
 });
 
 describe('StatusStrip', () => {
-  it('renders 288 slots and places a bucket with its status in the tooltip', () => {
-    const now = Date.parse('2026-10-13T12:00:00Z');
+  it('renders 48 clock-aligned half-hour bars, each showing the worst status in its half hour', () => {
+    const now = Date.parse('2026-10-13T12:10:00Z');
     const { container } = render(
-      <StatusStrip now={now} history={[{ checked_at: '2026-10-13T11:00:00Z', status: 'down' }]} />,
+      <StatusStrip
+        now={now}
+        history={[
+          { checked_at: '2026-10-13T11:00:00Z', status: 'ok' },
+          { checked_at: '2026-10-13T11:05:00Z', status: 'down' },
+          { checked_at: '2026-10-13T11:25:00Z', status: 'degraded' },
+          { checked_at: '2026-10-13T12:05:00Z', status: 'ok' },
+        ]}
+      />,
     );
-    expect(container.querySelectorAll('[title]').length).toBe(288);
-    expect(container.querySelector('[title$=": down"]')).toBeTruthy();
-    expect(screen.getByRole('img').getAttribute('aria-label')).toContain('1 down');
+    const bars = container.querySelectorAll('[role="img"] > div');
+    expect(bars.length).toBe(48);
+    // 12:00-12:30 is the current half hour (last bar), 11:30-12:00 had no checks, 11:00-11:30 was down at worst.
+    expect(bars[47].className).toContain('bg-green-500');
+    expect(bars[46].className).toContain('bg-muted');
+    expect(bars[45].className).toContain('bg-red-600');
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain('1 down and 0 degraded');
   });
 });

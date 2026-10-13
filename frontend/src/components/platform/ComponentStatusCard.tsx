@@ -7,8 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { PlatformComponentStatus, PlatformHealthStatus } from '@/types/platform';
 
-const STRIP_SLOTS = 288; // 24h / 5 min
-const SLOT_MS = 5 * 60 * 1000;
+// 48 half-hour bars: 288 five-minute bars cannot fit a card (each needs >= 1px plus a gap) and overflowed it.
+const STRIP_SLOTS = 48;
+const SLOT_MS = 30 * 60 * 1000;
+const SEVERITY: Record<PlatformHealthStatus, number> = { ok: 0, unknown: 1, degraded: 2, down: 3 };
+const hhmm = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const styles: Record<PlatformHealthStatus, { badge: string; segment: string; card: string }> = {
   ok: {
@@ -45,28 +48,42 @@ export function StatusStrip({
   history: PlatformComponentStatus['history'];
   now?: number;
 }) {
-  const start = now - STRIP_SLOTS * SLOT_MS;
-  const slots: ({ at: string; status: PlatformHealthStatus } | null)[] = Array(STRIP_SLOTS).fill(null);
+  // Bars sit on clock half-hours, so every card's strip lines up; the last bar is the current half hour.
+  const end = Math.floor(now / SLOT_MS) * SLOT_MS + SLOT_MS;
+  const start = end - STRIP_SLOTS * SLOT_MS;
+  const slots: (PlatformHealthStatus | null)[] = Array(STRIP_SLOTS).fill(null);
   for (const h of history) {
     const i = Math.floor((new Date(h.checked_at).getTime() - start) / SLOT_MS);
-    if (i >= 0 && i < STRIP_SLOTS) slots[i] = { at: h.checked_at, status: h.status };
+    if (i < 0 || i >= STRIP_SLOTS) continue;
+    const cur = slots[i];
+    if (cur === null || SEVERITY[h.status] > SEVERITY[cur]) slots[i] = h.status; // worst status in the half hour
   }
-  const bad = history.filter((h) => h.status === 'down').length;
-  const degraded = history.filter((h) => h.status === 'degraded').length;
+  const bad = slots.filter((s) => s === 'down').length;
+  const degraded = slots.filter((s) => s === 'degraded').length;
 
   return (
-    <div
-      role="img"
-      aria-label={`Last 24 hours: ${bad} down and ${degraded} degraded 5-minute periods`}
-      className="flex h-6 gap-px"
-    >
-      {slots.map((s, i) => (
-        <div
-          key={i}
-          title={s ? `${new Date(s.at).toLocaleString()}: ${s.status}` : 'No data'}
-          className={cn('flex-1 min-w-px rounded-[1px]', s ? styles[s.status].segment : 'bg-muted')}
-        />
-      ))}
+    <div className="space-y-1">
+      <div
+        role="img"
+        aria-label={`Last 24 hours: ${bad} down and ${degraded} degraded half-hour periods`}
+        className="grid h-6 w-full gap-[2px]"
+        style={{ gridTemplateColumns: `repeat(${STRIP_SLOTS}, minmax(0, 1fr))` }}
+      >
+        {slots.map((s, i) => {
+          const from = start + i * SLOT_MS;
+          return (
+            <div
+              key={i}
+              title={`${hhmm(from)}–${hhmm(from + SLOT_MS)}: ${s ?? 'no data'}`}
+              className={cn('rounded-[1px]', s ? styles[s].segment : 'bg-muted')}
+            />
+          );
+        })}
+      </div>
+      <div className="flex justify-between text-[10px] text-muted-foreground" aria-hidden>
+        <span>24h ago</span>
+        <span>now</span>
+      </div>
     </div>
   );
 }
