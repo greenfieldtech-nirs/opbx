@@ -7,16 +7,19 @@ structured logs from all services into one searchable store.
 
 | Service | Role |
 |---------|------|
-| **Loki** | Log store. 7-day retention (compactor), filesystem storage in the `loki_data` volume. |
+| **Loki** | Log store. Retention `LOKI_RETENTION_HOURS` (default 168 h = 7 days, compactor), filesystem storage in the `loki_data` named volume. |
 | **Grafana** | Viewer, proxied by nginx at `<APP_URL>/logs/`. |
 | **Alloy** | Collector. Tails OPBX containers through a read-only `docker-socket-proxy` (opt-in label `logging.opbx/collect=true`), parses the JSON contract, pushes to Loki. |
+| **docker-socket-proxy** | Read-only, filtered view of the Docker API (container list, logs, events; every write is denied). |
+
+All four are in the compose profile `logs` and do not start with a plain `docker compose up -d`. The containers that carry the collect label are `app`, `queue-worker`, `queue-worker-long`, `scheduler`, `dialer-worker`, `amd-worker` and `acd-worker`.
 
 ## Enabling
 
 ```bash
 # .env
 LOG_STACK_ENABLED=true
-GRAFANA_ADMIN_PASSWORD=<pick-a-password>
+GRAFANA_ADMIN_PASSWORD=<long random value, e.g. openssl rand -hex 32>
 
 docker compose --profile logs up -d
 ```
@@ -77,7 +80,7 @@ by `App\Logging\MaskCredentialsProcessor` before records leave Laravel.
 | Env var | Default | Purpose |
 |---------|---------|---------|
 | `LOG_STACK_ENABLED` | `false` | Documented flag; the real switch is the compose profile |
-| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / (empty→`admin`) | Grafana login |
+| `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` | `admin` / none | Grafana login. The password is required: compose refuses to start Grafana without it, and the app's environment check rejects an empty or placeholder value even when the profile is off (`docker/scripts/generate-secrets.sh` sets one) |
 | `GRAFANA_ROOT_URL` | `http://localhost/logs/` | **Must match the URL the browser uses** (`<APP_URL>/logs/`) |
 | `GRAFANA_CSRF_TRUSTED_ORIGINS` | (empty) | Extra hostnames reaching the UI (ngrok, second domain); space-separated, no scheme |
 | `LOKI_RETENTION_HOURS` | `168` (7d) | Loki compactor retention |

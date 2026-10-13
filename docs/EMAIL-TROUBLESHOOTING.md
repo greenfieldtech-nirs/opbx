@@ -12,7 +12,7 @@ and how to use the built-in diagnostic Artisan commands.
    - `TransactionalEmailInterface::sendAsync()` — dispatches a queue job
 2. **`TransactionalEmailService`** checks the per-driver rate limit, delegates to the configured driver, and writes an `EmailLog` record.
 3. **The driver** builds the provider-specific payload, calls the provider HTTP API, and logs the full request/response.
-4. **Queue worker** (`queue-worker` container) runs `SendTransactionalEmailJob` when using async sending.
+4. **Queue worker** (`queue-worker` container, which works the `auto-dialer` and `default` queues) runs `SendTransactionalEmailJob` when using async sending. `EMAIL_QUEUE` must name one of those queues.
 5. **Retries**: failed jobs are retried up to 3 times with backoffs of 30s, 60s, and 120s. After all retries fail, the job is moved to `failed_jobs`.
 
 ---
@@ -69,6 +69,8 @@ EMAIL_TRACK_CLICKS=true
 
 ## Diagnostic Commands
 
+Run the Artisan commands inside the app container, for example `docker compose exec app php artisan email:logs user@example.com`. The examples below omit the prefix.
+
 ### `email:test`
 
 Send a test email to validate provider configuration.
@@ -83,6 +85,8 @@ php artisan email:test user@example.com --sync
 # Test a specific provider without changing .env
 php artisan email:test user@example.com --provider=mailgun --sync
 ```
+
+`email:send-test --to=user@example.com [--subject=...] [--provider=...] [--dry-run]` is a second test command; `--dry-run` validates the configuration without sending.
 
 Output:
 
@@ -106,6 +110,8 @@ Statuses:
 - `delivered` — delivery confirmed (if webhooks are configured)
 - `bounced` — delivery failed permanently
 - `failed` — send failed (check `error_message`)
+
+Rows older than `RETENTION_EMAIL_LOGS_DAYS` (default 90) are pruned daily, so older sends no longer appear.
 
 ### `email:retry-failed`
 
@@ -162,10 +168,11 @@ Fix: set `MAILGUN_DOMAIN` and `MAILGUN_SECRET` (or the equivalent keys for your 
 
 Symptom: emails stay `queued` in `email_logs` and are never sent.
 
-Fix: start the worker container:
+Fix: start the worker container and check that it is healthy:
 
 ```bash
 docker compose up -d queue-worker
+docker compose ps queue-worker
 ```
 
 Or run a local worker:
@@ -199,16 +206,16 @@ Fix:
 
 Symptom: `Rate limit exceeded for mailgun`.
 
-Fix: increase the provider's `rate_limit` config or reduce send volume. Default is 100 per minute.
+Fix: reduce send volume. The limit is 100 sends per minute per provider. It has no environment variable; it can be changed only by adding a `rate_limit` key to the provider's entry under `email.providers` in `config/services.php`.
 
 ### `.env` changes not applied
 
 Symptom: updated credentials but still getting auth errors.
 
-Fix: restart the `app` and `queue-worker` containers so the new environment is loaded:
+Fix: restart the PHP containers so the configuration is reloaded (their entrypoint clears the config cache):
 
 ```bash
-docker compose restart app queue-worker
+docker compose restart app queue-worker queue-worker-long scheduler
 ```
 
 ---
@@ -222,3 +229,4 @@ docker compose restart app queue-worker
 - `app/Console/Commands/TestEmailConfiguration.php`
 - `app/Console/Commands/ShowEmailLogs.php`
 - `app/Console/Commands/RetryFailedEmails.php`
+- `app/Console/Commands/EmailSendTestCommand.php`

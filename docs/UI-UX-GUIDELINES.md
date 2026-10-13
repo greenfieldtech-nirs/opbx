@@ -143,7 +143,7 @@ Stat cards must follow the main Dashboard pattern:
 ## Loading & Error States
 
 - For full-page loading, show a `Card` with `LoadingSpinner` or skeletons.
-- For error states, show a centered message with a retry button inside a `Card`.
+- For query errors, use `QueryErrorState` from `@/components/design-system` (`title`, `error`, `onRetry`). It shows the API error message and a retry button.
 - Inline table loading is handled by `StandardDataTable` `isLoading` prop.
 
 ## Responsive Behavior
@@ -160,7 +160,10 @@ Stat cards must follow the main Dashboard pattern:
 | Empty state | `EmptyState` | `@/components/design-system` |
 | Loading spinner | `LoadingSpinner` | `@/components/design-system` |
 | Confirmation dialog | `ConfirmDialog` | `@/components/design-system` |
-| KPI/stat cards | custom `Card` with `CardHeader`/`CardContent` | `@/components/ui/card` |
+| Query error | `QueryErrorState` | `@/components/design-system` |
+| KPI/stat cards | `StatCard` (title, value, icon, color, optional trend), or a custom `Card` following the pattern above | `@/components/design-system`, `@/components/ui/card` |
+| Strategy pickers | `RingGroupStrategySelector`, `CallQueueStrategySelector`, `AlbsStrategySelector` | `@/components/design-system` |
+| Auto-refresh indicator | `RefreshTimer` | `@/components/design-system` |
 | Buttons | `Button` | `@/components/ui/button` |
 | Form inputs | `Input`, `Select`, `Switch`, `Textarea`, `Label` | `@/components/ui/*` |
 
