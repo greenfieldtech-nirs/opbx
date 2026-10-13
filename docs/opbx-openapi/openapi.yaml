@@ -907,6 +907,8 @@ components:
       $ref: './components/schemas/ApiKeyPermission.yaml'
     IvrMenu:
       $ref: './components/schemas/IvrMenu.yaml'
+    IvrMenuInput:
+      $ref: './components/schemas/IvrMenuInput.yaml'
     PhoneNumber:
       $ref: './components/schemas/PhoneNumber.yaml'
     AiAssistant:

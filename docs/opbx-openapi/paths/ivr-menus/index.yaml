@@ -9,9 +9,28 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, status, created_at, updated_at]
+            default: created_at
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Free-text search
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
@@ -38,18 +57,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
+              $ref: '../../components/schemas/IvrMenuInput.yaml'
       responses:
         '201':
           description: IVR Menu created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
@@ -71,9 +98,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:read
       responses:
         '200':
           description: IVR Menu details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -87,15 +123,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/IvrMenuInput.yaml'
       responses:
         '200':
           description: IVR Menu updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -112,6 +159,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:write
       responses:
         '204':
           description: IVR Menu deleted
