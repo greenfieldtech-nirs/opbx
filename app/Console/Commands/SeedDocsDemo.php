@@ -80,7 +80,7 @@ use Illuminate\Support\Str;
  * Rows are created directly (no model events, no jobs, no HTTP), so nothing
  * reaches Cloudonix or any other external service. All data is invented:
  *
- * @example.com emails, +1555 01xx numbers, acme-demo.example.com domain.
+ * @example.com emails, +1 202 555 01xx numbers (fictional range), acme-demo.example.com domain.
  */
 class SeedDocsDemo extends Command
 {
@@ -260,7 +260,7 @@ class SeedDocsDemo extends Command
                 'password' => $hash,
                 'role' => $role,
                 'status' => $status,
-                'phone' => '+15550'.(110 + $i),
+                'phone' => '+12025550'.(110 + $i),
             ])->id;
         }
 
@@ -294,8 +294,8 @@ class SeedDocsDemo extends Command
     private function aiAssistants(): void
     {
         foreach ([
-            ['aria', 'Aria - Front Desk Receptionist', 'vapi', '+15550170'],
-            ['max', 'Max - Support Triage', 'retell', '+15550171'],
+            ['aria', 'Aria - Front Desk Receptionist', 'vapi', '+12025550170'],
+            ['max', 'Max - Support Triage', 'retell', '+12025550171'],
         ] as [$key, $name, $provider, $phone]) {
             $this->id['ai_'.$key] = AiAssistant::create([
                 'organization_id' => $this->org, 'name' => $name, 'status' => 'active',
@@ -332,7 +332,7 @@ class SeedDocsDemo extends Command
                 'configuration' => ['sip_uri' => 'sip:'.(1001 + $i).'@'.self::DOMAIN],
             ], $key);
         }
-        $this->extension('1012', ExtensionType::FORWARD, ['configuration' => ['forward_to' => '+15550180']], 'forward');
+        $this->extension('1012', ExtensionType::FORWARD, ['configuration' => ['forward_to' => '+12025550180']], 'forward');
         $this->extension('1013', ExtensionType::AI_ASSISTANT, [
             'ai_assistant_id' => $this->id['ai_aria'],
             'configuration' => ['ai_assistant_id' => $this->id['ai_aria']],
@@ -493,14 +493,14 @@ class SeedDocsDemo extends Command
     private function dids(): void
     {
         $rows = [
-            ['main', '+15550100', 'Main Line', 'business_hours', ['business_hours_schedule_id' => $this->id['bh_office']]],
-            ['sales', '+15550101', 'Sales Direct', 'ring_group', ['ring_group_id' => $this->id['rg_sales']]],
-            ['support', '+15550102', 'Support Line', 'call_queue', ['call_queue_id' => $this->id['q_support']]],
-            ['conf', '+15550103', 'Conference Bridge', 'conference_room', ['conference_room_id' => $this->id['conf_all']]],
-            ['ai', '+15550104', 'AI Receptionist', 'ai_assistant', ['ai_assistant_id' => $this->id['ai_aria']]],
-            ['future', '+15550105', 'Spring Campaign (not yet assigned)', 'unavailable', []],
-            ['alice', '+15550106', 'Alice Direct', 'extension', ['extension_id' => $this->x['alice']]],
-            ['ivr', '+15550107', 'Customer Menu', 'ivr_menu', ['ivr_menu_id' => $this->id['ivr_main']]],
+            ['main', '+12025550100', 'Main Line', 'business_hours', ['business_hours_schedule_id' => $this->id['bh_office']]],
+            ['sales', '+12025550101', 'Sales Direct', 'ring_group', ['ring_group_id' => $this->id['rg_sales']]],
+            ['support', '+12025550102', 'Support Line', 'call_queue', ['call_queue_id' => $this->id['q_support']]],
+            ['conf', '+12025550103', 'Conference Bridge', 'conference_room', ['conference_room_id' => $this->id['conf_all']]],
+            ['ai', '+12025550104', 'AI Receptionist', 'ai_assistant', ['ai_assistant_id' => $this->id['ai_aria']]],
+            ['future', '+12025550105', 'Spring Campaign (not yet assigned)', 'unavailable', []],
+            ['alice', '+12025550106', 'Alice Direct', 'extension', ['extension_id' => $this->x['alice']]],
+            ['ivr', '+12025550107', 'Customer Menu', 'ivr_menu', ['ivr_menu_id' => $this->id['ivr_main']]],
         ];
         foreach ($rows as [$key, $number, $name, $type, $config]) {
             $this->id['did_'.$key] = DidNumber::create([
@@ -530,10 +530,10 @@ class SeedDocsDemo extends Command
         }
 
         foreach ([
-            [InboundBlacklistMatchType::EXACT, '+15550190', InboundBlacklistRejectionStrategy::DROP, 14],
-            [InboundBlacklistMatchType::EXACT, '+15550191', InboundBlacklistRejectionStrategy::REJECT, 6],
-            [InboundBlacklistMatchType::PREFIX, '+1555019', InboundBlacklistRejectionStrategy::TORMENT, 31],
-            [InboundBlacklistMatchType::WILDCARD, '+1555018*', InboundBlacklistRejectionStrategy::DROP, 3],
+            [InboundBlacklistMatchType::EXACT, '+12025550190', InboundBlacklistRejectionStrategy::DROP, 14],
+            [InboundBlacklistMatchType::EXACT, '+12025550191', InboundBlacklistRejectionStrategy::REJECT, 6],
+            [InboundBlacklistMatchType::PREFIX, '+1202555019', InboundBlacklistRejectionStrategy::TORMENT, 31],
+            [InboundBlacklistMatchType::WILDCARD, '+1202555018*', InboundBlacklistRejectionStrategy::DROP, 3],
         ] as [$match, $pattern, $strategy, $blocked]) {
             InboundBlacklist::create([
                 'organization_id' => $this->org, 'match_type' => $match, 'caller_id_pattern' => $pattern,
@@ -570,7 +570,7 @@ class SeedDocsDemo extends Command
     {
         $campaigns = [
             ['Fall Promo - Search Ads', 'google', 'cpc', ['ring_group_id' => $this->id['rg_sales']], CallTrackingDestinationType::RING_GROUP],
-            ['Partner Newsletter', 'newsletter', 'email', ['forward_to' => '+15550180'], CallTrackingDestinationType::FORWARD],
+            ['Partner Newsletter', 'newsletter', 'email', ['forward_to' => '+12025550180'], CallTrackingDestinationType::FORWARD],
         ];
         // Tracking numbers get their own DIDs, routed to the tracking campaign.
         foreach ($campaigns as $i => [$name, $source, $medium, $config, $type]) {
@@ -582,7 +582,7 @@ class SeedDocsDemo extends Command
                 'google_ads_upload_enabled' => false, 'meta_upload_enabled' => false,
             ]);
             $did = DidNumber::create([
-                'organization_id' => $this->org, 'phone_number' => '+1555011'.($i + 5),
+                'organization_id' => $this->org, 'phone_number' => '+1202555011'.($i + 5),
                 'friendly_name' => $name.' tracking line', 'routing_type' => 'call_tracking',
                 'routing_config' => ['call_tracking_campaign_id' => $c->id], 'status' => 'active',
             ]);
@@ -596,7 +596,7 @@ class SeedDocsDemo extends Command
                 $billsec = random_int(0, 3) === 0 ? 0 : random_int(15, 280);
                 $duration = $billsec > 0 ? $billsec + random_int(3, 12) : random_int(5, 30);
                 $disp = $billsec > 0 ? 'CONNECTED' : 'NO ANSWER';
-                $caller = '+15550'.random_int(120, 199);
+                $caller = '+12025550'.random_int(120, 199);
                 CallTrackingSession::create([
                     'organization_id' => $this->org, 'call_tracking_campaign_id' => $c->id,
                     'call_tracking_number_id' => $number->id, 'did_number_id' => $did->id,
@@ -620,7 +620,7 @@ class SeedDocsDemo extends Command
             'description' => 'Fictional outbound campaign (not running)', 'status' => CampaignStatus::PAUSED,
             'auto_start' => false, 'routing_destination_type' => RoutingDestinationType::AI_ASSISTANT,
             'routing_destination_id' => $this->id['ai_aria'], 'dial_timeout' => 45,
-            'destination_connect' => 'connected', 'caller_id' => '+15550100', 'max_dial_attempts' => 3,
+            'destination_connect' => 'connected', 'caller_id' => '+12025550100', 'max_dial_attempts' => 3,
             'concurrent_active_calls' => 3, 'days_active' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
             'start_time' => 9, 'end_time' => 17, 'start_date' => now()->startOfDay(),
             'end_date' => now()->addDays(30), 'timezone' => 'America/New_York', 'time_limit' => 1800,
@@ -639,7 +639,7 @@ class SeedDocsDemo extends Command
             'Ethan Bell', 'Harper Cole', 'Logan Fox', 'Ella Hunt', 'James Dean', 'Chloe West', 'Owen Pierce', 'Zoe Grant', 'Caleb Stone', 'Lily Marsh'];
         foreach ($names as $i => $name) {
             AutoDialerDestination::create([
-                'organization_id' => $this->org, 'list_id' => $list->id, 'phone_number' => '+15550'.(140 + $i),
+                'organization_id' => $this->org, 'list_id' => $list->id, 'phone_number' => '+12025550'.(140 + $i),
                 'name' => $name, 'status' => DestinationStatus::PENDING, 'dial_attempts' => 0,
                 'duration' => 0, 'billsec' => 0, 'total_duration' => 0,
             ]);
@@ -649,7 +649,7 @@ class SeedDocsDemo extends Command
     private function calls(): void
     {
         $ext = ['1001', '1002', '1005', '1006', '1007', '1008', '1009', '1010'];
-        $dids = ['+15550100', '+15550101', '+15550102', '+15550104', '+15550107'];
+        $dids = ['+12025550100', '+12025550101', '+12025550102', '+12025550104', '+12025550107'];
         $dispositions = ['CONNECTED', 'CONNECTED', 'CONNECTED', 'CONNECTED', 'CONNECTED', 'NO_ANSWER', 'NO_ANSWER', 'BUSY', 'FAILED'];
 
         for ($i = 0; $i < 150; $i++) {
@@ -660,7 +660,7 @@ class SeedDocsDemo extends Command
             $incoming = random_int(0, 99) < 62;
             $disposition = $dispositions[array_rand($dispositions)];
             $billsec = $disposition === 'CONNECTED' ? random_int(12, 900) : 0;
-            $external = '+15550'.random_int(120, 199);
+            $external = '+12025550'.random_int(120, 199);
             $mine = $ext[array_rand($ext)];
             CallDetailRecord::create([
                 'organization_id' => $this->org, 'session_timestamp' => $at, 'session_token' => (string) Str::uuid(),
@@ -674,9 +674,9 @@ class SeedDocsDemo extends Command
 
         // Live Calls: latest row per session within the last 30 minutes.
         foreach ([
-            ['connected', 'incoming', '+15550131', '1005', 9005],
-            ['connected', 'outgoing', '1006', '+15550162', 9006],
-            ['ringing', 'incoming', '+15550177', '1008', 9008],
+            ['connected', 'incoming', '+12025550131', '1005', 9005],
+            ['connected', 'outgoing', '1006', '+12025550162', 9006],
+            ['ringing', 'incoming', '+12025550177', '1008', 9008],
         ] as $i => [$status, $direction, $from, $to, $subscriber]) {
             SessionUpdate::create([
                 'organization_id' => $this->org, 'session_id' => 880000 + $i, 'session_token' => (string) Str::uuid(),
@@ -706,8 +706,8 @@ class SeedDocsDemo extends Command
             $handle = $disposition === QueueCallDisposition::ANSWERED ? random_int(45, 620) : null;
             $row = [
                 'organization_id' => $this->org, 'call_queue_id' => $queueId, 'call_id' => 'demo-call-'.$i,
-                'session_token' => (string) Str::uuid(), 'from_number' => '+15550'.random_int(120, 199),
-                'to_number' => '+15550102', 'entered_at' => $entered, 'waiting_seconds' => $wait,
+                'session_token' => (string) Str::uuid(), 'from_number' => '+12025550'.random_int(120, 199),
+                'to_number' => '+12025550102', 'entered_at' => $entered, 'waiting_seconds' => $wait,
                 'disposition' => $disposition, 'handling_seconds' => $handle,
                 'ended_at' => $entered->copy()->addSeconds($wait + ($handle ?? 0)),
             ];
