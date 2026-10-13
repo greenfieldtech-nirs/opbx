@@ -205,6 +205,18 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 - **Authentication**: Password-protected. The container start command writes `requirepass` from `REDIS_PASSWORD` (passed as `REDISCLI_AUTH`) into `/tmp/redis.conf`, so the password is not in `docker inspect` command args or `ps`. The healthcheck's `redis-cli` reads `REDISCLI_AUTH` too.
 - **Persistence**: Named volume `redis_data`
 
+### Updating an existing installation's docker-compose.yml
+
+After pulling a new version, bring your `docker-compose.yml` up to date with the new `docker-compose.yml.example` (all services, including the `logs` and `dev` profiles):
+
+```bash
+./scripts/update-compose.sh --dry-run   # report only: new, changed, yours-only and retired services
+./scripts/update-compose.sh             # asks per changed service: take the new version, or keep yours
+./scripts/update-compose.sh --yes       # unattended: take the new version of every changed service
+```
+
+New services are added, services that exist only in your file are always kept, and services removed upstream (e.g. `minio`) are removed only when you confirm (`--yes` keeps them). The result is validated with `docker compose config` before it is written, and the old file is kept as `docker-compose.yml.bak-<timestamp>`. Nothing is restarted; the script prints the `build` / `up -d` commands to run. Needs only Docker (YAML is handled by the `mikefarah/yq` image).
+
 ### SeaweedFS Configuration
 
 > **Upgrading an install that used MinIO?** Run `./scripts/migrate-minio-to-seaweedfs.sh` before switching `MINIO_ENDPOINT`. It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).

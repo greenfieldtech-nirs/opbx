@@ -199,3 +199,7 @@ acd-worker/target/
 
 # Stray SQLite database created by running the app outside Docker
 /opbx
+
+# scripts/update-compose.sh backups and scratch dirs
+docker-compose.yml.bak-*
+.compose-update.*/
