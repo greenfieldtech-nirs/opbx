@@ -31,6 +31,8 @@ import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
+import { classifyConfigError } from './configError';
+
 type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
 type CallState = 'idle' | 'ringing' | 'connected';
 
@@ -341,9 +343,16 @@ export function WebPhone({
     }
 
     if (configError) {
-      const status = (configError as any)?.response?.status;
-      if (status === 404) {
+      const failure = classifyConfigError(configError);
+      if (failure === 'no_extension') {
         setState('no_extension');
+      } else if (failure === 'cloudonix_not_configured') {
+        setErrorDetail({
+          title: 'Web Phone Unavailable',
+          message: "Cloudonix isn't configured for your organization.",
+          hint: 'Ask your Owner to complete Settings > Cloudonix.',
+        });
+        setState('error');
       } else {
         setErrorDetail({
           title: 'Web Phone Unavailable',

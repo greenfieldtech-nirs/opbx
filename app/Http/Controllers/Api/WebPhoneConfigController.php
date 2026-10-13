@@ -37,8 +37,9 @@ final class WebPhoneConfigController extends Controller
 
         if (! $cloudonixSettings || ! $cloudonixSettings->domain_name) {
             return response()->json([
+                'error' => 'cloudonix_not_configured',
                 'message' => 'Cloudonix settings are not configured for this organization.',
-            ], 404);
+            ], 409);
         }
 
         Log::info('Web Phone config retrieved', [
