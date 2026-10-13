@@ -245,7 +245,8 @@ class OutboundRoutingService
             // Check prefix match - REQUIRED if prefix is specified
             $prefixMatched = false;
             if (! empty($entry->destination_prefix)) {
-                $normalizedPrefix = str_replace(' ', '', $entry->destination_prefix);
+                // Spaces and hyphens are display formatting (the request allows them); they never appear in dialed numbers.
+                $normalizedPrefix = preg_replace('/[\s-]+/', '', $entry->destination_prefix);
                 $destWithoutPlus = ltrim($destinationNumber, '+');
 
                 Log::debug('OutboundRoutingService: Checking prefix', [

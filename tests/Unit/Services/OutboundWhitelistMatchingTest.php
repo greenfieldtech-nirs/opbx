@@ -77,6 +77,20 @@ class OutboundWhitelistMatchingTest extends TestCase
         $this->assertEquals('us_trunk', $result->outbound_trunk_name);
     }
 
+    public function test_find_outbound_whitelist_entry_matches_hyphenated_and_spaced_prefixes(): void
+    {
+        $entry = OutboundWhitelist::factory()->create([
+            'organization_id' => $this->organization->id,
+            'destination_country' => 'US',
+            'destination_prefix' => '+1-555 12',
+            'outbound_trunk_name' => 'us_trunk',
+        ]);
+
+        $result = $this->invokePrivateMethod('findOutboundWhitelistEntry', [$this->organization->id, '+15551234567']);
+
+        $this->assertSame($entry->id, $result?->id);
+    }
+
     /**
      * Test findOutboundWhitelistEntry returns null when no prefix matches.
      */
