@@ -371,7 +371,7 @@ class SeedDocsDemo extends Command
         foreach ([
             ['sales', 'Sales Team', RingGroupStrategy::SIMULTANEOUS, ['emma', 'frank', 'grace'], RingGroupFallbackAction::AI_ASSISTANT, ['fallback_ai_assistant_id' => $this->x['aria']]],
             ['support', 'Support Team', RingGroupStrategy::SEQUENTIAL, ['henry', 'isabel', 'jack'], RingGroupFallbackAction::EXTENSION, ['fallback_extension_id' => $this->x['forward']]],
-            ['exec', 'Executive Line', RingGroupStrategy::ROUND_ROBIN, ['alice', 'brian'], RingGroupFallbackAction::HANGUP, []],
+            ['exec', 'Executive Line', RingGroupStrategy::ROUND_ROBIN, ['alice', 'brian'], RingGroupFallbackAction::UNAVAILABLE, []], // shows the Unprovisioned badge
         ] as [$key, $name, $strategy, $members, $fallback, $fallbackAttrs]) {
             $rg = RingGroup::create([
                 'organization_id' => $this->org, 'name' => $name, 'description' => $name.' (demo)',
@@ -455,6 +455,9 @@ class SeedDocsDemo extends Command
                 ['monday' => ['09:00', '17:00'], 'tuesday' => ['09:00', '17:00'], 'wednesday' => ['09:00', '17:00'], 'thursday' => ['09:00', '17:00'], 'friday' => ['09:00', '16:00'], 'saturday' => ['10:00', '14:00']]],
             ['support', 'Support Desk Hours', 'rg-'.$this->id['rg_support'], BusinessHoursActionType::RING_GROUP, 'ext-'.$this->x['forward'], BusinessHoursActionType::EXTENSION,
                 ['monday' => ['08:00', '20:00'], 'tuesday' => ['08:00', '20:00'], 'wednesday' => ['08:00', '20:00'], 'thursday' => ['08:00', '20:00'], 'friday' => ['08:00', '20:00']]],
+            // Closed action disconnected: shows the Unprovisioned badge.
+            ['holiday', 'Holiday Hotline Hours', 'rg-'.$this->id['rg_sales'], BusinessHoursActionType::RING_GROUP, 'unavailable', BusinessHoursActionType::UNAVAILABLE,
+                ['saturday' => ['10:00', '16:00'], 'sunday' => ['10:00', '16:00']]],
         ] as [$key, $name, $open, $openType, $closed, $closedType, $days]) {
             $s = BusinessHoursSchedule::create([
                 'organization_id' => $this->org, 'name' => $name, 'status' => BusinessHoursStatus::ACTIVE,
@@ -517,10 +520,10 @@ class SeedDocsDemo extends Command
     private function security(): void
     {
         foreach ([
-            ['US and Canada', 'United States', '+1', 'acme-demo-trunk-us'],
-            ['United Kingdom', 'United Kingdom', '+44', 'acme-demo-trunk-eu'],
-            ['Germany', 'Germany', '+49', 'acme-demo-trunk-eu'],
-            ['Israel', 'Israel', '+972', 'acme-demo-trunk-il'],
+            ['US and Canada', 'US', '+1', 'acme-demo-trunk-us'],
+            ['United Kingdom', 'GB', '+44', 'acme-demo-trunk-eu'],
+            ['Germany', 'DE', '+49', 'acme-demo-trunk-eu'],
+            ['Israel', 'IL', '+972', 'acme-demo-trunk-il'],
         ] as [$name, $country, $prefix, $trunk]) {
             OutboundWhitelist::create([
                 'organization_id' => $this->org, 'name' => $name, 'destination_country' => $country,
@@ -559,9 +562,9 @@ class SeedDocsDemo extends Command
 
         CallNotificationsSettings::create([
             'organization_id' => $this->org, 'webhook_url' => 'https://hooks.acme-demo.example.com/opbx',
-            'auth_method' => 'hmac_sha256', 'auth_secret' => Str::random(40),
+            'auth_method' => 'bearer_token', 'auth_secret' => Str::random(40),
             'retry_attempts' => 3, 'retry_backoff_seconds' => 60, 'request_timeout_seconds' => 30,
-            'enabled_events' => ['new', 'ringing', 'connected', 'completed'],
+            'enabled_events' => ['new', 'ringing', 'connected', 'answered'],
             'rate_limit_per_minute' => 500, 'is_active' => true,
         ]);
     }
