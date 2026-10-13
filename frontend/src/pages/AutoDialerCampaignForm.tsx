@@ -1,3 +1,4 @@
+import { AMD_DEFAULT_ACTIONS } from './amdDefaults';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -683,9 +684,9 @@ export default function AutoDialerCampaignForm() {
                       setValue('amd_enabled', checked);
                       if (checked) {
                         // Set defaults when enabling
-                        setValue('action_voicemail', 'HANGUP');
-                        setValue('action_human', 'CONTINUE');
-                        setValue('action_unknown', 'HANGUP');
+                        setValue('action_voicemail', AMD_DEFAULT_ACTIONS.action_voicemail);
+                        setValue('action_human', AMD_DEFAULT_ACTIONS.action_human);
+                        setValue('action_unknown', AMD_DEFAULT_ACTIONS.action_unknown);
                       } else {
                         // Clear values when disabling
                         setValue('action_voicemail', undefined);
