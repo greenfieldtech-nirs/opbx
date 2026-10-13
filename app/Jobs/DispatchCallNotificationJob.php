@@ -27,8 +27,8 @@ class DispatchCallNotificationJob implements ShouldQueue
 
     public int $timeout;
 
-    /** @var array<int, int> */
-    public array $backoff = [60, 120];
+    /** @var array<int, int> Delay before each retry: the settings' retry_backoff_seconds, doubling, capped at 1 h. */
+    public array $backoff = [];
 
     /**
      * @param  array<string, mixed>  $payload
@@ -41,6 +41,8 @@ class DispatchCallNotificationJob implements ShouldQueue
     ) {
         $this->settingsId = $settings->id;
         $this->tries = ($settings->retry_attempts ?? 3) + 1;
+        $base = $settings->retry_backoff_seconds ?? 60;
+        $this->backoff = array_map(fn (int $retry): int => min($base * 2 ** $retry, 3600), range(0, max($this->tries - 2, 0)));
         $this->timeout = ($settings->request_timeout_seconds ?? 30) + 5;
     }
 

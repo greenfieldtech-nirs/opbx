@@ -70,6 +70,15 @@ class CallNotificationDispatchTest extends TestCase
         $this->assertSame([60, 120], $job->backoff);
     }
 
+    public function test_backoff_follows_the_configured_base_and_doubles(): void
+    {
+        $this->settings->update(['retry_attempts' => 3, 'retry_backoff_seconds' => 30]);
+
+        $job = new DispatchCallNotificationJob($this->settings->fresh(), [], 'e', 't');
+
+        $this->assertSame([30, 60, 120], $job->backoff);
+    }
+
     public function test_a_failing_endpoint_is_attempted_once_per_run_and_released(): void
     {
         Http::fake(['*' => Http::response('', 500)]);
