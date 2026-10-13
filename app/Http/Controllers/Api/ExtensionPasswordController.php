@@ -37,7 +37,7 @@ class ExtensionPasswordController extends Controller
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser();
 
-        $this->authorize('view', $extension);
+        $this->authorize('viewPassword', $extension);
 
         // Tenant scope check
         if ($extension->organization_id !== $user->organization_id) {

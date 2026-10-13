@@ -91,6 +91,10 @@ class ExtensionPolicy
             return false;
         }
 
+        if ($this->belongsToOwnerOutOfReach($user, $extension)) {
+            return false;
+        }
+
         // Owner and PBX Admin can update any extension
         if ($user->isOwner() || $user->isPBXAdmin()) {
             return true;
@@ -121,8 +125,30 @@ class ExtensionPolicy
             return false;
         }
 
+        if ($this->belongsToOwnerOutOfReach($user, $extension)) {
+            return false;
+        }
+
         // Only Owner and PBX Admin can delete extensions
         return $user->isOwner() || $user->isPBXAdmin();
+    }
+
+    /**
+     * Reading the SIP credentials of an extension: view, but never an Owner's extension for a non-Owner.
+     */
+    public function viewPassword(User $user, Extension $extension): bool
+    {
+        return $this->view($user, $extension) && ! $this->belongsToOwnerOutOfReach($user, $extension);
+    }
+
+    /**
+     * An Owner's extension is an Owner account asset: only an Owner may change or read its credentials.
+     */
+    private function belongsToOwnerOutOfReach(User $actor, Extension $extension): bool
+    {
+        $owner = $extension->user_id === null ? null : $extension->user;
+
+        return $owner !== null && app(UserPolicy::class)->actsOnOwner($actor, $owner);
     }
 
     /**
