@@ -286,26 +286,23 @@ sequenceDiagram
    cd opbx.cloudonix.com
    ```
 
-2. **Copy configuration files**
+2. **Prepare the configuration (before the first start)**
    ```bash
-   cp docker-compose.yml.example docker-compose.yml
-   cp .env.example .env
+   ./opbx_bootstrap.sh
    ```
-   > The `docker-compose.yml` file is ignored by git so you can customize it for your environment without affecting the repository.
+   The script creates `docker-compose.yml` (git-ignored, from `docker-compose.yml.example`) and `.env` (from `.env.example`),
+   generates `APP_KEY` and fills in the shared secrets (worker API tokens, Pusher/Soketi secret, Grafana, S3 keys) with
+   `docker/scripts/generate-secrets.sh`. The containers refuse to start with a missing `APP_KEY` or placeholder secrets.
 
-   Edit `.env` with your settings:
+   Then edit `.env` and set the values the script cannot choose for you. Use strong random passwords; `secret`,
+   `rootsecret`, `password`, `minioadmin` and `admin` are rejected at startup:
    ```env
-   # ngrok (for local development)
-   NGROK_AUTHTOKEN=your_ngrok_authtoken_here
-   
-   # Redis password (recommended for production)
-   REDIS_PASSWORD=your_redis_password
-   
-   # MySQL
-   DB_ROOT_PASSWORD=rootsecret
+   NGROK_AUTHTOKEN=your_ngrok_authtoken_here   # local development only
    DB_DATABASE=opbx
    DB_USERNAME=opbx
-   DB_PASSWORD=secret
+   DB_PASSWORD=...        # openssl rand -base64 32
+   DB_ROOT_PASSWORD=...   # openssl rand -base64 32
+   REDIS_PASSWORD=...     # openssl rand -base64 32
    ```
 
 3. **Start all services**
@@ -313,9 +310,8 @@ sequenceDiagram
    docker compose up -d
    ```
 
-4. **Initialize the application**
+4. **Initialize the database**
    ```bash
-   docker compose exec app php artisan key:generate
    docker compose exec app php artisan migrate --seed
    ```
 
