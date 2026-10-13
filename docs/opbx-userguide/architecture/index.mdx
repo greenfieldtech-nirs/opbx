@@ -94,7 +94,7 @@ MySQL stores all durable application data. Examples include:
 
 MySQL data is preserved in a host bind mount (`./volumes/mysql`). Server settings come from `docker/mysql/my.cnf`, and the container is limited to 1 GB of memory. Back it up regularly with `./scripts/backup-database.sh`.
 
-Old call detail records move out of the main tables in tiers: a warm archive table (`archived_call_detail_records`, in a separate schema set by `DB_CDR_ARCHIVE_DATABASE`) and then a cold compressed CSV archive in object storage. See [Configuration Reference](/data-models/configuration/index#call-detail-records-tiered).
+Old call detail records move out of the main tables in tiers: a warm archive table (`archived_call_detail_records`, in the main schema unless `DB_CDR_ARCHIVE_DATABASE` names another one) and then a cold compressed CSV archive in object storage. See [Configuration Reference](/data-models/configuration/index#call-detail-records-tiered).
 
 ### Redis (Ephemeral Runtime State)
 
