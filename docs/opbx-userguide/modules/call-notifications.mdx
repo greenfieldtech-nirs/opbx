@@ -45,7 +45,7 @@ Other roles get `403` from the API, so the page shows an error state if they ope
 6. Click **Create Settings** (or **Update Settings** once a configuration exists).
 7. Click **Test Webhook** to send a sample event.
 
-{/* SCREENSHOT: call-notifications-settings — Settings tab with Webhook URL https://hooks.acme-demo.example.com/opbx, Retry & Timeout values 3 / 60 / 30 / 500, the Event Types switches, and the Notifications Enabled, Update Settings and Test Webhook buttons */}
+![Settings tab with the webhook URL, Bearer Token authentication, Retry & Timeout values 3 / 60 / 30 / 500, the Event Types switches, and the Notifications Enabled, Update Settings and Test Webhook buttons](../img/screens/call-notifications-settings.jpg)
 
 ### Settings
 
@@ -147,7 +147,7 @@ The **Delivery Logs** tab lists deliveries with time, session token, from, to, s
 
 The `Authorization` header is never stored: the logs show it as `[redacted]`. Logs are kept for 90 days.
 
-{/* SCREENSHOT: call-notifications-logs — Delivery Logs tab in "Latest only" mode with several sessions, their statuses and HTTP response codes */}
+![Delivery Logs tab in Latest only mode with the Refresh button (empty in the demo organization: no deliveries yet)](../img/screens/call-notifications-logs.jpg)
 
 {/* SCREENSHOT: call-notifications-debug-dialog — debug dialog for one call session showing the request headers with Authorization: [redacted], the JSON body and the response */}
 
