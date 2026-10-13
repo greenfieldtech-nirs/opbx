@@ -1,9 +1,9 @@
-description: Not Found - Resource does not exist
+description: 'Not Found - Resource does not exist (JSON when the request sends Accept: application/json)'
 content:
   application/json:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: NOT_FOUND
+      error: NotFoundHttpException
       message: Resource not found
-      code: RESOURCE_NOT_FOUND
+      status: 404

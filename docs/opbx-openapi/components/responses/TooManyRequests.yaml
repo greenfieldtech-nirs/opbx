@@ -4,9 +4,9 @@ content:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: TOO_MANY_REQUESTS
-      message: Rate limit exceeded. Please try again later.
-      code: RATE_LIMIT_EXCEEDED
+      error: Rate limit exceeded
+      message: Maximum 60 requests per 1 minute(s) allowed
+      retry_after: 60
 headers:
   X-RateLimit-Limit:
     $ref: ../headers/X-RateLimit-Limit.yaml

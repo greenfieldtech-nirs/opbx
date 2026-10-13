@@ -833,6 +833,18 @@ components:
         widget's runtime API (`/v1/embed/*`). Requests carrying a browser
         `Origin` header are additionally checked against the organization's
         `embed_allowed_domains` allowlist.
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opbxk_ API key
+      description: |
+        Organization API key (prefix `opbxk_`), created by the Owner with
+        `POST /v1/api-keys` and sent as `Authorization: Bearer opbxk_...`.
+        Deny-by-default: a key reaches only operations whose resource it has
+        been granted. Each such operation names the grant it needs in its
+        `x-api-key-scope` extension (`<resource>:read` for GET,
+        `<resource>:write` for other methods; a `write` grant also allows
+        reads). Operations without `x-api-key-scope` answer API keys with 403.
     voiceWebhookAuth:
       type: apiKey
       in: header

@@ -1,17 +1,42 @@
 type: object
-description: Standard error response
+description: |
+  Error response. The API uses three shapes:
+  - Authentication/authorization and HTTP exceptions: `error` is a string
+    (`Unauthenticated`, `Forbidden`, or the exception class name such as
+    `NotFoundHttpException`), plus `message` (and `status` for HTTP exceptions).
+  - Controller errors (`errorResponse()`): `error` is an object
+    `{code, message, details}` and there is no top-level `message`.
+  - API-key scope denials and some guards: only `message`.
 properties:
   error:
-    type: string
-    description: Error type/code
-    example: UNAUTHORIZED
+    oneOf:
+    - type: string
+      example: Unauthenticated
+    - type: object
+      properties:
+        code:
+          type: string
+          example: CREATION_ERROR
+        message:
+          type: string
+        details:
+          type:
+          - object
+          - 'null'
+      required:
+      - code
+      - message
   message:
     type: string
     description: Human-readable error message
-    example: Authentication required
+    example: Authentication required to access this resource.
   code:
     type: string
-    description: Machine-readable error code
-    example: AUTH_REQUIRED
-required:
-  - message
+    description: Machine-readable error code (returned by some endpoints next to a string `error`)
+  retry_after:
+    type: integer
+    description: Seconds to wait (rate-limit responses only)
+  status:
+    type: integer
+    description: HTTP status code (HTTP exceptions only)
+    example: 404
