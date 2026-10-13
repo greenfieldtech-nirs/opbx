@@ -281,6 +281,31 @@ class UpdateAlbsRequest extends FormRequest
                 }
             }
 
+            // Refuse fallback loops: following ai_load_balancer fallbacks must never come back to this balancer.
+            $nextId = $fallbackAction === RingGroupFallbackAction::AI_LOAD_BALANCER->value
+                ? $this->input('fallback_ai_load_balancer_id') : null;
+            $selfModel = is_object($loadBalancerId) ? $loadBalancerId : $existingLoadBalancer;
+            $selfId = $selfModel?->id;
+            $path = [$selfModel?->name ?? '#'.$selfId];
+            $seen = [];
+            while ($selfId && $nextId && ! in_array((int) $nextId, $seen, true)) {
+                $seen[] = (int) $nextId;
+                $next = AiAssistantLoadBalancer::find($nextId);
+                if (! $next) {
+                    break;
+                }
+                $path[] = $next->name;
+                if ((int) $next->id === (int) $selfId) {
+                    $validator->errors()->add(
+                        'fallback_ai_load_balancer_id',
+                        'Fallback loop detected: '.implode(' -> ', $path).'. A load balancer fallback chain must not return to itself.'
+                    );
+                    break;
+                }
+                $nextId = $next->fallback_action?->value === RingGroupFallbackAction::AI_LOAD_BALANCER->value
+                    ? $next->fallback_ai_load_balancer_id : null;
+            }
+
             // Check for self-reference: cannot set own load balancer as fallback
             if ($fallbackAction === RingGroupFallbackAction::RING_GROUP->value && $fallbackRingGroupId) {
                 // Note: In the future if we allow ALBS to reference other ALBS, check here

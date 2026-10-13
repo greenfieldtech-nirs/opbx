@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -101,6 +102,23 @@ final class AiLoadBalancerQueueAndBalancerFallbackTest extends TestCase
         $this->deleteJson("/api/v1/ai-assistant-load-balancers/{$target->id}")->assertStatus(409)->assertJsonFragment(['id' => $lb->id]);
     }
 
+    public function test_update_refuses_fallback_loops_naming_the_cycle(): void
+    {
+        $c = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id, 'name' => 'LB-C']);
+        $b = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id, 'name' => 'LB-B', 'fallback_action' => 'ai_load_balancer', 'fallback_ai_load_balancer_id' => $c->id]);
+        $a = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id, 'name' => 'LB-A', 'fallback_action' => 'ai_load_balancer', 'fallback_ai_load_balancer_id' => $b->id]);
+
+        // C -> A would close A -> B -> C -> A.
+        $response = $this->putJson("/api/v1/ai-assistant-load-balancers/{$c->id}", $this->payload(['fallback_action' => 'ai_load_balancer', 'fallback_ai_load_balancer_id' => $a->id]))
+            ->assertStatus(422)->assertJsonValidationErrors('fallback_ai_load_balancer_id');
+        $this->assertStringContainsString('LB-C -> LB-A -> LB-B -> LB-C', json_encode($response->json('errors.fallback_ai_load_balancer_id')));
+        $this->assertNull($c->fresh()->fallback_ai_load_balancer_id);
+
+        // A non-looping chain is still accepted.
+        $d = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id]);
+        $this->putJson("/api/v1/ai-assistant-load-balancers/{$c->id}", $this->payload(['fallback_action' => 'ai_load_balancer', 'fallback_ai_load_balancer_id' => $d->id]))->assertOk();
+    }
+
     private function fallback(AiAssistantLoadBalancer $lb): string
     {
         $method = new \ReflectionMethod(AiLoadBalancerRoutingStrategy::class, 'handleFallback');
@@ -118,7 +136,7 @@ final class AiLoadBalancerQueueAndBalancerFallbackTest extends TestCase
         ]);
         $this->assertStringContainsString('No AI assistants available', $this->fallback($lb));
 
-        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response(['ok' => true])]);
+        Http::fake(['*' => Http::response(['ok' => true])]);
         $queue = CallQueue::factory()->create(['organization_id' => $this->org->id]);
         $lb->update(['fallback_call_queue_id' => $queue->id]);
         $xml = $this->fallback($lb);
