@@ -203,7 +203,7 @@ export const router = createBrowserRouter([
       {
         path: 'outbound-whitelist',
         element: (
-          <OwnerRoute>
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
             <OutboundWhitelistPage />
           </OwnerRoute>
         ),

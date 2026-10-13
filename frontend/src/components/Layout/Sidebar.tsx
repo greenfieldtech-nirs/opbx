@@ -96,7 +96,7 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner', 'pbx_admin'] },
       { name: 'Security', href: '', icon: '', isHeader: true },
       { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
-      { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
+      { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner', 'pbx_admin'] },
     ],
   },
   {

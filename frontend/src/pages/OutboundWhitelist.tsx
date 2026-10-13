@@ -43,6 +43,7 @@ import { outboundWhitelistService } from '@/services/outboundWhitelist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
 import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest, DIDNumber } from '@/types';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
@@ -90,7 +91,7 @@ const OutboundWhitelistPage: React.FC = () => {
   );
 
   // Check permissions
-  const canManageWhitelist = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManageWhitelist = can(user?.role, 'outboundWhitelist.manage');
 
   // Fetch outbound whitelist entries
   const {
