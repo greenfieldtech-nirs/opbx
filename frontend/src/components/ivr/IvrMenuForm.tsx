@@ -562,8 +562,8 @@ export function IvrMenuForm({
                       {fields.map((item, index) => {
                         const option = options?.[index];
                         return (
-                          <TableRow key={item.id} className="align-top hover:bg-transparent">
-                            <TableCell className="py-2">
+                          <TableRow key={item.id} className="hover:bg-transparent">
+                            <TableCell className="py-2 align-top">
                               <FormField
                                 control={control}
                                 name={`options.${index}.input_digits`}
@@ -586,7 +586,7 @@ export function IvrMenuForm({
                                 )}
                               />
                             </TableCell>
-                            <TableCell className="py-2">
+                            <TableCell className="py-2 align-top">
                               <DestinationTypeAndSelector
                                 typeValue={option?.destination_type}
                                 destinationValue={option?.destination_id ?? ''}
@@ -610,7 +610,7 @@ export function IvrMenuForm({
                                 render={() => <FormMessage className="mt-1" />}
                               />
                             </TableCell>
-                            <TableCell className="py-2 text-right">
+                            <TableCell className="py-2 align-top text-right">
                               <Button
                                 type="button"
                                 variant="ghost"
