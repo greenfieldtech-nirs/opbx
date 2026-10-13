@@ -899,6 +899,8 @@ components:
       $ref: './components/schemas/ConferenceRoomInput.yaml'
     BusinessHoursSchedule:
       $ref: './components/schemas/BusinessHoursSchedule.yaml'
+    BusinessHoursScheduleInput:
+      $ref: './components/schemas/BusinessHoursScheduleInput.yaml'
     ApiKey:
       $ref: './components/schemas/ApiKey.yaml'
     ApiKeyPermission:

@@ -9,9 +9,23 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, status, created_at, updated_at]
+            default: name
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
@@ -38,18 +52,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
+              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
       responses:
         '201':
           description: Business Hours Schedule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
@@ -71,9 +93,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:read
       responses:
         '200':
           description: Business Hours Schedule details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -87,15 +118,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
       responses:
         '200':
           description: Business Hours Schedule updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -110,15 +152,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
       responses:
         '200':
           description: Business Hours Schedule updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -135,6 +188,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       responses:
         '204':
           description: Business Hours Schedule deleted

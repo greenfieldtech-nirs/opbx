@@ -8,6 +8,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       parameters:
         - name: businessHour
           in: path
@@ -16,4 +18,19 @@ paths:
             type: integer
       responses:
         '201':
-          description: Schedule duplicated
+          description: Schedule duplicated as "<name> (Copy)" with status inactive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

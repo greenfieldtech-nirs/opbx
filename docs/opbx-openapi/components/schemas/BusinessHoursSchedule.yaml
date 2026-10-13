@@ -1,26 +1,75 @@
 type: object
 description: Business Hours Schedule
 properties:
+  id:
+    type: string
+    description: Schedule ID (serialized as a string)
+    example: '12'
+  organization_id:
+    type: string
+    description: Organization ID (serialized as a string)
+    example: '1'
+  name:
+    type: string
+    example: Business Hours
+  status:
+    type: string
+    enum: [active, inactive]
   is_unprovisioned:
     type: boolean
     readOnly: true
     description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
-  id:
-    type: integer
-  organization_id:
-    type: integer
-  name:
-    type: string
-    example: Business Hours
   timezone:
     type: string
+    description: IANA timezone (defaults to UTC)
     example: America/New_York
-  status:
-    type: string
-    enum: [active, inactive]
-  configuration:
+  schedule:
     type: object
-    description: Schedule configuration
+    description: Weekly schedule; always contains all seven days
+    properties:
+      monday:
+        $ref: '#/$defs/Day'
+      tuesday:
+        $ref: '#/$defs/Day'
+      wednesday:
+        $ref: '#/$defs/Day'
+      thursday:
+        $ref: '#/$defs/Day'
+      friday:
+        $ref: '#/$defs/Day'
+      saturday:
+        $ref: '#/$defs/Day'
+      sunday:
+        $ref: '#/$defs/Day'
+  exceptions:
+    type: array
+    description: Date exceptions, sorted by date
+    items:
+      type: object
+      properties:
+        id:
+          type: string
+        date:
+          type: string
+          format: date
+        name:
+          type: string
+        type:
+          type: string
+          enum: [closed, special_hours]
+        time_ranges:
+          type: array
+          description: Present only for `special_hours`
+          items:
+            $ref: '#/$defs/TimeRange'
+  open_hours_action:
+    $ref: '#/$defs/Action'
+  closed_hours_action:
+    $ref: '#/$defs/Action'
+  current_status:
+    type: string
+    enum: [open, closed]
+    description: Whether the schedule is open right now (inactive schedules are always closed)
   created_at:
     type: string
     format: date-time
@@ -33,3 +82,35 @@ required:
   - name
   - timezone
   - status
+$defs:
+  TimeRange:
+    type: object
+    properties:
+      id:
+        type: string
+      start_time:
+        type: string
+        description: HH:mm
+        example: '09:00'
+      end_time:
+        type: string
+        description: HH:mm
+        example: '17:00'
+  Day:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+      time_ranges:
+        type: array
+        items:
+          $ref: '#/$defs/TimeRange'
+  Action:
+    type: object
+    properties:
+      type:
+        type: string
+        enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, call_queue, unavailable]
+      target_id:
+        type: string
+        description: Target resource ID as a string (empty string when none)
