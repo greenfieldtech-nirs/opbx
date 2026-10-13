@@ -243,3 +243,5 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

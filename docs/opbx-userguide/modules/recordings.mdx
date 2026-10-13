@@ -101,8 +101,8 @@ The API can change a recording's **name**, **status** and **hold-music tag**. Th
 
 The uploaded file is removed from storage and the recording is deleted.
 
-:::caution Recordings in use are not protected
-Unlike routing resources, a recording is deleted even while it is used. An IVR menu that played it loses its greeting, and a call queue that used it as hold music loses its hold music. Check your IVR menus and queues before you delete.
+:::note Recordings in use cannot be deleted
+If an IVR menu still plays the recording as its greeting, or a call queue uses it as hold music, the delete is refused and a dialog lists every place it is used. Change those first, then delete again. Call records never block a delete.
 :::
 
 ![Delete announcement confirmation for Welcome Greeting](../img/screens/recordings-delete-dialog.jpg)
@@ -141,7 +141,7 @@ Unlike routing resources, a recording is deleted even while it is used. An IVR m
 | POST | `/v1/recordings` | Create: `type` `upload` with `file`, or `remote` with `remote_url` |
 | GET | `/v1/recordings/{recording}` | One recording |
 | PUT | `/v1/recordings/{recording}` | Change `name`, `status` or `is_moh` |
-| DELETE | `/v1/recordings/{recording}` | Delete |
+| DELETE | `/v1/recordings/{recording}` | Delete (409 with a usage list while an IVR menu or call queue uses it) |
 | GET | `/v1/recordings/{recording}/download` | Get a download token |
 | GET | `/v1/recordings/download` | Download with the token (Bearer header or `token` parameter) |
 

@@ -76,7 +76,7 @@ Assigning a list to a **Draft** campaign also makes that campaign **Active**. Se
 | Delete a Failed list | Yes | Yes | No | No | No |
 | Delete any other list | Yes | No | No | No | No |
 
-Deleting removes the list and all its numbers and asks for confirmation first.
+Deleting removes the list and all its numbers and asks for confirmation first. A list that is assigned to a campaign cannot be deleted: the delete is refused and a dialog names the campaign. Unassign the list first.
 
 ## Key data fields
 
@@ -127,7 +127,7 @@ Deleting removes the list and all its numbers and asks for confirmation first.
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/copy` | Copy |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/download` | CSV export |
 | PATCH | `/v1/auto-dialer-campaigns/lists/{list}/archive` | Archive |
-| DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete |
+| DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete (409 with a usage list while assigned to a campaign) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to a campaign (`campaign_id`) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign |
 

@@ -238,7 +238,7 @@ OPBX sends the **Refresh Token** value as the OAuth bearer token on the upload r
 1. Click the delete action on the campaign's row, or **Delete** on the campaign page.
 2. Confirm in the **Delete Campaign** dialog.
 
-A campaign delete is not blocked by its tracking numbers. Deleting a campaign also deletes its **tracking numbers, sessions, notification settings and notification logs**, so its history disappears from the analytics. The phone numbers keep the **Call tracking** routing type; give them a new destination afterwards.
+A campaign that still has tracking numbers cannot be deleted: the delete is refused and a dialog lists the phone numbers that route to it. Remove those tracking numbers (or give the phone numbers another destination) first, then delete again. Sessions are history and never block the delete, but deleting the campaign also deletes its **sessions, notification settings and notification logs**, so its history disappears from the analytics.
 
 ![Delete Campaign confirmation for Partner Newsletter](../img/screens/call-tracking-campaigns-delete-confirm.jpg)
 
@@ -274,7 +274,7 @@ A campaign delete is not blocked by its tracking numbers. Deleting a campaign al
 
 | Column | Notes |
 |--------|-------|
-| `call_tracking_campaign_id` | The campaign. Deleted with the campaign |
+| `call_tracking_campaign_id` | The campaign. Deleted with the campaign (only possible once no tracking numbers remain) |
 | `did_number_id` | The phone number. Unique: one campaign per number |
 | `friendly_name` | Up to 255 characters |
 | `status` | `active` or `inactive` |
@@ -285,7 +285,7 @@ A campaign delete is not blocked by its tracking numbers. Deleting a campaign al
 |--------|----------|---------|
 | GET | `/v1/call-tracking-campaigns` | List. Filters: `status`, `source`, `medium`, `search`, `unprovisioned=1` |
 | POST | `/v1/call-tracking-campaigns` | Create. Rejects "Destination unavailable" |
-| GET, PUT, DELETE | `/v1/call-tracking-campaigns/{campaign}` | Read, update, delete |
+| GET, PUT, DELETE | `/v1/call-tracking-campaigns/{campaign}` | Read, update, delete (409 with a usage list while phone numbers route to it) |
 | GET, POST | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | List or add tracking numbers |
 | PUT, DELETE | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Change the friendly name or status, or remove |
 | GET, PUT | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Webhook settings |

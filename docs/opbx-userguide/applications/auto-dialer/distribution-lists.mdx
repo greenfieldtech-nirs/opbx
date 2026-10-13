@@ -148,8 +148,10 @@ Choose **Delete** and confirm with **Permanently Delete**. The list and all its 
 
 | Who | Can delete |
 |-----|-----------|
-| Owner | Any list that is not assigned, or whose numbers are all still pending with zero attempts |
+| Owner | Any list that is not assigned to a campaign |
 | PBX Admin | **Failed** lists only |
+
+A list that is assigned to a campaign cannot be deleted: a dialog names the campaign. Unassign the list first, then delete it.
 
 A PBX Admin may see **Delete** on other lists in the row menu, but the server refuses it. Use **Archive** for lists that were dialed.
 
