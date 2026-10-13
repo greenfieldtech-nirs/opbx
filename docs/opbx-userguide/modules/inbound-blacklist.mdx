@@ -74,9 +74,9 @@ Every blocked call is logged and adds 1 to the rule's **Blocked Count**.
 
 A new rule is **Active**.
 
-{/* SCREENSHOT: inbound-blacklist-list — Inbound Blacklist list with four rules: two Exact (Drop and Reject), one Prefix (Torment) and one Wildcard (Drop), each Global, with blocked counts 14, 6, 31 and 3 */}
+![Inbound Blacklist list with four rules: one Wildcard (Drop), one Prefix (Torment) and two Exact (Drop and Reject), each Global, with blocked counts 3, 31, 14 and 6](../img/screens/inbound-blacklist-list.jpg)
 
-{/* SCREENSHOT: inbound-blacklist-create-dialog — Add Blacklist Entry dialog with pattern +1202555019, Prefix Match, Torment (Music) selected showing the 600-second note, and Global Blacklist switched off with two phone numbers ticked */}
+![Add Blacklist Entry dialog with pattern +1202555019, Prefix Match, Torment (Music) with the 600-second note, and Global Blacklist off with two phone numbers ticked](../img/screens/inbound-blacklist-create-dialog.jpg)
 
 ## Edit a rule
 
@@ -96,7 +96,7 @@ Click the **Active** or **Disabled** pill in the Status column. The change appli
 
 A rule is never referenced by other configuration, so the delete always goes through. The rule's blocked-call log entries are kept, without a link to the deleted rule.
 
-{/* SCREENSHOT: inbound-blacklist-delete-dialog — Delete Blacklist Entry confirmation for the +12025550191 rule */}
+![Delete Blacklist Entry confirmation for the +12025550191 rule](../img/screens/inbound-blacklist-delete-dialog.jpg)
 
 :::note Phone numbers used in a rule
 A phone number selected in a rule cannot be deleted from the Phone Numbers page. The delete is refused and the dialog lists the blacklist rule. Remove the number from the rule first (or make the rule global).
