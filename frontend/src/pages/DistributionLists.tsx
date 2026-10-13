@@ -94,7 +94,8 @@ export default function DistributionLists() {
     page,
     per_page: 25,
     search: search || undefined,
-    status: status && status !== 'all' && status !== 'active' ? status as DistributionListStatus : undefined,
+    // 'active' = server default (archived hidden); 'all' includes archived
+    status: status && status !== 'active' ? status as DistributionListStatus : undefined,
   });
 
   const archiveMutation = useArchiveList();
@@ -198,7 +199,7 @@ export default function DistributionLists() {
     );
   }
 
-  const lists = data?.data.filter(list => status !== 'active' || list.status !== 'archived') || [];
+  const lists = data?.data || [];
   const meta = data?.meta;
 
   if (loadFailed) {
@@ -430,6 +431,15 @@ export default function DistributionLists() {
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
+                              </DropdownMenuItem>
+                            )}
+                            {list.campaign_id && canManage && list.status !== 'archived' && (
+                              <DropdownMenuItem
+                                disabled
+                                title="This list is assigned to a campaign. Unassign it first to archive or delete it."
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive (unassign first)
                               </DropdownMenuItem>
                             )}
                             {list.can_archive && canManage && list.status !== 'failed' && (

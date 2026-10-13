@@ -57,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations, useDeleteList } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations, useDeleteList, useArchiveList } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
@@ -66,6 +66,7 @@ import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDia
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/services/api';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
@@ -132,6 +133,7 @@ export default function DistributionListDetail() {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const deleteListMutation = useDeleteList();
+  const archiveListMutation = useArchiveList();
   const { showIfInUse, inUseDialog } = useResourceInUse();
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -215,11 +217,6 @@ export default function DistributionListDetail() {
     } catch {
       toast.error('Failed to download list');
     }
-  };
-
-  const handleRetryFailed = () => {
-    // TODO: Implement retry failed destinations
-    toast.info('Retry functionality coming soon');
   };
 
   const handleResetDialAttempts = (destinationId: number) => {
@@ -356,7 +353,17 @@ export default function DistributionListDetail() {
               Archive
             </Button>
           )}
-          {list.status === 'failed' && canManage && (
+          {list.campaign_id && canManage && (
+            <Button
+              variant="outline"
+              disabled
+              title="This list is assigned to a campaign. Unassign it first to archive or delete it."
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Archive
+            </Button>
+          )}
+          {list.can_delete && canManage && (
             <Button variant="outline" className="text-red-600" onClick={() => setIsDeleteOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -470,10 +477,6 @@ export default function DistributionListDetail() {
                 </Button>
                 {selectedDestinations.length > 0 && (
                   <div className="flex gap-2">
-                    <Button variant="outline" className="h-10" onClick={handleRetryFailed}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Retry ({selectedDestinations.length})
-                    </Button>
                     <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Reset Dial Attempts ({selectedDestinations.length})
@@ -616,16 +619,6 @@ export default function DistributionListDetail() {
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                            )}
-                            {destination.status === 'failed' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRetryFailed()}
-                              >
-                                <RotateCcw className="h-4 w-4 mr-1" />
-                                Retry
-                              </Button>
                             )}
                             <Button
                               variant="ghost"
@@ -796,11 +789,16 @@ export default function DistributionListDetail() {
         list={list}
         open={isArchiveOpen}
         onOpenChange={setIsArchiveOpen}
-        onConfirm={() => {
-          toast.success('List archived');
-          setIsArchiveOpen(false);
+        onConfirm={async () => {
+          try {
+            await archiveListMutation.mutateAsync(list.id);
+            toast.success('List archived');
+            setIsArchiveOpen(false);
+          } catch (err) {
+            toast.error(getApiErrorMessage(err) || 'Failed to archive list');
+          }
         }}
-        isArchiving={false}
+        isArchiving={archiveListMutation.isPending}
       />
 
       <DeleteListDialog
