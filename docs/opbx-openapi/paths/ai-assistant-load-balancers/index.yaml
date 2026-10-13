@@ -424,7 +424,7 @@ paths:
       tags:
       - AI Load Balancers
       summary: Delete AI load balancer
-      description: Delete load balancer if not referenced by extensions
+      description: Refused with 409 when the load balancer is still referenced (for example by extensions or routing). The 409 body lists the references.
       operationId: deleteAiLoadBalancer
       security:
       - bearerAuth: []
@@ -437,11 +437,4 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
-          description: Load balancer in use
-          content:
-            application/json:
-              schema:
-                $ref: ../../components/schemas/Error.yaml
-              example:
-                error: CONFLICT
-                message: Cannot delete load balancer that is in use
+          $ref: ../../components/responses/ResourceInUse.yaml

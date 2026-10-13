@@ -1,0 +1,24 @@
+type: object
+description: |
+  Body of a 409 returned when a DELETE is refused because other resources still
+  reference the target (`App\Exceptions\ResourceInUseException`). The
+  `references` list is capped in `message` at 10 entries; the full list is always
+  in `references`. Remove the listed references, then retry the delete.
+required:
+  - error
+  - message
+  - references
+properties:
+  error:
+    type: string
+    description: Short error title naming the resource kind.
+    example: Cannot delete IVR menu
+  message:
+    type: string
+    description: Human-readable explanation that names the referencing resources.
+    example: 'This IVR menu is still used by: ring group "Sales" (fallback); and 1 more. Remove these references first.'
+  references:
+    type: array
+    description: Every resource that still references the target.
+    items:
+      $ref: './ResourceReference.yaml'

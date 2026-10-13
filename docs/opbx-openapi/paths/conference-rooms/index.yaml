@@ -150,6 +150,7 @@ paths:
       tags:
         - Conference Rooms
       summary: Delete conference room
+      description: Refused with 409 when the room is still referenced by routing. The 409 body lists the references.
       operationId: deleteConferenceRoom
       security:
         - bearerAuth: []
@@ -157,3 +158,9 @@ paths:
       responses:
         '204':
           description: Conference room deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

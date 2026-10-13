@@ -310,6 +310,7 @@ paths:
       tags:
       - Extensions
       summary: Delete extension
+      description: Refused with 409 when the extension is still referenced (for example by a ring group member, a queue membership, or a call-tracking or blacklist entry). The 409 body lists the references.
       operationId: deleteExtension
       security:
       - bearerAuth: []
@@ -323,3 +324,5 @@ paths:
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '409':
+          $ref: ../../components/responses/ResourceInUse.yaml

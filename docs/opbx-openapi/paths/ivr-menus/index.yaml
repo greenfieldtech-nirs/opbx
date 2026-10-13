@@ -107,6 +107,7 @@ paths:
       tags:
         - IVR Menus
       summary: Delete IVR Menu
+      description: Refused with 409 when the menu is still referenced by routing (for example from a DID or an option of another menu). The 409 body lists the references.
       operationId: deleteIVRMenu
       security:
         - bearerAuth: []
@@ -118,3 +119,5 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

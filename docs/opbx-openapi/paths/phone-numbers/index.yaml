@@ -130,6 +130,7 @@ paths:
       tags:
         - Phone Numbers
       summary: Delete Phone Number
+      description: Refused with 409 when the DID is still referenced (for example by routing, a call tracking number, an auto-dialer caller ID pool, or a blocked-DID entry). The 409 body lists the references.
       operationId: deletePhoneNumber
       security:
         - bearerAuth: []
@@ -141,3 +142,5 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

@@ -127,6 +127,7 @@ paths:
       tags:
         - Ring Groups
       summary: Delete ring group
+      description: Refused with 409 when the ring group is still referenced (for example as a fallback or from an extension). The 409 body lists the references.
       operationId: deleteRingGroup
       security:
         - bearerAuth: []
@@ -134,3 +135,9 @@ paths:
       responses:
         '204':
           description: Ring group deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

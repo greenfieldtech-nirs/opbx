@@ -130,6 +130,7 @@ paths:
       tags:
         - Business Hours
       summary: Delete Business Hours Schedule
+      description: Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
       operationId: deleteBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -141,3 +142,5 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

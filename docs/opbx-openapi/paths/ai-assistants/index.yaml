@@ -295,11 +295,4 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
-          description: AI assistant in use
-          content:
-            application/json:
-              schema:
-                $ref: ../../components/schemas/Error.yaml
-              example:
-                error: CONFLICT
-                message: Cannot delete AI Assistant that is in use by 3 extension(s). Please reassign these extensions first.
+          $ref: ../../components/responses/ResourceInUse.yaml
