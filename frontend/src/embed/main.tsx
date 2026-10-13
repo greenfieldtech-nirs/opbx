@@ -77,6 +77,7 @@ function mount(): void {
           iconPosition={embed.iconPosition}
           iconBackgroundColor={embed.iconBackgroundColor}
           autoOpen
+          lockName="opbx-webphone-embed"
         />
       </QueryClientProvider>
     </React.StrictMode>,

@@ -32,8 +32,9 @@ import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
+import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
 
-type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
+type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error' | 'other_tab';
 type CallState = 'idle' | 'ringing' | 'connected';
 
 type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -47,6 +48,8 @@ interface WebPhoneProps {
   iconBackgroundColor?: string;
   // Embed may open the dialer immediately.
   autoOpen?: boolean;
+  // Web Lock name electing the one tab that holds the SIP registration (the embed uses its own).
+  lockName?: string;
 }
 
 // Map the 4 corners to fixed-position Tailwind classes for the pull tab + panel.
@@ -145,6 +148,7 @@ export function WebPhone({
   iconPosition = 'bottom-right',
   iconBackgroundColor,
   autoOpen = false,
+  lockName = SIP_LOCK_NAME,
 }: WebPhoneProps = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
@@ -154,6 +158,11 @@ export function WebPhone({
   const cornerClass = CORNER_CLASSES[iconPosition];
 
   const [open, setOpen] = useState(autoOpen);
+  // The phone stays registered in the background for the whole session; the panel (`open`) is UI only.
+  // Only the leader tab registers; other tabs show "active in another tab".
+  const { role, takeOver } = useSipLeader(true, lockName);
+  const isLeader = role === 'leader';
+  const [initNonce, setInitNonce] = useState(0);
   const [state, setState] = useState<PhoneLifecycle>('loading');
   const [status, setStatus] = useState('Initializing...');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
@@ -209,7 +218,7 @@ export function WebPhone({
   const { data: configResponse, error: configError, refetch } = useQuery({
     queryKey: ['webphone-config'],
     queryFn: configQueryFn ?? getWebPhoneConfig,
-    enabled: open,
+    enabled: isLeader,
     retry: false,
     staleTime: Infinity,
   });
@@ -325,8 +334,8 @@ export function WebPhone({
   );
 
   useEffect(() => {
-    if (!open) {
-      setState('loading');
+    if (!isLeader) {
+      setState(role === 'follower' ? 'other_tab' : 'loading');
       resetCallState();
       setStatus('Initializing...');
       setErrorDetail(null);
@@ -435,6 +444,7 @@ export function WebPhone({
             setIncomingNumber(remoteUri);
             setIncomingSession(session);
             setStatus('Incoming call');
+            setOpen(true); // ring: bring the panel up even if it was closed
           } else {
             setCallState('ringing');
             setStatus('Calling...');
@@ -470,7 +480,7 @@ export function WebPhone({
         uaRef.current = null;
       }
     };
-  }, [open, config, configError, handleSessionEvents, resetCallState, getTonePlayer]);
+  }, [isLeader, role, initNonce, config, configError, handleSessionEvents, resetCallState, getTonePlayer]);
 
   const handleCall = useCallback(() => {
     if (!uaRef.current || !number || !config) return;
@@ -665,8 +675,7 @@ export function WebPhone({
       refetch();
       return;
     }
-    setOpen(false);
-    setTimeout(() => setOpen(true), 0);
+    setInitNonce((n) => n + 1);
   }, [configError, refetch]);
 
   return (
@@ -724,6 +733,21 @@ export function WebPhone({
                 <div className="flex flex-col items-center justify-center gap-3 py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Initializing Web Phone...</p>
+                </div>
+              )}
+
+              {state === 'other_tab' && (
+                <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                  <Phone className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h4 className="font-semibold">Web Phone is active in another tab</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Only one tab can receive calls. Use it here to move the phone to this tab.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={takeOver}>
+                    Use here
+                  </Button>
                 </div>
               )}
 
