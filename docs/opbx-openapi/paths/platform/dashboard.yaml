@@ -11,7 +11,78 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Dashboard data
+          description: Cross-tenant counts plus the latest organizations and audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      organizations:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          active:
+                            type: integer
+                          suspended:
+                            type: integer
+                          deleted:
+                            type: integer
+                      users:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          active:
+                            type: integer
+                          inactive:
+                            type: integer
+                          platform_managers:
+                            type: integer
+                      extensions:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      dids:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      recent_organizations:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            slug:
+                              type: string
+                            status:
+                              type: string
+                            timezone:
+                              type: string
+                            users_count:
+                              type: integer
+                            extensions_count:
+                              type: integer
+                            dids_count:
+                              type: integer
+                            created_at:
+                              type: string
+                              format: date-time
+                            updated_at:
+                              type: string
+                              format: date-time
+                      recent_audit_logs:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                          description: Same shape as the audit-log entries
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':

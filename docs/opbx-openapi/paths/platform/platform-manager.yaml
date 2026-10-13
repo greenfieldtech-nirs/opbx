@@ -14,6 +14,32 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_platform_manager:
+                  type: boolean
+              required: [is_platform_manager]
       responses:
         '200':
-          description: Platform manager status updated
+          description: Flag updated (revoking also invalidates the user's tokens)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      is_platform_manager:
+                        type: boolean
+        '422':
+          description: Cannot revoke the last platform manager

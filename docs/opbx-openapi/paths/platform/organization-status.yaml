@@ -14,6 +14,46 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, suspended, deleted]
+                reason:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 500
+              required: [status]
       responses:
         '200':
-          description: Status updated
+          description: Status changed (`deleted` soft-deletes the organization)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                      previous_status:
+                        type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Transition not allowed (body lists allowed_transitions), the organization has platform managers (delete), or validation failed

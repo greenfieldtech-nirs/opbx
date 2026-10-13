@@ -9,6 +9,110 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: platform_manager_user_id
+          in: query
+          schema:
+            type: integer
+        - name: target_organization_id
+          in: query
+          schema:
+            type: integer
+        - name: action
+          in: query
+          schema:
+            type: string
+          description: Exact action, for example `operate_as.started`
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         '200':
-          description: Audit logs
+          description: Audit log entries, newest first (per_page defaults to 25)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        platform_manager_user_id:
+                          type: integer
+                        target_organization_id:
+                          type:
+                            - integer
+                            - 'null'
+                        action:
+                          type: string
+                        target_entity_type:
+                          type:
+                            - string
+                            - 'null'
+                        target_entity_id:
+                          type:
+                            - integer
+                            - 'null'
+                        before_state:
+                          type:
+                            - object
+                            - 'null'
+                        after_state:
+                          type:
+                            - object
+                            - 'null'
+                        reason:
+                          type:
+                            - string
+                            - 'null'
+                        created_at:
+                          type: string
+                          format: date-time
+                        platform_manager:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            email:
+                              type: string
+                        target_organization:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            slug:
+                              type: string
+                  meta:
+                    allOf:
+                      - $ref: '../../components/schemas/PaginationMeta.yaml'
+                      - type: object
+                        properties:
+                          has_more:
+                            type: boolean
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

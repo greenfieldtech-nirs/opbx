@@ -8,9 +8,63 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Name or slug
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, deleted]
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [id, name, status, created_at, users_count, extensions_count, dids_count]
+            default: created_at
+        - name: sort_direction
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
       responses:
         '200':
-          description: Organizations list
+          description: Organizations with users/extensions/DID counts (per_page defaults to 25)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '../../components/schemas/Organization.yaml'
+                        - type: object
+                          properties:
+                            users_count:
+                              type: integer
+                            extensions_count:
+                              type: integer
+                            dids_count:
+                              type: integer
+                  meta:
+                    allOf:
+                      - $ref: '../../components/schemas/PaginationMeta.yaml'
+                      - type: object
+                        properties:
+                          has_more:
+                            type: boolean
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
     
   /v1/platform/organizations/{organization}:
     parameters:
@@ -30,7 +84,53 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Organization details
+          description: Organization with its users, counts and masked Cloudonix settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '../../components/schemas/Organization.yaml'
+                      - type: object
+                        properties:
+                          users_count:
+                            type: integer
+                          extensions_count:
+                            type: integer
+                          dids_count:
+                            type: integer
+                          ring_groups_count:
+                            type: integer
+                          business_hours_count:
+                            type: integer
+                          users:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                organization_id:
+                                  type: integer
+                                name:
+                                  type: string
+                                email:
+                                  type: string
+                                role:
+                                  type: string
+                                status:
+                                  type: string
+                                created_at:
+                                  type: string
+                                  format: date-time
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
     
     put:
       tags:
@@ -40,6 +140,45 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                timezone:
+                  type:
+                    - string
+                    - 'null'
+                settings:
+                  type:
+                    - object
+                    - 'null'
+                  description: Merged into the existing settings
+                  additionalProperties: true
       responses:
         '200':
           description: Organization updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Organization.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

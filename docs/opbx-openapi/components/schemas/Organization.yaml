@@ -18,8 +18,8 @@ properties:
     type: string
     enum:
       - active
-      - inactive
       - suspended
+      - deleted
     description: Organization status
     example: active
   timezone:
