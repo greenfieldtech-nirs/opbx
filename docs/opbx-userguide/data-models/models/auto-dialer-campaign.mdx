@@ -21,36 +21,37 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
 | `name` | varchar(255) | No | - | Campaign name |
 | `description` | text | Yes | null | Campaign description |
-| `status` | varchar(20) | No | draft | Campaign status enum |
+| `status` | enum | No | draft | `draft`, `active`, `paused`, `completed`, `archived` |
 | `auto_start` | boolean | No | false | Auto-start when ready |
-| `routing_destination_type` | varchar(50) | No | - | ai_assistant, ai_load_balancer, hangup |
+| `routing_destination_type` | enum | No | - | `ai_assistant`, `ai_load_balancer`, `hangup` |
 | `routing_destination_id` | bigint unsigned | Yes | null | Target destination ID |
-| `dial_timeout` | int | No | 60 | Seconds to ring before timeout |
-| `destination_connect` | varchar(20) | No | connected | connected or immediately |
-| `caller_id` | varchar(50) | Yes | null | Default Caller ID (legacy) |
+| `dial_timeout` | smallint unsigned | No | 60 | Seconds to ring before timeout |
+| `destination_connect` | enum | No | connected | `connected` or `immediately` |
+| `caller_id` | varchar(255) | No | - | Default Caller ID, E.164 |
 | `caller_id_strategy` | varchar(20) | No | round_robin | Distribution strategy for pool |
 | `caller_id_pool_enabled` | boolean | No | false | Whether pool mode is enabled |
-| `max_dial_attempts` | int | No | 1 | Max retries per destination |
-| `concurrent_active_calls` | int | No | 1 | Max concurrent calls (CAC, 1-50) |
-| `calls_per_second` | int | No | 1 | Call initiation rate (CPS, 1-30) |
-| `days_active` | json | Yes | null | Legacy schedule days |
-| `start_time` | int | Yes | null | Legacy start hour |
-| `end_time` | int | Yes | null | Legacy end hour |
-| `start_date` | date | Yes | null | Campaign start date |
-| `end_date` | date | Yes | null | Campaign end date |
-| `timezone` | varchar(50) | Yes | UTC | Schedule timezone |
+| `max_dial_attempts` | tinyint unsigned | No | 1 | Max attempts per destination (API: 1-5) |
+| `concurrent_active_calls` | int unsigned | No | 0 | Max concurrent calls (CAC; API: 1-50) |
+| `calls_per_second` | tinyint unsigned | No | 1 | Call initiation rate (CPS; API: 1-30) |
+| `days_active` | json | No | - | Legacy schedule days |
+| `start_time` | tinyint unsigned | Yes | null | Legacy start hour |
+| `end_time` | tinyint unsigned | Yes | null | Legacy end hour |
+| `start_date` | date | No | - | Campaign start date |
+| `end_date` | date | No | - | Campaign end date |
+| `timezone` | varchar(255) | No | UTC | Schedule timezone |
 | `schedule` | json | Yes | null | Full weekly schedule |
-| `time_limit` | int | Yes | null | Max call duration (seconds) |
+| `time_limit` | mediumint unsigned | No | 3600 | Max call duration in seconds (API: 30-14400) |
 | `record_calls` | boolean | No | false | Enable recording |
-| `action_voicemail` | string | Yes | null | AMD action for voicemail |
-| `action_human` | string | Yes | null | AMD action for human |
-| `action_unknown` | string | Yes | null | AMD action for unknown |
+| `action_voicemail` | varchar(255) | Yes | null | AMD action for voicemail (`HANGUP` or `CONTINUE`) |
+| `action_human` | varchar(255) | Yes | null | AMD action for human |
+| `action_unknown` | varchar(255) | Yes | null | AMD action for unknown |
+| `retry_on_voicemail` | boolean | No | false | Retry a destination that reached voicemail |
 | `total_destinations` | int | No | 0 | Total destinations count |
 | `completed_calls` | int | No | 0 | Completed calls count |
 | `failed_calls` | int | No | 0 | Failed calls count |
 | `voicemail_calls` | int | No | 0 | Voicemail calls count |
 | `pending_calls` | int | No | 0 | Pending calls count |
-| `pause_reason` | varchar(50) | Yes | null | Reason for pause |
+| `pause_reason` | varchar(255) | Yes | null | Reason for pause |
 | `resume_at` | timestamp | Yes | null | Scheduled resume time |
 | `started_at` | timestamp | Yes | null | When campaign started |
 | `completed_at` | timestamp | Yes | null | When campaign completed |

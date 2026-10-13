@@ -18,16 +18,16 @@ The `SessionUpdate` model stores real-time session update events from Cloudonix 
 |--------|------|----------|-------------|
 | `id` | bigint unsigned | No | Primary key |
 | `organization_id` | bigint unsigned | No | Tenant scope |
-| `session_id` | bigint unsigned | No | Cloudonix session ID |
+| `session_id` | bigint | No | Cloudonix session ID |
 | `session_token` | string | Yes | Token for Cloudonix API disconnect |
-| `event_id` | string | No | Idempotency key |
+| `event_id` | varchar(36) | No | Idempotency key |
 | `domain_id` | int | No | Cloudonix domain ID |
 | `domain` | string | No | Domain name |
-| `subscriber_id` | int | No | Subscriber ID |
+| `subscriber_id` | int | Yes | Subscriber ID |
 | `outgoing_subscriber_id` | int | Yes | Outgoing subscriber ID |
 | `caller_id` | string | No | Caller number |
 | `destination` | string | No | Callee number |
-| `direction` | string | No | inbound / outbound |
+| `direction` | enum | No | `incoming`, `outgoing`, `internal`, `application`. Copied to the CDR at ingest |
 | `status` | string | No | Current status |
 | `session_created_at` | datetime | No | Session creation time |
 | `session_modified_at` | datetime | No | Last modification time |
@@ -39,12 +39,12 @@ The `SessionUpdate` model stores real-time session update events from Cloudonix 
 | `vapp_server` | string | Yes | Voice app server |
 | `action` | string | No | |
 | `reason` | string | No | |
-| `last_error` | string | Yes | |
+| `last_error` | text | Yes | |
 | `call_ids` | JSON | No | Associated call IDs |
 | `profile` | JSON | No | Session profile (QoS, AMD) |
 | `processed_at` | datetime | No | When OPBX processed the event |
-| `created_at` | datetime | No | |
-| `updated_at` | datetime | No | |
+| `created_at` | timestamp | Yes | |
+| `updated_at` | timestamp | Yes | |
 
 ## Relationships
 
@@ -65,8 +65,10 @@ SessionUpdate::search($term) // caller_id or destination
 ## Usage Notes
 
 - The Live Calls module queries this table to display active sessions.
-- The `profile` field may contain AMD results written by the AMD worker.
+- The `profile` field is the Cloudonix session profile. For auto-dialer calls it can include the AMD result, which Laravel writes to the Cloudonix profile when the AMD worker reports.
 - Session updates are processed idempotently using `event_id`.
+- Every 15 minutes, `session-updates:cleanup` marks sessions stuck in an active state (no CDR or delete event arrived) as deleted.
+- Rows older than `RETENTION_SESSION_UPDATES_DAYS` (default 30) are pruned daily at 03:00.
 
 ## Related Documentation
 

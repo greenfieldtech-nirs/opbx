@@ -56,6 +56,7 @@ Configuration files and environment variables:
 - RingGroup (`App\Models\RingGroup`) — Ring group configuration
 - IvrMenu (`App\Models\IvrMenu`) — IVR menu structure
 - BusinessHoursSchedule (`App\Models\BusinessHoursSchedule`) — Business hours
+- CallQueue (`App\Models\CallQueue`) — Call queues (live state is in the ACD worker)
 
 ### AI Integration
 
@@ -70,12 +71,13 @@ Configuration files and environment variables:
 
 ### Call & Logging
 
-- CallDetailRecord (`App\Models\CallDetailRecord`) — CDR from Cloudonix
+- [CallDetailRecord](./models/call-detail-record) — CDR from Cloudonix, with the warm archive table
 - [SessionUpdate](./models/session-updates) — Real-time session events
 - [CallNotificationsSettings](./models/call-notifications-settings) — Webhook notification config
 - CallNotificationLog (`App\Models\CallNotificationLog`) — Notification delivery log
 - [EmailLog](./models/email-logs) — Transactional email log
 - [PlatformAuditLog](./models/platform-audit-logs) — Cross-tenant audit trail
+- [PlatformHealthCheck](./models/platform-health-check) — Platform Status history
 
 ### Call Tracking
 
@@ -93,6 +95,17 @@ Configuration files and environment variables:
 - BlockedCallLog (`App\Models\BlockedCallLog`) — Log of blocked calls
 
 ## Recently Added
+
+### Call Record Tiers and Platform Status (2026-10)
+
+| Change | Purpose |
+|--------|---------|
+| `archived_call_detail_records` | Warm tier for call records 6-12 months old |
+| `direction` on `call_detail_records` | Call direction, copied from the session update |
+| `platform_health_checks` | Platform Status history |
+| `unavailable` destination type | Added to every routing destination enum column |
+
+The unused `VoiceAgent` model was removed; AI assistants are `AiAssistant`.
 
 ### Caller ID Pooling (v2026.04)
 

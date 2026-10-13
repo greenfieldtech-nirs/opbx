@@ -18,19 +18,21 @@ The `CloudonixSettings` model stores per-organization Cloudonix CPaaS credential
 |--------|------|----------|-------------|
 | `id` | bigint unsigned | No | Primary key |
 | `organization_id` | bigint unsigned | No | One-to-one with organization |
-| `domain_uuid` | string | Yes | Cloudonix domain UUID |
+| `domain_uuid` | char(36) | Yes | Cloudonix domain UUID |
 | `domain_name` | string | Yes | Cloudonix domain name |
-| `domain_api_key` | string | Yes | **Encrypted** API key |
-| `domain_requests_api_key` | string | Yes | **Encrypted** webhook auth key |
+| `domain_api_key` | text | Yes | **Encrypted** API key |
+| `domain_requests_api_key` | text | Yes | **Encrypted** webhook auth key |
 | `webhook_base_url` | string | Yes | Override URL for webhooks |
-| `voice_application_id` | string | Yes | Cloudonix voice app ID |
+| `voice_application_id` | bigint unsigned | Yes | Cloudonix voice app ID |
 | `voice_application_uuid` | string | Yes | |
 | `voice_application_name` | string | Yes | |
-| `no_answer_timeout` | int | Yes | Default ring timeout |
-| `recording_format` | string | Yes | Preferred recording format |
+| `embed_allowed_domains` | JSON | Yes | Sites allowed to embed the dialer |
+| `no_answer_timeout` | int | No | Default ring timeout, seconds. Default 60 |
+| `call_recording_mode` | enum | No | `disabled`, `inbound`, `outbound`, `internal`, `inbound_outbound`, `all`. Default `disabled` |
+| `recording_format` | enum | No | `wav` or `mp3`. Default `mp3` |
 | `cloudonix_package` | string | Yes | free_tier, standard, etc. |
-| `created_at` | datetime | No | |
-| `updated_at` | datetime | No | |
+| `created_at` | timestamp | Yes | |
+| `updated_at` | timestamp | Yes | |
 
 ## Relationships
 

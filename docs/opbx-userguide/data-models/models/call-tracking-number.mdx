@@ -22,7 +22,7 @@ The `CallTrackingNumber` model links a DID number to a call tracking campaign. W
 | `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
 | `did_number_id` | bigint unsigned | No | - | Linked DID |
 | `friendly_name` | varchar(255) | Yes | null | Display label |
-| `status` | varchar(20) | No | active | Number status enum |
+| `status` | enum | No | active | `active` or `inactive` |
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
 
@@ -34,12 +34,6 @@ The `CallTrackingNumber` model links a DID number to a call tracking campaign. W
 $number->organization() → Organization
 $number->campaign() → CallTrackingCampaign
 $number->did() → DidNumber
-```
-
-### Has Many
-
-```php
-$number->sessions() → CallTrackingSession[]
 ```
 
 ## Status

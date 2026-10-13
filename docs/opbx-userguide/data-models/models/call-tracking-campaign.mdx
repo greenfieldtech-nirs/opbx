@@ -23,8 +23,8 @@ The `CallTrackingCampaign` model represents a marketing campaign that attributes
 | `source` | varchar(100) | Yes | null | Marketing source (e.g. utm_source) |
 | `medium` | varchar(100) | Yes | null | Marketing medium (e.g. utm_medium) |
 | `description` | text | Yes | null | Campaign description |
-| `status` | varchar(20) | No | active | Campaign status enum |
-| `destination_type` | varchar(50) | No | forward | Destination type enum |
+| `status` | enum | No | active | `active` or `inactive` |
+| `destination_type` | enum | No | forward | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `unavailable` |
 | `destination_config` | json | No | - | Destination-specific configuration |
 | `conversion_rule` | json | Yes | null | Conversion rule configuration |
 | `google_ads_upload_enabled` | boolean | No | false | Enable Google Ads conversion upload |
@@ -46,6 +46,7 @@ The required key inside `destination_config` depends on `destination_type`:
 | `ivr_menu` | `ivr_menu_id` | `6` |
 | `ai_assistant` | `ai_assistant_id` | `7` |
 | `ai_load_balancer` | `ai_load_balancer_id` | `8` |
+| `unavailable` | none | `{}` |
 
 ## Conversion Rule
 
@@ -70,8 +71,7 @@ campaign.organization() → Organization
 ```php
 campaign.trackingNumbers() → CallTrackingNumber[]
 campaign.sessions() → CallTrackingSession[]
-campaign.notificationSettings() → CallTrackingNotificationSettings
-campaign.notificationLogs() → CallTrackingNotificationLog[]
+campaign.notificationSettings() → CallTrackingNotificationSettings[]
 ```
 
 ## Enums
@@ -95,6 +95,7 @@ campaign.notificationLogs() → CallTrackingNotificationLog[]
 | `IVR_MENU` | ivr_menu |
 | `AI_ASSISTANT` | ai_assistant |
 | `AI_LOAD_BALANCER` | ai_load_balancer |
+| `UNAVAILABLE` | unavailable |
 
 ## Methods
 
@@ -103,13 +104,16 @@ campaign.notificationLogs() → CallTrackingNotificationLog[]
 ```php
 CallTrackingCampaign::forOrganization($orgId)
 CallTrackingCampaign::active()
-CallTrackingCampaign::inactive()
+CallTrackingCampaign::withStatus(CallTrackingCampaignStatus $status)
+CallTrackingCampaign::search($term)
 ```
 
 ### Business Logic
 
 ```php
 $campaign->isActive(): bool
+$campaign->getForwardTo(): ?string
+$campaign->getDestinationId(string $key): ?int
 ```
 
 ## Related Documentation

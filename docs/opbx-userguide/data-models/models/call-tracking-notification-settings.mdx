@@ -21,7 +21,7 @@ The `CallTrackingNotificationSettings` model stores per-campaign webhook notific
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
 | `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
 | `webhook_url` | varchar(2048) | No | - | Destination URL |
-| `auth_method` | varchar(50) | No | none | none, bearer_token, basic_auth |
+| `auth_method` | enum | No | none | `none`, `bearer_token`, `basic_auth` |
 | `auth_secret` | text | Yes | null | Encrypted token/password |
 | `auth_username` | varchar(255) | Yes | null | Basic auth username |
 | `enabled_events` | json | No | - | Array of event types |
@@ -51,12 +51,6 @@ The `CallTrackingNotificationSettings` model stores per-campaign webhook notific
 ```php
 $settings->organization() → Organization
 $settings->campaign() → CallTrackingCampaign
-```
-
-### Has Many
-
-```php
-$settings->logs() → CallTrackingNotificationLog[]
 ```
 
 ## Related Documentation

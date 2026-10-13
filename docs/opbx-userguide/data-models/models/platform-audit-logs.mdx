@@ -18,17 +18,17 @@ The `PlatformAuditLog` model records all cross-tenant actions performed by platf
 |--------|------|----------|-------------|
 | `id` | bigint unsigned | No | Primary key |
 | `platform_manager_user_id` | bigint unsigned | No | Acting user |
-| `target_organization_id` | bigint unsigned | No | Target organization |
-| `action` | string | No | create, update, delete, view |
-| `target_entity_type` | string | No | Model affected |
-| `target_entity_id` | int | No | Record ID |
+| `target_organization_id` | bigint unsigned | Yes | Target organization |
+| `action` | varchar(100) | No | Action name |
+| `target_entity_type` | varchar(100) | Yes | Model affected |
+| `target_entity_id` | bigint unsigned | Yes | Record ID |
 | `before_state` | JSON | Yes | Values before change |
 | `after_state` | JSON | Yes | Values after change |
-| `reason` | string | Yes | Reason for action |
+| `reason` | varchar(500) | Yes | Reason for action |
 | `ip_address` | string | Yes | Request IP |
 | `user_agent` | string | Yes | Request user agent |
-| `created_at` | datetime | No | |
-| `updated_at` | datetime | No | |
+| `created_at` | timestamp | Yes | |
+| `updated_at` | timestamp | Yes | |
 
 ## Relationships
 
@@ -42,8 +42,9 @@ $log->targetOrganization() → Organization
 - Platform audit logs are not tenant-scoped.
 - They are used for compliance, debugging, and security auditing.
 - `before_state` and `after_state` store snapshots of the affected record.
+- Rows older than `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) are pruned daily.
 
 ## Related Documentation
 
-- [Platform Management Memory](https://github.com/greenfieldtech-nirs/opbx/blob/main/.my_agent/memory/platform-management.md)
+- [Platform Management](/administration/platform-management)
 - User Model (`App\Models\User`)

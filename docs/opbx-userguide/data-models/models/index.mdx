@@ -22,12 +22,14 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 
 ### Call & Logging
 
-- `App\Models\CallDetailRecord` — CDR from Cloudonix (`call_detail_records`)
+- [CallDetailRecord](./call-detail-record) — CDR from Cloudonix (`call_detail_records`), with the warm-tier `ArchivedCallDetailRecord` (`archived_call_detail_records`)
+- `App\Models\CallLog` — Legacy call log, backfilled from CDRs (`call_logs`)
 - [SessionUpdate](./session-updates) — Real-time session events (`session_updates`)
 - [CallNotificationsSettings](./call-notifications-settings) — Webhook notification config (`call_notifications_settings`)
 - `App\Models\CallNotificationLog` — Notification delivery log (`call_notification_logs`)
 - [EmailLog](./email-logs) — Transactional email log (`email_logs`)
 - [PlatformAuditLog](./platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
+- [PlatformHealthCheck](./platform-health-check) — Platform Status history (`platform_health_checks`)
 
 ### Call Tracking
 
@@ -50,7 +52,16 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 - `App\Models\BusinessHoursScheduleDay` — Schedule days (`business_hours_schedule_days`)
 - `App\Models\BusinessHoursTimeRange` — Time ranges (`business_hours_time_ranges`)
 - `App\Models\BusinessHoursException` — Exceptions (`business_hours_exceptions`)
+- `App\Models\BusinessHoursExceptionTimeRange` — Exception time ranges (`business_hours_exception_time_ranges`)
 - `App\Models\ConferenceRoom` — Conference rooms (`conference_rooms`)
+
+### Call Queues
+
+- `App\Models\CallQueue` — Call queues (`call_queues`)
+- `App\Models\CallQueueAgent` — Queue agent membership (`call_queue_agents`)
+- `App\Models\QueueCall` — One row per queued call, for reports (`queue_calls`)
+
+Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/workers/acd-worker) keeps it in Redis.
 
 ### AI Integration
 
@@ -73,12 +84,22 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 - `App\Models\User` — User accounts (`users`)
 - `App\Models\Organization` — Multi-tenant organizations (`organizations`)
 - [CloudonixSettings](./cloudonix-settings) — Cloudonix credentials per org (`cloudonix_settings`)
+- `App\Models\OrganizationJoinRequest` — Requests to join an organization (`organization_join_requests`)
+- `App\Models\UserSocialIdentity` — Linked Auth0 social identities (`user_social_identities`)
+- `App\Models\UserEmbedToken` — Embeddable dialer tokens (`user_embed_tokens`)
+
+### API Access
+
+- `App\Models\PersonalAccessToken` — Sanctum tokens (`personal_access_tokens`)
+- `App\Models\ApiKey` — Organization API keys, `opbxk_` prefix (`api_keys`)
+- `App\Models\ApiKeyPermission` — Per-resource API key permissions (`api_key_permissions`)
 
 ## Tenancy Notes
 
 - Models with `#[ScopedBy([OrganizationScope::class])]` are automatically filtered by the authenticated user's organization.
 - Webhook handlers and platform admin operations must use `OrganizationScope::bypass()` when querying tenant-scoped models.
-- `PlatformAuditLog` and `EmailLog` are not tenant-scoped.
+- `PlatformAuditLog`, `PlatformHealthCheck` and `EmailLog` are not tenant-scoped.
+- Rows of several tables are pruned daily by retention settings; call records are tiered instead. See [Data Retention](../configuration/index#data-retention).
 
 ## Related Documentation
 
