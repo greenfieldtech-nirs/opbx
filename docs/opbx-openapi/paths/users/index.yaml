@@ -4,15 +4,17 @@ paths:
       tags:
       - Users
       summary: List users
-      description: 'Get a paginated list of users in the organization.
-
-        Supports filtering and sorting.
+      description: 'Get a paginated list of users in the organization, sorted by `sort_by`.
+        Supervisors see only themselves and their assigned users. Each user includes
+        its assigned `extension`.
 
         '
       operationId: listUsers
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -30,32 +32,6 @@ paths:
           - updated_at
           default: created_at
       - $ref: ../../components/parameters/query/SortOrder.yaml
-      - name: role
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - owner
-          - pbx_admin
-          - pbx_user
-          - reporter
-        description: Filter by user role
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - active
-          - inactive
-        description: Filter by user status
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-        description: Search in name and email
       responses:
         '200':
           description: List of users
@@ -95,6 +71,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       requestBody:
         required: true
         content:
@@ -134,7 +112,8 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
-                  description: User role (owner cannot be assigned)
+                  - supervisor
+                  description: User role (owner cannot be assigned; a PBX Admin cannot assign pbx_admin)
                   example: pbx_user
                 status:
                   type:
@@ -143,6 +122,7 @@ paths:
                   enum:
                   - active
                   - inactive
+                  - pending
                   default: active
                   description: Account status
                   example: active
@@ -211,6 +191,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:read
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       responses:
@@ -249,6 +231,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       requestBody:
@@ -269,10 +253,12 @@ paths:
                   maxLength: 255
                   example: jane.smith.new@example.com
                 password:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   format: password
                   minLength: 8
-                  description: Leave empty to keep current password
+                  description: Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                   example: NewSecurePass123
                 role:
                   type: string
@@ -280,12 +266,15 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
+                  - supervisor
+                  description: Owner cannot be assigned; users cannot change their own role
                   example: pbx_admin
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
                   example: active
                 phone:
                   type:
@@ -358,6 +347,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       requestBody:
@@ -378,10 +369,12 @@ paths:
                   maxLength: 255
                   example: jane.smith.new@example.com
                 password:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   format: password
                   minLength: 8
-                  description: Leave empty to keep current password
+                  description: Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                   example: NewSecurePass123
                 role:
                   type: string
@@ -389,12 +382,15 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
+                  - supervisor
+                  description: Owner cannot be assigned; users cannot change their own role
                   example: pbx_admin
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
                   example: active
                 phone:
                   type:
@@ -461,6 +457,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       responses:

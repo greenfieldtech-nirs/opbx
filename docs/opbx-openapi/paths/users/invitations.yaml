@@ -12,6 +12,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: users:write
       requestBody:
         required: true
         content:

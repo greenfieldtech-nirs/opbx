@@ -22,6 +22,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: users:read
       responses:
         '200':
           description: Deletion impact preview

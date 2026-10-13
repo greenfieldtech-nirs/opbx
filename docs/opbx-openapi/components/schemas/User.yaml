@@ -26,6 +26,7 @@ properties:
       - pbx_admin
       - pbx_user
       - reporter
+      - supervisor
     description: User's role within the organization
     example: pbx_admin
   status:
@@ -33,12 +34,38 @@ properties:
     enum:
       - active
       - inactive
-    description: Account status
+      - pending
+    description: Account status (`pending` = invited, not yet accepted)
     example: active
+  phone:
+    type:
+    - string
+    - 'null'
+    maxLength: 50
+    example: +1-555-123-4567
   is_platform_manager:
     type: boolean
     description: Whether user has platform manager privileges
     example: false
+  social_identities:
+    type: array
+    description: Linked social login identities
+    items:
+      type: object
+      properties:
+        provider:
+          type: string
+          example: google
+        provider_email:
+          type:
+          - string
+          - 'null'
+          format: email
+  extension:
+    description: The user's assigned extension. Present only when loaded (user list and detail); null when none is assigned.
+    oneOf:
+    - $ref: ./Extension.yaml
+    - type: 'null'
   created_at:
     type: string
     format: date-time
