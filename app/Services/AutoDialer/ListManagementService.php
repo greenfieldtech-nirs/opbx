@@ -459,6 +459,14 @@ class ListManagementService
             throw new \InvalidArgumentException('List cannot be archived in status: '.$list->status->label());
         }
 
+        if ($list->isAssigned()) {
+            throw new \InvalidArgumentException(sprintf(
+                'Cannot archive list "%s": it is assigned to campaign "%s". Unassign it first.',
+                $list->name,
+                $list->campaign?->name ?? '#'.$list->campaign_id
+            ));
+        }
+
         $list->archive();
 
         Log::info('ListManagementService: Archived list', [

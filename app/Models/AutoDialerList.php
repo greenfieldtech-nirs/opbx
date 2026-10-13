@@ -208,13 +208,15 @@ class AutoDialerList extends Model
      */
     public function canDelete(): bool
     {
-        // Not assigned to any campaign
-        if (! $this->campaign_id) {
-            return true;
-        }
+        return ! $this->isAssigned();
+    }
 
-        // Assigned, but all entries are pending with zero dial attempts
-        return $this->allDestinationsArePendingAndFresh();
+    /**
+     * Whether the list is assigned to a campaign (assigned lists cannot be deleted or archived).
+     */
+    public function isAssigned(): bool
+    {
+        return $this->campaign_id !== null;
     }
 
     /**

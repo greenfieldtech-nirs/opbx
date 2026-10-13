@@ -36,10 +36,15 @@ class DistributionListController extends Controller
         $this->authorize('viewAny', AutoDialerList::class);
 
         $lists = AutoDialerList::where('organization_id', Auth::user()->organization_id)
-            ->where('is_latest_version', true) // Only show latest versions
+            // Latest versions only; archiving clears the flag, so archived lists are matched explicitly.
+            ->where(fn ($q) => match ($request->status) {
+                'archived' => $q->where('status', ListStatus::ARCHIVED),
+                'all' => $q->where('is_latest_version', true)->orWhere('status', ListStatus::ARCHIVED),
+                default => $q->where('is_latest_version', true),
+            })
             ->with(['campaign', 'usedByCampaign'])
             ->withExists('versions as has_versions')
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->status && $request->status !== 'all', fn ($q) => $q->where('status', $request->status))
             ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
             ->when($request->search, function ($q, $search) {
                 $q->where('name', 'like', "%{$search}%");

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\AutoDialer;
 
 use App\Enums\ListStatus;
+use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
@@ -109,6 +110,66 @@ class DistributionListApiTest extends TestCase
             'id' => $list->id,
             'status' => 'archived',
         ]);
+    }
+
+    /** @test */
+    public function archiving_an_assigned_list_is_refused_and_names_the_campaign(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'name' => 'Spring Outreach',
+        ]);
+        $list = AutoDialerList::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => ListStatus::USED,
+            'campaign_id' => $campaign->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->patchJson("/api/v1/auto-dialer-campaigns/lists/{$list->id}/archive")
+            ->assertStatus(422)
+            ->assertJsonPath('error', fn (string $e) => str_contains($e, 'Spring Outreach'));
+
+        $this->assertDatabaseHas('auto_dialer_lists', ['id' => $list->id, 'status' => 'used']);
+
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/lists')
+            ->assertJsonPath('data.0.can_archive', false)
+            ->assertJsonPath('data.0.can_delete', false);
+    }
+
+    /** @test */
+    public function delete_flag_and_endpoint_follow_assignment_only(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        $assigned = AutoDialerList::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => ListStatus::IN_USE,
+            'campaign_id' => $campaign->id,
+        ]);
+        $free = AutoDialerList::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => ListStatus::READY,
+        ]);
+
+        $this->actingAs($this->user)->deleteJson("/api/v1/auto-dialer-campaigns/lists/{$assigned->id}")->assertStatus(409);
+        $this->actingAs($this->user)->deleteJson("/api/v1/auto-dialer-campaigns/lists/{$free->id}")->assertOk();
+    }
+
+    /** @test */
+    public function status_filter_lists_archived_lists_and_default_view_hides_them(): void
+    {
+        $ready = AutoDialerList::factory()->create(['organization_id' => $this->organization->id, 'status' => ListStatus::READY]);
+        $toArchive = AutoDialerList::factory()->create(['organization_id' => $this->organization->id, 'status' => ListStatus::READY]);
+        $this->actingAs($this->user)->patchJson("/api/v1/auto-dialer-campaigns/lists/{$toArchive->id}/archive")->assertOk();
+
+        $ids = fn (string $query) => collect($this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/lists'.$query)->assertOk()->json('data'))->pluck('id')->all();
+
+        $this->assertSame([$ready->id], $ids(''));
+        $this->assertSame([$toArchive->id], $ids('?status=archived'));
+        $this->assertEqualsCanonicalizing([$ready->id, $toArchive->id], $ids('?status=all'));
+        $this->assertSame([$ready->id], $ids('?status=ready'));
     }
 
     /** @test */

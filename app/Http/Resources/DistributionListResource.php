@@ -42,7 +42,7 @@ class DistributionListResource extends JsonResource
             ),
 
             // Flags
-            'can_archive' => $this->canBeArchived(),
+            'can_archive' => $this->canBeArchived() && ! $this->isAssigned(),
             'can_assign' => $this->status->canAssign(),
             'can_upload' => $this->status->canUpload(),
             'can_copy' => $this->status->canCopy(),
