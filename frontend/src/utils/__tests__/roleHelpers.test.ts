@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { can } from '../roleHelpers';
+import { can, canDeleteDistributionList } from '../roleHelpers';
 
 describe('can()', () => {
   it('limits disconnect to the owner', () => {
@@ -17,5 +17,12 @@ describe('can()', () => {
 
   it('is false without a role', () => {
     expect(can(undefined, 'recordings.manage')).toBe(false);
+  });
+
+  it('lets a PBX Admin delete only failed distribution lists', () => {
+    expect(canDeleteDistributionList('owner', 'ready')).toBe(true);
+    expect(canDeleteDistributionList('pbx_admin', 'failed')).toBe(true);
+    expect(canDeleteDistributionList('pbx_admin', 'ready')).toBe(false);
+    expect(canDeleteDistributionList('reporter', 'failed')).toBe(false);
   });
 });

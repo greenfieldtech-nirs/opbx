@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { autoDialerCampaignsApi } from '@/services/autoDialerCampaignsApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,7 +137,8 @@ export default function AutoDialerCampaigns() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Permission checks
-  const canManage = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canManage = can(currentUser?.role, 'autoDialer.manage');
+  const canDestroy = can(currentUser?.role, 'autoDialer.destroy');
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Debounce search input
@@ -571,23 +573,26 @@ export default function AutoDialerCampaigns() {
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(campaign);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canDestroy && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(campaign);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     }
                     
                     // Completed campaigns can only be archived
                     if (campaign.status === 'completed') {
+                      if (!canDestroy) return <span className="text-xs text-muted-foreground">-</span>;
                       return (
                         <Button
                           variant="outline"

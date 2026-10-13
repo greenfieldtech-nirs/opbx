@@ -49,6 +49,7 @@ import {
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import {
   useAutoDialerCampaign,
   useStartCampaign,
@@ -112,7 +113,8 @@ export default function AutoDialerCampaignDetail() {
   const [listsPage, setListsPage] = useState(1);
   const LISTS_PER_PAGE = 5;
 
-  const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canManageCampaigns = can(currentUser?.role, 'autoDialer.manage');
+  const canArchiveCampaign = can(currentUser?.role, 'autoDialer.destroy');
 
   // Mutations
   const startMutation = useStartCampaign();
@@ -260,10 +262,12 @@ export default function AutoDialerCampaignDetail() {
                 Resume
               </Button>
             )}
-            <Button onClick={() => handleAction('archive')} variant="outline" className="text-destructive">
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
-            </Button>
+            {canArchiveCampaign && (
+              <Button onClick={() => handleAction('archive')} variant="outline" className="text-destructive">
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
+              </Button>
+            )}
           </div>
         )}
       </div>

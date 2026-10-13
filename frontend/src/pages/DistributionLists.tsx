@@ -45,6 +45,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
+import { can, canDeleteDistributionList } from '@/utils/roleHelpers';
 import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
 import { useAutoDialerCampaigns } from '@/hooks/useAutoDialerCampaigns';
 import { cn } from '@/lib/utils';
@@ -77,7 +78,7 @@ const statusColors: Record<DistributionListStatus, string> = {
 export default function DistributionLists() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('active');
@@ -421,7 +422,7 @@ export default function DistributionLists() {
                                 View Errors
                               </DropdownMenuItem>
                             )}
-                            {list.can_delete && canManage && (
+                            {list.can_delete && canDeleteDistributionList(user?.role, list.status) && (
                               <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={(e) => {

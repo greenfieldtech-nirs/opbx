@@ -129,3 +129,8 @@ export type Ability = keyof typeof ABILITY_ROLES;
 export function can(role: UserRole | string | undefined, ability: Ability): boolean {
   return !!role && (ABILITY_ROLES[ability] as readonly string[]).includes(role);
 }
+
+/** DistributionListPolicy::delete — Owner always; PBX Admin only for failed lists. */
+export function canDeleteDistributionList(role: UserRole | string | undefined, listStatus: string): boolean {
+  return can(role, 'autoDialer.destroy') || (role === 'pbx_admin' && listStatus === 'failed');
+}

@@ -57,6 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
+import { can, canDeleteDistributionList } from '@/utils/roleHelpers';
 import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations, useDeleteList, useArchiveList } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
@@ -115,7 +116,7 @@ export default function DistributionListDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   // Get return URL from location state, default to distribution lists
   const returnUrl = (location.state as { from?: string })?.from || '/ui/auto-dialer/distribution-lists';
@@ -363,7 +364,7 @@ export default function DistributionListDetail() {
               Archive
             </Button>
           )}
-          {list.can_delete && canManage && (
+          {list.can_delete && canDeleteDistributionList(user?.role, list.status) && (
             <Button variant="outline" className="text-red-600" onClick={() => setIsDeleteOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
