@@ -1,0 +1,40 @@
+paths:
+  /v1/platform/users/{user}/delete-impact:
+    parameters:
+      - name: user
+        in: path
+        required: true
+        description: User ID (any organization)
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      tags:
+        - Platform
+      summary: Preview user deletion impact (platform)
+      description: |
+        Platform manager only. Returns what deleting the user would change, across
+        all organizations, without changing anything. Same preview as the organization
+        endpoint `GET /v1/users/{user}/delete-impact`.
+      operationId: getPlatformUserDeleteImpact
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Deletion impact preview
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '../../components/schemas/UserDeletionImpact.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
