@@ -14,6 +14,8 @@ import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -56,6 +58,8 @@ export default function Announcements() {
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
+  const { user } = useAuth();
+  const canManage = can(user?.role, 'recordings.manage');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Recording | null>(null);
 
   const queryClient = useQueryClient();
@@ -254,6 +258,7 @@ export default function Announcements() {
             <span className="text-foreground">Announcements</span>
           </div>
         </div>
+        {canManage && (
         <div className="flex gap-2">
           <Button onClick={() => setShowRemoteDialog(true)} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
@@ -264,6 +269,7 @@ export default function Announcements() {
             Upload File
           </Button>
         </div>
+        )}
       </div>
 
       <Card>
@@ -382,7 +388,7 @@ export default function Announcements() {
                     onCheckedChange={(checked) => {
                       toggleMohMutation.mutate({ id: announcement.id, is_moh: checked });
                     }}
-                    disabled={toggleMohMutation.isPending}
+                    disabled={toggleMohMutation.isPending || !canManage}
                     aria-label="Use as hold music"
                   />
                 )
@@ -444,18 +450,20 @@ export default function Announcements() {
                         <Download className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(announcement);
-                      }}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canManage && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(announcement);
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )
               }
@@ -464,8 +472,8 @@ export default function Announcements() {
               <EmptyState
                 icon={Database}
                 title="No announcements found"
-                description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : 'Get started by uploading a file or adding a remote URL'}
-                action={!filterForm.search && !filterForm.type && !filterForm.status ? {
+                description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : canManage ? 'Get started by uploading a file or adding a remote URL' : 'No announcements have been added yet'}
+                action={canManage && !filterForm.search && !filterForm.type && !filterForm.status ? {
                   label: "Upload File",
                   onClick: () => setShowUploadDialog(true)
                 } : undefined}
