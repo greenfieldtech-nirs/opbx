@@ -25,7 +25,7 @@ import {
 } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
-import { getEmbedBus } from './embedBus';
+import { getEmbedBus, handleEmbedClose } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
@@ -562,11 +562,11 @@ export function WebPhone({
           setOpen(true);
           break;
         case 'close':
-          setOpen(false);
+          handleEmbedClose(inActiveCall, bus, () => setOpen(false));
           break;
       }
     });
-  }, [handleHangup]);
+  }, [handleHangup, inActiveCall]);
 
   // Tell the host the widget is registered and ready to take commands.
   useEffect(() => {
