@@ -893,6 +893,8 @@ components:
       $ref: './components/schemas/QueueCall.yaml'
     ConferenceRoom:
       $ref: './components/schemas/ConferenceRoom.yaml'
+    ConferenceRoomInput:
+      $ref: './components/schemas/ConferenceRoomInput.yaml'
     BusinessHoursSchedule:
       $ref: './components/schemas/BusinessHoursSchedule.yaml'
     ApiKey:

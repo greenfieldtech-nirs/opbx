@@ -8,9 +8,36 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - max_participants
+              - status
+              - created_at
+              - updated_at
+            default: name
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - pending
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Free-text search
       responses:
         '200':
           description: List of conference rooms
@@ -36,19 +63,19 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: Weekly Standup
-                max_participants:
-                  type: integer
-                  example: 25
+              allOf:
+                - $ref: '../../components/schemas/ConferenceRoomInput.yaml'
+                - required:
+                    - name
+                    - max_participants
+                    - status
       responses:
         '201':
           description: Conference room created
@@ -61,6 +88,12 @@ paths:
                     type: string
                   data:
                     $ref: '../../components/schemas/ConferenceRoom.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
   /v1/conference-rooms/{conference_room}:
     parameters:
@@ -78,6 +111,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:read
       responses:
         '200':
           description: Conference room details
@@ -101,12 +136,14 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/ConferenceRoom.yaml'
+              $ref: '../../components/schemas/ConferenceRoomInput.yaml'
       responses:
         '200':
           description: Conference room updated
@@ -127,12 +164,14 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/ConferenceRoom.yaml'
+              $ref: '../../components/schemas/ConferenceRoomInput.yaml'
       responses:
         '200':
           description: Conference room updated
@@ -155,6 +194,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       responses:
         '204':
           description: Conference room deleted

@@ -26,12 +26,13 @@ properties:
     enum:
     - active
     - inactive
+    - pending
     example: active
   pin:
     type:
     - string
     - 'null'
-    description: Participant PIN
+    description: Participant PIN. Omitted unless the caller may update the room.
     example: '1234'
   pin_required:
     type: boolean
@@ -41,7 +42,7 @@ properties:
     type:
     - string
     - 'null'
-    description: Host PIN for moderator access
+    description: Host PIN for moderator access. Omitted unless the caller may update the room.
     example: '5678'
   recording_enabled:
     type: boolean
