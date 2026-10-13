@@ -3,204 +3,89 @@ sidebar_position: 8
 slug: /applications/auto-dialer/routing-destinations
 sidebar_class_name: cxGuidesSidebar
 title: Campaign Routing
-description: How auto-dialer calls are routed after being answered
+description: Where an answered auto-dialer call goes - AI assistant, AI load balancer or hangup - and how list metadata reaches it
 ---
 
 # Campaign Routing
 
-When an auto-dialer call is answered, OPBX routes it to the campaign's configured routing destination. This destination determines what happens to the call after the callee picks up.
+Every campaign has one **routing destination**. When a callee answers, Cloudonix connects the call there. A campaign can route to an **AI assistant**, an **AI load balancer**, or **Hangup**.
 
-## Routing Overview
+## Purpose
 
-The routing destination is configured per campaign on the Basic tab of the campaign form. All calls from the campaign use the same routing destination.
+Choose the routing destination to decide who talks to the people your campaign calls.
 
-## Destination Types
+## Prerequisites
 
-OPBX supports four routing destination types:
+- The destination exists in your organization: an [AI assistant](/modules/ai-assistants) or an [AI load balancer](/modules/ai-load-balancers) with active members.
+- A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/applications/auto-dialer/campaigns).
 
-| Type | Description | Use Case |
-|------|-------------|----------|
-| **AI Assistant (SIP)** | Routes to a SIP-based AI provider | Traditional AI voice providers using SIP trunking |
-| **AI Assistant (WebSocket)** | Routes to a WebSocket AI provider | Modern AI platforms using real-time streaming |
-| **AI Load Balancer** | Distributes calls across multiple AI assistants | High-volume campaigns requiring redundancy |
-| **Hangup** | Immediately ends the call | Testing campaigns without connecting to AI |
+## Set the destination
 
-## CXML Generation
+1. Open the campaign form, **Basic Info** tab.
+2. Under **Routing Destination**, choose the type.
+3. Under **Select Destination**, choose the assistant or load balancer. Hangup needs no selection.
+4. Save.
 
-When the Go Dialer Worker initiates a call, Laravel generates CXML (Cloudonix XML) that instructs Cloudonix how to handle the answered call:
+{/* SCREENSHOT: auto-dialer-routing-selector — Basic Info tab with Routing Destination = AI Assistant and Select Destination open, listing "Aria - Front Desk Receptionist" and "Max - Support Triage" */}
 
-| Destination Type | CXML Generated |
-|-----------------|----------------|
-| **AI Assistant (SIP)** | `<Dial><Service provider="...">phone</Service></Dial>` |
-| **AI Assistant (WebSocket)** | `<Connect><Stream url="wss://..."/></Connect>` |
-| **AI Load Balancer** | Same as above, selected by load balancing strategy |
-| **Hangup** | `<Response><Hangup/></Response>` |
+The campaign form has no **Disconnect** or "Destination unavailable" choice: a campaign is always routed to one of the three types below.
 
-## Call Flow
+## Destination types
 
-```mermaid
-sequenceDiagram
-    participant Worker as Go Worker
-    participant Laravel as Laravel API
-    participant CX as Cloudonix
-    participant Phone as Callee Phone
-    participant AI as AI Assistant
-    
-    Worker->>Laravel: POST /calls/initiate
-    Laravel->>Laravel: Generate CXML for destination
-    Laravel->>CX: Create call with CXML
-    CX->>Phone: Dial callee
-    Phone->>CX: Answer
-    CX->>AI: Connect (SIP/WebSocket)
-    AI->>Phone: AI conversation
-    Phone->>CX: Hang up
-    CX->>Laravel: CDR webhook
-    Laravel->>Laravel: Update session, decrement CAC
-```
+| Type | What the callee reaches | Typical use |
+|------|-------------------------|-------------|
+| AI Assistant | One AI assistant, over SIP or WebSocket depending on how the assistant is set up | A single assistant handles the campaign |
+| AI Load Balancer | One of the load balancer's active assistants, picked by its strategy, with failover to the next one | Higher volume, redundancy |
+| Hangup | The call is ended as soon as it is answered | Testing the dialer, schedule and rates without using an assistant |
 
-**Flow Explanation:**
+### AI assistant over SIP
 
-1. **Worker Polls**: Go Dialer Worker requests pending destinations from Laravel every 10 seconds
-2. **CXML Generation**: Laravel generates the appropriate CXML based on the campaign's routing destination
-3. **Call Creation**: Laravel calls Cloudonix API with the CXML and destination phone number
-4. **Dialing**: Cloudonix initiates the call to the callee's phone
-5. **Answer**: When the callee answers, Cloudonix executes the CXML
-6. **Connection**: CXML connects the call to the AI assistant via SIP or WebSocket
-7. **Conversation**: AI assistant interacts with the callee
-8. **Completion**: When the call ends, Cloudonix sends a CDR webhook to Laravel
-9. **Cleanup**: Laravel updates the call session, decrements the CAC counter, and updates campaign statistics
+The call is dialed to the assistant's service. If the assistant has an AI-assistant extension with a service URL, that URL (with its token and parameters) is used; otherwise the provider and the assistant's phone number are used. If neither is configured, the call is hung up.
 
-## AI Assistant (SIP)
+### AI assistant over WebSocket
 
-SIP-based AI assistants use traditional telephony protocols to connect calls.
+The call audio is streamed to the provider's WebSocket address, built from the provider's URL template with the call's details filled in.
 
-**Configuration:**
-- Select an AI assistant configured with SIP provider details
-- The assistant's SIP URI is used in the CXML
+### AI load balancer
 
-**CXML Example:**
-```xml
-<Response>
-  <Dial>
-    <Service provider="custom_sip_provider">sip:ai@example.com</Service>
-  </Dial>
-</Response>
-```
+OPBX asks the load balancer for an assistant according to its strategy, considering only **active** members whose assistant is **active**. It also gives Cloudonix a follow-through address: if that assistant fails (busy, no answer and so on), the next assistant is tried. If no member is available, the call is hung up.
 
-**When to Use:**
-- Your AI provider requires SIP connectivity
-- You need compatibility with traditional telephony infrastructure
-- Your AI platform does not support WebSocket streaming
+## Passing list data to the assistant
 
-## AI Assistant (WebSocket)
+The **Full Name**, **Batch Identifier** and **metadata columns** you mapped when uploading the [distribution list](/applications/auto-dialer/distribution-lists) are stored with each number. The metadata is handed to the assistant with each call:
 
-WebSocket-based AI assistants use real-time bidirectional streaming for AI interactions.
+| Assistant type | How metadata is sent |
+|----------------|---------------------|
+| SIP | As SIP headers named `X-<column>`, for example `X-company: Example Inc` |
+| WebSocket | As stream parameters named after the column |
+| Test (dummy) assistant | As comments in the call instructions |
 
-**Configuration:**
-- Select an AI assistant configured with a WebSocket URL template
-- OPBX fills in placeholders when generating CXML
+The metadata is kept when a load balancer fails over to another assistant. Numbers without metadata send none.
 
-**CXML Example:**
-```xml
-<Response>
-  <Connect>
-    <Stream url="wss://ai.example.com/stream?session=123&amp;from=+14155551234&amp;to=+14155555678"/>
-  </Connect>
-</Response>
-```
+## What happens if the destination is missing
 
-**WebSocket URL Parameters:**
+The destination is checked when the call is placed, not when you save the campaign. If the assistant or load balancer no longer exists, belongs to another organization, or (for a load balancer) has no available member, the callee answers and the call is **hung up at once**. Check the campaign's routing before you start it.
 
-The URL template supports placeholders that OPBX fills in at call time:
+## Deleting a destination that a campaign uses
 
-| Placeholder | Value |
-|-------------|-------|
-| **\{session\}** | Unique auto-dialer session ID for this call |
-| **\{from\}** | Campaign's configured Caller ID |
-| **\{to\}** | Destination phone number being dialed |
-| **\{bot_id\}** | AI assistant's bot identifier |
-| **\{auth_token\}** | Authentication token from AI assistant configuration |
+An AI assistant or AI load balancer that a campaign routes to cannot be deleted. The delete is refused and the **Cannot delete: still in use** dialog lists the campaign. Change the campaign's routing (pause it first if it is running), then delete again. Archived and completed campaigns count too.
 
-**When to Use:**
-- Your AI provider supports WebSocket streaming
-- You need lower latency than SIP can provide
-- You want real-time bidirectional audio streaming
+{/* SCREENSHOT: auto-dialer-routing-in-use-dialog — "Cannot delete: still in use" dialog for the AI assistant Aria, listing the auto-dialer campaign "Fall Webinar Follow-up" */}
 
-## AI Load Balancer
+## Call recording
 
-The AI Load Balancer distributes calls across multiple AI assistants using configurable strategies.
-
-**Configuration:**
-- Select a load balancer that contains multiple AI assistants
-- The load balancer's strategy determines which assistant handles each call
-
-**Strategies:**
-
-| Strategy | Description |
-|----------|-------------|
-| **Round Robin** | Cycles through assistants in order |
-| **Least Connections** | Routes to the assistant with fewest active calls |
-| **Random** | Randomly selects an assistant |
-| **Weighted** | Routes based on configured weights |
-
-**When to Use:**
-- High-volume campaigns that exceed single assistant capacity
-- Redundancy requirements (failover if one assistant fails)
-- Geographic distribution (different assistants for different regions)
-
-## Hangup
-
-The Hangup destination immediately ends the call when answered.
-
-**CXML Example:**
-```xml
-<Response>
-  <Hangup/>
-</Response>
-```
-
-**When to Use:**
-- Testing campaign configuration without connecting to AI
-- Verifying rate limiting and scheduling behavior
-- Load testing the dialing infrastructure
-
-:::warning
-Using Hangup in production campaigns results in immediate disconnection when callees answer. Only use this for testing.
-:::
-
-## Routing Configuration
-
-Configure routing when creating or editing a campaign:
-
-1. Go to the **Basic** tab
-2. Select **Routing Destination Type**
-3. Select the specific **Destination** (AI assistant or load balancer)
-4. Complete other campaign settings
-5. Save
-
-:::note
-The routing destination is configured once per campaign and applies to all calls. If you need different routing for different segments, create separate campaigns.
-:::
-
-## Best Practices
-
-1. **Test Before Scaling**: Use Hangup or a test AI assistant to verify your campaign works before using production AI
-
-2. **Match Capacity**: Ensure your AI assistant or load balancer can handle the campaign's CAC setting
-
-3. **Monitor Connection Quality**: Track answer rates and call durations to detect routing issues
-
-4. **Use Load Balancers for Scale**: When CAC exceeds 10, consider using a load balancer for redundancy
-
-5. **Verify WebSocket Parameters**: If using WebSocket routing, confirm all placeholder values are correctly configured in your AI assistant settings
+With **Record Calls** on (Advanced tab), Cloudonix records each call of the campaign. See [Recordings](/modules/recordings) for who can play recordings.
 
 ## Troubleshooting
 
-| Symptom | Cause | Solution |
-|---------|-------|----------|
-| Calls hang up immediately | Hangup destination selected | Change to an AI assistant destination |
-| AI never connects | CXML generation error | Check AI assistant configuration |
-| WebSocket connection fails | Invalid URL template | Verify placeholder syntax in AI assistant config |
-| SIP connection fails | Invalid SIP URI | Check SIP provider configuration |
-| Load balancer not distributing | Single assistant in balancer | Add more assistants to the load balancer |
-| High drop rate after answer | AI assistant capacity exceeded | Reduce CAC or add more AI assistants |
+| Symptom | Likely cause | What to do |
+|---------|--------------|-----------|
+| Callees answer and the line drops at once | Routing is Hangup, or the destination is missing or has no available member | Check the campaign's routing and the assistant's or load balancer's status |
+| Callees answer and the line drops after about 30 seconds | Voicemail detection with "If Detection Unclear = Hang up" | See [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
+| The assistant does not receive the lead's details | The columns were not mapped as metadata, or the assistant ignores them | Re-upload with the columns ticked as metadata; check the assistant's header or parameter handling |
+
+## Related pages
+
+- [AI Assistants](/modules/ai-assistants) and [AI Load Balancers](/modules/ai-load-balancers)
+- [Distribution Lists](/applications/auto-dialer/distribution-lists)
+- [Managing Campaigns](/applications/auto-dialer/campaigns)
