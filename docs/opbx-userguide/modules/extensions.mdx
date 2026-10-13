@@ -102,7 +102,7 @@ A phone number used as a default caller ID cannot be deleted until you clear it 
 ## Edit an extension
 
 1. Click the extension number or its row.
-2. Change the type, assignment or default caller ID. The number is shown but cannot be edited.
+2. Change the type, assignment or default caller ID. The number is shown but cannot be edited. Changing the type **to** PBX User creates the Cloudonix subscriber; changing it **from** PBX User removes the subscriber, so its SIP credentials stop working. Other edits of a PBX User extension do not call Cloudonix.
 3. Click **Save Changes**.
 
 **Status:** click the status badge in the list to switch between active and inactive. Calls to an inactive extension are not connected, and an inactive extension is skipped as a ring-group member.

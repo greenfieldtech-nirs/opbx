@@ -74,13 +74,9 @@ The API also accepts a **description** (up to 1000 characters) and a **status**;
 |----------|--------------|
 | Simultaneous | All members ring at the same time for the ring timeout. The first to answer gets the call. If nobody answers, the fallback runs |
 | Sequential | Members ring one at a time, in the order shown in the dialog, each for the ring timeout. The list is tried **Ring Turns** times, then the fallback runs |
-| Round Robin | Rings members one at a time, like Sequential (see the note below) |
+| Round Robin | Rings members one at a time like Sequential, but each new call starts at the next member after the one the previous call started at. Retries for the same call continue from that member |
 
 For Sequential, drag members by their handle to change the order. The top member rings first.
-
-:::caution Round Robin currently behaves like Sequential
-The call-routing code treats Round Robin and Sequential the same way: every call starts with the first member in the list. There is no rotation between calls yet.
-:::
 
 Only **active** member extensions are rung. An inactive member is skipped without an error. A **Forward** member rings its forward-to number or SIP address.
 

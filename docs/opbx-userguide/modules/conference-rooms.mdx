@@ -69,8 +69,17 @@ The API also accepts a **description** (up to 1000 characters). The dialog does 
 
 Webhook URLs must be valid URLs up to 500 characters that are publicly reachable: internal network addresses are refused.
 
-:::caution Settings that are stored but not applied yet
-When a call reaches a room, OPBX applies **Max Participants**, **Mute on Entry** and **Announce Join/Leave**. The other settings (PIN, host PIN, wait for host, music on hold, recording, auto-start recording and talk detection) are saved with the room but the call-routing code does not use them yet. Do not rely on a PIN to keep a room private.
+### How the settings apply to a call
+
+- **PIN Protection.** The caller is asked for the participant PIN followed by `#`. Three wrong entries end the call. No PIN entered ends the call.
+- **Host PIN.** A caller who enters the host PIN joins as the host. The host is never muted on entry.
+- **Wait for Host.** Participants wait (with hold music if enabled) until the host joins. This needs a Host PIN: without one the setting is ignored so the room cannot get stuck. If PIN Protection is off, callers are offered a short chance to enter the host PIN and are otherwise let in as waiting participants.
+- **Music on Hold.** Hold music plays while a caller is alone or waiting. When off, they wait in silence.
+- **Mute on Entry.** Participants join muted. **Announce Join/Leave** plays voice prompts when people join or leave. **Max Participants** is capped at 250.
+- **Recording.** The room is recorded from its start only when **Enable Recording** and **Auto-Start Recording** are both on. The recording is delivered to OPBX's recording handler, not to the Recording Webhook URL.
+
+:::caution Settings that are still stored but not applied
+**Talk detection** and the **Recording Webhook URL** are saved with the room but not used when a call joins.
 :::
 
 ## Edit a conference room
