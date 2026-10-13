@@ -15,7 +15,7 @@ OPBX provides a comprehensive set of modules for managing your business phone sy
 | Module | Description |
 |--------|-------------|
 | [User Management](/modules/user-management) | Create and manage user accounts with role-based access control |
-| [Supervisors](/modules/supervisors) | Assign read-only call-monitoring supervisors scoped to specific users and ring groups |
+| [Supervisors](/modules/supervisors) | Let a supervisor watch and coach live calls of the users and ring groups assigned to them |
 | [Extensions](/modules/extensions) | Configure phone extensions with SIP credentials and Cloudonix sync |
 | [Phone Numbers](/modules/phone-numbers) | Manage DID numbers and configure inbound call routing |
 | [Trunks](/modules/trunks) | Manage the inbound and outbound SIP trunks held in Cloudonix |
@@ -28,19 +28,22 @@ OPBX provides a comprehensive set of modules for managing your business phone sy
 | [AI Load Balancers](/modules/ai-load-balancers) | Distribute calls across multiple AI providers |
 | [Call Logs](/modules/call-logs) | View and export call detail records |
 | [Live Calls](/modules/live-calls) | Monitor, disconnect, and coach active calls in real time |
+| [Reporting](/modules/reporting) | Dashboard, call logs and live monitoring at a glance |
 | [Web Phone](/modules/web-phone) | In-browser softphone for placing, receiving, and coaching calls |
+| [Embedded Dialer](/modules/embedded-dialer) | Embed a user's Web Phone in a third-party website with one script snippet |
 | [Call Tracking Campaigns](/modules/call-tracking-campaigns) | Attribute inbound calls to marketing campaigns and sources |
 | [Call Tracking DNI](/modules/call-tracking-dni) | Dynamic number insertion for websites |
 | [Call Tracking Analytics](/modules/call-tracking-analytics) | Campaign performance, conversions, and exports |
 | [Call Notifications](/modules/call-notifications) | Configure webhook notifications for call events |
 | [Recordings](/modules/recordings) | Upload and manage audio files for IVR prompts and announcements |
 | [Inbound Blacklist](/modules/inbound-blacklist) | Block unwanted inbound callers |
-| [Outbound Whitelist](/modules/outbound-whitelist) | Control which external numbers users can dial |
+| [Outbound Whitelist](/modules/outbound-whitelist) | Choose which destination prefixes may be dialled, through which trunk and with which caller ID |
 | [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) | Run outbound calling campaigns |
 | [Distribution Lists](/modules/distribution-lists) | Manage contact lists for auto-dialer campaigns |
 | [Settings](/modules/settings) | Configure Cloudonix integration and organization settings |
 | [API Keys](/modules/api-keys) | Owner-managed scoped API keys with per-resource read/write permissions |
 | [MCP Server](/modules/mcp-server) | Let AI agents safely operate your PBX via the Model Context Protocol |
+| [Auth0 Syndicated Auth](/modules/auth0-syndicated-auth) | Social sign-in, invitations and organization join requests (when Auth0 is enabled) |
 
 ## Getting Started
 
@@ -61,10 +64,11 @@ Then add [Recordings](/modules/recordings) for prompts and hold music, and [Inbo
 
 ## Module Documentation Format
 
-Each module guide includes:
+Each module guide is a walk-through:
 
-- **Purpose** — What the module does
-- **Permissions** — Which roles can access and modify the module
-- **UI Workflow** — Step-by-step instructions for common tasks
-- **Related API Endpoints** — Links to the OPBX REST API reference
-- **Key Data Fields** — Important database fields and enums
+- **Purpose** and **prerequisites**: what the module is for and what must exist first
+- **Permissions**: which roles can see and change it
+- **Create, edit and delete**: step by step, with every field and its real limits
+- **What happens on save**, and the in-use check that can refuse a delete
+- **Common errors**: the messages you can see and what to do
+- **Related modules** and API endpoints
