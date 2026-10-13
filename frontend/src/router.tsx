@@ -347,7 +347,7 @@ export const router = createBrowserRouter([
       {
         path: 'call-tracking/integrations',
         element: (
-          <OwnerRoute>
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
             <CallTrackingIntegrations />
           </OwnerRoute>
         ),

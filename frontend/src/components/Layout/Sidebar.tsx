@@ -93,7 +93,7 @@ const sidebarSections: SidebarSection[] = [
       { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'Sessions', href: '/ui/call-tracking/sessions', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'DNI Snippet', href: '/ui/call-tracking/dni-snippet', icon: 'codicon-code', roles: ['owner', 'pbx_admin'] },
-      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner'] },
+      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner', 'pbx_admin'] },
       { name: 'Security', href: '', icon: '', isHeader: true },
       { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
       { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
