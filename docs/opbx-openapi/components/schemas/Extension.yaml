@@ -28,7 +28,7 @@ properties:
     example: '1001'
   name:
     type: string
-    description: Display name (derived from user for USER type)
+    description: Name of the assigned user, or `Unassigned` when no user is assigned
     example: John Doe
   type:
     type: string
@@ -40,6 +40,7 @@ properties:
     - ai_assistant
     - custom_logic
     - forward
+    - queue
     - ai_load_balancer
     description: Extension type
     example: user
@@ -48,6 +49,7 @@ properties:
     enum:
     - active
     - inactive
+    - pending
     description: Extension status
     example: active
   voicemail_enabled:
@@ -56,36 +58,30 @@ properties:
     example: true
   configuration:
     type: object
-    description: Type-specific configuration
+    description: Type-specific configuration (see the create request for the keys each type uses)
     additionalProperties: true
     example:
       forward_to: '+1234567890'
   sip_config:
-    type:
-    - object
-    - 'null'
-    description: SIP configuration (USER type only, authorized users)
+    type: object
+    description: >-
+      SIP registration metadata. Present only on `user` extensions. The password is never
+      included; read it with `GET /v1/extensions/{extension}/password`.
     properties:
       username:
         type: string
         example: '1001'
-      password:
-        type: string
-        example: sip_password_xyz
       server:
         type: string
         example: sip.cloudonix.io
   user:
+    description: Assigned user (present when loaded)
     $ref: ./User.yaml
   ai_assistant:
-    type:
-    - object
-    - 'null'
-    properties:
-      id:
-        type: integer
-      name:
-        type: string
+    description: Assigned AI assistant (present when loaded; null when none)
+    oneOf:
+    - $ref: ./AiAssistant.yaml
+    - type: 'null'
   ai_load_balancer:
     type:
     - object
@@ -99,6 +95,23 @@ properties:
         type: string
       members:
         type: array
+        items:
+          type: object
+          properties:
+            ai_assistant_id:
+              type: integer
+            ai_assistant_name:
+              type:
+              - string
+              - 'null'
+            priority:
+              type: integer
+            weight:
+              type: integer
+            position:
+              type: integer
+            status:
+              type: string
   default_caller_id_did_id:
     type:
     - integer
@@ -121,21 +134,6 @@ properties:
         type:
         - string
         - 'null'
-  cloudonix_synced:
-    type: boolean
-    description: Whether extension is synced with Cloudonix
-    example: true
-  cloudonix_subscriber_id:
-    type:
-    - integer
-    - 'null'
-    description: Cloudonix subscriber ID
-  cloudonix_uuid:
-    type:
-    - string
-    - 'null'
-    description: Cloudonix UUID
-    example: 550e8400-e29b-41d4-a716-446655440000
   created_at:
     type: string
     format: date-time

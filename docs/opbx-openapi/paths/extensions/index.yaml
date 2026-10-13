@@ -9,6 +9,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -18,10 +20,10 @@ paths:
           type: string
           enum:
           - extension_number
-          - name
           - type
           - status
           - created_at
+          - updated_at
           default: extension_number
       - $ref: ../../components/parameters/query/SortOrder.yaml
       - name: type
@@ -34,7 +36,9 @@ paths:
           - ring_group
           - ivr
           - ai_assistant
+          - custom_logic
           - forward
+          - queue
           - ai_load_balancer
       - name: status
         in: query
@@ -43,6 +47,12 @@ paths:
           enum:
           - active
           - inactive
+          - pending
+      - name: user_id
+        in: query
+        schema:
+          type: integer
+        description: Only extensions assigned to this user
       - name: search
         in: query
         schema:
@@ -73,6 +83,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       requestBody:
         required: true
         content:
@@ -82,13 +94,14 @@ paths:
               properties:
                 extension_number:
                   type: string
-                  description: Extension number (must be unique in organization)
+                  pattern: ^\d{3,5}$
+                  description: 3-5 digits, unique in the organization
                   example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
-                  description: User ID (required for USER type)
+                  description: Assigned user ID
                 type:
                   type: string
                   enum:
@@ -99,6 +112,7 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
                   example: user
                 status:
@@ -106,17 +120,63 @@ paths:
                   enum:
                   - active
                   - inactive
-                  default: active
+                  - pending
+                  example: active
                 voicemail_enabled:
                   type: boolean
-                  default: true
                 configuration:
                   type: object
+                  description: Type-specific settings. The key for the extension's type is required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
                   additionalProperties: true
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
                 default_caller_id_did_id:
                   type:
                   - integer
@@ -125,6 +185,7 @@ paths:
               required:
               - extension_number
               - type
+              - status
       responses:
         '201':
           description: Extension created
@@ -150,6 +211,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:read
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       responses:
@@ -174,6 +237,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       requestBody:
@@ -185,10 +250,14 @@ paths:
               properties:
                 extension_number:
                   type: string
+                  pattern: ^\d{3,5}$
+                  description: 3-5 digits, unique in the organization
+                  example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
+                  description: Assigned user ID
                 type:
                   type: string
                   enum:
@@ -199,20 +268,71 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
+                  example: user
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
+                  example: active
                 voicemail_enabled:
                   type: boolean
                 configuration:
                   type: object
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
+                  description: Type-specific settings. The key for the extension's type is required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
+                  additionalProperties: true
                 default_caller_id_did_id:
                   type:
                   - integer
@@ -244,6 +364,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       requestBody:
@@ -255,10 +377,14 @@ paths:
               properties:
                 extension_number:
                   type: string
+                  pattern: ^\d{3,5}$
+                  description: 3-5 digits, unique in the organization
+                  example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
+                  description: Assigned user ID
                 type:
                   type: string
                   enum:
@@ -269,20 +395,71 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
+                  example: user
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
+                  example: active
                 voicemail_enabled:
                   type: boolean
                 configuration:
                   type: object
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
+                  description: Type-specific settings. The key for the extension's type is required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
+                  additionalProperties: true
                 default_caller_id_did_id:
                   type:
                   - integer
@@ -315,6 +492,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       responses:
