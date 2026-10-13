@@ -8,6 +8,117 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:read
+      description: Paginated blocked-call log, newest first.
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: caller_id
+          in: query
+          schema:
+            type: string
+          description: Partial caller ID match
+        - name: blacklist_id
+          in: query
+          schema:
+            type: integer
+        - name: did_number_id
+          in: query
+          schema:
+            type: integer
+        - name: from_date
+          in: query
+          schema:
+            type: string
+          description: blocked_at lower bound
+        - name: to_date
+          in: query
+          schema:
+            type: string
+          description: blocked_at upper bound
+        - name: rejection_strategy
+          in: query
+          schema:
+            type: string
+            enum: [drop, reject, torment]
       responses:
         '200':
-          description: Blocked logs retrieved
+          description: Blocked call log page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        organization_id:
+                          type: integer
+                        inbound_blacklist_id:
+                          type:
+                            - integer
+                            - 'null'
+                        did_number_id:
+                          type:
+                            - integer
+                            - 'null'
+                        caller_id:
+                          type: string
+                        called_number:
+                          type:
+                            - string
+                            - 'null'
+                        call_sid:
+                          type:
+                            - string
+                            - 'null'
+                        session_id:
+                          type:
+                            - string
+                            - 'null'
+                        rejection_strategy:
+                          type: string
+                        torment_room_id:
+                          type:
+                            - string
+                            - 'null'
+                        torment_duration:
+                          type:
+                            - integer
+                            - 'null'
+                        source_ip:
+                          type:
+                            - string
+                            - 'null'
+                        blocked_at:
+                          type: string
+                          format: date-time
+                        inbound_blacklist:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            caller_id_pattern:
+                              type: string
+                        did_number:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            phone_number:
+                              type: string
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

@@ -1,30 +1,58 @@
 type: object
-description: Inbound Blacklist entry
+description: Inbound Blacklist entry (serialized model)
 properties:
   id:
     type: integer
   organization_id:
     type: integer
-  phone_number:
-    type: string
-    example: '+1234567890'
   match_type:
     type: string
     enum:
     - exact
     - prefix
-    - pattern
+    - wildcard
     example: exact
-  description:
+  caller_id_pattern:
+    type: string
+    example: '+1234567890'
+  is_global:
+    type: boolean
+    description: Applies to all DIDs when true; otherwise only to `did_numbers`
+  rejection_strategy:
+    type: string
+    enum:
+    - drop
+    - reject
+    - torment
+  torment_room_prefix:
     type:
     - string
     - 'null'
-    example: Spam caller
+  torment_music_timeout:
+    type:
+    - integer
+    - 'null'
   status:
     type: string
     enum:
     - active
     - inactive
+  blocked_count:
+    type: integer
+  did_numbers:
+    type: array
+    description: DIDs the entry applies to (DID-specific entries)
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        phone_number:
+          type: string
+        friendly_name:
+          type:
+          - string
+          - 'null'
   created_at:
     type: string
     format: date-time
@@ -34,6 +62,6 @@ properties:
 required:
 - id
 - organization_id
-- phone_number
+- caller_id_pattern
 - match_type
 - status

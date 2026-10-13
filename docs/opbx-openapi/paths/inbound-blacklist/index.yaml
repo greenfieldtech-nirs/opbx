@@ -4,14 +4,40 @@ paths:
       tags:
         - Inbound Blacklist
       summary: List Inbound Blacklist Entrys
-      description: Get paginated list of Inbound Blacklist Entrys
       operationId: listInboundBlacklistEntrys
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:read
+      description: Paginated list, newest first. `meta` has current_page, last_page, per_page and total.
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: rejection_strategy
+          in: query
+          schema:
+            type: string
+            enum: [drop, reject, torment]
+        - name: match_type
+          in: query
+          schema:
+            type: string
+            enum: [exact, prefix, wildcard]
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [global, did_specific]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
       responses:
         '200':
           description: List of Inbound Blacklist Entrys
@@ -37,6 +63,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:write
       requestBody:
         required: true
         content:
@@ -44,11 +72,39 @@ paths:
             schema:
               type: object
               properties:
-                name:
+                caller_id_pattern:
                   type: string
+                  maxLength: 50
+                  pattern: ^[\d\+\*\?]+$
+                  description: Digits, `+`, and the wildcards `*` and `?`
+                match_type:
+                  type: string
+                  enum: [exact, prefix, wildcard]
+                rejection_strategy:
+                  type: string
+                  enum: [drop, reject, torment]
+                is_global:
+                  type: boolean
+                did_number_ids:
+                  type:
+                    - array
+                    - 'null'
+                  description: Required when is_global is false
+                  items:
+                    type: integer
+              required: [caller_id_pattern, match_type, rejection_strategy]
       responses:
         '201':
-          description: Inbound Blacklist Entry created
+          description: Blacklist entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
@@ -70,9 +126,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:read
       responses:
         '200':
-          description: Inbound Blacklist Entry details
+          description: Blacklist entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -86,15 +151,47 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                caller_id_pattern:
+                  type: string
+                  maxLength: 50
+                  pattern: ^[\d\+\*\?]+$
+                  description: Digits, `+`, and the wildcards `*` and `?`
+                match_type:
+                  type: string
+                  enum: [exact, prefix, wildcard]
+                rejection_strategy:
+                  type: string
+                  enum: [drop, reject, torment]
+                is_global:
+                  type: boolean
+                did_number_ids:
+                  type:
+                    - array
+                    - 'null'
+                  description: Required when is_global is false
+                  items:
+                    type: integer
       responses:
         '200':
-          description: Inbound Blacklist Entry updated
+          description: Blacklist entry updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -109,15 +206,47 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                caller_id_pattern:
+                  type: string
+                  maxLength: 50
+                  pattern: ^[\d\+\*\?]+$
+                  description: Digits, `+`, and the wildcards `*` and `?`
+                match_type:
+                  type: string
+                  enum: [exact, prefix, wildcard]
+                rejection_strategy:
+                  type: string
+                  enum: [drop, reject, torment]
+                is_global:
+                  type: boolean
+                did_number_ids:
+                  type:
+                    - array
+                    - 'null'
+                  description: Required when is_global is false
+                  items:
+                    type: integer
       responses:
         '200':
-          description: Inbound Blacklist Entry updated
+          description: Blacklist entry updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -133,9 +262,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:write
       responses:
-        '204':
-          description: Inbound Blacklist Entry deleted
+        '200':
+          description: Blacklist entry deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
