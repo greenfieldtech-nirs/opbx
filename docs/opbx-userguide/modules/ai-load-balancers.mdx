@@ -50,9 +50,9 @@ Use a load balancer to:
 
 On save, the load balancer is stored as **Active** and becomes available as a destination everywhere AI load balancers are accepted. A new load balancer must have a real fallback: the create dialog does not offer **Disconnect**.
 
-{/* SCREENSHOT: ai-load-balancers-list — AI Load Balancers list with "Front Desk AI Pool": strategy Round Robin, members 2 / 2 active, fallback hangup, status Active, and the strategy, status and Unprovisioned filters */}
+![AI Load Balancers list with Front Desk AI Pool: strategy Round Robin, members 2 / 2 active, fallback hangup, status Active, and the strategy, status and Unprovisioned filters](../img/screens/ai-load-balancers-list.jpg)
 
-{/* SCREENSHOT: ai-load-balancers-edit-dialog — Edit AI Load Balancer dialog for Front Desk AI Pool with the Round Robin strategy, the members Aria and Max, Follow Through off and the Fallback Action set to Hangup */}
+![Edit AI Load Balancer dialog for Front Desk AI Pool with the Round Robin strategy, the members Aria and Max, Follow Through off and the Fallback Action set to Hang Up](../img/screens/ai-load-balancers-edit-dialog.jpg)
 
 ## Fields
 
@@ -77,7 +77,7 @@ On save, the load balancer is stored as **Active** and becomes available as a de
 
 Only members whose assistant is **active** take part. An assistant you deactivate later is skipped automatically.
 
-{/* SCREENSHOT: ai-load-balancers-percentage-weights — Edit AI Load Balancer dialog with Percentage Based selected, Aria at 50 % and Max at 50 %, and "Total Distribution: 100%" */}
+![Edit AI Load Balancer dialog with Percentage Based selected, Aria at 50% and Max at 50%, and Total Distribution: 100%](../img/screens/ai-load-balancers-percentage-weights.jpg)
 
 ### Follow Through
 
@@ -124,7 +124,7 @@ Click the **Active** or **Disabled** badge in the **Status** column. An inactive
 
 If anything still points at the load balancer, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, business-hours actions, ring-group and call-queue fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. Change those, then delete again. Call history never blocks a delete.
 
-{/* SCREENSHOT: ai-load-balancers-delete-confirm — Delete AI Load Balancer confirmation for "Front Desk AI Pool" */}
+![Delete AI Load Balancer confirmation for Front Desk AI Pool](../img/screens/ai-load-balancers-delete-confirm.jpg)
 
 ## Where a load balancer can be used
 
