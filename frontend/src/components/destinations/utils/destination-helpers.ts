@@ -147,11 +147,17 @@ export function transformBusinessHoursToOptions(
   }));
 }
 
+/** The /ai-assistants endpoint returns assistants without an extension number; only prefix "Ext N" when present. */
+function formatAiAssistantLabel(ext: { extension_number?: string; ai_assistant?: { name: string }; name?: string }): string {
+  const name = ext.ai_assistant?.name || ext.name || 'AI Assistant';
+  return ext.extension_number ? `Ext ${ext.extension_number} - ${name}` : name;
+}
+
 export function transformAiAssistantsToOptions(
   aiAssistants: Array<{
     id: string | number;
     ai_assistant_id?: string | number;
-    extension_number: string;
+    extension_number?: string;
     type?: string;
     ai_assistant?: { name: string };
     label?: string;
@@ -164,7 +170,7 @@ export function transformAiAssistantsToOptions(
       // Use ai_assistant_id if available, otherwise fall back to id
       id: String(ext.ai_assistant_id || ext.id),
       type: 'ai_assistant' as const,
-      label: ext.label || `Ext ${ext.extension_number} - ${ext.ai_assistant?.name || ext.name || 'AI Assistant'}`,
+      label: ext.label || formatAiAssistantLabel(ext),
       badge: getBadgeConfig('ai_assistant'),
       metadata: {
         extensionNumber: ext.extension_number,
