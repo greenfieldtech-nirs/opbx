@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
@@ -150,6 +151,7 @@ export default function Announcements() {
   });
 
   const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null);
+  const { showIfInUse, inUseDialog } = useResourceInUse();
 
   // Delete announcement mutation
   const deleteAnnouncementMutation = useMutation({
@@ -159,6 +161,8 @@ export default function Announcements() {
       toast.success('Announcement deleted successfully');
     },
     onError: (error: any) => {
+      setAnnouncementToDelete(null);
+      if (showIfInUse(error)) return;
       toast.error('Failed to delete announcement: ' + error.message);
     },
   });
@@ -553,6 +557,7 @@ export default function Announcements() {
           )}
         </DialogContent>
       </Dialog>
+      {inUseDialog}
     </div>
   );
 }
