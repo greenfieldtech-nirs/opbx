@@ -562,6 +562,7 @@ class DialerWorkerApiTest extends TestCase
         [$campaign] = $this->createCampaignWithDestinations([
             'status' => CampaignStatus::ACTIVE,
             'max_dial_attempts' => 3,
+            'retry_on_busy_no_answer' => true,
         ], 1, [
             'status' => DestinationStatus::DIALING,
             'dial_attempts' => 1,

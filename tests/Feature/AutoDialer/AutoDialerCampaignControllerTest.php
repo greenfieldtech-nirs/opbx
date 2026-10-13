@@ -358,6 +358,21 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertEquals('New Name', $campaign->name);
     }
 
+    public function test_update_sets_retry_settings_and_validates_delay(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        $url = '/api/v1/auto-dialer-campaigns/'.$campaign->id;
+
+        $this->actingAs($this->user)
+            ->putJson($url, ['retry_on_busy_no_answer' => true, 'retry_delay_minutes' => 30])
+            ->assertOk()
+            ->assertJsonPath('data.retry_on_busy_no_answer', true)
+            ->assertJsonPath('data.retry_delay_minutes', 30);
+
+        $this->actingAs($this->user)->putJson($url, ['retry_delay_minutes' => 0])->assertStatus(422);
+        $this->actingAs($this->user)->putJson($url, ['retry_delay_minutes' => 1441])->assertStatus(422);
+    }
+
     public function test_update_allows_enabled_day_with_empty_time_ranges(): void
     {
         $campaign = AutoDialerCampaign::factory()->create([

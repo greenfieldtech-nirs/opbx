@@ -27,6 +27,7 @@ use App\Models\DidNumber;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
+use App\Services\AutoDialer\DialerWorkerCampaignService;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
 use App\Services\CallQueue\ExtensionPresenceTracker;
 use App\Services\CallQueue\QueueCallLifecycleService;
@@ -1054,8 +1055,14 @@ class CloudonixWebhookController extends Controller
                         'next_retry_at' => $nextRetry,
                     ]);
                 } else {
+                    $outcome = app(DialerWorkerCampaignService::class)->decideOutcome(
+                        $campaign ?? new AutoDialerCampaign,
+                        (int) $destination->dial_attempts,
+                        $request->input('disposition')
+                    );
                     $destination->update([
-                        'status' => $this->mapDispositionToStatus($request->input('disposition')),
+                        'status' => $outcome['status'],
+                        'next_retry_at' => $outcome['next_retry_at'],
                         'last_disposition' => $request->input('disposition'),
                         'duration' => $request->input('duration', 0),
                         'billsec' => $request->input('billsec', 0),
@@ -1191,23 +1198,5 @@ class CloudonixWebhookController extends Controller
                 billsec: (int) $request->input('billsec', 0)
             );
         });
-    }
-
-    /**
-     * Map CDR disposition to destination status.
-     */
-    private function mapDispositionToStatus(?string $disposition): string
-    {
-        $dispositionMap = [
-            'answered' => 'completed',
-            'completed' => 'completed',
-            'busy' => 'failed',
-            'no-answer' => 'failed',
-            'failed' => 'failed',
-            'cancelled' => 'failed',
-            'congestion' => 'failed',
-        ];
-
-        return $dispositionMap[strtolower($disposition ?? '')] ?? 'completed';
     }
 }

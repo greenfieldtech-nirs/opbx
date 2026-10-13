@@ -47,6 +47,7 @@ class DialerWorkerDispositionTest extends TestCase
             'organization_id' => $this->organization->id,
             'status' => CampaignStatus::ACTIVE,
             'max_dial_attempts' => 3,
+            'retry_on_busy_no_answer' => true,
             'pending_calls' => 1,
         ]);
 

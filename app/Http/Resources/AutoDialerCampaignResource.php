@@ -61,6 +61,8 @@ class AutoDialerCampaignResource extends JsonResource
             'action_human' => $this->action_human,
             'action_unknown' => $this->action_unknown,
             'retry_on_voicemail' => $this->retry_on_voicemail,
+            'retry_on_busy_no_answer' => $this->retry_on_busy_no_answer,
+            'retry_delay_minutes' => $this->retry_delay_minutes,
 
             // Statistics
             'statistics' => [

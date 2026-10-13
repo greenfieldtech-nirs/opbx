@@ -110,14 +110,6 @@ const (
 	DestinationStatusFailed    DestinationStatus = "failed"
 )
 
-// RetryableDispositions are dispositions that should trigger a retry
-// Per Laravel: busy, no-answer, cancelled
-var RetryableDispositions = map[string]bool{
-	"busy":      true,
-	"no-answer": true,
-	"cancelled": true,
-}
-
 // InitiateCallRequest represents a request to initiate a call (matches Laravel expectations)
 type InitiateCallRequest struct {
 	CampaignID    int64    `json:"campaign_id"`

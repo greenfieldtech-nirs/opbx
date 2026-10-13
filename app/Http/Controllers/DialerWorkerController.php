@@ -310,7 +310,7 @@ class DialerWorkerController extends Controller
             'message' => 'Call status updated',
             'data' => [
                 'session_id' => $sessionModel->id,
-                'destination_status' => $this->getDestinationStatusFromDisposition($validated['disposition'] ?? null)->value,
+                'destination_status' => ($validated['disposition'] ?? null) === null ? DestinationStatus::PENDING->value : $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $validated['disposition'])['status']->value,
             ],
         ]);
     }
@@ -367,7 +367,7 @@ class DialerWorkerController extends Controller
                 'session_id' => $sessionModel->id,
                 'disposition' => $validated['disposition'],
                 'destination_status' => $destinationStatus->value,
-                'will_retry' => $validated['should_retry'] && isset($validated['next_retry_at']),
+                'will_retry' => $destinationStatus === DestinationStatus::PENDING,
             ],
         ]);
     }
@@ -559,20 +559,15 @@ class DialerWorkerController extends Controller
             'billsec' => $billsec,
         ];
 
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            $destinationData['status'] = DestinationStatus::COMPLETED;
+        $outcome = $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destinationData['status'] = $outcome['status'];
+
+        if ($outcome['status'] === DestinationStatus::COMPLETED) {
             $this->campaignService->incrementCompletedCalls($campaign);
-        } elseif ($this->campaignService->isFailedDisposition($disposition)) {
-            if ($this->campaignService->isRetryableDisposition($disposition) &&
-                ! $this->destinationService->hasReachedMaxAttempts($destination, $campaign->max_dial_attempts)) {
-                $destinationData['next_retry_at'] = $this->campaignService->calculateNextRetry($destination->dial_attempts);
-                $destinationData['status'] = DestinationStatus::PENDING;
-            } else {
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $this->campaignService->incrementFailedCalls($campaign);
-            }
+        } elseif ($outcome['status'] === DestinationStatus::PENDING) {
+            $destinationData['next_retry_at'] = $outcome['next_retry_at']->toIso8601String();
         } else {
-            $destinationData['status'] = $destination->status;
+            $this->campaignService->incrementFailedCalls($campaign);
         }
 
         $this->destinationService->updateDisposition($destination, $destinationData);
@@ -589,31 +584,31 @@ class DialerWorkerController extends Controller
     private function processDisposition($session, $campaign, $destination, array $validated): DestinationStatus
     {
         $disposition = $validated['disposition'];
-        $shouldRetry = $validated['should_retry'];
-        $nextRetryAt = $validated['next_retry_at'] ?? null;
 
-        // Determine destination status first
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            $this->destinationService->markAsCompleted($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+        // The server decides; the worker's should_retry / next_retry_at hints are ignored.
+        $outcome = $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destStatus = $outcome['status'];
+        $duration = $validated['duration'] ?? 0;
+        $billsec = $validated['billsec'] ?? 0;
+
+        if ($destStatus === DestinationStatus::COMPLETED) {
+            $this->destinationService->markAsCompleted($destination, $disposition, $duration, $billsec);
             $this->campaignService->incrementCompletedCalls($campaign);
             $sessionStatus = 'completed';
-            $destStatus = DestinationStatus::COMPLETED;
-        } elseif ($shouldRetry && $nextRetryAt) {
-            $this->destinationService->scheduleRetry($destination, $nextRetryAt, $disposition);
+        } elseif ($destStatus === DestinationStatus::PENDING) {
+            $this->destinationService->scheduleRetry($destination, $outcome['next_retry_at']->toIso8601String(), $disposition);
             $sessionStatus = 'failed';
-            $destStatus = DestinationStatus::PENDING;
 
             Log::info('DialerWorker: Destination scheduled for retry', [
                 'session_id' => $session->id,
                 'destination_id' => $destination->id,
                 'attempt_number' => $validated['attempt_number'],
-                'next_retry_at' => $nextRetryAt,
+                'next_retry_at' => $outcome['next_retry_at']->toIso8601String(),
             ]);
         } else {
-            $this->destinationService->markAsFailed($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+            $this->destinationService->markAsFailed($destination, $disposition, $duration, $billsec);
             $this->campaignService->incrementFailedCalls($campaign);
             $sessionStatus = 'failed';
-            $destStatus = DestinationStatus::FAILED;
         }
 
         // Update session
@@ -628,25 +623,5 @@ class DialerWorkerController extends Controller
         $this->campaignService->decrementPendingCalls($campaign);
 
         return $destStatus;
-    }
-
-    /**
-     * Get destination status from disposition string.
-     */
-    private function getDestinationStatusFromDisposition(?string $disposition): DestinationStatus
-    {
-        if ($disposition === null) {
-            return DestinationStatus::PENDING;
-        }
-
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            return DestinationStatus::COMPLETED;
-        }
-
-        if (in_array($disposition, ['failed', 'congestion'], true)) {
-            return DestinationStatus::FAILED;
-        }
-
-        return DestinationStatus::PENDING;
     }
 }

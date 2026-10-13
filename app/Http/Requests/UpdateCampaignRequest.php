@@ -121,6 +121,8 @@ class UpdateCampaignRequest extends FormRequest
             'action_human' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
             'action_unknown' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
             'retry_on_voicemail' => ['sometimes', 'boolean'],
+            'retry_on_busy_no_answer' => ['sometimes', 'boolean'],
+            'retry_delay_minutes' => ['sometimes', 'integer', 'min:1', 'max:1440'],
 
             'auto_start' => ['sometimes', 'boolean'],
 

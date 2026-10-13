@@ -49,6 +49,8 @@ class AutoDialerCampaignFactory extends Factory
             'action_human' => null,
             'action_unknown' => null,
             'retry_on_voicemail' => false,
+            'retry_on_busy_no_answer' => false,
+            'retry_delay_minutes' => 15,
             'voicemail_calls' => 0,
             'total_destinations' => 0,
             'completed_calls' => 0,

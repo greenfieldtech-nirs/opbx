@@ -518,6 +518,8 @@ class AutoDialerCampaignController extends Controller
             'action_human' => $data['action_human'] ?? null,
             'action_unknown' => $data['action_unknown'] ?? null,
             'retry_on_voicemail' => $data['retry_on_voicemail'] ?? false,
+            'retry_on_busy_no_answer' => $data['retry_on_busy_no_answer'] ?? false,
+            'retry_delay_minutes' => $data['retry_delay_minutes'] ?? 15,
             'days_active' => $scheduleData['days_active'],
             'schedule' => $schedule,
             'start_time' => $scheduleData['start_time'],

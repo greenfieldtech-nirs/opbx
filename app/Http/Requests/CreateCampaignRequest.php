@@ -112,6 +112,8 @@ class CreateCampaignRequest extends FormRequest
             'action_human' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
             'action_unknown' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
             'retry_on_voicemail' => ['boolean'],
+            'retry_on_busy_no_answer' => ['boolean'],
+            'retry_delay_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
 
             // Auto-start option
             'auto_start' => ['boolean'],
@@ -180,6 +182,8 @@ class CreateCampaignRequest extends FormRequest
             'action_human' => 'human action',
             'action_unknown' => 'unknown action',
             'retry_on_voicemail' => 'retry on voicemail',
+            'retry_on_busy_no_answer' => 'retry on busy / no-answer',
+            'retry_delay_minutes' => 'retry delay',
         ];
     }
 }

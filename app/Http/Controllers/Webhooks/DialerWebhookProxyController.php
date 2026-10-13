@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AutoDialerCallSession;
 use App\Scopes\OrganizationScope;
 use App\Services\AutoDialer\CDRPublisher;
+use App\Services\AutoDialer\DialerWorkerCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -307,57 +308,22 @@ class DialerWebhookProxyController extends Controller
             'last_call_id' => $session->call_id,
         ];
 
-        // Map disposition to status
-        $completedDispositions = ['answered', 'completed'];
-        $failedDispositions = ['busy', 'no-answer', 'failed', 'cancelled', 'congestion'];
+        $outcome = app(DialerWorkerCampaignService::class)
+            ->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destinationData['status'] = $outcome['status'];
 
-        if (in_array($disposition, $completedDispositions, true)) {
-            $destinationData['status'] = DestinationStatus::COMPLETED;
-        } elseif (in_array($disposition, $failedDispositions, true)) {
-            // Check if should retry
-            $retryableDispositions = ['busy', 'no-answer', 'cancelled'];
+        if ($outcome['status'] === DestinationStatus::PENDING) {
+            $destinationData['next_retry_at'] = $outcome['next_retry_at'];
 
-            if (in_array($disposition, $retryableDispositions, true) &&
-                $destination->dial_attempts < $campaign->max_dial_attempts) {
-                // Calculate next retry time (exponential backoff)
-                $nextRetry = $this->calculateNextRetry($destination->dial_attempts);
-                $destinationData['next_retry_at'] = $nextRetry;
-                $destinationData['status'] = DestinationStatus::PENDING;
-
-                Log::info('Dialer destination scheduled for retry', [
-                    'destination_id' => $destination->id,
-                    'attempts' => $destination->dial_attempts,
-                    'next_retry_at' => $nextRetry,
-                ]);
-            } else {
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $campaign->increment('failed_calls');
-            }
+            Log::info('Dialer destination scheduled for retry', [
+                'destination_id' => $destination->id,
+                'attempts' => $destination->dial_attempts,
+                'next_retry_at' => $outcome['next_retry_at'],
+            ]);
+        } elseif ($outcome['status'] === DestinationStatus::FAILED) {
+            $campaign->increment('failed_calls');
         }
 
         $destination->update($destinationData);
-    }
-
-    /**
-     * Calculate next retry time using exponential backoff.
-     *
-     * Schedule:
-     * - Attempt 1: 5 minutes
-     * - Attempt 2: 10 minutes
-     * - Attempt 3: 20 minutes
-     * - Attempt 4: 40 minutes
-     * - Attempt 5+: 60 minutes (cap)
-     */
-    private function calculateNextRetry(int $attemptNumber): string
-    {
-        $baseDelay = 5; // 5 minutes
-        $delay = $baseDelay * (2 ** ($attemptNumber - 1));
-
-        // Cap at 60 minutes
-        if ($delay > 60) {
-            $delay = 60;
-        }
-
-        return now()->addMinutes($delay)->toIso8601String();
     }
 }
