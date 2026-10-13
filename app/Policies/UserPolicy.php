@@ -180,7 +180,7 @@ class UserPolicy
     /**
      * Determine if the user can delete another user.
      *
-     * - Owner and PBX Admin can delete users
+     * - Owner and PBX Admin can delete users; only an Owner can delete an Owner
      * - Users cannot delete themselves (prevents lockout)
      * - Controller handles "last owner" business logic
      *
@@ -202,6 +202,11 @@ class UserPolicy
 
         // Users cannot delete themselves
         if ($authUser->id === $targetUser->id) {
+            return false;
+        }
+
+        // Only an Owner may delete an Owner (the controller keeps the last-Owner protection)
+        if ($targetUser->role->isOwner() && ! $authUser->role->isOwner()) {
             return false;
         }
 

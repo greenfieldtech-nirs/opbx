@@ -58,6 +58,8 @@ export interface StandardDataTableProps<T> {
     canView?: boolean;
     canEdit?: boolean;
     canDelete?: boolean;
+    /** Per-row override: return false to hide Delete for a specific row. */
+    canDeleteItem?: (item: T) => boolean;
     // Empty state
     emptyState?: ReactNode;
 }
@@ -83,6 +85,7 @@ export function StandardDataTable<T extends { id: string | number }>({
     canView = true,
     canEdit = true,
     canDelete = true,
+    canDeleteItem,
     emptyState
 }: StandardDataTableProps<T>) {
 
@@ -232,7 +235,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                             <TooltipContent>Edit</TooltipContent>
                                         </Tooltip>
                                     )}
-                                    {canDelete && (
+                                    {canDelete && (canDeleteItem?.(item) ?? true) && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button

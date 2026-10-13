@@ -160,4 +160,16 @@ class UserPrivilegeEscalationTest extends TestCase
         $this->assertContains($response->status(), [403, 409]);
         $this->assertNotNull($this->owner->fresh());
     }
+
+    public function test_only_an_owner_can_delete_an_owner(): void
+    {
+        $admin = $this->makeUser(UserRole::PBX_ADMIN);
+        $secondOwner = $this->makeUser(UserRole::OWNER);
+
+        $this->actingAs($admin, 'sanctum')->deleteJson("/api/v1/users/{$secondOwner->id}")->assertForbidden();
+        $this->assertNotNull($secondOwner->fresh());
+
+        $this->actingAs($this->owner, 'sanctum')->deleteJson("/api/v1/users/{$secondOwner->id}")->assertSuccessful();
+        $this->assertNull(User::find($secondOwner->id));
+    }
 }

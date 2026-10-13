@@ -644,6 +644,7 @@ function UsersComplete() {
             onSort={handleSort}
             canView={false}
             canEdit={false}
+            canDeleteItem={(u) => u.role !== 'owner' || user?.role === 'owner'}
             onDelete={isReadOnly ? undefined : (user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);

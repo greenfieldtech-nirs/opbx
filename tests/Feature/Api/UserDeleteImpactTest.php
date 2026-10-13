@@ -162,11 +162,16 @@ final class UserDeleteImpactTest extends TestCase
     public function test_failed_delete_rolls_back_every_change(): void
     {
         $r = $this->wire();
-        // The last-owner guard fails the delete after the impact ran: everything must roll back.
-        $this->victim->update(['role' => UserRole::OWNER]);
-        $this->admin->update(['role' => UserRole::PBX_ADMIN]);
+        // The delete fails after the impact ran: everything must roll back.
+        User::deleting(function (): never {
+            throw new \RuntimeException('simulated failure');
+        });
+        $this->withoutExceptionHandling([\RuntimeException::class]);
 
-        $this->deleteJson("/api/v1/users/{$this->victim->id}")->assertStatus(409);
+        try {
+            $this->deleteJson("/api/v1/users/{$this->victim->id}");
+        } catch (\RuntimeException) {
+        }
 
         $this->assertDatabaseHas('users', ['id' => $this->victim->id]);
         $this->assertSame($this->victim->id, $this->ext->fresh()->user_id);
