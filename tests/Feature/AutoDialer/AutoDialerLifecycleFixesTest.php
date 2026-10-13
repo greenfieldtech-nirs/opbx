@@ -8,6 +8,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Enums\UserRole;
+use App\Models\AiAssistant;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
@@ -114,5 +115,20 @@ final class AutoDialerLifecycleFixesTest extends TestCase
         $this->assertNull($fresh->action_human);
         $this->assertNull($fresh->action_unknown);
         $this->assertFalse($fresh->retry_on_voicemail);
+    }
+
+    public function test_routing_destination_must_belong_to_the_organisation_on_update(): void
+    {
+        $campaign = $this->draftCampaign();
+        $foreign = AiAssistant::factory()->create(['organization_id' => Organization::factory()->create()->id]);
+        $own = AiAssistant::factory()->create(['organization_id' => $this->org->id]);
+
+        $this->actingAs($this->user)->putJson("/api/v1/auto-dialer-campaigns/{$campaign->id}", [
+            'routing_destination_type' => 'ai_assistant', 'routing_destination_id' => $foreign->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('routing_destination_id');
+
+        $this->actingAs($this->user)->putJson("/api/v1/auto-dialer-campaigns/{$campaign->id}", [
+            'routing_destination_type' => 'ai_assistant', 'routing_destination_id' => $own->id,
+        ])->assertOk();
     }
 }
