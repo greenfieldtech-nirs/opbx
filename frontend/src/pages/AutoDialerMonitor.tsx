@@ -5,6 +5,7 @@
  * Features bird's-eye view with global summaries and drill-down campaign details.
  */
 
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -748,7 +749,9 @@ export default function AutoDialerMonitor() {
           </div>
         </div>
 
-        {isLoadingDetail || !detail ? (
+        {detailQuery.isError && !detail ? (
+          <QueryErrorState title="Failed to load campaign" error={detailQuery.error} onRetry={() => detailQuery.refetch()} />
+        ) : isLoadingDetail || !detail ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
