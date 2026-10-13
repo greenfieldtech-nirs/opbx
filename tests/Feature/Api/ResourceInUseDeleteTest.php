@@ -195,4 +195,21 @@ final class ResourceInUseDeleteTest extends TestCase
 
         $this->deleteJson("/api/v1/ring-groups/{$group->id}")->assertNoContent();
     }
+
+    public function test_extension_types_routing_to_a_resource_block_its_delete(): void
+    {
+        $queue = CallQueue::factory()->create($this->o());
+        $queueExt = Extension::factory()->create($this->o() + ['type' => ExtensionType::QUEUE, 'configuration' => ['call_queue_id' => $queue->id]]);
+        $this->assertBlocked("/api/v1/call-queues/{$queue->id}", 'extension', $queueExt->id, (string) $queueExt->extension_number);
+        $queueExt->delete();
+        $this->deleteJson("/api/v1/call-queues/{$queue->id}")->assertNoContent();
+
+        $menu = IvrMenu::factory()->create($this->o());
+        $ivrExt = Extension::factory()->create($this->o() + ['type' => ExtensionType::IVR, 'configuration' => ['ivr_id' => $menu->id]]);
+        $this->assertBlocked("/api/v1/ivr-menus/{$menu->id}", 'extension', $ivrExt->id, (string) $ivrExt->extension_number);
+
+        $group = RingGroup::factory()->create($this->o());
+        $rgExt = Extension::factory()->create($this->o() + ['type' => ExtensionType::RING_GROUP, 'configuration' => ['ring_group_id' => $group->id]]);
+        $this->assertBlocked("/api/v1/ring-groups/{$group->id}", 'extension', $rgExt->id, (string) $rgExt->extension_number);
+    }
 }

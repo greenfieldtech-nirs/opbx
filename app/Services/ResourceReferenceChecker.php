@@ -105,6 +105,7 @@ class ResourceReferenceChecker
             ...$this->polymorphicReferences($type, $resourceId, $organizationId),
             ...$this->jsonReferences($type, $resourceId, $organizationId),
             ...$this->businessHoursReferences($type, $resourceId, $organizationId),
+            ...$this->extensionTypeReferences($type, $resourceId, $organizationId),
         ];
 
         // A resource pointing at itself (e.g. a ring group falling back to itself) must not block its own delete.
@@ -161,6 +162,36 @@ class ResourceReferenceChecker
         }
 
         return $found;
+    }
+
+    /**
+     * Extensions whose type routes to a resource keep its id in configuration (ivr: ivr_menu_id or legacy ivr_id).
+     *
+     * @return list<array{type: string, id: int, name: string, detail: string}>
+     */
+    private function extensionTypeReferences(string $type, int $id, int $orgId): array
+    {
+        [$extType, $keys] = match ($type) {
+            'conference_room' => ['conference', ['conference_room_id']],
+            'ring_group' => ['ring_group', ['ring_group_id']],
+            'ivr_menu' => ['ivr', ['ivr_menu_id', 'ivr_id']],
+            'call_queue' => ['queue', ['call_queue_id']],
+            'ai_load_balancer' => ['ai_load_balancer', ['ai_load_balancer_id']],
+            default => [null, []],
+        };
+        if ($extType === null) {
+            return [];
+        }
+
+        $query = DB::table('extensions as t')->where('t.type', $extType)
+            ->where(function ($q) use ($keys, $id): void {
+                foreach ($keys as $key) {
+                    $q->orWhere("t.configuration->{$key}", $id);
+                }
+            });
+        $owner = $this->scopeOwner($query, null, false, $orgId);
+
+        return $this->rows($query, $owner, 'extension_number', 'extension', 'extension destination');
     }
 
     /**
