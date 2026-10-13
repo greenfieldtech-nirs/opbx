@@ -1,0 +1,37 @@
+paths:
+  /v1/call-queues/{call_queue}/toggle-status:
+    parameters:
+      - name: call_queue
+        in: path
+        required: true
+        schema:
+          type: integer
+
+    post:
+      tags:
+        - Call Queues
+      summary: Toggle call queue status
+      description: Flips the queue between `active` and `inactive`. Requires update permission on the queue.
+      operationId: toggleCallQueueStatus
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Queue status toggled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    enum: ['Call queue activated.', 'Call queue deactivated.']
+                  data:
+                    $ref: '../../components/schemas/CallQueue.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

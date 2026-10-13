@@ -1,0 +1,65 @@
+paths:
+  /v1/queues-dashboard/link:
+    get:
+      tags:
+        - Call Queues
+      summary: Get queues dashboard link
+      description: |
+        Returns the public wallboard URL for the organization's queues dashboard.
+        The token is created lazily on first call. Owner and PBX Admin only.
+        Anyone holding the URL can read the queue dashboard endpoints under
+        `/v1/public/queues-dashboard/{token}`, so treat it as a secret.
+      operationId: getQueuesDashboardLink
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        example: https://opbx.cloudonix.cloud/public/queues-dashboard/3f1c8a3e-7b2d-4c1e-9a55-2d6e0f9b1a10
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+  /v1/queues-dashboard/link/regenerate:
+    post:
+      tags:
+        - Call Queues
+      summary: Regenerate queues dashboard link
+      description: |
+        Rotates the public queues dashboard token. The previous URL stops working
+        immediately. Owner and PBX Admin only.
+      operationId: regenerateQueuesDashboardLink
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: New dashboard link (previous link is revoked)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

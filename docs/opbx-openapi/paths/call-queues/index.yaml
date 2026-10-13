@@ -122,10 +122,42 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
+    patch:
+      tags:
+        - Call Queues
+      summary: Partially update call queue
+      description: Same as `PUT /v1/call-queues/{call_queue}`. Only the fields sent are changed.
+      operationId: patchCallQueue
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/CallQueue.yaml'
+      responses:
+        '200':
+          description: Call queue updated
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
     delete:
       tags:
         - Call Queues
       summary: Delete call queue
+      description: Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, or extension). The 409 body lists the references.
       operationId: deleteCallQueue
       security:
         - bearerAuth: []
@@ -143,6 +175,8 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'
 
   /v1/call-queues/{call_queue}/agents/me/state:
     post:
