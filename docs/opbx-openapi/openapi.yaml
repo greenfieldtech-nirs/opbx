@@ -887,6 +887,8 @@ components:
       $ref: './components/schemas/Organization.yaml'
     RingGroup:
       $ref: './components/schemas/RingGroup.yaml'
+    RingGroupInput:
+      $ref: './components/schemas/RingGroupInput.yaml'
     CallQueue:
       $ref: './components/schemas/CallQueue.yaml'
     QueueCall:

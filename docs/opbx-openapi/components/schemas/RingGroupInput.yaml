@@ -1,0 +1,101 @@
+type: object
+description: Writable ring group fields (create and update requests)
+properties:
+  name:
+    type: string
+    minLength: 2
+    maxLength: 100
+    description: Unique within the organization
+    example: Sales Team
+  description:
+    type:
+    - string
+    - 'null'
+    maxLength: 1000
+  strategy:
+    type: string
+    enum:
+    - simultaneous
+    - round_robin
+    - sequential
+    example: simultaneous
+  timeout:
+    type: integer
+    minimum: 5
+    maximum: 300
+    description: Ring timeout in seconds
+    example: 30
+  ring_turns:
+    type: integer
+    minimum: 1
+    maximum: 9
+    example: 2
+  fallback_action:
+    type: string
+    enum:
+    - extension
+    - ring_group
+    - ivr_menu
+    - ai_assistant
+    - ai_load_balancer
+    - call_queue
+    - hangup
+    - unavailable
+    description: >-
+      Action when no member answers. `unavailable` is rejected on create (422) and accepted
+      on update. The matching `fallback_*_id` is required for destination actions.
+    example: hangup
+  fallback_extension_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `extension`
+  fallback_ring_group_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `ring_group`
+  fallback_ivr_menu_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `ivr_menu`
+  fallback_ai_assistant_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `ai_assistant` (an extension ID)
+  fallback_ai_load_balancer_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `ai_load_balancer`
+  fallback_call_queue_id:
+    type:
+    - integer
+    - 'null'
+    description: Required when fallback_action is `call_queue`
+  status:
+    type: string
+    enum:
+    - active
+    - inactive
+    example: active
+  members:
+    type: array
+    minItems: 1
+    maxItems: 50
+    description: Replaces the member list
+    items:
+      type: object
+      properties:
+        extension_id:
+          type: integer
+          description: Extension in the organization; distinct across members
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required:
+      - extension_id
+      - priority

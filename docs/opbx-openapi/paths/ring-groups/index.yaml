@@ -8,10 +8,45 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - strategy
+              - status
+              - created_at
+              - updated_at
+            default: created_at
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: strategy
+          in: query
+          schema:
+            type: string
+            enum:
+              - simultaneous
+              - round_robin
+              - sequential
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Free-text search
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
+      description: Supervisors see only the ring groups assigned to them.
       responses:
         '200':
           description: List of ring groups
@@ -37,29 +72,41 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: Sales Team
-                strategy:
-                  type: string
-                  enum: [simultaneous, round_robin, priority, weighted, memory]
-                  example: simultaneous
-                timeout:
-                  type: integer
-                  example: 30
-                fallback_action:
-                  type: string
-                  enum: [voicemail, extension, ring_group, ivr_menu, ai_assistant, disconnect]
+              allOf:
+                - $ref: '../../components/schemas/RingGroupInput.yaml'
+                - required:
+                    - name
+                    - strategy
+                    - timeout
+                    - ring_turns
+                    - fallback_action
+                    - status
+                    - members
       responses:
         '201':
           description: Ring group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/RingGroup.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
   /v1/ring-groups/{ring_group}:
     parameters:
@@ -77,6 +124,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:read
       responses:
         '200':
           description: Ring group details
@@ -87,6 +136,10 @@ paths:
                 properties:
                   data:
                     $ref: '../../components/schemas/RingGroup.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
 
     put:
       tags:
@@ -96,15 +149,34 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/RingGroup.yaml'
+              $ref: '../../components/schemas/RingGroupInput.yaml'
       responses:
         '200':
           description: Ring group updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/RingGroup.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
     patch:
       tags:
         - Ring Groups
@@ -113,15 +185,34 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/RingGroup.yaml'
+              $ref: '../../components/schemas/RingGroupInput.yaml'
       responses:
         '200':
           description: Ring group updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/RingGroup.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
     delete:
       tags:
@@ -132,6 +223,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ring-groups:write
       responses:
         '204':
           description: Ring group deleted

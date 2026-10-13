@@ -27,9 +27,7 @@ properties:
     enum:
     - simultaneous
     - round_robin
-    - priority
-    - weighted
-    - memory
+    - sequential
     description: Ring strategy
     example: simultaneous
   timeout:
@@ -43,15 +41,16 @@ properties:
   fallback_action:
     type: string
     enum:
-    - voicemail
     - extension
     - ring_group
     - ivr_menu
     - ai_assistant
     - ai_load_balancer
-    - disconnect
+    - call_queue
+    - hangup
+    - unavailable
     description: Action when no members answer
-    example: voicemail
+    example: hangup
   fallback_extension_id:
     type:
     - integer
@@ -77,6 +76,11 @@ properties:
     - integer
     - 'null'
     description: AI load balancer ID for fallback
+  fallback_call_queue_id:
+    type:
+    - integer
+    - 'null'
+    description: Call queue ID for fallback
   status:
     type: string
     enum:
@@ -85,7 +89,7 @@ properties:
     example: active
   members:
     type: array
-    description: Ring group members
+    description: Ring group members ordered by priority (present when loaded)
     items:
       type: object
       properties:
@@ -93,12 +97,38 @@ properties:
           type: integer
         extension_id:
           type: integer
+        extension_number:
+          type:
+          - string
+          - 'null'
+        user_name:
+          type:
+          - string
+          - 'null'
         priority:
           type: integer
-        weight:
-          type: integer
-        extension:
-          $ref: ./Extension.yaml
+  members_count:
+    type: integer
+    description: Number of members (list only)
+  active_members_count:
+    type: integer
+    description: Members whose extension is active (list only)
+  fallback_extension:
+    type: object
+    description: Fallback extension summary (present when loaded)
+    properties:
+      id:
+        type: integer
+      extension_number:
+        type: string
+  fallback_ai_load_balancer:
+    type: object
+    description: Fallback AI load balancer summary (present when loaded)
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
   created_at:
     type: string
     format: date-time
