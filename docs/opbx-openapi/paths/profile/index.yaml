@@ -67,8 +67,33 @@ paths:
                       updated_at:
                         type: string
                         format: date-time
+                      is_platform_manager:
+                        type: boolean
+                      social_identities:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            provider:
+                              type: string
+                            provider_email:
+                              type:
+                              - string
+                              - 'null'
                       organization:
-                        $ref: ../../components/schemas/Organization.yaml
+                        type: object
+                        description: Organization summary
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          slug:
+                            type: string
+                          status:
+                            type: string
+                          timezone:
+                            type: string
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
     put:

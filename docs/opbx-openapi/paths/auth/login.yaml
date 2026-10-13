@@ -29,11 +29,13 @@ paths:
                 email:
                   type: string
                   format: email
+                  maxLength: 255
                   description: User email address
                   example: admin@example.com
                 password:
                   type: string
                   format: password
+                  minLength: 8
                   description: User password
                   example: SecurePass123!
               required:

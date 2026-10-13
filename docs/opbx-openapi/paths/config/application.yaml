@@ -13,9 +13,7 @@ paths:
 
         '
       operationId: getApplicationConfig
-      security:
-      - bearerAuth: []
-      - cookieAuth: []
+      security: []
       responses:
         '200':
           description: Application configuration

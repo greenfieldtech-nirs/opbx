@@ -29,7 +29,9 @@ paths:
         - Organizations
       summary: Create organization join request
       description: |
-        Submit a request to join an organization using a social identity.
+        Submit a request to join an organization using the social identity captured
+        during Auth0 onboarding (422 `ONBOARDING_EXPIRED` when the onboarding ID is
+        unknown or already used).
         The request must be approved by an organization administrator before
         the user is created.
       operationId: createOrganizationJoinRequest
@@ -43,41 +45,17 @@ paths:
               properties:
                 organization_slug:
                   type: string
-                  description: Slug of the organization to join
+                  description: Slug of an existing organization to join
                   example: acme-corporation
-                provider:
+                onboarding_id:
                   type: string
-                  enum:
-                    - google
-                    - facebook
-                    - microsoft
-                    - github
-                    - x
-                  description: Social identity provider
-                  example: google
-                provider_subject:
-                  type: string
-                  maxLength: 255
-                  description: Provider-specific subject identifier
-                  example: '112233445566778899001'
-                email:
-                  type: string
-                  format: email
-                  maxLength: 255
-                  description: Email address of the requester
-                  example: jane.smith@example.com
-                name:
-                  type:
-                    - string
-                    - 'null'
-                  maxLength: 255
-                  description: Display name of the requester
-                  example: Jane Smith
+                  maxLength: 128
+                  description: >-
+                    Single-use onboarding ID issued by the Auth0 callback for an unknown social
+                    identity. The provider, subject, email and name come from that cached profile.
               required:
                 - organization_slug
-                - provider
-                - provider_subject
-                - email
+                - onboarding_id
       responses:
         '201':
           description: Join request created
