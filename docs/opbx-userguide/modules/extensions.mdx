@@ -73,9 +73,9 @@ What happens on save:
 - For **PBX User** extensions, OPBX generates a 32-character SIP password and creates the subscriber in Cloudonix. If the Cloudonix call fails, the extension is still saved; run **Sync Extensions** later.
 - The extension becomes available as a routing destination.
 
-{/* SCREENSHOT: extensions-list — Extensions list for Acme Corp (Demo): PBX User extensions 1001 to 1011 with 1011 (Karen Patel) inactive, the Forward extension 1012 and the AI Assistant extension 1013, with the type, status and assignment filters */}
+![Extensions list: PBX User extensions with 1011 (Karen Patel) inactive, the Forward extension 1012 and the AI Assistant extension 1013](../img/screens/extensions-list.jpg)
 
-{/* SCREENSHOT: extensions-create-dialog — Add Extension dialog with the suggested number, type PBX User, a user selected under Assignment and the Default Caller ID list showing Main Line (+12025550100) */}
+![Create Extension dialog with the suggested number 1014, type PBX User, a user under Assignment and Default Caller ID Main Line (+12025550100)](../img/screens/extensions-create-dialog.jpg)
 
 ## Fields
 
@@ -107,7 +107,7 @@ A phone number used as a default caller ID cannot be deleted until you clear it 
 
 **Status:** click the status badge in the list to switch between active and inactive. Calls to an inactive extension are not connected, and an inactive extension is skipped as a ring-group member.
 
-{/* SCREENSHOT: extensions-edit-dialog — Edit Extension dialog for the Forward extension 1012, with the read-only number, Extension Type Forward and the forward-to number +12025550180 */}
+![Edit Extension dialog for the Forward extension 1012 with the read-only number and the forward-to number +12025550180](../img/screens/extensions-edit-dialog.jpg)
 
 ## SIP passwords
 
@@ -144,7 +144,7 @@ The delete is refused while routing still points at the extension. The **Cannot 
 
 Change those first, then delete again. Call history never blocks a delete. A PBX User extension's Cloudonix subscriber is removed with it.
 
-{/* SCREENSHOT: extensions-in-use-dialog — "Cannot delete: still in use" dialog for extension 1012, listing the Support Team fallback, the Billing Queue fallback, the After Hours Menu option and the Support Desk Hours closed-hours action */}
+![Cannot delete: still in use dialog for extension 1012 listing the Support Team, Billing Queue, After Hours Menu and Support Desk Hours references](../img/screens/extensions-in-use-dialog.jpg)
 
 ### When a user is deleted
 
