@@ -114,13 +114,19 @@ Each action offers **Hang up** or **Continue to destination**. When you turn det
 | Auto-start | Disabled by default | Lets the scheduler start a Draft campaign on schedule (see [Auto-start](/applications/auto-dialer/scheduling#auto-start)) |
 | Time Limit (sec) | 30 to 14400. Default: 3600 | Maximum length of one call |
 | Dial Timeout (sec) | 1 to 300. Default: 60 | How long the callee's phone rings before the attempt is given up |
-| Connect When | Call Connected (default) or Immediately | Stored with the campaign. The current dialer does not use it (see the note below) |
+| Connect When | Call Connected (default) or Immediately | Sent to Cloudonix as `execute`. **Call Connected** starts the call flow (routing, AMD) when the callee answers; **Immediately** starts it while the callee's phone is still ringing |
 | Concurrent Active Calls (CAC) | 1 to 50. Default: 1 | Most calls in progress at once |
 | Calls Per Second (CPS) | 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25 or 30. Default: 1 | How fast new calls are started |
 | Max Dial Attempts | 1 to 5. Default: 1 | Most attempts per number, including retries |
+| Retry on busy / no-answer | Off by default | Redials a number whose call ended busy or unanswered, within Max Dial Attempts. Cancelled, failed and congested calls are never retried |
+| Retry delay (minutes) | 1 to 1440. Default: 15. Shown when the retry switch is on | How long to wait before redialing a busy or unanswered number |
 | Record Calls | Off by default | Asks Cloudonix to record each call |
 
 See [Rate Limiting](/applications/auto-dialer/rate-limiting) for CAC, CPS and attempts.
+
+:::note Connect When and detection
+Cloudonix turns its own machine detection off when a call is not started with **Call Connected**. If you use [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection), keep **Call Connected**.
+:::
 
 ![Advanced tab with CAC 3, CPS 1 call/sec, Max Dial Attempts 3 and Record Calls off](../../img/screens/auto-dialer-campaign-create-advanced.jpg)
 

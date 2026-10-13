@@ -68,11 +68,10 @@ Each call to a number counts as one attempt. A number is dialed again only while
 | Cloudonix refuses to place the call | The number goes back to pending and is retried after 1 minute, then 2 minutes. After **3 consecutive** refusals it is marked **Failed** |
 | Voicemail detected and **Retry on Voicemail** is on | The number goes back to pending with a delay of 5, 10, 20, 40, then 60 minutes (doubling, capped at 60), while attempts remain. See [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
 | The call was answered | The number is **Completed** |
-| Busy, no answer, failed, cancelled or congestion | See the caution below |
+| Busy or no answer | With **Retry on busy / no-answer** on and attempts left, the number goes back to pending after the campaign's **Retry delay** (a fixed number of minutes, default 15). Otherwise it is **Failed** |
+| Failed, cancelled, congestion or a result OPBX does not recognise | The number is **Failed**. These are never retried |
 
-:::caution Busy and no-answer retries
-OPBX contains a retry schedule for busy, no-answer and cancelled calls (5, 10, 20, 40, then 60 minutes, while attempts remain). However, the final outcome of a call is taken from the Cloudonix CDR, and that path currently marks busy, no-answer, failed, cancelled and congestion numbers as **Failed** without scheduling a retry, and treats a disposition it does not recognise as completed. Until this is resolved, do not rely on automatic retry of busy or unanswered numbers. To call them again, select them on the list's detail page and use **Reset Dial Attempts**, or copy the list.
-:::
+To call failed numbers again, select them on the list's detail page and use **Reset Dial Attempts**, or copy the list.
 
 On a retry, the dialer prefers a caller ID from the pool that has not been tried for that number yet.
 

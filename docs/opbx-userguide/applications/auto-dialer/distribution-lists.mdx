@@ -28,7 +28,7 @@ Use **Distribution Lists** to:
 
 Open **Auto Dialer → Distribution Lists**. Each row shows the name, status, version, number of destinations, the assigned campaign (or an **Assign Campaign** button) and the creation date. Only the latest version of each list is shown.
 
-- **Search** filters by name. The **status filter** defaults to All (except Archived).
+- **Search** filters by name. The **status filter** defaults to All (except Archived); **All Statuses** also lists archived lists, and **Archived** shows only those.
 - **Example CSV** downloads a sample file.
 - **Create List** opens the create dialog.
 - The row menu offers **View Details**, **Upload Destinations**, **Copy List**, **View Errors**, **Delete** and **Archive**, each only when the list's status allows it (see [List statuses](#list-statuses)).
@@ -84,7 +84,7 @@ A list holds at most **100,000** numbers. A file with more rows is split automat
 | Ready | Has valid numbers, not assigned | Replaces (see below) | Yes | Yes | Yes |
 | Failed | No valid number, or processing failed | Yes (adds) | No | No | Delete instead |
 | In Use | Assigned to a campaign | No | No | Yes | No |
-| Used | The campaign finished with it | Replaces | No | Yes | Yes |
+| Used | The campaign finished with it | Replaces | No | Yes | Only after you unassign it |
 | Archived | Kept for history | No | No | Yes | No |
 
 ### Replacing the numbers of a Ready or Used list
@@ -107,7 +107,7 @@ Click the unassign icon next to the campaign name on the list row. This works on
 
 ## The list detail page
 
-Click a list name. The header has **Refresh**, **Upload**, **Copy**, **Download**, **Archive** and (for Failed lists) **Delete**, each shown when allowed. Cards show the total and valid or invalid numbers, the connection rate, the average call duration and the total dial attempts. When the list is assigned, a card shows the campaign and the assignment date.
+Click a list name. The header has **Refresh**, **Upload**, **Copy**, **Download**, **Archive** and **Delete**. **Delete** is shown only when the list is not assigned to a campaign; for an assigned list **Archive** is disabled and explains that you must unassign first. Cards show the total and valid or invalid numbers, the connection rate, the average call duration and the total dial attempts. When the list is assigned, a card shows the campaign and the assignment date.
 
 Tabs:
 
@@ -122,8 +122,6 @@ On the Destinations tab:
 
 - **Reset Dial Attempts** (per row, or for the selected rows) sets the number back to pending with zero attempts and clears its last result, so it is dialed again.
 - **Reset Pending Entries** sets every number that is still pending back to zero attempts and clears its retry time.
-
-The **Retry** and per-row **Delete** buttons are not implemented yet; they only show "coming soon".
 
 ![Detail page of Fall Webinar Leads: 20 pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
 
@@ -140,7 +138,7 @@ The copy is a new, unassigned **Ready** list with the same numbers, names, batch
 
 ## Archive a list
 
-Choose **Archive** and confirm. Allowed for **Ready** and **Used** lists. An archived list is hidden by the default filter and can still be copied.
+Choose **Archive** and confirm. Allowed for **Ready** and **Used** lists that are **not assigned to a campaign**. Archiving an assigned list is refused with a message naming the campaign; unassign the list first. An archived list is hidden by the default filter (choose **Archived** or **All Statuses** to see it) and can still be copied.
 
 ## Delete a list
 
@@ -151,7 +149,7 @@ Choose **Delete** and confirm with **Permanently Delete**. The list and all its 
 | Owner | Any list that is not assigned to a campaign |
 | PBX Admin | **Failed** lists only |
 
-A list that is assigned to a campaign cannot be deleted: a dialog names the campaign. Unassign the list first, then delete it.
+**Delete** is offered only for lists that are not assigned to a campaign. If the server is asked to delete an assigned list anyway, it refuses and names the campaign. Unassign the list first, then delete it.
 
 A PBX Admin may see **Delete** on other lists in the row menu, but the server refuses it. Use **Archive** for lists that were dialed.
 

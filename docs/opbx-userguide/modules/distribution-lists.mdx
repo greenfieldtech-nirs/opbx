@@ -72,11 +72,11 @@ Assigning a list to a **Draft** campaign also makes that campaign **Active**. Se
 | Create, upload, copy, download | Yes | Yes | No | No | No |
 | Assign and unassign | Yes | Yes | No | No | No |
 | Reset dial attempts | Yes | Yes | No | No | No |
-| Archive (Ready or Used) | Yes | Yes | No | No | No |
+| Archive (Ready or Used, not assigned to a campaign) | Yes | Yes | No | No | No |
 | Delete a Failed list | Yes | Yes | No | No | No |
 | Delete any other list | Yes | No | No | No | No |
 
-Deleting removes the list and all its numbers and asks for confirmation first. A list that is assigned to a campaign cannot be deleted: the delete is refused and a dialog names the campaign. Unassign the list first.
+Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list and all its numbers and asks for confirmation first. A list that is assigned to a campaign cannot be deleted: the delete is refused and a dialog names the campaign. Unassign the list first.
 
 ## Key data fields
 
