@@ -7,11 +7,16 @@ namespace Database\Factories;
 use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Enums\RingGroupFallbackAction;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\Organization;
+use App\Models\RingGroup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AiAssistantLoadBalancer>
+ * @extends Factory<AiAssistantLoadBalancer>
  */
 class AiAssistantLoadBalancerFactory extends Factory
 {
@@ -33,6 +38,8 @@ class AiAssistantLoadBalancerFactory extends Factory
             'fallback_ring_group_id' => null,
             'fallback_ivr_menu_id' => null,
             'fallback_ai_assistant_id' => null,
+            'fallback_call_queue_id' => null,
+            'fallback_ai_load_balancer_id' => null,
             'created_by' => null,
             'updated_by' => null,
         ];
@@ -81,44 +88,44 @@ class AiAssistantLoadBalancerFactory extends Factory
     /**
      * Set fallback action to extension.
      */
-    public function withFallbackExtension(?\App\Models\Extension $extension = null): static
+    public function withFallbackExtension(?Extension $extension = null): static
     {
         return $this->state(fn (array $attributes) => [
             'fallback_action' => RingGroupFallbackAction::EXTENSION,
-            'fallback_extension_id' => $extension?->id ?? \App\Models\Extension::factory(),
+            'fallback_extension_id' => $extension?->id ?? Extension::factory(),
         ]);
     }
 
     /**
      * Set fallback action to ring group.
      */
-    public function withFallbackRingGroup(?\App\Models\RingGroup $ringGroup = null): static
+    public function withFallbackRingGroup(?RingGroup $ringGroup = null): static
     {
         return $this->state(fn (array $attributes) => [
             'fallback_action' => RingGroupFallbackAction::RING_GROUP,
-            'fallback_ring_group_id' => $ringGroup?->id ?? \App\Models\RingGroup::factory(),
+            'fallback_ring_group_id' => $ringGroup?->id ?? RingGroup::factory(),
         ]);
     }
 
     /**
      * Set fallback action to IVR menu.
      */
-    public function withFallbackIvrMenu(?\App\Models\IvrMenu $ivrMenu = null): static
+    public function withFallbackIvrMenu(?IvrMenu $ivrMenu = null): static
     {
         return $this->state(fn (array $attributes) => [
             'fallback_action' => RingGroupFallbackAction::IVR_MENU,
-            'fallback_ivr_menu_id' => $ivrMenu?->id ?? \App\Models\IvrMenu::factory(),
+            'fallback_ivr_menu_id' => $ivrMenu?->id ?? IvrMenu::factory(),
         ]);
     }
 
     /**
      * Set fallback action to AI assistant.
      */
-    public function withFallbackAiAssistant(?\App\Models\AiAssistant $aiAssistant = null): static
+    public function withFallbackAiAssistant(?AiAssistant $aiAssistant = null): static
     {
         return $this->state(fn (array $attributes) => [
             'fallback_action' => RingGroupFallbackAction::AI_ASSISTANT,
-            'fallback_ai_assistant_id' => $aiAssistant?->id ?? \App\Models\AiAssistant::factory(),
+            'fallback_ai_assistant_id' => $aiAssistant?->id ?? AiAssistant::factory(),
         ]);
     }
 }

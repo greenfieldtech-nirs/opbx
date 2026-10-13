@@ -22,6 +22,7 @@ use App\Services\AutoDialer\MetadataHelper;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\AlbsDistributionService;
+use App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -458,6 +459,8 @@ class AlbsFollowThroughController extends Controller
             RingGroupFallbackAction::RING_GROUP => $this->routeToRingGroup($albs, $request),
             RingGroupFallbackAction::IVR_MENU => $this->routeToIvrMenu($albs, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->routeToAiAssistant($albs, $request, $metadata),
+            RingGroupFallbackAction::CALL_QUEUE => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackCallQueue($albs, $request),
+            RingGroupFallbackAction::AI_LOAD_BALANCER => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackAiLoadBalancer($albs, $request),
             default => $this->hangupResponse(),
         };
     }

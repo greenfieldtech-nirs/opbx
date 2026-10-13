@@ -10,6 +10,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
@@ -342,6 +343,8 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::RING_GROUP => $this->handleFallbackRingGroup($aiLoadBalancer, $request),
             RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($aiLoadBalancer, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($aiLoadBalancer, $request),
+            RingGroupFallbackAction::CALL_QUEUE => $this->handleFallbackCallQueue($aiLoadBalancer, $request),
+            RingGroupFallbackAction::AI_LOAD_BALANCER => $this->handleFallbackAiLoadBalancer($aiLoadBalancer, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($aiLoadBalancer),
             RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->handleFallbackHangup($aiLoadBalancer),
@@ -513,6 +516,67 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         ]);
 
         return $this->routeToAiAssistant($fallbackAiAssistant, $aiLoadBalancer, $request);
+    }
+
+    /** Public: the follow-through controller reuses it. */
+    public function handleFallbackCallQueue(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    {
+        $callQueue = $aiLoadBalancer->fallback_call_queue_id
+            ? CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $aiLoadBalancer->fallback_call_queue_id)
+                ->where('organization_id', $aiLoadBalancer->organization_id)
+                ->first()
+            : null;
+
+        if (! $callQueue || ! $callQueue->isActive()) {
+            Log::warning('AiLoadBalancerRoutingStrategy: Fallback call queue missing or inactive', [
+                'ai_load_balancer_id' => $aiLoadBalancer->id,
+                'fallback_call_queue_id' => $aiLoadBalancer->fallback_call_queue_id,
+            ]);
+
+            return $this->handleFallbackHangup($aiLoadBalancer);
+        }
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::QUEUE,
+            $request,
+            new DidNumber,
+            ['call_queue' => $callQueue]
+        );
+    }
+
+    public function handleFallbackAiLoadBalancer(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    {
+        $targetId = $aiLoadBalancer->fallback_ai_load_balancer_id;
+
+        // Loop guard: A -> B -> A would otherwise recurse forever when every assistant is unavailable.
+        $visited = $request->attributes->get('albs_fallback_chain', [$aiLoadBalancer->id]);
+
+        $target = $targetId && ! in_array($targetId, $visited, true)
+            ? AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $targetId)
+                ->where('organization_id', $aiLoadBalancer->organization_id)
+                ->where('status', AlbsStatus::ACTIVE)
+                ->first()
+            : null;
+
+        if (! $target) {
+            Log::warning('AiLoadBalancerRoutingStrategy: Fallback AI load balancer missing, inactive or looping', [
+                'ai_load_balancer_id' => $aiLoadBalancer->id,
+                'fallback_ai_load_balancer_id' => $targetId,
+            ]);
+
+            return $this->handleFallbackHangup($aiLoadBalancer);
+        }
+
+        $request->attributes->set('albs_fallback_chain', [...$visited, $target->id]);
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::AI_LOAD_BALANCER,
+            $request,
+            new DidNumber,
+            ['ai_load_balancer' => $target]
+        );
     }
 
     private function handleFallbackHangup(AiAssistantLoadBalancer $aiLoadBalancer): Response

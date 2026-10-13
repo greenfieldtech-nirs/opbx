@@ -92,6 +92,8 @@ interface ExtendedAiAssistantLoadBalancer extends AiAssistantLoadBalancer {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
 }
 
 // Member form data type
@@ -111,6 +113,8 @@ const buildFallbackFields = (formData: FormData): Record<string, string | null |
     fallback_ring_group_id: null as string | null,
     fallback_ivr_menu_id: null as string | null,
     fallback_ai_assistant_id: null as string | null,
+    fallback_call_queue_id: null as string | null,
+    fallback_ai_load_balancer_id: null as string | null,
   };
 
   switch (formData.fallback_action) {
@@ -122,6 +126,10 @@ const buildFallbackFields = (formData: FormData): Record<string, string | null |
       return { ...base, fallback_ivr_menu_id: formData.fallback_ivr_menu_id };
     case 'ai_assistant':
       return { ...base, fallback_ai_assistant_id: formData.fallback_ai_assistant_id };
+    case 'call_queue':
+      return { ...base, fallback_call_queue_id: formData.fallback_call_queue_id };
+    case 'ai_load_balancer':
+      return { ...base, fallback_ai_load_balancer_id: formData.fallback_ai_load_balancer_id };
     case 'hangup':
     default:
       return base;
@@ -140,6 +148,8 @@ interface FormData {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   members: MemberFormData[];
 }
 
@@ -389,6 +399,18 @@ export default function AiAssistantLoadBalancers() {
       errors.fallback_ai_assistant = 'Fallback AI Assistant is required';
     }
 
+    if (formData.fallback_action === 'call_queue' && !formData.fallback_call_queue_id) {
+      errors.fallback_call_queue = 'Fallback call queue is required';
+    }
+
+    if (formData.fallback_action === 'ai_load_balancer') {
+      if (!formData.fallback_ai_load_balancer_id) {
+        errors.fallback_ai_load_balancer = 'Fallback AI load balancer is required';
+      } else if (selectedLoadBalancer && formData.fallback_ai_load_balancer_id === String(selectedLoadBalancer.id)) {
+        errors.fallback_ai_load_balancer = 'A load balancer cannot fall back to itself';
+      }
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -473,6 +495,8 @@ export default function AiAssistantLoadBalancers() {
       fallback_ring_group_id: lb.fallback_ring_group_id?.toString(),
       fallback_ivr_menu_id: lb.fallback_ivr_menu_id?.toString(),
       fallback_ai_assistant_id: lb.fallback_ai_assistant_id?.toString(),
+      fallback_call_queue_id: lb.fallback_call_queue_id?.toString(),
+      fallback_ai_load_balancer_id: lb.fallback_ai_load_balancer_id?.toString(),
       status: lb.status,
       members: lb.members.map(m => ({
         ai_assistant_id: m.ai_assistant_id,

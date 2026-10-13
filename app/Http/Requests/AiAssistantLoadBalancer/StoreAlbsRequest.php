@@ -97,6 +97,16 @@ class StoreAlbsRequest extends FormRequest
                 'nullable',
                 Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
+            'fallback_call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
+                'nullable',
+                Rule::exists('call_queues', 'id')->where('organization_id', $user->organization_id),
+            ],
+            'fallback_ai_load_balancer_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
+                'nullable',
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $user->organization_id)->whereNull('deleted_at'),
+            ],
             'status' => [
                 'required',
                 new Enum(AlbsStatus::class),
@@ -158,6 +168,11 @@ class StoreAlbsRequest extends FormRequest
             'fallback_ivr_menu_id.exists' => 'The selected fallback IVR menu does not exist.',
             'fallback_ai_assistant_id.required_if' => 'Fallback AI assistant is required when fallback action is "ai_assistant".',
             'fallback_ai_assistant_id.exists' => 'The selected fallback AI assistant does not exist.',
+            'fallback_call_queue_id.required_if' => 'Fallback call queue is required when fallback action is "call_queue".',
+            'fallback_call_queue_id.exists' => 'The selected fallback call queue does not exist.',
+            'fallback_ai_load_balancer_id.required_if' => 'Fallback AI load balancer is required when fallback action is "ai_load_balancer".',
+            'fallback_ai_load_balancer_id.exists' => 'The selected fallback AI load balancer does not exist.',
+            'fallback_ai_load_balancer_id.not_in' => 'A load balancer cannot fall back to itself.',
             'status.required' => 'Status is required.',
             'members.required' => 'At least one AI assistant member is required.',
             'members.min' => 'At least one AI assistant member is required.',

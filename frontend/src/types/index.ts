@@ -281,6 +281,8 @@ export interface AiAssistantLoadBalancer {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   fallback_extension?: {
     id: string;
     extension_number: string;
@@ -640,6 +642,8 @@ export interface CreateAiAssistantLoadBalancerRequest {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   status?: Status;
 }
 
@@ -660,6 +664,8 @@ export interface UpdateAiAssistantLoadBalancerRequest {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   status?: Status;
 }
 

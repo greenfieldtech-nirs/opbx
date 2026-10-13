@@ -46,6 +46,14 @@ properties:
     type:
       - integer
       - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
+    type:
+      - integer
+      - 'null'
   members:
     type: array
     description: Members ordered by position (present when loaded)
@@ -79,6 +87,10 @@ properties:
   fallback_ivr_menu:
     $ref: '#/$defs/Ref'
   fallback_ai_assistant:
+    $ref: '#/$defs/Ref'
+  fallback_call_queue:
+    $ref: '#/$defs/Ref'
+  fallback_ai_load_balancer:
     $ref: '#/$defs/Ref'
   created_at:
     type: string

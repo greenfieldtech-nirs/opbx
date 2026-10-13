@@ -21,7 +21,7 @@ properties:
   fallback_action:
     type: string
     enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
-    description: '`unavailable` is rejected on create (422) and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu and ai_assistant.'
+    description: '`unavailable` is rejected on create (422) and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, call_queue and ai_load_balancer (a load balancer cannot fall back to itself).'
   fallback_extension_id:
     type:
       - integer
@@ -35,6 +35,14 @@ properties:
       - integer
       - 'null'
   fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
     type:
       - integer
       - 'null'

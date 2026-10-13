@@ -33,6 +33,8 @@ class AiAssistantLoadBalancer extends Model
         'fallbackRingGroup:id,name',
         'fallbackIvrMenu:id,name',
         'fallbackAiAssistant:id,name',
+        'fallbackCallQueue:id,name',
+        'fallbackAiLoadBalancer:id,name',
     ];
 
     /**
@@ -52,6 +54,8 @@ class AiAssistantLoadBalancer extends Model
         'fallback_ring_group_id',
         'fallback_ivr_menu_id',
         'fallback_ai_assistant_id',
+        'fallback_call_queue_id',
+        'fallback_ai_load_balancer_id',
         'created_by',
         'updated_by',
     ];
@@ -118,6 +122,22 @@ class AiAssistantLoadBalancer extends Model
     public function fallbackAiAssistant(): BelongsTo
     {
         return $this->belongsTo(AiAssistant::class, 'fallback_ai_assistant_id');
+    }
+
+    /**
+     * Get the fallback call queue for this load balancer.
+     */
+    public function fallbackCallQueue(): BelongsTo
+    {
+        return $this->belongsTo(CallQueue::class, 'fallback_call_queue_id');
+    }
+
+    /**
+     * Get the fallback AI load balancer for this load balancer.
+     */
+    public function fallbackAiLoadBalancer(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'fallback_ai_load_balancer_id');
     }
 
     /**

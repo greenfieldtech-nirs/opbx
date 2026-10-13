@@ -95,6 +95,8 @@ interface FormData {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   members: MemberFormData[];
 }
 
@@ -426,6 +428,10 @@ export function LoadBalancerForm({
               ? formData.fallback_ivr_menu_id || ''
               : formData.fallback_action === 'ai_assistant'
               ? formData.fallback_ai_assistant_id || ''
+              : formData.fallback_action === 'call_queue'
+              ? formData.fallback_call_queue_id || ''
+              : formData.fallback_action === 'ai_load_balancer'
+              ? formData.fallback_ai_load_balancer_id || ''
               : ''
           }
           onChange={(type, destinationId) => {
@@ -436,9 +442,11 @@ export function LoadBalancerForm({
               fallback_ring_group_id: type === 'ring_group' ? destinationId : undefined,
               fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : undefined,
               fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : undefined,
+              fallback_call_queue_id: type === 'call_queue' ? destinationId : undefined,
+              fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : undefined,
             });
           }}
-          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup']}
+          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'call_queue', 'ai_load_balancer', 'hangup']}
           includeHangup={true}
           typeLabel="Action"
           destinationLabel="Destination"
