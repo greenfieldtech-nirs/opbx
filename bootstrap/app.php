@@ -28,6 +28,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -79,6 +80,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: AuthenticatesRequests::class,
             prepend: ResolveApiKey::class,
+        );
+
+        // ApplyOperateAsOrganization swaps the auth principal that OrganizationScope reads.
+        // Unlisted middleware sorts AFTER SubstituteBindings, so implicit route-model binding
+        // ran with the platform manager's own org and 404'd every single-record route while
+        // operating as another org. It must run after Authenticate and before binding.
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: ApplyOperateAsOrganization::class,
         );
 
         // DO NOT add EnforceApiKeyScope to the priority list. It must keep its
