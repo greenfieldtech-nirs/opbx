@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
+use App\Enums\ListStatus;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
@@ -205,7 +206,8 @@ class CampaignListService
      */
     public function hasValidList(AutoDialerCampaign $campaign): bool
     {
-        return $campaign->list !== null && $campaign->list->status === 'ready';
+        // An assigned list is IN_USE (assignment flips READY to IN_USE), so both count as startable.
+        return in_array($campaign->list?->status, [ListStatus::READY, ListStatus::IN_USE], true);
     }
 
     /**

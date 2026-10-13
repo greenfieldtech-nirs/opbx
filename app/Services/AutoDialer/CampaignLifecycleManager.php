@@ -154,7 +154,7 @@ class CampaignLifecycleManager
         $campaigns = AutoDialerCampaign::where('auto_start', true)
             ->where('status', CampaignStatus::DRAFT)
             ->whereHas('list', function ($query) {
-                $query->where('status', 'ready');
+                $query->whereIn('status', ['ready', 'in_use']);
             })
             ->get();
 
