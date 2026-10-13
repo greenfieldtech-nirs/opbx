@@ -3,110 +3,163 @@ sidebar_position: 1
 slug: /modules/user-management
 sidebar_class_name: cxGuidesSidebar
 title: "User Management"
-description: "Create and manage user accounts with role-based access control"
+description: "Create, edit, deactivate and delete users, set roles, and see what a delete changes"
 ---
 
 # User Management
 
-The User Management module controls who can access your OPBX organization and what they can do. Each user belongs to exactly one organization and has one of five roles.
+The Users page controls who can sign in to your organization and what each person can do. Each user belongs to exactly one organization and has exactly one role.
 
 ## Purpose
 
 Use this module to:
 
-- Create and deactivate user accounts
-- Assign roles and permissions
-- Reset user passwords
-- Manage user profile information
-- Control access to PBX features
+- add people to the organization;
+- set each person's role;
+- activate or deactivate accounts;
+- set passwords;
+- remove a person and see what that changes in routing.
 
-## Role Hierarchy
+## Prerequisites
 
-OPBX uses five roles:
+- You are the **Owner** or a **PBX Admin**. Other roles cannot open the Users page.
+- For a PBX User to take queue calls or be called, give them an **extension**. See [Extensions](/modules/extensions).
 
-| Role | Level | Capabilities |
-|------|-------|--------------|
-| Owner | 1 | Full access; can manage other owners and system-wide settings |
-| PBX Admin | 2 | Manage extensions, routing, users (except owners and other PBX admins) |
-| Supervisor | 3 | Read-only monitoring scoped to assigned users/ring groups; coach live calls; use the Web Phone |
-| PBX User | 3 | View assigned resources; update own extension settings |
-| Reporter | 4 | Read-only access to call logs, reports, and dashboards |
+## Roles
 
-:::info Role Assignment
-Only Owners can assign the Owner role. PBX Admins cannot create or modify other PBX Admins or Owners. See [Supervisors](/modules/supervisors) for how supervisor assignments scope what a supervisor can see and coach.
+| Role | What it is for |
+|------|----------------|
+| **Owner** | Runs the organization. Full access, including role changes and Cloudonix settings |
+| **PBX Admin** | Day-to-day administration of routing, numbers and users |
+| **PBX User** | An employee with an extension. Manages their own profile and queue login |
+| **Reporter** | Read-only access to reports, call logs and most configuration |
+| **Supervisor** | Watches and coaches only the users and groups assigned to them. See [Supervisors](/modules/supervisors) |
+
+:::info The Owner role
+The **Owner** role cannot be assigned through the API or the Users page: the server refuses it with "Owner role cannot be assigned. Each organization has a single owner." An organization's Owner is set up when the organization is created. Only an Owner can change another user's role, and an Owner cannot change their own role.
 :::
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View users | Yes | Yes | Self only | No |
-| Create users | Yes | Yes (non-owner) | No | No |
-| Update users | Yes | Yes (non-owner, non-admin) | Self only | No |
-| Delete users | Yes | PBX User / Reporter only | No | No |
-| Update role | Yes (not self) | No | No | No |
-| Update password | Others only | PBX User / Reporter only | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See the user list | Yes | Yes | No | No | Yes (self and assigned users) |
+| Open a user | Yes | Yes | Self only | Self only | Self and assigned users |
+| Create a user | Yes | Yes, but not an Owner or PBX Admin account | No | No | No |
+| Edit a user | Yes | Yes, with the limits below | Self only | No | No |
+| Change a role | Yes, not their own | No | No | No | No |
+| Activate or deactivate | Yes, not themselves, not the Owner | Yes, same limits as Owner | No | No | No |
+| Set a password | Yes, not their own (here) | PBX User and Reporter only | No | No | No |
+| Delete | Yes, not themselves | Yes, not themselves (see the note below) | No | No | No |
 
-## UI Workflow
+PBX Admin limits when editing:
 
-### Create a User
+- an Admin cannot change the role of a user who is an Owner or a PBX Admin;
+- an Admin cannot give the PBX Admin role to anyone;
+- an Admin cannot set the Owner role.
 
-1. Navigate to **Users** in the sidebar
-2. Click **Add User**
-3. Enter the user's name and email
-4. Select a role
-5. Optionally assign an extension
-6. Click **Save**
+:::caution Open question: PBX Admin can delete an Owner
+The permission to delete a user is the same for Owners and PBX Admins, and only the **last** Owner is protected. A PBX Admin can therefore delete another Owner or PBX Admin. The guide describes the code as it stands; confirm the intended rule before you rely on it.
+:::
 
-The new user receives an email invitation if transactional email is configured.
+## Create a user
 
-### Deactivate a User
+1. Open **Users** in the sidebar.
+2. Click **Add User**.
+3. Fill in the fields below and choose a role.
+4. Save.
 
-1. Find the user in the Users list
-2. Click **Edit**
-3. Change **Status** to `Inactive`
-4. Save the change
+| Field | Required | Limit | Notes |
+|-------|----------|-------|-------|
+| Name | Yes | 2 to 255 characters | |
+| Email | Yes | Valid email, up to 255 characters, unique within the organization | Used to sign in |
+| Password | Yes | At least 8 characters, with letters (upper and lower case) and numbers | Set by the admin when you create the account |
+| Role | Yes | Owner (refused), PBX Admin, PBX User, Reporter, Supervisor | An Admin cannot create an Owner or a PBX Admin |
+| Status | No | Active or Inactive. Default: Active | |
+| Phone | No | Up to 50 characters | |
+| Street address, city, state or province, postal code, country | No | 255, 100, 100, 20 and 100 characters | |
 
-Inactive users cannot log in but their history remains available.
+{/* SCREENSHOT: users-list — Users list with an Owner, a PBX Admin, a PBX User (Inactive badge) and a Reporter */}
 
-### Reset a Password
+{/* SCREENSHOT: users-create-dialog — Add User dialog with name, email, password, role PBX User selected */}
 
-1. Open the user details
-2. Click **Reset Password**
-3. Enter and confirm the new password
-4. Save
+### Invite instead of setting a password
 
-Password changes made by an administrator force the user to log in again.
+**Invite user** sends an invitation by email. It is available only when Auth0 sign-in is enabled for the deployment. If it is not, the server answers that Auth0 is not enabled. Invitations to an email address already in use are refused.
 
-## Key Data Fields
+## Edit a user
 
-### `users` Table
+1. Click the user, then **Edit**.
+2. Change the fields you need and save.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | Display name |
-| `email` | string | Globally unique |
-| `password` | string | Hashed with bcrypt |
-| `role` | enum | owner, pbx_admin, supervisor, pbx_user, reporter |
-| `status` | enum | active, inactive |
-| `is_platform_manager` | boolean | Cross-tenant admin flag |
+Two changes need care:
 
-## Related API Endpoints
+- **Role**: only an Owner can change it, and not their own.
+- **Status**: change it on the user's row or in the editor. Deactivating a user keeps their history. Nobody can deactivate themselves, and nobody can deactivate the Owner.
+
+## Set a password
+
+Open the user and choose **Set password**, then enter and confirm the new password. The same password rules as on create apply. You cannot change your own password here; use your profile instead (see [Organization Settings](/administration)).
+
+## Delete a user
+
+Deleting a user does not delete their extension. Before the delete is sent, a **Delete User** dialog lists exactly what will change, computed by the same code that performs the delete:
+
+| What happens | Detail |
+|--------------|--------|
+| The user's extensions are kept | They are unassigned and can be given to a new user |
+| Ring-group memberships | The user is removed. A ring group left with no members is allowed |
+| Call-queue memberships | The user is removed. A queue left with no agents is allowed and is flagged in the dialog |
+| Routes that pointed at those extensions | Changed to **Destination unavailable**. Callers hear "Destination doesn't exist" and the call ends |
+
+The routes changed can be on IVR options and their failover, ring-group and queue fallbacks, AI load balancer fallbacks, phone numbers, business-hours actions and call-tracking campaigns.
+
+Confirm only after reading the list. The Owner cannot be deleted while they are the last Owner, and nobody can delete their own account.
+
+{/* SCREENSHOT: users-delete-impact — Delete User dialog listing a kept extension, a removed queue membership flagged as becoming empty, and a DID route that will become Destination unavailable */}
+
+After the delete, the routes that were changed show **Unprovisioned** in their own lists. Fix them by choosing a new destination on the edit screen. See [IVR Menus](/modules/ivr-menus) and [Phone Numbers](/modules/phone-numbers).
+
+## Deactivate a user
+
+1. Click **Deactivate** on the user's row, or set Status to Inactive in the editor.
+2. Confirm.
+
+Use this instead of deleting when someone leaves temporarily, or when you want to keep the account and its history.
+
+## Key data fields
+
+### `users`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `name` | Display name |
+| `email` | Unique within the organization |
+| `password` | Stored hashed |
+| `role` | `owner`, `pbx_admin`, `pbx_user`, `reporter` or `supervisor` |
+| `status` | `active` or `inactive` |
+| `is_platform_manager` | Platform-level flag. Set by platform managers, not from this page |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/v1/users` | List users |
-| POST | `/v1/users` | Create user |
-| GET | `/v1/users/{user}` | Show user |
-| PUT | `/v1/users/{user}` | Update user |
-| DELETE | `/v1/users/{user}` | Delete user |
-| PATCH | `/v1/users/{user}/password` | Update user password |
+| POST | `/v1/users` | Create a user |
+| GET | `/v1/users/{user}` | One user |
+| PUT | `/v1/users/{user}` | Update a user (role and status rules above apply) |
+| GET | `/v1/users/{user}/delete-impact` | The changes a delete would make, without deleting |
+| DELETE | `/v1/users/{user}` | Delete (409 for the last Owner) |
+| PATCH | `/v1/users/{user}/password` | Set a password |
+| POST | `/v1/users/invite` | Invite by email (needs Auth0) |
 
-See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full request/response schemas.
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Extensions](/modules/extensions) — Assign extensions to users
-- [Settings](/modules/settings) — Organization-wide configuration
+- [Extensions](/modules/extensions) — assign extensions to users
+- [Supervisors](/modules/supervisors) — assign the users a supervisor can watch
+- [Call Queues](/modules/call-queues) — queue agents
+- [Organization Settings](/administration) — profile and Cloudonix integration

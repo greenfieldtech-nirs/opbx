@@ -1,0 +1,89 @@
+---
+sidebar_position: 4
+slug: /modules/trunks
+sidebar_class_name: cxGuidesSidebar
+title: "Trunks"
+description: "Manage the inbound and outbound SIP trunks your organization uses with Cloudonix"
+---
+
+# Trunks
+
+A trunk is a SIP connection between Cloudonix and a telephony provider or PBX equipment. **Inbound** trunks carry calls from a provider into OPBX. **Outbound** trunks carry calls from your extensions out to the public telephone network.
+
+The Trunks page is a window onto the trunks stored in Cloudonix for your domain. OPBX does not keep its own copy: each change is sent to Cloudonix straight away.
+
+## Purpose
+
+Use this module to:
+
+- add a provider's SIP trunk, inbound or outbound;
+- change its address, transport, prefix or credentials;
+- remove a trunk that is no longer used.
+
+## Prerequisites
+
+- Your organization's Cloudonix integration is configured. See [Cloudonix Setup](/installation/cloudonix-setup) and [Organization Settings](/administration). Without it, the address panels in the dialog show "Cloudonix settings not configured."
+- You are the **Owner** or a **PBX Admin**. Other roles do not see the Trunks item in the sidebar.
+- You have the provider's SIP address (IP or hostname), port and transport, and any username and password the provider requires.
+
+## Fields
+
+| Field | Required | Limit | Meaning |
+|-------|----------|-------|---------|
+| Name | Yes | 3 to 64 characters | Identifies the trunk. **Cannot be changed** after creation |
+| Direction | Yes | Inbound or Outbound | Which way calls flow on this trunk |
+| Address (IP or hostname) | Yes | Up to 255 characters, IP or host name | The provider's SIP address |
+| Port | Yes | 1 to 65535 | SIP port, usually 5060 |
+| Transport | Yes | UDP, TCP or TLS | SIP transport |
+| Prefix | No | Up to 20 characters | Added to the start of numbers on incoming calls |
+| Username | No | Up to 128 characters. Needed with a password | Authentication user name |
+| Password | No | Up to 128 characters. Needed with a username | Authentication password |
+
+### Direction
+
+Cloudonix stores a trunk created as Inbound as `public-inbound`, and one created as Outbound as `public-outbound`. The Trunks page shows both forms as **Inbound** or **Outbound**.
+
+### Authentication
+
+Authentication is optional. A username without a password, or a password without a username, is refused.
+
+The password is write-only: the page never shows a stored password. To keep the current password, leave the field empty when you edit the trunk. Type a new password only to change it.
+
+## Create a trunk
+
+1. Open **Trunks** in the sidebar.
+2. Click **Create Trunk**.
+3. Enter the name, direction, address, port and transport.
+4. Add a prefix or authentication only if the provider needs one.
+5. Save.
+
+The panels in the dialog explain the SIP addresses and the source IP that Cloudonix uses for outbound calls. Give that source IP to your provider so it accepts calls from Cloudonix.
+
+{/* SCREENSHOT: trunks-list — Trunks list with one Inbound and one Outbound trunk and the direction filter tabs */}
+
+{/* SCREENSHOT: trunks-create-dialog — Add Trunk dialog with direction Outbound, a hostname address, transport TLS and the Authentication section expanded */}
+
+## Edit a trunk
+
+Open the trunk and change its fields. The **name** is shown but cannot be changed. Changing other fields updates the trunk in Cloudonix immediately.
+
+## Delete a trunk
+
+Deleting asks you to confirm. If outbound whitelist entries name the trunk, the dialog lists them and you must tick the acknowledgement before the delete is sent. Those entries would then refer to a trunk that no longer exists, so update or remove them first when you can. This check is a warning; unlike phone numbers and routing resources, a trunk in use is not refused.
+
+{/* SCREENSHOT: trunks-delete-warning — Delete Trunk dialog with the in-use warning listing two outbound whitelist entries and the acknowledgement checkbox */}
+
+## Errors
+
+| Message | Meaning |
+|---------|---------|
+| Cloudonix settings not configured | The organization has no Cloudonix integration yet |
+| Cloudonix is unreachable, try again | Cloudonix could not be reached when the page loaded or a change was sent. Try again shortly |
+| Validation messages under a field | The field is out of range, for example a port above 65535 or a name shorter than 3 characters |
+
+## Related modules
+
+- [Outbound Whitelist](/modules/outbound-whitelist) — chooses the trunk used for each outbound rule
+- [Phone Numbers](/modules/phone-numbers) — inbound numbers
+- [Settings](/administration) — Cloudonix integration
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — how outbound calls choose a trunk and caller ID

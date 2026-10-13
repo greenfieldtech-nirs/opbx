@@ -3,122 +3,201 @@ sidebar_position: 25
 slug: /modules/call-queues
 sidebar_class_name: cxGuidesSidebar
 title: "Call Queues"
-description: "Stateful call distribution with waiting callers, agent states, and queue statistics"
+description: "Hold callers in a FIFO line until an agent is free, with agent login states, overflow and statistics"
 ---
 
 # Call Queues
 
-Call queues hold incoming callers in a FIFO line with music-on-hold until an agent becomes available. Unlike ring groups (which simply ring members), queues are **stateful**: callers wait, agents log in and out, overflow rules apply, and every call is measured for reporting.
+A call queue holds incoming callers in first-in, first-out order with music on hold, and offers each caller to an agent when one is free. Unlike a [ring group](/modules/ring-groups), a queue is **stateful**: agents log in and out, finished calls leave a wrap-up pause, callers that wait too long overflow to a fallback, and every call is measured.
 
-## When to Use a Queue vs a Ring Group
+## When to use a queue instead of a ring group
 
 | | Ring Group | Call Queue |
 |---|---|---|
-| Caller experience | Rings members immediately; fallback if nobody answers | Waits on hold with MOH until an agent is free |
-| Agent membership | Informal — members are just destinations | Formal — agents log in/out, have wrap-up time |
-| Distribution | Simultaneous / round-robin / sequential | ring-all / round-robin / least-talk-time / fewest-calls |
-| Statistics | Call logs only | Waiting/handling times, answered vs abandoned, per-call reports |
-| Best for | Small teams, simple distribution | Support/sales lines with measurable SLAs |
+| Caller experience | Rings members at once; fallback if nobody answers | Waits on hold with music until an agent is free |
+| Agents | Just destinations | Log in and out, have wrap-up time |
+| Distribution | Simultaneous, round-robin or sequential | Ring all, round robin, least talk time, fewest calls |
+| Statistics | Call logs only | Waiting and handling times, answered, abandoned and overflow counts, per-call reports |
 
-## How a Queued Call Flows
+## Purpose
 
-1. A call arrives at a queue destination (DID, IVR option, ring group fallback, or business hours rule)
-2. The caller is enqueued and hears music-on-hold; optionally, their queue position is announced periodically
-3. The [ACD worker](/workers/acd-worker) picks an available agent using the queue's strategy
-4. The agent's **extension is dialed directly** (follow-me/forwarding is never applied to queue offers)
-5. On answer, the call bridges; on no-answer, the next agent is offered immediately
-6. If the caller waits longer than the queue's max wait time, the call **overflows** to the fallback destination
-7. The call is finalized as answered / abandoned / overflow with waiting and handling times recorded
+Use a queue for a support or sales line where you need to know how long callers wait and how many were lost.
 
-## Distribution Strategies
+## Prerequisites
 
-| Strategy | Behavior | Best For |
-|----------|----------|----------|
-| Ring All | All available agents ring at once | Fastest answer on small teams |
-| Round Robin | Rotates through available agents | Even distribution |
-| Least Talk Time | Agent with the least cumulative talk time today | Balancing effort over the day |
-| Fewest Calls | Agent who has handled the fewest calls today | Balancing call count |
+Before you create a queue, prepare these:
+
+1. **Agents.** Each agent is an **active** user with an **extension assigned**. A user without an extension cannot be added. See [User Management](/modules/user-management) and [Extensions](/modules/extensions).
+2. **Hold music (optional).** An audio recording with the **Hold music** tag. Only tagged recordings are offered. See [Recordings](/modules/recordings).
+3. **A fallback destination.** Where overflow calls go (see below). It must exist and be active.
+
+## Create a queue
+
+1. Open **Call Queues** in the sidebar (Owner, PBX Admin and Reporter).
+2. Click **Create Queue**.
+3. Fill in the fields described under [Queue settings](#queue-settings).
+4. Add at least one agent in the **Agents** section.
+5. Choose the fallback destination and save.
+
+On save, the queue is stored and becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Agent states](#agent-states)).
+
+{/* SCREENSHOT: call-queues-list — Call Queues list with two queues, one active and one inactive, and an Unprovisioned badge on one row */}
+
+{/* SCREENSHOT: call-queues-create-dialog — Create Queue dialog showing strategy, timeouts, music on hold and the fallback destination selector */}
+
+## Queue settings
+
+| Field | Limits and default | Meaning |
+|-------|--------------------|---------|
+| Name | 2 to 100 characters; unique within the organization | Shown in lists and the agent widget |
+| Description | Up to 1000 characters | Free text |
+| Strategy | Ring all, round robin, least talk time, fewest calls. Default: ring all | How the next agent is chosen (table below) |
+| Agent ring timeout | 15 to 60 seconds. Default: 20 | How long one agent's extension rings before the offer moves on |
+| Max wait | 30 to 300 seconds. Default: 300 | How long a caller may wait before overflowing |
+| Wrap-up | 15 to 120 seconds. Default: 15 | Pause after each answered call before the agent is available again. Zero is not accepted |
+| Music on hold | An MOH-tagged recording, optional | Played to waiting callers |
+| Position announcements | Off by default. When on: interval 10 to 600 seconds (default 60) and an optional language code up to 20 characters | Tells waiting callers their position at the interval |
+| Immediate connect | Off by default | When an agent becomes free while callers wait, connect the next caller straight away instead of waiting for the next hold loop |
+| Status | Active or Inactive. Default: Active | Inactive queues do not accept calls |
+| Fallback destination | Required. See [Fallback](#fallback-destination) | Where overflow calls go |
+| Agents | At least 1, at most 100 active users with extensions | Who takes calls |
+
+### Strategies
+
+| Strategy | How the next agent is chosen |
+|----------|------------------------------|
+| Ring all | Every available agent is offered the call at once |
+| Round robin | Available agents in turn |
+| Least talk time | The available agent with the least talk time |
+| Fewest calls | The available agent who has handled the fewest calls |
+
+Agents are always dialed **at their extension**. Call-forwarding and follow-me settings are not applied to queue offers.
+
+### Fallback destination
+
+Overflow (max wait reached) goes to one of: **Extension**, **Ring Group**, **IVR Menu**, **AI Assistant**, **AI Load Balancer**, or **Hangup**. Queue-to-queue fallback is not supported.
+
+The fallback must be active when you save. A fallback that is deleted later is protected by the in-use check (see below).
 
 ## Agents
 
-Agents are organization users with an extension, assigned to one or more queues.
-
-### Agent States
+### Agent states
 
 | State | Meaning |
 |-------|---------|
-| Logged Out | Not receiving queue calls (default) |
-| Available | Receiving queue calls |
-| Wrap-Up | Post-call cooldown; auto-returns to Available after the queue's wrap-up seconds |
+| Logged out | Not offered calls. The default |
+| Available | Offered calls |
+| Wrap-up | Just finished a call. Returns to Available after the queue's wrap-up time |
 
-### Logging In and Out
+An available agent who is already on a call is skipped automatically. Presence comes from live call updates.
 
-- **From the UI**: the queue widget in the page header shows the agent's queues and lets them toggle Available / Logged Out
-- **From any phone**: dial `*45{queue_id}` (e.g. `*457` for queue 7) to toggle login state for that queue
+### Log in and out
 
-Agents marked Available who are already on a call are skipped automatically (extension presence is tracked from live session updates).
+- **In the app:** the queue widget in the page header lists the agent's queues and toggles Available and Logged out for each.
+- **From any phone:** dial `*45` followed by the queue ID. For example, `*457` toggles queue 7. The queue ID is shown on the queue's detail page.
 
-## Queue Settings
+### Agent membership
 
-| Setting | Description |
-|---------|-------------|
-| Name / Description | Identification |
-| Strategy | One of the four strategies above |
-| Agent ring timeout | How long an agent's extension rings before the offer moves on |
-| Max wait time | How long a caller may wait before overflowing to the fallback destination |
-| Wrap-up time | Seconds of Wrap-Up after each handled call (0 = none) |
-| Music on hold | An MOH-tagged recording played to waiting callers |
-| Position announcements | Optionally tell waiting callers their position, at a configurable interval and language |
-| Immediate connect | When an agent becomes available while callers wait, connect them proactively instead of waiting for the next hold loop |
-| Fallback destination | Where overflow calls go (see below) |
+The agent list on the queue shows the users who can take calls. Saving is refused if any selected user is inactive or has no extension (the message names the user), or if a selected user belongs to another organization.
 
-### Fallback Destinations
+## Queue behaviour in practice
 
-Overflow calls can route to: **Extension**, **Ring Group**, **IVR Menu**, **AI Assistant**, **AI Load Balancer**, or **Hangup**. (Queue-to-queue fallback is not supported.)
+1. A call reaches the queue (from a phone number, an IVR option, a ring group fallback or business hours).
+2. The caller hears the hold music and, if enabled, their position.
+3. The strategy picks an agent, whose extension rings for the agent ring timeout.
+4. If the agent answers, the call connects and is recorded as answered.
+5. If nobody answers, the offer moves on to the next agent.
+6. A caller who waits longer than the max wait is sent to the fallback and the call is recorded as overflow.
+7. A caller who hangs up is recorded as abandoned.
 
-## Routing Calls to a Queue
+When a call is requeued (for example after an offer is not answered), it keeps its **original position and its original enqueue time**. A requeued call that is already past the max wait overflows on its next check.
 
-Queues appear as a destination type everywhere destinations are configured:
+If the agent hangs up after the caller has joined, the call ends.
 
-- **Phone Numbers (DIDs)** — route a number straight to a queue
-- **IVR menus** — as an option target or failover
-- **Ring groups** — as the fallback when nobody answers
-- **Business hours** — route to a queue during specific hours
+## Routing calls to a queue
 
-## Live Monitoring
+A queue appears as a destination wherever destinations are configured:
 
-The queue detail page shows:
+- **Phone numbers (DIDs)**: route a number straight to the queue.
+- **IVR menus**: as an option target or the failover.
+- **Ring groups**: as the fallback when nobody answers.
+- **Business hours**: as the action for open or closed hours.
 
-- **Live** — waiting callers (position, wait time) and agent states, updating in real time
-- **Agents** — membership management
-- **Statistics** — aggregate metrics for the queue
+## Edit and delete
 
-Two dashboards are available:
+- **Disconnect**: on the edit screen only, the queue's fallback destination can be set to **Disconnect**, which stores "Destination unavailable". The queue then shows the Unprovisioned badge. Create screens never offer Disconnect; a new queue must have a fallback.
+- **Delete** asks for confirmation. If other configuration still points at the queue, the delete is refused and a dialog lists every place it is used (routing, ring group fallbacks, IVR options and so on). Change those first, then delete again. Past call records never block a delete.
 
-- **Queues Dashboard** (sidebar) — the authenticated overview of all queues with live state
-- **Public wallboard** — a token-authenticated deep link (`/public/queues-dashboard/{token}`) requiring no login, intended for a dedicated call-center screen. The link is shown on the Queues Dashboard page and can be regenerated there (regenerating invalidates the old link immediately). It exposes read-only queue lists, live state, and stats.
+:::caution Queue extension
+A queue can be given an internal extension of type **Queue** so that agents can transfer callers into it. The in-use check does not look at that extension. Remove or change the extension yourself before you delete the queue.
+:::
+
+{/* SCREENSHOT: call-queues-in-use-dialog — "Cannot delete: still in use" dialog for a call queue, listing an IVR option and a ring group fallback */}
+
+## Live monitoring
+
+The queue detail page has three tabs:
+
+- **Live**: waiting callers (position and wait time) and each agent's state, updated while the tab is open.
+- **Agents**: membership management.
+- **Statistics**: aggregates over a chosen period.
+
+Two other views:
+
+- **Queues Dashboard** (sidebar): all queues with live state.
+- **Public wallboard**: a link that needs no login, for a call-centre screen. It has the form `/public/queues-dashboard/{token}`. The link is shown on the Queues Dashboard page. **Regenerate** creates a new link and the old one stops working immediately. It shows read-only queue lists, live state and statistics.
+
+{/* SCREENSHOT: call-queues-live-tab — queue detail Live tab with two waiting callers and three agents in Available, Wrap-up and Logged out states */}
 
 ## Reporting
 
-- **Queue reports** (`Queue Reports` page): per-call rows with waiting time, handling time, disposition (answered / abandoned / overflow), and the answering agent
-- **CSV export** for external analysis
-- Aggregates (min/max/average/stddev waiting and handling times, rolling windows) on the queue's Statistics tab
-
-## API and Automation
-
-- **REST API**: full CRUD for queues and agent membership; read-only stats, live state, and per-call reports (with CSV export)
-- **Scoped API keys**: `call_queues` and `queue_calls` grantable resources (read level = GET only) for external dashboards
-- **MCP server**: read-only tools (`list_call_queues`, `get_call_queue_stats`, `get_call_queue_live`, `list_queue_calls`) for AI assistants
+- **Queue Reports** (sidebar): one row per call with waiting time, handling time, disposition (answered, abandoned or overflow) and the answering agent.
+- **CSV export** of the report rows.
+- **Statistics tab**: minimum, maximum, average and standard deviation of waiting and handling times, and counts over rolling windows (15 minutes, 30 minutes, 1 hour, 24 hours).
 
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
 |--------|-------|-----------|----------|----------|
-| View queues and statistics | Yes | Yes | Yes | Yes |
-| Create / update / delete queues | Yes | Yes | No | No |
-| Manage queue agents | Yes | Yes | No | No |
-| Change own agent state (login/logout) | Yes | Yes | Yes (if member) | No |
+| See the queue in the sidebar | Yes | Yes | No | Yes |
+| View queue details and statistics | Yes | Yes | Yes (API) | Yes |
+| Create, edit or delete a queue | Yes | Yes | No | No |
+| Manage agents | Yes | Yes | No | No |
+| Log yourself in or out of a queue you are a member of | Yes | Yes | Yes | No |
 
-:::tip Troubleshooting
-With the [centralized logging stack](/administration/centralized-logs) enabled, every queue event (enqueue, offer, answer, overflow) is searchable by the call's Cloudonix session token — the fastest way to trace a single caller's journey through a queue.
-:::
+PBX Users can read the queue through the API, but the sidebar does not show the page to them.
+
+## API and automation
+
+- **REST API**: create, read, update and delete queues and agent membership. Statistics, live state and per-call reports are read-only endpoints.
+- **Scoped API keys**: the `call-queues` and `queue-calls` resources, with read access meaning GET only. See [API Keys](/modules/api-keys).
+- **MCP server**: read-only tools `list_call_queues`, `get_call_queue`, `get_call_queue_stats`, `get_call_queue_live` and `list_queue_calls`. See [MCP Server](/modules/mcp-server).
+
+## Common errors
+
+| Message (summary) | What it means | What to do |
+|-------------------|---------------|-----------|
+| The hold music recording must belong to your organization / is not tagged as hold music | The chosen recording is from another organization or lacks the Hold music tag | Choose an MOH-tagged recording of your own |
+| Only active users can be queue agents. *name* is not active | The user is inactive | Activate the user or remove them from the agents |
+| Queue agents must have an extension assigned. *name* has no extension | The user has no extension | Assign an extension to the user first |
+| The selected fallback target must be active | The fallback is inactive | Activate it or pick another fallback |
+| Choose a destination | You tried to create a route as "unavailable" | Pick a destination. "Destination unavailable" is only available when editing |
+| Cannot delete call queue: still used by … | Other configuration points at the queue | Change the listed references, then delete |
+
+## Troubleshooting
+
+With the [centralized logging stack](/administration/centralized-logs) enabled, every queue event (enqueue, offer, answer, overflow) is searchable by the call's Cloudonix session token. That is the quickest way to follow one caller through a queue.
+
+Common causes of "nobody gets the call":
+
+- No agent is logged in (state Logged out). The Live tab shows the states.
+- The agent is already on a call, so presence skips them.
+- The agent's extension is not active. Check its status on [Extensions](/modules/extensions).
+
+## Related modules
+
+- [Ring Groups](/modules/ring-groups) — a simpler alternative, and a common queue fallback
+- [IVR Menus](/modules/ivr-menus) — route callers into a queue from a menu option
+- [Phone Numbers](/modules/phone-numbers) — route a number directly to a queue
+- [Recordings](/modules/recordings) — hold music
+- [Supervisors](/modules/supervisors) — supervisors can watch the queues they are assigned

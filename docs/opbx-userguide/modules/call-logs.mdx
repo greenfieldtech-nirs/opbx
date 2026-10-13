@@ -3,125 +3,169 @@ sidebar_position: 13
 slug: /modules/call-logs
 sidebar_class_name: cxGuidesSidebar
 title: "Call Logs"
-description: "View and export call detail records"
+description: "Search, filter, play back and export call detail records (CDRs)"
 ---
 
 # Call Logs
 
-Call Logs display the Call Detail Records (CDR) created from Cloudonix CDR webhooks. They provide a complete history of calls with disposition, duration, and AMD status.
+Call Logs shows the call detail records (CDRs) that Cloudonix sends to OPBX when a call ends. Each row is one call with its parties, disposition, durations and AMD result. You can search, open a call for details, play its recording, and export the results.
 
 ## Purpose
 
 Use this module to:
 
-- Search and filter call history
-- View call details including raw CDR payload
-- Export records to CSV
-- View aggregate statistics
-- Inspect AMD (Answering Machine Detection) results
+- find a call by number, date, disposition or direction;
+- open one call to see its full record and AMD result;
+- play or download the call's recording, if one was made;
+- export the results to CSV;
+- see totals and averages for a filtered set.
 
-## Table Columns
+Call logs are read-only. They are created by the Cloudonix call-end webhook and cannot be edited or deleted in the interface.
 
-| Column | Description |
-|--------|-------------|
-| From | Caller number |
-| To | Callee number |
-| Session Time | Call timestamp |
-| Disposition | Call outcome (ANSWER, BUSY, FAILED, etc.) |
-| AMD Status | `Enabled::{result}` or `Disabled` |
-| Duration | Total call duration |
-| Connected Time | Billable seconds |
+## Prerequisites
 
-## AMD Status
+- Calls are flowing through Cloudonix to your OPBX instance. If the Call Logs page is empty after a test call, check the webhook settings on [Settings](/administration) and [Cloudonix Setup](/installation/cloudonix-setup).
+- Only recorded calls have a recording to play. Recordings of IVR prompts and announcements are a different thing; see [Recordings](/modules/recordings).
 
-When AMD is enabled, the CDR includes the detection result:
+## Who can see what
 
-| Status | Meaning |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| Open Call Logs (sidebar) | Yes | Yes | Yes | Yes | Yes |
+| See the call records | All in the organization | All in the organization | All in the organization | All in the organization | Only calls to or from their assigned resources (single-call view) |
+| Export CSV | Yes | Yes | Yes | Yes | Not verified (see note) |
+| Play or download a recording | Yes | Yes | Yes | Yes | Only calls in their scope (single-call view) |
+
+:::note
+The supervisor limit is enforced when a single call is opened. Whether a supervisor's list and export are limited to their scope was not confirmed for this edition of the guide. Check before you rely on it.
+:::
+
+:::caution Recording playback for PBX Users
+The decision for recordings is that PBX Users may not list or play recordings from the Recordings page. **Call Logs do not apply that rule today**: any PBX User can play the recording of any call in the organization from this page. Treat this as a known gap until it is fixed.
+:::
+
+## Table columns
+
+| Column | Meaning |
 |--------|---------|
-| `Enabled::human` | Likely human answered |
-| `Enabled::voicemail` | Voicemail beep detected |
-| `Enabled::unknown` | Detection timed out or inconclusive |
-| `Disabled` | AMD was not used |
+| From | Calling number |
+| To | Called number |
+| Session time | When the call started |
+| Disposition | How the call ended, for example ANSWER, BUSY or FAILED |
+| Direction | Inbound or outbound |
+| User | The OPBX user who owns the extension involved, when there is one |
+| Duration | Total call length in seconds |
+| Billable (billsec) | Billable seconds |
+| AMD | Answering machine detection result (see below) |
 
-The detail dialog shows:
+Click a column header to sort. Sorting by the user name is available on the live tier only (see [Retention and archive](#retention-and-archive)).
 
-- Result
-- Confidence percentage
-- Detection time in milliseconds
-- Timestamp
-- Reason string
+## Searching and filtering
 
-## Filters
+| Filter | How it matches |
+|--------|----------------|
+| From number | Phone-number search (see below) |
+| To number | Phone-number search (see below) |
+| Disposition | Exact match |
+| Direction | Exact match (inbound or outbound) |
+| Date range | From the start of the first day to the end of the last day, by session time |
+| Session token | Exact match on the Cloudonix session token |
+| User | Matches the OPBX user who owns the extension |
 
-| Filter | Description |
-|--------|-------------|
-| From Number | Caller ID or origin number (LIKE) |
-| To Number | Destination number (LIKE) |
-| Disposition | Exact disposition match |
-| Date Range | Start and end dates |
+### Searching numbers
 
-## Permissions
+- A number matches from its **start**. Typing `+1415` finds numbers that begin with `+1415`.
+- The leading `+` is optional: `+1415` and `1415` both match numbers stored with or without the plus sign.
+- `*` and `%` are wildcards for any characters. `*555` matches numbers that contain `555` anywhere. `+1415*` is the same as `+1415`.
+- `_` is a literal character, not a wildcard.
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View call logs | Yes | Yes | Own only | Yes |
-| Export call logs | Yes | Yes | Own only | Yes |
-| View statistics | Yes | Yes | Own only | Yes |
+A search with a leading wildcard works, but is slower on large data sets. Use a prefix when you can.
 
-## UI Workflow
+The same number search applies to the list, the CSV export and the statistics.
 
-### View Call Logs
+## Call details
 
-1. Navigate to **Call Logs** in the sidebar
-2. Use filters to narrow results
-3. Click on any record for detailed information
+Open a row to see:
 
-### Export CDR Data
+- all the call fields, including the Cloudonix session token and call ID;
+- the **AMD** result: the result label, confidence percentage, detection time in milliseconds, timestamp and reason;
+- the recording player when the recording is available.
 
-1. Apply your desired filters
-2. Click **Export**
-3. The system streams the export in chunks of 1000 records
+### AMD results
 
-### View Statistics
+| Result | Meaning |
+|--------|---------|
+| `Enabled::human` | A person answered |
+| `Enabled::voicemail` | A voicemail greeting and beep were detected |
+| `Enabled::unknown` | Detection timed out or was not conclusive |
+| `Disabled` | AMD was not used on this call |
 
-1. Apply filters
-2. Click **Statistics**
-3. Review totals, averages, and disposition breakdowns
+{/* SCREENSHOT: call-logs-list — Call Logs list with a number-prefix filter applied and a few rows, one showing an AMD result */}
 
-## Key Data Fields
+{/* SCREENSHOT: call-logs-detail — call detail dialog showing the AMD block (result, confidence, detection time) and a recording player */}
 
-### `call_detail_records` Table
+## Recordings
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `call_id` | string | Cloudonix call ID |
-| `session_id` | string | |
-| `from` | string | Caller number |
-| `to` | string | Callee number |
-| `disposition` | string | Final disposition |
-| `duration` | integer | Total seconds |
-| `billsec` | integer | Billable seconds |
-| `session_timestamp` | datetime | |
-| `rated_cost` | decimal | |
-| `approx_cost` | decimal | |
-| `sell_cost` | decimal(4) | |
-| `raw_cdr` | JSON | Full Cloudonix payload |
+If a call was recorded, its row has a recording and the detail dialog shows a player. The recording is streamed; it is not fully loaded into memory on the server. Downloads are limited to 200 MB per file.
 
-## Related API Endpoints
+A recording is removed when its retention period ends. After that the row stays, with the recording marked as not available.
+
+## Exporting
+
+1. Apply the filters you need.
+2. Click **Export**.
+3. The CSV is produced in chunks of 1000 records, so large exports do not run out of memory.
+
+The export uses the same filters as the list, including the number-search rules.
+
+## Statistics
+
+Click **Statistics** to see totals, averages and a breakdown by disposition for the current filters.
+
+## Retention and archive
+
+Call records are kept in three tiers, by the call's session time (UTC):
+
+| Tier | Age | Where it is | Who can reach it |
+|------|-----|-------------|------------------|
+| Hot | Up to 6 months | The main database | Everyone in the organization, through this page and the API |
+| Warm | 6 to 12 months | A separate archive table in the database | API keys sent with `archive=1` (list, detail, export, statistics), and the platform owner's CDR archive endpoint. **Not** shown in this page |
+| Cold | More than 12 months | Compressed CSV files in object storage, one per organization per hour | Platform owner only, through object storage. Kept for 7 years, then deleted |
+
+Recordings have their own retention. They are not moved between tiers. They are deleted after `RECORDING_RETENTION_MONTHS`, which can never be longer than the cold-tier period (7 years by default). A CDR whose recording has been deleted stays, with its recording status set to none.
+
+Retention is set by environment variables. See the [Configuration Reference](/data-models/configuration/index#data-retention).
+
+:::note
+The move from hot to warm and from warm to cold runs once a day, at 04:00 UTC. Records do not disappear at the exact moment they cross a boundary.
+:::
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/call-detail-records` | List CDR records |
-| GET | `/v1/call-detail-records/{call_detail_record}` | Show a CDR record |
-| GET | `/v1/call-detail-records/export` | Export to CSV |
-| GET | `/v1/call-detail-records/statistics` | Aggregate statistics |
+| GET | `/v1/call-detail-records` | List (add `archive=1` for API keys to read the warm tier) |
+| GET | `/v1/call-detail-records/{call_detail_record}` | One record |
+| GET | `/v1/call-detail-records/{call_detail_record}/recording` | Stream the recording |
+| GET | `/v1/call-detail-records/export` | CSV export |
+| GET | `/v1/call-detail-records/statistics` | Totals and averages |
+| GET | `/v1/platform/cdr-archive` | Warm-tier records for all organizations (platform owners) |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Common problems
 
-- [Live Calls](/modules/live-calls) — Real-time monitoring
-- [AMD Worker](/workers/amd-worker) — Voicemail detection service
-- [Call Notifications](/modules/call-notifications) — Webhook notifications for call events
+| Symptom | Likely cause |
+|---------|--------------|
+| A call is missing | The call-end webhook did not reach OPBX. Check [Settings](/administration) and the Cloudonix webhook configuration |
+| Recording button is missing | The call was not recorded, or the recording was deleted by retention |
+| A search finds nothing for a number | Number search matches the start of the number. Add a wildcard (`*`) in front of the part you want |
+| A call older than 6 months is missing from this page | It moved to the warm tier. Use the API with an API key and `archive=1` |
+
+## Related modules
+
+- [Live Calls](/modules/live-calls) — real-time view of calls in progress
+- [Recordings](/modules/recordings) — recordings for IVR prompts and announcements (different from call recordings)
+- [AMD Worker](/workers/amd-worker) — voicemail detection service
+- [Call Notifications](/modules/call-notifications) — webhook notifications for call events
+- [API Keys](/modules/api-keys) — scoped keys, including archive access

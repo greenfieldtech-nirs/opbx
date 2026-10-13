@@ -3,145 +3,168 @@ sidebar_position: 3
 slug: /modules/phone-numbers
 sidebar_class_name: cxGuidesSidebar
 title: "Phone Numbers (DIDs)"
-description: "Managing inbound phone numbers and routing"
+description: "Add the numbers callers dial, route each one to a destination, and use it as a caller ID"
 ---
 
 # Phone Numbers (DIDs)
 
-Direct Inward Dialing (DID) numbers are the phone numbers that external callers dial to reach your organization. This page explains how to manage phone numbers and configure their routing.
+A phone number (DID, direct inward dial) is a number that outside callers dial to reach your organization. Each DID has one routing destination: an extension, ring group, queue, IVR menu, business-hours schedule, conference room, AI assistant or AI load balancer.
 
 ## Purpose
 
 Use this module to:
 
-- Add and label phone numbers
-- Configure inbound call routing
-- Enable or disable numbers
-- Choose from multiple destination types
-- Use a DID as the outbound caller ID for an extension or whitelist rule
+- add the numbers your organization owns;
+- route each number to a destination;
+- turn a number on or off;
+- use a number as the caller ID for outbound calls (see below).
 
-## Phone Number Format
+## Prerequisites
 
-OPBX stores phone numbers in E.164 international format:
-
-- Starts with a plus sign (`+`)
-- Followed by country code
-- Followed by national number
-
-Example: `+14155551234` (US number, 415 area code)
-
-A non-E.164 mode is available for internal or special-use numbers.
-
-:::warning
-Phone numbers are immutable after creation. If you need to change a number, delete the old entry and add a new one.
-:::
-
-## Routing Types
-
-When a call arrives at a DID, OPBX routes it to a destination:
-
-| Routing Type | Routes To | Best For |
-|-------------|-----------|----------|
-| Extension | A specific extension | Direct lines |
-| Ring Group | A group of extensions | Department coverage |
-| IVR Menu | Interactive voice menu | Main company number |
-| Business Hours | Time-based routing | Open/closed handling |
-| Conference Room | Conference bridge | Dedicated conference lines |
-| AI Assistant | AI voice agent | Automated support |
-| AI Load Balancer | Distributed AI agents | High-volume AI routing |
+- The number is provisioned in Cloudonix and points at your OPBX instance. See [Cloudonix Setup](/installation/cloudonix-setup).
+- The destination exists and is **active**. Creating a DID is refused if its destination is inactive, missing, or belongs to another organization.
 
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View phone numbers | Yes | Yes | Yes | Yes |
-| Create phone numbers | Yes | Yes | No | No |
-| Update phone numbers | Yes | Yes | No | No |
-| Delete phone numbers | Yes | Yes | No | No |
+|--------|:-----:|:---------:|:--------:|:--------:|
+| See Phone Numbers in the sidebar | Yes | Yes | No | Yes |
+| Create | Yes | Yes | No | No |
+| Edit routing or status | Yes | Yes | No | No |
+| Delete | Yes | Yes | No | No |
 
-## UI Workflow
+## Number format
 
-### Add a Phone Number
+The number must be in **E.164** format: a plus sign, a first digit from 1 to 9, then 1 to 14 more digits. For example `+14155551234`. Maximum 20 characters.
 
-1. Navigate to **Phone Numbers** in the sidebar
-2. Click **Add Phone Number**
-3. Enter the number in E.164 format (for example, `+14155551234`)
-4. Enter an optional friendly name
-5. Select the routing type
-6. Choose the destination
-7. Save the configuration
+A **non-E.164** option accepts digits, `+` and `#` only. Use it for internal or special-use numbers that are not valid E.164.
 
-:::tip
-Use a consistent format for all numbers. Include the plus sign and country code to ensure proper routing.
+The number must be **unique across all organizations**. A number that another organization already has is refused with "This phone number is already registered."
+
+:::warning Numbers cannot be changed
+The number is fixed after creation. To change it, delete the DID and create a new one. The delete is refused while the number is used elsewhere (see [Delete](#delete)).
 :::
 
-### Change Routing
+## Fields
 
-1. Find the number in the Phone Numbers list
-2. Click to edit
-3. Select a new routing type
-4. Choose the new destination
-5. Save changes
+| Field | Required | Limit | Meaning |
+|-------|----------|-------|---------|
+| Phone number | Yes | E.164 (or digits, `+`, `#` in non-E.164 mode), max 20 characters | The number callers dial |
+| Friendly name | No | Up to 255 characters | A label for your lists, for example "Main line" |
+| Routing type | Yes | See the table below | What kind of destination the call goes to |
+| Destination | Yes | Pick one existing, active item | The item itself |
+| Status | Yes | Active or Inactive. Default: Active | Whether the number is used for routing |
 
-Routing changes take effect immediately. Active calls are not affected, but new calls follow the new routing.
+### Routing types
 
-## Phone Number Status
+| Routing type | Routes to | Typical use |
+|--------------|-----------|-------------|
+| Extension | One extension | Direct line |
+| Ring group | A ring group | Department coverage |
+| Call queue | A call queue | Support or sales line that needs waiting and statistics |
+| IVR menu | A menu | Main company number with "press 1 for…" |
+| Business hours | A business-hours schedule | Open and closed handling |
+| Conference room | A conference room | Dedicated conference line |
+| AI assistant | An AI assistant | Automated answering |
+| AI load balancer | An AI load balancer | High-volume AI answering |
 
-| Status | Behavior |
-|--------|----------|
-| Active | Routes calls to the configured destination |
-| Inactive | Calls are rejected |
+Each destination must be **active**. A destination that is inactive, deleted, or belongs to another organization is refused.
 
-Set a number to Inactive when:
+## Create a phone number
 
-- The number is being ported
-- You want to temporarily block calls
-- The number is reserved for future use
+1. Open **Phone Numbers** in the sidebar.
+2. Click **Add Phone Number**.
+3. Enter the number in E.164 format, for example `+14155551234`.
+4. Enter a friendly name if you want one.
+5. Choose the routing type, then the destination.
+6. Save.
 
-## Using a DID as an Outbound Caller ID
+{/* SCREENSHOT: phone-numbers-list — Phone Numbers list with three numbers, one Unprovisioned, and the Unprovisioned filter button */}
 
-Besides receiving inbound calls, an **active** DID can be presented as the caller ID on **outbound** calls. Assign it as a Default Caller ID on an [Extension](/modules/extensions) or an [Outbound Whitelist](/modules/outbound-whitelist) rule.
+{/* SCREENSHOT: phone-numbers-create-dialog — Add Phone Number dialog with a valid E.164 number, routing type Call queue and the queue picker */}
 
-Only active DIDs owned by your organization can be used this way. If a DID selected as a caller ID is deactivated, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/installation/outbound-calling-overview) for details.
+A new number must be fully routed. The **Destination unavailable** choice is not offered when you create a number.
+
+## Change routing
+
+1. Click the number in the list.
+2. Change the routing type or destination, or the status.
+3. Save.
+
+On the edit screen only, the destination can be set to **Disconnect**. That stores "Destination unavailable" and the number shows the **Unprovisioned** badge. Callers hear "Destination doesn't exist" and the call ends. Use it when a number is provisioned but not yet in service.
+
+{/* SCREENSHOT: phone-numbers-unprovisioned — edit dialog for an unprovisioned number, with the Unprovisioned badge in the title and Destination unavailable in the destination picker */}
+
+## Status
+
+| Status | Meaning |
+|--------|---------|
+| Active | Calls to the number are routed to its destination |
+| Inactive | The number is not used for routing |
+
+Set a number to Inactive while it is being ported, to block calls temporarily, or while it is reserved.
+
+## Delete
+
+Deleting asks for confirmation. The delete is refused while the number is assigned as configuration somewhere else:
+
+- the default caller ID of an extension;
+- a call-tracking number;
+- the caller ID of an outbound whitelist rule;
+- a caller-ID pool of an auto-dialer campaign;
+- a scope of an inbound blacklist.
+
+The refusal opens a dialog that lists each place. Remove those assignments, then delete the number. Call history (call logs, CDRs, call-tracking sessions, blocked-call logs) never blocks a delete.
+
+{/* SCREENSHOT: phone-numbers-in-use-dialog — "Cannot delete: still in use" dialog for a DID, listing an extension default caller ID and an outbound whitelist entry */}
+
+## Using a number as an outbound caller ID
+
+Besides receiving calls, an **active** number can be shown as the caller ID on outbound calls. Assign it as the default caller ID on an [extension](/modules/extensions) or on an [outbound whitelist](/modules/outbound-whitelist) rule.
+
+Only active numbers owned by your organization can be used this way. When the chosen number is not usable, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/installation/outbound-calling-overview).
 
 :::note
-A previous organization-wide "default caller ID" setting has been superseded by the per-extension and per-whitelist Default Caller ID. The organization-level endpoints (`GET`/`PUT /v1/phone-numbers/default-caller-id`) are deprecated and no longer consulted during call routing.
+The organization-wide default caller ID (`GET` and `PUT /v1/phone-numbers/default-caller-id`) is deprecated. Call routing no longer reads it. Use the per-extension and per-whitelist default instead.
 :::
 
-## Key Data Fields
+## Key data fields
 
-### `did_numbers` Table
+### `did_numbers`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `phone_number` | string(20) | Globally unique, immutable |
-| `friendly_name` | string nullable | Display label |
-| `routing_type` | enum | extension, ring_group, business_hours, conference_room, ai_assistant, ivr_menu, ai_load_balancer |
-| `routing_config` | JSON | `{extension_id: N}` etc. |
-| `status` | enum | active, inactive |
-| `cloudonix_config` | JSON nullable | Cloudonix metadata |
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `phone_number` | String up to 20 characters. Unique across all organizations. Cannot be changed |
+| `friendly_name` | Optional label, up to 255 characters |
+| `routing_type` | `extension`, `ring_group`, `call_queue`, `ivr_menu`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer` or `unavailable` |
+| `routing_config` | JSON with the target id, for example `{"extension_id": 12}` |
+| `status` | `active` or `inactive` |
 
-## Related API Endpoints
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/phone-numbers[/{phoneNumber}]` | Standard CRUD |
+| GET | `/v1/phone-numbers` | List |
+| POST | `/v1/phone-numbers` | Create. Rejects "Destination unavailable" |
+| GET | `/v1/phone-numbers/{phoneNumber}` | One number |
+| PUT | `/v1/phone-numbers/{phoneNumber}` | Update routing and status. The number itself is refused if sent |
+| DELETE | `/v1/phone-numbers/{phoneNumber}` | Delete. Returns 409 with the list of uses when in use |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Best Practices
+## Best practices
 
-- Label numbers with their purpose (Sales, Support, Main)
-- Use consistent routing patterns for similar numbers
-- Document which numbers are published externally
-- Test each number after configuration
+- Label each number with its purpose (Sales, Support, Main).
+- Keep the same routing pattern for similar numbers.
+- Test each number after you change its routing.
 
-## Related Modules
+## Related modules
 
-- [Extensions](/modules/extensions) — Extension routing target and per-extension caller ID
-- [Ring Groups](/modules/ring-groups) — Ring group routing target
-- [IVR Menus](/modules/ivr-menus) — IVR routing target
-- [Business Hours](/modules/business-hours) — Time-based routing target
-- [Outbound Calling Overview](/installation/outbound-calling-overview) — Using a DID as an outbound caller ID
+- [Extensions](/modules/extensions) — extension routing target and per-extension caller ID
+- [Ring Groups](/modules/ring-groups) — ring group routing target
+- [Call Queues](/modules/call-queues) — queue routing target
+- [IVR Menus](/modules/ivr-menus) — menu routing target
+- [Business Hours](/modules/business-hours) — time-based routing target
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — using a number as an outbound caller ID
