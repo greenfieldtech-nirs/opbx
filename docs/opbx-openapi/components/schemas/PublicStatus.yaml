@@ -1,0 +1,23 @@
+type: object
+properties:
+  data:
+    type: object
+    properties:
+      status: {type: string, enum: [ok, degraded, down, unknown], description: Worst group status}
+      updated_at: {type: string, format: date-time, nullable: true}
+      groups:
+        type: array
+        items:
+          type: object
+          properties:
+            key: {type: string, example: call_routing}
+            name: {type: string, example: Call routing}
+            status: {type: string, enum: [ok, degraded, down, unknown]}
+            history:
+              type: array
+              description: Last 6 hours in 5-minute buckets, worst member status per bucket
+              items:
+                type: object
+                properties:
+                  at: {type: string, format: date-time}
+                  status: {type: string, enum: [ok, degraded, down, unknown]}

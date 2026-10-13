@@ -1,0 +1,21 @@
+paths:
+  /v1/public/status:
+    get:
+      tags:
+        - Platform
+      summary: Public platform status
+      description: >-
+        Unauthenticated platform status for the public status page. Six service groups, each with its
+        current status and 6 hours of history (5-minute buckets). Cached for 30 seconds; limited to 60
+        requests per minute per IP. Exposes no component names, versions, latency or error details.
+      operationId: getPublicStatus
+      security: []
+      responses:
+        '200':
+          description: Group statuses
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/PublicStatus.yaml'
+        '429':
+          description: Too many requests

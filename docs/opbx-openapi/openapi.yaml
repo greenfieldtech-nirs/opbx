@@ -583,6 +583,9 @@ paths:
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
 
+  /v1/public/status:
+    $ref: './paths/platform/public-status.yaml#/paths/~1v1~1public~1status'
+
   /v1/platform/status:
     $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status'
 
