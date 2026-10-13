@@ -182,7 +182,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                                 {getIdentityPrimary(item)}
                                                 {(item as { is_unprovisioned?: boolean }).is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
                                             </div>
-                                            <div className="text-xs text-muted-foreground capitalize">
+                                            <div className="text-xs text-muted-foreground">
                                                 {getIdentitySecondary(item)}
                                             </div>
                                         </div>

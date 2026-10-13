@@ -9,6 +9,7 @@
  * - Role-based UI (Owner/PBX Admin/PBX User/Reporter)
  */
 
+import { EXTENSION_BADGE_CONFIG, labelForRoutingType } from '@/components/destinations/utils/destination-config';
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { useState,useMemo,useEffect } from 'react';
@@ -1292,7 +1293,7 @@ export default function ExtensionsComplete() {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
-            getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
+            getIdentitySecondary={(extension) => `${EXTENSION_BADGE_CONFIG[extension.type as keyof typeof EXTENSION_BADGE_CONFIG]?.text ?? labelForRoutingType(extension.type)} Extension`}
             onIdentityClick={canCreate ? (ext) => canActOnExtension(ext) && openEditDialog(ext) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
