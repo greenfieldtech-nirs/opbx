@@ -596,7 +596,7 @@ export function IvrMenuForm({
                                 }}
                                 layout="horizontal"
                                 className="gap-2"
-                                typeClassName="w-[200px] flex-none"
+                                typeClassName="w-[260px] flex-none"
                                 destinationClassName="flex-1 min-w-0"
                                 allowedTypes={[...OPTION_TYPES]}
                                 extensionTypes={option?.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
