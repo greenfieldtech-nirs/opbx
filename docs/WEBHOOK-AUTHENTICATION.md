@@ -166,7 +166,9 @@ if (!hash_equals($settings->domain_requests_api_key, $providedToken)) {
 
 ### Backward Compatibility
 
-Organizations that have not configured a `domain_requests_api_key` will continue to receive webhooks without authentication. This is intentional to avoid breaking existing integrations. Organizations should configure an API key in **Settings → Cloudonix** to enable webhook authentication.
+Organizations that have not configured a `domain_requests_api_key` are still accepted, but each unauthenticated webhook is logged as `webhook.unauthenticated`. This is the rollout window that lets existing integrations keep working.
+
+Enforcement is switched on with `CLOUDONIX_WEBHOOK_REQUIRE_AUTH`. It defaults to `false` (warn only). When it is `true`, a status, CDR or dialer webhook from an organization with no key is rejected. Turn it on only after `php artisan cloudonix:provision-webhook-keys` has given every organization a key (use `--dry-run` first to list the organizations affected). The key is pushed to the organization's Cloudonix domain profile, so this is a Cloudonix-side change as well as an OPBX one.
 
 ---
 

@@ -58,7 +58,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 ### Real-Time Monitoring
 - **Live Call Dashboard**: Real-time call presence via WebSockets with automatic stale record cleanup
 - **Auto Dialer Monitor**: Real-time campaign monitoring with active calls, disposition pie charts, and KPI cards
-- **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export
+- **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export; older records move to a warm archive (6 to 12 months) and then to compressed cold files kept 7 years by default
 - **Call Statistics**: Volume, duration, and disposition metrics
 - **Call Notifications**: Webhook-based notifications for call events with SSRF protection and retry logic
 - **Centralized Logging**: Optional Loki + Grafana stack aggregating structured logs from all services, with per-call audit trails searchable by Cloudonix session token ([docs](docs/LOG-AGGREGATION.md))
@@ -69,7 +69,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Distributed Locking**: Prevents race conditions on concurrent calls
 - **Queue Workers**: Async job processing for non-blocking operations
 - **Service Architecture**: Modular voice routing with dedicated services for outbound, business hours, and IVR handling
-- **CAC Counter Reconciliation**: Self-healing Redis counters for the auto dialer worker
+- **CAC Counter Reconciliation**: Laravel reconciles the auto dialer's Redis CAC counters every minute, healing drift from missed or duplicate call records
 - **Circuit Breaker**: Fault tolerance for Cloudonix API calls with automatic fallback
 - **Resilient Cache**: Graceful degradation from Redis to database when Redis is unavailable
 
@@ -446,8 +446,10 @@ Webhooks are configured per-organization in **Settings → Cloudonix** in the ad
 
 **Health Check Endpoint:**
 ```bash
-curl http://localhost/health
+curl http://localhost/api/health
 ```
+
+**Platform Status:** platform managers see every component's health, with a 24-hour history, at `/ui/platform/status`. The public status page at `/status` shows coarse group health without login. See the [user guide](docs/opbx-userguide/administration/platform-management.mdx).
 
 **Application Logs:**
 ```bash
