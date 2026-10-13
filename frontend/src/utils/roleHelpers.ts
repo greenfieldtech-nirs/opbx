@@ -119,6 +119,8 @@ const ABILITY_ROLES = {
   'recordings.manage': ['owner', 'pbx_admin'],
   // CallTrackingAdPlatformIntegrationPolicy
   'callTracking.integrations': ['owner', 'pbx_admin'],
+  // CallQueuePolicy create/update/delete (Supervisors only read queues with their agents)
+  'callQueues.manage': ['owner', 'pbx_admin'],
   // OutboundWhitelistPolicy create/update/delete (view is open to every role)
   'outboundWhitelist.manage': ['owner', 'pbx_admin'],
 } as const;

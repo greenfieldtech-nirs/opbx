@@ -11,6 +11,7 @@ import { ArrowLeft, Clock, PhoneCall, Timer, Users } from 'lucide-react';
 
 import { callQueuesService, queueAgentService, queueStatsService, type QueueAgentState } from '@/services/callQueues.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ export default function CallQueueDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'callQueues.manage');
   const queryClient = useQueryClient();
 
   const agentStateMutation = useMutation({

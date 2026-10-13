@@ -22,6 +22,7 @@ import {
 import { recordingsService, usersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { StandardDataTable, Column, EmptyState, CallQueueStrategySelector } from '@/components/design-system';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
@@ -118,7 +119,7 @@ function NumberSelect({
 
 export default function CallQueues() {
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'callQueues.manage');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
