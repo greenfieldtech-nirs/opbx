@@ -23,11 +23,17 @@ const cloudFeatures = [
   'No server maintenance',
 ];
 
+const fdeFeatures = [
+  'All self-hosted features included',
+  'Priority enterprise support',
+  'Enterprise assigned FDE',
+];
+
 export function Pricing() {
   return (
     <section id="pricing" className="py-20 md:py-28 bg-card/30 border-y border-border">
       <div className="container mx-auto px-4">
-        <div className="max-w-5xl mx-auto text-center">
+        <div className="max-w-6xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/50 mb-6">
             <span className="text-xl font-medium text-muted-foreground">Pricing</span>
           </div>
@@ -38,7 +44,7 @@ export function Pricing() {
             Start free. Choose self-hosted control or managed cloud convenience.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
             <Card className="border border-border bg-card overflow-hidden text-left flex flex-col h-full">
               <CardHeader className="border-b border-border pb-6">
                 <CardTitle className="text-3xl font-bold text-foreground">Self-Hosted</CardTitle>
@@ -109,6 +115,40 @@ export function Pricing() {
                   <p className="text-xl text-muted-foreground mt-4">
                     Cloudonix usage billed separately.
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-border bg-card overflow-hidden text-left relative flex flex-col h-full">
+              <div className="absolute top-4 right-4">
+                <Badge className="bg-primary text-primary-foreground hover:bg-primary">
+                  Enterprise Special
+                </Badge>
+              </div>
+              <CardHeader className="border-b border-border pb-6">
+                <CardTitle className="text-3xl font-bold text-foreground">Self Hosted FDE</CardTitle>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-5xl font-bold text-foreground">Contact Us</span>
+                </div>
+                <p className="text-xl text-muted-foreground mt-2">
+                  Self hosted with Remote FDE support
+                </p>
+              </CardHeader>
+              <CardContent className="p-8 grow flex flex-col">
+                <ul className="space-y-3 mb-8">
+                  {fdeFeatures.map((feature) => (
+                    <li key={feature} className="flex items-center gap-3 text-xl text-muted-foreground">
+                      <span className="text-primary">✓</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto">
+                  <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                    <a href="https://www.cloudonix.com/#/contact-sales" target="_blank" rel="noopener noreferrer">
+                      Contact us
+                    </a>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
