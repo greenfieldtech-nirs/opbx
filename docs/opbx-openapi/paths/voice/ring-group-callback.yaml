@@ -132,5 +132,3 @@ paths:
           description: Empty response to continue call normally
         '401':
           description: Unauthorized - Invalid Bearer token
-        '429':
-          description: Rate limit exceeded

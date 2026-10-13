@@ -75,5 +75,3 @@ paths:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
         '401':
           description: Unauthorized - Invalid Bearer token
-        '429':
-          description: Rate limit exceeded

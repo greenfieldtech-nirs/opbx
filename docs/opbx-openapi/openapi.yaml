@@ -71,6 +71,7 @@ info:
       | `POST /voice/route` | Main inbound call routing (returns CXML) |
       | `POST /voice/ivr-input` | IVR digit input handling |
       | `POST /callbacks/voice/ring-group-callback` | Ring group routing |
+      | `POST /callbacks/voice/conference-pin` | Conference room PIN entry |
       | `POST /callbacks/voice/albs-follow-through` | ALB failover routing |
     
     ### Platform Manager
@@ -179,6 +180,9 @@ paths:
 
   /callbacks/voice/ring-group-callback:
     $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
+
+  /callbacks/voice/conference-pin:
+    $ref: './paths/voice/conference-pin.yaml#/paths/~1callbacks~1voice~1conference-pin'
 
   /callbacks/voice/queue-agent-connect:
     $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-agent-connect'
