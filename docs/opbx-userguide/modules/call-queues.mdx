@@ -41,9 +41,9 @@ Before you create a queue, prepare these:
 
 On save, the queue is stored and becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Agent states](#agent-states)).
 
-{/* SCREENSHOT: call-queues-list — Call Queues list with two queues, one active and one inactive, and an Unprovisioned badge on one row */}
+![Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the Unprovisioned filter button](../img/screens/call-queues-list.jpg)
 
-{/* SCREENSHOT: call-queues-create-dialog — Create Queue dialog showing strategy, timeouts, music on hold and the fallback destination selector */}
+![New Call Queue dialog showing the strategy, timeouts, hold music, the option switches, agents and the overflow fallback selector](../img/screens/call-queues-create-dialog.jpg)
 
 ## Queue settings
 
@@ -132,7 +132,7 @@ A queue appears as a destination wherever destinations are configured:
 A queue can be given an internal extension of type **Queue** so that agents can transfer callers into it. The in-use check does not look at that extension. Remove or change the extension yourself before you delete the queue.
 :::
 
-{/* SCREENSHOT: call-queues-in-use-dialog — "Cannot delete: still in use" dialog for a call queue, listing an IVR option and a ring group fallback */}
+![Cannot delete: still in use dialog for Billing Queue listing a Main Menu IVR option](../img/screens/call-queues-in-use-dialog.jpg)
 
 ## Live monitoring
 
