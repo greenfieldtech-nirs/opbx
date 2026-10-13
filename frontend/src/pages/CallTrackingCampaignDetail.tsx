@@ -25,6 +25,8 @@ import { CallTrackingNotificationSettingsForm } from '@/components/call-tracking
 import { CallTrackingNotificationLogsTable } from '@/components/call-tracking/CallTrackingNotificationLogsTable';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
+
 export default function CallTrackingCampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -189,9 +191,9 @@ export default function CallTrackingCampaignDetail() {
           variant={campaign.status === 'active' ? 'default' : 'secondary'}
           className={campaign.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
         >
-          {campaign.status}
+          {labelForRoutingType(campaign.status)}
         </Badge>
-        <Badge variant="outline">Destination: {campaign.destination_type}</Badge>
+        <Badge variant="outline">Destination: {labelForRoutingType(campaign.destination_type)}</Badge>
         {campaign.google_ads_upload_enabled && <Badge variant="outline">Google Ads</Badge>}
         {campaign.meta_upload_enabled && <Badge variant="outline">Meta</Badge>}
       </div>

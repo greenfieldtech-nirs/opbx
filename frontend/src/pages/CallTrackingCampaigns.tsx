@@ -30,6 +30,8 @@ import { cn } from '@/lib/utils';
 import type { CallTrackingCampaign } from '@/types/callTracking';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
+
 export default function CallTrackingCampaigns() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -134,7 +136,7 @@ export default function CallTrackingCampaigns() {
       header: 'Destination',
       cell: (campaign) => (
         <Badge variant="outline" className="capitalize">
-          {campaign.destination_type.replace('_', ' ')}
+          {labelForRoutingType(campaign.destination_type)}
         </Badge>
       ),
     },

@@ -157,6 +157,8 @@ const extractNumericId = (targetId: string): string => {
 /**
  * Get simple action display name as string (for table subtitles)
  */
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
+
 export const getActionDisplayNameSimple = (action: unknown): string => {
   if (!action) return 'Not set';
 
@@ -173,12 +175,12 @@ export const getActionDisplayNameSimple = (action: unknown): string => {
       case 'ai_assistant':
         return `AI Assistant ${actionObj.target_id}`;
       default:
-        return `${actionObj.type}: ${actionObj.target_id}`;
+        return `${labelForRoutingType(actionObj.type)} ${actionObj.target_id}`;
     }
   }
 
   if (typeof action === 'string') {
-    return action;
+    return labelForRoutingType(action);
   }
 
   return 'Unknown';

@@ -50,6 +50,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 import { cn } from '@/lib/utils';
 import {
   StandardDataTable,
@@ -310,7 +311,7 @@ export default function PhoneNumbers() {
       default:
         return {
           icon: Phone,
-          label: routingType,
+          label: labelForRoutingType(routingType),
           color: 'bg-gray-100 text-gray-800 border-gray-200',
         };
     }

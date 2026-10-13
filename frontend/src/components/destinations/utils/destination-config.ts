@@ -179,6 +179,17 @@ export function getDestinationTypeLabel(type: DestinationType): string {
 }
 
 /**
+ * Human label for any raw routing/destination value coming from the API (e.g. 'call_queue' -> 'Call Queue').
+ * Falls back to a spaced title-case for values the config does not know (e.g. 'call_tracking').
+ */
+export function labelForRoutingType(type: string | null | undefined): string {
+  if (!type) return '-';
+  const known = (DESTINATION_TYPE_CONFIG as Record<string, TypeMetadata | undefined>)[type];
+  if (known) return known.label;
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
  * Badge configurations for extension subtypes
  */
 export const EXTENSION_BADGE_CONFIG: Record<ExtensionType, { color: string; text: string }> = {
