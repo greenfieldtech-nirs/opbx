@@ -13,8 +13,10 @@ use App\Http\Resources\AiAssistantLoadBalancerResource;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
 use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -240,8 +242,10 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
 
-        // Try to acquire lock with timeout
-        if (! $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS)) {
+        // block() throws when the lock stays taken; the hook must return ?Lock, so the 409 is thrown.
+        try {
+            $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS);
+        } catch (LockTimeoutException) {
             Log::warning('Failed to acquire load balancer lock', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -249,10 +253,10 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
                 'lock_key' => $lockKey,
             ]);
 
-            return response()->json([
+            throw new HttpResponseException(response()->json([
                 'error' => 'Conflict',
                 'message' => 'Load balancer is currently being modified. Please try again.',
-            ], 409);
+            ], 409));
         }
 
         Log::debug('Load balancer lock acquired', [

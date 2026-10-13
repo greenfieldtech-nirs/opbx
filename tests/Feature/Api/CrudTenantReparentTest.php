@@ -13,6 +13,7 @@ use App\Models\Organization;
 use App\Models\RingGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -121,5 +122,32 @@ class CrudTenantReparentTest extends TestCase
 
         $this->putJson("/api/v1/ai-assistant-load-balancers/{$lb->id}", ['strategy' => 'bogus'])
             ->assertStatus(422)->assertJsonValidationErrors(['strategy']);
+    }
+
+    /** A busy update lock answers 409 Conflict (it used to surface as a 500). */
+    public function test_ring_group_and_load_balancer_update_return_409_while_locked(): void
+    {
+        $group = RingGroup::factory()->create(['organization_id' => $this->org->id]);
+        $ext = Extension::factory()->create(['organization_id' => $this->org->id]);
+        $lb = AiAssistantLoadBalancer::factory()->create(['organization_id' => $this->org->id]);
+        $assistant = AiAssistant::factory()->create(['organization_id' => $this->org->id]);
+
+        $held = [Cache::lock("lock:ring_group:{$group->id}", 30), Cache::lock("lock:albs:{$lb->id}", 30)];
+        foreach ($held as $lock) {
+            $this->assertTrue($lock->get());
+        }
+
+        try {
+            $this->putJson("/api/v1/ring-groups/{$group->id}", $this->ringGroupPayload([['extension_id' => $ext->id, 'priority' => 1]]))
+                ->assertStatus(409)->assertJson(['error' => 'Conflict']);
+            $this->putJson("/api/v1/ai-assistant-load-balancers/{$lb->id}", [
+                'name' => 'LB', 'strategy' => 'round_robin', 'fallback_action' => 'hangup', 'status' => 'active',
+                'members' => [['ai_assistant_id' => $assistant->id]],
+            ])->assertStatus(409)->assertJson(['error' => 'Conflict']);
+        } finally {
+            foreach ($held as $lock) {
+                $lock->release();
+            }
+        }
     }
 }
