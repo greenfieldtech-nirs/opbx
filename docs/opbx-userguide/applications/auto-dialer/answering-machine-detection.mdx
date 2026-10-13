@@ -36,7 +36,7 @@ Use AMD to avoid spending an AI conversation on voicemail boxes, to count how ma
 |-------|---------|--------------------------------------|--------------|
 | If Voicemail Detected | Hang up, Continue to destination | Hang up | A beep is heard |
 | If Human Detected | Hang up, Continue to destination | Continue to destination | Not reported by the current detector (see below) |
-| If Detection Unclear | Hang up, Continue to destination | **Hang up** | No beep within the detection window |
+| If Detection Unclear | Hang up, Continue to destination | **Continue to destination** | No beep within the detection window |
 | Retry on Voicemail | On or off | Off | A beep is heard and the number has attempts left |
 
 The form also shows a **Remote CXML URL** choice and URL boxes for each action. The server accepts only **Hang up** and **Continue**; a URL is refused when you save.
@@ -58,7 +58,7 @@ An action left empty is treated as **Continue**.
 Timings are set on the AMD worker: `AMD_DEFAULT_TIMEOUT_SECONDS` (default 30) and `AMD_MIN_BEEP_START_MS` (default 2000). See [AMD Worker](/workers/amd-worker).
 
 :::warning The detector does not recognise a human voice
-The current detector only listens for a beep. It never reports **Human**, so **If Human Detected** has no effect. A call answered by a person ends with **Unknown** when the detection window closes. With the default **If Detection Unclear = Hang up**, every call that does not reach a voicemail is **hung up after about 30 seconds**, including live conversations. For most campaigns set **If Detection Unclear** to **Continue to destination**.
+The current detector only listens for a beep. It never reports **Human**, so **If Human Detected** has no effect. A call answered by a person ends with **Unknown** when the detection window closes. The form now defaults **If Detection Unclear** to **Continue to destination**, so live conversations carry on. If you set it to **Hang up**, every call that does not reach a voicemail is **hung up after about 30 seconds**, including live conversations. Campaigns saved earlier keep the value they were saved with.
 :::
 
 ## Retry on Voicemail
@@ -82,7 +82,7 @@ Switching **Enable Detection** off in the edit form does **not** clear the actio
 
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
-| Live calls end after about 30 seconds | **If Detection Unclear** is Hang up | Set it to Continue to destination |
+| Live calls end after about 30 seconds | **If Detection Unclear** is Hang up (older campaigns or set by hand) | Set it to Continue to destination |
 | Voicemail is never detected | The AMD worker is down, or the webhook base URL is not set | Check the worker's health and the Cloudonix settings |
 | A real beep is missed | The beep came within the first 2 seconds, or the greeting was longer than the window | Raise `AMD_DEFAULT_TIMEOUT_SECONDS`; lower `AMD_MIN_BEEP_START_MS` with care |
 | Calls are hung up on a ringback or tone at answer | A steady tone after the 2-second gate | Raise `AMD_MIN_BEEP_START_MS` |

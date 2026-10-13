@@ -8,7 +8,7 @@ description: "Spread calls across several AI assistants, try the next one when a
 
 # AI Load Balancers
 
-An AI load balancer groups several [AI assistants](/modules/ai-assistants) behind one destination. Each call goes to one member chosen by the strategy (round robin, priority or percentage). With **Follow Through** on, a member that fails is skipped and the next one is tried. When no member can take the call, the **fallback** runs: an extension, ring group, IVR menu, another AI assistant, or hang up.
+An AI load balancer groups several [AI assistants](/modules/ai-assistants) behind one destination. Each call goes to one member chosen by the strategy (round robin, priority or percentage). With **Follow Through** on, a member that fails is skipped and the next one is tried. When no member can take the call, the **fallback** runs: an extension, ring group, IVR menu, another AI assistant, a call queue, another AI load balancer, or hang up.
 
 This page is the walk-through. For designs such as primary and backup, or A/B tests, see [AI Load Balancers (applications)](/applications/ai-load-balancers).
 
@@ -63,7 +63,7 @@ On save, the load balancer is stored as **Active** and becomes available as a de
 | Members | Yes | 1 to 50 active AI assistants; each assistant once | The assistants that take calls |
 | Weight | Percentage Based only | 0 to 100 % in steps of 5 in the dialog. Default for a new member: 100 | Share of calls for the member |
 | Follow Through | No | Off by default | Try the next member when one fails |
-| Fallback Action | Yes | Extension, Ring Group, IVR Menu, AI Assistant or Hangup. Default: Hangup | What happens when no member can take the call |
+| Fallback Action | Yes | Extension, Ring Group, IVR Menu, AI Assistant, Call Queue, AI Load Balancer or Hangup. Default: Hangup | What happens when no member can take the call |
 | Status | No | Active or Inactive. Default: Active. Change it from the list | Inactive load balancers send every call straight to the fallback |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
@@ -96,9 +96,11 @@ A call counts as failed when the provider leg ends **busy**, **no answer**, **fa
 | Ring Group | Sends the call to the ring group |
 | IVR Menu | Plays the menu |
 | AI Assistant | Connects one more assistant, without Follow Through. It cannot be a member of the same load balancer ("Circular reference detected") |
+| Call Queue | Puts the caller in the call queue |
+| AI Load Balancer | Hands the call to another load balancer's selection. It cannot be the same load balancer; a chain that loops back ends the call |
 | Hangup | Ends the call |
 
-The fallback target must belong to your organization and be **active** when you save.
+Call Queue and AI Load Balancer need a target: saving without one is refused. The fallback target must belong to your organization and be **active** when you save.
 
 ## Edit a load balancer
 
@@ -122,7 +124,7 @@ Click the **Active** or **Disabled** badge in the **Status** column. An inactive
 1. Click the delete action on the row.
 2. Confirm in the **Delete AI Load Balancer** dialog.
 
-If anything still points at the load balancer, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, business-hours actions, ring-group and call-queue fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. Change those, then delete again. Call history never blocks a delete.
+If anything still points at the load balancer, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, business-hours actions, ring-group, call-queue and AI load balancer fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. Change those, then delete again. Call history never blocks a delete.
 
 ![Delete AI Load Balancer confirmation for Front Desk AI Pool](../img/screens/ai-load-balancers-delete-confirm.jpg)
 
@@ -145,6 +147,7 @@ If anything still points at the load balancer, the delete is refused and the **C
 | Percentage distribution must equal 100% (currently: N%) | The weights do not add up to 100 | Adjust the weights |
 | Fallback … must be active | The fallback target is inactive | Activate it or pick another |
 | Circular reference detected: Fallback AI assistant cannot be a member | The fallback assistant is also a member | Pick a different fallback assistant |
+| A load balancer cannot fall back to itself | The AI Load Balancer fallback is the same load balancer | Pick a different one |
 | Choose a destination | You tried to create with "Destination unavailable" (API) | Pick a fallback. Disconnect is for edits only |
 | Load balancer is currently being modified | Two saves at the same time | Try again |
 | Cannot delete: still in use | Routing configuration points at the load balancer | Change the listed references, then delete |
@@ -161,8 +164,8 @@ If anything still points at the load balancer, the delete is refused and the **C
 | `strategy` | `round_robin`, `priority` or `percentage` |
 | `follow_through` | Boolean |
 | `status` | `active` or `inactive` |
-| `fallback_action` | `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `hangup` or `unavailable` |
-| `fallback_extension_id`, `fallback_ring_group_id`, `fallback_ivr_menu_id`, `fallback_ai_assistant_id` | Only the one that matches the action is set |
+| `fallback_action` | `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `call_queue`, `ai_load_balancer`, `hangup` or `unavailable` |
+| `fallback_extension_id`, `fallback_ring_group_id`, `fallback_ivr_menu_id`, `fallback_ai_assistant_id`, `fallback_call_queue_id`, `fallback_ai_load_balancer_id` | Only the one that matches the action is set |
 | `deleted_at` | Deletes are soft deletes |
 
 ### `ai_assistant_load_balancer_members`

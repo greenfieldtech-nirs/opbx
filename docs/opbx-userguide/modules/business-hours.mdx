@@ -78,7 +78,7 @@ There is no "Hangup" action. Use Disconnect on an existing schedule, or route to
 :::caution Things to check before relying on a schedule
 - **Time zone.** The hours are evaluated in the schedule's own time zone (the `timezone` field, `UTC` by default), including daylight-saving changes. The dialog has no time-zone field, so a schedule created in it is saved as **UTC**: enter the hours in UTC or set `timezone` through the API.
 - **Call Queue action.** The Call Queue action routes the caller into the queue, from a phone number, an IVR menu or a call-tracking number.
-- **Inactive schedules.** Setting a schedule to Inactive shows it as closed in the list, but the inbound routing code does not check the status. Change the phone number's routing instead of relying on Inactive.
+- **Inactive schedules.** An Inactive schedule is always treated as closed: every call sent to it (from a phone number, an IVR menu or a call-tracking number) uses the **closed-hours action**, whatever the hours say.
 :::
 
 ### Weekly schedule
@@ -109,10 +109,11 @@ Each exception has a date and a name (up to 255 characters). A date can only app
 ## How a call is routed
 
 1. A call arrives on a phone number routed to the schedule.
-2. If today's date has an exception, the exception decides: closed, or open only within its ranges.
-3. Otherwise the day's time ranges decide.
-4. Open: the open-hours action runs. Closed: the closed-hours action runs.
-5. If the target no longer exists or is inactive, the caller hears a short "not available" message and the call ends.
+2. If the schedule is Inactive, it is closed: go to step 4.
+3. If today's date has an exception, the exception decides: closed, or open only within its ranges.
+4. Otherwise the day's time ranges decide.
+5. Open: the open-hours action runs. Closed: the closed-hours action runs.
+6. If the target no longer exists or is inactive, the caller hears a short "not available" message and the call ends.
 
 ## Edit a schedule
 

@@ -56,12 +56,12 @@ The room is saved as **Active** and becomes available as a destination.
 | Max Participants | Required. 2 to 1000 (the dialog's number field stops at 500). Default: 25 | Callers beyond the limit cannot join |
 | PIN Protection | Off by default | When on, a participant PIN is required |
 | Participant PIN | Digits only, up to 20. Required when PIN Protection is on | |
-| Host PIN | Digits only, up to 20. Optional | |
-| Wait for Host | Off by default | |
+| Host PIN | Digits only, up to 20. Optional, but required when Wait for Host is on | |
+| Wait for Host | Off by default. Needs a Host PIN: saving without one is refused | |
 | Mute on Entry | Off by default | Participants join muted |
 | Announce Join/Leave | Off by default | Plays a tone or announcement when someone joins or leaves |
 | Music on Hold | Off by default | |
-| Enable Recording | Off by default. With **Auto-Start Recording** and an optional **Recording Webhook URL** | |
+| Enable Recording | Off by default. With an optional **Recording Webhook URL** | The room is recorded from its start |
 | Enable Talk Detection | Off by default. Needs a **Webhook URL** | |
 | Status | Active or Disabled. Default: Active | Changed from the list |
 
@@ -72,11 +72,11 @@ Webhook URLs must be valid URLs up to 500 characters that are publicly reachable
 ### How the settings apply to a call
 
 - **PIN Protection.** The caller is asked for the participant PIN followed by `#`. Three wrong entries end the call. No PIN entered ends the call.
-- **Host PIN.** A caller who enters the host PIN joins as the host. The host is never muted on entry.
-- **Wait for Host.** Participants wait (with hold music if enabled) until the host joins. This needs a Host PIN: without one the setting is ignored so the room cannot get stuck. If PIN Protection is off, callers are offered a short chance to enter the host PIN and are otherwise let in as waiting participants.
+- **Host PIN.** A caller who enters the host PIN joins as the host. The host is never muted on entry, and **the room ends for everyone when the host leaves**.
+- **Wait for Host.** Participants wait (with hold music if enabled) until the host joins. Saving the room with Wait for Host on and no Host PIN is refused (HTTP 422, error on `host_pin`). Rooms saved earlier with Wait for Host on and no Host PIN keep working: the setting is ignored for them so the room cannot get stuck, and the next save that touches Wait for Host or the Host PIN asks you to set a PIN. If PIN Protection is off, callers are offered a short chance to enter the host PIN and are otherwise let in as waiting participants.
 - **Music on Hold.** Hold music plays while a caller is alone or waiting. When off, they wait in silence.
 - **Mute on Entry.** Participants join muted. **Announce Join/Leave** plays voice prompts when people join or leave. **Max Participants** is capped at 250.
-- **Recording.** The room is recorded from its start only when **Enable Recording** and **Auto-Start Recording** are both on. The recording is delivered to OPBX's recording handler, not to the Recording Webhook URL.
+- **Recording.** The room is recorded from its start whenever **Enable Recording** is on (the old Auto-Start Recording setting is no longer needed or shown). The recording is delivered to OPBX's recording handler, not to the Recording Webhook URL.
 
 :::caution Settings that are still stored but not applied
 **Talk detection** and the **Recording Webhook URL** are saved with the room but not used when a call joins.
@@ -125,7 +125,7 @@ The delete is refused while something still routes to the room: a phone number, 
 | `status` | `active` or `inactive` |
 | `pin`, `host_pin` | Digits. Returned only to Owners and PBX Admins |
 | `pin_required`, `wait_for_host`, `mute_on_entry`, `announce_join_leave`, `music_on_hold` | Booleans |
-| `recording_enabled`, `recording_auto_start`, `recording_webhook_url` | Recording settings |
+| `recording_enabled`, `recording_webhook_url` | Recording settings. `recording_auto_start` is still stored but no longer affects recording |
 | `talk_detection_enabled`, `talk_detection_webhook_url` | Talk-detection settings |
 
 ## Related API endpoints
