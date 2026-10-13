@@ -92,11 +92,55 @@ class PlatformHealthServiceTest extends TestCase
             && ! $request->hasHeader('Authorization'));
     }
 
-    public function test_cloudonix_connection_failure_is_down(): void
+    private ?string $cloudonixOutcome = null;
+
+    /** Store one Cloudonix check a minute after the previous one and return its status and detail. */
+    private function cloudonixCheck(string $outcome): array
+    {
+        if ($this->cloudonixOutcome === null) {
+            // Registered once: Http::fake() stubs accumulate and the first match wins.
+            Http::fake([
+                'api.cloudonix.io*' => fn () => $this->cloudonixOutcome === 'none'
+                    ? throw new ConnectionException('x')
+                    : Http::response('', 404),
+                '*' => Http::response('ok', 200),
+            ]);
+        }
+        $this->cloudonixOutcome = $outcome;
+        $this->travel(1)->minutes();
+        // 'slow': every response counts as slower than the threshold.
+        config(['platform_status.cloudonix.slow_ms' => $outcome === 'slow' ? -1 : 3000]);
+
+        return app(PlatformHealthService::class)->runAndStore()['cloudonix'];
+    }
+
+    public function test_cloudonix_goes_red_only_after_three_consecutive_checks_without_a_response(): void
     {
         config(['services.cloudonix.api_base_url' => 'https://api.cloudonix.io']);
-        $down = $this->probe(['api.cloudonix.io*' => fn () => throw new ConnectionException('x')]);
-        $this->assertSame('down', $down['cloudonix']['status']);
+
+        $first = $this->cloudonixCheck('none');
+        $this->assertSame('ok', $first['status']);
+        $this->assertSame('api.cloudonix.io no response, 1 of 3 consecutive', $first['detail']);
+        $this->assertSame('ok', $this->cloudonixCheck('none')['status']);
+        $this->assertSame('down', $this->cloudonixCheck('none')['status']);
+        $this->assertSame('ok', $this->cloudonixCheck('ok')['status'], 'one good answer clears it');
+    }
+
+    public function test_cloudonix_goes_amber_only_after_three_consecutive_slow_responses(): void
+    {
+        config(['services.cloudonix.api_base_url' => 'https://api.cloudonix.io']);
+
+        $this->assertSame('ok', $this->cloudonixCheck('slow')['status']);
+        $this->assertSame('ok', $this->cloudonixCheck('slow')['status']);
+        $third = $this->cloudonixCheck('slow');
+        $this->assertSame('degraded', $third['status']);
+        $this->assertStringContainsString('3 of 3 consecutive', $third['detail']);
+
+        // A slow / no-response mix is three bad checks but not three without a response: amber, not red.
+        $this->cloudonixCheck('ok');
+        $this->cloudonixCheck('none');
+        $this->cloudonixCheck('slow');
+        $this->assertSame('degraded', $this->cloudonixCheck('none')['status']);
     }
 
     public function test_scheduler_age_thresholds(): void

@@ -30,4 +30,13 @@ return [
 
     // Scheduler heartbeat age (seconds): ok below, degraded below, otherwise down (owner: <1 min green, <3 min amber).
     'scheduler' => ['ok_seconds' => 60, 'degraded_seconds' => 180],
+
+    // Cloudonix is an external API over the internet, so single slow or lost requests are normal.
+    // Owner rule: amber only after N consecutive responses slower than slow_ms; red only after N
+    // consecutive checks with no response at all (no answer within timeout_seconds).
+    'cloudonix' => [
+        'slow_ms' => (int) env('PLATFORM_STATUS_CLOUDONIX_SLOW_MS', 3000),
+        'timeout_seconds' => (float) env('PLATFORM_STATUS_CLOUDONIX_TIMEOUT', 5),
+        'consecutive' => (int) env('PLATFORM_STATUS_CLOUDONIX_CONSECUTIVE', 3),
+    ],
 ];

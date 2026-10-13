@@ -67,9 +67,9 @@ class PlatformHealthService
         foreach (array_keys(self::COMPONENTS) as $component) {
             $started = hrtime(true);
             try {
-                [$status, $detail] = $this->probe($component);
+                [$status, $detail, $raw] = $this->probe($component) + [2 => null];
             } catch (Throwable $e) {
-                [$status, $detail] = [S::DOWN, 'Check failed ('.class_basename($e).')'];
+                [$status, $detail, $raw] = [S::DOWN, 'Check failed ('.class_basename($e).')', null];
             }
             $latency = (int) round((hrtime(true) - $started) / 1e6);
             $results[$component] = [
@@ -77,6 +77,7 @@ class PlatformHealthService
                 'status' => $status->value,
                 'latency_ms' => $status === S::UNKNOWN ? null : $latency,
                 'detail' => $detail,
+                'raw' => $raw,
             ];
         }
 
@@ -92,7 +93,7 @@ class PlatformHealthService
             'component' => $r['component'],
             'status' => $r['status'],
             'latency_ms' => $r['latency_ms'],
-            'detail' => json_encode(['message' => $r['detail']]),
+            'detail' => json_encode(array_filter(['message' => $r['detail'], 'raw' => $r['raw'] ?? null], fn ($v) => $v !== null)),
             'checked_at' => $now,
             'created_at' => $now,
             'updated_at' => $now,
@@ -318,14 +319,64 @@ class PlatformHealthService
     }
 
     /** @return array{0: S, 1: string} */
+    /**
+     * Cloudonix (external, over the internet): each check records a raw outcome (ok | slow | none) and the
+     * status only changes after N consecutive bad outcomes (owner rule): N with no response = down,
+     * N slow-or-no-response = degraded, otherwise ok.
+     *
+     * @return array{0: S, 1: string, 2: string}
+     */
     private function cloudonix(): array
     {
+        $cfg = config('platform_status.cloudonix');
         $base = (string) config('services.cloudonix.api_base_url');
         $host = parse_url($base, PHP_URL_HOST) ?: 'Cloudonix API';
-        // Unauthenticated GET of the base URL: any HTTP response means reachable.
-        [$status] = $this->http($base, anyResponse: true);
 
-        return [$status, $status === S::DOWN ? "$host unreachable" : "$host reachable"];
+        // Unauthenticated GET of the base URL: any HTTP response means reachable.
+        $started = hrtime(true);
+        try {
+            Http::timeout($cfg['timeout_seconds'])->connectTimeout($cfg['timeout_seconds'])->withoutRedirecting()->get($base);
+            $ms = (int) round((hrtime(true) - $started) / 1e6);
+            $raw = $ms > $cfg['slow_ms'] ? 'slow' : 'ok';
+        } catch (ConnectionException) {
+            $ms = null;
+            $raw = 'none';
+        }
+
+        // The previous N-1 outcomes; rows written before raw outcomes were stored fall back to their status.
+        $previous = PlatformHealthCheck::where('component', 'cloudonix')->orderByDesc('checked_at')->orderByDesc('id')
+            ->limit(max(0, $cfg['consecutive'] - 1))->get()
+            ->map(fn (PlatformHealthCheck $c) => $c->detail['raw'] ?? match ($c->status) {
+                S::DOWN->value => 'none',
+                S::DEGRADED->value => 'slow',
+                default => 'ok',
+            })->all();
+        $window = array_merge([$raw], $previous);
+        $full = count($window) >= $cfg['consecutive'];
+
+        $status = match (true) {
+            $full && count(array_filter($window, fn ($o) => $o === 'none')) === count($window) => S::DOWN,
+            $full && ! in_array('ok', $window, true) => S::DEGRADED,
+            default => S::OK,
+        };
+        $run = 0;
+        foreach ($window as $o) {
+            if ($o === 'ok') {
+                break;
+            }
+            $run++;
+        }
+
+        $detail = match ($raw) {
+            'ok' => "$host reachable",
+            'slow' => "$host slow ({$ms} ms)",
+            'none' => "$host no response",
+        };
+        if ($raw !== 'ok') {
+            $detail .= ", {$run} of {$cfg['consecutive']} consecutive";
+        }
+
+        return [$status, $detail, $raw];
     }
 
     /**
