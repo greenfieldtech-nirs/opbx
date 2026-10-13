@@ -12,6 +12,7 @@ use App\Models\AiAssistant;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\DidNumber;
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\AutoDialer\CampaignLifecycleManager;
@@ -156,5 +157,15 @@ final class AutoDialerLifecycleFixesTest extends TestCase
         $this->assertSame(DestinationStatus::PENDING, $stuckRetry->fresh()->status);
         $this->assertSame(DestinationStatus::FAILED, $stuckSpent->fresh()->status);
         $this->assertSame(DestinationStatus::FAILED, $spentPending->fresh()->status);
+    }
+
+    public function test_update_with_an_inactive_caller_id_pool_entry_is_a_422(): void
+    {
+        $campaign = $this->draftCampaign();
+        $inactive = DidNumber::factory()->create(['organization_id' => $this->org->id, 'status' => 'inactive']);
+
+        $this->actingAs($this->user)->putJson("/api/v1/auto-dialer-campaigns/{$campaign->id}", [
+            'caller_id_pool' => [['did_id' => $inactive->id]],
+        ])->assertStatus(422)->assertJsonValidationErrors('caller_id_pool');
     }
 }

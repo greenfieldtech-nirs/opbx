@@ -150,6 +150,17 @@ class AutoDialerCampaignController extends Controller
             ], 409);
         }
 
+        // Same pool validation as create: a bad pool is a 422, not a 500 from the sync.
+        if (isset($data['caller_id_pool'])
+            && ! $this->callerIdService->validateCallerIdPool($data['caller_id_pool'], $campaign->organization_id)['valid']) {
+            return response()->json([
+                'message' => 'Invalid Caller ID pool',
+                'errors' => [
+                    'caller_id_pool' => ['Some DIDs do not exist, do not belong to your organization, or are not active.'],
+                ],
+            ], 422);
+        }
+
         // Extract schedule data if provided
         if (isset($data['schedule'])) {
             $scheduleData = $this->scheduleExtractor->processSchedule($data['schedule']);
