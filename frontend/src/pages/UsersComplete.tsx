@@ -56,6 +56,8 @@ import {
 StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { useAuth } from '@/hooks/useAuth';
+import { useConfig } from '@/context/ConfigContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { User,UserRole,UserStatus } from '@/types';
 import { usersService } from '@/services/createResourceService';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
@@ -104,6 +106,7 @@ function UsersComplete() {
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const { auth0Config } = useConfig();
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -515,10 +518,26 @@ function UsersComplete() {
         <div className="flex items-center gap-2">
           {canCreateUsers && (
             <>
-              <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
-                <Mail className="h-4 w-4 mr-2" />
-                Invite User
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* span so the tooltip still shows on a disabled button */}
+                  <span tabIndex={auth0Config.enabled ? undefined : 0}>
+                    <Button
+                      variant="outline"
+                      disabled={!auth0Config.enabled}
+                      onClick={() => setShowInviteDialog(true)}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Invite User
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!auth0Config.enabled && (
+                  <TooltipContent>
+                    <p>Invitations need Auth0, which is not configured on this server.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add User
