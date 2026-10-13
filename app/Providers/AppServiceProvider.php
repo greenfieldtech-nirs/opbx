@@ -427,36 +427,7 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by(((string) $request->bearerToken()).'|'.$request->ip());
         });
 
-        // Webhook routes - 100 requests per minute per IP
-        RateLimiter::for('webhooks', function (Request $request) {
-            return Limit::perMinute(config('rate_limiting.webhooks', 100))
-                ->by($request->ip())
-                ->response(function (Request $request, array $headers) {
-                    return response()->json([
-                        'error' => 'Too Many Requests',
-                        'message' => 'Webhook rate limit exceeded.',
-                        'retry_after' => $headers['Retry-After'] ?? null,
-                    ], 429, $headers);
-                });
-        });
-
-        // Voice routing routes - 1000 requests per minute per IP (high traffic)
-        RateLimiter::for('voice', function (Request $request) {
-            return Limit::perMinute(config('rate_limiting.voice', 1000))
-                ->by($request->ip())
-                ->response(function (Request $request, array $headers) {
-                    // Return CXML format for voice routing endpoints
-                    $cxml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".
-                        '<Response>'."\n".
-                        '  <Say language="en-US">Service temporarily unavailable. Rate limit exceeded.</Say>'."\n".
-                        '  <Hangup/>'."\n".
-                        '</Response>';
-
-                    return response($cxml, 429, array_merge($headers, [
-                        'Content-Type' => 'application/xml',
-                    ]));
-                });
-        });
+        // Cloudonix webhook and voice routes are intentionally NOT rate-limited (see config/rate_limiting.php).
 
         // Sensitive operations - 10 requests per minute per user
         RateLimiter::for('sensitive', function (Request $request) {

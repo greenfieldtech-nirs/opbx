@@ -8,19 +8,18 @@ return [
     | Rate Limiting Configuration
     |--------------------------------------------------------------------------
     |
-    | Configure rate limits for different application endpoints.
     | Values are requests per minute unless otherwise specified.
+    |
+    | Cloudonix webhook routes (/api/webhooks/cloudonix/*) and voice routing /
+    | callback routes (/api/voice/*, /api/callbacks/voice/*) are intentionally
+    | NOT rate-limited: with many organisations Cloudonix fires hundreds of
+    | events per second, and throttling them would drop calls and CDRs.
+    | They are protected by signature / auth middleware and idempotency only.
     |
     */
 
-    // API routes - authenticated user requests
+    // Named limiter `api` - authenticated user requests (per user, or IP)
     'api' => env('RATE_LIMIT_API', 60),
-
-    // Webhook routes - external webhook requests per IP
-    'webhooks' => env('RATE_LIMIT_WEBHOOKS', 100),
-
-    // Voice routing routes - high traffic voice routing requests per IP
-    'voice' => env('RATE_LIMIT_VOICE', 1000),
 
     // Sensitive operations - password changes, role updates, etc.
     'sensitive' => env('RATE_LIMIT_SENSITIVE', 10),
@@ -33,4 +32,18 @@ return [
 
     // Decay period in seconds for sensitive operations
     'decay_seconds' => env('RATE_LIMIT_SENSITIVE_DECAY', 60),
+
+    // Per-organization limits used by the `rate_limit_org:<type>` middleware.
+    // Only `rate_limit_org:api` is applied to routes; `default` is the fallback.
+    'organization' => [
+        'api' => [
+            'max_attempts' => (int) env('RATE_LIMIT_API', 60),
+            'per_minutes' => (int) env('RATE_LIMIT_API_MINUTES', 1),
+        ],
+
+        'default' => [
+            'max_attempts' => (int) env('RATE_LIMIT_DEFAULT', 60),
+            'per_minutes' => (int) env('RATE_LIMIT_DEFAULT_MINUTES', 1),
+        ],
+    ],
 ];

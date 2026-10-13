@@ -50,7 +50,7 @@ class RateLimitPerOrganization
         }
 
         // Get rate limit configuration
-        $limits = config("rate-limiting.{$limitType}");
+        $limits = config("rate_limiting.organization.{$limitType}");
 
         if (! $limits) {
             Log::error('Rate limit: Invalid limit type', [
@@ -59,7 +59,7 @@ class RateLimitPerOrganization
             ]);
 
             // Use default limits if config missing
-            $limits = config('rate-limiting.default');
+            $limits = config('rate_limiting.organization.default');
         }
 
         // Fallback to hardcoded defaults if config not loaded (e.g., in tests)

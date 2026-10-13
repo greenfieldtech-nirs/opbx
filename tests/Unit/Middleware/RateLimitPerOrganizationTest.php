@@ -39,7 +39,7 @@ class RateLimitPerOrganizationTest extends TestCase
         ]);
 
         // Set test-friendly rate limits
-        config()->set('rate-limiting', [
+        config()->set('rate_limiting.organization', [
             'default' => [
                 'max_attempts' => 5,
                 'per_minutes' => 1,
@@ -184,7 +184,7 @@ class RateLimitPerOrganizationTest extends TestCase
         $request2->setUserResolver(fn () => $user2);
 
         // Use config value (5 from setUp)
-        $maxAttempts = config('rate-limiting.default.max_attempts');
+        $maxAttempts = config('rate_limiting.organization.default.max_attempts');
 
         // Exhaust org1's limit
         for ($i = 0; $i < $maxAttempts; $i++) {
