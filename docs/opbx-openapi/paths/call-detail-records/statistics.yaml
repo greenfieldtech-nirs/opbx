@@ -8,8 +8,50 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Defaults to 30 days ago
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Defaults to today
       responses:
         '200':
           description: CDR statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_calls:
+                    type: integer
+                  total_duration:
+                    type:
+                      - integer
+                      - number
+                  total_billsec:
+                    type:
+                      - integer
+                      - number
+                  average_duration:
+                    type:
+                      - number
+                      - 'null'
+                  total_cost:
+                    type: number
+                  by_disposition:
+                    type: object
+                    description: Call count per disposition
+                    additionalProperties:
+                      type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'

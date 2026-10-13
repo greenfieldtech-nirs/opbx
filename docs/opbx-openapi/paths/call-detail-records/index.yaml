@@ -9,6 +9,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
@@ -44,12 +46,45 @@ paths:
             type: string
             format: date
           description: Last day of the date range (inclusive).
-        - name: extension_id
+        - name: disposition
           in: query
-          required: false
           schema:
-            type: integer
-          description: Filter by destination extension.
+            type: string
+          description: Exact disposition (for example ANSWER, BUSY, NOANSWER)
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [incoming, outgoing, internal, application]
+        - name: user
+          in: query
+          schema:
+            type: string
+          description: Partial name of the extension's user (not available with `archive`)
+        - name: session_token
+          in: query
+          schema:
+            type: string
+          description: Exact session token (locates the CDR of a queue call)
+        - name: supervisor
+          in: query
+          schema:
+            type: boolean
+          description: When true and the caller is a Supervisor, restrict to the resources they supervise
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [session_timestamp, from, to, duration, billsec, disposition, user_full_name, direction]
+            default: session_timestamp
+          description: '`user_full_name` is not available with `archive`'
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [raw_cdr]
+          description: Include the complete raw CDR in each row
         - name: archive
           in: query
           required: false
@@ -78,56 +113,6 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
-  /v1/call-detail-records/export:
-    get:
-      tags:
-        - Call Detail Records
-      summary: Export Call Detail Records
-      description: Export CDRs as CSV/Excel for the current organization.
-      operationId: exportCallDetailRecords
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      parameters:
-        - name: format
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [csv, xlsx]
-            default: csv
-          description: Export format.
-      responses:
-        '200':
-          description: Exported CDR file
-          content:
-            text/csv:
-              schema:
-                type: string
-                format: binary
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
-  /v1/call-detail-records/statistics:
-    get:
-      tags:
-        - Call Detail Records
-      summary: CDR Statistics
-      description: Aggregate statistics for CDRs in the current organization.
-      operationId: callDetailRecordStatistics
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Statistics object
-          content:
-            application/json:
-              schema:
-                type: object
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
   /v1/call-detail-records/{call_detail_record}:
     parameters:
       - name: call_detail_record
@@ -145,17 +130,27 @@ paths:
         the warm archive instead of the live table.
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [raw_cdr]
       operationId: getCallDetailRecord
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
       responses:
         '200':
           description: Call Detail Record details
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/CallDetailRecord.yaml'
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/CallDetailRecord.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':

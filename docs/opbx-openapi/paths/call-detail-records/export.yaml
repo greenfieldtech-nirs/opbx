@@ -8,8 +8,58 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
+      description: >-
+        Streams all matching CDRs as CSV (newest first). Accepts the same filters as the
+        list endpoint (from, to, disposition, direction, user, session_token, from_date,
+        to_date). Supervisors are always limited to the resources they supervise.
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: disposition
+          in: query
+          schema:
+            type: string
+          description: Exact disposition (for example ANSWER, BUSY, NOANSWER)
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [incoming, outgoing, internal, application]
+        - name: user
+          in: query
+          schema:
+            type: string
+          description: Partial name of the extension's user (not available with `archive`)
+        - name: session_token
+          in: query
+          schema:
+            type: string
+          description: Exact session token (locates the CDR of a queue call)
       responses:
         '200':
-          description: CDR export
+          description: CSV file (Content-Disposition attachment)
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
