@@ -8,43 +8,104 @@ description: "Java/Vert.x stateful call queue (FIFO) service"
 
 # ACD Worker
 
-The ACD Worker is a Java/Vert.x 5 microservice that runs the brain of Call Queues. It owns the ephemeral, real-time queue state in Redis — Laravel owns voice (CXML), persistence (MySQL), and all APIs.
+The ACD Worker is a Java 21 / Vert.x 5 service that runs the state of [Call Queues](/modules/call-queues). It keeps the real-time queue state in Redis. Laravel owns everything else: the voice responses (CXML), persistence in MySQL, and all APIs.
 
 ## Purpose
 
 The worker handles:
 
-- FIFO queue ordering per queue (`enqueue`, `poll`, `dequeue`)
-- Agent state machine: `logged_out` / `available` / `wrap_up` (auto-expiring)
+- FIFO order per queue (enqueue, poll, dequeue, requeue)
+- Agent states: `AVAILABLE`, `BUSY`, `WRAP_UP`, `LOGGED_OUT`
 - Agent selection strategies: `ring_all`, `round_robin`, `least_talk_time`, `fewest_calls`
-- Overflow decisions when a caller exceeds the queue's max wait time
-- Live queue snapshots for the wallboard/reporting APIs
+- Overflow when a caller waits longer than the queue's max wait
+- Live queue snapshots for the queue dashboards
 
 ## How It Fits the Call Flow
 
-1. An inbound call routes to a queue — Laravel enqueues the caller in the worker and answers with hold CXML (MOH or announcement + pause)
-2. Cloudonix polls Laravel's `/api/callbacks/voice/queue-poll` endpoint after each hold segment
-3. Laravel asks the worker for a decision: **wait** (position), **dial** (agent list), or **overflow**
-4. On `dial`, Laravel returns `<Dial>` CXML directly to the agent extension(s) — never follow-me chains
-5. Dial results and CDR webhooks update the worker so agent state and queue positions stay accurate
+1. An inbound call routes to a queue. Laravel enqueues the caller in the worker and answers with hold CXML (music on hold, or an announcement and a pause).
+2. Cloudonix calls Laravel's `/api/callbacks/voice/queue-poll` after each hold segment.
+3. Laravel asks the worker for a decision: **wait** (with the position), **dial** (with the selected agents) or **overflow**.
+4. On `dial`, Laravel returns `<Dial>` CXML to the agents' extensions directly, never to follow-me chains. Agents whose extension is already on a call are skipped (see Presence below).
+5. Dial results, session updates and CDRs become lifecycle events (`answered`, `ended`, `abandoned`, `overflow`, `dial_failed`, `requeue`) that Laravel sends to the worker, so agent states and queue positions stay accurate.
 
 :::info Hard rule
 Queue offers always dial the agent's extension directly. Follow-me / forward chaining is never used for queue calls.
 :::
 
+## Agent States
+
+| State | Meaning | Offered calls |
+|-------|---------|---------------|
+| `AVAILABLE` | Logged in and free | Yes |
+| `BUSY` | On a queue call | No |
+| `WRAP_UP` | After a call, or paused | No |
+| `LOGGED_OUT` | Not in the queue (no agent record in Redis) | No |
+
+- After a queue call ends, a `BUSY` agent goes to `WRAP_UP` for the queue's wrap-up time, then back to `AVAILABLE`. Wrap-up expiry is checked lazily, on the next poll or live snapshot.
+- A **paused** agent is `WRAP_UP` with no end time (sticky) until the state is changed again. Laravel sets it when the agent state API (`POST /api/v1/call-queues/{id}/agents/me/state`) receives `wrap_up`. The `*45` feature code and the queue widget toggle only between `AVAILABLE` and `LOGGED_OUT`. A call answered by an agent who paused while it rang is still counted, and the agent stays paused.
+- Logging in seeds the agent's all-time talk time and call count from MySQL, so `least_talk_time` and `fewest_calls` stay correct after a worker restart.
+
+## Consistency Rules
+
+- **Atomic transitions.** Agent state changes on call events run as Lua scripts in Redis and are conditional: an event never recreates a logged-out agent and never overrides a pause.
+- **Idempotent events.** Each lifecycle event carries an event ID, and replays from Laravel (its retry window is about 6.5 minutes) are ignored.
+- **Requeue keeps the place.** If the agent who answered never connects, a `requeue` event releases the agent and puts the call back at its **original position with its original enqueue time**. A requeued call already past the max wait overflows on its next poll.
+- **Tombstones.** A dequeued call leaves a 10-minute marker, so a late poll cannot add it back.
+- **Recovery.** A poll for a call the worker does not know (for example after a restart) enqueues it again.
+
+## Presence
+
+The worker only sees queue calls. Laravel tracks whether each extension is on **any** call (for example a direct call) from Cloudonix session updates, in the Redis key `acd:presence:{organization_id}:{extension}`. Out-of-order updates are ignored, and the key expires after an hour as a guard against missed hang-ups. An agent whose extension is busy is skipped when an offer is made.
+
+## Redis Keys
+
+| Key | Type | Content |
+|-----|------|---------|
+| `acd:queue:{org}:{queue}` | list | Call IDs in FIFO order |
+| `acd:call:{org}:{queue}:{callId}` | hash | `queuedAt` (epoch ms) |
+| `acd:agent:{org}:{queue}:{userId}` | hash | `state`, `wrapUpUntil`, `talkSecondsTotal`, `callsHandledTotal` |
+| `acd:rr:{org}:{queue}` | string | Round-robin cursor (the user offered last) |
+| `acd:done:{org}:{queue}:{callId}` | string | Dequeued-call tombstone (10 minutes) |
+| `acd:evt:{org}:{eventId}` | string | Seen lifecycle event (dedupe) |
+| `acd:presence:{org}:{extension}` | string | Extension presence (written by Laravel) |
+
+## API
+
+All routes except health require `Authorization: Bearer {ACD_WORKER_API_TOKEN}`. Request bodies are read only after authentication and are capped at 64 KB.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/queue/enqueue` | Add a call to a queue |
+| POST | `/queue/poll` | Get a wait, dial or overflow decision |
+| POST | `/queue/live` | Live snapshot (callers and agent states) |
+| POST | `/events` | Call lifecycle event |
+| POST | `/agents/state` | Set an agent's state |
+| GET | `/health` (port 8085) | 200 while Redis answers a ping, 503 otherwise |
+
 ## Configuration
 
-| Variable | Description |
-|----------|-------------|
-| `ACD_WORKER_URL` | Base URL Laravel uses to reach the worker (default `http://acd-worker:8084`) |
-| `ACD_WORKER_API_TOKEN` | Bearer token authenticating Laravel → worker requests |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ACD_WORKER_URL` | `http://acd-worker:8084` | Base URL Laravel uses to reach the worker |
+| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required: the worker refuses to start when it is empty or a shipped placeholder |
+| `ACD_HTTP_PORT` | `8084` | API port |
+| `ACD_HEALTH_PORT` | `8085` | Health port |
+| `ACD_REDIS_HOST` / `ACD_REDIS_PORT` | `redis` / `6379` | Redis server |
+| `ACD_REDIS_PASSWORD` | — | Redis password. The compose file passes `REDIS_PASSWORD`. It is given to the client directly, never in a URI |
+| `ACD_LOG_LEVEL` | `info` | Log level |
 
-Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue calls degrade gracefully rather than failing hard.
+Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue calls degrade instead of failing hard, and lost `ended`, `abandoned` and `dial_failed` events are replayed from the Laravel queue.
+
+## Container
+
+- Image: `eclipse-temurin:21-jre`, runs as a non-root user (uid 10001).
+- No published ports; Laravel reaches it on the internal network.
+- Docker healthcheck: `GET http://localhost:8085/health` every 30 seconds. Because health fails when Redis is unreachable, Docker restarts a worker that lost Redis.
 
 ## Common Commands
 
 ```bash
-# Build (requires JDK 21; or build inside Docker)
+# Build and test (requires JDK 21; or build inside Docker)
 docker run --rm -v "$PWD/acd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
 
 # View logs

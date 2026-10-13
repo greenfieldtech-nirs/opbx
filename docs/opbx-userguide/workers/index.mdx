@@ -16,7 +16,17 @@ OPBX uses standalone worker services for specialized runtime tasks:
 | [AMD Worker](/workers/amd-worker) | Java/Vert.x 5 | Detects voicemail beeps in live audio streams |
 | [ACD Worker](/workers/acd-worker) | Java/Vert.x 5 | Runs call queue state (FIFO, agent states, selection strategies) |
 
-All workers run as Docker services in the standard Docker Compose stack. They communicate with the Laravel backend through REST APIs and Redis.
+All workers run as Docker services in the standard Docker Compose stack and start with a plain `docker compose up -d`. They communicate with the Laravel backend through REST APIs and Redis.
+
+| Worker | Talks to | Auth token | Healthcheck |
+|--------|----------|------------|-------------|
+| Dialer | Laravel API (polls it), Redis | `DIALER_WORKER_API_TOKEN` | `GET /webhooks/health` on 8081 |
+| AMD | Cloudonix audio via Nginx `/ws/amd/`; Laravel callbacks | `AMD_WORKER_API_TOKEN` | `GET /health` on 8083 |
+| ACD | Called by Laravel; Redis | `ACD_WORKER_API_TOKEN` | `GET /health` on 8085 (fails when Redis is down) |
+
+All three images run as a non-root user (uid 10001), and none publishes a host port by default. The workers refuse to start without their token.
+
+The PHP side has its own background services in the same stack: `queue-worker` and `queue-worker-long` (Laravel queue workers) and `scheduler` (runs `schedule:run` every minute). Their healthchecks check that the process is alive; the scheduler touches a heartbeat file on every tick and is unhealthy when it is older than 3 minutes.
 
 ## When to Read These Guides
 
@@ -26,7 +36,6 @@ Read the worker guides when you need to:
 - Build or run a worker locally
 - Configure worker environment variables
 - Troubleshoot campaign or AMD issues
-- Scale the dialer worker horizontally
 
 ## Common Commands
 
@@ -40,11 +49,9 @@ docker compose logs -f acd-worker
 
 Or enable the [centralized logging stack](/administration/centralized-logs) to search all worker logs (and Laravel's) in one place, including per-call audit trails by Cloudonix session token.
 
-### Scale the Dialer Worker
+### Dialer Worker Replicas
 
-```bash
-docker compose up -d --scale dialer-worker=3
-```
+Run exactly **one** dialer worker. The compose file pins `replicas: 1` because call pacing (CPS) is held in the worker's memory; a second replica would double the dial rate. Do not use `--scale dialer-worker`.
 
 ### Restart a Worker
 

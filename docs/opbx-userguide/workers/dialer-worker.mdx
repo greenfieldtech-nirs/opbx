@@ -19,8 +19,7 @@ The worker handles:
 - Enforcing CAC (Concurrent Active Calls) and CPS (Calls Per Second) limits
 - Initiating calls via the Laravel API
 - Serving a health endpoint for the platform status page
-- Managing retry queues in Redis
-- Selecting Caller IDs from pools
+- Selecting Caller IDs from pools, and remembering which ones a destination already tried
 
 ## Architecture
 
@@ -121,8 +120,8 @@ Laravel uses a dedicated `dialer` Redis connection with **no key prefix** for al
 1. Worker polls `GET /v1/dialer/worker/campaigns/active`
 2. For each active campaign, it registers CAC/CPS limits
 3. It fetches pending destinations: `GET /campaigns/{id}/destinations/pending`
-4. For each destination, it acquires a Redis lock, checks CAC, selects a Caller ID, and calls `POST /calls/initiate`
-5. On successful initiation, it increments the active call counter
+4. For each destination, it reserves a CAC slot (an atomic Lua increment that refuses when the campaign is at its limit), selects a Caller ID, and calls `POST /calls/initiate`
+5. If the initiate fails, the reserved slot is released. A `409` means another claim owns the destination and is skipped
 6. Laravel receives the call result from Cloudonix and owns the active-call count; it decrements the count when the call ends
 7. Retries are scheduled from the result as well (see the Laravel retry timing in the campaign documentation)
 
@@ -130,16 +129,14 @@ Laravel uses a dedicated `dialer` Redis connection with **no key prefix** for al
 
 | Key Pattern | Purpose |
 |-------------|---------|
-| `dialer:cac:{id}:active` | Active call counter per campaign |
-| `dialer:call:{session}` | Call state hash |
-| `dialer:lock:{key}` | Distributed locks |
-| `dialer:retry:{campaign}` | Retry sorted set |
-| `dialer:worker:{id}` | Worker heartbeat |
-| `dialer:idem:{key}` | Webhook idempotency |
+| `dialer:cac:{campaign_id}:active` | Active call counter per campaign (shared with Laravel, which decrements it) |
+| `dialer:rr:{campaign_id}:position` | Round-robin position in the caller ID pool |
+| `dialer:lru:{campaign_id}:timestamps` | Last-used times for the least-recently-used caller ID strategy |
+| `dialer:retry:{campaign_id}:{destination_id}` | Caller IDs already tried for a destination (1 hour) |
 
 ## Replicas
 
-Run **one** dialer-worker replica. The compose file pins `replicas: 1`. The CPS (calls-per-second) limiter is held in the worker's memory and is not shared between replicas, so a second replica would double the rate. Do not scale this service with `--scale`.
+Run **one** dialer-worker replica. The image runs as a non-root user (uid 10001), and the compose healthcheck calls `GET /webhooks/health` every 30 seconds. On `SIGTERM` the worker finishes in-flight initiates for up to 45 seconds (`stop_grace_period: 60s`). The compose file pins `replicas: 1`. The CPS (calls-per-second) limiter is held in the worker's memory and is not shared between replicas, so a second replica would double the rate. Do not scale this service with `--scale`.
 
 ## Troubleshooting
 
@@ -148,7 +145,7 @@ Run **one** dialer-worker replica. The compose file pins `replicas: 1`. The CPS 
 | Worker not dialing | Check `LARAVEL_API_URL` and `LARAVEL_API_TOKEN`; verify campaign status is `ACTIVE` |
 | Health check unreachable | Check `WEBHOOK_PORT` and query `GET /webhooks/health` on that port |
 | CAC counter drift | Laravel reconciles the counter every minute (`dialer:reconcile-cac`, scheduled) |
-| High memory usage | Reduce `POLL_INTERVAL` or scale horizontally |
+| Dial rate doubled | More than one dialer-worker is running. Keep exactly one replica |
 
 ## Related Modules
 
