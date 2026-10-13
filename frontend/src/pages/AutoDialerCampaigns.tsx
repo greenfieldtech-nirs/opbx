@@ -273,10 +273,8 @@ export default function AutoDialerCampaigns() {
 
   // Helper to check if campaign has Caller ID pool
   const hasCallerIdPool = (campaign: AutoDialerCampaign): boolean => {
-    return !!(
-      (campaign as any).caller_id_pool?.length > 0 ||
-      (campaign as any).caller_id_strategy
-    );
+    // caller_id_strategy always has a default, so it cannot signal a pool; a single-caller-ID campaign shows its number.
+    return (campaign as any).caller_id_pool?.length > 0;
   };
 
   // Get Caller ID pool count
