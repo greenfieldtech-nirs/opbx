@@ -23,6 +23,7 @@ class UserRoleTokenAbilitiesTest extends TestCase
         $this->assertContains('user:*', $abilities);
         $this->assertContains('settings:*', $abilities);
         $this->assertContains('recording-download:*', $abilities);
+        $this->assertNotContains('voice-agent:*', $abilities);
     }
 
     public function test_supervisor_keeps_supervisor_abilities(): void

@@ -42,7 +42,6 @@ enum UserRole: string
                 'business-hours:*',
                 'conference:*',
                 'ivr:*',
-                'voice-agent:*',
                 'call-log:*',
                 'outbound-whitelist:*',
                 'recording-download:*',
