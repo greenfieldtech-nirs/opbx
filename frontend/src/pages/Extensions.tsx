@@ -22,6 +22,7 @@ import { callQueuesService } from '@/services/callQueues.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
 Plus,
+KeyRound,
 Search,
 X,Phone,
 Copy,
@@ -1353,6 +1354,21 @@ export default function ExtensionsComplete() {
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
+                        {canCreate && canActOnExtension(extension) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedExtension(extension);
+                              setShowResetPasswordDialog(true);
+                            }}
+                            title="Reset password"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
