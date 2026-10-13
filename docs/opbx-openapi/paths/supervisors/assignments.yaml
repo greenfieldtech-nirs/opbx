@@ -13,6 +13,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: supervisors:read
       parameters:
         - name: user
           in: path
@@ -48,6 +50,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: supervisors:write
       parameters:
         - name: user
           in: path

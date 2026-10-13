@@ -8,6 +8,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: session-updates:read
       parameters:
         - name: supervisor
           in: query

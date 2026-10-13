@@ -24,6 +24,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: session-updates:write
       parameters:
         - name: sessionId
           in: path

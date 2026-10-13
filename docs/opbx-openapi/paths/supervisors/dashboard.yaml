@@ -13,6 +13,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: dashboard:read
       responses:
         '200':
           description: Assigned dashboard data
