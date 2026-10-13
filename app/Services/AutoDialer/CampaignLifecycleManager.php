@@ -6,7 +6,6 @@ namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
-use App\Jobs\ProcessAutoDialerCampaignJob;
 use App\Models\AutoDialerCampaign;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
@@ -42,9 +41,7 @@ class CampaignLifecycleManager
             'started_at' => now(),
         ]);
 
-        // Dispatch processing job
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
-            ->onQueue('auto-dialer');
+        // No Laravel dialing job: the Go dialer picks up every Active campaign (single dialer path).
 
         Log::info('Campaign started', [
             'campaign_id' => $campaign->id,
@@ -95,10 +92,6 @@ class CampaignLifecycleManager
         $campaign->update([
             'status' => CampaignStatus::ACTIVE,
         ]);
-
-        // Resume processing
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
-            ->onQueue('auto-dialer');
 
         Log::info('Campaign resumed', [
             'campaign_id' => $campaign->id,
