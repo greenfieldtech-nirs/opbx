@@ -207,6 +207,8 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 
 ### SeaweedFS Configuration
 
+> **Upgrading an install that used MinIO?** Run `./scripts/migrate-minio-to-seaweedfs.sh` before switching `MINIO_ENDPOINT`. It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).
+
 SeaweedFS replaces MinIO as the S3-compatible store. The app still reads the `MINIO_*` variables; they are only the S3 endpoint and keys. On AWS, point `MINIO_ENDPOINT` and the keys at real S3 instead.
 
 - **Image**: `chrislusf/seaweedfs:4.47` (single `weed server` process: master, volume, and S3 API)

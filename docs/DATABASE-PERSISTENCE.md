@@ -135,6 +135,32 @@ SeaweedFS runs as a single `weed server` process (master, volume server, and S3 
 
 SeaweedFS packs objects into volume files inside the bind-mounted directory. Browse objects through an S3 client, not the host filesystem. Back up the whole directory while the container is stopped.
 
+#### Upgrading from MinIO
+
+Installations created before SeaweedFS kept their objects (call recordings, IVR/announcement audio, the cold CDR archive) in MinIO under `./volumes/minio`. The new `docker-compose.yml` has no MinIO service, so copy the content across before switching the app:
+
+```bash
+./scripts/backup-database.sh                        # back up first
+cp docker-compose.yml.example docker-compose.yml    # or merge the SeaweedFS service into your compose file
+./scripts/migrate-minio-to-seaweedfs.sh --dry-run   # lists buckets and object counts, copies nothing
+./scripts/migrate-minio-to-seaweedfs.sh             # copies and verifies every bucket
+```
+
+The script starts SeaweedFS, runs a temporary MinIO container on `./volumes/minio` with the same `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`, mirrors every bucket (all organisations, since each one is a folder inside the bucket), and verifies each bucket with `mc diff` and object counts. It exits non-zero on any mismatch and is safe to re-run. `./volumes/minio` is never modified, so it stays as a fallback.
+
+When it reports success, switch the app over:
+
+```bash
+# .env
+MINIO_ENDPOINT=http://seaweedfs:8333
+
+docker compose up -d app
+docker compose restart queue-worker queue-worker-long scheduler
+docker compose exec app php artisan storage:initialize
+```
+
+Copied objects get the migration date as their last-modified time (S3 cannot keep the original), so recording retention counts from the migration date.
+
 ---
 
 ## Storage Responsibilities
