@@ -73,10 +73,10 @@ OPBX_INVITE_TOKEN_TTL_HOURS=24
 OPBX_INVITE_RATE_LIMIT_PER_HOUR=10
 ```
 
-After editing `.env`, clear the configuration cache:
+After editing `.env`, recreate the app containers so they read the new values (the entrypoint also clears the config cache):
 
 ```bash
-php artisan config:clear
+docker compose up -d --force-recreate app queue-worker queue-worker-long scheduler
 ```
 
 ## Verify Frontend Configuration
@@ -90,7 +90,6 @@ The frontend reads SaaS and Auth0 state from `/api/v1/config/application`. Open 
     "enabled": true,
     "domain": "your-tenant.us.auth0.com",
     "client_id": "your-client-id",
-    "redirect_uri": "https://your-opbx-domain/ui/auth/callback",
     "providers": ["google", "facebook", "microsoft", "github", "x"]
   }
 }

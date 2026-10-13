@@ -53,8 +53,11 @@ OPBX can route calls to these destination types:
 | IVR Menu | Interactive voice response menu |
 | Business Hours | Time-based routing decision |
 | Conference Room | Multi-party conference bridge |
-| AI Assistant | AI-powered voice agent |
+| AI Assistant | AI assistant from a supported provider |
 | AI Load Balancer | Distributed AI agent routing |
+| Call Queue | Callers wait on hold until an agent is free |
+| Call Tracking | A tracking campaign that records the source, then routes the call |
+| Unavailable | Plays a "destination unavailable" message and hangs up |
 
 ## Routing Chains
 
@@ -95,7 +98,7 @@ Before routing, OPBX checks if the caller is on the inbound blacklist:
 
 | Action | Behavior |
 |--------|----------|
-| Silent Drop | Call ends without notification |
+| Drop | Call ends without notification |
 | Reject | Caller hears a busy or error message |
 | Torment | Call connects to a "torment" conference (hold music loop) |
 

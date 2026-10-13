@@ -8,7 +8,30 @@ description: "Create your first organization and admin account"
 
 # First Login
 
-After installing OPBX, you need to create your first organization and administrator account. This guide walks you through the initial setup process.
+After installing OPBX, you either log in with the seeded owner account or register a new organization. This guide walks you through both.
+
+## The Seeded Owner Account
+
+On a fresh database, the `app` container seeds one organization and one owner:
+
+| Item | Value |
+|------|-------|
+| Organization | `Default Organization` (slug `default-org`, timezone UTC) |
+| Email | `admin@example.com` |
+| Password | `password` |
+| Role | Owner |
+
+Log in at `http://localhost/ui/login` and **change the password immediately** (or remove the account once you have your own owner). Seeding runs only when the `organizations` table is empty.
+
+## Platform Managers
+
+A platform manager administers all organizations (see [Platform Management](/administration/platform-management)). Neither the seeded account nor a registered owner is one. Create one from the command line:
+
+```bash
+docker compose exec app php artisan opbx:create-platform-manager      # interactive: new user and organization
+docker compose exec app php artisan opbx:set-platform-manager admin@example.com
+docker compose exec app php artisan opbx:revoke-platform-manager admin@example.com
+```
 
 ## Registration Process
 
@@ -31,8 +54,13 @@ Fill in the required fields:
 | Field | Requirements |
 |-------|--------------|
 | Organization Name | 2-100 characters, unique across the system |
-| Admin Email | Valid email address, used for login |
-| Password | Minimum 8 characters, must include uppercase, lowercase, number, and special character |
+| Timezone | Required, a valid IANA timezone |
+| Slug | Optional. 2-50 characters, lowercase letters, digits and hyphens, unique |
+| Admin Name | 2-100 characters |
+| Admin Email | Valid email address with a real domain, not already used. Used for login |
+| Password and confirmation | Minimum 8 characters, must include uppercase, lowercase, number, and special character |
+
+When reCAPTCHA is enabled (`RECAPTCHA_ENABLED=true`), the form is also checked with reCAPTCHA v3.
 
 :::tip Password Security
 Use a strong, unique password for the admin account. This account has full access to your organization.
@@ -47,9 +75,7 @@ Click **Create Organization**. The system performs these actions:
 3. Issues a Sanctum access token for API access
 4. Redirects you to the Dashboard
 
-:::note First Organization
-The first organization created on a fresh OPBX installation becomes the primary tenant. Additional organizations can be created later by platform administrators through the platform management interface.
-:::
+Registration is open to anyone who can reach the page. Each registration creates a separate organization.
 
 ## Authentication Modes
 
@@ -64,12 +90,14 @@ The frontend (`AuthContext`) stores the token in `localStorage` as `opbx_token` 
 
 ## Dashboard Overview
 
-After registration, you land on the Dashboard. This page provides:
+After login, you land on the Dashboard. It shows:
 
-- **Quick Setup Checklist**: Guided steps to configure your PBX
-- **Call Statistics**: Summary of calls made and received
-- **Active Calls Count**: Real-time count of ongoing calls
-- **System Status**: Health indicators for connected services
+- **Counters**: Active calls, extensions, phone numbers and conference rooms
+- **Recent Calls**: The latest calls in your organization
+
+Supervisors see their assigned users and ring groups instead.
+
+{/* SCREENSHOT: dashboard-first-login — Dashboard of a new organization with the four counters and an empty Recent Calls list */}
 
 ## First Steps After Login
 
@@ -93,6 +121,7 @@ Extensions can be:
 - **IVR menus**: Automated phone menus
 - **AI assistants**: Routes to AI providers
 - **AI load balancers**: Distributes calls across AI providers
+- **Call queues**: Callers wait on hold until an agent is free
 - **Forward**: Forwards calls to external numbers
 - **Custom logic**: Advanced routing via webhooks
 
@@ -104,10 +133,13 @@ Each DID routes to a destination such as:
 
 - A specific extension
 - A ring group
+- A call queue
 - An IVR menu
 - Business hours routing
 - A conference room
 - An AI assistant or AI load balancer
+- A call tracking campaign
+- Unavailable (a message, then hang up)
 
 ### 4. Configure Call Routing
 

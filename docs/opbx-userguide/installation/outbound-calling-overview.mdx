@@ -12,7 +12,7 @@ This page explains how OPBX handles calls that originate from an internal extens
 
 ## What Counts as an Outbound Call
 
-An outbound call is one placed **from an internal user extension to an external number**. OPBX distinguishes these from internal extension-to-extension calls by the length of the dialed number: short numbers (3–4 digits) are treated as internal extensions and are never routed outbound.
+An outbound call is one placed **from an internal user extension to an external number**. OPBX distinguishes these from internal extension-to-extension calls by the length of the dialed number: a number with fewer than 7 digits is treated as an internal extension and is never routed outbound.
 
 Outbound calls are the only calls that use the caller ID resolution described below. Inbound and internal calls do not.
 

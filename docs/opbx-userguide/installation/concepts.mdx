@@ -40,6 +40,7 @@ Extensions are numbered endpoints in your phone system. They are typically 3-5 d
 | IVR | `ivr` | Automated phone menu | Extension 700 for main menu |
 | AI Assistant | `ai_assistant` | Routes calls to AI providers | Extension 900 for AI receptionist |
 | AI Load Balancer | `ai_load_balancer` | Distributes calls across AI providers | Extension 901 for AI failover |
+| Call Queue | `queue` | Points at a call queue | Extension 500 for the support queue |
 | Forward | `forward` | Forwards calls to external numbers | Extension 101 forwarding to mobile |
 | Custom Logic | `custom_logic` | Advanced routing via webhooks | Extension for custom integrations |
 
@@ -55,11 +56,14 @@ Each DID has a destination that determines where incoming calls route:
 
 - Extension
 - Ring group
+- Call queue
 - IVR menu
 - Business hours routing
 - Conference room
 - AI assistant
 - AI load balancer
+- Call tracking campaign
+- Unavailable (plays a "destination unavailable" message and hangs up)
 
 :::note DID Management
 DIDs are configured in OPBX but must be purchased and assigned through your Cloudonix account or telecom provider.
@@ -82,7 +86,7 @@ Each ring group has:
 - Member extensions
 - Ring timeout (how long to wait before giving up)
 - Ring turns (for sequential strategy)
-- Fallback action (extension, ring group, IVR, AI assistant, AI load balancer, or hang up)
+- Fallback action (extension, ring group, IVR, AI assistant, AI load balancer, call queue, hang up, or unavailable)
 
 ## IVR Menus
 
@@ -100,6 +104,19 @@ IVR (Interactive Voice Response) menus provide automated phone navigation. Calle
 IVR menus support text-to-speech for dynamic content. Enter plain text and OPBX converts it to spoken audio using Cloudonix TTS voices.
 :::
 
+## Call Queues
+
+Call queues hold callers in first-in, first-out order with music on hold and offer each caller to an available agent. Agents log in and out, and get a wrap-up pause after each call. Queue state is kept by the Java [ACD worker](/workers/acd-worker).
+
+| Strategy | Behavior |
+|----------|----------|
+| Ring all | Rings every available agent |
+| Round robin | Rotates through the agents |
+| Least talk time | Offers to the agent with the least total talk time |
+| Fewest calls | Offers to the agent who handled the fewest calls |
+
+A caller who waits longer than the queue's maximum wait overflows to its fallback. See [Call Queues](/modules/call-queues).
+
 ## Business Hours
 
 Business hours enable time-based call routing. Calls route to different destinations depending on whether your business is open or closed.
@@ -112,7 +129,7 @@ Business hours enable time-based call routing. Calls route to different destinat
 - **Open Destination**: Where calls go during business hours
 - **Closed Destination**: Where calls go after hours
 
-Destinations use prefixed string IDs such as `ext-{id}`, `rg-{id}`, `conf-{id}`, `ivr-{id}`, `ai-{id}`, and `alb-{id}`.
+Each destination is stored as a type plus the target ID. Types are extension, ring group, conference room, IVR menu, AI assistant, AI load balancer, call queue, and unavailable.
 
 :::note Precision
 Business hours use the IANA timezone configured on the schedule. Ensure the timezone is correct before configuring business hours.
@@ -139,12 +156,12 @@ AI assistants connect calls to AI providers via SIP or WebSocket protocols.
 
 ### Supported Providers
 
-OPBX supports 19 providers through a registry-based configuration system. Common providers include OpenAI, Anthropic, Google, Azure, Bland AI, Retell AI, Vapi, Ultravox, and custom CXML endpoint providers.
+Providers come from a registry (`config/ai-providers.php`, 48 entries, several of them transport variants of one provider). Examples include OpenAI, ElevenLabs, Retell, VAPI, Ultravox, Synthflow, Telnyx and Dograh.
 
 Each AI assistant configuration includes:
 
 - Provider selection
-- Phone number (when applicable)
+- Protocol
 - Provider-specific configuration JSON
 - Status (`active` or `inactive`)
 
@@ -191,6 +208,8 @@ flowchart TD
     B --> G[Conference Room]
     B --> H[AI Assistant]
     B --> I[AI Load Balancer]
+    B --> Q[Call Queue]
+    Q --> |Max wait reached| N[Queue Fallback]
     F --> |Open| J[Open Hours Destination]
     F --> |Closed| K[Closed Hours Destination]
     E --> |Digit Input| L[Option Destination]
