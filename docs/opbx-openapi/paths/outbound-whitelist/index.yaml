@@ -9,9 +9,22 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [destination_country, destination_prefix, outbound_trunk_name, created_at, updated_at]
+            default: created_at
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: search
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: List of Outbound Whitelist Entrys
@@ -37,6 +50,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
@@ -60,6 +75,7 @@ paths:
                     - string
                     - 'null'
                   maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
                   description: Digits, spaces, '+' and '-' only.
                 outbound_trunk_name:
                   type: string
@@ -71,7 +87,16 @@ paths:
                   description: Must reference an active DID owned by the authenticated organization.
       responses:
         '201':
-          description: Outbound Whitelist Entry created
+          description: Whitelist entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
@@ -93,9 +118,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:read
       responses:
         '200':
-          description: Outbound Whitelist Entry details
+          description: Whitelist entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -109,12 +143,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - destination_country
+                - outbound_trunk_name
               properties:
                 name:
                   type: string
@@ -122,11 +162,14 @@ paths:
                 destination_country:
                   type: string
                   maxLength: 100
+                  description: Unique within the organization.
                 destination_prefix:
                   type:
                     - string
                     - 'null'
                   maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
+                  description: Digits, spaces, '+' and '-' only.
                 outbound_trunk_name:
                   type: string
                   maxLength: 255
@@ -137,7 +180,16 @@ paths:
                   description: Must reference an active DID owned by the authenticated organization.
       responses:
         '200':
-          description: Outbound Whitelist Entry updated
+          description: Whitelist entry updated (update requires the same fields as create)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -152,15 +204,53 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - destination_country
+                - outbound_trunk_name
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                destination_country:
+                  type: string
+                  maxLength: 100
+                  description: Unique within the organization.
+                destination_prefix:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
+                  description: Digits, spaces, '+' and '-' only.
+                outbound_trunk_name:
+                  type: string
+                  maxLength: 255
+                default_caller_id_did_id:
+                  type:
+                    - integer
+                    - 'null'
+                  description: Must reference an active DID owned by the authenticated organization.
       responses:
         '200':
-          description: Outbound Whitelist Entry updated
+          description: Whitelist entry updated (update requires the same fields as create)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -176,6 +266,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       responses:
         '204':
           description: Outbound Whitelist Entry deleted
