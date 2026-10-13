@@ -3,82 +3,80 @@ sidebar_position: 26
 slug: /modules/embedded-dialer
 sidebar_class_name: cxGuidesSidebar
 title: "Embedded Dialer"
-description: "Embed a user's Web Phone into any third-party website with a single script snippet"
+description: "Put one user's Web Phone on another website, such as a CRM, with a script snippet and a per-user token"
 ---
 
 # Embedded Dialer
 
-The Embedded Dialer lets you drop a specific user's [Web Phone](/modules/web-phone)
-into any third-party website — most commonly a CRM — with a single copy-and-paste
-script snippet. The dialer runs inside a sandboxed iframe served by OPBX and is
-authenticated by a per-user embed token. Host pages can drive it programmatically
-through the `window.OpbxDialer` command API.
+The Embedded Dialer puts one user's [Web Phone](/modules/web-phone) on a website you control, most often a CRM. You paste a short script into the page. It loads an OPBX iframe that registers the user's extension and offers click-to-dial. The host page can drive the dialer and listen to call events through `window.OpbxDialer`.
 
 ## Purpose
 
 Use the Embedded Dialer to:
 
-- Give a user click-to-dial from inside a CRM or internal web app without leaving the page
-- Automate outbound calls from host-page events (e.g. "call this lead")
-- React to call lifecycle events (started, ended, failed) in the host application
+- let a user call from inside a CRM or internal web app;
+- start calls from the host page, for example a "Call this lead" button;
+- react in the host page when a call starts, ends or fails.
 
-## Availability
+## Prerequisites
 
-Embed tokens are managed from the [Users](/modules/user-management) page. Only
-**Owners** and **PBX Admins** can view or manage a user's embed token.
+- The user has a **user extension** and the organization has Cloudonix settings with a domain. Without them the widget shows "Web Phone Unavailable".
+- The user and the organization are **active**. Otherwise the widget's API answers "Embed token is not active."
+- At least one **allowed domain** is set for the organization (below). With none, no site can show the dialer.
+- The host page is served over **HTTPS**.
+- OPBX's public address (the organization's webhook base URL, or `APP_URL`) is reachable from the browsers that load the host page. The snippet points at it.
 
-| Role | Manage embed tokens |
-|------|--------------------|
-| Owner | Yes |
-| PBX Admin | Yes |
-| Supervisor | No |
-| PBX User | No |
-| Reporter | No |
+## Permissions
 
-The embedded Web Phone itself works exactly like the in-app Web Phone: the target
-user must have a **user-type extension** and the organization must have
-**Cloudonix settings** configured. Without an extension, the widget shows the
-same "unavailable" state as the in-app Web Phone.
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| Set the organization's allowed domains (Settings) | Yes | No | No | No | No |
+| Open a user's Embedded Dialer dialog, set icon position and colour | Yes | Yes | No | No | No |
+| Regenerate a user's token and get the snippet | Yes | Yes | No | No | No |
 
-## Configuring Allowed Domains (organization-wide)
+Token management is only for signed-in users. Scoped API keys cannot call the embed-token endpoints.
 
-The list of websites permitted to embed the dialer is an **organization-level**
-setting, shared by every embedded user. Set it once:
+## Step 1: Allow the host website
 
-1. Open **Settings → Cloudonix**.
-2. Under **Embedded Dialer — Allowed Domains**, add one or more hostnames
-   (no scheme, e.g. `crm.acme.com`). The dialer refuses to load on any origin
-   not in this list.
-3. Save the settings.
+The list of websites that may embed the dialer is set once for the whole organization and applies to every embedded user.
 
-## Getting the Snippet
+1. Open **Settings** (Owner only).
+2. Find **Embedded Dialer — Allowed Domains**.
+3. Add each host name without a scheme, for example `crm.example.com`. For local testing, `localhost` or an IP address with an optional port is accepted, for example `localhost:3000` or `127.0.0.1:3000`.
+4. Save the settings.
 
-1. Open the **Users** page.
-2. Click the **Embed** (`</>`) action on the row for the user you want to embed.
-3. In the **Embedded Dialer** dialog, choose the floating **Icon Position** and
-   **Icon Color**, then click **Save Settings**.
-4. Click **Regenerate Token**. The installation snippet is revealed **once** —
-   copy it immediately.
+Each entry must be a host name, `localhost` or an IPv4 address, optionally followed by `:port`. Anything else is refused with "Each embed allowed domain must be a valid hostname, localhost, or IP address, optionally with a port".
 
-The snippet works on any of the organization's allowed domains configured above.
+While the list is empty, Settings shows "No domains yet — the embedded dialer cannot be used until you add one."
 
-:::warning The token is shown only once
-Embed tokens are stored hashed and can never be displayed again. If you lose the
-snippet, click **Regenerate Token** to produce a new one. Regenerating
-**revokes the previous token**, so any site still using the old snippet stops
-working until you update it.
+{/* SCREENSHOT: embedded-dialer-allowed-domains — Settings page, Embedded Dialer — Allowed Domains section with crm.example.com in the list */}
+
+## Step 2: Get the snippet for a user
+
+1. Open **Users**.
+2. On the user's row, in the **Embed** column, click **Get Code** (tooltip "Embedded dialer settings").
+3. In the **Embedded Dialer** dialog, choose:
+   - **Icon Position**: Bottom Right (default), Bottom Left, Top Right or Top Left;
+   - **Icon Color**: a colour in `#RRGGBB` form (default `#007acc`).
+4. Click **Save Settings**. A toast confirms "Embedded dialer settings saved".
+5. Click **Regenerate Token**. The **Installation Snippet (shown once)** appears with a **Copy** button. Copy it now.
+
+{/* SCREENSHOT: embedded-dialer-dialog — Embedded Dialer dialog for a user, with Icon Position Bottom Right, Icon Color #007acc and the one-time Installation Snippet shown after Regenerate Token */}
+
+:::warning The token is shown once, and regenerating revokes the old one
+The token is stored only as a hash and cannot be shown again. If you lose the snippet, click **Regenerate Token** for a new one. Regenerating **immediately revokes** the previous token: every site that still uses the old snippet stops working. There is no confirmation step before this happens.
 :::
 
-## Installing the Snippet
+## Step 3: Install the snippet
 
-Paste the snippet anywhere in the host page's HTML. It looks like this:
+Paste the snippet anywhere in the host page's HTML:
 
 ```html
 <script>
   (function(w,d,s,c){var j=d.createElement(s);j.async=1;j.src=c.loaderUrl;
   j.onload=function(){w.OpbxDialer.init(c);};d.head.appendChild(j);})
   (window,document,'script',{
-    loaderUrl:'https://your-opbx-host/embed/loader.js',
+    loaderUrl:'https://pbx.example.com/embed/loader.js',
     token:'opbxd_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     iconPosition:'bottom-right',
     iconBackgroundColor:'#007acc'
@@ -86,131 +84,118 @@ Paste the snippet anywhere in the host page's HTML. It looks like this:
 </script>
 ```
 
-The loader injects an iframe (`/embed/dialer`) that hosts the widget and bridges
-commands and events over `postMessage` with an explicit target origin.
+| Setting | Meaning |
+|---------|---------|
+| `loaderUrl` | The OPBX loader script. Built from the organization's webhook base URL, falling back to `APP_URL` |
+| `token` | The user's embed token: `opbxd_` followed by 40 characters |
+| `iconPosition` | `bottom-right`, `bottom-left`, `top-right` or `top-left` |
+| `iconBackgroundColor` | The launcher colour |
 
-### Configuration Variables
+The loader adds a 360 × 600 pixel iframe (`/embed/dialer`) in the chosen corner, with microphone access allowed. Inside it the Web Phone opens and registers straight away. The icon position and colour shown inside the iframe come from the settings saved in the dialog.
 
-| Variable | Description |
-|----------|-------------|
-| `loaderUrl` | URL of the OPBX loader script. Prefilled in the snippet, derived from the organization's **webhook base URL** (the same public address Cloudonix uses to reach OPBX), falling back to `APP_URL`. Make sure that URL is set and publicly routable, otherwise the snippet points at an unreachable host. |
-| `token` | The per-user embed token (prefix `opbxd_`). Identifies and authenticates the user. |
-| `iconPosition` | Floating launcher position: `bottom-right`, `bottom-left`, `top-right`, or `top-left`. |
-| `iconBackgroundColor` | Hex color for the floating launcher, e.g. `#007acc`. |
+## Drive the dialer from the host page
 
-## Widget API
-
-After the snippet runs, the host page can control the dialer through the global
-`window.OpbxDialer` object:
-
-| Method | Description |
-|--------|-------------|
-| `OpbxDialer.init(config)` | Called by the snippet to create the iframe. You do not normally call this yourself. |
-| `OpbxDialer.dial(number)` | Open the dialer and place a call to `number`. |
-| `OpbxDialer.hangup()` | End the current call. |
-| `OpbxDialer.open()` | Expand the dialer panel. |
-| `OpbxDialer.close()` | Collapse the dialer panel. |
-| `OpbxDialer.on(event, callback)` | Subscribe to a widget event (see below). |
+| Method | What it does |
+|--------|--------------|
+| `OpbxDialer.dial(number)` | Opens the dialer and calls `number`. If the phone is not registered yet, the call is placed as soon as it is |
+| `OpbxDialer.hangup()` | Ends the current call |
+| `OpbxDialer.open()` | Opens the dialer panel |
+| `OpbxDialer.close()` | Closes the dialer panel |
+| `OpbxDialer.on(event, callback)` | Adds a handler for an event |
+| `OpbxDialer.init(config)` | Called by the snippet. You do not call it yourself |
 
 ### Events
 
-Register handlers with `OpbxDialer.on(event, callback)`:
+| Event | When | Payload |
+|-------|------|---------|
+| `ready` | The phone has registered and can take commands | None |
+| `call.started` | A call connected | None |
+| `call.ended` | A connected call ended | None |
+| `call.failed` | A call failed to connect | `{ cause }` |
 
-| Event | Fired when |
-|-------|-----------|
-| `ready` | The widget has loaded and registered and is ready to place calls. |
-| `call.started` | A call has connected. |
-| `call.ended` | A call has ended normally. |
-| `call.failed` | A call failed to connect. |
+:::caution Events start after the first command
+The widget sends events only to the page that has spoken to it, so it waits for the host page's first command before delivering any event (earlier events are queued, not lost). Send a command, for example `OpbxDialer.open()`, once the loader has run if you rely on `ready`.
+:::
 
 ```js
 OpbxDialer.on('ready', () => console.log('dialer ready'));
-OpbxDialer.on('call.started', (payload) => console.log('call started', payload));
-OpbxDialer.on('call.ended', (payload) => console.log('call ended', payload));
-OpbxDialer.on('call.failed', (payload) => console.log('call failed', payload));
+OpbxDialer.on('call.started', () => console.log('call started'));
+OpbxDialer.on('call.ended', () => console.log('call ended'));
+OpbxDialer.on('call.failed', (p) => console.log('call failed', p.cause));
+OpbxDialer.open();
 
-// Place a call from a host-page click handler:
 document.querySelector('#call-lead').addEventListener('click', () => {
-  OpbxDialer.dial('+12125551234');
+  OpbxDialer.dial('+12025550123');
 });
 ```
 
-## Security Model
+Closing the panel unregisters the phone, as in the app. Do not call `OpbxDialer.close()` during a call.
 
-The Embedded Dialer is protected by several layers:
+## Security model
 
-- **Domain allowlist** — An **organization-level** list of allowed hostnames,
-  configured once under **Settings → Cloudonix → Embedded Dialer** (or via the
-  Cloudonix settings API). This is application data on the organization's
-  Cloudonix settings (`cloudonix_settings.embed_allowed_domains`), **not** an
-  environment variable, and it applies to every embedded user in the
-  organization. The iframe document sets a `frame-ancestors`
-  Content-Security-Policy so only those domains can frame it, and the embed API
-  refuses requests whose `Origin` is present but not in the list. Same-origin
-  calls from inside the iframe send no `Origin` and are allowed — the bearer
-  token is the auth there.
-- **Per-user token** — Each token maps to exactly one user and is stored hashed
-  (never in plaintext). It is shown only at generation time.
-- **Regenerate = revoke** — Regenerating a token immediately invalidates the old
-  one. This is the fast mitigation if a token is leaked.
-- **HTTPS-only framing** — `frame-ancestors` is emitted with an `https://`
-  scheme, so the dialer can only be embedded on secure origins. A local-dev
-  escape hatch, `EMBED_ALLOW_INSECURE_FRAMING`, additionally emits `http://`
-  ancestors so an `http://localhost` page can frame the dialer while testing.
-  It defaults to `false` and **must stay `false` in production** — enabling it
-  lets insecure origins frame the widget, exposing the extension's SIP
-  credentials.
+| Protection | How it works |
+|------------|--------------|
+| Allowed domains | The iframe page sends a `frame-ancestors` Content-Security-Policy listing only the allowed domains, with `https://`. With no allowed domains it is `'none'`. The embed API refuses an `Origin` that is not on the list ("Origin not allowed.") |
+| Origin required for the SIP config | `/v1/embed/config` returns the extension's SIP password. It is answered only to an allowed `Origin`, or to the iframe's own same-origin request (marked by the browser with `Sec-Fetch-Site: same-origin`). Anything else gets "Origin required." |
+| Per-user token | One token per user, stored hashed, shown once. An invalid token gets "Invalid embed token." |
+| Active user and organization | An inactive user or organization gets "Embed token is not active." (403) |
+| Regenerate = revoke | A new token replaces the old one immediately |
+| Rate limit | 60 requests per minute per token and IP address on the embed API |
+| No third-party scripts | The widget bundles its JsSIP library; it loads nothing from a CDN |
 
-### Residual Risk: SIP password exposure
+For local development only, `EMBED_ALLOW_INSECURE_FRAMING=true` also allows `http://` ancestors so an `http://localhost` page can frame the dialer. It defaults to `false` and must stay `false` in production.
 
-:::danger Treat embedded extensions as lower-trust
-The embedded Web Phone registers with Cloudonix using the extension's **SIP
-username and password**, exactly like the in-app Web Phone. Because the widget
-runs on a third-party host page, that SIP password is reachable by the host
-page's JavaScript. Cloudonix does not currently issue ephemeral WebRTC
-credentials, so this exposure cannot be fully eliminated.
+:::danger The extension's SIP password reaches the host page's browser
+The embedded phone registers with the extension's SIP user name and password, exactly like the in-app Web Phone. Because the widget runs inside a page you embed it in, treat any extension used this way as **lower-trust**:
 
-Mitigations:
-- Only add domains you fully control and trust to the organization allowlist.
-- Treat any extension used for embedding as **lower-trust** — assume its SIP
-  credentials could be observed by the embedding site.
-- If you suspect a token or host site is compromised, **Regenerate** the token
-  immediately to revoke access.
+- allow only domains you control;
+- use a dedicated extension for embedding where possible;
+- if you suspect a leak, **Regenerate** the token at once and reset the extension password on [Extensions](/modules/extensions).
 :::
 
-### Host-site CSP
+### Host-page Content Security Policy
 
-The widget ships the JsSIP library in its own bundle (no third-party script
-origin) and connects to Cloudonix over `wss://webrtc.cloudonix.io`. If the
-embedding site enforces a Content Security Policy, it must allow that origin
-(`connect-src wss://webrtc.cloudonix.io`) or the dialer cannot register.
+If the host site sends its own CSP, it must allow:
 
-## Related API Endpoints
+- `script-src` and `frame-src` for your OPBX address (loader and iframe);
+- the browser to reach `wss://webrtc.cloudonix.io` from the iframe (the iframe is served by OPBX, so this is governed by OPBX's headers, not the host page's).
 
-Token management (authenticated OPBX admin API):
+## Common errors
+
+| Message or symptom | What it means | What to do |
+|--------------------|---------------|-----------|
+| The dialer area stays blank; the browser console reports a `frame-ancestors` violation | The host domain is not on the allowed list, or the page is HTTP | Add the domain in Settings; serve the page over HTTPS |
+| Invalid embed token. | The token was regenerated or mistyped | Regenerate and install the new snippet |
+| Embed token is not active. | The user or the organization is inactive | Activate them |
+| Origin not allowed. | The request came from a domain not on the list | Add the domain |
+| Web Phone Unavailable | No user extension, or no Cloudonix domain | Assign an extension; check Settings |
+| Too many requests (429) | More than 60 embed API calls a minute from one token and IP | Reduce reloads |
+
+## Related API endpoints
+
+Token management (signed-in Owner or PBX Admin):
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/users/{user}/embed-token` | Get the user's embed settings (icon position/color) |
-| PATCH | `/v1/users/{user}/embed-token` | Update icon position and color |
-| POST | `/v1/users/{user}/embed-token/regenerate` | Rotate the token and return the one-time snippet |
-| GET | `/v1/settings/cloudonix` | Read organization settings, including `embed_allowed_domains` |
-| PUT | `/v1/settings/cloudonix` | Update `embed_allowed_domains` (organization allowlist) |
+| GET | `/v1/users/{user}/embed-token` | Icon settings. Creates the user's token record if it does not exist yet |
+| PATCH | `/v1/users/{user}/embed-token` | Update `icon_position` and `icon_background_color` |
+| POST | `/v1/users/{user}/embed-token/regenerate` | New token; returns the token and the snippet once |
+| PUT | `/v1/settings/cloudonix` | Update `embed_allowed_domains` (Owner) |
 
-Widget runtime (token-authenticated, origin-checked):
+Widget runtime (embed token):
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/embed/config` | SIP provisioning for the embedded user |
-| GET | `/v1/embed/calls-log` | Recent calls for the embedded user |
-| GET | `/embed/loader.js` | Host-side loader that defines `window.OpbxDialer` |
-| GET | `/embed/dialer` | The iframe document that hosts the widget |
+| GET | `/embed/loader.js` | The host-side loader (`window.OpbxDialer`) |
+| GET | `/embed/dialer?token=…` | The iframe page |
+| GET | `/v1/embed/config` | SIP settings for the embedded user |
+| GET | `/v1/embed/calls-log` | The user's last 50 outbound calls |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Web Phone](/modules/web-phone) — The in-app softphone this feature embeds
-- [User Management](/modules/user-management) — Where embed tokens are managed
-- [Extensions](/modules/extensions) — Provision the extension the dialer registers as
-- [Settings](/modules/settings) — Configure Cloudonix integration
+- [Web Phone](/modules/web-phone) — the softphone that is embedded
+- [User Management](/modules/user-management) — the Embed column and Get Code button
+- [Extensions](/modules/extensions) — the extension the dialer registers as
+- [Settings](/modules/settings) — allowed domains and Cloudonix settings
