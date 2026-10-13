@@ -17,11 +17,41 @@ paths:
           application/x-www-form-urlencoded:
             schema:
               type: object
-              description: Cloudonix callback form fields (CallSid, From, To, and queue query parameters).
+              properties:
+                CallSid:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                call_queue_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                call_id:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                session_data:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 2000
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Organization ID appended to callback URLs by the platform
+              required: [CallSid]
           application/json:
             schema:
-              type: object
-              description: Cloudonix callback fields as JSON.
+              $ref: '#/paths/~1callbacks~1voice~1queue-poll/post/requestBody/content/application~1x-www-form-urlencoded/schema'
       responses:
         '200':
           description: CXML instructions for the call
@@ -49,11 +79,41 @@ paths:
           application/x-www-form-urlencoded:
             schema:
               type: object
-              description: Cloudonix callback form fields for the dial result.
+              properties:
+                CallSid:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                call_queue_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                call_id:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                session_data:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 2000
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Organization ID appended to callback URLs by the platform
+              required: [CallSid]
           application/json:
             schema:
-              type: object
-              description: Cloudonix callback fields as JSON.
+              $ref: '#/paths/~1callbacks~1voice~1queue-poll/post/requestBody/content/application~1x-www-form-urlencoded/schema'
       responses:
         '200':
           description: CXML instructions for the call

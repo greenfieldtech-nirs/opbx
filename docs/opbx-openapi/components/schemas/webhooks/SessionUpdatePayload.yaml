@@ -1,19 +1,102 @@
 type: object
-description: Cloudonix session-update webhook payload
+description: Cloudonix session-update webhook payload (validated by SessionUpdateRequest)
 properties:
-  session_token:
-    type: string
+  id:
+    type: integer
+    description: Cloudonix session ID
+  token:
+    type:
+    - string
+    - 'null'
     description: Session token
-  session_id:
-    type: integer
-    description: Session ID
+  eventId:
+    type:
+    - string
+    - 'null'
+  domainId:
+    type:
+    - integer
+    - 'null'
+  domain:
+    type:
+    - string
+    - 'null'
+  subscriberId:
+    type:
+    - integer
+    - 'null'
+  outgoingSubscriberId:
+    type:
+    - integer
+    - 'null'
+  callerId:
+    type:
+    - string
+    - 'null'
+  destination:
+    type: string
+  direction:
+    type:
+    - string
+    - 'null'
+    enum: [incoming, outgoing, internal, application, null]
   status:
+    type:
+    - string
+    - 'null'
+    example: connected
+  createdAt:
     type: string
-    description: Session status
-    example: active
-  call_id:
+  modifiedAt:
     type: string
-    description: Associated call ID
-  timestamp:
-    type: integer
-    description: Unix timestamp
+  callStartTime:
+    type:
+    - integer
+    - 'null'
+  callAnswerTime:
+    type:
+    - integer
+    - 'null'
+  answerTime:
+    type:
+    - string
+    - 'null'
+  startTime:
+    type:
+    - string
+    - 'null'
+  timeLimit:
+    type:
+    - integer
+    - 'null'
+  vappServer:
+    type:
+    - string
+    - 'null'
+  action:
+    type: string
+  reason:
+    type:
+    - string
+    - 'null'
+  lastError:
+    type:
+    - string
+    - 'null'
+  callIds:
+    type:
+    - array
+    - 'null'
+    items:
+      type: string
+  profile:
+    type:
+    - object
+    - 'null'
+    additionalProperties: true
+required:
+- id
+- destination
+- createdAt
+- modifiedAt
+- action

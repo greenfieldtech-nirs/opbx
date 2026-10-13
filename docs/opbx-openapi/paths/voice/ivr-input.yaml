@@ -14,6 +14,50 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                CallSid:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                  description: Call SID
+                Digits:
+                  type: string
+                  maxLength: 10
+                  pattern: '^[0-9*#]+$'
+                  description: Collected DTMF digits
+                From:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Caller number
+                To:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Called number
+                Domain:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Cloudonix domain
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                  enum: [ringing, answered, completed, failed, busy, no-answer, in-progress, null]
+                  description: Call status
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Organization ID appended to callback URLs by the platform
+              required: [CallSid, Digits, From, To]
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/paths/~1voice~1ivr-input/post/requestBody/content/application~1json/schema'
       responses:
         '200':
           description: CXML response

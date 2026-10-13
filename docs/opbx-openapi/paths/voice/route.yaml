@@ -23,22 +23,46 @@ paths:
             schema:
               type: object
               properties:
-                To:
-                  type: string
-                  description: Called number
-                  example: '+1987654321'
-                From:
-                  type: string
-                  description: Caller number
-                  example: '+1234567890'
-                Domain:
-                  type: string
-                  description: Cloudonix domain
-                  example: example.cloudonix.io
                 CallSid:
                   type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
                   description: Call SID
-                  example: CA550e8400e29b41d4a716446655440000
+                From:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Caller number
+                To:
+                  type: string
+                  maxLength: 64
+                  pattern: '^(\+?[1-9]\d{1,14}|\*\d{1,10}|\d{1,10}|(spy|barge)_[0-9a-f]{16,}|whisper_(caller|callee|both)_[0-9a-f]{16,})$'
+                  description: Called number, a `*`-feature code, or a supervisor coaching target (spy_/barge_/whisper_<party>_ + hex token)
+                Domain:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Cloudonix domain
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                  enum: [ringing, in-progress, answered, completed, failed, busy, no-answer, new, null]
+                  description: Call status
+                Direction:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [subscriber, inbound, outbound, application, null]
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Organization ID appended to callback URLs by the platform
+              required: [CallSid, From, To]
       responses:
         '200':
           description: CXML routing response
