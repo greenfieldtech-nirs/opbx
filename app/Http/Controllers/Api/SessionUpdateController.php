@@ -58,13 +58,8 @@ class SessionUpdateController extends Controller
 
             $organizationId = $user->organization_id;
 
-            $isSupervisor = $request->boolean('supervisor') && $user->isSupervisor();
-            $supervisorIdentifiers = null;
-
-            if ($isSupervisor) {
-                $supervisorIdentifiers = app(SupervisorFilterService::class)
-                    ->resourceIdentifiers($user);
-            }
+            // Supervisors are always scoped by role; the legacy ?supervisor= flag is ignored.
+            $supervisorIdentifiers = app(SupervisorFilterService::class)->scopeFor($user);
 
             try {
                 $activeCalls = app(ActiveCallsService::class)
@@ -228,6 +223,14 @@ class SessionUpdateController extends Controller
     {
         $this->authorize('viewAny', SessionUpdate::class);
 
+        // A Supervisor only sees sessions that involve their scope (anything else reads as not found).
+        $identifiers = app(SupervisorFilterService::class)->scopeFor(auth()->user());
+        if ($identifiers !== null && ! SessionUpdate::where('session_id', $sessionId)
+            ->where(fn ($q) => $q->whereIn('caller_id', $identifiers)->orWhereIn('destination', $identifiers))
+            ->exists()) {
+            return response()->json(['message' => 'Session not found', 'session_id' => $sessionId], 404);
+        }
+
         // Get all events for this session
         $events = SessionUpdate::where('session_id', $sessionId)
             ->orderBy('created_at', 'asc')
@@ -271,7 +274,10 @@ class SessionUpdateController extends Controller
         $this->authorize('viewAny', SessionUpdate::class);
 
         // Same bounded window as the live-calls list: latest row per session, updated in the last 30 minutes.
-        $calls = app(ActiveCallsService::class)->forOrganization((int) $request->user()->organization_id);
+        $calls = app(ActiveCallsService::class)->forOrganization(
+            (int) $request->user()->organization_id,
+            app(SupervisorFilterService::class)->scopeFor($request->user())
+        );
 
         $byStatus = [
             'processing' => $calls->where('status', 'processing')->count(),

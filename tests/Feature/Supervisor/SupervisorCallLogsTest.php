@@ -44,4 +44,27 @@ final class SupervisorCallLogsTest extends TestCase
 
         $response->assertOk()->assertJsonCount(1, 'data');
     }
+
+    public function test_supervisor_is_scoped_without_the_flag_and_sees_own_calls(): void
+    {
+        $org = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $assignedUser = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $assignedUser->id, 'type' => 'user', 'extension_number' => '1001']);
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $supervisor->id, 'type' => 'user', 'extension_number' => '1002']);
+        $supervisor->supervisedUsers()->attach($assignedUser->id, ['organization_id' => $org->id]);
+
+        CallDetailRecord::factory()->create(['organization_id' => $org->id, 'from' => '1001']);
+        CallDetailRecord::factory()->create(['organization_id' => $org->id, 'from' => '1002']);
+        CallDetailRecord::factory()->create(['organization_id' => $org->id, 'from' => '9999']);
+
+        $this->actingAs($supervisor)->getJson('/api/v1/call-detail-records')
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($supervisor)->getJson('/api/v1/call-detail-records/statistics')
+            ->assertOk()->assertJsonPath('total_calls', 2);
+
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $this->actingAs($owner)->getJson('/api/v1/call-detail-records')
+            ->assertOk()->assertJsonCount(3, 'data');
+    }
 }

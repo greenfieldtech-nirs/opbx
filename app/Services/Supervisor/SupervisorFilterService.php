@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Supervisor;
 
 use App\Enums\ExtensionType;
+use App\Models\ApiKey;
 use App\Models\Extension;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
@@ -19,6 +20,7 @@ final class SupervisorFilterService
      * - assigned users' extension numbers
      * - assigned ring group IDs
      * - assigned ring groups' extension numbers (if available)
+     * - the supervisor's own user ID and own extension number(s)
      *
      * Also includes a "+"-prefixed variant of every identifier: session_updates
      * (used for live calls) stores caller_id/destination E.164-normalized with
@@ -36,7 +38,7 @@ final class SupervisorFilterService
         $users = $supervisor->supervisedUsers;
         $ringGroups = $supervisor->supervisedRingGroups;
 
-        $userIds = $users->pluck('id')->toArray();
+        $userIds = $users->pluck('id')->push($supervisor->id)->unique()->values()->toArray();
         $ringGroupIds = $ringGroups->pluck('id')->toArray();
 
         $userExtensionNumbers = Extension::withoutGlobalScope(OrganizationScope::class)
@@ -54,7 +56,7 @@ final class SupervisorFilterService
             ->toArray();
 
         $identifiers = new Collection;
-        $identifiers = $identifiers->merge($users->pluck('id')->map(fn ($id) => (string) $id));
+        $identifiers = $identifiers->merge(collect($userIds)->map(fn ($id) => (string) $id));
         $identifiers = $identifiers->merge($userExtensionNumbers);
         $identifiers = $identifiers->merge($ringGroups->pluck('id')->map(fn ($id) => (string) $id));
         $identifiers = $identifiers->merge($ringGroupExtensionNumbers);
@@ -69,6 +71,17 @@ final class SupervisorFilterService
             ->unique(null, true)
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Call-data scope of a user by role: null (unrestricted) unless the user is a Supervisor, who is always
+     * limited to their assigned users/groups and their own extension - never decided by a request flag.
+     *
+     * @return array<int, string>|null
+     */
+    public function scopeFor(User|ApiKey $user): ?array
+    {
+        return $user->isSupervisor() ? $this->resourceIdentifiers($user) : null;
     }
 
     public function userExtensionNumbers(User $supervisor): array

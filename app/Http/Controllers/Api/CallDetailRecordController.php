@@ -115,8 +115,8 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Supervisor-scoped filter: restrict CDRs to resources the Supervisor manages
-        if ($request->boolean('supervisor') && $request->user()?->isSupervisor()) {
+        // Supervisors are always restricted to their scope (the legacy ?supervisor= flag is ignored).
+        if ($request->user() !== null) {
             $this->applySupervisorFilter($query, $request->user());
         }
 
@@ -262,9 +262,6 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         // Build query with same filters as index
         $query = $this->getModelClass()::forOrganization($user->organization_id);
-
-        // Apply Supervisor-scoped filter
-        $this->applySupervisorFilter($query, $user);
 
         $this->applyCustomFilters($query, $request);
 
