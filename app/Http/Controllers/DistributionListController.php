@@ -173,6 +173,8 @@ class DistributionListController extends Controller
      */
     public function uploadProgress(string $jobId): JsonResponse
     {
+        $this->authorize('viewAny', AutoDialerList::class);
+
         $progress = $this->listService->getUploadProgress($jobId);
 
         if (! $progress) {

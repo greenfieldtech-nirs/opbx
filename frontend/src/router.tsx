@@ -250,35 +250,67 @@ export const router = createBrowserRouter([
       },
       {
         path: 'auto-dialer/campaigns',
-        element: <AutoDialerCampaigns />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerCampaigns />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/new',
-        element: <AutoDialerCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id',
-        element: <AutoDialerCampaignDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerCampaignDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id/edit',
-        element: <AutoDialerCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id/upload',
-        element: <AutoDialerUploadList />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerUploadList />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/distribution-lists',
-        element: <DistributionLists />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <DistributionLists />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/distribution-lists/:id',
-        element: <DistributionListDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <DistributionListDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/monitor',
-        element: <AutoDialerMonitor />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerMonitor />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking',

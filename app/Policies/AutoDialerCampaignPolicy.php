@@ -17,7 +17,8 @@ class AutoDialerCampaignPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->role->canManageUsers();
+        // Read access: Owner, PBX Admin and Reporter only.
+        return $user->role->canViewReports();
     }
 
     /**
@@ -27,7 +28,7 @@ class AutoDialerCampaignPolicy
      */
     public function view(User $user, AutoDialerCampaign $campaign): bool
     {
-        return $user->organization_id === $campaign->organization_id;
+        return $user->organization_id === $campaign->organization_id && $user->role->canViewReports();
     }
 
     /**

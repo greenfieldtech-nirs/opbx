@@ -541,10 +541,9 @@ class AutoDialerMonitorTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_monitor_detail_allows_same_organization_users(): void
+    public function test_monitor_detail_refuses_pbx_user(): void
     {
-        // The view policy only checks organization, not role
-        // So regular users in the same org can view campaign details
+        // Auto-dialer read access is Owner, PBX Admin and Reporter only.
         $campaign = AutoDialerCampaign::factory()->create([
             'organization_id' => $this->organization->id,
             'status' => CampaignStatus::ACTIVE,
@@ -553,7 +552,7 @@ class AutoDialerMonitorTest extends TestCase
         $response = $this->actingAs($this->regularUser)
             ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail");
 
-        $response->assertOk();
+        $response->assertForbidden();
     }
 
     public function test_monitor_detail_owner_can_access(): void
