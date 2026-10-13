@@ -59,6 +59,7 @@ import { ValidationErrorsDialog } from './DistributionLists/components/Validatio
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
@@ -98,6 +99,7 @@ export default function DistributionLists() {
 
   const archiveMutation = useArchiveList();
   const deleteMutation = useDeleteList();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const unassignMutation = useUnassignListFromCampaign();
   const downloadExampleMutation = useDownloadExample();
   const queryClient = useQueryClient();
@@ -148,7 +150,9 @@ export default function DistributionLists() {
       await deleteMutation.mutateAsync(deleteList.id);
       toast.success('List deleted successfully');
       setDeleteList(null);
-    } catch {
+    } catch (err) {
+      setDeleteList(null);
+      if (showIfInUse(err)) return;
       toast.error('Failed to delete list');
     }
   };
@@ -536,6 +540,7 @@ export default function DistributionLists() {
           campaigns={campaignsData?.data || []}
         />
       )}
+      {inUseDialog}
     </div>
   );
 }

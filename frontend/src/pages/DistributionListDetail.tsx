@@ -57,7 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations } from '@/hooks/useDistributionLists';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations, useDeleteList } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
@@ -66,6 +66,7 @@ import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDia
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const statusColors: Record<string, string> = {
@@ -130,6 +131,8 @@ export default function DistributionListDetail() {
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const deleteListMutation = useDeleteList();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -804,12 +807,18 @@ export default function DistributionListDetail() {
         list={list}
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
-        onConfirm={() => {
-          toast.success('List deleted');
-          setIsDeleteOpen(false);
-          navigate('/ui/auto-dialer/distribution-lists');
+        onConfirm={async () => {
+          try {
+            await deleteListMutation.mutateAsync(list.id);
+            toast.success('List deleted');
+            setIsDeleteOpen(false);
+            navigate('/ui/auto-dialer/distribution-lists');
+          } catch (err) {
+            setIsDeleteOpen(false);
+            if (!showIfInUse(err)) toast.error('Failed to delete list');
+          }
         }}
-        isDeleting={false}
+        isDeleting={deleteListMutation.isPending}
       />
 
       <ValidationErrorsDialog
@@ -840,6 +849,7 @@ export default function DistributionListDetail() {
           </div>
         </DialogContent>
       </Dialog>
+      {inUseDialog}
     </div>
   );
 }
