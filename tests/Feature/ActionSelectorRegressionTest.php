@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Models\Extension;
 use App\Models\Organization;
+use App\Models\RingGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -34,6 +36,10 @@ class ActionSelectorRegressionTest extends TestCase
             'organization_id' => $this->organization->id,
             'role' => UserRole::OWNER,
         ]);
+
+        // Targets referenced by the ids used below must exist in the organization.
+        Extension::factory()->create(['id' => 101, 'organization_id' => $this->organization->id]);
+        RingGroup::factory()->create(['id' => 5, 'organization_id' => $this->organization->id]);
     }
 
     /**
