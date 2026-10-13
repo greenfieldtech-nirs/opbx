@@ -52,12 +52,18 @@ fi
 REQUIRED_VARS=(
     "DB_PASSWORD"
     "APP_KEY"
-    "GRAFANA_ADMIN_PASSWORD"
     "PUSHER_APP_SECRET"
     "DIALER_WORKER_API_TOKEN"
     "AMD_WORKER_API_TOKEN"
     "ACD_WORKER_API_TOKEN"
 )
+
+# Grafana only runs with the optional `logs` compose profile: require its admin
+# password only when the log stack is in use (LOG_STACK_ENABLED=true in .env, or
+# "logs" in COMPOSE_PROFILES).
+if [[ "${LOG_STACK_ENABLED:-false}" == "true" ]] || [[ ",${COMPOSE_PROFILES:-}," == *",logs,"* ]]; then
+    REQUIRED_VARS+=("GRAFANA_ADMIN_PASSWORD")
+fi
 
 # Track validation status
 VALIDATION_FAILED=0
