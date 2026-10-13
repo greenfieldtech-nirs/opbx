@@ -6,6 +6,7 @@ namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
 use App\Models\CallDetailRecord;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,5 +69,35 @@ final class CdrRecordingStreamTest extends TestCase
         $this->actingAs($user)->get("/api/v1/call-detail-records/{$cdr->id}/recording")->assertStatus($status);
         $this->actingAs($user)->getJson("/api/v1/call-detail-records/{$cdr->id}")
             ->assertJsonPath('data.has_recording', $status === 200);
+    }
+
+    public function test_supervisor_plays_only_cdrs_in_scope(): void
+    {
+        Storage::fake('recordings');
+        $org = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $agent = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+        Extension::factory()->create([
+            'organization_id' => $org->id,
+            'user_id' => $agent->id,
+            'extension_number' => '2001',
+            'type' => 'user',
+        ]);
+        $supervisor->supervisedUsers()->attach($agent->id, ['organization_id' => $org->id]);
+        Storage::disk('recordings')->put("{$org->id}/cdr/3.mp3", 'abc');
+        $make = fn (string $from) => CallDetailRecord::factory()->create([
+            'organization_id' => $org->id,
+            'from' => $from,
+            'to' => '9999',
+            'recording_status' => 'available',
+            'recording_stored_path' => 'cdr/3.mp3',
+        ]);
+        $inScope = $make('2001');
+        $outOfScope = $make('2002');
+
+        $this->actingAs($supervisor)->get("/api/v1/call-detail-records/{$inScope->id}/recording")->assertOk();
+        $this->actingAs($supervisor)->getJson("/api/v1/call-detail-records/{$inScope->id}")
+            ->assertJsonPath('data.has_recording', true);
+        $this->actingAs($supervisor)->get("/api/v1/call-detail-records/{$outOfScope->id}/recording")->assertForbidden();
     }
 }

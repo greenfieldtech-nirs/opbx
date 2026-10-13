@@ -50,11 +50,13 @@ class CallDetailRecordPolicy
     }
 
     /**
-     * Playing a call's recording follows the Recordings rule (D13: Owner, PBX Admin, Reporter) on top of view.
+     * Playing a call's recording: Owner, PBX Admin, Reporter (D13) and Supervisors, always on top of view
+     * (a Supervisor only plays CDRs of their assigned users/groups).
      */
     public function playRecording(User $user, CallDetailRecord $callDetailRecord): bool
     {
-        return app(RecordingPolicy::class)->viewAny($user) && $this->view($user, $callDetailRecord);
+        return ($user->isSupervisor() || app(RecordingPolicy::class)->viewAny($user))
+            && $this->view($user, $callDetailRecord);
     }
 
     /**
