@@ -161,7 +161,8 @@ class BusinessHoursSchedule extends Model
      */
     public function isCurrentlyOpen(?Carbon $dateTime = null): bool
     {
-        $dateTime ??= Carbon::now();
+        // Evaluate in the schedule's own time zone (defaults to UTC, seeded from the organisation's).
+        $dateTime = ($dateTime ?? Carbon::now())->copy()->setTimezone($this->timezone ?: 'UTC');
 
         // Check if it's an exception date
         $exception = $this->getExceptionForDate($dateTime);
@@ -319,6 +320,12 @@ class BusinessHoursSchedule extends Model
                 // Parse "ivr-1" to get IVR menu ID 1
                 if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
                     $config['ivr_menu_id'] = (int) $matches[1];
+                }
+                break;
+
+            case BusinessHoursActionType::CALL_QUEUE:
+                if (preg_match('/^queue-(\d+)$/', $targetId, $matches)) {
+                    $config['call_queue_id'] = (int) $matches[1];
                 }
                 break;
         }

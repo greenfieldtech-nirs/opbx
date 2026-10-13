@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
+use App\Enums\AiAssistantStatus;
+use App\Enums\AlbsStatus;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
 use App\Enums\IvrDestinationType;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -338,10 +343,10 @@ class IvrRoutingService
      * Route to call queue destination.
      *
      * @param  Request  $request  The incoming request
-     * @param  \App\Models\CallQueue  $callQueue  The validated call queue
+     * @param  CallQueue  $callQueue  The validated call queue
      * @return Response CXML response
      */
-    private function routeToCallQueue(Request $request, \App\Models\CallQueue $callQueue): Response
+    private function routeToCallQueue(Request $request, CallQueue $callQueue): Response
     {
         Log::debug('IvrRoutingService: Routing to call queue', [
             'call_sid' => $request->input('CallSid'),
@@ -494,9 +499,32 @@ class IvrRoutingService
             BusinessHoursActionType::IVR_MENU => $this->routeBusinessHoursToIvrMenu($request, $targetId, $organizationId),
             BusinessHoursActionType::AI_ASSISTANT => $this->routeBusinessHoursToAiAssistant($request, $targetId, $organizationId),
             BusinessHoursActionType::AI_LOAD_BALANCER => $this->routeBusinessHoursToAiLoadBalancer($request, $targetId, $organizationId),
+            BusinessHoursActionType::CALL_QUEUE => $this->routeBusinessHoursToCallQueue($request, $targetId, $organizationId),
             BusinessHoursActionType::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->createErrorResponse('Business hours routing not available.'),
         };
+    }
+
+    /**
+     * Route business hours action to call queue.
+     */
+    private function routeBusinessHoursToCallQueue(Request $request, ?string $targetId, int $organizationId): Response
+    {
+        $callQueueId = $targetId ? $this->parseTargetId($targetId, 'queue') : null;
+
+        $callQueue = $callQueueId
+            ? CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $callQueueId)
+                ->where('organization_id', $organizationId)
+                ->where('status', 'active')
+                ->first()
+            : null;
+
+        if (! $callQueue) {
+            return $this->createErrorResponse('Business hours routing not available.');
+        }
+
+        return $this->routeToCallQueue($request, $callQueue);
     }
 
     /**
@@ -660,10 +688,10 @@ class IvrRoutingService
             return $this->createErrorResponse('Business hours routing not available.');
         }
 
-        $aiAssistant = \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
+        $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $organizationId)
-            ->where('status', \App\Enums\AiAssistantStatus::ACTIVE)
+            ->where('status', AiAssistantStatus::ACTIVE)
             ->first();
 
         if (! $aiAssistant) {
@@ -699,10 +727,10 @@ class IvrRoutingService
             return $this->createErrorResponse('Business hours routing not available.');
         }
 
-        $aiLoadBalancer = \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+        $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $albsId)
             ->where('organization_id', $organizationId)
-            ->where('status', \App\Enums\AlbsStatus::ACTIVE)
+            ->where('status', AlbsStatus::ACTIVE)
             ->first();
 
         if (! $aiLoadBalancer) {
@@ -848,11 +876,11 @@ class IvrRoutingService
                 ->where('id', $destinationId)
                 ->where('organization_id', $organizationId)
                 ->first(),
-            IvrDestinationType::AI_ASSISTANT => \App\Models\AiAssistant::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::AI_ASSISTANT => AiAssistant::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $destinationId)
                 ->where('organization_id', $organizationId)
                 ->first(),
-            IvrDestinationType::AI_LOAD_BALANCER => \App\Models\AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+            IvrDestinationType::AI_LOAD_BALANCER => AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $destinationId)
                 ->where('organization_id', $organizationId)
                 ->first(),

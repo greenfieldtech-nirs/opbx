@@ -10,6 +10,7 @@ use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -313,6 +314,7 @@ class InboundRoutingService
             BusinessHoursActionType::IVR_MENU => $this->resolveBusinessHoursIvrMenu($did, $targetId, $destination),
             BusinessHoursActionType::AI_ASSISTANT => $this->resolveBusinessHoursAiAssistant($did, $targetId, $destination),
             BusinessHoursActionType::AI_LOAD_BALANCER => $this->resolveBusinessHoursAiLoadBalancer($did, $targetId, $destination),
+            BusinessHoursActionType::CALL_QUEUE => $this->resolveBusinessHoursCallQueue($did, $targetId, $destination),
             BusinessHoursActionType::UNAVAILABLE => $destination['unavailable'] = true,
             default => Log::warning('InboundRoutingService: Business Hours action type not handled', [
                 'did_id' => $did->id,
@@ -412,6 +414,26 @@ class InboundRoutingService
 
             if ($ivrMenu) {
                 $destination['ivr_menu'] = $ivrMenu;
+            }
+        }
+    }
+
+    /**
+     * Resolve business hours call queue target.
+     */
+    private function resolveBusinessHoursCallQueue(DidNumber $did, ?string $targetId, array &$destination): void
+    {
+        $callQueueId = $targetId ? $this->parseTargetId($targetId, 'queue') : null;
+
+        if ($callQueueId) {
+            $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $callQueueId)
+                ->where('organization_id', $did->organization_id)
+                ->where('status', 'active')
+                ->first();
+
+            if ($callQueue) {
+                $destination['call_queue'] = $callQueue;
             }
         }
     }
