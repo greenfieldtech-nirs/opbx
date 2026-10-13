@@ -3,175 +3,177 @@ sidebar_position: 2
 slug: /modules/auth0-syndicated-auth
 sidebar_class_name: cxGuidesSidebar
 title: "Auth0 Syndicated Authentication"
-description: "Social login, account linking, invitations, and organization join requests"
+description: "Social sign-in through Auth0, linked accounts, email invitations and organization join requests"
 ---
 
 # Auth0 Syndicated Authentication
 
-When OPBX runs in SaaS mode, users can authenticate through Auth0 social identity providers. Auth0 syndicated authentication works **alongside** the existing email/password flow: existing password users can keep using their password, and they can optionally link one or more social providers to the same account.
+When the deployment has Auth0 configured, people can sign up and sign in with a social account (Google, Facebook, Microsoft, GitHub or X) instead of, or in addition to, an email and password. The same feature powers **email invitations** and **requests to join** an existing organization.
 
-## Feature Overview
+Auth0 sign-in works **alongside** password sign-in. A password user can keep their password and also link one or more social accounts.
 
-Use this module for:
+## Prerequisites
 
-- Signing up new organizations with a social account.
-- Logging in with a linked social provider.
-- Linking and unlinking social identities from a user's profile.
-- Inviting new team members by email and having them accept through Auth0.
-- Letting new users request membership in an existing organization.
-
-The feature is available only when `OPBX_SAAS_ENABLED=true` and the Auth0 tenant is configured. See [Auth0 Setup](../installation/auth0-setup) for configuration instructions.
-
-## User Flows
-
-### New User — Create an Organization
-
-1. Go to `/ui/register`.
-2. Click the social provider you want to use.
-3. Complete authentication with Auth0.
-4. OPBX creates a new organization and assigns the **Owner** role.
-5. The user is logged in and redirected to the Dashboard.
-
-This is the social equivalent of the local registration flow described in [First Login](../installation/first-login).
-
-### New User — Request to Join an Existing Organization
-
-1. Go to `/ui/register` and click a social provider.
-2. After Auth0 returns to OPBX, the onboarding page appears.
-3. Choose **Request to join an organization**.
-4. Enter the target organization's slug.
-5. Submit the request.
-
-An **Owner** or **PBX Admin** of the target organization reviews pending requests. Once approved, the user becomes an active **PBX User** in that organization.
-
-### Existing User — Social Login
-
-1. Go to `/ui/login`.
-2. Click the social provider that was previously linked.
-3. Complete authentication with Auth0.
-4. OPBX matches the provider identity and issues an access token.
-5. The user is redirected to the Dashboard.
-
-### Link an Existing Password Account
-
-1. Log in with the existing email and password.
-2. Go to **Profile** settings and open **Linked Accounts**.
-3. Click **Connect** next to the desired provider.
-4. Authenticate with Auth0 using the **same verified email address**.
-5. The provider is linked. From now on, login can use either the password or the linked provider.
-
-### Unlink a Social Identity
-
-1. Go to **Profile > Linked Accounts**.
-2. Click **Disconnect** next to the provider.
-3. The provider identity is removed, but the OPBX account and password remain active.
-
-### Accept an Invitation
-
-Owners and PBX Admins can invite users by email from the [User Management](./user-management) screen:
-
-1. The administrator sends an invitation to an email address.
-2. OPBX creates a pending user and sends a magic-link email.
-3. The invitee opens the link and authenticates with Auth0 using the invited email.
-4. OPBX activates the pending user as a **PBX User** and issues a session token.
-
-If the social provider does not return a verified email, or if the email does not match the invitation, the acceptance fails and the user is returned to the login page.
-
-## Organization Join Requests
-
-Join requests are created when a new user chooses to join an existing organization instead of creating one.
-
-### Submitting a Request
-
-New users submit a request from the Auth0 onboarding page. The request records:
-
-- The target organization slug.
-- The user's email, name, and social provider details.
-
-### Managing Requests
-
-Owners and PBX Admins can review pending requests and take one of the following actions:
-
-| Action | Result |
-|--------|--------|
-| **Approve** | Creates an active **PBX User**, links the social identity, and notifies the requester. |
-| **Reject** | Marks the request as rejected; the requester must create an organization or request to join a different one. |
-
-Requests that are not pending cannot be approved again.
+- The deployment runs with `OPBX_SAAS_ENABLED=true` and the Auth0 variables (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_REDIRECT_URI`, `AUTH0_PROVIDERS`). See [Auth0 Setup](/installation/auth0-setup).
+- Without this configuration, no social buttons are shown, the **Linked Accounts** section of the profile is hidden, and every Auth0 endpoint, including **Invite User**, answers `503` with `AUTH0_NOT_CONFIGURED` "Auth0 is not enabled."
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| Log in with a social provider | Yes | Yes | Yes | Yes |
-| Link/unlink own social identity | Yes | Yes | Yes | Yes |
-| Invite users by email | Yes | Yes | No | No |
-| Approve or reject join requests | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| Sign in with a linked social account | Yes | Yes | Yes | Yes | Yes |
+| Link or unlink their own social accounts | Yes | Yes | Yes | Yes | Yes |
+| Invite a user by email | Yes | Yes | No | No | No |
+| List, approve or reject join requests (API) | Yes | Yes | No | No | No |
 
-:::info User Invitations
-Invited users are always created with the **PBX User** role. Only Owners and PBX Admins can send invitations.
-:::
+## Sign up: create a new organization
 
-## Error Handling
+1. Open the registration page (`/ui/register`).
+2. Click a social provider button.
+3. Sign in at the provider. The provider must report the email address as **verified**.
+4. OPBX creates a new organization and makes you its **Owner**, then opens the Dashboard.
 
-Common Auth0-related errors and how to resolve them:
+## Sign in with a social account
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `AUTH0_NOT_CONFIGURED` | SaaS mode or Auth0 variables are missing. | Verify `.env` and run `php artisan config:clear`. |
-| `AUTH0_INVALID_STATE` | The OAuth state expired or the callback was reused. | Try logging in again. |
-| `AUTH0_EMAIL_UNVERIFIED` | The social provider did not return a verified email. | Verify the email with the provider. |
-| `AUTH0_ACCOUNT_EXISTS` | The email already has a password account. | Log in with the password, then link the provider. |
-| `AUTH0_LINK_EMAIL_MISMATCH` | The Auth0 email does not match the logged-in account. | Use the same email or link a different provider. |
-| `INVITE_EXPIRED_OR_INVALID` | The invitation token is missing, expired, or already used. | Ask an administrator for a new invitation. |
-| `JOIN_REQUEST_PENDING` | The join request is waiting for approval. | Wait for an Owner or PBX Admin to approve it. |
+1. Open the sign-in page (`/ui/login`).
+2. Click the provider you linked before.
+3. After the provider sign-in, OPBX finds the linked account and opens the Dashboard.
 
-## Related API Endpoints
+The session lasts 24 hours. What happens when the social account is not linked yet:
+
+| Situation | Result |
+|-----------|--------|
+| The provider's email is not verified | `AUTH0_EMAIL_UNVERIFIED`: verify the email with the provider first |
+| An OPBX account with that email already exists | `AUTH0_ACCOUNT_EXISTS`: sign in with your password, then link the provider in your profile |
+| No OPBX account with that email | The **Complete your account** page opens (below) |
+| The OPBX account is inactive or pending | `ACCOUNT_INACTIVE` "Account is not active." |
+
+{/* SCREENSHOT: auth0-login-buttons — sign-in page with email and password fields and the social provider buttons below */}
+
+## Complete your account (new social users)
+
+When someone signs in with a social account that matches no OPBX user, the **Complete your account** page offers two choices:
+
+- **Create a new organization**: signs in at the provider again and creates the organization with the person as Owner.
+- **Request to join organization**: enter the **Organization slug** (for example `acme-corp`) and submit. The toast says "Join request submitted. Please wait for approval."
+
+The onboarding session is valid for 60 minutes and can be used once ("Onboarding session is invalid or expired." otherwise). The slug must belong to an existing organization.
+
+{/* SCREENSHOT: auth0-onboarding — Complete your account page with the Create a new organization button and the Organization slug field with Request to join organization */}
+
+## Join requests
+
+A join request records the target organization, the person's email and name, and the social account they used.
+
+There is no page for join requests; an Owner or PBX Admin handles them through the API:
+
+| Action | Endpoint | Result |
+|--------|----------|--------|
+| List pending requests | `GET /v1/organizations/join-requests` | Pending requests of your organization, newest first |
+| Approve | `POST /v1/organizations/join-requests/{id}/approve` | Creates an **active PBX User** with a random password and links the social account. The person can then sign in with that provider |
+| Reject | `POST /v1/organizations/join-requests/{id}/reject` | Marks the request rejected |
+
+A request that is no longer pending cannot be approved again (`JOIN_REQUEST_NOT_PENDING`). OPBX does not email the requester about the decision.
+
+## Link a social account to your profile
+
+1. Sign in (with your password or an already linked provider).
+2. Open **Profile** from the user menu.
+3. In **Linked Accounts**, click **Connect** next to a provider.
+4. Sign in at the provider with the **same email address** as your OPBX account (upper and lower case do not matter).
+5. You return to your profile with the provider shown as linked.
+
+| Error | Meaning |
+|-------|---------|
+| `AUTH0_LINK_EMAIL_MISMATCH` "Auth0 email does not match your account email." | The provider account has another email |
+| `AUTH0_LINK_ALREADY_LINKED` | That provider account is already linked to a user |
+
+## Unlink a social account
+
+In **Profile** › **Linked Accounts**, click **Disconnect** next to the provider. The toast says "Account unlinked." Your OPBX account and password stay as they are.
+
+{/* SCREENSHOT: auth0-linked-accounts — Profile page Linked Accounts card with Google linked (Disconnect button) and Microsoft not linked (Connect button) */}
+
+## Invite a user by email
+
+1. Open **Users** and click **Invite User** (Owner and PBX Admin).
+2. Enter the email address and send.
+3. OPBX creates a **pending** user with the **PBX User** role and emails a link to `/ui/invite?token=…`.
+4. The invitee opens the link. The page says "You're invited" with the organization name.
+5. The invitee clicks **Accept & Continue** and signs in at the first configured provider, with the invited email filled in.
+6. If the provider's email is verified and matches the invitation, the user becomes **active** and is signed in.
+
+Rules:
+
+- The **Invite User** button is shown on the Users page even when Auth0 is not configured; the invitation is then refused with "Auth0 is not enabled."
+- The link is valid for 24 hours (`OPBX_INVITE_TOKEN_TTL_HOURS`) and can be used once.
+- Inviting an email that is still pending sends a new link; the old one stops working.
+- Inviting an email that already belongs to a user is refused: "A user with this email already exists in the organization."
+- Each organization can send at most 10 invitations per hour (`OPBX_INVITE_RATE_LIMIT_PER_HOUR`): "Invitation rate limit exceeded. Please try again later."
+- Change the invited user's role afterwards on the Users page if PBX User is not right.
+
+{/* SCREENSHOT: auth0-invite-dialog — Invite User dialog on the Users page with an email address entered */}
+
+{/* SCREENSHOT: auth0-accept-invitation — "You're invited" page for Acme Corp (Demo) with the Accept & Continue button */}
+
+| Invitation error | Meaning |
+|------------------|---------|
+| `INVITE_EXPIRED_OR_INVALID` "Invitation is invalid or has expired." | The link is wrong, expired or already used |
+| `INVITE_INVALID_USER` | The invited user was already activated |
+| `INVITE_EMAIL_MISMATCH` | The provider account's email is not the invited email |
+| `AUTH0_EMAIL_UNVERIFIED` | The provider did not confirm the email |
+
+## Other errors
+
+| Code | Cause | What to do |
+|------|-------|-----------|
+| `AUTH0_NOT_CONFIGURED` | Auth0 is not enabled or no provider is configured | Configure Auth0 (see Prerequisites) |
+| `AUTH0_INVALID_PROVIDER` | The provider is not in `AUTH0_PROVIDERS` | Use a configured provider |
+| `AUTH0_INVALID_STATE` | The sign-in attempt expired or the callback was reused | Start the sign-in again |
+| `AUTH0_INVALID_CALLBACK` | The callback is missing its code or state | Start the sign-in again |
+| `AUTH0_RESOLUTION_FAILED` | Unexpected error while matching the account | Check the logs |
+
+## Key data fields
+
+### `user_social_identities`
+
+| Column | Notes |
+|--------|-------|
+| `user_id` | The OPBX user |
+| `provider` | `google`, `facebook`, `microsoft`, `github` or `x` |
+| `provider_subject` | The provider's user id |
+| `provider_email` | Email returned by the provider when linked |
+| `provider_data` | Extra provider details |
+
+### `organization_join_requests`
+
+| Column | Notes |
+|--------|-------|
+| `organization_id` | Target organization |
+| `email`, `name` | The requester |
+| `provider`, `provider_subject` | The social account used |
+| `status` | `pending`, `approved` or `rejected` |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/v1/auth/auth0/redirect` | Start the Auth0 authorization flow |
-| GET | `/v1/auth/auth0/callback` | Complete the flow and exchange the code |
-| POST | `/v1/auth/auth0/link` | Start account linking |
-| POST | `/v1/auth/auth0/unlink` | Unlink a provider identity |
-| POST | `/v1/users/invite` | Invite a user by email |
-| GET | `/v1/users/invite/validate` | Validate an invitation token |
-| POST | `/v1/users/invite/accept` | Accept an invitation and get the Auth0 redirect URL |
-| GET | `/v1/organizations/join-requests` | List pending join requests |
-| POST | `/v1/organizations/join-requests` | Submit a join request |
-| POST | `/v1/organizations/join-requests/{id}/approve` | Approve a join request |
-| POST | `/v1/organizations/join-requests/{id}/reject` | Reject a join request |
+| POST | `/v1/auth/auth0/redirect` | Start a sign-in (`provider`, `intent`) |
+| GET | `/v1/auth/auth0/callback` | Finish the sign-in |
+| POST | `/v1/auth/auth0/link` | Start linking a provider (signed in) |
+| POST | `/v1/auth/auth0/unlink` | Unlink a provider (signed in) |
+| POST | `/v1/users/invite` | Invite by email (Owner, PBX Admin; needs Auth0) |
+| GET | `/v1/users/invite/validate` | Check an invitation link |
+| POST | `/v1/users/invite/accept` | Accept and get the Auth0 sign-in URL |
+| POST | `/v1/organizations/join-requests` | Submit a join request (onboarding) |
+| GET | `/v1/organizations/join-requests` | Pending requests |
+| POST | `/v1/organizations/join-requests/{id}/approve` | Approve |
+| POST | `/v1/organizations/join-requests/{id}/reject` | Reject |
 
-See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full request/response schemas.
+See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Key Data Fields
+## Related modules
 
-### `user_social_identities` Table
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `user_id` | FK | Linked OPBX user |
-| `provider` | enum | `google`, `facebook`, `microsoft`, `github`, `x` |
-| `provider_subject` | string | Unique identifier from the social provider |
-| `provider_email` | string | Email returned by the provider at link time |
-| `provider_data` | json | Additional provider metadata |
-
-### `organization_join_requests` Table
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Target organization |
-| `email` | string | Requester's email |
-| `name` | string | Requester's display name |
-| `provider` | enum | Social provider used |
-| `provider_subject` | string | Social provider subject |
-| `status` | enum | `pending`, `approved`, `rejected` |
-| `role` | enum | Defaults to `pbx_user` |
-
-## Related Modules
-
-- [User Management](./user-management) — Create and manage users, roles, and invitations
-- [Settings](./settings) — Configure organization-wide settings and linked accounts
-- [Auth0 Setup](../installation/auth0-setup) — Auth0 tenant and environment configuration
+- [User Management](/modules/user-management) — the Invite User button and roles
+- [Profile](/administration/profile) — Linked Accounts
+- [Auth0 Setup](/installation/auth0-setup) — tenant and environment configuration

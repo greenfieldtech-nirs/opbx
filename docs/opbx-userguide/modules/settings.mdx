@@ -3,121 +3,171 @@ sidebar_position: 15
 slug: /modules/settings
 sidebar_class_name: cxGuidesSidebar
 title: "Settings"
-description: "Configure Cloudonix integration and organization settings"
+description: "Connect your organization to its Cloudonix domain and set ring timeout, call recording and webhook options"
 ---
 
 # Settings
 
-The Settings module contains organization-wide configuration, including Cloudonix CPaaS credentials and webhook settings.
+The Settings page connects your organization to its Cloudonix domain. Until it is configured, OPBX cannot place or route calls, sync extensions, or list voice trunks. The same page holds organization-wide call options: the no-answer timeout, which calls are recorded, the recording file format, and the domains allowed to host the embedded dialer.
 
 ## Purpose
 
-Use this module to:
+Use this page to:
 
-- Connect OPBX to your Cloudonix domain
-- Validate and store API credentials
-- Configure webhook base URLs
-- Generate webhook authentication keys
-- List available outbound trunks
+- enter and validate your Cloudonix domain UUID and API key;
+- create or rotate the key Cloudonix uses to authenticate its webhooks to OPBX;
+- see (and, if allowed, override) the webhook URLs Cloudonix calls;
+- set the no-answer timeout, call recording and recording format;
+- list the domains allowed to embed the dialer.
 
-:::note Owner-Only Access
-Only users with the Owner role can access and modify Cloudonix settings.
-:::
+## Prerequisites
 
-## Cloudonix Settings
-
-Cloudonix integration is stored per organization in the `cloudonix_settings` table. Credentials are encrypted at rest.
-
-### Required Fields
-
-| Field | Description |
-|-------|-------------|
-| Domain UUID | Cloudonix domain UUID |
-| Domain API Key | Cloudonix domain API key |
-
-### Optional Fields
-
-| Field | Description |
-|-------|-------------|
-| Webhook Base URL | Override URL for Cloudonix callbacks |
-| No Answer Timeout | Default ring timeout |
-| Recording Format | Preferred recording format |
-
-## Webhook URL Resolution
-
-OPBX resolves the effective webhook base URL in this priority order:
-
-1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable (production mode)
-2. `webhook_base_url` saved in Cloudonix settings
-3. `APP_URL` from `.env`
-
-The resulting callback endpoints are:
-
-| Purpose | Path |
-|---------|------|
-| Session updates | `{base_url}/api/webhooks/cloudonix/session-update` |
-| CDR events | `{base_url}/api/webhooks/cloudonix/cdr` |
-| Voice routing | `{base_url}/api/voice/route` |
+- A Cloudonix domain and its **domain API key**. See [Cloudonix Setup](/installation/cloudonix-setup).
+- You are the **Owner**.
 
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View Cloudonix settings | Yes | No | No | No |
-| Update Cloudonix settings | Yes | No | No | No |
-| Generate webhook key | Yes | No | No | No |
+|--------|:-----:|:---------:|:--------:|:--------:|
+| Open Settings (user menu at the top right) | Yes | No | No | No |
+| Read, validate and save Cloudonix settings | Yes | No | No | No |
+| Generate a webhook key | Yes | No | No | No |
+| List voice trunks (`/settings/cloudonix/outbound-trunks`) | Yes | No | No | No |
 
-## UI Workflow
+Other roles do not see the **Settings** item in the user menu, get "Access denied" if they open the address, and get `403` from the API. Settings endpoints are never available to [API keys](/modules/api-keys).
 
-### Configure Cloudonix
+## Configure Cloudonix
 
-1. Navigate to **Settings** in the sidebar
-2. Enter the Domain UUID
-3. Enter the Domain API Key
-4. Click **Validate Credentials**
-5. Click **Save Cloudonix Settings**
-6. Optionally click **Generate Webhook API Key**
+1. Click your name at the top right and choose **Settings**.
+2. Under **Cloudonix Integration**, enter the **Cloudonix Domain UUID** (format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+3. Enter the **Cloudonix Domain API Key**. Use the eye button to show or hide it.
+4. Set the other fields you need (below).
+5. Click **Validate and Save Settings**.
 
-### Override Webhook Base URL
+What happens on **Validate and Save Settings**:
 
-1. Expand **Advanced Options**
-2. Enter the public HTTPS URL
-3. Save
+1. The UUID and key are checked against Cloudonix. If they are wrong, the badge next to the button shows **Invalid** and nothing is saved ("Invalid Cloudonix credentials. Please check your domain UUID and API key.").
+2. Values from your Cloudonix domain profile are copied into the form: the domain name, the call timeout (if it is between 5 and 120 seconds) and the recording format (if it is WAV or MP3).
+3. The settings are saved. The domain name always comes from Cloudonix; it cannot be typed in.
+4. If the organization has no webhook key yet, OPBX generates one.
+5. OPBX pushes the call timeout, recording format, session-update URL, CDR URL and webhook key to the Cloudonix domain.
+6. OPBX creates or updates the Cloudonix voice application that sends calls to OPBX and makes it the domain's default.
 
-## Key Data Fields
+The badge then shows **Saved** and a toast confirms the save. A full-page "Saving Settings" overlay is shown while this runs.
 
-### `cloudonix_settings` Table
+If saving locally works but the push to Cloudonix fails, the API answers with a `warning` ("Settings saved locally, but failed to sync to Cloudonix: …"). Check the logs if calls do not reach OPBX after a save.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | One-to-one with organization |
-| `domain_uuid` | string | Cloudonix domain UUID |
-| `domain_name` | string | Cloudonix domain name |
-| `domain_api_key` | string | **Encrypted** at rest |
-| `domain_requests_api_key` | string | **Encrypted** webhook auth key |
-| `webhook_base_url` | string nullable | Override URL |
-| `voice_application_id` | string nullable | Cloudonix voice app ID |
-| `voice_application_uuid` | string nullable | |
-| `voice_application_name` | string nullable | |
-| `no_answer_timeout` | integer nullable | |
-| `recording_format` | string nullable | |
-| `cloudonix_package` | string nullable | free_tier, standard, etc. |
+{/* SCREENSHOT: settings-cloudonix — Settings page, Cloudonix Integration card with Domain UUID, masked Domain API Key, the Validate and Save Settings button and a green Saved badge */}
 
-## Related API Endpoints
+### Fields
+
+| Field | Required | Limits and default | Meaning |
+|-------|----------|--------------------|---------|
+| Cloudonix Domain UUID | Yes | A UUID. A UUID used by another organization is refused | Identifies your Cloudonix domain |
+| Cloudonix Domain API Key | Yes | Up to 255 characters | Authenticates OPBX to Cloudonix. Shown masked after saving; a masked value is never saved over the real key |
+| Cloudonix Domain Requests API Key | No | Up to 255 characters. Generated automatically on the first save if empty | The key Cloudonix sends with every webhook so OPBX can check it. See [Webhook key](#webhook-key) |
+| Webhook Base URL | No | A URL, up to 255 characters | Base for the URLs Cloudonix calls. Hidden when the installation sets the URL (see below) |
+| Embedded Dialer — Allowed Domains | No | Hostnames, `localhost` or an IPv4 address, each with an optional port | Sites allowed to host the [embedded dialer](/modules/embedded-dialer). Empty list: the dialer cannot be embedded |
+| No Answer Timeout (seconds) | Yes | 5 to 120. Default: 60 | How long a call rings before it counts as unanswered |
+| Call Recording | Yes | See the next table. Default: Do not record calls | Which calls are recorded |
+| Recording Media File Format | Yes | WAV or MP3. Default: MP3 | File format of call recordings |
+
+| Call Recording option | Records |
+|-----------------------|---------|
+| Do not record calls | Nothing |
+| Record all inbound calls | Calls from outside to your numbers |
+| Record all outbound calls | Calls from extensions to outside numbers |
+| Record all internal calls | Extension-to-extension calls |
+| Record all inbound/outbound calls | Inbound and outbound, not internal |
+| Record all calls (inbound/outbound/internal) | Everything |
+
+Recordings appear in [Call Logs](/modules/call-logs) and are visible to the Owner, PBX Admins and Reporters.
+
+## Webhook key
+
+The **Cloudonix Domain Requests API Key** is a shared secret. Cloudonix sends it with every webhook, and OPBX can reject webhooks that do not carry it.
+
+- **Generate** creates a new 32-character key and puts it in the field. An amber box shows it once with a copy button: "Save this key now - it will not be shown again after you save settings."
+- The new key takes effect only after you click **Validate and Save Settings**, which also pushes it to Cloudonix.
+- If you save with an empty field and no key exists, OPBX creates a key itself and pushes it. If that push fails, the key is removed again so Cloudonix is never left with a key OPBX would reject.
+
+{/* SCREENSHOT: settings-webhook-key — Cloudonix Domain Requests API Key field with the amber "New API Key Generated" box and its copy button (key value blurred) */}
+
+## Webhook URLs
+
+At the bottom of the page, two read-only fields show the URLs OPBX registers in Cloudonix, each with a copy button. They are hidden when the installation sets the webhook URL (see below).
+
+| Field | URL |
+|-------|-----|
+| Domain CDR Endpoint | `{base}/api/webhooks/cloudonix/cdr` |
+| Domain Session Update Callback URL | `{base}/api/webhooks/cloudonix/session-update` |
+
+The base URL is chosen in this order:
+
+1. `OPBX_APPLICATION_WEBHOOK_BASEURL`, if the installation sets it. The page then shows **Webhook Base URL (Application Level)** with the effective URL and "Managed by system administrator"; the per-organization field and the two URL fields are hidden.
+2. The organization's **Webhook Base URL**.
+3. The application URL (`APP_URL`).
+
+Voice calls are sent to `{base}/api/voice/route` through the voice application created on save.
+
+{/* SCREENSHOT: settings-call-options — No Answer Timeout, Call Recording ("Record all inbound/outbound calls") and Recording Media File Format fields, with the Domain CDR Endpoint and Session Update Callback URL below */}
+
+## Embedded dialer domains
+
+1. Type a hostname such as `crm.example.com` (or `localhost:3000` for local development) in the **Embedded Dialer — Allowed Domains** box. A scheme such as `https://` is removed.
+2. Click the add button. A duplicate is refused with "Domain already added".
+3. Remove a domain with the × on its badge.
+4. Click **Validate and Save Settings** to store the list.
+
+See [Embedded Dialer](/modules/embedded-dialer).
+
+## Common errors
+
+| Message | What it means | What to do |
+|---------|---------------|-----------|
+| Please enter both Domain UUID and API Key | One of them is empty | Fill in both |
+| The domain UUID must be a valid UUID format. | The UUID is malformed | Copy it again from Cloudonix |
+| Invalid Cloudonix credentials. Please check your domain UUID and API key. | Cloudonix rejected them | Check the key and UUID in the Cloudonix console |
+| This Cloudonix domain is already registered to another organization. | Another organization uses this domain | Use your own domain |
+| The no answer timeout must be at least 5 seconds. / must not exceed 120 seconds. | Out of range | Use 5 to 120 |
+| Each embed allowed domain must be a valid hostname, localhost, or IP address… | Wrong format | Enter a host name without a path |
+| Cannot validate with masked API key… | The key field holds the masked value and nothing is saved yet | Enter the full key |
+
+## Key data fields
+
+### `cloudonix_settings`
+
+| Column | Notes |
+|--------|-------|
+| `organization_id` | One row per organization |
+| `domain_uuid` | Unique across organizations |
+| `domain_name` | From the Cloudonix domain profile |
+| `domain_api_key` | Encrypted; returned masked |
+| `domain_requests_api_key` | Webhook key; encrypted; returned masked |
+| `webhook_base_url` | Optional override |
+| `embed_allowed_domains` | List of allowed embed hosts |
+| `no_answer_timeout` | 5 to 120 seconds |
+| `call_recording_mode` | `disabled`, `inbound`, `outbound`, `internal`, `inbound_outbound` or `all` |
+| `recording_format` | `wav` or `mp3` |
+| `cloudonix_package` | Billing package name from Cloudonix |
+| `voice_application_id`, `voice_application_uuid`, `voice_application_name` | The Cloudonix voice application OPBX manages |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/settings/cloudonix` | Get settings (masked keys) |
-| PUT | `/v1/settings/cloudonix` | Update settings and sync voice app |
-| POST | `/v1/settings/cloudonix/validate` | Validate credentials |
-| POST | `/v1/settings/cloudonix/generate-requests-key` | Generate webhook auth key |
-| GET | `/v1/settings/cloudonix/outbound-trunks` | List voice trunks |
+| GET | `/v1/settings/cloudonix` | Settings (keys masked), callback and CDR URLs, webhook URL details |
+| PUT | `/v1/settings/cloudonix` | Save, sync to Cloudonix and set up the voice application |
+| POST | `/v1/settings/cloudonix/validate` | Check credentials and return profile values |
+| POST | `/v1/settings/cloudonix/generate-requests-key` | Generate a webhook key (not saved until PUT) |
+| GET | `/v1/settings/cloudonix/outbound-trunks` | Voice trunks of the domain |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Cloudonix Integration](/installation/cloudonix-setup) — Setup guide
-- [Extensions](/modules/extensions) — Cloudonix subscriber sync requires settings
-- [Phone Numbers](/modules/phone-numbers) — Outbound trunks are used for routing
+- [Cloudonix Setup](/installation/cloudonix-setup) — creating the domain and key
+- [Trunks](/modules/trunks) and [Outbound Whitelist](/modules/outbound-whitelist) — use the domain's voice trunks
+- [Extensions](/modules/extensions) — synced to Cloudonix subscribers
+- [Embedded Dialer](/modules/embedded-dialer) — uses the allowed domains
+- [Call Logs](/modules/call-logs) — recordings and call records
