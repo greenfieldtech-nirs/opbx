@@ -73,9 +73,9 @@ For the endpoint-and-UUID providers the stream URL is `{endpoint}/{agent UUID}`.
 
 On save, OPBX stores the assistant as **Active**, sets its protocol (SIP, WebSocket or Dummy) from the provider, and checks each required field. The assistant is then offered in every destination picker that accepts an AI assistant.
 
-{/* SCREENSHOT: ai-assistants-list — AI Assistants list with "Aria - Front Desk Receptionist" (VAPI, SIP) and "Max - Support Triage" (Retell, SIP), both Active, with the status, protocol and provider filters */}
+![AI Assistants list with Aria - Front Desk Receptionist (VAPI, SIP) and Max - Support Triage (Retell, SIP), both Active, with the status, protocol and provider filters](../img/screens/ai-assistants-list.jpg)
 
-{/* SCREENSHOT: ai-assistants-create-dialog — Create AI Assistant dialog with the provider dropdown open, showing the SIP Providers, WebSocket Providers and Test Providers groups */}
+![Create AI Assistant dialog with the provider dropdown open, showing the end of the SIP providers and the WebSocket Providers and Test Providers groups](../img/screens/ai-assistants-create-dialog.jpg)
 
 ## Fields
 
@@ -89,7 +89,7 @@ On save, OPBX stores the assistant as **Active**, sets its protocol (SIP, WebSoc
 
 The phone number of a SIP provider must be E.164. A value such as `2025550170` without the plus sign is accepted by the server, but use the full `+12025550170` form.
 
-{/* SCREENSHOT: ai-assistants-websocket-fields — Create AI Assistant dialog with Dograh Cloud selected: the read-only WebSocket Endpoint and the empty Agent UUID field */}
+![Create AI Assistant dialog with Dograh Cloud selected: the read-only WebSocket Endpoint and the empty Agent UUID field](../img/screens/ai-assistants-websocket-fields.jpg)
 
 ## Edit an assistant
 
@@ -141,7 +141,7 @@ If anything still points at the assistant, the delete is refused and the **Canno
 
 Change or remove those references, then delete again. Call history (call logs and CDRs) never blocks a delete.
 
-{/* SCREENSHOT: ai-assistants-in-use-dialog — "Cannot delete: still in use" dialog for "Aria - Front Desk Receptionist", listing extension 1013, the phone number +12025550104, an After Hours Menu option, the Front Desk AI Pool member and the Fall Webinar Follow-up campaign */}
+![Cannot delete: still in use dialog for Aria listing the Front Desk AI Pool member, extension 1013, an After Hours Menu option, the Fall Webinar Follow-up campaign and the phone number +12025550104](../img/screens/ai-assistants-in-use-dialog.jpg)
 
 ## Common errors
 
