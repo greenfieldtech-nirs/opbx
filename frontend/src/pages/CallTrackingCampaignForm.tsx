@@ -60,12 +60,13 @@ const DEFAULT_VALUES: FormData = {
   meta_upload_enabled: false,
 };
 
-const toPayload = (data: FormData): CampaignFormData => ({
+// On edit, keep the campaign's stored description and status (the form has no fields for them).
+const toPayload = (data: FormData, existing?: { description?: string | null; status?: string }): CampaignFormData => ({
   name: data.name,
   source: data.source || null,
   medium: data.medium || null,
-  description: null,
-  status: 'active',
+  description: existing?.description ?? null,
+  status: (existing?.status ?? 'active') as CampaignFormData['status'],
   destination_type: data.destination_type,
   destination_config: data.destination_config,
   conversion_rule: {
@@ -116,7 +117,7 @@ export default function CallTrackingCampaignForm() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const payload = toPayload(data);
+      const payload = toPayload(data, isEdit ? campaign : undefined);
 
       if (isEdit) {
         await updateMutation.mutateAsync({ id: id!, data: payload });
