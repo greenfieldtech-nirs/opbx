@@ -23,6 +23,7 @@ import {
 import { CallTrackingNumbersList } from '@/components/call-tracking/CallTrackingNumbersList';
 import { CallTrackingNotificationSettingsForm } from '@/components/call-tracking/CallTrackingNotificationSettingsForm';
 import { CallTrackingNotificationLogsTable } from '@/components/call-tracking/CallTrackingNotificationLogsTable';
+import { AddCallTrackingNumberDialog } from '@/components/call-tracking/AddCallTrackingNumberDialog';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
@@ -34,6 +35,7 @@ export default function CallTrackingCampaignDetail() {
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
   const isReadOnly = ['reporter', 'pbx_user'].includes(user?.role || '');
   const [campaignToDelete, setCampaignToDelete] = useState(false);
+  const [addNumberOpen, setAddNumberOpen] = useState(false);
 
   const { data: campaign, isLoading: campaignLoading, isError, error } = useCallTrackingCampaign(id);
   const { data: numbers, isLoading: numbersLoading } = useCallTrackingNumbers(id!);
@@ -210,7 +212,7 @@ export default function CallTrackingCampaignDetail() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Tracking Numbers</CardTitle>
               {canManage && (
-                <Button onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/numbers/new`)}>
+                <Button onClick={() => setAddNumberOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Number
                 </Button>
@@ -271,6 +273,7 @@ export default function CallTrackingCampaignDetail() {
         loading={deleteMutation.isPending}
       />
       {inUseDialog}
+      {id && <AddCallTrackingNumberDialog campaignId={id} open={addNumberOpen} onOpenChange={setAddNumberOpen} />}
     </div>
   );
 }

@@ -56,7 +56,8 @@ export default function CallTrackingSessions() {
 
   const params = useMemo(
     () => ({
-      search: debouncedSearch || undefined,
+      // The server requires 3+ characters (min:3 keeps the LIKE scan cheap); shorter input is not sent.
+      search: debouncedSearch.trim().length >= 3 ? debouncedSearch.trim() : undefined,
       start_date: startDate,
       end_date: endDate,
       is_converted: convertedOnly || undefined,
