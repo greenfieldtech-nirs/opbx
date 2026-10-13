@@ -313,7 +313,7 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 1440
-                  description: Minutes to wait before redialing a busy / no-answer destination (default 15)
+                  description: Minutes to wait before the FIRST busy / no-answer retry (default 15). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours).
                 days_active:
                   type:
                   - array
@@ -533,7 +533,7 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 1440
-                  description: Minutes to wait before redialing a busy / no-answer destination (default 15)
+                  description: Minutes to wait before the FIRST busy / no-answer retry (default 15). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours).
                 days_active:
                   type:
                   - array
@@ -706,7 +706,7 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 1440
-                  description: Minutes to wait before redialing a busy / no-answer destination (default 15)
+                  description: Minutes to wait before the FIRST busy / no-answer retry (default 15). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours).
                 days_active:
                   type:
                   - array

@@ -47,7 +47,7 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `action_unknown` | varchar(255) | Yes | null | AMD action for unknown |
 | `retry_on_voicemail` | boolean | No | false | Retry a destination that reached voicemail |
 | `retry_on_busy_no_answer` | boolean | No | false | Redial busy / no-answer destinations within `max_dial_attempts` |
-| `retry_delay_minutes` | integer | No | 15 | Minutes before redialing (1 to 1440) |
+| `retry_delay_minutes` | integer | No | 15 | Minutes before the first busy / no-answer retry (1 to 1440); doubles for each further retry, capped at 24 hours |
 | `total_destinations` | int | No | 0 | Total destinations count |
 | `completed_calls` | int | No | 0 | Completed calls count |
 | `failed_calls` | int | No | 0 | Failed calls count |

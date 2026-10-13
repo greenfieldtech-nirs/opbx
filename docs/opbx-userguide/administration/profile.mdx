@@ -49,12 +49,12 @@ Business-hours schedules and auto-dialer campaigns have their own time zone sett
 | City (Optional) | No | Up to 100 characters | |
 | State/Province (Optional) | No | Up to 100 characters | |
 | Postal Code (Optional) | No | Up to 20 characters | |
-| Role | — | — | Shown as a badge with "Contact your organization owner to change your role". The Owner sees a role selector instead (see below) |
+| Role | — | — | Shown as a badge. Nobody can change their own role here; ask an Owner (the Owner sees "You cannot change your own role") |
 
 Click **Save Profile**. Only changed fields are sent; if nothing changed, the toast says "Profile is already up to date". After a save the form shows the values the server stored.
 
-:::caution The Owner's role selector
-The Owner's profile shows a **Role** selector, but nobody can change their own role: saving a different role is refused (`403`) and nothing is saved. To change roles, use the [Users](/modules/user-management) page for other users.
+:::note Your own role
+Nobody can change their own role, so the profile shows it as a badge for every role. To change roles, use the [Users](/modules/user-management) page for other users.
 :::
 
 ## Change Password

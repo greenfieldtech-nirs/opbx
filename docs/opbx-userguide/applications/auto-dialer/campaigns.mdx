@@ -16,7 +16,7 @@ Use **Campaign Manager** to:
 
 - create a campaign and edit it while it is Draft or Paused;
 - start, pause, resume and archive it;
-- delete a Draft campaign;
+- delete a Draft campaign (Owner only; archiving is Owner only too);
 - see its progress, settings, assigned lists and caller-ID usage.
 
 ## Prerequisites
@@ -36,10 +36,10 @@ Open **Auto Dialer → Campaign Manager**. Each row shows the campaign name, sta
 
 | Status | Actions on the row |
 |--------|--------------------|
-| Draft | **Edit**, **Delete** |
+| Draft | **Edit**, **Delete** (Delete is for the Owner only) |
 | Running | **Edit** (disabled, with the hint "Pause the campaign to edit") |
 | Paused | **Edit** |
-| Completed | **Archive** |
+| Completed | **Archive** (Owner only) |
 | Archived | None |
 
 ![Campaign Manager list with Fall Webinar Follow-up in Paused status, routing AI Assistant, and the status filter open](../../img/screens/auto-dialer-campaigns-list.jpg)
@@ -119,7 +119,7 @@ Each action offers **Hang up** or **Continue to destination**. When you turn det
 | Calls Per Second (CPS) | 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25 or 30. Default: 1 | How fast new calls are started |
 | Max Dial Attempts | 1 to 5. Default: 1 | Most attempts per number, including retries |
 | Retry on busy / no-answer | Off by default | Redials a number whose call ended busy or unanswered, within Max Dial Attempts. Cancelled, failed and congested calls are never retried |
-| Retry delay (minutes) | 1 to 1440. Default: 15. Shown when the retry switch is on | How long to wait before redialing a busy or unanswered number |
+| First retry delay (minutes) | 1 to 1440. Default: 15. Shown when the retry switch is on | Wait before the first redial; each further retry waits twice as long, up to 24 hours |
 | Record Calls | Off by default | Asks Cloudonix to record each call |
 
 See [Rate Limiting](/applications/auto-dialer/rate-limiting) for CAC, CPS and attempts.

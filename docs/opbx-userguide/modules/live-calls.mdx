@@ -35,7 +35,7 @@ For finished calls, use [Call Logs](/modules/call-logs).
 | See the calls | All in the organization | All in the organization | Not in the sidebar (see the caution below) | All, read-only | Only calls to or from their assigned users and ring groups |
 | Spy, Whisper, Barge | Yes | No | No | No | Yes, calls in their scope |
 | Disconnect one call | Yes | No | No | No | No (the button is shown, the server refuses it) |
-| Disconnect All Calls | Yes | No (the button is shown, every disconnect is refused) | No | No | No |
+| Disconnect All Calls | Yes | No (the button is hidden) | No | No | No |
 | Clear Stale (display only) | Yes | Yes | No | No | No |
 
 The server allows only the **Owner** to disconnect a call. PBX Admins and Supervisors see a disconnect control on the page, but the request is refused with "This action is unauthorized." Reporters and Supervisors see a **Read-Only** badge next to the page title.
@@ -65,7 +65,7 @@ A Supervisor's list contains only calls whose caller or destination is one of th
 | Duration | Time since the session started, for example `4m 12s` |
 | Started | Local time the session started |
 | Session ID | The Cloudonix session ID |
-| Actions | Spy, Whisper, Barge and Disconnect. Shown to Owners and Supervisors only |
+| Actions | Spy, Whisper and Barge are shown to Owners and Supervisors; Disconnect only to the Owner |
 
 ### Which calls count as active
 
