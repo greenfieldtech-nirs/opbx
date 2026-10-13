@@ -1186,17 +1186,6 @@ class CloudonixWebhookController extends Controller
             // The Go worker increments this when initiating calls but has no
             // Pub/Sub subscriber to decrement it — Laravel handles this directly.
             $this->cdrPublisher->decrementCacCounter($session->campaign_id, $session->session_token);
-
-            // Also publish CDR event to Redis channel for any future subscribers
-            $this->cdrPublisher->publish(
-                sessionToken: $sessionToken,
-                campaignId: $session->campaign_id,
-                destinationId: $destination ? $destination->id : $session->destination_id,
-                sessionId: $session->id,
-                disposition: $request->input('disposition', 'unknown'),
-                duration: (int) $request->input('duration', 0),
-                billsec: (int) $request->input('billsec', 0)
-            );
         });
     }
 }
