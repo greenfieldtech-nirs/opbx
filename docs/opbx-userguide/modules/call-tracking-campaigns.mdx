@@ -116,7 +116,7 @@ A tracking number links one phone number to one campaign. A phone number can bel
 
 On the campaign page, the **Tracking Numbers** tab lists the numbers with their friendly name and status.
 
-To add a number, use the API (the **Add Number** button does not open a form in the current version):
+To add a number, click **Add Number** on the **Tracking Numbers** tab, pick one of your active phone numbers and optionally give it a friendly name. The same can be done through the API:
 
 ```http
 POST /v1/call-tracking-campaigns/{campaign}/call-tracking-numbers
@@ -141,8 +141,8 @@ When a tracking number is removed (`DELETE …/call-tracking-numbers/{number}`),
 2. Click **Edit**.
 3. Change the fields and click **Update Campaign**.
 
-:::caution Saving from the form
-The form always saves the campaign as **Active** and clears the description. To keep a campaign inactive, set the status again from the list after you save. The form also only knows Forward, Extension and Ring Group; edit a campaign with another destination type through the API.
+:::note Saving from the form
+Editing keeps the campaign's current description and status. The form only knows Forward, Extension and Ring Group; edit a campaign with another destination type through the API.
 :::
 
 ### Disconnect
@@ -174,7 +174,7 @@ Each campaign can send its sessions to your own webhook. Open the campaign and s
 
 Click **Save Settings**, then **Test Webhook** to post a sample `call.received` event (with made-up numbers) right away. The result appears on the **Logs** tab. The test needs saved, active settings.
 
-The token or password is not returned by the server. When you save the settings again with Bearer Token or Basic Auth, type it in again; the save is refused without it.
+The token or password is not returned by the server. When you save the settings again with the same Bearer Token or Basic Auth, you can leave it empty to keep the stored one; type a new value only to replace it.
 
 ### Events
 
@@ -186,7 +186,7 @@ The token or password is not returned by the server. When you save the settings 
 | `call.failed` | The disposition was `FAILED` or `BUSY` |
 | `call.converted` | The session is converted |
 
-The server accepts these five event names. The form lists **Call Received**, **Call Answered**, **Call Completed** and **Call Converted**; **Call Completed** is not a valid event and makes the save fail, so leave it unchecked. Enable `call.missed` and `call.failed` through the API.
+The server accepts these five event names, and the form lists all five: **Call Received**, **Call Answered**, **Call Missed**, **Call Failed** and **Call Converted**.
 
 Each event is delivered by a background job with a 30-second request timeout and up to three attempts (after 30 seconds, 2 minutes and 10 minutes). Authorization headers are shown as `***REDACTED***` in the logs.
 
@@ -252,8 +252,8 @@ A campaign that still has tracking numbers cannot be deleted: the delete is refu
 | Choose a destination | You tried to create with "Destination unavailable" (API) | Pick a destination. Disconnect is for edits only |
 | The selected did number id is invalid | The phone number is inactive or not yours | Use an active number of your organization |
 | The did number id has already been taken | The number already belongs to a campaign | Remove it from the other campaign first |
-| The selected enabled_events.N is invalid | **Call Completed** was checked | Uncheck it |
-| The auth secret field is required when auth method is … | The token or password was not re-entered | Enter it and save again |
+| The selected enabled_events.N is invalid | An event name the server does not know was sent through the API | Use one of the five event names |
+| The auth secret field is required when auth method is … | No token or password is stored yet for this campaign | Enter it and save |
 | Notification settings are missing, inactive, or have no webhook URL configured | **Test Webhook** before saving active settings | Save the settings first |
 
 ## Key data fields

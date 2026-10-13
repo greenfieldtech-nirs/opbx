@@ -64,7 +64,7 @@ While the list is empty, Settings shows "No domains yet — the embedded dialer 
 ![Embedded Dialer dialog for Emma Wilson with Icon Position Bottom Right, Icon Color #007acc and the Regenerate Token and Save Settings buttons (the one-time snippet appears only after Regenerate Token)](../img/screens/embedded-dialer-dialog.jpg)
 
 :::warning The token is shown once, and regenerating revokes the old one
-The token is stored only as a hash and cannot be shown again. If you lose the snippet, click **Regenerate Token** for a new one. Regenerating **immediately revokes** the previous token: every site that still uses the old snippet stops working. There is no confirmation step before this happens.
+The token is stored only as a hash and cannot be shown again. If you lose the snippet, click **Regenerate Token** for a new one. Regenerating **immediately revokes** the previous token: every site that still uses the old snippet stops working. OPBX asks you to confirm before it happens.
 :::
 
 ## Step 3: Install the snippet
@@ -100,7 +100,7 @@ The loader adds a 360 × 600 pixel iframe (`/embed/dialer`) in the chosen corner
 | `OpbxDialer.dial(number)` | Opens the dialer and calls `number`. If the phone is not registered yet, the call is placed as soon as it is |
 | `OpbxDialer.hangup()` | Ends the current call |
 | `OpbxDialer.open()` | Opens the dialer panel |
-| `OpbxDialer.close()` | Closes the dialer panel |
+| `OpbxDialer.close()` | Closes the dialer panel. Ignored while a call is in progress (see `close.rejected`) |
 | `OpbxDialer.on(event, callback)` | Adds a handler for an event |
 | `OpbxDialer.init(config)` | Called by the snippet. You do not call it yourself |
 
@@ -112,6 +112,7 @@ The loader adds a 360 × 600 pixel iframe (`/embed/dialer`) in the chosen corner
 | `call.started` | A call connected | None |
 | `call.ended` | A connected call ended | None |
 | `call.failed` | A call failed to connect | `{ cause }` |
+| `close.rejected` | `OpbxDialer.close()` was ignored because a call is in progress | `{ reason: 'call_in_progress' }` |
 
 :::caution Events start after the first command
 The widget sends events only to the page that has spoken to it, so it waits for the host page's first command before delivering any event (earlier events are queued, not lost). Send a command, for example `OpbxDialer.open()`, once the loader has run if you rely on `ready`.
@@ -122,6 +123,7 @@ OpbxDialer.on('ready', () => console.log('dialer ready'));
 OpbxDialer.on('call.started', () => console.log('call started'));
 OpbxDialer.on('call.ended', () => console.log('call ended'));
 OpbxDialer.on('call.failed', (p) => console.log('call failed', p.cause));
+OpbxDialer.on('close.rejected', (p) => console.log('close ignored:', p.reason));
 OpbxDialer.open();
 
 document.querySelector('#call-lead').addEventListener('click', () => {
@@ -129,7 +131,7 @@ document.querySelector('#call-lead').addEventListener('click', () => {
 });
 ```
 
-Closing the panel unregisters the phone, as in the app. Do not call `OpbxDialer.close()` during a call.
+The embedded phone stays registered while the page is open, even when the panel is closed, and an incoming call opens the panel. Several tabs showing the dialer for the same user share one registration: the first tab holds it, the others show "Web Phone is active in another tab" with a **Use here** button, and the next tab takes over when the first one closes. This is independent of the OPBX app's own Web Phone. A host `close` during a call is ignored and answered with the `close.rejected` event; outside a call it closes the panel.
 
 ## Security model
 

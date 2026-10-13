@@ -35,12 +35,12 @@ A [Reporter](/modules/user-management#roles) is the other read-only role. The di
 | Call Logs | Call records in scope, read-only. No Export button |
 | Users | Themselves and their assigned users, view only |
 | Ring Groups | Their assigned ring groups, view only |
-| Call Queues | Listed in the sidebar, but the page is not open to Supervisors (see the caution below) |
+| Call Queues | The queues where one of their assigned users, or the Supervisor, is an agent: list, detail, agents and live status, read only |
 
 Every other page sends a Supervisor back to the Dashboard with "Access denied — Supervisors can only access their assigned dashboards and reports." A Supervisor cannot disconnect calls, export call logs, or change any configuration.
 
-:::caution Call Queues link
-The Supervisor sidebar shows **Call Queues**, but opening it redirects to the Dashboard with the "Access denied" message, and the server does not let Supervisors read queues. Supervisors cannot be assigned queues.
+:::note Call Queues are read only
+There is no queue assignment. A Supervisor sees a queue when at least one of their assigned users, or the Supervisor themselves, is one of its agents. Other queues are hidden from the list and refused with 403 when opened directly. A Supervisor cannot create, edit, delete or toggle a queue, cannot change another agent's state, and has no access to the queue reports or the Queues Dashboard.
 :::
 
 ## How the scope is built
@@ -113,7 +113,7 @@ Both lists may be empty: saving with nothing selected removes every assignment.
 | Column | Meaning |
 |--------|---------|
 | Name and email | Click to open the assignment dialog |
-| Status | **Enabled** or **Disabled**. Click the badge to switch it; this sets the user Active or Inactive at once, without a confirmation |
+| Status | **Enabled** or **Disabled**. Click the badge to switch it; after you confirm, this sets the user Active or Inactive at once |
 | Assigned Users | Up to two names, then "+*n*" |
 | Assigned Ring Groups | Up to two names, then "+*n*" |
 | Actions | **Assign Resources** |

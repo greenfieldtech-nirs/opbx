@@ -55,7 +55,7 @@ What happens on **Validate and Save Settings**:
 
 The badge then shows **Saved** and a toast confirms the save. A full-page "Saving Settings" overlay is shown while this runs.
 
-If saving locally works but the push to Cloudonix fails, the API answers with a `warning` ("Settings saved locally, but failed to sync to Cloudonix: …"). Check the logs if calls do not reach OPBX after a save.
+If saving locally works but the push to Cloudonix fails, the API answers with a `warning` ("Settings saved locally, but failed to sync to Cloudonix: …") and the page shows a warning toast, "Settings saved, but not synced to Cloudonix", instead of the success message. Check the logs if calls do not reach OPBX after a save.
 
 {/* SCREENSHOT: settings-cloudonix — Settings page, Cloudonix Integration card with Domain UUID, masked Domain API Key, the Validate and Save Settings button and a green Saved badge */}
 

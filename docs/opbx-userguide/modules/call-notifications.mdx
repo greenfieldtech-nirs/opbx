@@ -56,13 +56,13 @@ Other roles get `403` from the API, so the page shows an error state if they ope
 | Username | For Basic Authentication | Up to 255 characters | Basic-auth user name |
 | Bearer Token / Password | Bearer Token: yes. Basic: no | 16 to 512 characters | The secret. Once saved it is never shown again; leave the field blank to keep it |
 | Retry Attempts | No | 1 to 10. Default: 3 | Retries after a failed delivery |
-| Retry Backoff | No | 10 to 3600 seconds. Default: 60 | Stored, but see the note below |
+| Retry Backoff | No | 10 to 3600 seconds. Default: 60 | Delay before the first retry; it doubles for each further retry (capped at 1 hour) |
 | Timeout | No | 5 to 120 seconds. Default: 30 | How long to wait for your endpoint |
 | Rate Limit | No | 100 to 5000 per minute. Default: 500 | Maximum events sent per minute |
 | Event Types | Yes | At least one | Which statuses are sent (table below) |
 
 :::note Retry timing
-Failed deliveries are retried after 60 seconds, then every 120 seconds, up to the number of Retry Attempts. The **Retry Backoff** value is saved but the delivery job does not use it.
+Failed deliveries are retried up to the number of Retry Attempts. The first retry waits **Retry Backoff** seconds and each further retry waits twice as long as the one before (with the default 60 seconds: 60, 120, 240...), never more than one hour.
 :::
 
 ### Authentication header

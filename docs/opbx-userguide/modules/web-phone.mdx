@@ -15,7 +15,7 @@ The Web Phone is a softphone built into OPBX. It registers your own **user exten
 Use the Web Phone to:
 
 - place calls from any page of OPBX;
-- answer calls to your extension while the Web Phone is open;
+- answer calls to your extension in the browser, whether or not the panel is open;
 - redial your recent outbound calls;
 - spy, whisper or barge from [Live Calls](/modules/live-calls) (Owners and Supervisors).
 
@@ -41,7 +41,7 @@ The same Web Phone can be placed on another website, such as a CRM. See [Embedde
 The role does not decide whether the Web Phone works; the extension does. Without a user extension the Web Phone opens with **Web Phone Unavailable** — "No extension is assigned to your account. Web Phone cannot be used."
 
 :::note
-The same "Web Phone Unavailable" message also appears when the organization has no Cloudonix domain configured, because the server answers both cases the same way.
+When the organization has no Cloudonix domain configured, the panel instead says "Cloudonix isn't configured for your organization" and asks you to have your Owner complete Settings > Cloudonix (the server answers 409 `cloudonix_not_configured`, while a missing extension is 404).
 :::
 
 ## Open the Web Phone
@@ -52,8 +52,10 @@ The same "Web Phone Unavailable" message also appears when the organization has 
 
 Close the panel with **X**. While a call is active, **X** is disabled ("End the call before closing").
 
-:::caution Calls reach you only while the panel is open
-The Web Phone registers when you open it and unregisters when you close it. While it is closed, calls to your extension do not ring in the browser. Keep it open if you expect calls.
+:::note The phone stays registered
+The Web Phone registers when you sign in to OPBX and stays registered while you are signed in, whether the panel is open or not. An incoming call opens the panel and rings. Closing the panel does not unregister the phone; signing out does.
+
+Only one browser tab holds the registration. In another tab the panel says "Web Phone is active in another tab" and offers **Use here** to move the phone to that tab. When the tab holding the registration closes, the next open tab takes over automatically.
 :::
 
 {/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, header status Registered, a number entered in the display */}
@@ -82,11 +84,11 @@ While a call is active the rest of the page is dimmed and blocked, the panel can
 
 ## Answer a call
 
-While the panel is open and registered, an incoming call shows **Incoming call** with the caller's number and two buttons: **Answer** and **Reject**.
+While the phone is registered, an incoming call opens the panel and shows **Incoming call** with the caller's number and two buttons: **Answer** and **Reject**.
 
 ## Recents
 
-The **Recents** tab lists the last **50** calls placed **from your extension**, newest first. Each row shows the number, when it was placed and, for calls with a duration, how long it lasted. The disposition is coloured green when it is `ANSWER` and red otherwise.
+The **Recents** tab lists the last **50** calls placed **from your extension**, newest first. Each row shows the number, when it was placed and, for calls with a duration, how long it lasted. The icon is green when the disposition is `ANSWER` or `CONNECTED` and red otherwise.
 
 - Click a row to redial: the Web Phone switches to **Keypad**, fills in the number and places the call.
 - The list is reloaded each time you open the tab.
@@ -109,7 +111,8 @@ Ringing, busy, congestion and dial tones follow the conventions of the organizat
 
 | Message | What it means | What to do |
 |---------|---------------|-----------|
-| Web Phone Unavailable — No extension is assigned to your account | No user extension, or no Cloudonix domain for the organization | Assign a user extension; check [Settings](/modules/settings) |
+| Web Phone Unavailable — No extension is assigned to your account | No user extension | Assign a user extension |
+| Web Phone Unavailable — Cloudonix isn't configured for your organization | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/modules/settings) |
 | Connection Failed — Could not open a connection to the voice server | The browser cannot reach `wss://webrtc.cloudonix.io` | Check the network and firewall, then **Retry** |
 | Authentication Rejected | Cloudonix refused the extension's password | Reset the extension password on [Extensions](/modules/extensions) |
 | Extension Not Found | The subscriber does not exist in Cloudonix | Check that the extension is synced to Cloudonix |
@@ -119,7 +122,7 @@ Every error screen shows the raw cause from the SIP library and a **Retry** butt
 
 ## How it works
 
-1. When you open the panel, OPBX calls `GET /v1/webphone/config` for your extension's SIP settings.
+1. When you sign in (in the tab that holds the registration), OPBX calls `GET /v1/webphone/config` for your extension's SIP settings.
 2. The bundled JsSIP library (served by OPBX itself, not loaded from a third-party site) creates a SIP user agent.
 3. The user agent connects to `wss://webrtc.cloudonix.io:443` and registers as `sip:<extension>@<your Cloudonix domain>` with the extension's password.
 4. Calls you place go through the normal OPBX outbound routing, as from any other phone on your extension.
@@ -143,7 +146,7 @@ The config contains your SIP password. It is returned only to you, for your own 
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 when there is no user extension or no Cloudonix domain |
+| GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 `No extension is assigned to this user` when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
 | GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
 
