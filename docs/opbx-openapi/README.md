@@ -2,22 +2,28 @@
 
 This directory contains the complete OpenAPI 3.1 specification for the OPBX (Open Source Business PBX) API.
 
-## Regenerating from source
+## Keeping it in sync with the code
 
-The `paths` block is generated from the Laravel route list. To refresh it after route changes:
+The spec is maintained by hand from the code. To find routes that are missing or changed,
+list the routes (with their middleware) from the running stack:
 
 ```bash
-php artisan route:list --json > docs/superpowers/work/route-list.json
+docker compose exec -T app php artisan route:list --json > /tmp/route-list.json
 ```
 
-After regenerating the route list, update the `$ref` entries in `openapi.yaml` and the path files under `paths/` so that every route is documented.
+Compare it with the `paths` block in `openapi.yaml` and the path files under `paths/`, then
+update the `$ref` entries and path files so that every route is documented. Field-level
+sources: FormRequest `rules()` in `app/Http/Requests/**` (and inline `$request->validate()`),
+API Resources in `app/Http/Resources/**`, and the route middleware in `routes/api.php`,
+`routes/platform.php` and `routes/webhooks.php` for auth.
 
 ## Validation
 
-Lint the specification with Redocly before committing:
+Lint the specification with Redocly before committing (must report 0 errors):
 
 ```bash
-npx @redocly/cli lint docs/opbx-openapi/openapi.yaml
+docker run --rm -v "$PWD/docs/opbx-openapi":/spec docker.io/redocly/cli:2.58.2 \
+  lint /spec/openapi.yaml --format=summary
 ```
 
 ## Structure
@@ -57,16 +63,21 @@ docs/opbx-openapi/
 
 ## Authentication
 
-The API supports two authentication methods:
+Each operation lists the schemes it accepts in `security`:
 
-### 1. Bearer Token (API Clients)
-```
-Authorization: Bearer <token>
-```
+| Scheme | Used by |
+|--------|---------|
+| `bearerAuth` | Sanctum personal access token (`Authorization: Bearer <token>`) |
+| `cookieAuth` | SPA session: `GET /sanctum/csrf-cookie`, then the session cookie plus `X-XSRF-TOKEN` |
+| `apiKeyAuth` | Organization API key (`Authorization: Bearer opbxk_...`). Only on operations that carry `x-api-key-scope: <resource>:<read\|write>`; GET needs `read`, other methods `write`. Everything else answers API keys with 403. |
+| `embedTokenAuth` | Embedded Dialer token (`opbxd_...`) for `/v1/embed/*` |
+| `webhookBearer` | Cloudonix webhooks (Bearer or HMAC-SHA256, per organization) |
+| `voiceWebhookAuth` | Voice routing callbacks (`domain_requests_api_key`) |
+| `dialerWorkerAuth` | Dialer worker (`DIALER_WORKER_API_TOKEN`) |
+| `amdWorkerAuth` | AMD worker (`AMD_WORKER_API_TOKEN`) |
 
-### 2. Cookie-based (SPA)
-- Obtain CSRF token via `GET /sanctum/csrf-cookie`
-- Include X-XSRF-TOKEN header or rely on httpOnly cookie
+Public operations have `security: []` (for example login, registration, the public status
+page, the public queues wallboard, signed recording URLs and HMAC-signed queue callbacks).
 
 ## Usage
 
@@ -147,11 +158,16 @@ redocly lint docs/opbx-openapi/openapi.yaml
 
 | Resource | Endpoints |
 |----------|-----------|
-| **Dashboard** | Cross-tenant statistics |
-| **Organizations** | Organization management |
-| **Operate As** | Start/stop platform-owner impersonation of an organization (acts as its Owner) |
-| **Users** | Cross-tenant user management |
-| **Audit Logs** | Platform-wide audit trail |
+| **Dashboard** | `GET /v1/platform/dashboard` - cross-tenant counts, recent organizations and audit entries |
+| **Organizations** | List, show, update settings, change status (active/suspended/deleted), list and create users |
+| **Operate As** | `POST /v1/platform/operate-as/{organization}`, `DELETE /v1/platform/operate-as` - act as an organization's Owner |
+| **Users** | Cross-tenant list/show/update/delete, delete-impact preview, password reset, platform-manager flag |
+| **Audit Logs** | `GET /v1/platform/audit-logs` - filterable platform audit trail |
+| **CDR Archive** | `GET /v1/platform/cdr-archive` - warm-archive CDRs across organizations |
+| **Status** | `GET /v1/platform/status`, `POST /v1/platform/status/check` (plus the public `GET /v1/public/status`) |
+
+All platform routes require a Sanctum user with the platform-manager flag
+(`EnsurePlatformManager`); API keys are not accepted.
 
 ## Rate Limiting
 
@@ -176,12 +192,13 @@ Rate limits are applied per organization:
 ```
 
 ### Error Response
+Authentication, authorization and HTTP exceptions:
 ```json
-{
-  "error": "ERROR_CODE",
-  "message": "Human-readable error message",
-  "code": "MACHINE_CODE"
-}
+{ "error": "Unauthenticated", "message": "Authentication required to access this resource." }
+```
+Controller errors:
+```json
+{ "error": { "code": "CREATION_ERROR", "message": "Human-readable error message", "details": null } }
 ```
 
 ### Validation Error
@@ -239,7 +256,8 @@ All endpoints are prefixed with `/api/v1` (except webhooks which use their own p
 - All authenticated endpoints require valid Sanctum token or session cookie
 - Webhooks use signature verification (HMAC)
 - Voice routing uses organization-specific Bearer tokens
-- Platform endpoints require platform manager flag
+- Platform endpoints require the platform manager flag
+- API keys reach only the operations whose resource they were granted (`x-api-key-scope`)
 
 ## License
 

@@ -5,9 +5,9 @@ info:
     This API provides complete control plane access for managing a multi-tenant business PBX system.
     The API is built on Laravel 12 with Sanctum authentication.
 
-    > **Generated from source:** This specification is derived from the current Laravel
-    > route list (`docs/superpowers/work/route-list.json`) and controller FormRequest
-    > classes. Regenerate it whenever routes or validation rules change.
+    > **Derived from source:** This specification follows the Laravel route list
+    > (`php artisan route:list --json`), the FormRequest classes and the API Resources.
+    > Update it whenever routes, validation rules or resources change.
     
     ## Authentication
     
