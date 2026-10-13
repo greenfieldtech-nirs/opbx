@@ -14,7 +14,7 @@ paths:
       - dialerWorkerAuth: []
       responses:
         '200':
-          description: Worker service is healthy
+          description: Worker API is healthy
           content:
             application/json:
               schema:
@@ -22,10 +22,13 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: ok
-                  timestamp:
-                    type: string
-                    format: date-time
+                    example: healthy
+                  active_campaigns:
+                    type: integer
+                  active_calls:
+                    type: integer
+                  queue_depth:
+                    type: integer
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
   /v1/dialer/worker/campaigns/active:
@@ -79,9 +82,28 @@ paths:
       operationId: pauseCampaignFromWorker
       security:
       - dialerWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                paused_by:
+                  type: string
+                resume_at:
+                  type:
+                  - string
+                  - 'null'
+                  format: date-time
+              required:
+              - reason
+              - paused_by
       responses:
         '200':
-          description: Campaign paused successfully
+          description: Campaign paused
           content:
             application/json:
               schema:
@@ -89,7 +111,12 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Campaign paused successfully
+                    example: Campaign paused
+                  data:
+                    type: object
+                    additionalProperties: true
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -116,9 +143,15 @@ paths:
       operationId: getPendingDestinations
       security:
       - dialerWorkerAuth: []
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 50
       responses:
         '200':
-          description: List of pending destinations
+          description: Destinations to dial
           content:
             application/json:
               schema:
@@ -127,19 +160,16 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        phone_number:
-                          type: string
-                        dial_attempts:
-                          type: integer
-                        last_dial_attempt_at:
-                          type:
-                          - string
-                          - 'null'
-                          format: date-time
+                      $ref: ../../components/schemas/ListDestination.yaml
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -166,9 +196,15 @@ paths:
       operationId: getRetryDestinations
       security:
       - dialerWorkerAuth: []
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 50
       responses:
         '200':
-          description: List of retry destinations
+          description: Destinations to dial
           content:
             application/json:
               schema:
@@ -177,17 +213,16 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                        phone_number:
-                          type: string
-                        dial_attempts:
-                          type: integer
-                        last_dial_attempt_at:
-                          type: string
-                          format: date-time
+                      $ref: ../../components/schemas/ListDestination.yaml
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -205,6 +240,12 @@ paths:
       operationId: initiateCall
       security:
       - dialerWorkerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        schema:
+          type: string
+        description: Replays of the same key for the same destination return the original 201 response instead of placing a second call
       requestBody:
         required: true
         content:
@@ -212,31 +253,61 @@ paths:
             schema:
               type: object
               properties:
-                destination_id:
-                  type: integer
                 campaign_id:
+                  type: integer
+                destination_id:
                   type: integer
                 phone_number:
                   type: string
-                caller_id:
+                worker_id:
                   type: string
+                initiated_at:
+                  type: string
+                  format: date-time
+                caller_id:
+                  type:
+                  - string
+                  - 'null'
+                  description: Defaults to the campaign caller ID
+                caller_did_id:
+                  type:
+                  - integer
+                  - 'null'
               required:
-              - destination_id
               - campaign_id
+              - destination_id
               - phone_number
-              - caller_id
+              - worker_id
+              - initiated_at
       responses:
-        '200':
+        '201':
           description: Call initiated
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  call_sid:
+                  message:
                     type: string
-                  session_id:
-                    type: string
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: integer
+                      call_id:
+                        type:
+                        - string
+                        - 'null'
+                      caller_id:
+                        type: string
+                      caller_did_id:
+                        type:
+                        - integer
+                        - 'null'
+                      callback_url:
+                        type: string
+        '500':
+          description: Cloudonix rejected the call
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '422':
@@ -263,18 +334,37 @@ paths:
               properties:
                 campaign_id:
                   type: integer
-                destination_id:
+                session_id:
                   type: integer
+                phone_number:
+                  type: string
+                call_sid:
+                  type: string
               required:
               - campaign_id
-              - destination_id
+              - session_id
+              - phone_number
+              - call_sid
       responses:
         '200':
-          description: CXML generated
+          description: CXML for the answered call, wrapped in JSON
           content:
-            application/xml:
+            application/json:
               schema:
-                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      cxml:
+                        type: string
+                      routing_type:
+                        type:
+                        - string
+                        - 'null'
+                        enum: [ai_assistant, ai_load_balancer, hangup, null]
+        '404':
+          description: Campaign not found
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '422':
@@ -309,23 +399,32 @@ paths:
               properties:
                 status:
                   type: string
-                  enum:
-                  - initiated
-                  - ringing
-                  - answered
-                  - completed
-                  - failed
-                  - busy
-                  - no_answer
+                disposition:
+                  type:
+                  - string
+                  - 'null'
                 duration:
                   type:
                   - integer
                   - 'null'
+                billsec:
+                  type:
+                  - integer
+                  - 'null'
+                recording_url:
+                  type:
+                  - string
+                  - 'null'
+                completed_at:
+                  type:
+                  - string
+                  - 'null'
+                  format: date-time
               required:
               - status
       responses:
         '200':
-          description: Status updated
+          description: Call status updated
           content:
             application/json:
               schema:
@@ -333,7 +432,13 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Status updated successfully
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: integer
+                      destination_status:
+                        type: string
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -368,22 +473,32 @@ paths:
               properties:
                 disposition:
                   type: string
-                  enum:
-                  - answered
-                  - voicemail
-                  - busy
-                  - no_answer
-                  - failed
-                  - fax_machine
-                notes:
+                  enum: [answered, completed, busy, no-answer, failed, cancelled, congestion]
+                should_retry:
+                  type: boolean
+                next_retry_at:
                   type:
                   - string
                   - 'null'
+                  format: date-time
+                attempt_number:
+                  type: integer
+                  minimum: 1
+                duration:
+                  type:
+                  - integer
+                  - 'null'
+                billsec:
+                  type:
+                  - integer
+                  - 'null'
               required:
               - disposition
+              - should_retry
+              - attempt_number
       responses:
         '200':
-          description: Disposition set
+          description: Disposition recorded
           content:
             application/json:
               schema:
@@ -391,7 +506,17 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Disposition recorded successfully
+                  data:
+                    type: object
+                    properties:
+                      session_id:
+                        type: integer
+                      disposition:
+                        type: string
+                      destination_status:
+                        type: string
+                      will_retry:
+                        type: boolean
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -418,11 +543,24 @@ paths:
               properties:
                 worker_id:
                   type: string
-                state:
-                  type: object
+                active_calls:
+                  type: array
+                  items: {}
+                retry_queue:
+                  type: array
+                  items: {}
+                campaign_states:
+                  type: array
+                  items: {}
+                last_updated:
+                  type: string
+                  format: date-time
               required:
               - worker_id
-              - state
+              - active_calls
+              - retry_queue
+              - campaign_states
+              - last_updated
       responses:
         '200':
           description: State persisted
