@@ -185,6 +185,9 @@ class AutoDialerCloudonixService
             $payload['timeout'] = $campaign->dial_timeout;
         }
 
+        // "Connect when": 'connected' (default) runs the application on answer, 'immediately' while ringing.
+        $payload['execute'] = $campaign->destination_connect === 'immediately' ? 'immediately' : 'connected';
+
         // Optional: Time limit
         if ($campaign->time_limit) {
             $payload['timeLimit'] = $campaign->time_limit;

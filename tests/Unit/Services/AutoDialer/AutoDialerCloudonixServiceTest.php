@@ -272,6 +272,23 @@ class AutoDialerCloudonixServiceTest extends TestCase
         );
     }
 
+    public function test_build_payload_passes_connect_when_as_execute(): void
+    {
+        $this->mockOutboundRouting->shouldReceive('findOutboundWhitelistEntry')->andReturn(null);
+        $method = (new \ReflectionClass($this->service))->getMethod('buildPayload');
+        $method->setAccessible(true);
+
+        foreach (['immediately' => 'immediately', 'connected' => 'connected'] as $stored => $expected) {
+            $campaign = $this->createCampaign([
+                'routing_destination_type' => RoutingDestinationType::HANGUP,
+                'destination_connect' => $stored,
+            ]);
+            $payload = $method->invoke($this->service, $campaign, $this->createDestination(), 'https://example.com/w', null);
+
+            $this->assertSame($expected, $payload['execute']);
+        }
+    }
+
     public function test_validate_credentials_delegates_to_client(): void
     {
         // This is a static method that delegates to CloudonixClient
