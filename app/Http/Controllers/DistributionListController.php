@@ -106,6 +106,7 @@ class DistributionListController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'has_header' => ['nullable', 'boolean'],
             'mapping' => ['required', 'array'],
             'mapping.phone' => ['required', 'string'],
             'mapping.name' => ['nullable', 'string'],
@@ -116,6 +117,7 @@ class DistributionListController extends Controller
 
         $file = $validated['file'];
         $mapping = $validated['mapping'];
+        $mapping['has_header'] = filter_var($validated['has_header'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
         // Determine action based on list status
         $canUploadToCurrent = $list->status->canUpload();

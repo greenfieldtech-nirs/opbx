@@ -136,6 +136,7 @@ export function UnifiedUploadDialog({
         listId: list.id,
         file,
         mapping: cleanedMapping,
+        hasHeader,
       });
 
       setJobId(result.data.job_id);

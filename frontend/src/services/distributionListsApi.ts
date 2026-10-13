@@ -103,6 +103,7 @@ export const distributionListsApi = {
     listId: string | number,
     file: File,
     mapping: CsvMappingConfig,
+    hasHeader: boolean = true,
   ): Promise<{
     message: string;
     data: {
@@ -117,6 +118,7 @@ export const distributionListsApi = {
   }> => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('has_header', hasHeader ? '1' : '0');
     formData.append('mapping[phone]', mapping.phone);
     if (mapping.name) {
       formData.append('mapping[name]', mapping.name);

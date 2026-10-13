@@ -78,11 +78,13 @@ export function useUploadList() {
       listId,
       file,
       mapping,
+      hasHeader,
     }: {
       listId: string | number;
       file: File;
       mapping: CsvMappingConfig;
-    }) => distributionListsApi.uploadCsv(listId, file, mapping),
+      hasHeader?: boolean;
+    }) => distributionListsApi.uploadCsv(listId, file, mapping, hasHeader),
     onSuccess: (_) => {
       // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });

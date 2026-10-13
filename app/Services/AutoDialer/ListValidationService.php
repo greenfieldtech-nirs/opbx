@@ -119,10 +119,15 @@ class ListValidationService
 
             $rowNumber++;
 
-            if ($rowNumber === 1 && $hasHeader) {
-                $headers = array_map(fn ($h) => trim((string) $h), $rowData);
+            if ($rowNumber === 1) {
+                // Without a header row the columns are addressed as column_1, column_2, ...
+                $headers = $hasHeader
+                    ? array_map(fn ($h) => trim((string) $h), $rowData)
+                    : array_map(fn ($i) => 'column_'.($i + 1), array_keys($rowData));
 
-                continue;
+                if ($hasHeader) {
+                    continue;
+                }
             }
 
             if ($totalRows < $limit) {
@@ -184,7 +189,14 @@ class ListValidationService
                 );
             }
 
-            $headers = array_map(fn ($h) => trim((string) $h), $this->normalizeRowToUtf8($headers));
+            $headers = $this->normalizeRowToUtf8($headers);
+            if ($mapping['has_header'] ?? true) {
+                $headers = array_map(fn ($h) => trim((string) $h), $headers);
+            } else {
+                // No header row: name the columns column_N and treat the first row as data.
+                $headers = array_map(fn ($i) => 'column_'.($i + 1), array_keys($headers));
+                rewind($handle);
+            }
             $phoneColumn = $mapping['phone'] ?? null;
 
             if (empty($phoneColumn) || ! in_array($phoneColumn, $headers, true)) {

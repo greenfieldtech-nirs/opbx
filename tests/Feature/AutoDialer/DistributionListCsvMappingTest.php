@@ -153,4 +153,30 @@ class DistributionListCsvMappingTest extends TestCase
             }
         }
     }
+
+    /** @test */
+    public function it_previews_and_uploads_a_headerless_csv_keeping_the_first_row(): void
+    {
+        $csv = "+14155551212,John Doe\n+14155551213,Jane Smith\n";
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/auto-dialer-campaigns/lists/{$this->list->id}/preview-csv", [
+                'file' => UploadedFile::fake()->createWithContent('contacts.csv', $csv),
+                'has_header' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.headers', ['column_1', 'column_2'])
+            ->assertJsonPath('data.total_rows', 2);
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/auto-dialer-campaigns/lists/{$this->list->id}/upload", [
+                'file' => UploadedFile::fake()->createWithContent('contacts.csv', $csv),
+                'has_header' => false,
+                'mapping' => ['phone' => 'column_1', 'name' => 'column_2'],
+            ])
+            ->assertOk();
+
+        $this->assertSame(2, AutoDialerDestination::where('list_id', $this->list->id)->count());
+        $this->assertDatabaseHas('auto_dialer_destinations', ['list_id' => $this->list->id, 'phone_number' => '+14155551212', 'name' => 'John Doe']);
+    }
 }
