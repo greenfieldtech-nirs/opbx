@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,6 +126,7 @@ export default function LiveCalls() {
   const isSupervisor = currentUser?.role === 'supervisor';
   const isReadOnly = ['reporter', 'pbx_user', 'supervisor'].includes(currentUser?.role);
   const canUseLiveCallActions = ['owner', 'supervisor'].includes(currentUser?.role);
+  const canDisconnect = can(currentUser?.role, 'liveCalls.disconnect');
   const queryClient = useQueryClient();
 
   // Refresh interval state (default: 5 seconds)
@@ -418,7 +420,7 @@ export default function LiveCalls() {
         </div>
         <div className="flex items-center gap-4">
           {/* Disconnect All Calls Button */}
-          {!isReadOnly && liveCalls.length > 0 && (
+          {canDisconnect && liveCalls.length > 0 && (
             <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
               <AlertDialogTrigger asChild>
                 <Button
@@ -788,6 +790,7 @@ export default function LiveCalls() {
                                 </TooltipContent>
                               </Tooltip>
 
+                              {canDisconnect && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -808,6 +811,7 @@ export default function LiveCalls() {
                                   <p>Disconnect</p>
                                 </TooltipContent>
                               </Tooltip>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>
