@@ -113,39 +113,42 @@ The `MINIO_*` names are kept for compatibility. Existing installations that used
 | `CLOUDONIX_API_BASE_URL` | `https://api.cloudonix.io` | Cloudonix API base URL |
 | `CLOUDONIX_API_TIMEOUT` | `30` | API timeout |
 | `CLOUDONIX_SIP_SERVER` | `sip.cloudonix.io` | SIP server |
+| `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` | `false` | `false`: status, CDR and dialer webhooks from an organization with no webhook key are accepted and logged as `webhook.unauthenticated`. `true`: they are rejected with 401. Turn on after `php artisan cloudonix:provision-webhook-keys` |
+| `CXML_DEFAULT_TIMEOUT` | `30` | Default `<Dial>` timeout (seconds) for extension and ring group dials |
 
-Per-organization credentials are stored in `cloudonix_settings`.
+Per-organization credentials, including the webhook key, are stored in `cloudonix_settings`.
 
 ### Webhooks / Rate Limiting
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RATE_LIMIT_API` | `60` | API requests per minute |
-| `RATE_LIMIT_WEBHOOKS` | `100` | Webhook requests per minute |
-| `RATE_LIMIT_VOICE` | `1000` | Voice requests per minute |
+| `RATE_LIMIT_API` | `60` | API requests per minute per organization |
+| `RATE_LIMIT_WEBHOOKS` | `100` | Webhook requests per minute. Defined, but no route applies a webhook rate limit |
+| `RATE_LIMIT_VOICE` | `1000` | Voice requests per minute. Defined, but no route applies a voice rate limit |
 | `RATE_LIMIT_SENSITIVE` | `10` | Sensitive operations per minute |
 | `RATE_LIMIT_SENSITIVE_ADMIN` | `60` | Admin sensitive operations |
 | `RATE_LIMIT_AUTH` | `5` | Auth attempts per minute |
-| `CLOUDONIX_CDR_AUTH_KEY` | — | Optional CDR auth key |
+| `WEBHOOK_IDEMPOTENCY_TTL` | `86400` | Seconds a webhook idempotency key (`idem:webhook:{key}`) is kept |
+| `WEBHOOK_MAX_CACHE_SIZE` | `102400` | Largest response (bytes) cached for a duplicate webhook |
+| `WEBHOOK_REPLAY_MAX_AGE` | `300` | Webhooks with an older `timestamp` are rejected (CDRs are accepted with a log line) |
+| `CLOUDONIX_CDR_AUTH_KEY` | — | Read into `config/webhooks.php` but not used by any code |
+
+See [Webhooks](/architecture/webhooks) for the authentication flow.
 
 ### Voice Routing
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VOICE_CACHE_EXTENSION_TTL` | `1800` | Extension cache TTL (seconds) |
-| `VOICE_CACHE_BUSINESS_HOURS_TTL` | `900` | Business hours cache TTL |
-| `VOICE_LOCK_TIMEOUT` | `30` | Lock timeout |
-| `VOICE_LOCK_BLOCK` | `3` | Lock block time |
-| `VOICE_MAX_RETRIES` | `3` | Max retries |
-| `VOICE_IDEMPOTENCY_TTL` | `3600` | Idempotency TTL |
-| `VOICE_NO_ANSWER_TIMEOUT` | `30` | No-answer timeout |
-| `CXML_DEFAULT_TIMEOUT` | `30` | CXML default timeout |
+| `VOICE_CACHE_EXTENSION_TTL` | `1800` | Extension routing cache TTL (seconds) |
+| `VOICE_CACHE_BUSINESS_HOURS_TTL` | `900` | Business hours routing cache TTL (seconds) |
+
+`VOICE_LOCK_TIMEOUT`, `VOICE_LOCK_BLOCK`, `VOICE_MAX_RETRIES`, `VOICE_IDEMPOTENCY_TTL` and `VOICE_NO_ANSWER_TIMEOUT` are in `.env.example` and `config/voice_routing.php` but are not read by any code. The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`.
 
 ### Circuit Breaker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CIRCUIT_BREAKER_ENABLED` | `true` | Enable circuit breaker |
+| `CIRCUIT_BREAKER_ENABLED` | `true` | Read into config, but the Cloudonix client applies the breaker regardless |
 | `CIRCUIT_BREAKER_CLOUDONIX_THRESHOLD` | `5` | Failure threshold |
 | `CIRCUIT_BREAKER_CLOUDONIX_TIMEOUT` | `30` | Timeout (seconds) |
 | `CIRCUIT_BREAKER_CLOUDONIX_RETRY_AFTER` | `60` | Retry after (seconds) |
@@ -160,15 +163,28 @@ Per-organization credentials are stored in `cloudonix_settings`.
 | `DIALER_WEBHOOK_PORT` | `8081` | Worker webhook port (container) |
 | `DIALER_WEBHOOK_HOST_PORT` | `8181` | Host port publishing the worker webhook endpoint |
 | `DIALER_POLL_INTERVAL` | `10s` | Campaign poll interval |
+| `DIALER_WORKER_API_TOKEN_SECONDARY` | — | Optional second token Laravel accepts, for rotation |
 
 ### AMD Worker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AMD_WORKER_API_TOKEN` | — | Callback auth token |
+| `AMD_WORKER_API_TOKEN` | — | Callback auth token. Required |
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | Max streams |
+| `AMD_MIN_BEEP_START_MS` | `2000` | Earliest point (ms after stream start) a beep may be accepted |
+| `AMD_LOG_LEVEL` | `info` | Log level |
 | `AMD_DUMP_AUDIO` | `false` | Dump audio to WAV |
 | `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | Dump directory |
+
+### ACD Worker
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required |
+| `ACD_WORKER_URL` | `http://acd-worker:8084` | Worker URL used by Laravel |
+| `ACD_LOG_LEVEL` | `info` | Log level |
+
+The worker reads Redis from `ACD_REDIS_HOST`, `ACD_REDIS_PORT` and `ACD_REDIS_PASSWORD`, which the compose file sets from the Redis service and `REDIS_PASSWORD`. See [ACD Worker](../../workers/acd-worker).
 
 ### ngrok
 
@@ -177,14 +193,22 @@ Per-organization credentials are stored in `cloudonix_settings`.
 | `NGROK_AUTHTOKEN` | — | ngrok authtoken |
 | `NGROK_DOMAIN` | — | Custom domain (paid plans) |
 
+The `ngrok` service is in the `dev` profile: `docker compose --profile dev up -d ngrok`.
+
 ### UserCheck
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `USERCHECK_ENABLED` | `true` | Enable email validation |
+| `USERCHECK_ENABLED` | `true` | Enable email validation at registration and invitation |
 | `USERCHECK_API_TOKEN` | — | API token |
 | `USERCHECK_BASE_URL` | `https://api.usercheck.com` | |
-| `USERCHECK_TIMEOUT` | `5` | |
+| `USERCHECK_TIMEOUT` | `5` | Seconds |
+| `USERCHECK_BLOCK_DISPOSABLE` | `true` | Reject disposable addresses |
+| `USERCHECK_BLOCK_BLOCKLISTED` | `true` | Reject blocklisted domains |
+| `USERCHECK_BLOCK_SPAM` | `true` | Reject spam domains |
+| `USERCHECK_BLOCK_ROLE_ACCOUNTS` | `true` | Reject role accounts (for example `info@`) |
+| `USERCHECK_BLOCK_RELAY_DOMAINS` | `false` | Reject email relay domains |
+| `USERCHECK_BLOCK_PUBLIC_DOMAINS` | `false` | Reject public mail providers |
 
 ### reCAPTCHA
 
@@ -245,7 +269,7 @@ Call records are not pruned. They move through three tiers, by session time in U
 | `CDR_COLD_RETENTION_YEARS` | `7` | Years a cold (compressed CSV) archive file is kept |
 | `RECORDING_RETENTION_MONTHS` | empty | Months a call recording is kept. Empty means the cold retention period. A larger value is reduced to the cold retention period |
 
-The warm tier lives in a separate database schema, configured with `DB_CDR_ARCHIVE_DATABASE` (and optional `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`). Each falls back to the main database setting. The cold tier is written to the bucket named by `CDR_ARCHIVE_BUCKET` (default `cdr-archive`). See [Call Logs](/modules/call-logs#retention-and-archive).
+The warm tier is the `archived_call_detail_records` table on the `cdr_archive` connection. Without `DB_CDR_ARCHIVE_DATABASE` it lives in the main schema. To use a separate schema, create it, grant the app user, and set `DB_CDR_ARCHIVE_DATABASE` (and optionally `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`; each falls back to the main database setting). The cold tier is written to the bucket named by `CDR_ARCHIVE_BUCKET` (default `cdr-archive`). See [Call Logs](/modules/call-logs#retention-and-archive).
 
 ## Platform Status
 
@@ -263,13 +287,21 @@ Each probe URL can be overridden with `PLATFORM_STATUS_*_URL`. See [Platform Man
 
 ## Health Check Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/health` | Public API health |
-| `/api/storage/health` | Storage health (auth required) |
-| `/api/websocket/health` | WebSocket health (auth required) |
-| `/webhooks/health` | Dialer worker health |
-| `/health` (amd-worker:8083) | AMD worker health |
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /api/health` | None | API liveness: `{"status":"ok","timestamp":...}` |
+| `GET /api/v1/public/status` | None (cached 30 s, 60/min) | Public platform status, grouped by service |
+| `GET /api/voice/health` | None | Voice routing health |
+| `GET /api/storage/health` | Sanctum | Writes, reads and deletes a test object in the recordings bucket |
+| `GET /api/websocket/health` | Sanctum | Sends a test event through Soketi |
+| `GET /api/v1/dialer/worker/health` | Dialer worker token | Laravel side of the dialer worker API |
+| `GET dialer-worker:8081/webhooks/health` | None (internal) | Dialer worker health |
+| `GET amd-worker:8083/health` | None (internal) | AMD worker health and detection counters |
+| `GET acd-worker:8085/health` | None (internal) | ACD worker health; 503 when Redis does not answer |
+| `GET mcp-server:8080/health` | None (internal) | MCP server health |
+| `GET soketi:9601/ready` | None | Soketi readiness |
+
+The internal endpoints are what the Docker healthchecks call. Platform Status (`platform:health-check`, every minute) probes all components and stores the results in `platform_health_checks`.
 
 ## Docker Services
 
