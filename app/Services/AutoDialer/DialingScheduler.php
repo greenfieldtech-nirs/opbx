@@ -15,14 +15,24 @@ use Carbon\Carbon;
 class DialingScheduler
 {
     /**
+     * Calendar-date check in the campaign timezone. start_date/end_date are dates (midnight), so
+     * comparing instants would exclude the whole end date.
+     */
+    public function isWithinDateRange(AutoDialerCampaign $campaign): bool
+    {
+        $today = now($campaign->timezone)->format('Y-m-d');
+
+        return $today >= $campaign->start_date->format('Y-m-d') && $today <= $campaign->end_date->format('Y-m-d');
+    }
+
+    /**
      * Check if campaign is within its scheduled hours.
      */
     public function isWithinSchedule(AutoDialerCampaign $campaign): bool
     {
         $now = now($campaign->timezone);
 
-        // Check date range
-        if ($now->lt($campaign->start_date) || $now->gt($campaign->end_date)) {
+        if (! $this->isWithinDateRange($campaign)) {
             return false;
         }
 
@@ -49,8 +59,8 @@ class DialingScheduler
         $now = now($campaign->timezone);
         $today = $now->copy()->startOfDay();
 
-        // Check if we're still within the date range
-        if ($now->gt($campaign->end_date)) {
+        // Check if we're still within the date range (the end date itself is a valid day)
+        if ($now->format('Y-m-d') > $campaign->end_date->format('Y-m-d')) {
             return null; // Campaign has ended
         }
 

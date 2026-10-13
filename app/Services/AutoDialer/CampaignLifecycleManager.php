@@ -214,19 +214,21 @@ class CampaignLifecycleManager
      */
     public function checkAndAutoStart(): void
     {
-        // Find auto-start campaigns that are ready
-        $campaigns = AutoDialerCampaign::where('auto_start', true)
-            ->where('status', CampaignStatus::DRAFT)
-            ->whereHas('list', function ($query) {
-                $query->whereIn('status', ['ready', 'in_use']);
-            })
-            ->get();
+        // Console run: there is no tenant, so bypass the organisation scope.
+        OrganizationScope::bypass(function (): void {
+            $campaigns = AutoDialerCampaign::where('auto_start', true)
+                ->where('status', CampaignStatus::DRAFT)
+                ->whereHas('list', function ($query) {
+                    $query->whereIn('status', ['ready', 'in_use']);
+                })
+                ->get();
 
-        foreach ($campaigns as $campaign) {
-            if ($this->shouldAutoStart($campaign)) {
-                $this->start($campaign);
+            foreach ($campaigns as $campaign) {
+                if ($this->shouldAutoStart($campaign)) {
+                    $this->start($campaign);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -234,13 +236,7 @@ class CampaignLifecycleManager
      */
     private function shouldAutoStart(AutoDialerCampaign $campaign): bool
     {
-        // Check if within date range
-        $now = now($campaign->timezone);
-        if ($now->lt($campaign->start_date) || $now->gt($campaign->end_date)) {
-            return false;
-        }
-
-        // Check if within schedule
+        // isWithinSchedule covers the date range (end date inclusive), weekday and hours
         return $this->scheduler->isWithinSchedule($campaign);
     }
 

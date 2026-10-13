@@ -252,4 +252,25 @@ class CampaignLifecycleManagerTest extends TestCase
         $this->assertFalse($summary['can_pause']);
         $this->assertFalse($summary['is_runnable']);
     }
+
+    public function test_check_and_auto_start_starts_a_campaign_on_its_end_date_without_a_tenant(): void
+    {
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::DRAFT,
+            'auto_start' => true,
+            'start_time' => 9,
+            'end_time' => 17,
+            'start_date' => now()->subDays(3)->toDateString(),
+            'end_date' => now()->toDateString(),
+            'timezone' => 'UTC',
+        ]);
+        AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+
+        $this->travelTo(now('UTC')->setTime(14, 0));
+        auth()->logout(); // scheduled command: no user, no tenant
+
+        $this->manager->checkAndAutoStart();
+
+        $this->assertEquals(CampaignStatus::ACTIVE, $campaign->fresh()->status);
+    }
 }
