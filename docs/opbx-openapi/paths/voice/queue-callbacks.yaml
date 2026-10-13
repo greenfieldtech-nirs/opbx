@@ -1,0 +1,163 @@
+paths:
+  /callbacks/voice/queue-poll:
+    post:
+      tags:
+        - Voice Routing
+      summary: Call queue poll
+      description: |
+        Hold-loop callback for a call waiting in a call queue. Decides whether to keep the
+        caller waiting, dial an agent, or overflow. Returns CXML.
+        Authentication: voice webhook Bearer token (per organization).
+      operationId: queuePollCallback
+      security:
+        - voiceWebhookAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: Cloudonix callback form fields (CallSid, From, To, and queue query parameters).
+          application/json:
+            schema:
+              type: object
+              description: Cloudonix callback fields as JSON.
+      responses:
+        '200':
+          description: CXML instructions for the call
+          content:
+            application/xml:
+              schema:
+                type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /callbacks/voice/queue-dial-callback:
+    post:
+      tags:
+        - Voice Routing
+      summary: Call queue agent dial result
+      description: |
+        Receives the result of an agent dial attempt for a queued call. Returns CXML.
+        Authentication: voice webhook Bearer token (per organization).
+      operationId: queueDialCallback
+      security:
+        - voiceWebhookAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: Cloudonix callback form fields for the dial result.
+          application/json:
+            schema:
+              type: object
+              description: Cloudonix callback fields as JSON.
+      responses:
+        '200':
+          description: CXML instructions for the call
+          content:
+            application/xml:
+              schema:
+                type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+
+  /callbacks/voice/queue-dial:
+    get:
+      tags:
+        - Voice Routing
+      summary: Queue proactive dial (immediate connect)
+      description: |
+        Returns the CXML that dials an agent immediately for a queued call. The URL is
+        HMAC-signed, so no Bearer token is used (application-switched fetches may not carry one).
+        Accepts GET or POST.
+      operationId: queueImmediateDialGet
+      security: []
+      responses:
+        '200':
+          description: CXML instructions (a hangup when the call is no longer valid)
+          content:
+            application/xml:
+              schema:
+                type: string
+    post:
+      tags:
+        - Voice Routing
+      summary: Queue proactive dial (immediate connect)
+      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      operationId: queueImmediateDialPost
+      security: []
+      responses:
+        '200':
+          description: CXML instructions (a hangup when the call is no longer valid)
+          content:
+            application/xml:
+              schema:
+                type: string
+
+  /callbacks/voice/queue-agent-connect:
+    get:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all agent leg
+      description: |
+        Called when an originated agent leg answers in conference-mediated ring-all. The leg
+        claims the call, and the caller is joined to the winner's room. HMAC-signed URL, no
+        Bearer token. Accepts GET or POST.
+      operationId: queueAgentConnectGet
+      security: []
+      responses:
+        '200':
+          description: CXML instructions
+          content:
+            application/xml:
+              schema:
+                type: string
+    post:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all agent leg
+      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      operationId: queueAgentConnectPost
+      security: []
+      responses:
+        '200':
+          description: CXML instructions
+          content:
+            application/xml:
+              schema:
+                type: string
+
+  /callbacks/voice/queue-conference-join:
+    get:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all caller join
+      description: |
+        Joins the waiting caller to the room of the agent who claimed the call in
+        conference-mediated ring-all. HMAC-signed URL, no Bearer token. Accepts GET or POST.
+      operationId: queueConferenceJoinGet
+      security: []
+      responses:
+        '200':
+          description: CXML instructions
+          content:
+            application/xml:
+              schema:
+                type: string
+    post:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all caller join
+      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      operationId: queueConferenceJoinPost
+      security: []
+      responses:
+        '200':
+          description: CXML instructions
+          content:
+            application/xml:
+              schema:
+                type: string

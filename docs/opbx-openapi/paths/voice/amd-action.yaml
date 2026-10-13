@@ -5,45 +5,62 @@ paths:
         - Voice Routing
       summary: AMD action handler
       description: |
-        Receives detection results from the AMD (Answering Machine Detection) worker.
-        Processes the AMD result and determines the next action for the call.
-        
-        Middleware: None (public endpoint)
+        Receives the Answering Machine Detection result from the AMD worker and runs the
+        auto-dialer campaign's configured action for the call (for example hang up or
+        route to a human agent). Only detection results of `voicemail`, `human` or
+        `unknown` are accepted. Fields `action`, `confidence`, `detectionTimeMs` and
+        `reason` are optional, sent by the worker, and are informational.
+
+        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`.
       operationId: amdAction
-      security: []
+      security:
+        - amdWorkerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - callSid
+                - streamSid
+                - session
+                - result
               properties:
-                session_id:
+                callSid:
                   type: string
-                  description: Call session ID
+                  description: Cloudonix call SID.
                   example: CA550e8400e29b41d4a716446655440000
+                streamSid:
+                  type: string
+                  description: Media stream SID the worker analysed.
+                session:
+                  type: string
+                  description: Auto-dialer session token of the call (see `POST /voice/amd-session`).
+                  example: 9d1f3c2a7b8e4f60a1c2d3e4f5a6b7c8
                 result:
                   type: string
-                  enum: [human, machine, unknown]
-                  description: AMD detection result
-                  example: human
+                  enum: [voicemail, human, unknown]
+                  description: AMD detection result.
+                  example: voicemail
+                action:
+                  type: [string, 'null']
+                  description: Action the worker suggests. Ignored by the server.
                 confidence:
-                  type: number
+                  type: [number, 'null']
                   format: float
-                  minimum: 0
-                  maximum: 1
-                  description: Confidence score of the detection
+                  description: Confidence score of the detection.
                   example: 0.95
-                duration:
-                  type: integer
-                  description: Detection duration in milliseconds
+                detectionTimeMs:
+                  type: [integer, 'null']
+                  description: Detection duration in milliseconds.
                   example: 2500
-              required:
-                - session_id
-                - result
+                reason:
+                  type: [string, 'null']
+                  description: Free-text reason from the worker.
       responses:
         '200':
-          description: AMD action processed
+          description: 'AMD result processed (or rejected with `status: error` in the body)'
           content:
             application/json:
               schema:
@@ -51,10 +68,109 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: processed
-                  action:
+                    enum: [ok, error]
+                    example: ok
+        '401':
+          description: Missing or wrong AMD worker token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
                     type: string
-                    enum: [connect, leave_voicemail, hangup]
-                    example: connect
-        '400':
-          $ref: '../../components/responses/BadRequest.yaml'
+                    example: error
+                  message:
+                    type: string
+                    example: Unauthorized
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '503':
+          description: AMD worker authentication is not configured on the server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: AMD worker authentication is not configured
+
+  /voice/amd-session:
+    post:
+      tags:
+        - Voice Routing
+      summary: AMD stream admission check
+      description: |
+        Called by the AMD worker when a media stream starts. Checks that the session
+        token belongs to a known, active (not terminated) auto-dialer call. Only then
+        does the worker analyse the stream.
+
+        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`.
+      operationId: amdSessionCheck
+      security:
+        - amdWorkerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session]
+              properties:
+                session:
+                  type: string
+                  maxLength: 255
+                  description: Auto-dialer session token of the call.
+      responses:
+        '200':
+          description: Session is active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                    enum: [true]
+        '401':
+          description: Missing or wrong AMD worker token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: Unauthorized
+        '404':
+          description: Unknown or inactive session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: boolean
+                    enum: [false]
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '503':
+          description: AMD worker authentication is not configured on the server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: AMD worker authentication is not configured
