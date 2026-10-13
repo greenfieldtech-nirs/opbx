@@ -16,6 +16,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -26,6 +28,7 @@ paths:
           type: string
           enum:
           - draft
+          - pending
           - processing
           - ready
           - in_use
@@ -79,6 +82,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -133,6 +138,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Example CSV file
@@ -178,6 +185,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Distribution list details
@@ -210,6 +219,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: List deleted successfully

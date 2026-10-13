@@ -26,6 +26,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -36,9 +38,35 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: CSV file to upload (max 50MB)
+                  description: CSV or TXT file to upload (max 50MB)
+                mapping:
+                  type: object
+                  description: >-
+                    Column mapping, sent as form fields `mapping[phone]`, `mapping[name]`,
+                    `mapping[batch_identifier]` and `mapping[metadata][]`.
+                  properties:
+                    phone:
+                      type: string
+                      description: CSV column holding the phone number
+                    name:
+                      type:
+                        - string
+                        - 'null'
+                    batch_identifier:
+                      type:
+                        - string
+                        - 'null'
+                    metadata:
+                      type:
+                        - array
+                        - 'null'
+                      items:
+                        type: string
+                  required:
+                    - phone
               required:
                 - file
+                - mapping
       responses:
         '200':
           description: File uploaded and processing started
@@ -115,6 +143,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -194,6 +224,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Upload progress

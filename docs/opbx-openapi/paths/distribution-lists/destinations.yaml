@@ -23,6 +23,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -34,8 +36,10 @@ paths:
           enum:
           - pending
           - dialing
-          - completed
+          - connected
           - failed
+          - completed
+          - invalid
         description: Filter by destination status
       - name: search
         in: query
@@ -54,40 +58,7 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        phone_number:
-                          type: string
-                          example: '+14155551212'
-                        description:
-                          type:
-                          - string
-                          - 'null'
-                          example: John Doe - Sales Lead
-                        status:
-                          type: string
-                          enum:
-                          - pending
-                          - dialing
-                          - completed
-                          - failed
-                          example: pending
-                        dial_attempts:
-                          type: integer
-                          example: 0
-                        last_dialed_at:
-                          type:
-                          - string
-                          - 'null'
-                          format: date-time
-                          example: null
-                        created_at:
-                          type: string
-                          format: date-time
-                          example: '2024-01-10 08:00:00'
+                      $ref: ../../components/schemas/ListDestination.yaml
                   meta:
                     $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
@@ -110,6 +81,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -121,12 +94,12 @@ paths:
                   type: string
                   description: Phone number in E.164 format
                   example: '+14155551212'
-                description:
+                name:
                   type:
                   - string
                   - 'null'
                   maxLength: 255
-                  description: Optional description
+                  description: Optional contact name
                   example: John Doe - Sales Lead
               required:
               - phone_number
@@ -142,26 +115,7 @@ paths:
                     type: string
                     example: Destination added successfully
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      phone_number:
-                        type: string
-                        example: '+14155551212'
-                      description:
-                        type:
-                        - string
-                        - 'null'
-                        example: John Doe - Sales Lead
-                      status:
-                        type: string
-                        example: pending
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-01-10 08:00:00'
+                    $ref: ../../components/schemas/ListDestination.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -196,6 +150,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -214,12 +170,12 @@ paths:
                         type: string
                         description: Phone number in E.164 format
                         example: '+14155551212'
-                      description:
+                      name:
                         type:
                         - string
                         - 'null'
                         maxLength: 255
-                        description: Optional description
+                        description: Optional contact name
                         example: John Doe - Sales Lead
                     required:
                     - phone_number
@@ -297,6 +253,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -365,6 +323,8 @@ paths:
       security:
       - bearerAuth: []
       - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: Dial attempts reset

@@ -1,0 +1,64 @@
+type: object
+description: Destination (phone number) in a distribution list
+properties:
+  id:
+    type: integer
+  phone_number:
+    type: string
+    example: '+14155551212'
+  name:
+    type:
+    - string
+    - 'null'
+  batch_identifier:
+    type:
+    - string
+    - 'null'
+  metadata:
+    type:
+    - object
+    - 'null'
+    additionalProperties: true
+  status:
+    type: string
+    enum: [pending, dialing, connected, failed, completed, invalid]
+  status_label:
+    type: string
+  priority:
+    type: integer
+  dial_attempts:
+    type: integer
+  last_dialed_at:
+    type:
+    - string
+    - 'null'
+    description: Y-m-d H:i:s
+    example: '2024-01-10 08:00:00'
+  last_disposition:
+    type:
+    - string
+    - 'null'
+  duration:
+    type:
+    - integer
+    - 'null'
+  billsec:
+    type:
+    - integer
+    - 'null'
+  total_duration:
+    type:
+    - integer
+    - 'null'
+  last_error:
+    type:
+    - string
+    - 'null'
+  is_invalid:
+    type: boolean
+  created_at:
+    type: string
+    description: Y-m-d H:i:s
+  updated_at:
+    type: string
+    description: Y-m-d H:i:s

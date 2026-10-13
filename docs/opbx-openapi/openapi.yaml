@@ -961,6 +961,8 @@ components:
       $ref: './components/schemas/CallTrackingAdPlatformIntegration.yaml'
     DistributionList:
       $ref: './components/schemas/DistributionList.yaml'
+    ListDestination:
+      $ref: './components/schemas/ListDestination.yaml'
     MonitorSummary:
       $ref: './components/schemas/MonitorSummary.yaml'
     MonitorDetail:

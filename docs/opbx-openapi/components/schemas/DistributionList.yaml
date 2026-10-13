@@ -28,6 +28,7 @@ properties:
     type: string
     enum:
     - draft
+    - pending
     - processing
     - ready
     - in_use
@@ -101,6 +102,10 @@ properties:
     type: boolean
     description: Whether the list can accept uploads
     example: true
+  can_delete:
+    type: boolean
+  can_unassign:
+    type: boolean
   can_copy:
     type: boolean
     description: Whether the list can be copied
