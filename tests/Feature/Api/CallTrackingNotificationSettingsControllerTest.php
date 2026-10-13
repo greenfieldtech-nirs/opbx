@@ -342,6 +342,21 @@ class CallTrackingNotificationSettingsControllerTest extends TestCase
             ->assertJsonValidationErrors(['auth_secret']);
     }
 
+    public function test_update_without_secret_keeps_stored_secret(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $campaign = CallTrackingCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        $settings = $this->createSettings($campaign);
+
+        $this->putJson('/api/v1/call-tracking-campaigns/'.$campaign->id.'/notification-settings', [
+            'webhook_url' => 'https://example.com/webhooks/other',
+            'auth_method' => 'bearer_token',
+            'enabled_events' => ['call.received'],
+        ])->assertStatus(200);
+
+        $this->assertSame('secret', $settings->refresh()->auth_secret);
+    }
+
     public function test_update_validates_basic_auth_requires_username_and_secret(): void
     {
         Sanctum::actingAs($this->owner);
