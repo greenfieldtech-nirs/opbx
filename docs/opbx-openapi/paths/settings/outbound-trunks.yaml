@@ -10,4 +10,20 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Trunks retrieved
+          description: Outbound trunks of the Cloudonix domain
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trunks:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  count:
+                    type: integer
+        '422':
+          description: Cloudonix settings not configured
+        '500':
+          description: Cloudonix API error

@@ -8,6 +8,47 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain_uuid:
+                  type: string
+                  format: uuid
+                domain_api_key:
+                  type: string
+                  description: Full key; a masked key is accepted only when settings are saved
+              required: [domain_uuid, domain_api_key]
       responses:
         '200':
-          description: Validation completed
+          description: Credentials are valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  message:
+                    type: string
+                  profile_settings:
+                    type:
+                      - object
+                      - 'null'
+                    additionalProperties: true
+        '422':
+          description: Invalid credentials (or a masked key without saved settings); `valid` is false
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: Validation error

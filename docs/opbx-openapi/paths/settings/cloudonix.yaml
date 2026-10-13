@@ -10,7 +10,46 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Settings retrieved
+          description: Settings (settings is null when not configured yet). Owner only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    oneOf:
+                      - $ref: '../../components/schemas/CloudonixSettings.yaml'
+                      - type: 'null'
+                  callback_url:
+                    type: string
+                    format: uri
+                  cdr_url:
+                    type: string
+                    format: uri
+                  webhook_url_details:
+                    type: object
+                    description: Present when settings exist
+                    properties:
+                      effective_url:
+                        type:
+                          - string
+                          - 'null'
+                      application_url:
+                        type:
+                          - string
+                          - 'null'
+                      organization_url:
+                        type:
+                          - string
+                          - 'null'
+                      is_overridden:
+                        type: boolean
+                      source:
+                        type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
     
     put:
       tags:
@@ -20,6 +59,76 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain_uuid:
+                  type:
+                    - string
+                    - 'null'
+                  format: uuid
+                  description: Must not be registered to another organization
+                domain_api_key:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                  description: A masked value keeps the stored key
+                domain_requests_api_key:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                webhook_base_url:
+                  type:
+                    - string
+                    - 'null'
+                  format: uri
+                  maxLength: 255
+                embed_allowed_domains:
+                  type: array
+                  items:
+                    type: string
+                    description: Hostname, localhost or IPv4, with optional port
+                no_answer_timeout:
+                  type: integer
+                  minimum: 5
+                  maximum: 120
+                call_recording_mode:
+                  type: string
+                  enum: [disabled, inbound, outbound, internal, inbound_outbound, all]
+                recording_format:
+                  type: string
+                  enum: [wav, mp3]
+                cloudonix_package:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+              required: [no_answer_timeout, call_recording_mode, recording_format]
       responses:
         '200':
-          description: Settings updated
+          description: Settings saved and synced to Cloudonix (message carries a warning when the sync failed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  settings:
+                    $ref: '../../components/schemas/CloudonixSettings.yaml'
+                  callback_url:
+                    type: string
+                  cdr_url:
+                    type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

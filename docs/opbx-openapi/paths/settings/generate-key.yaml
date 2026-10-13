@@ -10,4 +10,13 @@ paths:
         - cookieAuth: []
       responses:
         '200':
-          description: Key generated
+          description: A new random key. Not stored; send it in `domain_requests_api_key` to save it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_key:
+                    type: string
+                  message:
+                    type: string
