@@ -43,6 +43,24 @@ final class EmbedDialerPageTest extends TestCase
         );
     }
 
+    public function test_inactive_user_or_organisation_is_forbidden(): void
+    {
+        $org = Organization::factory()->create();
+        $user = User::factory()->create(['organization_id' => $org->id]);
+        CloudonixSettings::factory()->create(['organization_id' => $org->id, 'embed_allowed_domains' => ['crm.acme.com']]);
+        [, $token] = app(EmbedTokenService::class)->generateFor($user);
+
+        $this->get('/embed/dialer?token='.$token)->assertOk();
+
+        $org->forceFill(['status' => 'suspended'])->save();
+        $this->get('/embed/dialer?token='.$token)->assertStatus(403)
+            ->assertHeader('Content-Security-Policy', "frame-ancestors 'none'");
+
+        $org->forceFill(['status' => 'active'])->save();
+        $user->forceFill(['status' => 'inactive'])->save();
+        $this->get('/embed/dialer?token='.$token)->assertStatus(403);
+    }
+
     public function test_loader_js_is_served(): void
     {
         $this->get('/embed/loader.js')
