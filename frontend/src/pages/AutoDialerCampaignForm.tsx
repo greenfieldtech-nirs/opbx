@@ -90,9 +90,9 @@ const campaignSchema = z.object({
   time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 3600),
   record_calls: z.boolean().nullish().transform(v => v ?? false),
   amd_enabled: z.boolean().nullish().transform(v => v ?? false),
-  action_voicemail: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
-  action_human: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
-  action_unknown: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
+  action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
+  action_unknown: z.enum(['HANGUP', 'CONTINUE']).optional(),
   retry_on_voicemail: z.boolean().nullish().transform(v => v ?? false),
   auto_start: z.boolean().nullish().transform(v => v ?? false),
 });
@@ -148,8 +148,7 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
 }
 
 /**
- * AMD Action Selector Component (Left Column)
- * Dropdown to select HANGUP, CONTINUE, or Remote CXML URL
+ * AMD Action Selector: HANGUP or CONTINUE (the API accepts nothing else).
  */
 interface AmdActionSelectorProps {
   label: string;
@@ -158,85 +157,18 @@ interface AmdActionSelectorProps {
 }
 
 function AmdActionSelector({ label, value, onChange }: AmdActionSelectorProps) {
-  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-  const selectValue = isCustomUrl ? 'CUSTOM_URL' : (value || 'HANGUP');
-
   return (
     <div className="space-y-2">
       <Label className="text-sm">{label}</Label>
-      <Select
-        value={selectValue}
-        onValueChange={(selected) => {
-          if (selected === 'CUSTOM_URL') {
-            onChange('https://example.com'); // Trigger URL input in right column
-          } else {
-            onChange(selected);
-          }
-        }}
-      >
+      <Select value={value || 'HANGUP'} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder="Select action" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="CONTINUE">Continue to destination</SelectItem>
           <SelectItem value="HANGUP">Hang up</SelectItem>
-          <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
         </SelectContent>
       </Select>
-    </div>
-  );
-}
-
-/**
- * AMD URL Input Component (Right Column)
- * Shown only when the corresponding action is set to Remote CXML URL
- */
-interface AmdUrlInputProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function AmdUrlInput({ label, value, onChange }: AmdUrlInputProps) {
-  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
-
-  // Sync when external value changes
-  useEffect(() => {
-    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-    if (externalIsUrl) {
-      setUrlValue(value);
-    } else {
-      setUrlValue('');
-    }
-  }, [value]);
-
-  if (!isCustomUrl) {
-    return (
-      <div className="space-y-2 opacity-50">
-        <Label className="text-sm">{label}</Label>
-        <Input
-          type="url"
-          placeholder="Select 'Remote CXML URL' on the left..."
-          disabled
-          value=""
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm">{label}</Label>
-      <Input
-        type="url"
-        placeholder="https://your-domain.com/voicemail-cxml"
-        value={urlValue}
-        onChange={(e) => {
-          setUrlValue(e.target.value);
-          onChange(e.target.value);
-        }}
-      />
     </div>
   );
 }
@@ -700,26 +632,24 @@ export default function AutoDialerCampaignForm() {
 
                 {watch('amd_enabled') && (
                   <div className="space-y-4 pl-4 border-l-2 border-muted">
-                    {/* Two-column layout: 25% actions / 75% URL inputs */}
                     <div className="flex flex-col lg:flex-row gap-6">
-                      {/* Left Column - Action Selectors (25%) */}
-                      <div className="lg:w-[25%] space-y-4">
+                      <div className="lg:w-[50%] space-y-4">
                         <AmdActionSelector
                           label="If Voicemail Detected"
                           value={watch('action_voicemail') || ''}
-                          onChange={(value) => setValue('action_voicemail', value)}
+                          onChange={(value) => setValue('action_voicemail', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         <AmdActionSelector
                           label="If Human Detected"
                           value={watch('action_human') || ''}
-                          onChange={(value) => setValue('action_human', value)}
+                          onChange={(value) => setValue('action_human', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         <AmdActionSelector
                           label="If Detection Unclear"
                           value={watch('action_unknown') || ''}
-                          onChange={(value) => setValue('action_unknown', value)}
+                          onChange={(value) => setValue('action_unknown', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         {/* Retry on Voicemail */}
@@ -738,26 +668,6 @@ export default function AutoDialerCampaignForm() {
                         </div>
                       </div>
 
-                      {/* Right Column - CXML URL Inputs (75%) */}
-                      <div className="lg:w-[75%] space-y-4">
-                        <AmdUrlInput
-                          label="Voicemail CXML URL"
-                          value={watch('action_voicemail') || ''}
-                          onChange={(value) => setValue('action_voicemail', value)}
-                        />
-
-                        <AmdUrlInput
-                          label="Human CXML URL"
-                          value={watch('action_human') || ''}
-                          onChange={(value) => setValue('action_human', value)}
-                        />
-
-                        <AmdUrlInput
-                          label="Unknown CXML URL"
-                          value={watch('action_unknown') || ''}
-                          onChange={(value) => setValue('action_unknown', value)}
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
