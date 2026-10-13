@@ -9,6 +9,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:read
       parameters:
         - name: direction
           in: query
@@ -50,6 +52,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:write
       requestBody:
         required: true
         content:

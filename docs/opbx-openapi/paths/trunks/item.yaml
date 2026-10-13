@@ -16,6 +16,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:read
       responses:
         '200':
           description: Trunk details
@@ -46,6 +48,81 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip:
+                  type: string
+                  description: IPv4, IPv6, or hostname of the trunk peer.
+                port:
+                  type: integer
+                  minimum: 1
+                  maximum: 65535
+                transport:
+                  type: string
+                  enum:
+                  - udp
+                  - tcp
+                  - tls
+                prefix:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                username:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  description: May be sent alone (keeps the stored password).
+                password:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 128
+                  writeOnly: true
+                  description: Requires `username`. Never serialized in responses.
+                overwrite_from:
+                  type: boolean
+      responses:
+        '200':
+          description: Trunk updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Trunk.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '502':
+          description: Cloudonix API unavailable
+    patch:
+      tags:
+        - Trunks
+      summary: Partially update a trunk
+      description: >-
+        Update a trunk in Cloudonix. `name` and `direction` are immutable
+        post-create. All fields are optional. Omitting `password` leaves the
+        stored credential untouched; `password` is write-only and is never
+        returned in responses.
+      operationId: patchTrunk
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:write
       requestBody:
         required: true
         content:
@@ -113,6 +190,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: trunks:write
       responses:
         '204':
           description: Trunk deleted
