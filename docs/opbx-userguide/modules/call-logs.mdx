@@ -32,12 +32,12 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Open Call Logs (sidebar) | Yes | Yes | Yes | Yes | Yes |
-| See the call records | All in the organization | All in the organization | All in the organization | All in the organization | Only calls to or from their assigned resources (single-call view) |
-| Export CSV | Yes | Yes | Yes | Yes | Not verified (see note) |
+| See the call records | All in the organization | All in the organization | All in the organization; the page starts filtered to their own extension | All in the organization | Only calls to or from their assigned users and ring groups |
+| Export CSV (button) | Yes | Yes | No | No | No |
 | Play or download a recording | Yes | Yes | Yes | Yes | Only calls in their scope (single-call view) |
 
 :::note
-The supervisor limit is enforced when a single call is opened. Whether a supervisor's list and export are limited to their scope was not confirmed for this edition of the guide. Check before you rely on it.
+The PBX User's own-extension filter is only a default on the page; they can clear it. A supervisor's list is limited because the page asks for the supervisor view; the plain API list (`GET /v1/call-detail-records` without `supervisor=true`) is not limited. A single call and the CSV export are always limited to the supervisor's scope.
 :::
 
 :::caution Recording playback for PBX Users
@@ -113,7 +113,7 @@ A recording is removed when its retention period ends. After that the row stays,
 ## Exporting
 
 1. Apply the filters you need.
-2. Click **Export**.
+2. Click **Export** (shown to the Owner and PBX Admins only).
 3. The CSV is produced in chunks of 1000 records, so large exports do not run out of memory.
 
 The export uses the same filters as the list, including the number-search rules.
