@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { embedTokensService } from '@/services/embedTokens.service';
 import type { EmbedIconPosition } from '@/types/embed.types';
 
@@ -90,6 +91,8 @@ export function EmbeddedDialerDialog({
     },
     onError: () => toast.error('Failed to save settings'),
   });
+
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   const regenerateMutation = useMutation({
     mutationFn: () => embedTokensService.regenerate(userId!),
@@ -201,7 +204,7 @@ export function EmbeddedDialerDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => regenerateMutation.mutate()}
+            onClick={() => setConfirmRegenerate(true)}
             disabled={regenerateMutation.isPending || isLoading}
           >
             <RefreshCw
@@ -219,6 +222,16 @@ export function EmbeddedDialerDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        onOpenChange={setConfirmRegenerate}
+        title="Regenerate embed token"
+        description="The current token is revoked immediately: every page embedding the dialer with it stops working until you install the new snippet."
+        confirmLabel="Regenerate"
+        variant="danger"
+        onConfirm={() => regenerateMutation.mutate()}
+      />
     </Dialog>
   );
 }
