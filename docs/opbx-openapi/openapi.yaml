@@ -180,6 +180,21 @@ paths:
   /callbacks/voice/ring-group-callback:
     $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
 
+  /callbacks/voice/queue-agent-connect:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-agent-connect'
+
+  /callbacks/voice/queue-conference-join:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-conference-join'
+
+  /callbacks/voice/queue-dial:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-dial'
+
+  /callbacks/voice/queue-dial-callback:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-dial-callback'
+
+  /callbacks/voice/queue-poll:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-poll'
+
   /health:
     $ref: './paths/health.yaml#/paths/~1health'
 
@@ -415,6 +430,9 @@ paths:
   /v1/call-detail-records/{call_detail_record}:
     $ref: './paths/call-detail-records/index.yaml#/paths/~1v1~1call-detail-records~1{call_detail_record}'
 
+  /v1/call-detail-records/{call_detail_record}/recording:
+    $ref: './paths/call-detail-records/recording.yaml#/paths/~1v1~1call-detail-records~1{call_detail_record}~1recording'
+
   /v1/call-notifications/logs:
     $ref: './paths/call-notifications/logs.yaml#/paths/~1v1~1call-notifications~1logs'
 
@@ -439,6 +457,9 @@ paths:
   /v1/call-queues/{call_queue}:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}'
 
+  /v1/call-queues/{call_queue}/toggle-status:
+    $ref: './paths/call-queues/toggle-status.yaml#/paths/~1v1~1call-queues~1{call_queue}~1toggle-status'
+
   /v1/call-queues/{call_queue}/agents/me/state:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}~1agents~1me~1state'
 
@@ -453,6 +474,12 @@ paths:
 
   /v1/queue-calls/export:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1queue-calls~1export'
+
+  /v1/queues-dashboard/link:
+    $ref: './paths/queues-dashboard/link.yaml#/paths/~1v1~1queues-dashboard~1link'
+
+  /v1/queues-dashboard/link/regenerate:
+    $ref: './paths/queues-dashboard/link.yaml#/paths/~1v1~1queues-dashboard~1link~1regenerate'
 
   /v1/conference-rooms:
     $ref: './paths/conference-rooms/index.yaml#/paths/~1v1~1conference-rooms'
@@ -586,6 +613,15 @@ paths:
   /v1/public/status:
     $ref: './paths/platform/public-status.yaml#/paths/~1v1~1public~1status'
 
+  /v1/public/queues-dashboard/{token}/queues:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/live:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1live'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/stats:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1stats'
+
   /v1/platform/status:
     $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status'
 
@@ -615,6 +651,9 @@ paths:
 
   /v1/platform/users/{user}:
     $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}'
+
+  /v1/platform/users/{user}/delete-impact:
+    $ref: './paths/platform/user-delete-impact.yaml#/paths/~1v1~1platform~1users~1{user}~1delete-impact'
 
   /v1/platform/users/{user}/password:
     $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}~1password'
@@ -700,6 +739,9 @@ paths:
   /v1/users/{user}:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users~1{user}'
 
+  /v1/users/{user}/delete-impact:
+    $ref: './paths/users/delete-impact.yaml#/paths/~1v1~1users~1{user}~1delete-impact'
+
   /v1/users/{user}/embed-token:
     $ref: './paths/users/embed-token.yaml#/paths/~1v1~1users~1{user}~1embed-token'
 
@@ -723,6 +765,9 @@ paths:
 
   /voice/amd-action:
     $ref: './paths/voice/amd-action.yaml#/paths/~1voice~1amd-action'
+
+  /voice/amd-session:
+    $ref: './paths/voice/amd-action.yaml#/paths/~1voice~1amd-session'
 
   /voice/health:
     $ref: './paths/voice/health.yaml#/paths/~1voice~1health'
@@ -750,6 +795,9 @@ paths:
 
   /webhooks/cloudonix/dialer:
     $ref: './paths/webhooks/dialer-proxy.yaml#/paths/~1webhooks~1cloudonix~1dialer'
+
+  /webhooks/cloudonix/recording-status:
+    $ref: './paths/webhooks/recording-status.yaml#/paths/~1webhooks~1cloudonix~1recording-status'
 
   /webhooks/cloudonix/session-update:
     $ref: './paths/webhooks/session-update.yaml#/paths/~1webhooks~1cloudonix~1session-update'
@@ -794,6 +842,10 @@ components:
       type: http
       scheme: bearer
       description: Bearer token for dialer worker authentication (DIALER_WORKER_API_TOKEN)
+    amdWorkerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token for AMD worker authentication (AMD_WORKER_API_TOKEN). Used by `/voice/amd-action` and `/voice/amd-session`.
   
   schemas:
     # Common response schemas
