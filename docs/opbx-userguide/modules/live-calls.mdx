@@ -54,7 +54,7 @@ A Supervisor's list contains only calls whose caller or destination is one of th
 2. Read the four counters at the top: **Total Active**, **Processing**, **Ringing** and **Connected**.
 3. The table below lists one row per active call.
 
-{/* SCREENSHOT: live-calls-list — Live Calls as the Owner with three active calls: two Connected (Emma Wilson incoming from +1 202 555 0131, Frank Ortiz outgoing to +1 202 555 0162) and one Ringing (Henry Brooks), counters 3 / 0 / 1 / 2, Refresh set to 5 Seconds and the Spy, Whisper, Barge and Disconnect actions */}
+![Live Calls with three active calls (two Connected, one Ringing), the counters and the Spy, Whisper, Barge and Disconnect actions](../img/screens/live-calls-list.jpg)
 
 ### Table columns
 
@@ -100,7 +100,7 @@ Reporters and Supervisors are not admitted to the organization channel, so their
 4. While connected, the Web Phone header reads "On call - Coaching: Spy" (or Whisper, Barge).
 5. To stop, hang up in the Web Phone. When the coaching call ends, the Web Phone closes.
 
-{/* SCREENSHOT: live-calls-whisper-menu — Live Calls row with the Whisper menu open, showing "Whisper to caller" and "Whisper to callee" */}
+![Whisper menu open on a call row with Whisper to caller and Whisper to callee](../img/screens/live-calls-whisper-menu.jpg)
 
 {/* SCREENSHOT: live-calls-coaching-webphone — Web Phone opened by a Spy action, showing the Spy label and the call timer */}
 
@@ -133,7 +133,7 @@ A disconnect ends the call for everyone on it at once. It cannot be undone.
 
 For ten seconds after Disconnect All, the disconnected calls are kept off the list even if Cloudonix still reports them, so they do not flash back while the hang-up is processed.
 
-{/* SCREENSHOT: live-calls-disconnect-all-dialog — "Dangerous Operation" dialog asking to disconnect all 3 active calls, with Cancel and "Yes, Disconnect All" */}
+![Dangerous Operation dialog asking to disconnect all 3 active calls](../img/screens/live-calls-disconnect-all-dialog.jpg)
 
 ## Common errors
 
