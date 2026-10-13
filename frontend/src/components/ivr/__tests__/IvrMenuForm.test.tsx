@@ -61,6 +61,17 @@ describe('IvrMenuForm', () => {
     expect(screen.getByLabelText('Maximum Turns')).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('lists options as rows of one table and deletes a row with its icon button', async () => {
+    renderForm({ name: 'Main', useTTS: true, tts_text: 'Hello', options: [option, { ...option, input_digits: '2' }] });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /Menu Options/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /Menu Options/ }));
+    expect(await screen.findAllByRole('table')).toHaveLength(1);
+    expect(screen.getByLabelText('Option 2 digits')).toHaveValue('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete option 1' }));
+    await waitFor(() => expect(screen.queryByLabelText('Option 2 digits')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Option 1 digits')).toHaveValue('2');
+  });
+
   it('shows the TTS length error and a live counter', async () => {
     renderForm({ name: 'Main', useTTS: true, tts_text: 'x', options: [option] });
     fireEvent.change(screen.getByLabelText('Text to Speak'), { target: { value: 'a'.repeat(1001) } });

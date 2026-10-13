@@ -19,7 +19,7 @@ import type {
   CloudonixVoiceLanguage,
   Recording,
 } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -548,35 +548,45 @@ export function IvrMenuForm({
                   <p className="text-sm">Add options below to define how callers navigate your IVR menu</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {fields.map((item, index) => {
-                    const option = options?.[index];
-                    return (
-                      <Card key={item.id} className="w-full">
-                        <CardContent className="p-4">
-                          <div className="flex flex-col md:flex-row gap-6 items-start w-full">
-                            <FormField
-                              control={control}
-                              name={`options.${index}.input_digits`}
-                              render={({ field }) => (
-                                <FormItem className="w-full md:w-20 shrink-0">
-                                  <FormLabel>Digits *</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      onChange={(e) => {
-                                        // Only digits, * and # are allowed
-                                        if (/^[0-9*#]*$/.test(e.target.value)) field.onChange(e);
-                                      }}
-                                      placeholder="1"
-                                      maxLength={IVR_LIMITS.inputDigits}
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <div className="flex-1 min-w-0 w-full space-y-2">
+                // One bordered table, edited inline; one row per option.
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-24">Digits</TableHead>
+                        <TableHead>Destination</TableHead>
+                        <TableHead className="w-12"><span className="sr-only">Actions</span></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fields.map((item, index) => {
+                        const option = options?.[index];
+                        return (
+                          <TableRow key={item.id} className="align-top hover:bg-transparent">
+                            <TableCell className="py-2">
+                              <FormField
+                                control={control}
+                                name={`options.${index}.input_digits`}
+                                render={({ field }) => (
+                                  <FormItem className="space-y-1">
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        aria-label={`Option ${index + 1} digits`}
+                                        onChange={(e) => {
+                                          // Only digits, * and # are allowed
+                                          if (/^[0-9*#]*$/.test(e.target.value)) field.onChange(e);
+                                        }}
+                                        placeholder="1"
+                                        maxLength={IVR_LIMITS.inputDigits}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </TableCell>
+                            <TableCell className="py-2">
                               <DestinationTypeAndSelector
                                 typeValue={option?.destination_type}
                                 destinationValue={option?.destination_id ?? ''}
@@ -585,35 +595,38 @@ export function IvrMenuForm({
                                   setValue(`options.${index}.destination_id`, destId, { shouldDirty: true, shouldValidate: true });
                                 }}
                                 layout="horizontal"
-                                typeClassName="w-full md:w-[220px] flex-none"
+                                className="gap-2"
+                                typeClassName="w-[200px] flex-none"
                                 destinationClassName="flex-1 min-w-0"
                                 allowedTypes={[...OPTION_TYPES]}
                                 extensionTypes={option?.destination_type === 'ai_assistant' ? ['ai_assistant'] : ['user', 'forward']}
                                 allowDisconnect={isEdit}
-                                typeLabel="Type"
-                                destinationLabel="Destination"
+                                typeLabel=""
+                                destinationLabel=""
                               />
                               <FormField
                                 control={control}
                                 name={`options.${index}.destination_id`}
-                                render={() => <FormMessage />}
+                                render={() => <FormMessage className="mt-1" />}
                               />
-                            </div>
-                            <div className="w-full md:w-10 shrink-0 md:pt-6">
-                              <button
+                            </TableCell>
+                            <TableCell className="py-2 text-right">
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="icon"
                                 onClick={() => remove(index)}
-                                className="h-10 w-full flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors border rounded-md"
-                                aria-label="Delete option"
+                                className="text-muted-foreground hover:text-destructive"
+                                aria-label={`Delete option ${index + 1}`}
                               >
                                 <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
 
