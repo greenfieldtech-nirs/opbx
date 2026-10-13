@@ -3,137 +3,91 @@ sidebar_position: 3
 slug: /applications/ai-load-balancers
 sidebar_class_name: cxGuidesSidebar
 title: AI Load Balancers
-description: Distributing calls across multiple AI assistants
+description: Designs for spreading calls across AI assistants, failing over between them, and falling back to people
 ---
 
 # AI Load Balancers
 
-AI Load Balancers distribute incoming calls across multiple AI assistants using configurable strategies. This ensures high availability, load distribution, and intelligent failover handling.
+An AI load balancer puts several AI assistants behind one destination. It chooses one assistant per call, can move on to the next assistant when one fails, and runs a fallback when none can take the call.
 
-## Load Balancing Strategies
+This page explains the designs. The step-by-step screens, every field and the error messages are in the module walk-through: [AI Load Balancers](/modules/ai-load-balancers).
 
-Choose the strategy that best fits your use case:
-
-| Strategy | Algorithm | Best For |
-|----------|-----------|----------|
-| Round Robin | Rotates through members in order (Redis-backed counter) | Even distribution across assistants |
-| Priority | Routes to highest-priority available member | Primary/backup setups |
-| Percentage | Weighted random distribution (0-100% per member) | A/B testing, gradual rollouts |
-
-### Round Robin
-
-Calls rotate through members sequentially. A Redis-backed counter ensures consistent distribution even across multiple OPBX instances.
-
-### Priority
-
-Members are ordered by priority value. The system always attempts to route to the highest-priority active member first.
-
-### Percentage
-
-Each member receives a percentage weight (0-100%). The system uses weighted random selection to distribute calls proportionally. Total percentages do not need to equal 100%.
-
-## Members
-
-Add AI assistants as members with configurable attributes:
-
-| Attribute | Description |
-|-----------|-------------|
-| AI Assistant | The assistant to include in the pool |
-| Priority | Used by Priority strategy (lower number = higher priority) |
-| Weight | Used by Percentage strategy (0-100) |
-| Position | Used by Round Robin strategy (order in rotation) |
-| Status | Active or Inactive |
-
-:::tip
-Set a member to Inactive to temporarily remove it from the pool without deleting the configuration.
-:::
-
-## Follow-Through Failover
-
-Enable follow-through to automatically try the next assistant when the selected one fails.
-
-### How It Works
+## How a call moves through a load balancer
 
 ```mermaid
 flowchart TD
-    A[Call Arrives] --> B[Select AI Assistant via Strategy]
-    B --> C{Call Successful?}
-    C -->|Yes| D[Call Connected]
-    C -->|No| E{Follow-Through Enabled?}
-    E -->|No| F[Execute Fallback]
-    E -->|Yes| G{More Untried Assistants?}
+    A[Call reaches the load balancer] --> S{Load balancer active?}
+    S -->|No| F[Fallback]
+    S -->|Yes| B[Strategy picks an active member]
+    B -->|No active member| F
+    B --> C{Assistant call fails?}
+    C -->|No| D[Caller talks to the assistant]
+    C -->|Yes| E{Follow Through on?}
+    E -->|No| F
+    E -->|Yes| G{Untried members left?}
     G -->|Yes| B
     G -->|No| F
 ```
 
-The system tracks which assistants have been tried for each call to prevent infinite loops. An assistant is considered failed if it returns busy or no-answer.
+A failure is a provider leg that ends busy, no answer, failed, canceled or with an unknown status. Members already tried for the call are skipped (the list is kept for one hour).
 
-### When Follow-Through Applies
+## Strategies
 
-Follow-through triggers when:
+| Strategy | Choice per call | Typical use |
+|----------|-----------------|-------------|
+| Round Robin | Members take turns in list order | Even load across equal assistants |
+| Priority Based | Always the first active member in list order | A primary assistant with backups |
+| Percentage Based | Weighted random choice; the dialog requires the weights to total 100 % | A/B tests and gradual roll-outs |
 
-- The selected AI Assistant is busy
-- The selected AI Assistant does not answer
-- The connection fails
+## Designs
 
-### When All Assistants Fail
+### Primary and backup
 
-If all available assistants have been tried and failed, the system executes the configured fallback action.
+- Strategy **Priority Based**, with the primary assistant at the top of the list.
+- **Follow Through** on, so a busy or failed primary moves the call to the next member.
+- Members from different providers, so one provider's outage does not stop every member.
+- A **Ring Group** or **Extension** fallback, so the last resort is a person.
 
-## Fallback Actions
+### Gradual roll-out of a new assistant
 
-When follow-through is disabled or all assistants fail, the system executes a fallback action:
+- Strategy **Percentage Based**.
+- Start with 10 % on the new assistant and 90 % on the current one. The dialog offers weights in steps of 5 %.
+- Raise the share as you gain confidence. Saving the load balancer applies the new weights to the next call.
 
-| Fallback | Description |
-|----------|-------------|
-| Extension | Route to a specific extension |
-| Ring Group | Route to a ring group |
-| IVR Menu | Route to an IVR menu |
-| AI Assistant | Route to another AI Assistant (without follow-through to prevent loops) |
-| Hangup | End the call |
+### Even load
 
-:::warning
-When using another AI Assistant as fallback, follow-through is automatically disabled to prevent routing loops.
-:::
+- Strategy **Round Robin** across assistants that do the same job.
+- Follow Through on, so a failing member does not lose the caller.
 
-## Creating an AI Load Balancer
+## Fallback
 
-1. Navigate to **AI Load Balancers** in the sidebar
-2. Click **Create**
-3. Enter a descriptive name
-4. Select a load balancing strategy
-5. Add members (AI assistants with their configuration)
-6. Enable or disable follow-through failover
-7. Select a fallback action
-8. Click **Save**
+| Fallback | Result |
+|----------|--------|
+| Extension | Rings an extension |
+| Ring Group | Sends the call to a ring group |
+| IVR Menu | Plays a menu |
+| AI Assistant | One more assistant, tried without Follow Through. It must not be a member of the same load balancer |
+| Hangup | Ends the call (the default) |
 
-## Best Practices
+On the edit dialog, **Disconnect** sets the fallback to "Destination unavailable". The load balancer is then marked **Unprovisioned** until you choose a real fallback. A new load balancer always needs a real fallback.
 
-### For High Availability
+## Example: Acme Corp front desk
 
-- Use the **Priority** strategy with follow-through enabled
-- Configure at least two AI assistants from different providers
-- Set a Ring Group or extension as fallback
+The demo organization has a load balancer **Front Desk AI Pool**: Round Robin over the assistants **Aria - Front Desk Receptionist** (VAPI) and **Max - Support Triage** (Retell), with Hangup as the fallback. Routing a phone number to it alternates callers between the two assistants.
 
-### For Gradual Rollouts
+{/* SCREENSHOT: ai-load-balancers-app-overview — AI Load Balancers list with Front Desk AI Pool (Round Robin, 2 / 2 active members, fallback hangup) */}
 
-- Use the **Percentage** strategy
-- Start with 10% on the new assistant, 90% on the existing one
-- Gradually shift percentages as you gain confidence
+## Where to use a load balancer
 
-### For Cost Optimization
-
-- Use the **Round Robin** strategy to distribute load evenly
-- Monitor usage patterns and adjust member weights accordingly
+A load balancer is a destination for phone numbers, IVR options and failovers, business-hours actions, ring-group and call-queue fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. While any of those point at it, it cannot be deleted; the delete dialog lists them.
 
 ## Monitoring
 
-Track load balancer performance through:
+- [Call Logs](/modules/call-logs) show each call to the number that routes to the load balancer.
+- With the [centralized logging stack](/administration/centralized-logs), the routing log names the member chosen for each call and every failover step.
 
-- Call logs showing which assistant handled each call
-- Failure rates per member
-- Fallback action triggers
+## Related pages
 
-:::note
-Member status changes take effect immediately for new calls. Ongoing calls are not affected.
-:::
+- [AI Load Balancers (module walk-through)](/modules/ai-load-balancers)
+- [AI Assistants](/applications/ai-assistants)
+- [Auto Dialer](/applications/auto-dialer) — campaigns can connect answered calls to a load balancer

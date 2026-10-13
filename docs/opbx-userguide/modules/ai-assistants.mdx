@@ -3,104 +3,194 @@ sidebar_position: 18
 slug: /modules/ai-assistants
 sidebar_class_name: cxGuidesSidebar
 title: "AI Assistants"
-description: "Configure AI-powered voice agents"
+description: "Connect calls to an AI voice agent over SIP or WebSocket, and route callers to it from anywhere in OPBX"
 ---
 
 # AI Assistants
 
-AI Assistants connect calls to AI providers via SIP or WebSocket protocols. They can be linked to extensions or used as routing destinations for auto-dialer campaigns and other PBX features.
+An AI assistant is a connection to an AI voice agent hosted by a provider (Retell, VAPI, ElevenLabs, Dograh and others). When a call reaches the assistant, OPBX hands the call to the provider, either by dialling the provider's SIP service or by streaming the audio over a WebSocket. Once it exists, the assistant is a destination like any other: phone numbers, IVR options, business hours, queue fallbacks and campaigns can all send callers to it.
+
+This page is the walk-through. For the concepts and typical designs, see [AI Assistants (applications)](/applications/ai-assistants).
 
 ## Purpose
 
 Use this module to:
 
-- Create AI assistant configurations
-- Select from supported providers
-- Configure provider-specific settings
-- Link assistants to extensions
+- register an AI voice agent you have built with a provider;
+- choose how OPBX connects to it (the provider decides SIP or WebSocket);
+- turn an assistant on or off;
+- remove an assistant once nothing routes to it.
 
-## Supported Providers
+## Prerequisites
 
-OPBX uses a registry-based provider system with 19 supported providers. Common providers include:
-
-- OpenAI
-- Anthropic
-- Google
-- Azure
-- Bland AI
-- Retell AI
-- Vapi
-- Ultravox
-- Custom CXML endpoint providers
-
-Each provider defines its own JSON configuration schema with required fields, validation rules, and default values.
-
-## Extension Integration
-
-Extensions of type `AI_ASSISTANT` link to an `AiAssistant` record via `ai_assistant_id`.
-
-### CXML Endpoint Proxying
-
-When an AI_ASSISTANT extension is dialed internally and its provider is a `cxml_endpoint` with a `proxy_did_number`, OPBX forwards the call to the remote endpoint as if it were an inbound call to the proxy DID. This allows inbound-only CXML endpoints to handle extension calls.
+- An agent set up with the provider. For a SIP provider you need the agent's phone number (E.164) at that provider. For a WebSocket provider you need the agent identifier (and, for some providers, the endpoint or token).
+- You are the **Owner** or a **PBX Admin** to create, edit or delete. Reporters can open the page read-only.
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View AI assistants | Yes | Yes | Yes | Yes |
-| Create AI assistants | Yes | Yes | No | No |
-| Update AI assistants | Yes | Yes | No | No |
-| Delete AI assistants | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See **AI Assistants** in the sidebar | Yes | Yes | No | Yes (read-only) | No |
+| List and view (API) | Yes | Yes | Yes | Yes | Yes |
+| Create | Yes | Yes | No | No | No |
+| Edit, activate or deactivate | Yes | Yes | No | No | No |
+| Delete | Yes | Yes | No | No | No |
 
-## UI Workflow
+The page is under **Apps and Security → AI Configuration**. That sidebar section is shown to Owners, PBX Admins and Reporters only.
 
-### Create an AI Assistant
+## Providers
 
-1. Navigate to **AI Assistants** in the sidebar
-2. Click **Create AI Assistant**
-3. Enter a name
-4. Select a provider
-5. Fill in the provider-specific configuration form
-6. Optionally enter a phone number
-7. Save
+The provider list comes from the server (`config/ai-providers.php`), so a deployment can add providers without a code change. The current list has 48 entries in three groups, and the dropdown in the dialog shows the same groups:
 
-### Link to an Extension
+| Group | Count | Examples | Configuration fields |
+|-------|------:|----------|----------------------|
+| **SIP Providers** | 42 | Retell (plus UDP, TCP and TLS variants), VAPI (plus UDP and No Proxy), ElevenLabs, Ultravox, Synthflow, Telnyx, OpenAI, Millis (US and EU), X (x.ai) | **Phone Number**: the agent's number at the provider, E.164, for example `+12025550170` |
+| **WebSocket Providers** | 5 | DeepDub, Dograh Cloud, Dograh OSS, AssemblyAI, Cloudonix | Depends on the provider (table below) |
+| **Test Providers** | 1 | Dummy Test | None |
 
-1. Go to **Extensions**
-2. Create or edit an extension
-3. Set the type to **AI Assistant**
-4. Select the AI assistant
-5. Save
+WebSocket providers:
 
-## Key Data Fields
+| Provider | Fields |
+|----------|--------|
+| DeepDub | **Bot ID** (up to 255 characters) and **Authentication Token** (up to 512 characters) |
+| Dograh Cloud | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
+| AssemblyAI | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
+| Cloudonix | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
+| Dograh OSS | **WebSocket Endpoint** (your own server, a URL) and **Agent UUID** |
 
-### `ai_assistants` Table
+For the endpoint-and-UUID providers the stream URL is `{endpoint}/{agent UUID}`.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | Display name |
-| `provider` | string | Provider key from registry |
-| `configuration` | JSON | Provider-specific settings |
-| `phone_number` | string nullable | Associated phone number |
-| `status` | enum | active, inactive |
+**Dummy Test** connects to nothing. The caller hears a short recorded-style message saying the routing works, and the call ends. Use it to test a routing path before the real agent is ready.
 
-## Related API Endpoints
+## Create an AI assistant
+
+1. Open **AI Assistants** in the sidebar.
+2. Click **Add AI Assistant**. The **Create AI Assistant** dialog opens.
+3. Enter a **Name**.
+4. Choose the **AI Service Provider**. The configuration fields for that provider appear below it.
+5. Fill in the fields, for example the phone number for a SIP provider.
+6. Click **Create AI Assistant**.
+
+On save, OPBX stores the assistant as **Active**, sets its protocol (SIP, WebSocket or Dummy) from the provider, and checks each required field. The assistant is then offered in every destination picker that accepts an AI assistant.
+
+{/* SCREENSHOT: ai-assistants-list — AI Assistants list with "Aria - Front Desk Receptionist" (VAPI, SIP) and "Max - Support Triage" (Retell, SIP), both Active, with the status, protocol and provider filters */}
+
+{/* SCREENSHOT: ai-assistants-create-dialog — Create AI Assistant dialog with the provider dropdown open, showing the SIP Providers, WebSocket Providers and Test Providers groups */}
+
+## Fields
+
+| Field | Required | Limits | Meaning |
+|-------|----------|--------|---------|
+| Name | Yes | Up to 255 characters; unique within the organization | Shown in lists and destination pickers |
+| AI Service Provider | Yes | One of the providers above | Decides the protocol and the configuration fields |
+| Configuration fields | Per provider | See [Providers](#providers) | How OPBX reaches the agent |
+| Status | No | Active or Inactive. Default: Active | Inactive assistants are not used for calls |
+| Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
+
+The phone number of a SIP provider must be E.164. A value such as `2025550170` without the plus sign is accepted by the server, but use the full `+12025550170` form.
+
+{/* SCREENSHOT: ai-assistants-websocket-fields — Create AI Assistant dialog with Dograh Cloud selected: the read-only WebSocket Endpoint and the empty Agent UUID field */}
+
+## Edit an assistant
+
+1. Click the assistant's row (Owner and PBX Admin only).
+2. Change the name, provider or configuration.
+3. Click **Update AI Assistant**.
+
+Changing the provider also changes the protocol, and the configuration fields are replaced by the new provider's fields.
+
+## Activate or deactivate
+
+Click the **Active** or **Inactive** badge in the **Status** column. The change is saved at once.
+
+An inactive assistant stays configured but is not used:
+
+- routes that point straight at it (a phone number, an IVR option, a business-hours action) do not connect callers to it;
+- an AI load balancer skips it as a member;
+- it cannot be added as a load-balancer member or chosen as a load-balancer fallback while it is inactive.
+
+Calls already connected are not affected.
+
+## Where an assistant can be used
+
+| Place | How |
+|-------|-----|
+| [Phone Numbers](/modules/phone-numbers) | Routing type **AI assistant** |
+| [IVR Menus](/modules/ivr-menus) | An option target or the failover |
+| [Business Hours](/modules/business-hours) | The open-hours or closed-hours action |
+| [Call Queues](/modules/call-queues) | The overflow fallback |
+| [AI Load Balancers](/modules/ai-load-balancers) | As a member, or as the fallback |
+| [Extensions](/modules/extensions) | An extension of type **AI Assistant**, so it can be dialled internally |
+| [Ring Groups](/modules/ring-groups) | The **AI assistant** fallback of a ring group points at an AI Assistant extension, not at the assistant itself |
+| [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) | The routing destination for answered calls |
+| [Call Tracking Campaigns](/modules/call-tracking-campaigns) | The campaign destination (API only) |
+
+## Delete an assistant
+
+1. Click the delete action on the assistant's row.
+2. Confirm in the **Delete AI Assistant?** dialog.
+
+If anything still points at the assistant, the delete is refused and the **Cannot delete: still in use** dialog lists every place, for example:
+
+- an extension of type AI Assistant;
+- a phone number, IVR option or IVR failover;
+- a business-hours action;
+- a call-queue fallback;
+- an AI load balancer, as a member or as its fallback;
+- an auto-dialer campaign or a call-tracking campaign.
+
+Change or remove those references, then delete again. Call history (call logs and CDRs) never blocks a delete.
+
+{/* SCREENSHOT: ai-assistants-in-use-dialog — "Cannot delete: still in use" dialog for "Aria - Front Desk Receptionist", listing extension 1013, the phone number +12025550104, an After Hours Menu option, the Front Desk AI Pool member and the Fall Webinar Follow-up campaign */}
+
+## Common errors
+
+| Message (summary) | What it means | What to do |
+|-------------------|---------------|-----------|
+| An AI Assistant with this name already exists in your organization | The name is taken | Choose another name |
+| Please select a provider | No provider was chosen | Pick a provider |
+| Unknown AI provider: *key* | The provider key is not in the server's list (API) | Use a key from `GET /v1/ai-assistant/providers` |
+| *Field* is required | A required configuration field is empty | Fill it in |
+| Phone Number must be a valid phone number (E.164 format) | The SIP number is not a valid number | Enter it as `+` and country code, for example `+12025550170` |
+| *Field* must be a valid URL | The Dograh OSS endpoint is not a URL | Enter the full `wss://…` address |
+| Cannot delete: still in use | Routing configuration points at the assistant | Change the listed references, then delete |
+
+## Key data fields
+
+### `ai_assistants`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `name` | Unique within the organization (deleted assistants excluded) |
+| `description` | Optional, up to 1000 characters |
+| `provider` | Provider key, for example `vapi` or `dograh-cloud` |
+| `protocol` | `sip`, `websocket` or `dummy`. Set from the provider |
+| `configuration` | JSON with the provider's fields, for example `{"phone_number": "+12025550170"}` |
+| `status` | `active` or `inactive` |
+| `deleted_at` | Deletes are soft deletes |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/ai-assistants[/{assistant}]` | Standard CRUD |
-| GET | `/v1/ai-assistant/providers` | List available providers |
-| GET | `/v1/ai-assistant/providers/{provider}` | Provider details |
-| GET | `/v1/ai-assistant/providers/{provider}/schema` | Provider config schema |
-| GET | `/v1/ai-assistant/providers/protocol/{protocol}` | Providers by protocol |
+| GET | `/v1/ai-assistants` | List. Filters: `status`, `protocol`, `provider`, `search` |
+| POST | `/v1/ai-assistants` | Create |
+| GET | `/v1/ai-assistants/{id}` | One assistant |
+| PUT | `/v1/ai-assistants/{id}` | Update |
+| DELETE | `/v1/ai-assistants/{id}` | Delete. Returns 409 with the list of uses when in use |
+| GET | `/v1/ai-assistant/providers` | All providers and their fields |
+| GET | `/v1/ai-assistant/providers/{provider}` | One provider |
+| GET | `/v1/ai-assistant/providers/protocol/{protocol}` | Providers for `sip` or `websocket` |
+
+Scoped API keys use the `ai-assistants` and `ai-assistant-providers` resources (see [API Keys](/modules/api-keys)). The [MCP server](/modules/mcp-server) has `list_ai_providers`, `get_ai_provider`, `list_ai_assistants`, `get_ai_assistant`, `create_ai_assistant`, `update_ai_assistant` and `delete_ai_assistant`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Extensions](/modules/extensions) — AI_ASSISTANT type extensions
-- [AI Load Balancers](/modules/ai-load-balancers) — Distribute across AI assistants
-- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — Campaign routing destinations
-- [Phone Numbers](/modules/phone-numbers) — DIDs can route to AI assistants
+- [AI Load Balancers](/modules/ai-load-balancers) — spread calls over several assistants, with failover
+- [Extensions](/modules/extensions) — AI Assistant extensions for internal dialling
+- [Phone Numbers](/modules/phone-numbers) — route a number straight to an assistant
+- [AI Assistants (applications)](/applications/ai-assistants) — concepts and designs

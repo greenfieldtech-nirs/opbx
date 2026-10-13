@@ -3,36 +3,45 @@ sidebar_position: 5
 slug: /applications
 sidebar_class_name: cxGuidesSidebar
 title: "PBX Applications"
-description: "Advanced applications built on top of OPBX"
+description: "AI voice agents, AI load balancing and outbound campaign dialing built on top of OPBX"
 ---
 
 # PBX Applications
 
-OPBX includes advanced applications that extend the core PBX functionality with AI-powered voice agents and automated outbound dialing.
+The applications build on the core PBX: they add AI voice agents and automated outbound dialing. They are found in the sidebar under **Apps and Security**, which Owners, PBX Admins and Reporters can see. Creating and changing them needs the Owner or PBX Admin role.
 
-## Available Applications
+| Application | What it does | Sidebar |
+|-------------|--------------|---------|
+| [AI Assistants](/applications/ai-assistants) | Connects callers to an AI voice agent at one of 47 providers (42 over SIP, 5 over WebSocket), plus a Dummy Test provider for checking routes | **AI Configuration → AI Assistants** |
+| [AI Load Balancers](/applications/ai-load-balancers) | Spreads calls across several assistants (round robin, priority or percentage), fails over between them and falls back to a person or menu | **AI Configuration → AI Load Balancers** |
+| [Auto Dialer](/applications/auto-dialer) | Runs outbound calling campaigns from distribution lists, with scheduling, pacing, answering-machine detection and a live monitor | **Auto Dialer** (Owner and PBX Admin only) |
 
-| Application | Description |
-|-------------|-------------|
-| [AI Assistants](/applications/ai-assistants) | Integrate AI-powered voice agents from 17 providers via SIP or WebSocket |
-| [AI Load Balancers](/applications/ai-load-balancers) | Distribute calls across multiple AI assistants with failover |
-| [Auto Dialer](/applications/auto-dialer) | Run outbound calling campaigns with rate limiting, scheduling, and real-time monitoring |
+{/* SCREENSHOT: applications-sidebar — the Apps and Security sidebar section expanded, showing the Auto Dialer, AI Configuration, Call Tracking and Security groups */}
 
-## AI Voice Integration
+## AI voice agents
 
-OPBX supports connecting answered calls to AI-powered voice agents through two protocols:
+An [AI assistant](/applications/ai-assistants) is a destination like an extension or a ring group: phone numbers, IVR options, business hours, queue fallbacks and campaigns can send callers to it. The provider decides how the call is handed over:
 
-- **SIP** -- 16 providers including Retell, Vapi, ElevenLabs, and more
-- **WebSocket** -- Real-time audio streaming for providers like Deepdub
+- **SIP**: OPBX dials the provider's service with the agent's phone number.
+- **WebSocket**: OPBX streams the call audio to the provider's endpoint.
 
-AI Load Balancers allow you to distribute calls across multiple AI assistants using round-robin, priority, or percentage-based strategies with automatic failover.
+An [AI load balancer](/applications/ai-load-balancers) puts several assistants behind one destination, so one failing provider does not stop the line.
+
+Step-by-step screens: [AI Assistants](/modules/ai-assistants) and [AI Load Balancers](/modules/ai-load-balancers).
 
 ## Auto Dialer
 
-The Auto Dialer is a complete outbound campaign management system that includes:
+The [Auto Dialer](/applications/auto-dialer) places outbound calls for a campaign:
 
-- Campaign creation with scheduling and rate limiting
-- Distribution list management with CSV upload
-- Concurrent call control (CAC) and calls-per-second (CPS) pacing
-- Answering machine detection
-- Real-time campaign monitoring with live statistics
+- campaigns with schedules and time windows;
+- distribution lists uploaded as CSV;
+- pacing by concurrent calls and calls per second;
+- answering-machine detection;
+- a real-time monitor with live statistics.
+
+Answered calls are connected to an AI assistant or an AI load balancer.
+
+## Related modules
+
+- [Call Tracking Campaigns](/modules/call-tracking-campaigns) — also under **Apps and Security**, attributes inbound calls to marketing campaigns
+- [Phone Numbers](/modules/phone-numbers) — route numbers to assistants and load balancers
