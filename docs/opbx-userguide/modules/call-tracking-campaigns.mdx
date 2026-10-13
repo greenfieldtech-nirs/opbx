@@ -3,154 +3,204 @@ sidebar_position: 20
 slug: /modules/call-tracking-campaigns
 sidebar_class_name: cxGuidesSidebar
 title: "Call Tracking Campaigns"
-description: "Assign DIDs to marketing campaigns, route inbound calls, and attribute conversions"
+description: "Attribute inbound calls to marketing campaigns: tracking numbers, routing, conversion rules, webhooks and ad-platform uploads"
 ---
 
 # Call Tracking Campaigns
 
-Call Tracking lets you assign phone numbers to marketing campaigns, route inbound calls to a destination of your choice, and attribute calls to sources, mediums, and campaigns for analytics and conversion tracking.
+Call tracking ties inbound calls to the marketing that produced them. A **campaign** stands for one marketing source and medium (for example `google` / `cpc`). It owns one or more **tracking numbers** (phone numbers that you publish only in that campaign) and a **destination** where the calls go. Every finished call to a tracking number becomes a **session**, which is checked against the campaign's **conversion rule** and can be sent to a webhook, Google Ads and Meta.
 
 ## Purpose
 
 Use this module to:
 
-- Create campaigns that represent marketing channels or initiatives
-- Assign one or more DIDs to each campaign as tracking numbers
-- Route inbound calls to external numbers or existing OPBX destinations
-- Define conversion rules based on call duration and disposition
-- Send converted calls to Google Ads and Meta for offline attribution
-- Deliver webhook notifications for call events
+- create a campaign per marketing channel;
+- attach tracking numbers to it;
+- route the campaign's calls to a forward number, an extension or a ring group;
+- define what counts as a converted call;
+- notify your own systems by webhook, and upload conversions to Google Ads and Meta.
 
-## Campaigns
+Results are on the [Call Tracking Analytics](/modules/call-tracking-analytics) pages. To show the right number on your website, see [Call Tracking DNI](/modules/call-tracking-dni).
 
-A campaign groups together a source (for example, `google`), a medium (for example, `cpc`), a routing destination, and conversion rules. When a call arrives on a tracking number assigned to a campaign, OPBX creates a session and attributes it to that campaign.
+## Prerequisites
 
-### Campaign Status
+- One **active** phone number per tracking number, not yet used by another campaign. See [Phone Numbers](/modules/phone-numbers).
+- The destination: an external number in E.164 form, or the ID of an active extension or ring group.
+- You are the **Owner** or a **PBX Admin** to create, edit or delete.
 
-| Status | Behavior |
-|--------|----------|
-| Active | Calls are tracked, routed, and reported |
-| Inactive | The campaign is ignored; calls to its tracking numbers are not attributed |
+## Permissions
 
-Set a campaign to Inactive when you are not currently running the associated marketing initiative.
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See **Call Tracking → Campaigns** in the sidebar | Yes | Yes | No | Yes (read-only) | No |
+| List and view campaigns (API) | Yes | Yes | Yes | Yes | Yes |
+| Create, edit, delete, activate or deactivate a campaign | Yes | Yes | No | No | No |
+| Add, edit or remove tracking numbers | Yes | Yes | No | No | No |
+| View and change webhook notification settings | Yes | Yes | No | No | No |
+| Open **Integrations** in the sidebar | Yes | No | No | No | No |
+| Read or change ad-platform integrations (API) | Yes | Yes | No | No | No |
 
-## Destination Types
+The **Call Tracking** group is part of the **Apps and Security** sidebar section, which Owners, PBX Admins and Reporters can see. In the campaign list, only Owners and PBX Admins can open a campaign.
 
-Each campaign defines where inbound calls are sent.
+## How a tracked call works
 
-| Destination Type | Config Field | Best For |
-|------------------|--------------|----------|
-| Forward | `forward_to` | Route to any external E.164 number |
-| Extension | `extension_id` | Route to a specific user extension |
-| Ring Group | `ring_group_id` | Distribute across a department |
-| Business Hours | `business_hours_schedule_id` | Time-based open/closed routing |
-| Conference Room | `conference_room_id` | Dedicated conference bridge |
-| IVR Menu | `ivr_menu_id` | Automated menu routing |
-| AI Assistant | `ai_assistant_id` | AI voice agent handling |
-| AI Load Balancer | `ai_load_balancer_id` | Distributed AI agent routing |
+1. A caller dials a tracking number.
+2. The number's routing type is **Call tracking**, so OPBX looks up its campaign.
+3. If the tracking number and the campaign are active, the call goes to the campaign's destination.
+4. When the call ends and its CDR arrives, OPBX creates a **session** with the caller, the campaign's source and medium, the duration and the disposition.
+5. The conversion rule decides whether the session is **converted**.
+6. Webhook events are queued for the enabled event types, and a converted session is uploaded to Google Ads and Meta when both the campaign toggle and the organization integration are on.
 
-:::tip
-The campaign form in the web UI exposes Forward, Extension, and Ring Group by default. All destination types are available through the API.
+Sessions are created only for calls to an **active** tracking number in an **active** campaign. A call that cannot be routed (inactive number or campaign, missing destination) hears a short spoken message and is ended.
+
+## Create a campaign
+
+1. Open **Call Tracking → Campaigns**.
+2. Click **New Campaign**.
+3. Under **Basic Information**, enter the **Name** and, for DNI and reports, the **Source** and **Medium** (use the same values as your `utm_source` and `utm_medium`).
+4. Under **Destination**, choose the **Destination Type** and fill in its field.
+5. Under **Ad-Platform Uploads**, turn on **Google Ads** or **Meta Conversions** if you want converted calls uploaded.
+6. Under **Conversion Rules**, set the rule.
+7. Click **Create Campaign**.
+
+The campaign is saved as **Active**. Add tracking numbers next (see below); a campaign without tracking numbers receives no calls.
+
+{/* SCREENSHOT: call-tracking-campaigns-list — Call Tracking Campaigns list with "Fall Promo - Search Ads" (google, cpc, ring group, 1 tracking number) and "Partner Newsletter" (newsletter, email, forward, 1 tracking number), both Active, with the status filter and the Unprovisioned filter button */}
+
+{/* SCREENSHOT: call-tracking-campaigns-form — New Campaign page with Basic Information, Destination set to Forward to Number, Ad-Platform Uploads off, and Conversion Rules 30 seconds with Require answered disposition on */}
+
+## Campaign fields
+
+| Field | Required | Limits and default | Meaning |
+|-------|----------|--------------------|---------|
+| Name | Yes | Up to 255 characters; unique within the organization | Shown in lists and reports; matched by DNI `utm_campaign` |
+| Source | No | Up to 100 characters | Attribution source, for example `google` |
+| Medium | No | Up to 100 characters | Attribution medium, for example `cpc` |
+| Destination Type | Yes | Forward to Number, Extension or Ring Group in the form. Default: Forward to Number | Where calls go (table below) |
+| Google Ads | No | Off by default | Upload converted calls to Google Ads |
+| Meta Conversions | No | Off by default | Send converted calls to the Meta Conversions API |
+| Min Answered Duration (seconds) | No | 0 or more. Form default: 30 | Billable seconds a call needs to convert |
+| Conversion Value | No | 0 or more | Value stored on each converted session and sent in webhooks |
+| Require answered disposition | No | Form default: on | Only answered calls can convert |
+| Status | — | Active or Inactive. New campaigns are Active | Change it from the list |
+| Description | No (API only) | Free text | Not shown in the form |
+
+### Destination types
+
+| Destination Type | Field in the form | Result |
+|------------------|-------------------|--------|
+| Forward to Number | **Forward To**: an external number, up to 50 characters, for example `+12025550180` | The call is dialled out to that number (recorded if inbound recording is on) |
+| Extension | **Extension ID**: the numeric ID of the extension | The call rings the extension |
+| Ring Group | **Ring Group ID**: the numeric ID of the ring group | The call goes to the ring group |
+
+The form takes the internal **ID**, not the extension number or the group name. The ID is shown in the API and in the address bar when you open the item.
+
+Through the API a campaign can also route to a **business-hours schedule**, **conference room**, **IVR menu**, **AI assistant** or **AI load balancer**. The destination must be active when the call arrives; otherwise the caller hears a short message and the call ends.
+
+### Conversion rule
+
+A session is **converted** when:
+
+- **Require answered disposition** is off, or the call was answered (disposition `CONNECTED` or `ANSWERED`); and
+- its billable seconds are at least **Min Answered Duration**.
+
+The rule is applied once, when the session is created. Changing the rule later does not re-evaluate past sessions.
+
+:::caution API defaults
+The form starts with 30 seconds and **Require answered disposition** on. A campaign created through the API without a `conversion_rule` gets 0 seconds and the requirement off, so **every** call counts as converted.
 :::
 
-## DNI and Number Assignment
+## Tracking numbers
 
-Dynamic Number Insertion (DNI) swaps the phone number displayed on your website based on the visitor's UTM parameters. See [Call Tracking DNI](/modules/call-tracking-dni) for installation instructions.
+A tracking number links one phone number to one campaign. A phone number can belong to only one campaign.
 
-### Assign a Tracking Number
+On the campaign page, the **Tracking Numbers** tab lists the numbers with their friendly name and status.
 
-1. Open a campaign and select the **Tracking Numbers** tab
-2. Click **Add Number**
-3. Choose an existing DID from the Phone Numbers module
-4. Enter an optional friendly name (for example, "Google Ads — San Francisco")
-5. Save
+To add a number, use the API (the **Add Number** button does not open a form in the current version):
 
-When you assign a DID to a campaign, OPBX updates the DID's routing type to `call_tracking` and points it at the campaign. You can assign multiple numbers to one campaign or dedicate one number per campaign.
+```http
+POST /v1/call-tracking-campaigns/{campaign}/call-tracking-numbers
+{ "did_number_id": 42, "friendly_name": "Search ads line", "status": "active" }
+```
 
-### Tracking Number Status
+| Field | Required | Limits | Meaning |
+|-------|----------|--------|---------|
+| `did_number_id` | Yes | An **active** phone number of your organization, not used by any campaign | The number callers dial |
+| `friendly_name` | No | Up to 255 characters | Label in lists |
+| `status` | No | `active` or `inactive`. Default: `active` | Inactive numbers are not routed, not used by DNI and create no sessions |
 
-| Status | Behavior |
-|--------|----------|
-| Active | Eligible for DNI swaps and routes calls to the campaign |
-| Inactive | Ignored by DNI swaps; calls are still routed by the DID configuration |
+When a number is added, OPBX changes the phone number's routing type to **Call tracking**, pointing at the campaign. Its previous routing is replaced.
 
-## Conversion Rules
+When a tracking number is removed (`DELETE …/call-tracking-numbers/{number}`), the phone number keeps the **Call tracking** routing type. Calls to it then hear a short message and end. Give the phone number a new destination on the [Phone Numbers](/modules/phone-numbers) page.
 
-A conversion rule decides whether a tracked call counts as a conversion.
+{/* SCREENSHOT: call-tracking-campaigns-detail — campaign page for "Fall Promo - Search Ads" with the status, destination and upload badges, and the Tracking Numbers tab listing +12025550115 */}
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| Require answered disposition | `true` | Only `CONNECTED` or `ANSWERED` dispositions can convert |
-| Min answered duration (seconds) | `30` | The call must last at least this many billable seconds |
-| Conversion value | none | Optional monetary value attached to each conversion |
+## Edit a campaign
 
-OPBX evaluates the rule when a session is created from a Call Detail Record (CDR). If the call meets all enabled conditions, `is_converted` is set to `true` and the configured conversion value is stored on the session.
+1. In the list, click the campaign to open it.
+2. Click **Edit**.
+3. Change the fields and click **Update Campaign**.
 
-## Ad-Platform Integration
-
-Call Tracking can upload converted calls to Google Ads and send them to the Meta Conversions API.
-
-### Enable Uploads
-
-1. Go to **Call Tracking → Integrations**
-2. Configure your organization-wide Google Ads and Meta credentials
-3. Open each campaign and enable the desired upload toggles
-4. Define the campaign conversion rules
-
-Both the organization integration and the campaign toggle must be enabled before conversions are uploaded.
-
-### Google Ads
-
-OPBX calls the Google Ads API `customers/{customer_id}:uploadCallConversions` endpoint for each converted session. Required settings:
-
-- Developer token
-- Refresh token
-- Customer ID
-- Conversion action resource name
-
-### Meta Conversions API
-
-OPBX posts a `Contact` event to the Meta Conversions API for each converted session. The caller phone number is SHA-256 hashed before being sent. Required settings:
-
-- Pixel ID
-- Access token
-
-## Notification Settings
-
-Each campaign can send webhook notifications for call events.
-
-### Supported Events
-
-| Event | Fired When |
-|-------|------------|
-| `call.received` | A call is received on a tracking number |
-| `call.answered` | The call is answered |
-| `call.completed` | The call ends |
-| `call.converted` | The call meets the conversion rule |
-
-### Authentication
-
-| Method | Behavior |
-|--------|----------|
-| None | No authentication header is sent |
-| Bearer Token | Sends `Authorization: Bearer <token>` |
-| Basic Auth | Sends `Authorization: Basic <username:password>` |
-
-:::tip
-Use the **Test Webhook** button to send a sample `call.received` payload and verify connectivity. Authorization headers are redacted in the delivery log.
+:::caution Saving from the form
+The form always saves the campaign as **Active** and clears the description. To keep a campaign inactive, set the status again from the list after you save. The form also only knows Forward, Extension and Ring Group; edit a campaign with another destination type through the API.
 :::
 
-### Webhook Payload
+### Disconnect
+
+On the edit page only, the **Destination Type** list offers **Disconnect**. It saves the campaign with "Destination unavailable": callers to its tracking numbers hear "Destination doesn't exist" and the call ends. The campaign then shows the **Unprovisioned** badge in the list and on its page, and the **Unprovisioned** filter finds it. To reconnect it, choose a destination type again and save. The create page never offers Disconnect.
+
+The same state appears after a [user is deleted](/modules/user-management#delete-a-user) whose extension was the campaign's destination.
+
+## Activate or deactivate
+
+Click the **Active** or **Inactive** badge in the **Status** column of the list. An inactive campaign:
+
+- does not route its tracking numbers: callers hear a short message and the call ends;
+- creates no sessions;
+- is not matched by DNI.
+
+## Webhook notifications
+
+Each campaign can send its sessions to your own webhook. Open the campaign and select the **Notifications** tab.
+
+| Field | Limits | Meaning |
+|-------|--------|---------|
+| Webhook URL | Required, a URL, up to 2048 characters | Where events are posted. Deliveries to private or local network addresses are blocked |
+| Authentication | None, Bearer Token or Basic Auth | Header sent with each request |
+| Username | Required for Basic Auth, up to 255 characters | |
+| Token / Password | Required for Bearer Token and Basic Auth, up to 2048 characters | Stored encrypted and never shown again |
+| Enabled Events | At least the events you want | Which events are sent |
+| Active | On by default | Turns delivery on or off |
+
+Click **Save Settings**, then **Test Webhook** to post a sample `call.received` event (with made-up numbers) right away. The result appears on the **Logs** tab. The test needs saved, active settings.
+
+The token or password is not returned by the server. When you save the settings again with Bearer Token or Basic Auth, type it in again; the save is refused without it.
+
+### Events
+
+| Event | Sent when |
+|-------|-----------|
+| `call.received` | Every session |
+| `call.answered` | The call was answered |
+| `call.missed` | The call was not answered and did not fail |
+| `call.failed` | The disposition was `FAILED` or `BUSY` |
+| `call.converted` | The session is converted |
+
+The server accepts these five event names. The form lists **Call Received**, **Call Answered**, **Call Completed** and **Call Converted**; **Call Completed** is not a valid event and makes the save fail, so leave it unchecked. Enable `call.missed` and `call.failed` through the API.
+
+Each event is delivered by a background job with a 30-second request timeout and up to three attempts (after 30 seconds, 2 minutes and 10 minutes). Authorization headers are shown as `***REDACTED***` in the logs.
+
+### Payload
 
 ```json
 {
   "event": "call.converted",
-  "event_id": "uuid",
-  "timestamp": "2026-06-25T12:34:56+00:00",
+  "event_id": "ct_event_6f1c…",
+  "timestamp": "2026-10-13T12:34:56+00:00",
   "organization_id": 1,
-  "campaign": { "id": 5, "name": "Google Ads — HVAC" },
-  "tracking_number": "+14155551234",
-  "caller_number": "+14155559876",
+  "campaign": { "id": 5, "name": "Fall Promo - Search Ads" },
+  "tracking_number": "+12025550115",
+  "caller_number": "+12025550142",
   "source": "google",
   "medium": "cpc",
   "duration": 87,
@@ -161,119 +211,102 @@ Use the **Test Webhook** button to send a sample `call.received` payload and ver
 }
 ```
 
-## Permissions
+{/* SCREENSHOT: call-tracking-campaigns-notifications — Notifications tab of a campaign with an empty Webhook URL, Authentication None, the Enabled Events checkboxes, the Active switch and the Save Settings and Test Webhook buttons */}
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View campaigns | Yes | Yes | Yes | Yes |
-| Create campaigns | Yes | Yes | No | No |
-| Update campaigns | Yes | Yes | No | No |
-| Delete campaigns | Yes | Yes | No | No |
-| View tracking numbers | Yes | Yes | Yes | Yes |
-| Create tracking numbers | Yes | Yes | No | No |
-| Update tracking numbers | Yes | Yes | No | No |
-| Delete tracking numbers | Yes | Yes | No | No |
-| Configure ad-platform integrations | Yes | Yes | No | No |
+## Ad-platform uploads
 
-## UI Workflow
+Converted sessions can be uploaded to Google Ads and Meta. Both switches must be on:
 
-### Create a Campaign
+1. the organization integration, on **Call Tracking → Integrations** (Owner);
+2. the **Google Ads** or **Meta Conversions** switch on the campaign.
 
-1. Navigate to **Call Tracking → Campaigns**
-2. Click **New Campaign**
-3. Enter a campaign name
-4. Optionally enter a source and medium for attribution
-5. Choose a destination type and fill in the destination details
-6. Set conversion rules
-7. Enable Google Ads or Meta uploads if desired
-8. Save the campaign
+| Integration | Fields | What OPBX sends |
+|-------------|--------|-----------------|
+| Google Ads | Developer Token, Refresh Token, Customer ID, Conversion Action Resource Name (for example `customers/123/conversionActions/456`) | A call conversion to the Google Ads `uploadCallConversions` endpoint |
+| Meta Conversions API | Pixel ID, Access Token | A `Contact` event with the caller's number hashed (SHA-256) |
 
-### Add a Tracking Number
+Turn an integration on, fill in its fields and click **Save Integrations**. Secrets are stored encrypted and are never shown again; each card shows **Configured** or **Not configured**, and a field left empty keeps the stored value. Fields that were never set are required when you turn an integration on.
 
-1. Open the campaign detail page
-2. Select the **Tracking Numbers** tab
-3. Click **Add Number**
-4. Select a DID and enter an optional friendly name
-5. Save
+:::caution Google Ads token
+OPBX sends the **Refresh Token** value as the OAuth bearer token on the upload request. It does not exchange it for an access token. Check the job logs after the first conversion.
+:::
 
-### Configure Webhooks
+{/* SCREENSHOT: call-tracking-integrations — Call Tracking Integrations page with the Google Ads and Meta Conversions API cards, both Disabled and Not configured */}
 
-1. Open the campaign detail page
-2. Select the **Notifications** tab
-3. Enter the webhook URL
-4. Choose an authentication method
-5. Select the events to send
-6. Save and test the webhook
+## Delete a campaign
 
-## Key Data Fields
+1. Click the delete action on the campaign's row, or **Delete** on the campaign page.
+2. Confirm in the **Delete Campaign** dialog.
 
-### `call_tracking_campaigns` Table
+A campaign delete is not blocked by its tracking numbers. Deleting a campaign also deletes its **tracking numbers, sessions, notification settings and notification logs**, so its history disappears from the analytics. The phone numbers keep the **Call tracking** routing type; give them a new destination afterwards.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | Campaign display name |
-| `source` | string nullable | Attribution source, e.g. `google` |
-| `medium` | string nullable | Attribution medium, e.g. `cpc` |
-| `description` | text nullable | Optional description |
-| `status` | enum | `active` or `inactive` |
-| `destination_type` | enum | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer` |
-| `destination_config` | JSON | `{forward_to: "..."}`, `{extension_id: N}`, etc. |
-| `conversion_rule` | JSON | `{min_answered_duration_seconds, requires_answered_disposition, conversion_value}` |
-| `google_ads_upload_enabled` | boolean | Upload converted calls to Google Ads |
-| `meta_upload_enabled` | boolean | Send converted calls to Meta |
+{/* SCREENSHOT: call-tracking-campaigns-delete-confirm — Delete Campaign confirmation for "Partner Newsletter" */}
 
-### `call_tracking_numbers` Table
+## Common errors
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `call_tracking_campaign_id` | FK | Parent campaign |
-| `did_number_id` | FK | Linked DID |
-| `friendly_name` | string nullable | Display label |
-| `status` | enum | `active` or `inactive` |
+| Message (summary) | What it means | What to do |
+|-------------------|---------------|-----------|
+| The name has already been taken | Another campaign has the name | Choose another name |
+| Forward to is required for destination type forward (and similar) | The destination field is empty | Fill in the number or ID |
+| The selected extension id / ring group id is invalid | No such extension or ring group | Use the internal ID |
+| Choose a destination | You tried to create with "Destination unavailable" (API) | Pick a destination. Disconnect is for edits only |
+| The selected did number id is invalid | The phone number is inactive or not yours | Use an active number of your organization |
+| The did number id has already been taken | The number already belongs to a campaign | Remove it from the other campaign first |
+| The selected enabled_events.N is invalid | **Call Completed** was checked | Uncheck it |
+| The auth secret field is required when auth method is … | The token or password was not re-entered | Enter it and save again |
+| Notification settings are missing, inactive, or have no webhook URL configured | **Test Webhook** before saving active settings | Save the settings first |
 
-## Related API Endpoints
+## Key data fields
+
+### `call_tracking_campaigns`
+
+| Column | Notes |
+|--------|-------|
+| `name` | Unique within the organization |
+| `source`, `medium` | Up to 100 characters each |
+| `status` | `active` or `inactive` |
+| `destination_type` | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer` or `unavailable` |
+| `destination_config` | JSON, for example `{"forward_to": "+12025550180"}` or `{"ring_group_id": 3}` |
+| `conversion_rule` | JSON: `min_answered_duration_seconds`, `requires_answered_disposition`, `conversion_value` |
+| `google_ads_upload_enabled`, `meta_upload_enabled` | Booleans |
+
+### `call_tracking_numbers`
+
+| Column | Notes |
+|--------|-------|
+| `call_tracking_campaign_id` | The campaign. Deleted with the campaign |
+| `did_number_id` | The phone number. Unique: one campaign per number |
+| `friendly_name` | Up to 255 characters |
+| `status` | `active` or `inactive` |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/call-tracking-campaigns` | List campaigns |
-| POST | `/v1/call-tracking-campaigns` | Create campaign |
-| GET | `/v1/call-tracking-campaigns/{campaign}` | Get campaign |
-| PUT | `/v1/call-tracking-campaigns/{campaign}` | Update campaign |
-| DELETE | `/v1/call-tracking-campaigns/{campaign}` | Delete campaign |
-| GET | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | List tracking numbers |
-| POST | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | Add tracking number |
-| PUT | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Update tracking number |
-| DELETE | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Remove tracking number |
-| GET | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Get notification settings |
-| PUT | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Update notification settings |
-| POST | `/v1/call-tracking-campaigns/{campaign}/notification-settings/test` | Test webhook |
-| GET | `/v1/call-tracking-campaigns/{campaign}/notification-logs` | View delivery logs |
-| GET/PUT | `/v1/call-tracking-ad-platform-integrations` | Manage ad-platform credentials |
+| GET | `/v1/call-tracking-campaigns` | List. Filters: `status`, `source`, `medium`, `search`, `unprovisioned=1` |
+| POST | `/v1/call-tracking-campaigns` | Create. Rejects "Destination unavailable" |
+| GET, PUT, DELETE | `/v1/call-tracking-campaigns/{campaign}` | Read, update, delete |
+| GET, POST | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers` | List or add tracking numbers |
+| PUT, DELETE | `/v1/call-tracking-campaigns/{campaign}/call-tracking-numbers/{number}` | Change the friendly name or status, or remove |
+| GET, PUT | `/v1/call-tracking-campaigns/{campaign}/notification-settings` | Webhook settings |
+| POST | `/v1/call-tracking-campaigns/{campaign}/notification-settings/test` | Send a test event (5 per minute) |
+| GET | `/v1/call-tracking-campaigns/{campaign}/notification-logs` | Delivery log |
+| GET, PUT | `/v1/call-tracking-ad-platform-integrations` | Google Ads and Meta settings |
+
+Scoped API keys use the `call-tracking-campaigns`, `call-tracking-sessions`, `call-tracking-analytics` and `call-tracking-ad-platform-integrations` resources (see [API Keys](/modules/api-keys)). The [MCP server](/modules/mcp-server) has the read-only tools `list_call_tracking_campaigns`, `get_call_tracking_campaign` and `list_call_tracking_numbers`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Best Practices
+## Best practices
 
-- Use consistent source and medium values that match your UTM parameters
-- Assign a unique tracking number per campaign for clean attribution
-- Set conversion rules that match your business definition of a qualified lead
-- Test webhook notifications before enabling them in production
-- Keep ad-platform credentials in the Integrations page up to date
-- Review notification logs regularly to catch delivery failures
+- Use the same source and medium values as your UTM parameters, so DNI finds the campaign.
+- Give each campaign its own tracking numbers; never print a tracking number outside its campaign.
+- Set the conversion rule before the campaign goes live, because past sessions are not re-evaluated.
+- Test the webhook before you rely on it, and check the **Logs** tab after the first real calls.
 
-## Related Modules
+## Related modules
 
-- [Phone Numbers (DIDs)](/modules/phone-numbers) — Provision and manage the numbers used as tracking numbers
-- [Call Tracking DNI](/modules/call-tracking-dni) — Dynamic Number Insertion for your website
-- [Call Tracking Analytics](/modules/call-tracking-analytics) — Dashboard, KPIs, and exports
-- [Extensions](/modules/extensions) — Extension routing target
-- [Ring Groups](/modules/ring-groups) — Ring group routing target
-- [Business Hours](/modules/business-hours) — Time-based routing target
-- [IVR Menus](/modules/ivr-menus) — IVR routing target
-- [Conference Rooms](/modules/conference-rooms) — Conference room routing target
-- [AI Assistants](/modules/ai-assistants) — AI assistant routing target
-- [AI Load Balancers](/modules/ai-load-balancers) — AI load balancer routing target
+- [Call Tracking Analytics](/modules/call-tracking-analytics) — dashboard and sessions
+- [Call Tracking DNI](/modules/call-tracking-dni) — show the campaign's number on your website
+- [Phone Numbers](/modules/phone-numbers) — the numbers used as tracking numbers
+- [Ring Groups](/modules/ring-groups) and [Extensions](/modules/extensions) — campaign destinations
