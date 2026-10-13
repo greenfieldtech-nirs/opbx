@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Enums\UserRole;
+use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerList;
 use App\Models\CallQueue;
 use App\Models\CallTrackingCampaign;
 use App\Models\CallTrackingNumber;
@@ -75,5 +77,20 @@ final class GroupThreeInUseDeleteTest extends TestCase
         // Sessions are history: once no DID routes to the campaign, the delete goes through.
         $number->delete();
         $this->deleteJson("/api/v1/call-tracking-campaigns/{$campaign->id}")->assertNoContent();
+    }
+
+    public function test_distribution_list_assigned_to_campaign_is_blocked_unassigned_is_not(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create($this->o());
+        $list = AutoDialerList::factory()->create($this->o() + ['campaign_id' => $campaign->id, 'used_by_campaign_id' => $campaign->id]);
+
+        $this->deleteJson("/api/v1/auto-dialer-campaigns/lists/{$list->id}")
+            ->assertStatus(409)
+            ->assertJsonFragment(['type' => 'auto_dialer_campaign', 'id' => $campaign->id, 'name' => $campaign->name, 'detail' => 'assigned list']);
+        $this->assertDatabaseHas('auto_dialer_lists', ['id' => $list->id]);
+
+        // used_by_campaign_id alone is history and never blocks.
+        $list->update(['campaign_id' => null]);
+        $this->deleteJson("/api/v1/auto-dialer-campaigns/lists/{$list->id}")->assertSuccessful();
     }
 }

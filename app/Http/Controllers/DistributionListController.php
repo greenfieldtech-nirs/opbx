@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\CampaignStatus;
 use App\Enums\ListStatus;
+use App\Exceptions\ResourceInUseException;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCampaign;
@@ -13,6 +14,7 @@ use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\ListManagementService;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -416,6 +418,11 @@ class DistributionListController extends Controller
     public function destroy(AutoDialerList $list): JsonResponse
     {
         $this->authorize('delete', $list);
+
+        $check = app(ResourceReferenceChecker::class)->checkReferences('distribution_list', $list->id, $list->organization_id);
+        if ($check['has_references']) {
+            throw new ResourceInUseException('distribution_list', $check['references']);
+        }
 
         try {
             // Delete associated destinations first

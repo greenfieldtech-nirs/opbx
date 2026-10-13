@@ -114,6 +114,7 @@ class ResourceReferenceChecker
             ...$this->jsonReferences($type, $resourceId, $organizationId),
             ...$this->businessHoursReferences($type, $resourceId, $organizationId),
             ...$this->extensionTypeReferences($type, $resourceId, $organizationId),
+            ...$this->distributionListReferences($type, $resourceId, $organizationId),
         ];
 
         // A resource pointing at itself (e.g. a ring group falling back to itself) must not block its own delete.
@@ -232,6 +233,25 @@ class ResourceReferenceChecker
         }
 
         return $found;
+    }
+
+    /**
+     * A distribution list assigned to a campaign is in use (used_by_campaign_id is history and ignored).
+     *
+     * @return list<array{type: string, id: int, name: string, detail: string}>
+     */
+    private function distributionListReferences(string $type, int $id, int $orgId): array
+    {
+        if ($type !== 'distribution_list') {
+            return [];
+        }
+
+        $query = DB::table('auto_dialer_lists as l')
+            ->join('auto_dialer_campaigns as t', 't.id', '=', 'l.campaign_id')
+            ->where('l.id', $id)
+            ->where('t.organization_id', $orgId);
+
+        return $this->rows($query, 't', 'name', 'auto_dialer_campaign', 'assigned list');
     }
 
     /**
