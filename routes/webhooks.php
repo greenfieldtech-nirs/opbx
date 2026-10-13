@@ -90,6 +90,11 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
         ->middleware(['voice.webhook.auth'])
         ->name('voice.ring-group-callback');
 
+    // Conference room PIN / host PIN digits
+    Route::post('/voice/conference-pin', [VoiceRoutingController::class, 'handleConferencePin'])
+        ->middleware(['voice.webhook.auth'])
+        ->name('voice.conference-pin');
+
     // ALB follow-through callback for failover routing
     Route::post('/voice/albs-follow-through', [AlbsFollowThroughController::class, 'handle'])
         ->middleware(['voice.webhook.auth'])

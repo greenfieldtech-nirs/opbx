@@ -284,6 +284,54 @@ class CxmlBuilder
     }
 
     /**
+     * Add Dial with a Conference noun using only attributes Cloudonix documents for <Conference>.
+     *
+     * @param  string  $room  Conference identifier (letters/digits/underscore)
+     * @param  bool  $startOnEnter  false makes the participant wait until someone with true enters
+     * @param  int|null  $maxParticipants  Capped to Cloudonix's maximum of 250
+     * @param  bool  $muted  Join muted
+     * @param  bool  $holdMusic  Play hold music while alone / waiting
+     * @param  bool  $prompts  Voice prompts when participants join or leave
+     * @param  bool  $record  Record the conference from its start
+     */
+    public function dialConferenceRoom(
+        string $room,
+        bool $startOnEnter = true,
+        ?int $maxParticipants = null,
+        bool $muted = false,
+        bool $holdMusic = true,
+        bool $prompts = false,
+        bool $record = false,
+        ?string $recordingStatusCallback = null
+    ): self {
+        $dial = $this->document->createElement('Dial');
+
+        $conference = $this->document->createElement('Conference', htmlspecialchars($room, self::XML_ENCODING, 'UTF-8'));
+        $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
+        $conference->setAttribute('endConferenceOnExit', 'false');
+        $conference->setAttribute('muted', $muted ? 'true' : 'false');
+        $conference->setAttribute('holdMusic', $holdMusic ? 'true' : 'false');
+        $conference->setAttribute('prompts', $prompts ? 'true' : 'false');
+
+        if ($maxParticipants !== null) {
+            $conference->setAttribute('maxParticipants', (string) min(250, max(1, $maxParticipants)));
+        }
+
+        if ($record) {
+            $conference->setAttribute('record', 'record-from-start');
+
+            if ($recordingStatusCallback !== null) {
+                $conference->setAttribute('recordingStatusCallback', $recordingStatusCallback);
+            }
+        }
+
+        $dial->appendChild($conference);
+        $this->response->appendChild($dial);
+
+        return $this;
+    }
+
+    /**
      * Join a call-queue conference room (conference-mediated ring-all).
      *
      * Emits only attributes Cloudonix documents for <Conference>. Both the
