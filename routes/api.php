@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
+use App\Http\Controllers\Api\CallQueueAgentController;
+use App\Http\Controllers\Api\CallQueueController;
 use App\Http\Controllers\Api\CallTrackingAdPlatformIntegrationController;
 use App\Http\Controllers\Api\CallTrackingAnalyticsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
@@ -31,14 +33,13 @@ use App\Http\Controllers\Api\OrganizationJoinRequestController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicQueuesDashboardController;
+use App\Http\Controllers\Api\PublicStatusController;
+use App\Http\Controllers\Api\QueueCallController;
+use App\Http\Controllers\Api\QueuesDashboardLinkController;
+use App\Http\Controllers\Api\QueueStatsController;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
-use App\Http\Controllers\Api\CallQueueAgentController;
-use App\Http\Controllers\Api\PublicQueuesDashboardController;
-use App\Http\Controllers\Api\CallQueueController;
-use App\Http\Controllers\Api\QueueCallController;
-use App\Http\Controllers\Api\QueueStatsController;
-use App\Http\Controllers\Api\QueuesDashboardLinkController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -197,6 +198,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
     });
 
+    // Public platform status page (no auth, cached 30s, rate limited)
+    Route::get('public/status', [PublicStatusController::class, 'show'])
+        ->middleware('throttle:60,1')
+        ->name('public.status');
 
     // Broadcasting authentication routes (for WebSocket presence channels)
     // Must be accessible to authenticated users for Laravel Echo
