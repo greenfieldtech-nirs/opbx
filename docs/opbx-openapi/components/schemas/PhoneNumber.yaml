@@ -1,45 +1,81 @@
 type: object
 description: Phone Number (DID)
 properties:
-  is_unprovisioned:
-    type: boolean
-    readOnly: true
-    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
   organization_id:
     type: integer
   phone_number:
     type: string
-    example: '+1987654321'
-  label:
+    example: '+14155550123'
+  friendly_name:
     type:
     - string
     - 'null'
     example: Main Line
-  status:
-    type: string
-    enum:
-    - active
-    - inactive
   routing_type:
     type: string
     enum:
     - extension
     - ring_group
-    - ivr_menu
-    - unavailable
+    - business_hours
+    - conference_room
     - ai_assistant
-  routing_target_id:
-    type:
-    - integer
-    - 'null'
+    - ai_load_balancer
+    - ivr_menu
+    - call_queue
+    - unavailable
+  routing_config:
+    type: object
+    description: "Routing target keyed by type, for example `{\"extension_id\": 12}`; empty for `unavailable`"
+    additionalProperties: true
+  status:
+    type: string
+    enum:
+    - active
+    - inactive
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+  cloudonix_config:
+    type: object
+    additionalProperties: true
   created_at:
     type: string
     format: date-time
   updated_at:
     type: string
     format: date-time
+  extension:
+    description: Routing target when routing_type is `extension` (present when loaded)
+    $ref: ./Extension.yaml
+  ring_group:
+    description: Routing target when routing_type is `ring_group`
+    $ref: ./RingGroup.yaml
+  business_hours_schedule:
+    description: Routing target when routing_type is `business_hours`
+    $ref: ./BusinessHoursSchedule.yaml
+  conference_room:
+    description: Routing target when routing_type is `conference_room`
+    $ref: ./ConferenceRoom.yaml
+  ai_assistant:
+    description: Routing target when routing_type is `ai_assistant`
+    $ref: ./AiAssistant.yaml
+  ai_load_balancer:
+    description: Routing target when routing_type is `ai_load_balancer`
+    $ref: ./AiAssistantLoadBalancer.yaml
+  ivr_menu:
+    description: Routing target when routing_type is `ivr_menu`
+    $ref: ./IvrMenu.yaml
+  call_queue:
+    type: object
+    description: Routing target when routing_type is `call_queue`
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
 required:
 - id
 - organization_id

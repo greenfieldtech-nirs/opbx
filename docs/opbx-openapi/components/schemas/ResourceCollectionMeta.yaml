@@ -1,0 +1,24 @@
+type: object
+description: >-
+  Pagination metadata of a Laravel resource collection (endpoints that return
+  `XResource::collection($paginator)` directly). Comes with a top-level `links` object.
+allOf:
+  - $ref: ./PaginationMeta.yaml
+  - type: object
+    properties:
+      path:
+        type: string
+        format: uri
+      links:
+        type: array
+        items:
+          type: object
+          properties:
+            url:
+              type:
+                - string
+                - 'null'
+            label:
+              type: string
+            active:
+              type: boolean

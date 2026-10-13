@@ -4,15 +4,32 @@ paths:
       tags:
         - Phone Numbers
       summary: List Phone Numbers
-      description: Get paginated list of Phone Numbers
       operationId: listPhoneNumbers
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: routing_type
+          in: query
+          schema:
+            type: string
+            enum: [extension, ring_group, business_hours, conference_room, ai_assistant, ai_load_balancer, ivr_menu]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches phone number or friendly name
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
+      description: Paginated list ordered by created_at descending (per_page default 20, max 100). Returned as a Laravel resource collection (top-level `links`).
       responses:
         '200':
           description: List of Phone Numbers
@@ -25,8 +42,10 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/PhoneNumber.yaml'
+                  links:
+                    $ref: '../../components/schemas/PaginationLinks.yaml'
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: '../../components/schemas/ResourceCollectionMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
@@ -38,18 +57,26 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
+              allOf:
+                - $ref: '../../components/schemas/PhoneNumberInput.yaml'
+                - required: [phone_number, routing_type, routing_config, status]
       responses:
         '201':
           description: Phone Number created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
@@ -71,9 +98,18 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:read
       responses:
         '200':
           description: Phone Number details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -87,15 +123,24 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/PhoneNumberInput.yaml'
       responses:
         '200':
           description: Phone Number updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -110,15 +155,24 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/PhoneNumberInput.yaml'
       responses:
         '200':
           description: Phone Number updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -135,6 +189,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       responses:
         '204':
           description: Phone Number deleted

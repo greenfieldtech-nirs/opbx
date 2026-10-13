@@ -867,6 +867,10 @@ components:
       $ref: './components/schemas/ValidationError.yaml'
     PaginationMeta:
       $ref: './components/schemas/PaginationMeta.yaml'
+    ResourceCollectionMeta:
+      $ref: './components/schemas/ResourceCollectionMeta.yaml'
+    PaginationLinks:
+      $ref: './components/schemas/PaginationLinks.yaml'
     
     # Entity schemas
     User:
@@ -911,6 +915,8 @@ components:
       $ref: './components/schemas/IvrMenuInput.yaml'
     PhoneNumber:
       $ref: './components/schemas/PhoneNumber.yaml'
+    PhoneNumberInput:
+      $ref: './components/schemas/PhoneNumberInput.yaml'
     AiAssistant:
       $ref: './components/schemas/AiAssistant.yaml'
     AiAssistantLoadBalancer:

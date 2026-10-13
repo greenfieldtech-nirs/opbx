@@ -16,6 +16,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:read
       responses:
         '200':
           description: Default outbound caller ID (or null)
@@ -58,6 +60,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:

@@ -1,0 +1,60 @@
+type: object
+description: Phone number create/update request
+properties:
+  phone_number:
+    type: string
+    maxLength: 20
+    description: >-
+      Create only (prohibited on update). E.164 (`^\+[1-9]\d{1,14}$`) unless
+      `enable_non_e164` is true, then digits, `+` and `#`. Unique across all organizations.
+    example: '+14155550123'
+  friendly_name:
+    type:
+    - string
+    - 'null'
+    maxLength: 255
+  routing_type:
+    type: string
+    enum:
+    - extension
+    - ring_group
+    - business_hours
+    - conference_room
+    - ai_assistant
+    - ai_load_balancer
+    - ivr_menu
+    - call_queue
+    - unavailable
+    description: '`unavailable` is rejected on create (422) and accepted on update'
+  routing_config:
+    type: object
+    description: >-
+      The target ID for the routing type. Required (may be `{}` for `unavailable`);
+      the referenced resource must exist in the organization.
+    properties:
+      extension_id:
+        type: integer
+      ring_group_id:
+        type: integer
+      business_hours_schedule_id:
+        type: integer
+      conference_room_id:
+        type: integer
+      ai_assistant_id:
+        type: integer
+      ai_load_balancer_id:
+        type: integer
+      ivr_menu_id:
+        type: integer
+      call_queue_id:
+        type: integer
+  status:
+    type: string
+    enum:
+    - active
+    - inactive
+  enable_non_e164:
+    type:
+    - boolean
+    - 'null'
+    description: Create only. Allow non-E.164 numbers.
