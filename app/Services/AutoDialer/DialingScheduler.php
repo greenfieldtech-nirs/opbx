@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Models\AutoDialerCampaign;
+use Carbon\Carbon;
 
 /**
  * Dialing Scheduler Service
@@ -43,7 +44,7 @@ class DialingScheduler
     /**
      * Get the next scheduled run time for a campaign.
      */
-    public function getNextScheduledTime(AutoDialerCampaign $campaign): ?\Carbon\Carbon
+    public function getNextScheduledTime(AutoDialerCampaign $campaign): ?Carbon
     {
         $now = now($campaign->timezone);
         $today = $now->copy()->startOfDay();
@@ -88,7 +89,7 @@ class DialingScheduler
     /**
      * Check if a specific day is active for the campaign.
      */
-    private function isActiveDay(AutoDialerCampaign $campaign, \Carbon\Carbon $date): bool
+    private function isActiveDay(AutoDialerCampaign $campaign, Carbon $date): bool
     {
         $day = strtolower($date->format('l'));
 

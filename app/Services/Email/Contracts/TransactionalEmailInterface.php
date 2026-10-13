@@ -6,6 +6,7 @@ namespace App\Services\Email\Contracts;
 
 use App\Services\Email\DTOs\EmailMessage;
 use App\Services\Email\DTOs\EmailSendResult;
+use App\Services\Email\Exceptions\EmailException;
 
 /**
  * Transactional Email Interface
@@ -21,7 +22,7 @@ interface TransactionalEmailInterface
      * @param  EmailMessage  $message  The email message to send
      * @return EmailSendResult The result of the send operation
      *
-     * @throws \App\Services\Email\Exceptions\EmailException When sending fails
+     * @throws EmailException When sending fails
      */
     public function send(EmailMessage $message): EmailSendResult;
 

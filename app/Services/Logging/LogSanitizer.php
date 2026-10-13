@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Logging;
 
+use Illuminate\Http\Request;
+
 /**
  * Service for sanitizing sensitive data from logs.
  *
@@ -172,7 +174,7 @@ class LogSanitizer
         if (is_int($key)) {
             return false;
         }
-        
+
         $lowerKey = strtolower($key);
 
         // Check exact matches
@@ -209,7 +211,7 @@ class LogSanitizer
      *
      * Extracts useful request information while excluding sensitive data.
      *
-     * @param  \Illuminate\Http\Request  $request  Request to extract from
+     * @param  Request  $request  Request to extract from
      * @return array<string, mixed> Safe log context
      */
     public static function requestContext($request): array

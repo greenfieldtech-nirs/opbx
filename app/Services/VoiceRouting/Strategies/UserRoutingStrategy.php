@@ -9,7 +9,6 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CxmlBuilder\CxmlBuilder;
-use App\Services\VoiceRouting\Strategies\ForwardRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -26,12 +25,12 @@ class UserRoutingStrategy implements RoutingStrategy
         /** @var Extension $extension */
         $extension = $destination['extension'] ?? null;
 
-        if (!$extension) {
+        if (! $extension) {
             return response(CxmlBuilder::unavailable('Extension not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         // Check if extension is active
-        if (!$extension->isActive()) {
+        if (! $extension->isActive()) {
             return response(CxmlBuilder::unavailable('Extension is not available'), 200, ['Content-Type' => 'application/xml']);
         }
 
@@ -41,7 +40,8 @@ class UserRoutingStrategy implements RoutingStrategy
 
         if ($forwardTo) {
             // Delegate to forwarding logic
-            $forwardStrategy = new ForwardRoutingStrategy();
+            $forwardStrategy = new ForwardRoutingStrategy;
+
             return $forwardStrategy->route($request, $did, $destination);
         }
 

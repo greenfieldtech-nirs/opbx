@@ -6,6 +6,7 @@ namespace App\Services\VoiceRouting;
 
 use App\Enums\ExtensionType;
 use App\Models\DidNumber;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\RoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -99,7 +100,7 @@ class VoiceRoutingStrategyExecutor
     private function createErrorResponse(string $message): Response
     {
         return response(
-            \App\Services\CxmlBuilder\CxmlBuilder::sayWithHangup($message, true),
+            CxmlBuilder::sayWithHangup($message, true),
             200,
             ['Content-Type' => 'application/xml']
         );

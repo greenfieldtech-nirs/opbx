@@ -24,14 +24,14 @@ class ForwardRoutingStrategy implements RoutingStrategy
         /** @var Extension $extension */
         $extension = $destination['extension'] ?? null;
 
-        if (!$extension) {
+        if (! $extension) {
             return response(CxmlBuilder::unavailable('Forward extension not found'), 200, ['Content-Type' => 'application/xml']);
         }
 
         $config = $extension->configuration ?? [];
         $forwardTo = $config['forward_to'] ?? null;
 
-        if (!$forwardTo) {
+        if (! $forwardTo) {
             return response(CxmlBuilder::unavailable('Forward destination not configured'), 200, ['Content-Type' => 'application/xml']);
         }
 
@@ -65,16 +65,16 @@ class ForwardRoutingStrategy implements RoutingStrategy
             ->where('extension_number', $forwardTo)
             ->first();
 
-        if (!$targetExtension) {
+        if (! $targetExtension) {
             return response(CxmlBuilder::unavailable("Target extension $forwardTo not found"), 200, ['Content-Type' => 'application/xml']);
         }
 
-        if (!$targetExtension->isActive()) {
+        if (! $targetExtension->isActive()) {
             return response(CxmlBuilder::unavailable("Target extension $forwardTo is inactive"), 200, ['Content-Type' => 'application/xml']);
         }
 
         $sipUri = $targetExtension->getSipUri();
-        if (!$sipUri) {
+        if (! $sipUri) {
             return response(CxmlBuilder::unavailable("Target extension $forwardTo has no valid SIP URI"), 200, ['Content-Type' => 'application/xml']);
         }
 

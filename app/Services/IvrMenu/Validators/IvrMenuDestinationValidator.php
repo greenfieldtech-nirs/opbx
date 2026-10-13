@@ -18,7 +18,7 @@ class IvrMenuDestinationValidator implements IvrMenuValidatorInterface
     public function validate(Validator $validator, array $data, ?int $excludeMenuId = null): void
     {
         $organizationId = auth()->user()?->organization_id;
-        if (!$organizationId) {
+        if (! $organizationId) {
             return;
         }
 
@@ -27,16 +27,16 @@ class IvrMenuDestinationValidator implements IvrMenuValidatorInterface
             $destinationType = $option['destination_type'] ?? null;
             $destinationId = $option['destination_id'] ?? null;
 
-            if (!$destinationType || !$destinationId) {
+            if (! $destinationType || ! $destinationId) {
                 continue;
             }
 
             $exists = $this->destinationExists($destinationType, $destinationId, $organizationId, $excludeMenuId);
 
-            if (!$exists) {
+            if (! $exists) {
                 $validator->errors()->add(
                     "options.{$index}.destination_id",
-                    "Selected destination does not exist or is not accessible."
+                    'Selected destination does not exist or is not accessible.'
                 );
             }
         }
@@ -49,7 +49,7 @@ class IvrMenuDestinationValidator implements IvrMenuValidatorInterface
             if ($failoverType !== 'hangup') {
                 $exists = $this->destinationExists($failoverType, $failoverId, $organizationId, $excludeMenuId);
 
-                if (!$exists) {
+                if (! $exists) {
                     $validator->errors()->add(
                         'failover_destination_id',
                         'Selected failover destination does not exist or is not accessible.'
@@ -79,7 +79,7 @@ class IvrMenuDestinationValidator implements IvrMenuValidatorInterface
             'ivr_menu' => IvrMenu::where('id', $id)
                 ->where('organization_id', $organizationId)
                 ->where('status', 'active')
-                ->when($excludeMenuId, fn($q) => $q->where('id', '!=', $excludeMenuId))
+                ->when($excludeMenuId, fn ($q) => $q->where('id', '!=', $excludeMenuId))
                 ->exists(),
 
             default => false,

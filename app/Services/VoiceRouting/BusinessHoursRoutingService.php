@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\BusinessHoursActionType;
+use App\Enums\ExtensionType;
 use App\Models\BusinessHoursSchedule;
+use App\Models\CallQueue;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
@@ -32,9 +33,9 @@ class BusinessHoursRoutingService
     /**
      * Check business hours and route accordingly.
      *
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID for logging
-     * @param Request $request The incoming request
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID for logging
+     * @param  Request  $request  The incoming request
      * @return Response|null CXML response if business hours routing applies, null otherwise
      */
     public function checkBusinessHours(int $organizationId, string $callSid, Request $request): ?Response
@@ -63,10 +64,10 @@ class BusinessHoursRoutingService
     /**
      * Route to business hours action destination.
      *
-     * @param string|array $action The routing action (string for backward compatibility, array for new format)
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID
-     * @param Request $request The incoming request
+     * @param  string|array  $action  The routing action (string for backward compatibility, array for new format)
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID
+     * @param  Request  $request  The incoming request
      * @return Response CXML response
      */
     private function routeToBusinessHoursAction($action, int $organizationId, string $callSid, Request $request): Response
@@ -92,9 +93,9 @@ class BusinessHoursRoutingService
     /**
      * Route using array-format action configuration.
      *
-     * @param array $action The action configuration array
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID
+     * @param  array  $action  The action configuration array
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID
      * @return Response CXML response
      */
     private function routeArrayAction(array $action, int $organizationId, string $callSid, Request $request): Response
@@ -138,7 +139,7 @@ class BusinessHoursRoutingService
             );
         }
 
-        $callQueue = \App\Models\CallQueue::withoutGlobalScope(OrganizationScope::class)
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $callQueueId)
             ->where('organization_id', $organizationId)
             ->where('status', 'active')
@@ -152,8 +153,8 @@ class BusinessHoursRoutingService
             );
         }
 
-        return app(\App\Services\VoiceRouting\VoiceRoutingManager::class)
-            ->executeStrategy(\App\Enums\ExtensionType::QUEUE, $request, new DidNumber, ['call_queue' => $callQueue]);
+        return app(VoiceRoutingManager::class)
+            ->executeStrategy(ExtensionType::QUEUE, $request, new DidNumber, ['call_queue' => $callQueue]);
     }
 
     /**

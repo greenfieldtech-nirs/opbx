@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\IvrMenu;
 
+use App\Services\IvrMenu\Validators\IvrMenuAudioValidator;
+use App\Services\IvrMenu\Validators\IvrMenuDestinationValidator;
+use App\Services\IvrMenu\Validators\IvrMenuPriorityValidator;
 use App\Services\IvrMenu\Validators\IvrMenuValidatorInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Validator;
@@ -27,6 +30,7 @@ class IvrMenuValidationPipeline
     public function addValidator(IvrMenuValidatorInterface $validator): self
     {
         $this->validators->push($validator);
+
         return $this;
     }
 
@@ -45,10 +49,10 @@ class IvrMenuValidationPipeline
      */
     public static function createDefault(): self
     {
-        $pipeline = new self();
-        $pipeline->addValidator(new \App\Services\IvrMenu\Validators\IvrMenuDestinationValidator());
-        $pipeline->addValidator(new \App\Services\IvrMenu\Validators\IvrMenuPriorityValidator());
-        $pipeline->addValidator(new \App\Services\IvrMenu\Validators\IvrMenuAudioValidator());
+        $pipeline = new self;
+        $pipeline->addValidator(new IvrMenuDestinationValidator);
+        $pipeline->addValidator(new IvrMenuPriorityValidator);
+        $pipeline->addValidator(new IvrMenuAudioValidator);
 
         return $pipeline;
     }

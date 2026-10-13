@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
+use App\Models\AiAssistant;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Services\AiAssistant\ProviderRegistry;
@@ -79,7 +80,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      */
     private function routeWebSocket(
         Request $request,
-        \App\Models\AiAssistant $aiAssistant,
+        AiAssistant $aiAssistant,
         array $config,
         ?string $provider,
         ?Extension $extension = null
@@ -162,7 +163,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      * Returns a simple CXML response with a test message and hangup.
      */
     private function routeDummy(
-        \App\Models\AiAssistant $aiAssistant,
+        AiAssistant $aiAssistant,
         ?Extension $extension = null
     ): Response {
         Log::info('Routing to Dummy AI provider', [
@@ -185,7 +186,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      * This supports both legacy configuration and service_url column.
      */
     private function routeSip(
-        \App\Models\AiAssistant $aiAssistant,
+        AiAssistant $aiAssistant,
         array $config,
         ?string $provider,
         ?Extension $extension = null

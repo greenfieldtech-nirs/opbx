@@ -11,13 +11,13 @@ class RecordingRemoteService
     /**
      * Validate a remote URL.
      *
-     * @param string $url The URL to validate
+     * @param  string  $url  The URL to validate
      * @return array{success: bool, message?: string}
      */
     public function validateUrl(string $url): array
     {
         // Basic URL validation
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
             return [
                 'success' => false,
                 'message' => 'Invalid URL format.',
@@ -26,8 +26,8 @@ class RecordingRemoteService
 
         // Check scheme (HTTPS preferred, HTTP allowed)
         $parsedUrl = parse_url($url);
-        if (!isset($parsedUrl['scheme']) ||
-            !in_array(strtolower($parsedUrl['scheme']), ['http', 'https'], true)) {
+        if (! isset($parsedUrl['scheme']) ||
+            ! in_array(strtolower($parsedUrl['scheme']), ['http', 'https'], true)) {
             return [
                 'success' => false,
                 'message' => 'Only HTTP and HTTPS URLs are allowed.',
@@ -35,7 +35,7 @@ class RecordingRemoteService
         }
 
         // Security: Check domain allowlist if configured
-        if (!$this->isDomainAllowed($parsedUrl['host'] ?? '')) {
+        if (! $this->isDomainAllowed($parsedUrl['host'] ?? '')) {
             return [
                 'success' => false,
                 'message' => 'Domain not allowed. Please contact administrator.',
@@ -50,7 +50,7 @@ class RecordingRemoteService
         }
 
         // Basic reachability check (optional - can be disabled for performance)
-        if (!$this->checkUrlReachability($url)) {
+        if (! $this->checkUrlReachability($url)) {
             Log::warning('Remote recording URL may not be reachable', [
                 'url' => $url,
             ]);
@@ -62,9 +62,6 @@ class RecordingRemoteService
 
     /**
      * Check if a domain is allowed based on configuration.
-     *
-     * @param string $domain
-     * @return bool
      */
     private function isDomainAllowed(string $domain): bool
     {
@@ -98,9 +95,6 @@ class RecordingRemoteService
 
     /**
      * Check if a URL is reachable.
-     *
-     * @param string $url
-     * @return bool
      */
     private function checkUrlReachability(string $url): bool
     {
@@ -147,6 +141,7 @@ class RecordingRemoteService
             $statusLine = $headers[0] ?? '';
             if (preg_match('/HTTP\/\d+\.\d+\s+(\d+)/', $statusLine, $matches)) {
                 $statusCode = (int) $matches[1];
+
                 return $statusCode >= 200 && $statusCode < 400;
             }
 
@@ -165,7 +160,6 @@ class RecordingRemoteService
     /**
      * Get basic information about a remote URL.
      *
-     * @param string $url
      * @return array{size?: int, mime_type?: string, reachable: bool}
      */
     public function getUrlInfo(string $url): array

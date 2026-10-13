@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Recording;
 
 use App\Models\Recording;
+use App\Scopes\OrganizationScope;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class RecordingAccessService
 {
     /**
      * Generate a secure access token for file download.
-     *
-     * @param Recording $recording
-     * @param int $userId
-     * @return string
      */
     public function generateAccessToken(Recording $recording, int $userId): string
     {
@@ -43,9 +40,7 @@ class RecordingAccessService
     /**
      * Validate an access token and return the recording if valid.
      *
-     * @param string $token
-     * @param int|null $userId If null, uses user ID from token (for token-only access like audio playback)
-     * @return Recording|null
+     * @param  int|null  $userId  If null, uses user ID from token (for token-only access like audio playback)
      */
     public function validateAccessToken(string $token, ?int $userId = null): ?Recording
     {
@@ -53,11 +48,12 @@ class RecordingAccessService
             $decrypted = Crypt::decryptString($token);
             $payload = json_decode($decrypted, true);
 
-            if (!$payload ||
-                !isset($payload['recording_id'], $payload['organization_id'], $payload['user_id'], $payload['expires_at'])) {
+            if (! $payload ||
+                ! isset($payload['recording_id'], $payload['organization_id'], $payload['user_id'], $payload['expires_at'])) {
                 Log::warning('Invalid access token format', [
                     'user_id' => $userId,
                 ]);
+
                 return null;
             }
 
@@ -68,6 +64,7 @@ class RecordingAccessService
                     'recording_id' => $payload['recording_id'],
                     'expired_at' => Carbon::createFromTimestamp($payload['expires_at']),
                 ]);
+
                 return null;
             }
 
@@ -78,20 +75,22 @@ class RecordingAccessService
                     'request_user_id' => $userId,
                     'recording_id' => $payload['recording_id'],
                 ]);
+
                 return null;
             }
 
             // Get and validate recording (bypass OrganizationScope since token validates org_id)
-            $recording = Recording::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+            $recording = Recording::withoutGlobalScope(OrganizationScope::class)
                 ->find($payload['recording_id']);
 
-            if (!$recording ||
+            if (! $recording ||
                 $recording->organization_id !== $payload['organization_id'] ||
-                !$recording->isActive()) {
+                ! $recording->isActive()) {
                 Log::warning('Invalid recording access', [
                     'recording_id' => $payload['recording_id'],
                     'user_id' => $userId ?? $payload['user_id'],
                 ]);
+
                 return null;
             }
 
@@ -115,11 +114,6 @@ class RecordingAccessService
 
     /**
      * Log a file access event.
-     *
-     * @param Recording $recording
-     * @param int $userId
-     * @param string $action
-     * @param array $metadata
      */
     public function logFileAccess(Recording $recording, int $userId, string $action, array $metadata = []): void
     {
@@ -136,19 +130,16 @@ class RecordingAccessService
 
     /**
      * Securely delete a file with overwrite.
-     *
-     * @param string $filePath
-     * @return bool
      */
     public function secureDelete(string $filePath): bool
     {
-        if (!file_exists($filePath)) {
+        if (! file_exists($filePath)) {
             return true;
         }
 
         $enableSecureDelete = config('recordings.enable_secure_delete', true);
 
-        if (!$enableSecureDelete) {
+        if (! $enableSecureDelete) {
             // Simple delete if secure delete is disabled
             return unlink($filePath);
         }
