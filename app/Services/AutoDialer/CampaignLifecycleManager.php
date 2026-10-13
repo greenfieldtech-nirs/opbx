@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
+use App\Enums\DestinationStatus;
 use App\Jobs\ProcessAutoDialerCampaignJob;
 use App\Models\AutoDialerCampaign;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -141,6 +143,41 @@ class CampaignLifecycleManager
         Log::info('Campaign archived', [
             'campaign_id' => $campaign->id,
         ]);
+    }
+
+    /**
+     * Complete every Active campaign whose destinations have all reached a final state.
+     *
+     * The Go dialer never completes campaigns, so this runs from the scheduled check command.
+     * Work remaining = a destination being dialled/connected, or pending with attempts left.
+     */
+    public function completeFinishedCampaigns(): int
+    {
+        return OrganizationScope::bypass(function (): int {
+            $completed = 0;
+
+            foreach (AutoDialerCampaign::where('status', CampaignStatus::ACTIVE)->get() as $campaign) {
+                $destinations = $campaign->destinations();
+                if (! (clone $destinations)->exists()) {
+                    continue;
+                }
+
+                $remaining = (clone $destinations)->where(function ($q) use ($campaign) {
+                    $q->whereIn('auto_dialer_destinations.status', [DestinationStatus::DIALING, DestinationStatus::CONNECTED])
+                        ->orWhere(function ($q) use ($campaign) {
+                            $q->where('auto_dialer_destinations.status', DestinationStatus::PENDING)
+                                ->where('auto_dialer_destinations.dial_attempts', '<', $campaign->max_dial_attempts);
+                        });
+                })->exists();
+
+                if (! $remaining) {
+                    $this->complete($campaign);
+                    $completed++;
+                }
+            }
+
+            return $completed;
+        });
     }
 
     /**
