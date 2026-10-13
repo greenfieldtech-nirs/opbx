@@ -35,6 +35,7 @@ ListOrdered
 import { cn } from '@/lib/utils';
 import { getStatusColor } from '@/utils/formatters';
 import logger from '@/utils/logger';
+import { canActOnRole } from '@/utils/roleHelpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -405,6 +406,8 @@ export default function ExtensionsComplete() {
   // Check user permissions
   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser.role);
+  // An Owner's extension (credentials included) can only be changed by an Owner
+  const canActOnExtension = (ext: Extension) => canActOnRole(currentUser.role, ext.user?.role);
 
   // Client-side assignment filter (backend doesn't expose this yet)
   const displayedExtensions = useMemo(() => {
@@ -1280,13 +1283,13 @@ export default function ExtensionsComplete() {
           <StandardDataTable<Extension>
             data={displayedExtensions}
             isLoading={isLoading}
-            onRowClick={canCreate ? openEditDialog : undefined}
+            onRowClick={canCreate ? (ext) => canActOnExtension(ext) && openEditDialog(ext) : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
             getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
-            onIdentityClick={canCreate ? openEditDialog : undefined}
+            onIdentityClick={canCreate ? (ext) => canActOnExtension(ext) && openEditDialog(ext) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
@@ -1297,11 +1300,12 @@ export default function ExtensionsComplete() {
               setShowDeleteDialog(true);
             }) : undefined}
             canDelete={canCreate}
+            canDeleteItem={canActOnExtension}
             columns={[
               ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{
                 header: 'Password',
                 cell: (extension: Extension) => (
-                  extension.type === 'user' ? (
+                  extension.type === 'user' && canActOnExtension(extension) ? (
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">
                         {visiblePasswords.has(extension.id)
@@ -1381,7 +1385,7 @@ export default function ExtensionsComplete() {
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) {
+                      if (!isReadOnly && canActOnExtension(extension)) {
                         handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
                       }
                     }}

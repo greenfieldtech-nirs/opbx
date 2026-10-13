@@ -94,3 +94,12 @@ export function getAllRoles(): Array<{
 export function canEditRoles(role: UserRole): boolean {
   return role === 'owner';
 }
+
+/**
+ * True when `actorRole` may act on an account whose role is `targetRole`.
+ * An Owner account can only be changed (edit, password, embed token, delete,
+ * its extension credentials) by an Owner; mirrors UserPolicy::actsOnOwner.
+ */
+export function canActOnRole(actorRole: UserRole | undefined, targetRole: UserRole | undefined): boolean {
+  return targetRole !== 'owner' || actorRole === 'owner';
+}

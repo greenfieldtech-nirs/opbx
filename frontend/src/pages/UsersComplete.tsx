@@ -28,6 +28,7 @@ UserX,RefreshCw,
 Code2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { canActOnRole } from '@/utils/roleHelpers';
 import { formatDate,getRoleColor,getRoleDisplayName,getStatusColor } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -632,19 +633,19 @@ function UsersComplete() {
           <StandardDataTable<User>
             data={paginatedUsers}
             isLoading={isLoading}
-            onRowClick={openEditDialog}
+            onRowClick={(u) => canActOnRole(user?.role, u.role) && openEditDialog(u)}
             identityIcon={UserCheck}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(user) => user.name}
             getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : 'PBX User'}
-            onIdentityClick={openEditDialog}
+            onIdentityClick={(u) => canActOnRole(user?.role, u.role) && openEditDialog(u)}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
             canView={false}
             canEdit={false}
-            canDeleteItem={(u) => u.role !== 'owner' || user?.role === 'owner'}
+            canDeleteItem={(u) => canActOnRole(user?.role, u.role)}
             onDelete={isReadOnly ? undefined : (user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);
@@ -722,15 +723,15 @@ function UsersComplete() {
               },
               ...(canCreateUsers ? [{
                 header: 'Embed',
-                cell: (user: User) => (
+                cell: (target: User) => !canActOnRole(user?.role, target.role) ? null : (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEmbedUser(user);
+                      setEmbedUser(target);
                       setShowEmbedDialog(true);
                     }}
                     title="Embedded dialer settings"
-                    aria-label={`Get embed code for ${user.name}`}
+                    aria-label={`Get embed code for ${target.name}`}
                   >
                     <Badge
                       variant="outline"
