@@ -44,9 +44,9 @@ Use this module to:
 
 The schedule is saved as **Active**. It becomes available as a routing type on phone numbers.
 
-{/* SCREENSHOT: business-hours-list — Business Hours list with Main Office Hours and Support Desk Hours, showing the timezone, exception count, last-modified date and the Active status badge, with the Unprovisioned filter in the toolbar */}
+![Business Hours list with Holiday Hotline Hours (Unprovisioned), Main Office Hours and Support Desk Hours, showing timezone, exception count, last-modified date and status, with the Unprovisioned filter in the toolbar](../img/screens/business-hours-list.jpg)
 
-{/* SCREENSHOT: business-hours-create-dialog — Create Schedule dialog with the open-hours action set to IVR Menu "Main Menu", the closed-hours action set to IVR Menu "After Hours Menu", and the weekly calendar filled from the Monday-Friday 9:00-17:00 template */}
+![Schedule dialog for Main Office Hours with the open-hours action IVR Menu Main Menu, the closed-hours action IVR Menu After Hours Menu and the weekly calendar](../img/screens/business-hours-create-dialog.jpg)
 
 ## Fields
 
@@ -104,7 +104,7 @@ Each exception has a date and a name (up to 255 characters). A date can only app
 
 **Import Holidays** loads public holidays from the public `date.nager.at` service for the country and year you choose. Tick the holidays to add them as Closed exceptions. The browser calls that service directly.
 
-{/* SCREENSHOT: business-hours-exceptions — Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed) */}
+![Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed)](../img/screens/business-hours-exceptions.jpg)
 
 ## How a call is routed
 
@@ -140,7 +140,7 @@ The API and the MCP server (`duplicate_business_hours`) can copy a schedule with
 
 The delete is refused while a phone number, an IVR menu option or failover, or a call-tracking campaign still routes to the schedule. The **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
 
-{/* SCREENSHOT: business-hours-in-use-dialog — "Cannot delete: still in use" dialog for Main Office Hours, listing the phone number +12025550100 (Main Line) as a routing target */}
+![Cannot delete: still in use dialog for Main Office Hours listing the phone number +12025550100 as a routing target](../img/screens/business-hours-in-use-dialog.jpg)
 
 ## Common errors
 
