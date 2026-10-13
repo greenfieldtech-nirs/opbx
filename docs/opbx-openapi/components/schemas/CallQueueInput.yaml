@@ -1,0 +1,85 @@
+type: object
+description: Call queue create/update request (update requires the same fields as create)
+properties:
+  name:
+    type: string
+    minLength: 2
+    maxLength: 100
+    description: Unique within the organization
+  description:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  strategy:
+    type: string
+    enum: [ring_all, round_robin, least_talk_time, fewest_calls]
+  agent_ring_timeout:
+    type: integer
+    minimum: 15
+    maximum: 60
+  max_wait_seconds:
+    type: integer
+    minimum: 30
+    maximum: 300
+  wrap_up_seconds:
+    type: integer
+    minimum: 15
+    maximum: 120
+  announce_position:
+    type: boolean
+  immediate_connect:
+    type: boolean
+  conference_ring_all:
+    type: boolean
+  announce_position_timeout:
+    type:
+      - integer
+      - 'null'
+    minimum: 10
+    maximum: 600
+    description: Required when announce_position is true
+  announce_position_language:
+    type:
+      - string
+      - 'null'
+    maxLength: 20
+  moh_recording_id:
+    type:
+      - integer
+      - 'null'
+  fallback_action:
+    type: string
+    enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
+    description: '`unavailable` is rejected on create (422) and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant and ai_load_balancer.'
+  fallback_extension_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ring_group_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ivr_menu_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
+    type:
+      - integer
+      - 'null'
+  status:
+    type: string
+    enum: [active, inactive]
+  agents:
+    type: array
+    minItems: 1
+    maxItems: 100
+    description: Agent user IDs (distinct)
+    items:
+      type: integer
+required: [name, strategy, agent_ring_timeout, max_wait_seconds, wrap_up_seconds, fallback_action, status, agents]

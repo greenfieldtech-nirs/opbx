@@ -40,8 +40,24 @@ properties:
     example: 300
   wrap_up_seconds:
     type: integer
-    description: Post-call agent pause (0 = disabled)
+    description: Post-call agent pause
     example: 15
+  announce_position:
+    type: boolean
+    description: Periodically announce the caller's queue position
+  announce_position_timeout:
+    type:
+      - integer
+      - 'null'
+    description: Seconds between position announcements
+  announce_position_language:
+    type:
+      - string
+      - 'null'
+  immediate_connect:
+    type: boolean
+  conference_ring_all:
+    type: boolean
   moh_recording_id:
     type:
       - integer
@@ -56,7 +72,9 @@ properties:
       - ivr_menu
       - ai_assistant
       - ai_load_balancer
+      - call_queue
       - hangup
+      - unavailable
     example: extension
   fallback_extension_id:
     type:
@@ -104,9 +122,30 @@ properties:
   agents_count:
     type: integer
     example: 5
+  moh_recording:
+    $ref: '#/$defs/Ref'
+  fallback_extension:
+    $ref: '#/$defs/Ref'
+  fallback_ring_group:
+    $ref: '#/$defs/Ref'
+  fallback_ivr_menu:
+    $ref: '#/$defs/Ref'
+  fallback_ai_assistant:
+    $ref: '#/$defs/Ref'
   created_at:
     type: string
     format: date-time
   updated_at:
     type: string
     format: date-time
+$defs:
+  Ref:
+    type: object
+    description: Related resource summary (present when loaded); `name` or `extension_number`
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      extension_number:
+        type: string

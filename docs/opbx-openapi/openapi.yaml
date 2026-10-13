@@ -895,6 +895,8 @@ components:
       $ref: './components/schemas/RingGroupInput.yaml'
     CallQueue:
       $ref: './components/schemas/CallQueue.yaml'
+    CallQueueInput:
+      $ref: './components/schemas/CallQueueInput.yaml'
     QueueCall:
       $ref: './components/schemas/QueueCall.yaml'
     ConferenceRoom:

@@ -8,9 +8,32 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, strategy, status, created_at, updated_at]
+            default: created_at
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: strategy
+          in: query
+          schema:
+            type: string
+            enum: [ring_all, round_robin, least_talk_time, fewest_calls]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: search
+          in: query
+          schema:
+            type: string
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
@@ -37,12 +60,14 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueue.yaml'
+              $ref: '../../components/schemas/CallQueueInput.yaml'
       responses:
         '201':
           description: Call queue created
@@ -58,9 +83,28 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       responses:
         '200':
           description: Queues the authenticated user is an agent of, with current state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        state:
+                          type: string
+                          description: Agent state from the queue engine (LOGGED_OUT when unknown)
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
@@ -73,6 +117,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -102,6 +148,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -113,7 +161,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueue.yaml'
+              $ref: '../../components/schemas/CallQueueInput.yaml'
       responses:
         '200':
           description: Call queue updated
@@ -131,6 +179,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -142,7 +192,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueue.yaml'
+              $ref: '../../components/schemas/CallQueueInput.yaml'
       responses:
         '200':
           description: Call queue updated
@@ -162,6 +212,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -187,6 +239,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -206,13 +260,30 @@ paths:
                   type: string
                   enum: [available, wrap_up, logged_out]
                   description: Agent presence state (wrap_up is sticky when toggled manually)
+                user_id:
+                  type: integer
+                  description: Owner/PBX Admin only - set the state of this agent instead of their own
       responses:
         '200':
           description: Agent state updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  state:
+                    type: string
+                    enum: [available, wrap_up, logged_out]
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
           $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '502':
+          description: The queue engine did not accept the state change
 
   /v1/call-queues/{call_queue}/stats:
     get:
@@ -223,6 +294,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -241,7 +314,7 @@ paths:
             format: date-time
       responses:
         '200':
-          description: Waiting/handling time aggregates (min/max/avg/stddev) and totals
+          $ref: '../public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1stats/get/responses/200'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -256,6 +329,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -264,7 +339,7 @@ paths:
             type: integer
       responses:
         '200':
-          description: Waiting callers with positions, agent states, and rolling counts (15m/30m/1h/24h)
+          $ref: '../public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1live/get/responses/200'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -279,6 +354,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: queue-calls:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
@@ -327,6 +404,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: queue-calls:read
       parameters:
         - name: queue_id
           in: query

@@ -16,6 +16,8 @@ paths:
       security:
         - bearerAuth: []
         - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       responses:
         '200':
           description: Queue status toggled
