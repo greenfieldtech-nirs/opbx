@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, RefreshCw, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -69,6 +70,7 @@ export default function CallTrackingCampaigns() {
   const totalPages = data?.meta?.last_page ?? 1;
 
   const deleteMutation = useDeleteCallTrackingCampaign();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const updateMutation = useUpdateCallTrackingCampaign();
 
   const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all' || unprovisionedOnly;
@@ -96,6 +98,8 @@ export default function CallTrackingCampaigns() {
       toast.success('Campaign deleted successfully');
       setCampaignToDelete(null);
     } catch (err) {
+      setCampaignToDelete(null);
+      if (showIfInUse(err)) return;
       toast.error((err as Error)?.message || 'Failed to delete campaign');
     }
   };
@@ -367,6 +371,7 @@ export default function CallTrackingCampaigns() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+      {inUseDialog}
     </div>
   );
 }

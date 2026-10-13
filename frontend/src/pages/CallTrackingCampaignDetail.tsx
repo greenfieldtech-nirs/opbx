@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Plus, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,6 +39,7 @@ export default function CallTrackingCampaignDetail() {
   const { data: logs, isLoading: logsLoading } = useCallTrackingNotificationLogs(id!, { per_page: 10 });
 
   const deleteMutation = useDeleteCallTrackingCampaign();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const updateSettingsMutation = useUpdateCallTrackingNotificationSettings();
   const testNotificationMutation = useTestCallTrackingNotification();
 
@@ -48,6 +50,8 @@ export default function CallTrackingCampaignDetail() {
       toast.success('Campaign deleted successfully');
       navigate('/ui/call-tracking/campaigns');
     } catch (err) {
+      setCampaignToDelete(false);
+      if (showIfInUse(err)) return;
       toast.error((err as Error)?.message || 'Failed to delete campaign');
     }
   };
@@ -264,6 +268,7 @@ export default function CallTrackingCampaignDetail() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+      {inUseDialog}
     </div>
   );
 }
