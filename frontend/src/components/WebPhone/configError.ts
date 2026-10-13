@@ -7,3 +7,8 @@ export function classifyConfigError(err: unknown): WebPhoneConfigFailure {
   if (response?.status === 409 && response.data?.error === 'cloudonix_not_configured') return 'cloudonix_not_configured';
   return 'error';
 }
+
+/** Cloudonix reports a completed call as ANSWER or CONNECTED. */
+export function isAnsweredDisposition(disposition: string | null | undefined): boolean {
+  return ['ANSWER', 'CONNECTED'].includes((disposition ?? '').toUpperCase());
+}

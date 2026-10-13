@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { classifyConfigError } from '../configError';
+import { classifyConfigError, isAnsweredDisposition } from '../configError';
+
+describe('isAnsweredDisposition', () => {
+  it('counts ANSWER and CONNECTED as answered', () => {
+    expect(isAnsweredDisposition('ANSWER')).toBe(true);
+    expect(isAnsweredDisposition('connected')).toBe(true);
+    expect(isAnsweredDisposition('NO_ANSWER')).toBe(false);
+    expect(isAnsweredDisposition(undefined)).toBe(false);
+  });
+});
 
 describe('classifyConfigError', () => {
   it('maps 404 to no_extension', () => {
