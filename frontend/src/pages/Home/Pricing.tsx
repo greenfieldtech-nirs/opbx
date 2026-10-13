@@ -52,7 +52,7 @@ export function Pricing() {
                   <span className="text-5xl font-bold text-foreground">$0</span>
                   <span className="text-muted-foreground">/ month</span>
                 </div>
-                <p className="text-xl text-muted-foreground mt-2">
+                <p className="text-xl text-muted-foreground mt-2 min-h-[2lh]">
                   MIT licensed. Run on your own infrastructure.
                 </p>
               </CardHeader>
@@ -95,7 +95,7 @@ export function Pricing() {
                   <span className="text-5xl font-bold text-foreground">$0</span>
                   <span className="text-muted-foreground">/ month</span>
                 </div>
-                <p className="text-xl text-muted-foreground mt-2">
+                <p className="text-xl text-muted-foreground mt-2 min-h-[2lh]">
                   Managed OPBX instance, no ops overhead.
                 </p>
               </CardHeader>
@@ -130,7 +130,7 @@ export function Pricing() {
                 <div className="mt-4 flex items-baseline gap-2">
                   <span className="text-5xl font-bold text-foreground">Contact Us</span>
                 </div>
-                <p className="text-xl text-muted-foreground mt-2">
+                <p className="text-xl text-muted-foreground mt-2 min-h-[2lh]">
                   Self hosted with Remote FDE support
                 </p>
               </CardHeader>
@@ -149,6 +149,8 @@ export function Pricing() {
                       Contact us
                     </a>
                   </Button>
+                  {/* Keeps the button level with the other cards, which have a footnote line under it. */}
+                  <p className="text-xl mt-4 invisible" aria-hidden="true">&nbsp;</p>
                 </div>
               </CardContent>
             </Card>
