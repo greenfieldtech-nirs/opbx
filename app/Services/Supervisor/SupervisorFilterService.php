@@ -6,6 +6,7 @@ namespace App\Services\Supervisor;
 
 use App\Enums\ExtensionType;
 use App\Models\ApiKey;
+use App\Models\CallQueueAgent;
 use App\Models\Extension;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
@@ -82,6 +83,24 @@ final class SupervisorFilterService
     public function scopeFor(User|ApiKey $user): ?array
     {
         return $user->isSupervisor() ? $this->resourceIdentifiers($user) : null;
+    }
+
+    /**
+     * Call queues a Supervisor may read: those where an assigned user, or the supervisor, is an agent.
+     *
+     * @return array<int, int>
+     */
+    public function callQueueIds(User $supervisor): array
+    {
+        $userIds = $supervisor->supervisedUsers->pluck('id')->push($supervisor->id)->unique()->values()->all();
+
+        return CallQueueAgent::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $supervisor->organization_id)
+            ->whereIn('user_id', $userIds)
+            ->pluck('call_queue_id')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function userExtensionNumbers(User $supervisor): array

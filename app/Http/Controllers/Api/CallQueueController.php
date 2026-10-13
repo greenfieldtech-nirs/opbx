@@ -12,6 +12,7 @@ use App\Http\Requests\CallQueue\UpdateCallQueueRequest;
 use App\Http\Resources\CallQueueResource;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
+use App\Services\Supervisor\SupervisorFilterService;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -81,6 +82,11 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
+        $currentUser = $request->user();
+        if ($currentUser && $currentUser->isSupervisor()) {
+            $query->whereIn('id', app(SupervisorFilterService::class)->callQueueIds($currentUser));
+        }
+
         $query->with([
             'agents.extension:id,user_id,extension_number,status',
             'mohRecording:id,name',
