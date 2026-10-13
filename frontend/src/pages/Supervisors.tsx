@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { invalidateRoutingResources } from '@/lib/invalidation';
 import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -99,6 +100,8 @@ export default function Supervisors() {
     setShowAssignmentDialog(true);
   };
 
+  const [statusSupervisor, setStatusSupervisor] = useState<User | null>(null);
+
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: UserStatus }) => {
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
@@ -117,7 +120,7 @@ export default function Supervisors() {
 
   const handleStatusToggle = (supervisor: User, e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleStatusMutation.mutate({ id: supervisor.id, currentStatus: supervisor.status });
+    setStatusSupervisor(supervisor);
   };
 
   const handleAssignmentClose = (open: boolean) => {
@@ -313,6 +316,18 @@ export default function Supervisors() {
           />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={statusSupervisor !== null}
+        onOpenChange={(open) => { if (!open) setStatusSupervisor(null); }}
+        title={statusSupervisor?.status === 'active' ? 'Deactivate Supervisor' : 'Activate Supervisor'}
+        description={`Are you sure you want to ${statusSupervisor?.status === 'active' ? 'deactivate' : 'activate'} ${statusSupervisor?.name ?? 'this supervisor'}?`}
+        confirmLabel={statusSupervisor?.status === 'active' ? 'Deactivate' : 'Activate'}
+        variant={statusSupervisor?.status === 'active' ? 'danger' : 'default'}
+        onConfirm={() => statusSupervisor
+          ? toggleStatusMutation.mutateAsync({ id: statusSupervisor.id, currentStatus: statusSupervisor.status }).catch(() => undefined)
+          : undefined}
+      />
 
       <SupervisorAssignmentDialog
         userId={assignmentUserId}
