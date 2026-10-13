@@ -100,10 +100,11 @@ const VoiceSelector: React.FC<{
           <div className="flex-1">
             <Combobox
               options={filteredVoices.map((voice: CloudonixVoice) => {
-                const languageProviderPricing = `${getLanguageName(voice.language)} / ${voice.provider} / ${voice.pricing}`;
+                // provider/pricing can be missing (e.g. the built-in fallback voices); never print "undefined"
+                const languageProviderPricing = [getLanguageName(voice.language), voice.provider, voice.pricing].filter(Boolean).join(' / ');
                 return {
                   value: voice.id,
-                  label: `${voice.name} - ${languageProviderPricing} - ${voice.gender}`,
+                  label: [voice.name, languageProviderPricing, voice.gender].filter(Boolean).join(' - '),
                 };
               })}
               value={value}
