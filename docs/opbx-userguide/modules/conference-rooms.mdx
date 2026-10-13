@@ -44,9 +44,9 @@ The API leaves `pin` and `host_pin` out of the response for anyone who cannot ed
 
 The room is saved as **Active** and becomes available as a destination.
 
-{/* SCREENSHOT: conference-rooms-list — Conference Rooms list with Weekly All-Hands (capacity 50, Recording and Mute on Entry badges, PIN security) and Support Escalation Bridge (capacity 15, Standard audio, Open security) */}
+![Conference Rooms list with Support Escalation Bridge (capacity 15, Standard audio, Open) and Weekly All-Hands (capacity 50, Recording and Mute on Entry, PIN and Wait for Host)](../img/screens/conference-rooms-list.jpg)
 
-{/* SCREENSHOT: conference-rooms-create-dialog — Create Conference Room dialog with the Security & Access and Audio Settings sections expanded, PIN Protection on and a participant PIN entered */}
+![Create Conference Room dialog with Security & Access and Audio Settings expanded, PIN Protection on and a participant PIN entered](../img/screens/conference-rooms-create-dialog.jpg)
 
 ## Fields
 
@@ -80,7 +80,7 @@ When a call reaches a room, OPBX applies **Max Participants**, **Mute on Entry**
 
 **Status:** click the **Active** or **Disabled** badge in the list. Callers who reach a disabled room hear "Conference room is closed" and the call ends.
 
-{/* SCREENSHOT: conference-rooms-edit-dialog — Edit Conference Room dialog for Weekly All-Hands, showing PIN 4821 and host PIN 9034 to an Owner, with Wait for Host, Mute on Entry and Announce Join/Leave on */}
+![Edit Conference Room dialog for Weekly All-Hands showing PIN 4821, host PIN 9034, Wait for Host, Mute on Entry and Announce Join/Leave on](../img/screens/conference-rooms-edit-dialog.jpg)
 
 ## Delete a conference room
 
@@ -89,7 +89,7 @@ When a call reaches a room, OPBX applies **Max Participants**, **Mute on Entry**
 
 The delete is refused while something still routes to the room: a phone number, an IVR menu option or failover, a business-hours action, an extension of type Conference, or a call-tracking campaign. The **Cannot delete: still in use** dialog lists each one. Change those first, then delete again.
 
-{/* SCREENSHOT: conference-rooms-in-use-dialog — "Cannot delete: still in use" dialog for Weekly All-Hands, listing the phone number +12025550103 (Conference Bridge) as a routing target */}
+![Cannot delete: still in use dialog for Weekly All-Hands listing the phone number +12025550103 as a routing target](../img/screens/conference-rooms-in-use-dialog.jpg)
 
 ## Common errors
 
