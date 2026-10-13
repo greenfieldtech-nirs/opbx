@@ -100,4 +100,19 @@ final class AutoDialerLifecycleFixesTest extends TestCase
         $this->assertSame(CampaignStatus::ACTIVE, $dialing->fresh()->status);
         $this->assertSame(CampaignStatus::ACTIVE, $empty->fresh()->status);
     }
+
+    public function test_update_clears_saved_amd_actions_when_sent_as_null(): void
+    {
+        $campaign = $this->draftCampaign(['action_voicemail' => 'HANGUP', 'action_human' => 'CONTINUE', 'action_unknown' => 'HANGUP', 'retry_on_voicemail' => true]);
+
+        $this->actingAs($this->user)->putJson("/api/v1/auto-dialer-campaigns/{$campaign->id}", [
+            'action_voicemail' => null, 'action_human' => null, 'action_unknown' => null, 'retry_on_voicemail' => false,
+        ])->assertOk();
+
+        $fresh = $campaign->fresh();
+        $this->assertNull($fresh->action_voicemail);
+        $this->assertNull($fresh->action_human);
+        $this->assertNull($fresh->action_unknown);
+        $this->assertFalse($fresh->retry_on_voicemail);
+    }
 }

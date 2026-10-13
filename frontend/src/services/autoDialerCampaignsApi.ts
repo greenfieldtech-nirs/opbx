@@ -117,9 +117,9 @@ export interface UpdateCampaignRequest {
   time_limit?: number;
   record_calls?: boolean;
   // WebSocket-based AMD action fields
-  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
-  action_human?: 'HANGUP' | 'CONTINUE' | string;
-  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  action_voicemail?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
+  action_human?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
+  action_unknown?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   retry_on_voicemail?: boolean;
   auto_start?: boolean;
 }

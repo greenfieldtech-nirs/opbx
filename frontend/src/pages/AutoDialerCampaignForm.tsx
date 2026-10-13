@@ -336,7 +336,13 @@ export default function AutoDialerCampaignForm() {
             action_human: data.action_human,
             action_unknown: data.action_unknown,
             retry_on_voicemail: data.retry_on_voicemail,
-          } : {}),
+          } : {
+            // AMD switched off: clear whatever was saved before
+            action_voicemail: null,
+            action_human: null,
+            action_unknown: null,
+            retry_on_voicemail: false,
+          }),
         };
         
         // Add routing fields only if provided
