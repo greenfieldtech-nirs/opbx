@@ -3,127 +3,199 @@ sidebar_position: 5
 slug: /modules/business-hours
 sidebar_class_name: cxGuidesSidebar
 title: "Business Hours"
-description: "Route calls based on time of day with weekly schedules and holidays"
+description: "Send calls to one destination while you are open and another while you are closed, with weekly hours and holiday exceptions"
 ---
 
 # Business Hours
 
-Business Hours enable time-based call routing. Calls route to different destinations depending on whether your business is open or closed.
+A business-hours schedule decides where a call goes based on the time it arrives. It has weekly opening hours, optional exception dates (holidays and special hours), an **open-hours action** and a **closed-hours action**. Route a phone number to the schedule and it picks the right destination for every call.
 
 ## Purpose
 
 Use this module to:
 
-- Define weekly open and closed hours
-- Configure time zones
-- Add holiday and special-hours exceptions
-- Route calls to different destinations during open and closed periods
+- set opening hours for each day of the week, with one or more time ranges per day;
+- add holidays and days with special hours;
+- send open-hours calls to, for example, an IVR menu and closed-hours calls to an after-hours menu.
 
-## Configuration Elements
+## Prerequisites
 
-| Element | Description |
-|---------|-------------|
-| Weekly Schedule | Open hours for each day of the week |
-| Time Zone | IANA timezone for accurate routing |
-| Exceptions | Closed dates or special hours (for example, holidays) |
-| Open Destination | Where calls go during business hours |
-| Closed Destination | Where calls go after hours |
-
-## Destination Types
-
-Business hours support the following destination types using prefixed string IDs:
-
-| Prefix | Destination |
-|--------|-------------|
-| `ext-{id}` | Extension |
-| `rg-{id}` | Ring Group |
-| `conf-{id}` | Conference Room |
-| `ivr-{id}` | IVR Menu |
-| `ai-{id}` | AI Assistant |
-| `alb-{id}` | AI Load Balancer |
+- **Both destinations exist.** Create the extensions, ring groups, menus, rooms, queues or AI targets first.
+- **A phone number** to route to the schedule. See [Phone Numbers](/modules/phone-numbers).
 
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View schedules | Yes | Yes | Yes | Yes |
-| Create schedules | Yes | Yes | No | No |
-| Update schedules | Yes | Yes | No | No |
-| Delete schedules | Yes | Yes | No | No |
+|--------|:-----:|:---------:|:--------:|:--------:|
+| See Business Hours in the sidebar | Yes | Yes | No | No |
+| View schedules | Yes | Yes | Yes (API) | Yes (API) |
+| Create, edit, delete, duplicate, change status | Yes | Yes | No | No |
 
-## UI Workflow
+## Create a schedule
 
-### Create a Schedule
+1. Open **Business Hours** in the sidebar.
+2. Click **New Schedule**.
+3. Enter the **Name**.
+4. Choose the **Open Hours Action** type and its destination.
+5. Choose the **Closed Hours Action** type and its destination.
+6. Set the weekly hours (see [Weekly schedule](#weekly-schedule)).
+7. Optionally add exception dates.
+8. Click **Create Schedule**.
 
-1. Navigate to **Business Hours** in the sidebar
-2. Click **Create Schedule**
-3. Enter a name and select a timezone
-4. Define weekly hours for each day
-5. Add exceptions (holidays or special hours)
-6. Set the open-hours destination
-7. Set the closed-hours destination
-8. Save
+The schedule is saved as **Active**. It becomes available as a routing type on phone numbers.
 
-### Duplicate a Schedule
+{/* SCREENSHOT: business-hours-list — Business Hours list with Main Office Hours and Support Desk Hours, showing the timezone, exception count, last-modified date and the Active status badge, with the Unprovisioned filter in the toolbar */}
 
-1. Open the schedule
-2. Click **Duplicate**
-3. The system creates a copy with "(Copy)" appended to the name
-4. Edit the copy as needed
+{/* SCREENSHOT: business-hours-create-dialog — Create Schedule dialog with the open-hours action set to IVR Menu "Main Menu", the closed-hours action set to IVR Menu "After Hours Menu", and the weekly calendar filled from the Monday-Friday 9:00-17:00 template */}
 
-### Toggle Status
+## Fields
 
-Use the status toggle to enable or disable a schedule. Disabled schedules are not used for routing.
+| Field | Limits | Meaning |
+|-------|--------|---------|
+| Name | Required. 2 to 255 characters, unique within the organization | Shown in lists and in the phone-number destination picker |
+| Open Hours Action | Required. A type and one destination | Where calls go while the schedule is open |
+| Closed Hours Action | Required. A type and one destination | Where calls go while it is closed |
+| Weekly schedule | Each day on or off. An enabled day needs at least one time range | The regular opening hours |
+| Exceptions | Up to 100 dates | Holidays and special hours |
+| Status | Active or Inactive. Default: Active | Changed from the list |
+| Timezone | Shown in the list; see the caution below | The time zone of the hours |
 
-## Schedule Templates
+### Action types
 
-The frontend provides templates to speed up configuration:
+| Type | Destination |
+|------|-------------|
+| Extension | One extension |
+| Ring Group | A ring group |
+| Conference | A conference room |
+| IVR Menu | A menu |
+| AI Assistant | An AI assistant |
+| AI Load Balancer | An AI load balancer |
+| Call Queue | A call queue |
+| Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-and-unprovisioned-schedules) |
 
-- `mon-fri-business`
-- `mon-fri-all-day`
-- `sun-thu-business`
-- `sun-thu-all-day`
-- `24-7`
+There is no "Hangup" action. Use Disconnect on an existing schedule, or route to a destination that ends the call.
 
-## Holiday Import
+:::caution Things to check before relying on a schedule
+- **Time zone.** The dialog has no time-zone field and new schedules are saved as **UTC**. The routing code compares the hours with the server clock (UTC) and does not apply the schedule's time zone. Enter the hours in UTC.
+- **Call Queue action.** The dialog offers Call Queue, but the inbound routing code does not handle a Call Queue action on a schedule. Test such a schedule before you use it, or route to the queue through an IVR menu or ring-group fallback instead.
+- **Inactive schedules.** Setting a schedule to Inactive shows it as closed in the list, but the inbound routing code does not check the status. Change the phone number's routing instead of relying on Inactive.
+:::
 
-The UI can fetch public holidays from `date.nager.at` by country and year. Select the holidays you want to import as closed exceptions.
+### Weekly schedule
 
-## Key Data Fields
+Each day of the week is either closed or has one or more time ranges in `HH:mm` format. The end time must be after the start time. A call at the end time is already closed.
 
-### `business_hours_schedules` Table
+Helpers in the dialog:
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope, soft deletes |
-| `name` | string | Unique per org |
-| `status` | enum | active, inactive |
-| `timezone` | string | IANA timezone |
-| `open_hours_action` | JSON | `{target_id: "ext-13"}` |
-| `open_hours_action_type` | enum | BusinessHoursActionType |
-| `closed_hours_action` | JSON | `{target_id: "rg-5"}` |
-| `closed_hours_action_type` | enum | BusinessHoursActionType |
+- **Template**: Monday-Friday 9:00-17:00, Monday-Friday all day, Sunday-Thursday 9:00-17:00, Sunday-Thursday all day, or 24 x 7. "All day" and 24 x 7 use 00:00 to 23:59.
+- **Copy hours**: copies one day's ranges to the days you tick, in the **Copy Hours To Multiple Days** dialog.
+- **Clear All**: closes every day.
 
-### Related Tables
+### Exception dates
 
-- `business_hours_schedule_days` — One row per day of the week per schedule
-- `business_hours_time_ranges` — Time intervals per day
-- `business_hours_exceptions` — Exception dates
-- `business_hours_exception_time_ranges` — Exception time intervals
+An exception replaces the weekly hours for one date.
 
-## Related API Endpoints
+| Exception type | Meaning |
+|----------------|---------|
+| Closed All Day | Closed for the whole date. No time ranges allowed |
+| Special Hours | Open only during the time ranges you give. At least one range |
+
+Each exception has a date and a name (up to 255 characters). A date can only appear once; duplicates in one request are dropped silently.
+
+**Import Holidays** loads public holidays from the public `date.nager.at` service for the country and year you choose. Tick the holidays to add them as Closed exceptions. The browser calls that service directly.
+
+{/* SCREENSHOT: business-hours-exceptions — Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed) */}
+
+## How a call is routed
+
+1. A call arrives on a phone number routed to the schedule.
+2. If today's date has an exception, the exception decides: closed, or open only within its ranges.
+3. Otherwise the day's time ranges decide.
+4. Open: the open-hours action runs. Closed: the closed-hours action runs.
+5. If the target no longer exists or is inactive, the caller hears a short "not available" message and the call ends.
+
+## Edit a schedule
+
+1. Click the schedule in the list.
+2. Change the fields and click **Save Changes**.
+
+**Status:** click the status badge in the list to switch between Active and Inactive.
+
+### Disconnect and unprovisioned schedules
+
+On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows the **Unprovisioned** badge in the list and the dialog title.
+
+The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
+
+An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. Use the **Unprovisioned** filter to find these schedules, then choose a new destination.
+
+## Duplicate a schedule
+
+The API and the MCP server (`duplicate_business_hours`) can copy a schedule with its days and exceptions. The copy is named "*original* (Copy)" and starts **Inactive**. The page has no Duplicate button.
+
+## Delete a schedule
+
+1. Click the delete icon on the row.
+2. Confirm in the **Delete Schedule** dialog.
+
+The delete is refused while a phone number, an IVR menu option or failover, or a call-tracking campaign still routes to the schedule. The **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
+
+{/* SCREENSHOT: business-hours-in-use-dialog — "Cannot delete: still in use" dialog for Main Office Hours, listing the phone number +12025550100 (Main Line) as a routing target */}
+
+## Common errors
+
+| Message | What it means | What to do |
+|---------|---------------|-----------|
+| A schedule with this name already exists in your organization. | Duplicate name | Choose another name |
+| *Day* is enabled but has no time ranges. | An open day without hours | Add a range or close the day |
+| End time must be after start time. | A range ends before it starts | Fix the times |
+| Special hours exceptions must have at least one time range. | Special Hours without hours | Add a range or use Closed All Day |
+| Maximum 100 exceptions allowed per schedule. | Too many exception dates | Remove old dates |
+| Choose a destination. | A create request used Destination unavailable | Pick a real destination |
+| This business hours is still used by: … | The delete was refused | Change the listed references, then delete |
+
+## Key data fields
+
+### `business_hours_schedules`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope. Soft-deleted rows keep `deleted_at` |
+| `name` | Unique among the organization's live schedules |
+| `status` | `active` or `inactive` |
+| `timezone` | IANA name. Default `UTC` |
+| `open_hours_action_type`, `closed_hours_action_type` | `extension`, `ring_group`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `call_queue` or `unavailable` |
+| `open_hours_action`, `closed_hours_action` | JSON with a prefixed target, for example `{"target_id": "ivr-3"}` |
+
+Target prefixes checked by the API: `ext-` (extension), `rg-` (ring group), `queue-` (call queue) and `ivr-` (IVR menu), each followed by the id. The API checks the format only, not that the target exists.
+
+### Related tables
+
+- `business_hours_schedule_days`: one row per weekday, with `enabled`.
+- `business_hours_time_ranges`: the ranges of a day.
+- `business_hours_exceptions`: date, name and type (`closed` or `special_hours`).
+- `business_hours_exception_time_ranges`: the ranges of a special-hours date.
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/business-hours[/{businessHour}]` | Standard CRUD |
-| POST | `/v1/business-hours/{businessHour}/duplicate` | Duplicate a schedule |
-| PATCH | `/v1/business-hours/{businessHour}/toggle-status` | Toggle active status |
+| GET | `/v1/business-hours` | List. Filters: `status`, `search`, `unprovisioned=1` |
+| POST | `/v1/business-hours` | Create. Rejects `unavailable` actions |
+| GET | `/v1/business-hours/{businessHour}` | One schedule with days and exceptions |
+| PUT | `/v1/business-hours/{businessHour}` | Update |
+| DELETE | `/v1/business-hours/{businessHour}` | Delete. Returns 409 with `references` when in use |
+| POST | `/v1/business-hours/{businessHour}/duplicate` | Copy, saved as Inactive |
+| PATCH | `/v1/business-hours/{businessHour}/toggle-status` | Switch Active and Inactive |
+
+Scoped API keys use the `business-hours` resource. The MCP server has `list_business_hours`, `get_business_hours`, `create_business_hours`, `update_business_hours`, `duplicate_business_hours`, `set_business_hours_status` and `delete_business_hours`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Phone Numbers](/modules/phone-numbers) — DIDs can route to business hours
-- [IVR Menus](/modules/ivr-menus) — IVR options can route to business hours
-- [Ring Groups](/modules/ring-groups) — Common closed-hours destination
+- [Phone Numbers](/modules/phone-numbers) — route a number to a schedule
+- [IVR Menus](/modules/ivr-menus) — a common open-hours or closed-hours destination
+- [Ring Groups](/modules/ring-groups) — another common destination
+- [User Management](/modules/user-management) — deleting a user can disconnect an action

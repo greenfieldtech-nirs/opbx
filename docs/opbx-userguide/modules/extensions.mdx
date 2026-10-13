@@ -3,154 +3,213 @@ sidebar_position: 2
 slug: /modules/extensions
 sidebar_class_name: cxGuidesSidebar
 title: "Extensions Management"
-description: "Creating and managing PBX extensions"
+description: "Create extensions, choose what each one reaches, set the outbound caller ID, and keep SIP phones in sync with Cloudonix"
 ---
 
 # Extensions
 
-Extensions are the foundation of your PBX system. They represent numbered endpoints that callers can reach directly or through routing configurations.
+An extension is a short internal number, for example `1005`. Dialing it reaches whatever the extension is linked to: a person's phone, a ring group, a queue, a conference room, an IVR menu, an AI assistant, an AI load balancer, or an outside number.
+
+Extensions of type **PBX User** are SIP accounts. OPBX creates a matching subscriber in Cloudonix so a desk phone, softphone or the [web phone](/modules/web-phone) can register with it.
 
 ## Purpose
 
 Use this module to:
 
-- Create and manage extension endpoints
-- Assign extensions to users
-- Configure extension-specific routing
-- Assign a default outbound caller ID per extension
-- Sync user extensions to Cloudonix as SIP subscribers
-- Reset SIP passwords
+- give each person an internal number and a SIP account;
+- create short numbers for groups, queues, conference rooms, menus and AI;
+- forward an internal number to an outside number;
+- set the caller ID used for outbound calls from an extension;
+- see SIP passwords and keep the extensions aligned with Cloudonix.
 
-## Extension Types
+## Prerequisites
 
-OPBX supports multiple extension types for different use cases:
-
-| Type | Value | Description | Configuration |
-|------|-------|-------------|---------------|
-| User | `user` | SIP phone extension for a person | Assigned to a user, auto-generated SIP password |
-| Conference | `conference` | Routes to a conference room | Select conference room |
-| Ring Group | `ring_group` | Routes to a ring group | Select ring group |
-| IVR | `ivr` | Routes to an IVR menu | Select IVR menu |
-| AI Assistant | `ai_assistant` | Routes to an AI provider | Select AI assistant |
-| AI Load Balancer | `ai_load_balancer` | Routes to AI load balancer | Select load balancer |
-| Forward | `forward` | Forwards to external number | Enter phone number |
-| Custom Logic | `custom_logic` | Custom application routing | Container app/block name |
+- **Cloudonix settings** for the organization (domain and API key). Without them, PBX User extensions are saved but no SIP subscriber is created. See [Settings](/modules/settings).
+- **The target exists.** For any type other than PBX User and Forward, create the ring group, queue, room, menu, assistant or load balancer first.
+- **A phone number (optional)** for the default caller ID. See [Phone Numbers](/modules/phone-numbers).
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View extensions | Yes | Yes | Yes | Yes |
-| Create extensions | Yes | Yes | No | No |
-| Update extensions | Yes | Yes | Own only | No |
-| Delete extensions | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See Extensions in the sidebar | Yes | Yes | Yes | Yes | No |
+| View extensions | Yes | Yes | Yes (read-only page) | Yes (read-only page) | Only extensions of their assigned users (API) |
+| Create, delete, sync | Yes | Yes | No | No | No |
+| Edit | Yes | Yes | Own extension, through the API only | No | No |
+| Toggle status from the list | Yes | Yes | No | No | No |
+| See SIP passwords on the page | Yes | Yes | No | No | No |
 
-## UI Workflow
+A PBX User may change their own extension through the API but cannot change its type, its assigned user or its status.
 
-### Create an Extension
+## Extension types
 
-1. Navigate to **Extensions** in the sidebar
-2. Click **Create Extension**
-3. Enter an extension number (3-5 digits, unique within your organization)
-4. Select the extension type
-5. Configure type-specific settings
-6. Save the extension
+| Type (page label) | API value | Links to |
+|-------------------|-----------|----------|
+| PBX User | `user` | A user in the organization (optional). Gets a SIP account |
+| Forward | `forward` | An outside number or SIP address, up to 50 characters |
+| Ring Group | `ring_group` | A ring group |
+| Call Queue | `queue` | A call queue. The queue must be active |
+| Conference | `conference` | A conference room |
+| IVR Menu | `ivr` | An IVR menu |
+| AI Assistant | `ai_assistant` | An AI assistant |
+| AI Load Balancer | `ai_load_balancer` | An AI load balancer |
 
-:::warning
-Extension numbers cannot be changed after creation. If you need a different number, delete the extension and create a new one.
+The API also has a `custom_logic` type (a Cloudonix container application and block name, up to 255 characters each). The page does not offer it.
+
+A **Call Queue** extension lets agents transfer callers into a queue by number. See [Call Queues](/modules/call-queues).
+
+## Create an extension
+
+1. Open **Extensions** in the sidebar.
+2. Click **Add Extension**. The dialog suggests the next free number.
+3. Check or change the **Extension Number**.
+4. Choose the **Extension Type**, then the **Assignment** (the user, group, room and so on, or the forward-to number).
+5. Optionally choose a **Default Caller ID**.
+6. Click **Create Extension**.
+
+What happens on save:
+
+- The extension is stored as **Active**.
+- For **PBX User** extensions, OPBX generates a 32-character SIP password and creates the subscriber in Cloudonix. If the Cloudonix call fails, the extension is still saved; run **Sync Extensions** later.
+- The extension becomes available as a routing destination.
+
+{/* SCREENSHOT: extensions-list — Extensions list for Acme Corp (Demo): PBX User extensions 1001 to 1011 with 1011 (Karen Patel) inactive, the Forward extension 1012 and the AI Assistant extension 1013, with the type, status and assignment filters */}
+
+{/* SCREENSHOT: extensions-create-dialog — Add Extension dialog with the suggested number, type PBX User, a user selected under Assignment and the Default Caller ID list showing Main Line (+12025550100) */}
+
+## Fields
+
+| Field | Required | Limits | Meaning |
+|-------|----------|--------|---------|
+| Extension Number | Yes | 3 to 5 digits, unique within the organization. Cannot be changed later | The number people dial |
+| Extension Type | Yes | See the table above | What the extension reaches |
+| Assignment | Yes, except for PBX User | One item of the chosen type, from your organization. Forward: up to 50 characters | The target |
+| Default Caller ID | No | A phone number of your organization; the list shows active numbers | Caller ID for outbound calls from this extension |
+| Status | Set in the list | Active or Inactive. Default: Active | Inactive extensions are not routed to |
+
+The API also accepts `voicemail_enabled` (PBX User only; any other type is refused with "Voicemail can only be enabled for user extensions.").
+
+:::warning Extension numbers cannot be changed
+The number is fixed after creation. To use another number, create a new extension and delete the old one. The delete is refused while the old extension is still used in routing.
 :::
 
-### Reset a SIP Password
+### Default caller ID
 
-1. Open the extension details
-2. Click **Reset Password**
-3. The new password displays immediately
-4. Update the SIP phone configuration
+The default caller ID is the number presented when someone calls out from this extension. It takes precedence over the caller ID of an [outbound whitelist](/modules/outbound-whitelist) rule. When the chosen number is not active, the call falls through to the next caller ID in the order described in the [Outbound Calling Overview](/installation/outbound-calling-overview).
 
-:::note
-Resetting the SIP password disconnects any active registrations. The SIP phone must re-register with the new credentials.
-:::
+A phone number used as a default caller ID cannot be deleted until you clear it here.
 
-### Set a Default Caller ID
+## Edit an extension
 
-An extension can be assigned a **Default Caller ID** — an active DID owned by your organization that is presented when the user places an outbound call.
+1. Click the extension number or its row.
+2. Change the type, assignment or default caller ID. The number is shown but cannot be edited.
+3. Click **Save Changes**.
 
-1. Open the extension's create or edit dialog
-2. Select a DID under **Default Caller ID** (or leave it unset)
-3. Save
+**Status:** click the status badge in the list to switch between active and inactive. Calls to an inactive extension are not connected, and an inactive extension is skipped as a ring-group member.
 
-An extension's Default Caller ID takes precedence over the caller ID configured on an [Outbound Whitelist](/modules/outbound-whitelist) rule. See the [Outbound Calling Overview](/installation/outbound-calling-overview) for the full precedence order and rationale.
+{/* SCREENSHOT: extensions-edit-dialog — Edit Extension dialog for the Forward extension 1012, with the read-only number, Extension Type Forward and the forward-to number +12025550180 */}
 
-### Sync to Cloudonix
+## SIP passwords
 
-1. Go to **Extensions** in the sidebar
-2. Click **Sync to Cloudonix**
-3. The system creates SIP subscribers for all USER-type extensions
-4. Compare local and Cloudonix state before confirming if desired
+The **Password** column appears for Owners and PBX Admins when the list contains PBX User extensions.
 
-## Cloudonix Synchronization
+- Click the eye icon to load and show the password. Click again to hide it.
+- Click the copy icon to copy it.
 
-User extensions sync to Cloudonix as SIP subscribers. The sync lifecycle is:
+Only PBX User extensions have a password. The API also has a reset endpoint (see below) that generates a new password and pushes it to Cloudonix. After a reset, every registered phone must be configured with the new password.
 
-- **Create USER**: Auto-generate a 32-character hex password, insert into DB, then create the Cloudonix subscriber
-- **Type change TO USER**: Generate a password and sync to Cloudonix
-- **Type change FROM USER**: Remove the password and unsync from Cloudonix
-- **Delete USER**: Unsync from Cloudonix, then delete from DB
-- **Bidirectional sync**: Pushes local changes, imports Cloudonix subscribers, and aligns statuses
+{/* SCREENSHOT: extensions-password-shown — Extensions list with the password of extension 1005 revealed and the copy icon next to it */}
 
-## Key Data Fields
+## Sync with Cloudonix
 
-### `extensions` Table
+**Sync Extensions** is enabled when OPBX finds a difference between its PBX User extensions and the Cloudonix subscribers. A sync:
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `user_id` | FK nullable | Only for USER type |
-| `extension_number` | string(5) | 3-5 digits, unique per org, immutable |
-| `password` | string(32) | SIP auth password (plain text for SIP client sharing) |
-| `type` | enum | user, conference, ring_group, ivr, ai_assistant, custom_logic, forward, ai_load_balancer |
-| `status` | enum | active, inactive |
-| `voicemail_enabled` | boolean | Only for USER type |
-| `configuration` | JSON | Type-specific config |
-| `ai_assistant_id` | FK nullable | Direct AI assistant link |
-| `default_caller_id_did_id` | FK nullable | DID presented as caller ID on outbound calls |
-| `cloudonix_subscriber_id` | string nullable | Cloudonix sync tracking |
+1. creates a Cloudonix subscriber for each PBX User extension that has none;
+2. creates an unassigned PBX User extension for each Cloudonix subscriber with a 3 to 5 character number that OPBX does not have (longer numbers are treated as phone numbers and skipped);
+3. sets the local status of matching extensions to the Cloudonix status.
 
-The API also returns a nested `default_caller_id` object (`id`, `phone_number`, `friendly_name`) when the relationship is loaded.
+## Delete an extension
 
-## Related API Endpoints
+1. Click the delete icon on the row.
+2. Confirm in the **Delete Extension?** dialog. It warns when the extension is assigned to a user.
+
+The delete is refused while routing still points at the extension. The **Cannot delete: still in use** dialog lists each place, for example:
+
+- a ring group that has it as a member or a fallback;
+- a call queue or AI load balancer fallback;
+- an IVR menu option or failover;
+- a phone number routed to it;
+- a business-hours open or closed action;
+- a call-tracking campaign destination.
+
+Change those first, then delete again. Call history never blocks a delete. A PBX User extension's Cloudonix subscriber is removed with it.
+
+{/* SCREENSHOT: extensions-in-use-dialog — "Cannot delete: still in use" dialog for extension 1012, listing the Support Team fallback, the Billing Queue fallback, the After Hours Menu option and the Support Desk Hours closed-hours action */}
+
+### When a user is deleted
+
+Deleting a user does **not** delete their extension. It is kept, unassigned, and can be given to someone else. Routes that pointed at it are changed to "Destination unavailable". See [User Management](/modules/user-management#delete-a-user).
+
+## Common errors
+
+| Message | What it means | What to do |
+|---------|---------------|-----------|
+| Extension number must be 3-5 digits. | Wrong format | Use 3 to 5 digits |
+| This extension number is already in use within your organization. | Duplicate | Choose another number |
+| Extension number cannot be changed after creation. | The API request tried to change it | Create a new extension instead |
+| *Ring group / call queue / IVR / conference room …* ID is required for … extensions. | No assignment for that type | Pick the target |
+| The selected call queue must be active. | Queue extension pointing at an inactive queue | Activate the queue first |
+| User ID should only be set for user extensions. | A user was sent with another type | Remove the user or change the type |
+| The selected caller ID does not belong to your organization. | Wrong default caller ID | Pick one of your numbers |
+| This extension is still used by: … | The delete was refused | Change the listed references, then delete |
+
+## Key data fields
+
+### `extensions`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `user_id` | The assigned user. PBX User type only, may be empty |
+| `extension_number` | 3 to 5 digits, unique within the organization, fixed |
+| `password` | SIP password, PBX User only. Never in list responses |
+| `type` | `user`, `forward`, `ring_group`, `queue`, `conference`, `ivr`, `ai_assistant`, `ai_load_balancer` or `custom_logic` |
+| `status` | `active` or `inactive` |
+| `voicemail_enabled` | PBX User only |
+| `configuration` | The target id, for example `{"ring_group_id": 4}` or `{"forward_to": "+12025550180"}` |
+| `ai_assistant_id` | Set for AI Assistant extensions |
+| `default_caller_id_did_id` | The phone number used as outbound caller ID |
+| `cloudonix_subscriber_id` | The Cloudonix subscriber, when synced |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/extensions[/{extension}]` | Standard CRUD |
-| GET | `/v1/extensions/sync/compare` | Compare local vs Cloudonix state |
-| POST | `/v1/extensions/sync` | Perform bidirectional sync |
-| GET | `/v1/extensions/{extension}/password` | View current SIP password |
-| PUT | `/v1/extensions/{extension}/reset-password` | Reset SIP password |
+| GET | `/v1/extensions` | List. Filters: `type`, `status`, `user_id`, `search` |
+| POST | `/v1/extensions` | Create |
+| GET | `/v1/extensions/{extension}` | One extension |
+| PUT | `/v1/extensions/{extension}` | Update |
+| DELETE | `/v1/extensions/{extension}` | Delete. Returns 409 with `references` when in use |
+| GET | `/v1/extensions/{extension}/password` | SIP password (PBX User only; 204 for other types) |
+| PUT | `/v1/extensions/{extension}/reset-password` | New SIP password, pushed to Cloudonix |
+| GET | `/v1/extensions/sync/compare` | Differences between OPBX and Cloudonix |
+| POST | `/v1/extensions/sync` | Run the sync |
+
+Scoped API keys use the `extensions` resource. The MCP server has `list_extensions`, `get_extension`, `create_extension`, `update_extension` and `delete_extension`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Best Practices
+## Best practices
 
-### Numbering Plan
+- Keep a numbering plan, for example 1000–1999 for people and 2000–2999 for groups and queues.
+- Set an extension to inactive instead of deleting it when someone is away.
+- Treat SIP passwords as secrets; reset one if it may have leaked.
 
-Develop a consistent numbering plan for your organization:
+## Related modules
 
-- Reserve 3-digit extensions for departments (for example, 100-199 for sales)
-- Use 4-digit extensions for individual users
-- Avoid numbers that conflict with feature codes
-
-### Security
-
-- Reset SIP passwords periodically
-- Disable extensions instead of leaving them active but unused
-- Monitor registration logs for unauthorized devices
-
-## Related Modules
-
-- [User Management](/modules/user-management) — Assign users to extensions
-- [Phone Numbers](/modules/phone-numbers) — DIDs route to extensions and serve as caller IDs
-- [Ring Groups](/modules/ring-groups) — Extensions are ring group members
-- [AI Assistants](/modules/ai-assistants) — AI_ASSISTANT type extensions
-- [Outbound Calling Overview](/installation/outbound-calling-overview) — How the per-extension caller ID is used
+- [User Management](/modules/user-management) — the people PBX User extensions belong to
+- [Ring Groups](/modules/ring-groups) — extensions are ring-group members
+- [Phone Numbers](/modules/phone-numbers) — route a number to an extension, and use a number as caller ID
+- [Web Phone](/modules/web-phone) — a browser phone that registers with a PBX User extension
+- [Outbound Calling Overview](/installation/outbound-calling-overview) — how the caller ID is chosen

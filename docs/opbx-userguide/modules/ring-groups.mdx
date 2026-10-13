@@ -3,113 +3,209 @@ sidebar_position: 4
 slug: /modules/ring-groups
 sidebar_class_name: cxGuidesSidebar
 title: "Ring Groups"
-description: "Distribute incoming calls across groups of extensions"
+description: "Ring several extensions for one call, choose the ring strategy, and decide where unanswered calls go"
 ---
 
 # Ring Groups
 
-Ring groups allow incoming calls to ring multiple extensions simultaneously or sequentially.
+A ring group rings a set of extensions for one incoming call. The first member who answers takes the call. If nobody answers, the call goes to the group's **fallback** destination.
+
+A ring group is **stateless**: members do not log in, and there are no waiting callers or statistics. For callers that should wait on hold until someone is free, use a [call queue](/modules/call-queues).
 
 ## Purpose
 
 Use this module to:
 
-- Create call distribution groups for departments
-- Choose a ring strategy (simultaneous, round-robin, sequential)
-- Set ring timeout and retry turns
-- Configure fallback actions when no one answers
+- give a department one destination, for example "Sales Team";
+- choose whether members ring together or one after another;
+- set how long each member rings and how many rounds are tried;
+- choose where unanswered calls go.
 
-## Distribution Strategies
+## Prerequisites
 
-| Strategy | Behavior | Best For |
-|----------|----------|----------|
-| Simultaneous | All members ring at once | Small teams where anyone can answer |
-| Round Robin | Distributes calls evenly across members | Balancing workload across agents |
-| Sequential | Tries members one by one | Escalation chains or priority routing |
-
-## Fallback Actions
-
-When no member answers within the timeout, the call can route to:
-
-| Action | Description |
-|--------|-------------|
-| Extension | A specific extension |
-| Ring Group | Another ring group |
-| IVR Menu | An IVR menu |
-| AI Assistant | An AI assistant |
-| AI Load Balancer | An AI load balancer |
-| Hangup | Disconnect the call |
+1. **Member extensions.** Members are extensions of type **User** or **Forward**, and they must be **active**. See [Extensions](/modules/extensions).
+2. **A fallback destination (optional).** If you want unanswered calls to go somewhere other than a hangup, the target (extension, ring group, IVR menu, AI assistant, AI load balancer or call queue) must exist and be active.
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View ring groups | Yes | Yes | Yes | Yes |
-| Create ring groups | Yes | Yes | No | No |
-| Update ring groups | Yes | Yes | No | No |
-| Delete ring groups | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See Ring Groups in the sidebar | Yes | Yes | No | Yes | Yes |
+| View ring groups | Yes | Yes | Yes (API) | Yes (read-only page) | Only the groups assigned to them |
+| Create, edit, delete | Yes | Yes | No | No | No |
+| Toggle status from the list | Yes | Yes | No | No | No |
 
-## UI Workflow
+Reporters and supervisors see the page with a **Read-Only** badge. Supervisor assignments are made on [Supervisors](/modules/supervisors).
 
-### Create a Ring Group
+## Create a ring group
 
-1. Navigate to **Ring Groups** in the sidebar
-2. Click **Create Ring Group**
-3. Enter a name and optional description
-4. Select a strategy
-5. Set the ring timeout (seconds)
-6. Add member extensions
-7. Choose a fallback action
-8. Save
+1. Open **Ring Groups** in the sidebar.
+2. Click **Create Ring Group**.
+3. Enter the **Ring Group Name**.
+4. Choose the **strategy** (see [Strategies](#strategies)).
+5. Click **Add Member** for each extension and pick it from the list.
+6. Set **Extension Ring Timeout** and **Ring Turns**.
+7. Choose the **Fallback Action** and, if it needs one, the destination.
+8. Click **Create Ring Group**.
 
-### Update Members
+On save the group is stored as **Active** and becomes available as a destination everywhere in OPBX.
 
-1. Open the ring group
-2. Add, remove, or reorder members
-3. Save the changes
+{/* SCREENSHOT: ring-groups-list — Ring Groups list with Sales Team (Simultaneous), Support Team (Sequential) and Executive Line (Round Robin), the Strategy, Status and Unprovisioned filters in the toolbar */}
 
-The controller uses a delete-and-recreate pattern for members, so the list is fully replaced on each update.
+{/* SCREENSHOT: ring-groups-create-dialog — Create Ring Group dialog with three members, the strategy cards, timeout 25 and ring turns 2, and the fallback action selector open */}
 
-## Key Data Fields
+## Fields
 
-### `ring_groups` Table
+| Field | Limits and default | Meaning |
+|-------|--------------------|---------|
+| Ring Group Name | Required. 2 to 100 characters, unique within the organization | Shown in lists and destination pickers |
+| Strategy | Simultaneous, Round Robin or Sequential. Default: Simultaneous | How members are rung |
+| Members | Required. 1 to 50 extensions, each only once | Who is rung. Only active **User** and **Forward** extensions are offered and accepted |
+| Extension Ring Timeout | 5 to 300 seconds. Default: 30 | How long the call rings (all members for Simultaneous, each member for the others) |
+| Ring Turns | 1 to 9. Default: 2 | How many rounds through the member list (Sequential and Round Robin) |
+| Fallback Action | Required. Default in the dialog: Extension | Where the call goes when nobody answers |
+| Fallback destination | Required for every action except Hangup | The extension, group, menu, assistant, load balancer or queue |
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | Group name |
-| `description` | string nullable | |
-| `strategy` | enum | simultaneous, round_robin, sequential |
-| `timeout` | integer | Ring timeout in seconds |
-| `ring_turns` | integer | Number of ring cycles (sequential) |
-| `fallback_action` | enum | Action when no one answers |
-| `fallback_extension_id` | FK nullable | |
-| `fallback_ring_group_id` | FK nullable | Self-referencing |
-| `fallback_ivr_menu_id` | FK nullable | |
-| `fallback_ai_assistant_id` | FK nullable | |
-| `fallback_ai_load_balancer_id` | FK nullable | |
-| `status` | enum | active, inactive |
+The API also accepts a **description** (up to 1000 characters) and a **status**; the dialog does not show them. New groups are always Active.
 
-### `ring_group_members` Table
+### Strategies
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `ring_group_id` | FK | Parent group |
-| `extension_id` | FK | Member extension |
-| `priority` | integer | Member order |
+| Strategy | What happens |
+|----------|--------------|
+| Simultaneous | All members ring at the same time for the ring timeout. The first to answer gets the call. If nobody answers, the fallback runs |
+| Sequential | Members ring one at a time, in the order shown in the dialog, each for the ring timeout. The list is tried **Ring Turns** times, then the fallback runs |
+| Round Robin | Rings members one at a time, like Sequential (see the note below) |
 
-## Related API Endpoints
+For Sequential, drag members by their handle to change the order. The top member rings first.
+
+:::caution Round Robin currently behaves like Sequential
+The call-routing code treats Round Robin and Sequential the same way: every call starts with the first member in the list. There is no rotation between calls yet.
+:::
+
+Only **active** member extensions are rung. An inactive member is skipped without an error. A **Forward** member rings its forward-to number or SIP address.
+
+### Fallback actions
+
+| Action | Where the call goes |
+|--------|---------------------|
+| Extension | One extension |
+| Ring Group | Another ring group. The group being edited is not offered |
+| IVR Menu | A menu |
+| AI Assistant | An extension of type AI Assistant |
+| AI Load Balancer | An AI load balancer |
+| Call Queue | A call queue |
+| Hangup | The caller hears "No agents available" and the call ends |
+| Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-and-unprovisioned-groups) |
+
+The fallback target must belong to your organization and be **active** when you save. If it becomes inactive or is removed later, the call ends with the Hangup message instead.
+
+## Edit a ring group
+
+1. Click the group's name or row in the list.
+2. Change the fields and click **Save Changes**.
+
+Saving the dialog replaces the whole member list with the one shown.
+
+**Status:** click the **Active** or **Disabled** badge in the list to switch it straight away. A disabled group does not ring anybody: callers hear "Ring group is inactive" and the call ends.
+
+### Disconnect and unprovisioned groups
+
+On the edit dialog only, the fallback action list has a **Disconnect** choice. It sets the fallback to **Destination unavailable**: when nobody answers, callers hear "Destination doesn't exist" and the call ends. The group then shows the **Unprovisioned** badge in the list and in the dialog title.
+
+The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination." A new group must have a real fallback.
+
+Groups can also become unprovisioned when a user is deleted and the group's fallback pointed at that user's extension (see [User Management](/modules/user-management#delete-a-user)).
+
+To find these groups, click the **Unprovisioned** filter in the toolbar. To fix one, open it and choose a new fallback.
+
+{/* SCREENSHOT: ring-groups-edit-dialog — Edit Ring Group dialog for Support Team (Sequential), with drag handles on the three members and the fallback action list showing the Disconnect item */}
+
+## Delete a ring group
+
+1. Click the delete icon on the row.
+2. Confirm in the **Delete Ring Group** dialog.
+
+The delete is refused while other configuration still routes calls to the group. The dialog **Cannot delete: still in use** lists each place, for example:
+
+- a phone number routed to the group;
+- an IVR menu option or failover;
+- another ring group's, call queue's or AI load balancer's fallback;
+- a business-hours open or closed action;
+- a call-tracking campaign destination;
+- an extension of type Ring Group that points at it.
+
+Change those first, then delete again. A group that falls back to itself does not block its own delete. Call history never blocks a delete.
+
+{/* SCREENSHOT: ring-groups-in-use-dialog — "Cannot delete: still in use" dialog for Support Team, listing the Main Menu option, the Support Desk Hours open-hours action and the Support Queue fallback */}
+
+## Routing calls to a ring group
+
+A ring group appears as a destination in:
+
+- **Phone numbers (DIDs)**: route a number to the group.
+- **IVR menus**: as an option target or the failover.
+- **Business hours**: as the open-hours or closed-hours action.
+- **Other ring groups, call queues and AI load balancers**: as the fallback.
+- **Call-tracking campaigns**: as the destination.
+
+## Common errors
+
+| Message | What it means | What to do |
+|---------|---------------|-----------|
+| A ring group with this name already exists in your organization. | Duplicate name | Choose another name |
+| At least one member is required. / Maximum 50 members allowed per ring group. | Member count out of range | Add or remove members |
+| Each extension can only be added once to a ring group. | The same extension twice | Remove the duplicate |
+| Only user and forward extensions can be added to ring groups. Extension *n* is not allowed. | The extension is another type (AI assistant, conference and so on) | Pick a User or Forward extension |
+| Only active extensions can be added to ring groups. Extension *n* is not active. | The extension is inactive | Activate it or pick another |
+| Fallback … must be active. | The fallback target is inactive | Activate it or pick another |
+| Choose a destination. | A create request used "Destination unavailable" | Pick a real fallback |
+| Ring group is currently being modified. Please try again. | Someone else is saving the same group | Wait a moment and save again |
+| This ring group is still used by: … | The delete was refused | Change the listed references, then delete |
+
+## Key data fields
+
+### `ring_groups`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `name` | Unique within the organization |
+| `description` | Optional, up to 1000 characters |
+| `strategy` | `simultaneous`, `round_robin` or `sequential` |
+| `timeout` | Ring timeout in seconds |
+| `ring_turns` | Rounds through the member list |
+| `fallback_action` | `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `call_queue`, `hangup` or `unavailable` |
+| `fallback_extension_id`, `fallback_ring_group_id`, `fallback_ivr_menu_id`, `fallback_ai_assistant_id`, `fallback_ai_load_balancer_id`, `fallback_call_queue_id` | Only the one matching the action is kept. `fallback_ai_assistant_id` points at an extension of type AI Assistant |
+| `status` | `active` or `inactive` |
+
+### `ring_group_members`
+
+| Column | Notes |
+|--------|-------|
+| `ring_group_id` | The group |
+| `extension_id` | The member extension |
+| `priority` | 1 to 100. Ring order for Sequential and Round Robin |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET/POST/PUT/DELETE | `/v1/ring-groups[/{ringGroup}]` | Standard CRUD |
+| GET | `/v1/ring-groups` | List. Filters: `strategy`, `status`, `search`, `unprovisioned=1` |
+| POST | `/v1/ring-groups` | Create. Rejects `unavailable` as the fallback |
+| GET | `/v1/ring-groups/{ringGroup}` | One group with members |
+| PUT | `/v1/ring-groups/{ringGroup}` | Update. Sending `members` replaces the list; omitting it keeps the list |
+| DELETE | `/v1/ring-groups/{ringGroup}` | Delete. Returns 409 with `references` when in use |
+
+Scoped API keys use the `ring-groups` resource. The MCP server has `list_ring_groups`, `get_ring_group`, `create_ring_group`, `update_ring_group` and `delete_ring_group`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [Extensions](/modules/extensions) — Members are extensions
-- [Phone Numbers](/modules/phone-numbers) — DIDs can route to ring groups
-- [IVR Menus](/modules/ivr-menus) — IVR options can route to ring groups
-- [AI Load Balancers](/modules/ai-load-balancers) — ALBS fallback can route to ring groups
+- [Extensions](/modules/extensions) — members are extensions
+- [Call Queues](/modules/call-queues) — a stateful alternative, and a possible fallback
+- [Phone Numbers](/modules/phone-numbers) — route a number to a group
+- [IVR Menus](/modules/ivr-menus) — route a menu option to a group
+- [Business Hours](/modules/business-hours) — route open or closed hours to a group
+- [Supervisors](/modules/supervisors) — assign groups to a supervisor
