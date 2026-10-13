@@ -37,7 +37,7 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 | Play or download a recording | Yes | Yes | Yes | Yes | Only calls in their scope (single-call view) |
 
 :::note
-The PBX User's own-extension filter is only a default on the page; they can clear it. A supervisor's list is limited because the page asks for the supervisor view; the plain API list (`GET /v1/call-detail-records` without `supervisor=true`) is not limited. A single call and the CSV export are always limited to the supervisor's scope.
+The PBX User's own-extension filter is only a default on the page; they can clear it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but no longer needed.
 :::
 
 :::caution Recording playback for PBX Users

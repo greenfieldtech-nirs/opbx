@@ -37,7 +37,7 @@ Use this module to:
 | Create, delete, sync | Yes | Yes | No | No | No |
 | Edit | Yes | Yes | Own extension, through the API only | No | No |
 | Toggle status from the list | Yes | Yes | No | No | No |
-| See SIP passwords on the page | Yes | Yes | No | No | No |
+| See SIP passwords on the page | Yes (any extension; a PBX Admin not an Owner's) | Yes (not an Owner's) | Own extension only | Own extension only | Own extension only |
 
 A PBX User may change their own extension through the API but cannot change its type, its assigned user or its status.
 
@@ -111,7 +111,7 @@ A phone number used as a default caller ID cannot be deleted until you clear it 
 
 ## SIP passwords
 
-The **Password** column appears for Owners and PBX Admins when the list contains PBX User extensions.
+The **Password** column appears when the list contains an extension whose password you may read. Owners and PBX Admins may read any PBX User extension's password (a PBX Admin never an Owner's). PBX Users, Supervisors and Reporters may read only the password of the extension linked to their own user; the server refuses every other one with 403.
 
 - Click the eye icon to load and show the password. Click again to hide it.
 - Click the copy icon to copy it.
@@ -191,7 +191,7 @@ Deleting a user does **not** delete their extension. It is kept, unassigned, and
 | GET | `/v1/extensions/{extension}` | One extension |
 | PUT | `/v1/extensions/{extension}` | Update |
 | DELETE | `/v1/extensions/{extension}` | Delete. Returns 409 with `references` when in use |
-| GET | `/v1/extensions/{extension}/password` | SIP password (PBX User only; 204 for other types) |
+| GET | `/v1/extensions/{extension}/password` | SIP password (PBX User type only; 204 for other types). Owner and PBX Admin: any extension (a PBX Admin not an Owner's); every other role: only its own |
 | PUT | `/v1/extensions/{extension}/reset-password` | New SIP password, pushed to Cloudonix |
 | GET | `/v1/extensions/sync/compare` | Differences between OPBX and Cloudonix |
 | POST | `/v1/extensions/sync` | Run the sync |

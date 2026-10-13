@@ -54,7 +54,7 @@ For each Supervisor, OPBX collects these identifiers:
 
 Each identifier is also matched with a leading `+`, because live calls store extension numbers in E.164 form. A call is in scope when its caller or its destination matches one of them: `caller_id` or `destination` for live calls, `from` or `to` for call records.
 
-A Supervisor with no assignments sees no calls.
+A Supervisor with no assignments sees only their own calls. The scope always includes the Supervisor's own user and extension.
 
 :::note
 A ring group adds calls to the scope only if it has its own extension of type Ring group. Calls that reach a ring group straight from a phone number match only through the member who answers, when that member is an assigned user.
@@ -142,8 +142,8 @@ A Supervisor coaches calls from **Live Calls** with **Spy**, **Whisper** or **Ba
 
 Supervisors do not join the organization's WebSocket channel, because it carries every call in the organization. Their Live Calls page uses polling only.
 
-:::caution Scope depends on the request
-On the call-list endpoints (`/v1/session-updates/active` and `/v1/call-detail-records`), the server applies the Supervisor scope only when the request includes `supervisor=true`. The OPBX pages always send it for Supervisors. A Supervisor calling the API without it gets the organization's full list. Opening a single call record, the CSV export and the Supervisor Dashboard are always scoped.
+:::note Scope is decided by role
+On the call-list endpoints (`/v1/session-updates/active`, its statistics, `/v1/call-detail-records` and its export and statistics), the server always applies the Supervisor scope to a Supervisor. The `supervisor=true` flag is ignored. The scope includes the Supervisor's own user and extension, so their own calls are listed too.
 :::
 
 ## Key data fields
@@ -173,8 +173,8 @@ The role is stored as `supervisor` in `users.role`.
 | GET | `/v1/supervisors/{user}/assignments` | A Supervisor's assigned users and ring groups |
 | PUT | `/v1/supervisors/{user}/assignments` | Replace them. Body: `user_ids` and `ring_group_ids`, both required arrays (may be empty) |
 | GET | `/v1/dashboard/supervisor` | Scoped dashboard data. Owners and PBX Admins get the whole organization |
-| GET | `/v1/session-updates/active?supervisor=true` | Live calls in scope |
-| GET | `/v1/call-detail-records?supervisor=true` | Call records in scope |
+| GET | `/v1/session-updates/active` | Live calls in scope |
+| GET | `/v1/call-detail-records` | Call records in scope |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
 
 Scoped API keys use the `supervisors` resource for the assignment endpoints.

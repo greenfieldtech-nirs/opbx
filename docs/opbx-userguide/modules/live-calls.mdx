@@ -40,12 +40,10 @@ For finished calls, use [Call Logs](/modules/call-logs).
 
 The server allows only the **Owner** to disconnect a call. PBX Admins and Supervisors see a disconnect control on the page, but the request is refused with "This action is unauthorized." Reporters and Supervisors see a **Read-Only** badge next to the page title.
 
-:::caution Not enforced by the server
-The server lets **every** signed-in role read the active-call list, and applies the Supervisor scope only when the request asks for it (`supervisor=true`, which the page always sends for Supervisors). A PBX User who opens `/ui/live-calls` directly, or any role calling the API, sees all of the organization's active calls. Treat the sidebar and the page as the only limit until this is fixed.
-:::
+The Supervisor scope is applied by the server on role alone: a Supervisor always gets only the calls of their assigned users and ring groups plus their own, whether or not the request carries `supervisor=true` (still accepted, no longer needed). The same holds for the active-call statistics and the call detail view. Owners, PBX Admins and Reporters see all of the organization's calls.
 
 :::note Supervisor scope
-A Supervisor's list contains only calls whose caller or destination is one of their assigned users, one of those users' extension numbers, or the extension number of an assigned ring group. See [Supervisors](/modules/supervisors).
+A Supervisor's list contains only calls whose caller or destination is one of their assigned users, one of those users' extension numbers, their own user or extension, or the extension number of an assigned ring group. See [Supervisors](/modules/supervisors).
 :::
 
 ## Open the page
@@ -173,7 +171,7 @@ Session updates are kept for 30 days.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/session-updates/active` | Active calls. Add `supervisor=true` to apply the Supervisor scope. Optional `status` and `direction` filters |
+| GET | `/v1/session-updates/active` | Active calls (Supervisors are always scoped to their users, ring groups and own calls). Optional `status` and `direction` filters |
 | GET | `/v1/session-updates/active/stats` | Counts by status and direction, average and longest duration |
 | GET | `/v1/session-updates/{sessionId}` | Event history of one session |
 | DELETE | `/v1/session-updates/{sessionId}/disconnect` | Disconnect a call (Owner only) |

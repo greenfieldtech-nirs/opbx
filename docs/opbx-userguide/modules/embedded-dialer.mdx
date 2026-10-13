@@ -138,7 +138,7 @@ Closing the panel unregisters the phone, as in the app. Do not call `OpbxDialer.
 | Allowed domains | The iframe page sends a `frame-ancestors` Content-Security-Policy listing only the allowed domains, with `https://`. With no allowed domains it is `'none'`. The embed API refuses an `Origin` that is not on the list ("Origin not allowed.") |
 | Origin required for the SIP config | `/v1/embed/config` returns the extension's SIP password. It is answered only to an allowed `Origin`, or to the iframe's own same-origin request (marked by the browser with `Sec-Fetch-Site: same-origin`). Anything else gets "Origin required." |
 | Per-user token | One token per user, stored hashed, shown once. An invalid token gets "Invalid embed token." |
-| Active user and organization | An inactive user or organization gets "Embed token is not active." (403) |
+| Active user and organization | An inactive user or organization gets "Embed token is not active." (403), on the API and on the dialer page |
 | Regenerate = revoke | A new token replaces the old one immediately |
 | Rate limit | 60 requests per minute per token and IP address on the embed API |
 | No third-party scripts | The widget bundles its JsSIP library; it loads nothing from a CDN |

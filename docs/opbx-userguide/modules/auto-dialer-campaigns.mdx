@@ -22,7 +22,7 @@ Use this module to:
 
 ## Prerequisites
 
-- **Owner** or **PBX Admin** role.
+- **Owner** or **PBX Admin** role to change anything; **Reporter** may view.
 - An [AI assistant](/modules/ai-assistants) or [AI load balancer](/modules/ai-load-balancers), unless you route to Hangup for testing.
 - At least one **active** [phone number](/modules/phone-numbers) for the caller ID.
 - The [dialer worker](/workers/dialer-worker) running (single replica), and the [AMD worker](/workers/amd-worker) for voicemail detection.
@@ -81,8 +81,8 @@ A Draft campaign becomes **Active** when a Ready list is assigned to it.
 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See the Auto Dialer pages | Yes | Yes | No | No | No |
-| List campaigns and the monitor | Yes | Yes | No | No | No |
+| See the Auto Dialer pages | Yes | Yes | No | Yes (read-only) | No |
+| List campaigns, destinations and the monitor | Yes | Yes | No | Yes | No |
 | Create, edit, start, pause, resume | Yes | Yes | No | No | No |
 | Archive | Yes | No | No | No | No |
 | Delete (Draft only) | Yes | No | No | No | No |
