@@ -374,7 +374,10 @@ export default function RingGroups() {
       toast.success('Ring group deleted successfully');
     },
     onError: (error: unknown) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = getApiErrorMessage(error) || 'Failed to delete ring group';
       toast.error(message);
     },

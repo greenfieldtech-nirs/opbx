@@ -197,7 +197,10 @@ export default function IVRMenus() {
       toast.success('IVR menu deleted successfully');
     },
     onError: (error: Error | unknown) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to delete IVR menu');
     },

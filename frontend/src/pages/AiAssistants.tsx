@@ -172,7 +172,10 @@ export default function AiAssistants() {
       toast.success('AI Assistant deleted successfully');
     },
     onError: (error: any) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete AI Assistant';
       toast.error(message);
     },

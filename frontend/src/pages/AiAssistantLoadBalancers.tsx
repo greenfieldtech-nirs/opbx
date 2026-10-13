@@ -336,7 +336,10 @@ export default function AiAssistantLoadBalancers() {
       toast.success('AI Load Balancer deleted successfully');
     },
     onError: (error: any) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.message || 'Failed to delete AI Load Balancer';
       toast.error(message);
     },

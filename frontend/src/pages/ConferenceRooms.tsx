@@ -193,7 +193,10 @@ export default function ConferenceRooms() {
       toast.success('Conference room deleted successfully');
     },
     onError: (error: any) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete conference room';
       toast.error(message);
     },

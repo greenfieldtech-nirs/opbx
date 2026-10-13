@@ -934,6 +934,7 @@ export default function ExtensionsComplete() {
         setShowDeleteDialog(false);
         setSelectedExtension(null);
       },
+      onError: () => setShowDeleteDialog(false),
     });
   };
 

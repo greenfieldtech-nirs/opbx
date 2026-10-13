@@ -188,7 +188,10 @@ export default function PhoneNumbers() {
       toast.success('Phone number deleted successfully');
     },
     onError: (error: any) => {
-      if (showIfInUse(error)) return;
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.message || 'Failed to delete phone number';
       toast.error(message);
     },

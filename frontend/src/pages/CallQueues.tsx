@@ -196,6 +196,7 @@ export default function CallQueues() {
       invalidate();
     },
     onError: (error) => {
+      setQueueToDelete(null);
       if (!showIfInUse(error)) toast.error(getApiErrorMessage(error));
     },
   });
