@@ -87,9 +87,9 @@ A number that has been set to Inactive is skipped and the next step is used.
 
 Because the country is unique, you cannot have two rules for the same country. To allow only some area codes, use one rule with the narrowest prefix you need.
 
-{/* SCREENSHOT: outbound-whitelist-list — Outbound Whitelist list with four rules (US and Canada, United Kingdom, Germany, Israel), each showing country, trunk, created date and an Active status pill */}
+![Outbound Whitelist list with four rules (Germany, United Kingdom, Israel, US and Canada), each showing country, trunk, created date and an Active status pill](../img/screens/outbound-whitelist-list.jpg)
 
-{/* SCREENSHOT: outbound-whitelist-create-dialog — Add Whitelist Entry dialog with Name, Country picker, Additional Prefix, Voice Trunk selector and Default Caller ID set to "Main Line (+12025550100)" */}
+![Add Whitelist Entry dialog with Name, Country picker, Additional Prefix, Voice Trunk selector (no trunks in the demo) and Default Caller ID set to Main Line (+12025550100)](../img/screens/outbound-whitelist-create-dialog.jpg)
 
 ## Edit a rule
 
@@ -109,7 +109,7 @@ Click the **Active** or **Disabled** pill in the Status column. The change is sa
 
 Nothing else in OPBX points at a whitelist rule, so the delete is never refused. Calls that only this rule allowed are refused from then on.
 
-{/* SCREENSHOT: outbound-whitelist-delete-dialog — Delete Whitelist Entry confirmation for the "Germany" rule */}
+![Delete Whitelist Entry confirmation for the Germany rule](../img/screens/outbound-whitelist-delete-dialog.jpg)
 
 :::note Phone numbers used as a rule's caller ID
 A phone number that is the Default Caller ID of a whitelist rule cannot be deleted. The delete on the Phone Numbers page is refused and the dialog lists this rule. Change the rule's caller ID first.
