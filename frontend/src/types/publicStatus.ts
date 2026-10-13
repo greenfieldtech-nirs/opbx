@@ -5,7 +5,7 @@ export interface PublicStatusGroup {
   name: string;
   status: PlatformHealthStatus;
   /** Last 6h in 5-minute buckets, worst member status per bucket. */
-  history: { at: string; status: PlatformHealthStatus }[];
+  history: { at: string; status: PlatformHealthStatus; check_at?: string }[];
 }
 
 export interface PublicStatus {

@@ -86,4 +86,20 @@ describe('StatusStrip', () => {
     expect(bars[45].className).toContain('bg-red-600');
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain('1 down and 0 degraded');
   });
+
+  it('shows the time of the deciding check while a bar is hovered', () => {
+    const now = Date.parse('2026-10-13T12:10:00Z');
+    const checkAt = '2026-10-13T11:07:42Z';
+    const { container } = render(
+      <StatusStrip now={now} history={[{ checked_at: '2026-10-13T11:05:00Z', status: 'down', check_at: checkAt }]} />,
+    );
+    const bars = container.querySelectorAll('[role="img"] > div');
+    const time = new Date(checkAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    expect(screen.getByText('24h ago')).toBeInTheDocument();
+    fireEvent.mouseEnter(bars[45]);
+    expect(screen.getByText(`Down · checked ${time}`)).toBeInTheDocument();
+    fireEvent.mouseLeave(screen.getByRole('img'));
+    expect(screen.getByText('24h ago')).toBeInTheDocument();
+  });
 });

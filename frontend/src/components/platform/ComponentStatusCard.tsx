@@ -3,6 +3,7 @@
  * Status is always conveyed by a text label as well as colour.
  */
 
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { PlatformComponentStatus, PlatformHealthStatus } from '@/types/platform';
@@ -12,6 +13,8 @@ const STRIP_SLOTS = 48;
 const SLOT_MS = 30 * 60 * 1000;
 const SEVERITY: Record<PlatformHealthStatus, number> = { ok: 0, unknown: 1, degraded: 2, down: 3 };
 const hhmm = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const hhmmss = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const STATUS_TEXT: Record<PlatformHealthStatus, string> = { ok: 'Operational', degraded: 'Degraded', down: 'Down', unknown: 'Unknown' };
 
 export const statusStyles: Record<PlatformHealthStatus, { badge: string; segment: string; card: string }> = {
   ok: {
@@ -61,15 +64,28 @@ export function StatusStrip({
   // Bars sit on clock slots, so every strip lines up; the last bar is the current slot.
   const end = Math.floor(now / slotMs) * slotMs + slotMs;
   const start = end - slotCount * slotMs;
-  const slots: (PlatformHealthStatus | null)[] = Array(slotCount).fill(null);
+  // Per bar: the worst status in the slot and the time of the latest check with that status.
+  const slots: ({ status: PlatformHealthStatus; checkAt: number } | null)[] = Array(slotCount).fill(null);
   for (const h of history) {
     const i = Math.floor((new Date(h.checked_at).getTime() - start) / slotMs);
     if (i < 0 || i >= slotCount) continue;
+    const checkAt = new Date(h.check_at ?? h.checked_at).getTime();
     const cur = slots[i];
-    if (cur === null || SEVERITY[h.status] > SEVERITY[cur]) slots[i] = h.status; // worst status in the slot
+    if (cur === null || SEVERITY[h.status] > SEVERITY[cur.status] || (h.status === cur.status && checkAt > cur.checkAt)) {
+      slots[i] = { status: h.status, checkAt };
+    }
   }
-  const bad = slots.filter((s) => s === 'down').length;
-  const degraded = slots.filter((s) => s === 'degraded').length;
+  const bad = slots.filter((s) => s?.status === 'down').length;
+  const degraded = slots.filter((s) => s?.status === 'degraded').length;
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  const describe = (i: number) => {
+    const s = slots[i];
+    const from = start + i * slotMs;
+    return s
+      ? `${STATUS_TEXT[s.status]} · checked ${hhmmss(s.checkAt)}`
+      : `No data · ${hhmm(from)}–${hhmm(from + slotMs)}`;
+  };
 
   return (
     <div className="space-y-1">
@@ -78,21 +94,27 @@ export function StatusStrip({
         aria-label={`${periodLabel}: ${bad} down and ${degraded} degraded ${slotName} periods`}
         className="grid h-6 w-full gap-[2px]"
         style={{ gridTemplateColumns: `repeat(${slotCount}, minmax(0, 1fr))` }}
+        onMouseLeave={() => setHovered(null)}
       >
-        {slots.map((s, i) => {
-          const from = start + i * slotMs;
-          return (
-            <div
-              key={i}
-              title={`${hhmm(from)}–${hhmm(from + slotMs)}: ${s ?? 'no data'}`}
-              className={cn('rounded-[1px]', s ? statusStyles[s].segment : 'bg-muted')}
-            />
-          );
-        })}
+        {slots.map((s, i) => (
+          <div
+            key={i}
+            title={describe(i)}
+            onMouseEnter={() => setHovered(i)}
+            className={cn('rounded-[1px]', s ? statusStyles[s.status].segment : 'bg-muted', hovered === i && 'ring-2 ring-foreground/60')}
+          />
+        ))}
       </div>
+      {/* Hovering a bar shows when its deciding check ran, in place of the axis labels. */}
       <div className="flex justify-between text-[10px] text-muted-foreground" aria-hidden>
-        <span>{startLabel}</span>
-        <span>now</span>
+        {hovered === null ? (
+          <>
+            <span>{startLabel}</span>
+            <span>now</span>
+          </>
+        ) : (
+          <span className="w-full text-center font-medium text-foreground">{describe(hovered)}</span>
+        )}
       </div>
     </div>
   );

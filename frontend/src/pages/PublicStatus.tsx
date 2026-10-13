@@ -80,7 +80,7 @@ export default function PublicStatus() {
                     </span>
                   </div>
                   <StatusStrip
-                    history={g.history.map((h) => ({ checked_at: h.at, status: h.status }))}
+                    history={g.history.map((h) => ({ checked_at: h.at, status: h.status, check_at: h.check_at }))}
                     slotCount={72}
                     slotMs={SLOT_MS}
                     startLabel="6h ago"

@@ -150,7 +150,8 @@ export interface PlatformComponentStatus {
   detail: string;
   checked_at: string | null;
   /** Last 24h in 5-minute buckets, worst status per bucket. */
-  history: { checked_at: string; status: PlatformHealthStatus }[];
+  // checked_at = bucket start; check_at = time of the check that set the bucket's status.
+  history: { checked_at: string; status: PlatformHealthStatus; check_at?: string }[];
 }
 
 export interface PlatformStatusSnapshot {
