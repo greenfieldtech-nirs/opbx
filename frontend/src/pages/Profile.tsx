@@ -294,9 +294,7 @@ export default function Profile() {
       if (data.country !== profileData?.country) {
         updateData.country = data.country || null;
       }
-      if (data.role && data.role !== profileData?.role) {
-        updateData.role = data.role;
-      }
+      // Own role changes are refused by the server (UpdateProfileRequest), so none is sent.
 
       // If nothing changed, just show success
       if (Object.keys(updateData).length === 0) {
@@ -670,38 +668,7 @@ export default function Profile() {
                   <Shield className="inline h-4 w-4 mr-1" />
                   Role
                 </Label>
-                {isOwner ? (
-                  <>
-                    <Controller
-                      name="role"
-                      control={controlProfile}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          disabled={isUpdatingProfile}
-                        >
-                          <SelectTrigger id="role">
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="owner">Owner</SelectItem>
-                            <SelectItem value="pbx_admin">PBX Admin</SelectItem>
-                            <SelectItem value="pbx_user">PBX User</SelectItem>
-                            <SelectItem value="reporter">Reporter</SelectItem>
-                            <SelectItem value="supervisor">Supervisor</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                      <p className="text-xs text-amber-800">
-                        Changing user roles affects their permissions. Be careful when modifying roles.
-                      </p>
-                    </div>
-                  </>
-                ) : (
+                {(
                   <>
                     <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                       <Badge className={getRoleColor(profileData?.role as UserRole)}>
@@ -709,7 +676,9 @@ export default function Profile() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Contact your organization owner to change your role
+                      {isOwner
+                        ? 'You cannot change your own role.'
+                        : 'Contact your organization owner to change your role'}
                     </p>
                   </>
                 )}
