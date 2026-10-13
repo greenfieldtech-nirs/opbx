@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
-use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -145,9 +143,8 @@ class CampaignMonitorService
         $data = Cache::remember($cacheKey, self::DETAIL_CACHE_TTL, function () use ($campaign): array {
             $activeCalls = $this->getWorkerActiveCalls($campaign->id);
 
-            // Force 0 active calls for paused campaigns
-            if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-                $this->setWorkerActiveCalls($campaign->id, 0);
+            // Paused campaigns show 0 active calls (display only; pausing resets the real counter)
+            if ($campaign->status === CampaignStatus::PAUSED) {
                 $activeCalls = 0;
             }
 
@@ -244,26 +241,6 @@ class CampaignMonitorService
     }
 
     /**
-     * Set worker active calls in Redis.
-     *
-     * @param  int  $campaignId  The campaign ID
-     * @param  int  $value  The value to set
-     */
-    private function setWorkerActiveCalls(int $campaignId, int $value): void
-    {
-        try {
-            $dialerRedis = Redis::connection('dialer');
-            $dialerRedis->set("dialer:cac:{$campaignId}:active", $value);
-        } catch (\Exception $e) {
-            Log::error('Failed to set worker active calls in Redis', [
-                'campaign_id' => $campaignId,
-                'value' => $value,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
      * Get active session details from the database.
      *
      * @param  int  $campaignId  The campaign ID
@@ -301,9 +278,8 @@ class CampaignMonitorService
     {
         $activeCalls = $this->getWorkerActiveCalls($campaign->id);
 
-        // Force 0 for paused campaigns
-        if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-            $this->setWorkerActiveCalls($campaign->id, 0);
+        // Paused campaigns show 0 active calls (display only; pausing resets the real counter)
+        if ($campaign->status === CampaignStatus::PAUSED) {
             $activeCalls = 0;
         }
 
@@ -356,12 +332,6 @@ class CampaignMonitorService
                 return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
             }
 
-            // Clean up stale dialing records
-            $this->cleanupStaleDialing($campaign, $listIds);
-
-            // Clean up stale pending records that have exhausted max attempts
-            $this->cleanupStalePending($campaign, $listIds);
-
             $counts = AutoDialerDestination::whereIn('list_id', $listIds)
                 ->selectRaw("COUNT(*) as total,
                     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -378,58 +348,6 @@ class CampaignMonitorService
                 'dialing' => (int) $counts->dialing,
             ];
         });
-    }
-
-    /**
-     * Clean up stale dialing destinations.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  Collection  $listIds  The list IDs
-     */
-    private function cleanupStaleDialing(AutoDialerCampaign $campaign, $listIds): void
-    {
-        $buildQuery = function () use ($campaign, $listIds) {
-            $query = AutoDialerDestination::whereIn('list_id', $listIds)
-                ->where('status', DestinationStatus::DIALING);
-
-            // For active campaigns, only clean up records stuck for > 5 minutes
-            if ($campaign->status !== CampaignStatus::PAUSED) {
-                $query->where('last_dialed_at', '<', now()->subMinutes(5));
-            }
-
-            return $query;
-        };
-
-        // Mark as failed if max dial attempts have been reached
-        $buildQuery()
-            ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::FAILED]);
-
-        // Reset remaining stale destinations to pending for retry
-        $buildQuery()
-            ->where('dial_attempts', '<', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::PENDING]);
-    }
-
-    /**
-     * Clean up stale pending destinations that have exhausted retry attempts.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  Collection  $listIds  The list IDs
-     */
-    private function cleanupStalePending(AutoDialerCampaign $campaign, $listIds): void
-    {
-        $updated = AutoDialerDestination::whereIn('list_id', $listIds)
-            ->where('status', DestinationStatus::PENDING)
-            ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::FAILED]);
-
-        if ($updated > 0) {
-            Log::info('Cleaned up stale pending destinations', [
-                'campaign_id' => $campaign->id,
-                'count' => $updated,
-            ]);
-        }
     }
 
     /**
@@ -503,10 +421,8 @@ class CampaignMonitorService
      */
     private function getActiveSessions(AutoDialerCampaign $campaign): array
     {
-        // Paused campaigns have no active calls - clean up stale sessions
+        // Paused campaigns have no active calls (pausing already fails the in-flight sessions)
         if ($campaign->status === CampaignStatus::PAUSED) {
-            $this->cleanupStaleSessions($campaign->id);
-
             return [];
         }
 
@@ -525,24 +441,6 @@ class CampaignMonitorService
                     'duration_seconds' => $s->initiated_at ? (int) now()->diffInSeconds($s->initiated_at) : 0,
                 ])
                 ->toArray();
-        });
-    }
-
-    /**
-     * Clean up stale active sessions for a campaign.
-     *
-     * @param  int  $campaignId  The campaign ID
-     */
-    private function cleanupStaleSessions(int $campaignId): void
-    {
-        OrganizationScope::bypass(function () use ($campaignId): void {
-            AutoDialerCallSession::where('campaign_id', $campaignId)
-                ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                ->update([
-                    'status' => 'failed',
-                    'disposition' => 'cancelled',
-                    'completed_at' => now(),
-                ]);
         });
     }
 

@@ -7,6 +7,8 @@ namespace App\Services\AutoDialer;
 use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerDestination;
+use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 
@@ -170,6 +172,38 @@ class CampaignLifecycleManager
             }
 
             return $completed;
+        });
+    }
+
+    /**
+     * Repair destinations left behind by lost callbacks (formerly done as a side effect of the monitor GET).
+     *
+     * Dialing records stuck > 5 minutes (any age while paused) go back to pending, or fail when attempts
+     * are used up; pending records with no attempts left fail. Runs from the scheduled check command.
+     */
+    public function reconcileStaleDestinations(): void
+    {
+        OrganizationScope::bypass(function (): void {
+            $campaigns = AutoDialerCampaign::whereIn('status', [CampaignStatus::ACTIVE, CampaignStatus::PAUSED])->get();
+
+            foreach ($campaigns as $campaign) {
+                $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+                if ($listIds->isEmpty()) {
+                    continue;
+                }
+
+                $stuck = fn () => AutoDialerDestination::whereIn('list_id', $listIds)
+                    ->where('status', DestinationStatus::DIALING)
+                    ->when($campaign->status !== CampaignStatus::PAUSED, fn ($q) => $q->where('last_dialed_at', '<', now()->subMinutes(5)));
+
+                $stuck()->where('dial_attempts', '>=', $campaign->max_dial_attempts)->update(['status' => DestinationStatus::FAILED]);
+                $stuck()->where('dial_attempts', '<', $campaign->max_dial_attempts)->update(['status' => DestinationStatus::PENDING]);
+
+                AutoDialerDestination::whereIn('list_id', $listIds)
+                    ->where('status', DestinationStatus::PENDING)
+                    ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
+                    ->update(['status' => DestinationStatus::FAILED]);
+            }
         });
     }
 

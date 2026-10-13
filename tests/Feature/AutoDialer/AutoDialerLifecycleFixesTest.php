@@ -131,4 +131,30 @@ final class AutoDialerLifecycleFixesTest extends TestCase
             'routing_destination_type' => 'ai_assistant', 'routing_destination_id' => $own->id,
         ])->assertOk();
     }
+
+    public function test_monitor_reads_do_not_mutate_and_the_sweep_repairs_stale_destinations(): void
+    {
+        $campaign = $this->draftCampaign(['status' => CampaignStatus::ACTIVE, 'max_dial_attempts' => 3]);
+        $list = AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+        $make = fn (DestinationStatus $status, int $attempts) => AutoDialerDestination::factory()->create([
+            'organization_id' => $this->org->id, 'list_id' => $list->id, 'status' => $status,
+            'dial_attempts' => $attempts, 'last_dialed_at' => now()->subMinutes(10),
+        ]);
+        $stuckRetry = $make(DestinationStatus::DIALING, 1);
+        $stuckSpent = $make(DestinationStatus::DIALING, 3);
+        $spentPending = $make(DestinationStatus::PENDING, 3);
+
+        $this->actingAs($this->user)->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail")->assertOk();
+        $this->actingAs($this->user)->getJson('/api/v1/auto-dialer-campaigns/monitor/summary')->assertOk();
+
+        $this->assertSame(DestinationStatus::DIALING, $stuckRetry->fresh()->status);
+        $this->assertSame(DestinationStatus::DIALING, $stuckSpent->fresh()->status);
+        $this->assertSame(DestinationStatus::PENDING, $spentPending->fresh()->status);
+
+        app(CampaignLifecycleManager::class)->reconcileStaleDestinations();
+
+        $this->assertSame(DestinationStatus::PENDING, $stuckRetry->fresh()->status);
+        $this->assertSame(DestinationStatus::FAILED, $stuckSpent->fresh()->status);
+        $this->assertSame(DestinationStatus::FAILED, $spentPending->fresh()->status);
+    }
 }
