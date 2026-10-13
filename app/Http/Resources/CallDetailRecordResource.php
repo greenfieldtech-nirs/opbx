@@ -73,7 +73,9 @@ class CallDetailRecordResource extends JsonResource
             // Call recording
             'recording_status' => $this->recording_status,
             'recording_duration' => $this->recording_duration,
-            'has_recording' => $this->recording_status === 'available',
+            // Only roles allowed to play (D13) see the player.
+            'has_recording' => $this->recording_status === 'available'
+                && (bool) $request->user()?->can('playRecording', $this->resource),
 
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(

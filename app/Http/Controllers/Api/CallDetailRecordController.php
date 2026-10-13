@@ -226,7 +226,7 @@ class CallDetailRecordController extends AbstractApiCrudController
      */
     public function recording(CallDetailRecord $call_detail_record): StreamedResponse|JsonResponse
     {
-        $this->authorize('view', $call_detail_record);
+        $this->authorize('playRecording', $call_detail_record);
 
         if ($call_detail_record->recording_status !== 'available' || ! $call_detail_record->recording_stored_path) {
             return response()->json(['error' => 'Recording not available'], 404);

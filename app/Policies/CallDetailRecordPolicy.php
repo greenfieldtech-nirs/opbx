@@ -50,6 +50,14 @@ class CallDetailRecordPolicy
     }
 
     /**
+     * Playing a call's recording follows the Recordings rule (D13: Owner, PBX Admin, Reporter) on top of view.
+     */
+    public function playRecording(User $user, CallDetailRecord $callDetailRecord): bool
+    {
+        return app(RecordingPolicy::class)->viewAny($user) && $this->view($user, $callDetailRecord);
+    }
+
+    /**
      * Determine if the user can create call detail records.
      */
     public function create(User $user): bool
