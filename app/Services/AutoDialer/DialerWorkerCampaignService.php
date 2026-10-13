@@ -212,6 +212,7 @@ class DialerWorkerCampaignService
      * answered/completed -> COMPLETED. busy/no-answer -> PENDING with next_retry_at when the
      * campaign has "retry on busy / no-answer" on and attempts remain, otherwise FAILED.
      * cancelled, failed, congestion and anything unknown -> FAILED (never retried).
+     * The gap grows: retry_delay_minutes x 2^(attempt-1), capped at 24 h.
      *
      * @return array{status: DestinationStatus, next_retry_at: ?Carbon}
      */
@@ -228,10 +229,18 @@ class DialerWorkerCampaignService
             && $dialAttempts < $campaign->max_dial_attempts) {
             return [
                 'status' => DestinationStatus::PENDING,
-                'next_retry_at' => now()->addMinutes(max(1, (int) $campaign->retry_delay_minutes)),
+                'next_retry_at' => now()->addMinutes($this->retryDelayMinutes($campaign, $dialAttempts)),
             ];
         }
 
         return ['status' => DestinationStatus::FAILED, 'next_retry_at' => null];
+    }
+
+    /** Busy / no-answer retry gap in minutes after the given attempt: base x 2^(attempt-1), max 1440. */
+    public function retryDelayMinutes(AutoDialerCampaign $campaign, int $dialAttempts): int
+    {
+        $base = max(1, (int) $campaign->retry_delay_minutes);
+
+        return (int) min(1440, $base * (2 ** min(max(1, $dialAttempts) - 1, 20)));
     }
 }

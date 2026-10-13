@@ -827,7 +827,7 @@ export default function AutoDialerCampaignForm() {
 
                     {watch('retry_on_busy_no_answer') && (
                       <div className="space-y-2">
-                        <Label htmlFor="retry_delay_minutes">Retry delay (minutes)</Label>
+                        <Label htmlFor="retry_delay_minutes">First retry delay (minutes)</Label>
                         <Input
                           id="retry_delay_minutes"
                           type="number"
@@ -835,7 +835,7 @@ export default function AutoDialerCampaignForm() {
                           min={1}
                           max={1440}
                         />
-                        <p className="text-sm text-muted-foreground">Wait before redialing (1–1440)</p>
+                        <p className="text-sm text-muted-foreground">Wait before the first retry (1–1440). Each further retry waits twice as long as the previous one, up to 24 hours.</p>
                       </div>
                     )}
                   </div>
