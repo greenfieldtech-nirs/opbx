@@ -7,6 +7,7 @@ namespace Tests\Feature\Api;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\UserRole;
 use App\Models\BusinessHoursSchedule;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,12 +35,19 @@ class BusinessHoursControllerTest extends TestCase
 
     private User $otherOrgOwner;
 
+    private Extension $extA;
+
+    private Extension $extB;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->organization = Organization::factory()->create(['name' => 'Test Org']);
         $this->otherOrganization = Organization::factory()->create(['name' => 'Other Org']);
+
+        $this->extA = Extension::factory()->create(['organization_id' => $this->organization->id]);
+        $this->extB = Extension::factory()->create(['organization_id' => $this->organization->id]);
 
         $this->owner = User::factory()->create([
             'organization_id' => $this->organization->id,
@@ -131,11 +139,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-101',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -184,11 +192,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-101',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -225,11 +233,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-102',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '10:00', 'end_time' => '18:00']]],
@@ -273,11 +281,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-102',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -371,5 +379,21 @@ class BusinessHoursControllerTest extends TestCase
         $response = $this->postJson("/api/v1/business-hours/{$schedule->id}/duplicate");
 
         $response->assertStatus(403);
+    }
+
+    public function test_store_rejects_target_from_another_organization(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $foreign = Extension::factory()->create(['organization_id' => $this->otherOrganization->id]);
+
+        $day = ['enabled' => false, 'time_ranges' => []];
+        $this->postJson('/api/v1/business-hours', [
+            'name' => 'Cross org',
+            'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'UTC',
+            'open_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$foreign->id}"],
+            'closed_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extA->id}"],
+            'schedule' => array_fill_keys(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], $day),
+        ])->assertStatus(422)->assertJsonValidationErrors(['open_hours_action.target_id']);
     }
 }

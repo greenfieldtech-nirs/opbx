@@ -8,6 +8,7 @@ use App\Enums\CallerIdStrategy;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class CreateCampaignRequest extends FormRequest
 {
@@ -36,6 +37,7 @@ class CreateCampaignRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::requiredIf(fn () => $this->input('routing_destination_type') !== 'hangup'),
+                $this->routingDestinationExists(),
             ],
 
             // Cloudonix API Parameters
@@ -116,10 +118,26 @@ class CreateCampaignRequest extends FormRequest
 
             // Caller ID Pooling
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
-            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
             'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'caller_id_strategy' => ['sometimes', Rule::enum(CallerIdStrategy::class)],
         ];
+    }
+
+    /**
+     * The routing destination must exist in the caller's organization (table chosen by destination type).
+     */
+    private function routingDestinationExists(): \Closure|Exists
+    {
+        $table = match ($this->input('routing_destination_type')) {
+            'ai_assistant' => 'ai_assistants',
+            'ai_load_balancer' => 'ai_assistant_load_balancers',
+            default => null,
+        };
+
+        return $table === null
+            ? fn () => true
+            : Rule::exists($table, 'id')->where('organization_id', $this->user()?->organization_id);
     }
 
     /**

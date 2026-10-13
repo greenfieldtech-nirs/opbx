@@ -9,6 +9,7 @@ use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
 use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Validator;
@@ -363,6 +364,23 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                         'IVR menu target ID must be in format: ivr-{identifier}'
                     );
                 }
+            }
+            // The prefixed target must exist in the caller's organization.
+            $tables = [
+                BusinessHoursActionType::EXTENSION->value => ['ext', 'extensions'],
+                BusinessHoursActionType::RING_GROUP->value => ['rg', 'ring_groups'],
+                BusinessHoursActionType::CALL_QUEUE->value => ['queue', 'call_queues'],
+                BusinessHoursActionType::IVR_MENU->value => ['ivr', 'ivr_menus'],
+                BusinessHoursActionType::CONFERENCE_ROOM->value => ['conf', 'conference_rooms'],
+            ];
+
+            if (isset($tables[$type])
+                && preg_match('/^'.$tables[$type][0].'-(\d+)$/', (string) $targetId, $matches) === 1
+                && ! DB::table($tables[$type][1])
+                    ->where('id', (int) $matches[1])
+                    ->where('organization_id', $this->user()?->organization_id)
+                    ->exists()) {
+                $validator->errors()->add($field.'.target_id', 'The selected target does not exist in your organization.');
             }
         }
     }

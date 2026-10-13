@@ -102,31 +102,31 @@ class UpdateCampaignRequest extends FormRequest
             ],
             CallTrackingDestinationType::EXTENSION => [
                 'field' => 'extension_id',
-                'rule' => 'required|integer|exists:extensions,id',
+                'rule' => ['required', 'integer', Rule::exists('extensions', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::RING_GROUP => [
                 'field' => 'ring_group_id',
-                'rule' => 'required|integer|exists:ring_groups,id',
+                'rule' => ['required', 'integer', Rule::exists('ring_groups', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::BUSINESS_HOURS => [
                 'field' => 'business_hours_schedule_id',
-                'rule' => 'required|integer|exists:business_hours_schedules,id',
+                'rule' => ['required', 'integer', Rule::exists('business_hours_schedules', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::CONFERENCE_ROOM => [
                 'field' => 'conference_room_id',
-                'rule' => 'required|integer|exists:conference_rooms,id',
+                'rule' => ['required', 'integer', Rule::exists('conference_rooms', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::IVR_MENU => [
                 'field' => 'ivr_menu_id',
-                'rule' => 'required|integer|exists:ivr_menus,id',
+                'rule' => ['required', 'integer', Rule::exists('ivr_menus', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::AI_ASSISTANT => [
                 'field' => 'ai_assistant_id',
-                'rule' => 'required|integer|exists:ai_assistants,id',
+                'rule' => ['required', 'integer', Rule::exists('ai_assistants', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
             CallTrackingDestinationType::AI_LOAD_BALANCER => [
                 'field' => 'ai_load_balancer_id',
-                'rule' => 'required|integer|exists:ai_assistant_load_balancers,id',
+                'rule' => ['required', 'integer', Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $this->user()?->organization_id)],
             ],
         };
 

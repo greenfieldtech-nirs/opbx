@@ -34,7 +34,7 @@ class UpdateInboundBlacklistRequest extends FormRequest
             ],
             'did_number_ids.*' => [
                 'integer',
-                'exists:did_numbers,id',
+                Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'is_global' => ['boolean'],
             // Note: torment_room_prefix and torment_music_timeout are auto-generated

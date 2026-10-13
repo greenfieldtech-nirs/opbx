@@ -111,7 +111,7 @@ class StoreCallQueueRequest extends FormRequest
             ],
             'moh_recording_id' => [
                 'nullable',
-                'exists:recordings,id',
+                Rule::exists('recordings', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_action' => [
                 'required',
@@ -121,27 +121,27 @@ class StoreCallQueueRequest extends FormRequest
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ring_group_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
-                'exists:ring_groups,id',
+                Rule::exists('ring_groups', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ivr_menu_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
-                'exists:ivr_menus,id',
+                Rule::exists('ivr_menus', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ai_load_balancer_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
                 'nullable',
-                'exists:ai_assistant_load_balancers,id',
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'status' => [
                 'required',
@@ -156,7 +156,7 @@ class StoreCallQueueRequest extends FormRequest
             'agents.*' => [
                 'integer',
                 'distinct',
-                'exists:users,id',
+                Rule::exists('users', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
         ];
     }

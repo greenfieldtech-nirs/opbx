@@ -9,6 +9,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class UpdateCampaignRequest extends FormRequest
 {
@@ -47,6 +48,7 @@ class UpdateCampaignRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::requiredIf(fn () => $this->input('routing_destination_type') !== 'hangup'),
+                $this->routingDestinationExists(),
             ],
 
             // Can only update if campaign is draft or paused
@@ -124,10 +126,26 @@ class UpdateCampaignRequest extends FormRequest
 
             // Caller ID Pooling - can only be modified when campaign is draft or paused
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
-            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
             'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'caller_id_strategy' => ['sometimes', Rule::enum(CallerIdStrategy::class)],
         ];
+    }
+
+    /**
+     * The routing destination must exist in the caller's organization (table chosen by destination type).
+     */
+    private function routingDestinationExists(): \Closure|Exists
+    {
+        $table = match ($this->input('routing_destination_type') ?? $this->route('campaign')?->routing_destination_type?->value) {
+            'ai_assistant' => 'ai_assistants',
+            'ai_load_balancer' => 'ai_assistant_load_balancers',
+            default => null,
+        };
+
+        return $table === null
+            ? fn () => true
+            : Rule::exists($table, 'id')->where('organization_id', $this->user()?->organization_id);
     }
 
     /**
