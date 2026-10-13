@@ -3,115 +3,164 @@ sidebar_position: 25
 slug: /modules/api-keys
 sidebar_class_name: cxGuidesSidebar
 title: "API Keys"
-description: "Owner-managed scoped API keys with per-resource read/write permissions"
+description: "Issue scoped API keys with read or write access per resource, and revoke them"
 ---
 
 # API Keys
 
-API Keys let an organization Owner issue long-lived credentials that grant programmatic access to a defined set of business and configuration resources. Each key carries its own permission set, which is the sole gate on what the key can do — a key's access is independent of any user's role.
+An API key lets a script, an integration or an MCP client call the OPBX REST API without a user session. Each key carries its own list of permissions, one per resource, and those permissions are the **only** thing that decides what the key may do. The role of the Owner who created the key does not apply.
 
 ## Purpose
 
 Use this module to:
 
-- Issue credentials for integrations, scripts, and CI/CD pipelines
-- Grant fine-grained, per-resource read or write access
-- Revoke access without disturbing user accounts
+- give an integration (a CRM, a reporting tool, a provisioning script) access to the API;
+- grant read-only or read-write access per resource;
+- connect an MCP client to the [MCP Server](/modules/mcp-server);
+- revoke access at once without touching any user account.
 
-## How Access Works
+## Prerequisites
 
-A key is granted a list of permissions, each pairing a resource with a level:
-
-- **read** — allows `GET` and `HEAD` requests to that resource
-- **write** — allows all methods (write implies read)
-
-Requests authenticated with a key are authorized **only** by the key's permissions. The role model that governs user sessions is not consulted. A key can never be granted access to management endpoints — including the API Keys endpoints themselves, which means a key can never create, modify, or revoke keys.
-
-Keys never expire. They remain valid until an Owner revokes them.
-
-## The One-Time Key Value
-
-When a key is created, the plaintext value (prefixed `opbxk_`) is returned **once** and shown once in the UI. Only a hash is stored server-side, so the value can never be retrieved again. Store it securely at creation time; if it is lost, revoke the key and create a new one.
-
-Authenticate requests with the standard bearer header:
-
-```
-Authorization: Bearer opbxk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-```
-
-## Grantable Resources
-
-Only business and configuration resources are grantable. The current allowlist:
-
-`users`, `extensions`, `conference-rooms`, `ai-assistants`, `ring-groups`, `ai-assistant-load-balancers`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`
-
-Retrieve the live list from `GET /v1/api-keys/grantable-resources`.
+- You are the **Owner**. No other role can see or manage API keys.
 
 ## Permissions
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|-------|-----------|----------|----------|
-| View API keys | Yes | No | No | No |
-| Create API keys | Yes | No | No | No |
-| Update API keys | Yes | No | No | No |
-| Revoke API keys | Yes | No | No | No |
+|--------|:-----:|:---------:|:--------:|:--------:|
+| See API Keys in the sidebar (Analytics section) | Yes | No | No | No |
+| List, create, update and revoke keys | Yes | No | No | No |
 
-API Key management is Owner-only. Non-owners receive a `403` response and the sidebar entry is hidden.
+Other roles get "Access denied" in the app and `403` from the API. An API key can never manage API keys, whatever its permissions: the API key endpoints are not grantable and answer `403`.
 
-## UI Workflow
+## How a key's access works
 
-### Create a Key
+Each permission pairs a **resource** with a **level**:
 
-1. Navigate to **API Keys** in the sidebar (Owner only)
-2. Click **Create API Key**
-3. Enter a name
-4. For each resource, choose **None**, **Read**, or **Write**
-5. Save — at least one permission is required
-6. Copy the one-time key value from the reveal dialog and store it securely
+| Level | Allows |
+|-------|--------|
+| Read | `GET` and `HEAD` requests to that resource |
+| Write | Every method (Write includes Read) |
+| No Access | The resource is not granted (no permission row) |
 
-### Revoke a Key
+A request authenticated with a key is checked like this:
 
-1. Find the key in the list
-2. Click **Revoke** and confirm
+1. The endpoint must belong to a grantable resource. Endpoints outside the list (API key management, user password changes, extension password resets, embed tokens, organization settings, platform management and so on) answer `403` "This API key is not permitted to access this endpoint."
+2. The key must have a permission for that resource, otherwise `403` "This API key is not permitted to access *resource*."
+3. A Read permission used with `POST`, `PUT`, `PATCH` or `DELETE` answers `403` "This API key has read-only access to *resource*."
 
-Revoked keys remain listed with a revocation timestamp and can no longer authenticate requests.
+A key always acts inside the organization it was created in.
 
-## Key Data Fields
+### Grantable resources
 
-### `api_keys` Table
+`users`, `extensions`, `conference-rooms`, `ai-assistants`, `ai-assistant-providers`, `ring-groups`, `call-queues`, `queue-calls`, `ai-assistant-load-balancers`, `ivr-menus`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`, `call-tracking-campaigns`, `call-tracking-analytics`, `call-tracking-sessions`, `call-tracking-ad-platform-integrations`, `supervisors`, `auto-dialer-campaigns`, `distribution-lists`, `session-updates`, `call-notifications`, `dashboard`, `trunks`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `organization_id` | FK | Tenant scope |
-| `name` | string | |
-| `token` | string | SHA-256 hash of the key; plaintext never stored |
-| `last_used_at` | datetime | Nullable; write throttled to once per 5 seconds per key |
-| `revoked_at` | datetime | Nullable; set when revoked |
+The live list comes from `GET /v1/api-keys/grantable-resources`. In the dialog the slugs are shown in title case, for example **Call Detail Records**.
 
-### `api_key_permissions` Table
+### Archived call records
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | bigint | Primary key |
-| `api_key_id` | FK | Owning key |
-| `resource` | string | Grantable resource slug |
-| `level` | enum | read, write |
+Only an API key can read the archive tier of call detail records (records 6 to 12 months old). Add `archive=1` to the list, single-record, export or statistics request of `call-detail-records`. The flag is ignored for signed-in users, including the Owner. See [Call Logs](/modules/call-logs).
 
-## Related API Endpoints
+## Create a key
+
+1. Open **API Keys** (in the **Analytics** section of the sidebar).
+2. Click **Create API Key**.
+3. Enter a **Name** (required, up to 255 characters), for example "CRM Integration".
+4. Under **Permissions**, choose **No Access**, **Read** or **Write** for each resource. The buttons **Disable All**, **Grant Read-Only All** and **Grant Write All** set every resource at once.
+5. Click **Create**. The button stays disabled until there is a name and at least one permission.
+6. The **API Key Created** dialog shows the key once. Copy it and store it in a secret manager, then click **I've copied it**. The dialog cannot be closed by clicking outside it or pressing Escape.
+
+The key starts with `opbxk_` followed by 40 random characters. Only a SHA-256 hash is stored, so the key can never be shown again. If it is lost, revoke it and create a new one.
+
+{/* SCREENSHOT: api-keys-list — API Keys page with the REST API and MCP Server endpoint cards on top and two keys: "Reporting Dashboard" (call-detail-records:read, dashboard:read) and "CRM Integration" (users:read, extensions:write, phone-numbers:read), both Active with a last-used date */}
+
+{/* SCREENSHOT: api-keys-create-dialog — Create API Key dialog with the name "CI pipeline", the three bulk buttons and per-resource selectors, Call Detail Records set to Read */}
+
+{/* SCREENSHOT: api-keys-reveal-dialog — API Key Created dialog with a placeholder key (opbxk_ followed by Xs) and the Copy button */}
+
+## Use a key
+
+Send the key as a bearer token:
+
+```bash
+curl -H "Authorization: Bearer opbxk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+     https://pbx.example.com/api/v1/phone-numbers
+```
+
+The top of the API Keys page shows two endpoint cards with copy buttons:
+
+- **REST API**: the base URL for REST calls.
+- **MCP Server**: the URL to give MCP clients, with the same bearer key. See [MCP Server](/modules/mcp-server).
+
+## List columns
+
+| Column | Shows |
+|--------|-------|
+| Name | The key's name |
+| Permissions | One badge per permission, for example `extensions:write` |
+| Last used | Date of the last request, or **Never**. Updated at most every 5 seconds per key (every request for `users` and `extensions`) |
+| Status | **Active** or **Revoked** |
+| Actions | **Revoke** for active keys |
+
+## Change a key
+
+The page has no edit dialog. To rename a key or replace its permissions, use `PUT /v1/api-keys/{id}` with `name` and/or `permissions`. The new permission list **replaces** the old one completely and must contain at least one entry. Name and permissions change together or not at all.
+
+## Revoke a key
+
+1. Click **Revoke** on the key's row.
+2. Confirm in the **Revoke API key?** dialog.
+
+The key stops working immediately: requests with it answer `401` "Unauthenticated." Revoked keys stay in the list, dimmed, with the **Revoked** badge. Revoking cannot be undone and a revoked key cannot be deleted.
+
+{/* SCREENSHOT: api-keys-revoke-dialog — Revoke API key? confirmation for "Reporting Dashboard" */}
+
+## Common errors
+
+| Response | What it means | What to do |
+|----------|---------------|-----------|
+| `401` Unauthenticated. | The key is wrong or revoked | Check the key; create a new one if it was revoked |
+| `403` This API key is not permitted to access this endpoint. | The endpoint is not grantable to keys | Use a user session for that action |
+| `403` This API key is not permitted to access *resource*. | The key has no permission for that resource | Grant the resource with `PUT /v1/api-keys/{id}` |
+| `403` This API key has read-only access to *resource*. | A write request with a Read permission | Grant Write |
+| `422` on create | No name, no permissions, an unknown resource or a level other than `read` or `write` | Fix the request |
+
+## Key data fields
+
+### `api_keys`
+
+| Column | Notes |
+|--------|-------|
+| `id` | Primary key |
+| `organization_id` | Tenant scope |
+| `name` | Up to 255 characters |
+| `token` | SHA-256 hash of the key; the key itself is never stored |
+| `created_by` | The Owner who created it |
+| `last_used_at` | Time of the last request (throttled, see above) |
+| `revoked_at` | Set when revoked |
+
+### `api_key_permissions`
+
+| Column | Notes |
+|--------|-------|
+| `api_key_id` | The key |
+| `resource` | A grantable resource slug |
+| `level` | `read` or `write` |
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/api-keys` | List keys |
-| POST | `/v1/api-keys` | Create a key (returns one-time value) |
-| GET | `/v1/api-keys/grantable-resources` | List grantable resource slugs |
-| GET | `/v1/api-keys/{apiKey}` | Get a key |
-| PUT | `/v1/api-keys/{apiKey}` | Update name and/or replace permissions |
-| DELETE | `/v1/api-keys/{apiKey}` | Revoke a key |
+| GET | `/v1/api-keys` | List keys, newest first |
+| POST | `/v1/api-keys` | Create a key. The response carries the key once in `key` |
+| GET | `/v1/api-keys/grantable-resources` | Grantable resource slugs |
+| GET | `/v1/api-keys/{id}` | One key |
+| PUT | `/v1/api-keys/{id}` | Rename and/or replace permissions |
+| DELETE | `/v1/api-keys/{id}` | Revoke |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Related Modules
+## Related modules
 
-- [User Management](/modules/user-management) — Roles governing interactive (session) access
-- [Settings](/modules/settings) — Organization-level configuration
+- [MCP Server](/modules/mcp-server) — uses API keys for authentication
+- [User Management](/modules/user-management) — roles for signed-in users
+- [Call Logs](/modules/call-logs) — the archive tier readable with a key
