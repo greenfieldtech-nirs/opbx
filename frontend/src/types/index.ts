@@ -952,6 +952,8 @@ export interface WebhookUrlDetails {
 }
 
 export interface CloudonixSettings {
+  /** Set by the update endpoint when the settings were saved locally but the Cloudonix sync failed. */
+  warning?: string;
   id: number;
   organization_id: number;
   domain_uuid: string | null;

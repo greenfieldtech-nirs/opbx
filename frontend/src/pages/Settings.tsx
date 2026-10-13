@@ -248,11 +248,16 @@ export default function Settings() {
             (result.profile_settings.no_answer_timeout !== undefined ||
               result.profile_settings.recording_format !== undefined);
 
-          toast.success('Settings validated and saved successfully', {
-            description: settingsApplied
-              ? 'Settings from your Cloudonix domain have been applied and synced.'
-              : 'Your Cloudonix integration settings have been saved and synced.',
-          });
+          if (savedSettings.warning) {
+            // Saved locally, but the push to Cloudonix failed: do not claim success.
+            toast.warning('Settings saved, but not synced to Cloudonix', { description: savedSettings.warning });
+          } else {
+            toast.success('Settings validated and saved successfully', {
+              description: settingsApplied
+                ? 'Settings from your Cloudonix domain have been applied and synced.'
+                : 'Your Cloudonix integration settings have been saved and synced.',
+            });
+          }
 
           // Refresh settings to verify persistence
           try {
