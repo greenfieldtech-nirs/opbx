@@ -230,7 +230,6 @@ class CallTrackingDestinationResolver
         $schedule = BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $scheduleId)
             ->where('organization_id', $campaign->organization_id)
-            ->where('status', 'active')
             ->first();
 
         if (! $schedule) {

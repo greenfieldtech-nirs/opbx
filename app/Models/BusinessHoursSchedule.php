@@ -149,10 +149,6 @@ class BusinessHoursSchedule extends Model
      */
     public function getCurrentStatusAttribute(): string
     {
-        if ($this->status === BusinessHoursStatus::INACTIVE) {
-            return 'closed';
-        }
-
         return $this->isCurrentlyOpen() ? 'open' : 'closed';
     }
 
@@ -161,6 +157,11 @@ class BusinessHoursSchedule extends Model
      */
     public function isCurrentlyOpen(?Carbon $dateTime = null): bool
     {
+        // An inactive schedule is never open: every routing path then uses its Closed action.
+        if ($this->status !== BusinessHoursStatus::ACTIVE) {
+            return false;
+        }
+
         // Evaluate in the schedule's own time zone (defaults to UTC, seeded from the organisation's).
         $dateTime = ($dateTime ?? Carbon::now())->copy()->setTimezone($this->timezone ?: 'UTC');
 
