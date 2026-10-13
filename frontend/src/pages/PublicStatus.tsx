@@ -47,7 +47,7 @@ export default function PublicStatus() {
   const banner = data ? BANNERS[bannerFor(data.groups)] : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground home-dark flex flex-col">
+    <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular flex flex-col">
       <HomeHeader />
       <main className="container mx-auto px-4 py-12 flex-1 max-w-4xl">
         <h1 className="text-4xl font-bold mb-2">Platform Status</h1>
