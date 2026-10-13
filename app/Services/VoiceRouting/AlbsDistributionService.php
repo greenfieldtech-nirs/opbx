@@ -87,14 +87,7 @@ class AlbsDistributionService
         $memberCount = $members->count();
 
         try {
-            // Atomic INCR that also (re)sets the TTL whenever the key has none, so a crash between
-            // INCR and EXPIRE can never leave an immortal counter.
-            $counter = (int) Redis::eval(
-                "local n = redis.call('INCR', KEYS[1]); if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return n",
-                1,
-                $this->getRoundRobinKey($albs->id),
-                self::ROUND_ROBIN_TTL
-            );
+            $counter = $this->nextCounter($this->getRoundRobinKey($albs->id));
 
             // Calculate index using modulo (counter - 1 to make it 0-indexed)
             $index = ($counter - 1) % $memberCount;
@@ -340,6 +333,20 @@ class AlbsDistributionService
 
             return 0;
         }
+    }
+
+    /**
+     * Atomic INCR that also (re)sets the TTL whenever the key has none, so a crash between
+     * INCR and EXPIRE can never leave an immortal counter. Shared by every round-robin user.
+     */
+    public function nextCounter(string $key): int
+    {
+        return (int) Redis::eval(
+            "local n = redis.call('INCR', KEYS[1]); if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return n",
+            1,
+            $key,
+            self::ROUND_ROBIN_TTL
+        );
     }
 
     /**

@@ -18,6 +18,7 @@ use App\Services\CallRecording\CallRecordingDecision;
 use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\VoiceRouting\AlbsDistributionService;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -222,7 +223,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
         // Calculate which member to try in this attempt
         // Using modulo to cycle through members for each ring turn
-        $memberIndex = $attempt % $memberCount;
+        $memberIndex = ($this->roundRobinStart($ringGroup, $request, $attempt, $memberCount) + $attempt) % $memberCount;
 
         // Get the specific member
         $member = $members->values()->get($memberIndex);
@@ -256,6 +257,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         $relativeUrl = route('voice.ring-group-callback', [
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
+            'rr_start' => $request->input('rr_start'),
             // Pass necessary context
             'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt]),
         ], false); // Get relative URL
@@ -276,6 +278,33 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         );
 
         return $builder->toResponse();
+    }
+
+    /**
+     * Starting member offset for Round Robin: one shared counter advances per new call, and the
+     * chosen offset travels in the callback URL (`rr_start`) so retries walk on from it.
+     * Sequential groups always start at 0.
+     */
+    private function roundRobinStart(RingGroup $ringGroup, Request $request, int $attempt, int $memberCount): int
+    {
+        if ($ringGroup->strategy !== StrategyEnum::ROUND_ROBIN) {
+            return 0;
+        }
+
+        if ($request->input('rr_start') === null) {
+            $start = 0;
+            if ($attempt === 0) {
+                try {
+                    $start = (app(AlbsDistributionService::class)->nextCounter("ringgroup:rr:{$ringGroup->id}") - 1) % $memberCount;
+                } catch (\Throwable $e) {
+                    Log::error('RingGroupRoutingStrategy: round robin counter unavailable, starting at first member', ['error' => $e->getMessage()]);
+                }
+            }
+            // Pin it for the rest of this request (recursive attempts) and for the callback URLs.
+            $request->merge(['rr_start' => $start]);
+        }
+
+        return (int) $request->input('rr_start');
     }
 
     /**
