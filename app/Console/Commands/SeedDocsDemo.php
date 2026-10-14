@@ -519,11 +519,12 @@ class SeedDocsDemo extends Command
 
     private function security(): void
     {
+        // The prefix is an optional area code added after the country code, never the country code itself
         foreach ([
-            ['US and Canada', 'US', '+1', 'acme-demo-trunk-us'],
-            ['United Kingdom', 'GB', '+44', 'acme-demo-trunk-eu'],
-            ['Germany', 'DE', '+49', 'acme-demo-trunk-eu'],
-            ['Israel', 'IL', '+972', 'acme-demo-trunk-il'],
+            ['US and Canada', 'US', null, 'acme-demo-trunk-us'],
+            ['United Kingdom', 'GB', null, 'acme-demo-trunk-eu'],
+            ['Germany', 'DE', null, 'acme-demo-trunk-eu'],
+            ['Israel', 'IL', null, 'acme-demo-trunk-il'],
         ] as [$name, $country, $prefix, $trunk]) {
             OutboundWhitelist::create([
                 'organization_id' => $this->org, 'name' => $name, 'destination_country' => $country,
