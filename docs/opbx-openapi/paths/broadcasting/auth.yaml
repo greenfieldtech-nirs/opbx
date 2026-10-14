@@ -24,7 +24,7 @@ paths:
           required: true
           schema:
             type: string
-          example: "private-organization.1"
+          example: "presence-org.1"
       responses:
         '200':
           description: Channel authentication payload
@@ -32,7 +32,17 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  auth:
+                    type: string
+                    description: Signature in the form `<app-key>:<hmac>`
+                  channel_data:
+                    type: string
+                    description: >-
+                      Presence channels only: JSON string with `user_id` and
+                      `user_info` (`id`, `name`, `email`, `role`)
+                required:
+                  - auth
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
@@ -44,8 +54,19 @@ paths:
       description: |
         Laravel Echo broadcasting authentication endpoint.
 
-        Returns the authentication payload needed to subscribe to private
-        or presence channels from the SPA.
+        Returns the Pusher-protocol authentication payload needed to subscribe
+        to private or presence channels from the SPA. The body may be JSON or
+        form-encoded.
+
+        Channels:
+        - `presence-org.{organizationId}`: live call presence. Allowed for
+          owners and PBX admins of that organization (supervisors and other
+          roles are denied).
+        - `private-user.{userId}`: only the user themselves.
+        - `private-extension.{extensionId}`: users of the extension's organization.
+
+        Requires an authenticated user in an active organization
+        (`tenant.scope`). Denied channels return 403.
       operationId: authenticateBroadcastingChannel
       security:
         - bearerAuth: []
@@ -62,7 +83,7 @@ paths:
                   example: "1234.5678"
                 channel_name:
                   type: string
-                  example: "private-organization.1"
+                  example: "presence-org.1"
               required:
                 - socket_id
                 - channel_name
@@ -73,7 +94,17 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  auth:
+                    type: string
+                    description: Signature in the form `<app-key>:<hmac>`
+                  channel_data:
+                    type: string
+                    description: >-
+                      Presence channels only: JSON string with `user_id` and
+                      `user_info` (`id`, `name`, `email`, `role`)
+                required:
+                  - auth
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
