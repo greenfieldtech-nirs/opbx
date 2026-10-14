@@ -108,6 +108,8 @@ The image (`eclipse-temurin:21-jre`) runs as a non-root user (uid 10001). In the
 
 ## Environment Variables
 
+The compose file passes only some of these to the container: `AMD_WEBSOCKET_PORT`, `AMD_HTTP_PORT`, `AMD_WORKER_API_TOKEN`, `AMD_MODEL_PATH` (`/app/models/beep_detector.onnx`), `AMD_MAX_CONCURRENT_STREAMS`, `AMD_MIN_BEEP_START_MS`, `AMD_LOG_LEVEL`, `AMD_DUMP_AUDIO` and `AMD_DUMP_AUDIO_PATH`. The others (`AMD_DEFAULT_TIMEOUT_SECONDS`, `AMD_DETECTORS`, `AMD_ACTION_CALLBACK_URL`, `AMD_SESSION_CHECK_URL`) keep their defaults unless you add them to the `amd-worker` environment in the compose file; setting them only in `.env` has no effect.
+
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `AMD_WEBSOCKET_PORT` | `8082` | No | WebSocket listener port |
@@ -125,7 +127,7 @@ The image (`eclipse-temurin:21-jre`) runs as a non-root user (uid 10001). In the
 | `AMD_SESSION_CHECK_URL` | callback URL with `/amd-action` replaced by `/amd-session` | No | Session admission URL. If it cannot be derived, every stream fails the check |
 
 :::danger
-`AMD_WORKER_API_TOKEN` must match the value configured in OPBX (`AMD_WORKER_API_TOKEN` in `.env`). Laravel compares it in constant time. The worker refuses to start when the token is empty or a shipped placeholder.
+`AMD_WORKER_API_TOKEN` must match the value configured in OPBX (`AMD_WORKER_API_TOKEN` in `.env`). Laravel compares it in constant time and answers 401 on a mismatch, or 503 when its own token is empty. The worker refuses to start when the token is empty or a shipped placeholder.
 :::
 
 ## Session Admission
@@ -137,7 +139,7 @@ A stream must belong to a live auto-dialer call:
 3. Audio keeps flowing while the check runs. A result found before the answer is held until it arrives.
 4. An unknown session closes the stream ("Unknown session"), and any result for it is dropped.
 
-Only 8 kHz audio is accepted. A second connection with the same stream ID is rejected, and connections above `AMD_MAX_CONCURRENT_STREAMS` are closed with code 1013.
+Only 8 kHz audio is accepted; another sample rate closes the stream with code 1003. A second connection with the same stream ID is rejected, connections above `AMD_MAX_CONCURRENT_STREAMS` are closed with code 1013, and a connection to any path other than `/ws/detect` is closed.
 
 ## Detection Pipeline
 
@@ -188,14 +190,14 @@ Default: voicemail → `HANGUP`; human or unknown → `CONTINUE`.
 curl http://localhost:8083/health
 ```
 
-Returns JSON with `status`, `model_loaded`, `active_streams`, `max_streams`, `total_detections`, `detection_breakdown`, `avg_detection_time_ms`, `errors_total` and `uptime_seconds`. The compose healthcheck calls it every 30 seconds.
+Returns JSON with `status`, `model_loaded`, `active_streams`, `max_streams`, `total_detections`, `detection_breakdown` (`voicemail`, `human`, `unknown`), `avg_detection_time_ms`, `errors_total` and `uptime_seconds`. The compose healthcheck calls it every 30 seconds, and the [Platform Status](/opbx/administration/platform-management#platform-status) page probes it every minute (`PLATFORM_STATUS_AMD_URL`, default `http://amd-worker:8083/health`).
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
 | AMD results not appearing | Verify `AMD_WORKER_API_TOKEN` matches OPBX; check `docker compose logs -f amd-worker` for "Unknown session" or callback errors |
-| Voicemail reported as unknown | The beep came before `AMD_MIN_BEEP_START_MS`, or after the timeout; review a dumped stream |
+| Voicemail reported as unknown | The beep came before `AMD_MIN_BEEP_START_MS`, or after the timeout; review a dumped stream. To raise the timeout, add `AMD_DEFAULT_TIMEOUT_SECONDS` to the `amd-worker` environment in the compose file |
 | High false-positive rate | Review dumped audio with `OfflineToneTest` and tune detector parameters |
 | Model fails to load | Ensure `AMD_MODEL_PATH` points to a valid ONNX file (the compose file mounts `./amd-worker/models`); the worker falls back to tone energy detection |
 | Streams rejected | Check concurrent stream count against `AMD_MAX_CONCURRENT_STREAMS` |
@@ -204,3 +206,4 @@ Returns JSON with `status`, `model_loaded`, `active_streams`, `max_streams`, `to
 
 - [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) — Campaigns that trigger AMD
 - [Call Logs](/opbx/modules/call-logs) — CDR includes AMD results
+- [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) — turning detection on for a campaign
