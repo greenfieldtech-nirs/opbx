@@ -1298,6 +1298,8 @@ export interface AutoDialerList {
     version_number: number;
   };
   has_versions: boolean;
+  /** "(Part N)" lists a large upload was split into; deleting the list deletes them too. */
+  parts_count?: number;
   can_archive: boolean;
   can_assign: boolean;
   can_upload: boolean;

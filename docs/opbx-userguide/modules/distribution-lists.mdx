@@ -77,7 +77,7 @@ A campaign can hold several lists; assigning another list adds it to the ones al
 | Delete a Failed list | Yes | Yes | No | No | No |
 | Delete any other list | Yes | No | No | No | No |
 
-Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list completely (the list, all its numbers, their dialing records and the backup copies kept when it was re-uploaded; nothing can be restored) and asks for confirmation first. Lists split off a large file ("*name* (Part 2)" and so on) are separate lists and stay. A list that is assigned to a campaign cannot be deleted: the delete is refused and a dialog names the campaign. Unassign the list first.
+Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list completely (the list, all its numbers, their dialing records and the backup copies kept when it was re-uploaded; nothing can be restored) and asks for confirmation first. The lists split off it from a large file ("*name* (Part 2)" and so on) are deleted with it, and the confirmation says how many. A list that is assigned to a campaign, or whose parts include one that is, cannot be deleted: the delete is refused, nothing is deleted, and a dialog names the campaign (and the part). Unassign it first.
 
 ## Workflows
 
@@ -210,7 +210,7 @@ Adding single numbers or batches of up to 1000 numbers (`destinations`, `destina
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/copy` | Copy |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/download` | CSV export |
 | PATCH | `/v1/auto-dialer-campaigns/lists/{list}/archive` | Archive |
-| DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete the list and everything stored with it (409 with a usage list while assigned to a campaign) |
+| DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete the list, its parts and everything stored with them (409 with a usage list while the list or a part is assigned to a campaign) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to a campaign (`campaign_id`) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign (403 while the campaign is active, 422 once its entries have started processing) |
 

@@ -80,7 +80,7 @@ phone_number,name,batch_identifier,company
 
 ### Large files
 
-A list holds at most **100,000** numbers. A file with more rows is split automatically: the first part goes into your list and each further part into a new list named "*name* (Part 2)", "(Part 3)" and so on.
+A list holds at most **100,000** numbers. A file with more rows is split automatically: the first part goes into your list and each further part into a new list named "*name* (Part 2)", "(Part 3)" and so on. The parts belong to your list: deleting the list deletes them too.
 
 ## List statuses
 
@@ -217,11 +217,11 @@ Archiving is offered for **Ready** and **Used** lists that are **not assigned to
 Who can do this: the Owner for any list that is not assigned to a campaign; a PBX Admin for **Failed** lists only. **Delete** is shown only to those roles.
 
 1. Choose **Delete** in the row menu or on the detail page.
-2. In the **Delete List** dialog, click **Permanently Delete**. For a list that is not Failed the dialog warns that only Owners can delete such lists.
+2. In the **Delete List** dialog, click **Permanently Delete**. For a list that is not Failed the dialog warns that only Owners can delete such lists. For a list split from a large file the dialog also says how many parts are deleted with it.
 
-Result: the toast "List deleted successfully" (row menu) or "List deleted" (detail page, which then returns to the list page) appears. The list is deleted completely: the list, all its numbers, their dialing records and the backup copies kept when the list was re-uploaded. It cannot be restored. Lists created by splitting a large file ("*name* (Part 2)" and so on) are separate lists and are not deleted with it.
+Result: the toast "List deleted successfully" (row menu) or "List deleted" (detail page, which then returns to the list page) appears. The list is deleted completely: the list, all its numbers, their dialing records and the backup copies kept when the list was re-uploaded. It cannot be restored. The lists created by splitting a large file into it ("*name* (Part 2)" and so on) are deleted the same way, all together.
 
-If the server is asked to delete a list that a campaign still uses, it refuses and the **Cannot delete: still in use** dialog names the campaign. Unassign the list first, then delete it.
+If the server is asked to delete a list that a campaign still uses, or a list one of whose parts a campaign still uses, it refuses, deletes nothing, and the **Cannot delete: still in use** dialog names the campaign (and the part, for a part). Unassign the list or part first, then delete the list.
 
 ![Delete List confirmation dialog for Fall Webinar Leads](../../img/screens/auto-dialer-lists-delete-dialog.jpg)
 

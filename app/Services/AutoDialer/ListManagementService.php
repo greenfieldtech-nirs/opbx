@@ -450,18 +450,23 @@ class ListManagementService
      */
     public function deleteList(AutoDialerList $list): void
     {
-        DB::transaction(function () use ($list): void {
-            $list->destinations()->delete();
-            $list->delete();
+        $lists = collect([$list, ...$list->allParts()]);
+
+        DB::transaction(function () use ($lists): void {
+            foreach ($lists as $each) {
+                $each->destinations()->delete();
+                $each->delete();
+            }
         });
 
+        $prefixes = $lists->map(fn (AutoDialerList $each): string => "list_{$each->id}_v")->all();
         $disk = Storage::disk('list_backups');
         $disk->delete(array_values(array_filter(
             $disk->files(),
-            fn (string $file): bool => str_starts_with($file, "list_{$list->id}_v")
+            fn (string $file): bool => Str::startsWith($file, $prefixes)
         )));
 
-        Log::info('ListManagementService: Deleted list', ['list_id' => $list->id]);
+        Log::info('ListManagementService: Deleted list', ['list_id' => $list->id, 'part_ids' => $lists->skip(1)->pluck('id')->values()->all()]);
     }
 
     /**

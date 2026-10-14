@@ -110,6 +110,25 @@ class AutoDialerList extends Model
     }
 
     /**
+     * The "(Part N)" lists ProcessLargeListJob split off this list. The name filter keeps out
+     * version rows of the retired create-new-version flow, which share parent_list_id.
+     */
+    public function parts(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_list_id')->where('name', 'like', '% (Part %)');
+    }
+
+    /**
+     * Every part of this list, and their parts in turn.
+     *
+     * @return \Illuminate\Support\Collection<int, self>
+     */
+    public function allParts(): \Illuminate\Support\Collection
+    {
+        return $this->parts->flatMap(fn (self $part) => [$part, ...$part->allParts()]);
+    }
+
+    /**
      * Get the latest version of this list lineage.
      */
     public function latestVersion(): HasOne

@@ -102,4 +102,75 @@ class DistributionListDeleteTest extends TestCase
         $this->assertDatabaseHas('auto_dialer_destinations', ['id' => $entry->id]);
         Storage::disk('list_backups')->assertExists($backup);
     }
+
+    /**
+     * A part ProcessLargeListJob split off the given list.
+     */
+    private function part(AutoDialerList $list, int $number, array $attributes = []): AutoDialerList
+    {
+        return AutoDialerList::factory()->ready()->create([
+            'organization_id' => $list->organization_id,
+            'name' => "{$list->name} (Part {$number})",
+            'parent_list_id' => $list->id,
+            'is_latest_version' => false,
+            ...$attributes,
+        ]);
+    }
+
+    public function test_delete_removes_every_part_of_a_split_list(): void
+    {
+        $list = AutoDialerList::factory()->ready()->create(['organization_id' => $this->organization->id, 'name' => 'Leads']);
+        $parts = [$this->part($list, 2), $this->part($list, 3)];
+        $entries = array_map(fn (AutoDialerList $part) => $this->destination($part), $parts);
+        $backups = array_map(fn (AutoDialerList $part) => $this->backupFile($part), $parts);
+
+        // A version row from the retired create-new-version flow shares the parent link but is not a part.
+        $version = AutoDialerList::factory()->ready()->create([
+            'organization_id' => $this->organization->id, 'name' => 'Leads', 'parent_list_id' => $list->id,
+        ]);
+        $other = AutoDialerList::factory()->ready()->create(['organization_id' => $this->organization->id]);
+        $otherEntry = $this->destination($other);
+
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
+            ->assertJsonPath('data.parts_count', 2);
+
+        $this->actingAs($this->user)
+            ->deleteJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
+            ->assertOk();
+
+        foreach ($parts as $i => $part) {
+            $this->assertDatabaseMissing('auto_dialer_lists', ['id' => $part->id]);
+            $this->assertDatabaseMissing('auto_dialer_destinations', ['id' => $entries[$i]->id]);
+            Storage::disk('list_backups')->assertMissing($backups[$i]);
+        }
+        $this->assertDatabaseHas('auto_dialer_lists', ['id' => $version->id]);
+        $this->assertDatabaseHas('auto_dialer_lists', ['id' => $other->id]);
+        $this->assertDatabaseHas('auto_dialer_destinations', ['id' => $otherEntry->id]);
+    }
+
+    public function test_an_assigned_part_blocks_the_whole_delete(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id, 'name' => 'Spring Drive']);
+        $list = AutoDialerList::factory()->ready()->create(['organization_id' => $this->organization->id, 'name' => 'Leads']);
+        $free = $this->part($list, 2);
+        $assigned = $this->part($list, 3, [
+            'campaign_id' => $campaign->id, 'used_by_campaign_id' => $campaign->id, 'status' => ListStatus::IN_USE,
+        ]);
+        $entries = [$this->destination($list), $this->destination($free), $this->destination($assigned)];
+        $backup = $this->backupFile($free);
+
+        $this->actingAs($this->user)
+            ->deleteJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
+            ->assertStatus(409)
+            ->assertJsonFragment(['message' => 'This distribution list is still used by: auto dialer campaign "Spring Drive" (assigned part "Leads (Part 3)"). Remove these references first.']);
+
+        foreach ([$list, $free, $assigned] as $kept) {
+            $this->assertDatabaseHas('auto_dialer_lists', ['id' => $kept->id]);
+        }
+        foreach ($entries as $entry) {
+            $this->assertDatabaseHas('auto_dialer_destinations', ['id' => $entry->id]);
+        }
+        Storage::disk('list_backups')->assertExists($backup);
+    }
 }

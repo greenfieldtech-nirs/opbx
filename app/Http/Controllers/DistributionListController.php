@@ -43,6 +43,7 @@ class DistributionListController extends Controller
             })
             ->with(['campaign', 'usedByCampaign'])
             ->withExists('versions as has_versions')
+            ->withCount('parts')
             ->when($request->status && $request->status !== 'all', fn ($q) => $q->where('status', $request->status))
             ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
             ->when($request->search, function ($q, $search) {
@@ -93,7 +94,7 @@ class DistributionListController extends Controller
     {
         $this->authorize('view', $list);
 
-        $list->load(['campaign', 'usedByCampaign', 'parentList', 'versions']);
+        $list->load(['campaign', 'usedByCampaign', 'parentList', 'versions'])->loadCount('parts');
 
         return response()->json([
             'data' => new DistributionListResource($list),
@@ -425,9 +426,14 @@ class DistributionListController extends Controller
     {
         $this->authorize('delete', $list);
 
-        $check = app(ResourceReferenceChecker::class)->checkReferences('distribution_list', $list->id, $list->organization_id);
-        if ($check['has_references']) {
-            throw new ResourceInUseException('distribution_list', $check['references']);
+        // The list and every part it was split into must be unassigned; deleting the list deletes the parts.
+        $checker = app(ResourceReferenceChecker::class);
+        $references = collect([$list, ...$list->allParts()])->flatMap(fn (AutoDialerList $each) => array_map(
+            fn (array $ref): array => $each->is($list) ? $ref : [...$ref, 'detail' => "assigned part \"{$each->name}\""],
+            $checker->checkReferences('distribution_list', $each->id, $each->organization_id)['references'],
+        ))->all();
+        if ($references !== []) {
+            throw new ResourceInUseException('distribution_list', $references);
         }
 
         try {

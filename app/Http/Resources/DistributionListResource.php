@@ -41,6 +41,8 @@ class DistributionListResource extends JsonResource
                 fn () => (bool) ($this->has_versions ?? $this->versions()->exists())
             ),
 
+            'parts_count' => $this->whenCounted('parts'),
+
             // Flags
             'can_archive' => $this->canBeArchived() && ! $this->isAssigned(),
             'can_assign' => $this->status->canAssign(),

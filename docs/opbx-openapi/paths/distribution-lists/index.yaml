@@ -242,12 +242,15 @@ paths:
       description: |
         Delete a distribution list completely: the list, all its destinations, their dial
         sessions and the backup copies of its destinations kept when the list was
-        re-uploaded. Nothing of the list remains. Lists created by splitting a large upload
-        ("*name* (Part 2)" and so on) are separate lists and are not deleted with it.
+        re-uploaded. Nothing of the list remains. The lists created by splitting a large
+        upload into it ("*name* (Part 2)" and so on; counted in `parts_count`) are deleted
+        the same way, in the same transaction.
 
         Lists in 'failed' status can be deleted by Owners and PBX Admins; lists in any
-        other status only by Owners. A list that is assigned to a campaign returns 409
-        (unassign it first).
+        other status only by Owners. If the list, or any of its parts, is assigned to a
+        campaign the request returns 409 and deletes nothing; each reference names the
+        campaign, and for a part its `detail` is `assigned part "<part name>"`. Unassign
+        it first.
       operationId: deleteDistributionList
       security:
       - bearerAuth: []
