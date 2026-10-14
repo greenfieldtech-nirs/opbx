@@ -343,6 +343,8 @@ class CloudonixWebhookController extends Controller
             // Trigger call notification webhook if enabled for this organization
             $this->triggerCallNotification($sessionUpdate, $organizationId);
 
+            $this->broadcastCallState($organizationId, $validated);
+
             // Correlate with call queues (presence tracking + answer events)
             try {
                 app(QueueCallLifecycleService::class)->handleSessionUpdate($sessionUpdate);
@@ -392,6 +394,8 @@ class CloudonixWebhookController extends Controller
                 return;
             }
 
+            $this->broadcastCallState($organizationId, $validated);
+
             app(QueueCallLifecycleService::class)->handleSessionEnd(
                 $organizationId,
                 $this->phoneNumberService->normalizeToE164($validated['destination']),
@@ -402,6 +406,25 @@ class CloudonixWebhookController extends Controller
             );
         } catch (\Throwable $e) {
             Log::warning('Terminal session update: presence cleanup failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Live Calls page: call.answered on the first answer, call.ended on the first terminal update.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function broadcastCallState(int $organizationId, array $validated): void
+    {
+        $callLog = CallLog::forCall($organizationId, [$validated['token'] ?? null, ...($validated['callIds'] ?? [])]);
+        if (! $callLog) {
+            return;
+        }
+
+        if (ExtensionPresenceTracker::endsSession($validated['status'], $validated['action'] ?? null)) {
+            $callLog->markEnded($validated['status']);
+        } elseif (in_array($validated['status'], ['connected', 'connect', 'answer', 'answered', 'active'], true)) {
+            $callLog->markAnswered();
         }
     }
 
@@ -463,7 +486,7 @@ class CloudonixWebhookController extends Controller
             $this->trackCallFromCdr($cdr, $organizationId);
 
             // Also update CallLog if it exists (for backwards compatibility)
-            $callLog = CallLog::where('call_id', $callId)->first();
+            $callLog = CallLog::forCall((int) $organizationId, [$callId, $request->input('session.token') ?? $request->input('session_token')]);
             if ($callLog) {
                 $updateData = [
                     'cloudonix_cdr' => $request->all(),
@@ -478,6 +501,7 @@ class CloudonixWebhookController extends Controller
                 }
 
                 $callLog->update($updateData);
+                $callLog->markEnded((string) $request->input('disposition'), $request->has('duration') ? (int) $request->input('duration') : null);
 
                 Log::info('CDR data also saved to call log', [
                     'call_id' => $callId,

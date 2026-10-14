@@ -23,7 +23,7 @@ graph LR
     Laravel[Laravel API] -->|Broadcast events| Soketi
 ```
 
-When the `call-initiated` webhook arrives, `ProcessInboundCallJob` broadcasts `call.initiated` on the organization's presence channel, and Soketi forwards it to every subscribed client. The Live Calls page merges these events into its list, but its main source is polling: it reloads the active calls from the session-updates API every 5 seconds by default (the refresh menu offers No Refresh, 1, 5, 15, 30 and 60 seconds).
+When the `call-initiated` webhook arrives, `ProcessInboundCallJob` broadcasts `call.initiated` on the organization's presence channel, and Soketi forwards it to every subscribed client. Later `session-update` and CDR webhooks for the same call broadcast `call.answered` and `call.ended`. The Live Calls page merges these events into its list, but its main source is polling: it reloads the active calls from the session-updates API every 5 seconds by default (the refresh menu offers No Refresh, 1, 5, 15, 30 and 60 seconds).
 
 ---
 
@@ -98,7 +98,15 @@ The organization presence channel is the primary channel for live call updates. 
 | `CallAnswered` | `call.answered` | `org.{organizationId}` | `call_id`, `status`, `answered_at`, `extension_id` |
 | `CallEnded` | `call.ended` | `org.{organizationId}` | `call_id`, `status`, `ended_at`, `duration` |
 
-Only `CallInitiated` is dispatched today, by `ProcessInboundCallJob` after the `call-initiated` webhook. The `CallAnswered` and `CallEnded` classes exist and the frontend listens for them, but no backend code dispatches them. These are the only broadcast events in the backend; the `user.{userId}` and `extension.{extensionId}` channels have authorization rules but no events.
+When each event is dispatched:
+
+- `CallInitiated`: by `ProcessInboundCallJob` after the `call-initiated` webhook, which creates the call log (`call_logs`, keyed by the call's `CallSid`).
+- `CallAnswered`: by the `session-update` webhook when the session status is `connected`, `connect`, `answer`, `answered` or `active` (any case). The call log gets status `answered` and `answered_at`.
+- `CallEnded`: by the first terminal `session-update` (`busy`, `cancel`, `failed`, `congestion`, `completed`, `hangup`, `bye` and their variants, or a deleted session) or by the CDR webhook, whichever comes first. The call log gets `ended_at`, the final status (`completed`, `busy`, `no_answer` or `failed`, from the session status or the CDR disposition) and, from the CDR, the duration.
+
+Both are matched to the call log by the session `token` or any of the session's `callIds` (for the CDR: `call_id` or `session.token`), within the webhook's organization. Each is sent at most once per call: the call log row is updated only while `answered_at` (or `ended_at`) is still empty, so retried webhooks, replayed CDRs and duplicate statuses broadcast nothing. An answer that arrives after the call ended is not broadcast. A call with no call log (no `call-initiated` webhook for it) broadcasts neither event; the Live Calls page has no entry for it to update anyway.
+
+These are the only broadcast events in the backend; the `user.{userId}` and `extension.{extensionId}` channels have authorization rules but no events.
 
 ---
 
@@ -198,7 +206,7 @@ For larger deployments, scale Soketi horizontally or tune these limits.
 
 ### No Live Call Updates
 
-1. Confirm the `call-initiated` webhook reaches OPBX and the queue workers are running (`ProcessInboundCallJob` broadcasts `call.initiated`). Answered and ended states come from polling, not WebSocket events.
+1. Confirm the `call-initiated` webhook reaches OPBX and the queue workers are running (`ProcessInboundCallJob` broadcasts `call.initiated`). Answered and ended states come from `call.answered` and `call.ended` (sent by the `session-update` and CDR webhooks) and from polling.
 2. Verify the user is subscribed to `org.{organizationId}`.
 3. Check that the organization channel authorization returns user data. It returns nothing for Reporters, PBX Users and Supervisors.
 
