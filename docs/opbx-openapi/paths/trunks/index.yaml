@@ -4,7 +4,10 @@ paths:
       tags:
         - Trunks
       summary: List Trunks
-      description: List SIP trunks proxied from Cloudonix, optionally filtered by direction.
+      description: |
+        List the SIP trunks of the organization's Cloudonix domain, optionally filtered by
+        direction (exact match on the Cloudonix value). Owner and PBX Admin only. Each trunk
+        carries the names of the outbound whitelist entries that use it.
       operationId: listTrunks
       security:
         - bearerAuth: []
@@ -35,10 +38,36 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/Trunk.yaml'
+                  meta:
+                    type: object
+                    properties:
+                      sip_hostname:
+                        type: string
+                        description: SIP hostname of the domain (`<domain uuid, lowercase>.sip.cloudonix.net`)
+                        example: 3f1c8a3e-7b2d-4c1e-9a55-2d6e0f9b1a10.sip.cloudonix.net
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '404':
+          description: The organization has no Cloudonix settings
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.
 
     post:
       tags:
@@ -47,7 +76,9 @@ paths:
       description: >-
         Create a trunk in Cloudonix. Only `inbound`/`outbound` directions are
         accepted; Cloudonix normalizes them to `public-inbound`/`public-outbound`.
-        `password` is write-only and is never returned in responses.
+        `password` is write-only and is never returned in responses. `overwrite_from` is
+        sent to Cloudonix only together with `username`/`password`. Owner and PBX Admin
+        only. `in_use_by` is always empty in the response.
       operationId: createTrunk
       security:
         - bearerAuth: []
@@ -103,6 +134,7 @@ paths:
                   description: Required when `username` is provided. Never serialized in responses.
                 overwrite_from:
                   type: boolean
+                  description: Applied only when `username` or `password` is sent
               required:
               - name
               - ip
@@ -122,8 +154,25 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '404':
+          description: The organization has no Cloudonix settings
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.

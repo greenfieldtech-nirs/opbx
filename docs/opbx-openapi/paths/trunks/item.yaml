@@ -12,6 +12,7 @@ paths:
       tags:
         - Trunks
       summary: Get Trunk
+      description: One trunk of the organization's Cloudonix domain, with `in_use_by`. Owner and PBX Admin only.
       operationId: getTrunk
       security:
         - bearerAuth: []
@@ -30,10 +31,27 @@ paths:
                     $ref: '../../components/schemas/Trunk.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.
 
     put:
       tags:
@@ -43,7 +61,9 @@ paths:
         Update a trunk in Cloudonix. `name` and `direction` are immutable
         post-create. All fields are optional. Omitting `password` leaves the
         stored credential untouched; `password` is write-only and is never
-        returned in responses.
+        returned in responses. `overwrite_from` is sent to Cloudonix only together
+        with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always
+        empty in the response.
       operationId: updateTrunk
       security:
         - bearerAuth: []
@@ -90,6 +110,7 @@ paths:
                   description: Requires `username`. Never serialized in responses.
                 overwrite_from:
                   type: boolean
+                  description: Applied only when `username` or `password` is sent
       responses:
         '200':
           description: Trunk updated
@@ -102,12 +123,29 @@ paths:
                     $ref: '../../components/schemas/Trunk.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.
     patch:
       tags:
         - Trunks
@@ -116,7 +154,9 @@ paths:
         Update a trunk in Cloudonix. `name` and `direction` are immutable
         post-create. All fields are optional. Omitting `password` leaves the
         stored credential untouched; `password` is write-only and is never
-        returned in responses.
+        returned in responses. `overwrite_from` is sent to Cloudonix only together
+        with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always
+        empty in the response.
       operationId: patchTrunk
       security:
         - bearerAuth: []
@@ -163,6 +203,7 @@ paths:
                   description: Requires `username`. Never serialized in responses.
                 overwrite_from:
                   type: boolean
+                  description: Applied only when `username` or `password` is sent
       responses:
         '200':
           description: Trunk updated
@@ -175,17 +216,35 @@ paths:
                     $ref: '../../components/schemas/Trunk.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.
 
     delete:
       tags:
         - Trunks
       summary: Delete Trunk
+      description: Deletes the trunk in Cloudonix. Owner and PBX Admin only. Outbound whitelist entries that use it are not changed.
       operationId: deleteTrunk
       security:
         - bearerAuth: []
@@ -197,7 +256,24 @@ paths:
           description: Trunk deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not an Owner or PBX Admin
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
-          $ref: '../../components/responses/NotFound.yaml'
+          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '502':
-          description: Cloudonix API unavailable
+          description: Cloudonix API unavailable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: cloudonix_unavailable
+                message: Unable to reach the Cloudonix API. Please try again later.
