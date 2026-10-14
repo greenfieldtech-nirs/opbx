@@ -249,7 +249,7 @@ Click a campaign's row or name (Owner and PBX Admin). The header has **Back to C
 
 Below the cards: the full configuration (routing, caller ID strategy and pool, dial timeout, connect mode, attempts, retry on busy / no-answer, CAC), the assigned distribution lists (name, version, records, invalid; five per page), the schedule (timezone, date range, active days), time limit, recording and the voicemail detection actions, or "Not configured".
 
-For an Owner or PBX Admin each assigned list has **Unassign**, which takes the list back from the campaign (the list and its numbers are kept and it returns to **Ready**). Once the campaign has started processing a list's entries, the list shows **Locked** instead and can no longer be unassigned. See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
+For an Owner or PBX Admin each assigned list has **Unassign**, which takes the list back from the campaign (the list and its numbers are kept and it returns to **Ready**). While the campaign is **Active** every list shows **Locked** (pause the campaign to unassign one), and once the campaign has started processing a list's entries, that list shows **Locked** for good; the hover text gives the reason. See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
 
 ![Detail page of Fall Webinar Follow-up: Paused badge, Resume button, the list Fall Webinar Leads with 20 records, routing AI Assistant and the Monday to Friday America/New_York schedule](../../img/screens/auto-dialer-campaign-detail.jpg)
 

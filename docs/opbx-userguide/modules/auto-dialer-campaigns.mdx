@@ -184,9 +184,9 @@ One row per call attempt: campaign, destination, session token, status, disposit
 | PATCH | `/v1/auto-dialer-campaigns/{campaign}/resume` | Resume |
 | PATCH | `/v1/auto-dialer-campaigns/{campaign}/archive` | Archive (Owner) |
 | POST | `/v1/auto-dialer-campaigns/{campaign}/reset-cac` | Reset the concurrent-call counter |
-| GET | `/v1/auto-dialer-campaigns/{campaign}/list` | Every list assigned to the campaign, with `can_unassign` |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/list` | Every list assigned to the campaign, with `can_unassign` and `unassign_refusal` |
 | POST | `/v1/auto-dialer-campaigns/{campaign}/list` | Upload a CSV as another list of the campaign |
-| DELETE | `/v1/auto-dialer-campaigns/{campaign}/list/{list}` | Unassign one list (422 once its entries have started processing) |
+| DELETE | `/v1/auto-dialer-campaigns/{campaign}/list/{list}` | Unassign one list (403 while the campaign is active, 422 once its entries have started processing) |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/destinations` | Numbers of the campaign's lists |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/concurrency` | Live CAC use |
 | GET | `/v1/auto-dialer-campaigns/monitor/summary` | Monitor overview |

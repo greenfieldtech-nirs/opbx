@@ -12,6 +12,7 @@ use App\Jobs\ProcessListUploadJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -594,16 +595,21 @@ class ListManagementService
     /**
      * Unassign a list from its campaign, keeping the list and its entries.
      *
+     * Both unassign endpoints (campaign and distribution list) go through here.
+     *
+     * @throws AuthorizationException while the list's campaign is active (403)
      * @throws \InvalidArgumentException when the list is not assigned or its entries have started processing
      */
     public function unassignList(AutoDialerList $list): void
     {
-        if (! $list->campaign_id) {
-            throw new \InvalidArgumentException('List is not assigned to any campaign');
+        $refusal = $list->unassignRefusal();
+
+        if ($refusal === AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE) {
+            throw new AuthorizationException($refusal);
         }
 
-        if (! $list->canUnassign()) {
-            throw new \InvalidArgumentException(AutoDialerList::STARTED_PROCESSING_MESSAGE);
+        if ($refusal !== null) {
+            throw new \InvalidArgumentException($refusal);
         }
 
         $campaignId = $list->campaign_id;

@@ -356,7 +356,7 @@ export default function DistributionLists() {
                             {canManage && !list.can_unassign && (
                               <span
                                 className="text-xs text-muted-foreground"
-                                title="Cannot unassign: some destinations have been dialed"
+                                title={list.unassign_refusal ?? 'Cannot unassign this list'}
                               >
                                 Locked
                               </span>

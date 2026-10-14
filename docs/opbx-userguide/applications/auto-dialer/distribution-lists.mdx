@@ -129,7 +129,10 @@ Who can do this: Owner and PBX Admin.
 
 Result: the toast "List unassigned from campaign successfully" (on the campaign page, "List unassigned from campaign") appears and the list returns to **Ready**. The campaign's other lists and its status are not changed.
 
-This works only while **every number is still pending with zero attempts**. Once the campaign has started processing the list's entries (a number was dialed, or is no longer pending), the list stays with the campaign for good: the row shows **Locked** instead of the icon ("Cannot unassign: some destinations have been dialed"), and the server refuses with "Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending)." Use [Copy a list](#copy-a-list) to dial the same numbers with another campaign.
+The same rules apply here and on the campaign's detail page:
+
+- **The campaign must not be Active.** While it is, the row shows **Locked** instead of the icon (hover text "Cannot unassign list: its campaign is active. Pause the campaign first.") and the server refuses with that message. Pause the campaign, unassign the list, then resume.
+- **Every number must still be pending with zero attempts.** Once the campaign has started processing the list's entries (a number was dialed, or is no longer pending), the list stays with the campaign for good: the row shows **Locked** (hover text "Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).") and the server refuses with that message. Use [Copy a list](#copy-a-list) to dial the same numbers with another campaign.
 
 ## The list detail page
 
@@ -241,6 +244,7 @@ If the server is asked to delete a list that a campaign still uses, it refuses a
 | Cannot upload to list in status: In Use | The list is assigned | Unassign it, or copy it and upload to the copy |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
 | Cannot assign list … because it is currently running. Pause the campaign first | The campaign is dialing | Pause the campaign, assign, then resume |
+| Cannot unassign list: its campaign is active. Pause the campaign first. | The list's campaign is Active | Pause the campaign, unassign, then resume |
 | Cannot unassign list: its entries have started processing for this campaign … | Calls were made from the list, or a number is no longer pending | Leave it, or copy the list |
 | A list with this name already exists | Copy name in use | Choose another name |
 | Batch would exceed maximum list size of 100000 | Adding numbers through the API would pass the limit | Use another list |

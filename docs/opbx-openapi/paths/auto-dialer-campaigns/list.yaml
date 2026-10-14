@@ -17,8 +17,9 @@ paths:
         Get every distribution list assigned to a campaign, oldest assignment first (by list ID).
         A campaign can hold several lists. Owner, PBX Admin and Reporter only.
 
-        `can_unassign` is false once the campaign has started processing the list's entries
-        (any destination dialed or no longer pending); such a list can no longer be unassigned.
+        `can_unassign` is false while the campaign is `active`, and for good once the campaign
+        has started processing the list's entries (any destination dialed or no longer pending);
+        `unassign_refusal` gives the reason.
         Returns `{"data": []}` when no list is assigned.
       operationId: getCampaignList
       security:
@@ -66,8 +67,14 @@ paths:
                           example: '2026-04-10T14:35:00+00:00'
                         can_unassign:
                           type: boolean
-                          description: True while every entry of the list is still pending with zero dial attempts
+                          description: True while the campaign is not active and every entry of the list is still pending with zero dial attempts
                           example: true
+                        unassign_refusal:
+                          type:
+                          - string
+                          - 'null'
+                          description: Why the list cannot be unassigned now; null when it can
+                          example: null
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -184,7 +191,9 @@ paths:
       description: |
         Unassign one distribution list from a campaign. The list and its destinations are kept;
         the list returns to `ready` and the campaign's other lists are not affected.
-        Owner and PBX Admin only; refused with 403 while the campaign is `active`.
+        Owner and PBX Admin only; refused with 403 while the campaign is `active` ("Cannot
+        unassign list: its campaign is active. Pause the campaign first."). Same rules, status
+        codes and messages as `POST /v1/auto-dialer-campaigns/lists/{list}/unassign`.
 
         Once the campaign has started processing the list's entries (any destination dialed or
         no longer pending) the list can no longer be unassigned (422). Returns 404 when the list
@@ -215,7 +224,22 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          description: Not allowed, or the list's campaign is active
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              examples:
+                campaignActive:
+                  summary: The list's campaign is active
+                  value:
+                    error: Forbidden
+                    message: 'Cannot unassign list: its campaign is active. Pause the campaign first.'
+                notAllowed:
+                  summary: Role or policy denial
+                  value:
+                    error: Forbidden
+                    message: This action is unauthorized.
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':

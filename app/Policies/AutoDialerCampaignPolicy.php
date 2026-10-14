@@ -168,7 +168,8 @@ class AutoDialerCampaignPolicy
     /**
      * Determine whether the user can unassign a list from the campaign.
      *
-     * User must have manage permission and campaign must not be active.
+     * User must have manage permission; the list rules (campaign not active, entries not
+     * started) are checked by ListManagementService::unassignList().
      */
     public function deleteList(User $user, AutoDialerCampaign $campaign): bool
     {
@@ -177,11 +178,6 @@ class AutoDialerCampaignPolicy
         }
 
         if (! $user->role->canManageUsers()) {
-            return false;
-        }
-
-        // Cannot delete list if campaign is active
-        if ($campaign->status === CampaignStatus::ACTIVE) {
             return false;
         }
 

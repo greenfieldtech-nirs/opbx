@@ -115,7 +115,7 @@ Click **Assign Campaign** on the list's row. See [Assign a list to a campaign](/
 
 ### Unassign a list from a campaign
 
-**Who can do this:** Owner, PBX Admin. Only until the campaign has started processing the list's entries: once a number has been dialed or is no longer pending, the list stays with the campaign (HTTP 422).
+**Who can do this:** Owner, PBX Admin. Not while the list's campaign is Active (HTTP 403, "Cannot unassign list: its campaign is active. Pause the campaign first."; pause it first), and only until the campaign has started processing the list's entries: once a number has been dialed or is no longer pending, the list stays with the campaign (HTTP 422). The same rules, codes and messages apply on the list page, on the campaign's detail page and to both API endpoints. While a list cannot be unassigned its row shows **Locked**; the hover text gives the reason.
 
 Click the unassign icon next to the campaign name, or **Unassign** next to the list on the campaign's detail page. The campaign's other lists are not affected. The page confirms "List unassigned from campaign successfully". See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
 
@@ -212,7 +212,7 @@ Adding single numbers or batches of up to 1000 numbers (`destinations`, `destina
 | PATCH | `/v1/auto-dialer-campaigns/lists/{list}/archive` | Archive |
 | DELETE | `/v1/auto-dialer-campaigns/lists/{list}` | Delete the list and everything stored with it (409 with a usage list while assigned to a campaign) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to a campaign (`campaign_id`) |
-| POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign (422 once its entries have started processing) |
+| POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign (403 while the campaign is active, 422 once its entries have started processing) |
 
 **Scoped API keys** use the `distribution-lists` resource. The **MCP server** offers tools such as `list_distribution_lists`, `create_distribution_list`, `add_distribution_list_destinations`, `assign_distribution_list` and `unassign_distribution_list`. See [API Keys](/opbx/modules/api-keys) and [MCP Server](/opbx/modules/mcp-server).
 

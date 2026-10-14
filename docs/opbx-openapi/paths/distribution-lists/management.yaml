@@ -432,23 +432,19 @@ paths:
       tags:
       - Distribution Lists
       summary: Unassign list from campaign
-      description: 'Unassign a distribution list from its campaign.
+      description: |
+        Unassign a distribution list from its campaign. Same rules, status codes and
+        messages as `DELETE /v1/auto-dialer-campaigns/{campaign}/list/{list}`.
 
-
-        The list must be assigned to a campaign (otherwise 403). Once the campaign has
-
-        started processing the list''s entries (any destination dialed or no longer
-
-        pending), the list can no longer be unassigned (422). After unassignment the
-
-        list returns to ''ready'' status and `campaign_id`, `used_by_campaign_id` and
-
-        `used_at` are cleared; the campaign''s other lists are not affected.
-
+        The list must be assigned to a campaign (otherwise 403). While the list's campaign
+        is `active` the unassign is refused with 403 ("Cannot unassign list: its campaign
+        is active. Pause the campaign first."). Once the campaign has started processing the
+        list's entries (any destination dialed or no longer pending), the list can no longer
+        be unassigned (422). After unassignment the list returns to 'ready' status and
+        `campaign_id`, `used_by_campaign_id` and `used_at` are cleared; the campaign's other
+        lists are not affected.
 
         Roles: Owner and PBX Admin.
-
-        '
       operationId: unassignListFromCampaign
       security:
       - bearerAuth: []
@@ -480,7 +476,22 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          description: Not allowed, or the list's campaign is active
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              examples:
+                campaignActive:
+                  summary: The list's campaign is active
+                  value:
+                    error: Forbidden
+                    message: 'Cannot unassign list: its campaign is active. Pause the campaign first.'
+                notAllowed:
+                  summary: Role or policy denial
+                  value:
+                    error: Forbidden
+                    message: This action is unauthorized.
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':

@@ -207,15 +207,20 @@ class CampaignListService
      */
     public function getListsDetails(AutoDialerCampaign $campaign): array
     {
-        return $campaign->lists()->orderBy('id')->get()->map(fn (AutoDialerList $list) => [
-            'id' => $list->id,
-            'name' => $list->name,
-            'status' => $list->status->value ?? $list->status,
-            'total_rows' => $list->total_rows,
-            'valid_rows' => $list->valid_rows,
-            'invalid_rows' => $list->invalid_rows,
-            'processed_at' => $list->processed_at?->toIso8601String(),
-            'can_unassign' => $list->canUnassign(),
-        ])->all();
+        return $campaign->lists()->orderBy('id')->get()->map(function (AutoDialerList $list) use ($campaign) {
+            $refusal = $list->setRelation('campaign', $campaign)->unassignRefusal();
+
+            return [
+                'id' => $list->id,
+                'name' => $list->name,
+                'status' => $list->status->value ?? $list->status,
+                'total_rows' => $list->total_rows,
+                'valid_rows' => $list->valid_rows,
+                'invalid_rows' => $list->invalid_rows,
+                'processed_at' => $list->processed_at?->toIso8601String(),
+                'can_unassign' => $refusal === null,
+                'unassign_refusal' => $refusal,
+            ];
+        })->all();
     }
 }

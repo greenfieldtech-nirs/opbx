@@ -1304,6 +1304,8 @@ export interface AutoDialerList {
   can_copy: boolean;
   can_delete: boolean;
   can_unassign: boolean;
+  /** Why the list cannot be unassigned (campaign active, or entries started); null when it can or is not assigned. */
+  unassign_refusal: string | null;
   created_at: string;
   processed_at: string | null;
   archived_at: string | null;

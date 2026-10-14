@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Scopes\OrganizationScope;
@@ -21,6 +22,8 @@ class AutoDialerList extends Model
     use HasFactory;
 
     public const string STARTED_PROCESSING_MESSAGE = 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).';
+
+    public const string CAMPAIGN_ACTIVE_MESSAGE = 'Cannot unassign list: its campaign is active. Pause the campaign first.';
 
     /**
      * The table associated with the model.
@@ -219,16 +222,29 @@ class AutoDialerList extends Model
     }
 
     /**
-     * Check if the list can be unassigned from its campaign: refused once any of its
-     * entries has started processing (dialled, or no longer pending).
+     * Why the list cannot be unassigned from its campaign right now, or null when it can:
+     * refused while the campaign is active, and once any of its entries has started
+     * processing (dialled, or no longer pending).
+     */
+    public function unassignRefusal(): ?string
+    {
+        if (! $this->campaign_id) {
+            return 'List is not assigned to any campaign';
+        }
+
+        if ($this->campaign?->status === CampaignStatus::ACTIVE) {
+            return self::CAMPAIGN_ACTIVE_MESSAGE;
+        }
+
+        return $this->allDestinationsArePendingAndFresh() ? null : self::STARTED_PROCESSING_MESSAGE;
+    }
+
+    /**
+     * Check if the list can be unassigned from its campaign (see unassignRefusal()).
      */
     public function canUnassign(): bool
     {
-        if (! $this->campaign_id) {
-            return false;
-        }
-
-        return $this->allDestinationsArePendingAndFresh();
+        return $this->unassignRefusal() === null;
     }
 
     /**

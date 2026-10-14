@@ -116,8 +116,14 @@ properties:
     example: true
   can_unassign:
     type: boolean
-    description: The list is assigned to a campaign and every destination is still pending with zero dial attempts
+    description: The list is assigned to a campaign that is not active, and every destination is still pending with zero dial attempts
     example: false
+  unassign_refusal:
+    type:
+    - string
+    - 'null'
+    description: Why an assigned list cannot be unassigned now (its campaign is active, or its entries have started processing); null when it can, or when it is not assigned
+    example: 'Cannot unassign list: its campaign is active. Pause the campaign first.'
   can_copy:
     type: boolean
     description: Status is ready, in_use, used or archived

@@ -191,6 +191,51 @@ class CampaignMultipleListsTest extends TestCase
         $this->assertNull($fresh->fresh()->campaign_id);
     }
 
+    public function test_both_unassign_endpoints_refuse_alike_while_the_campaign_is_active(): void
+    {
+        $this->campaign->update(['status' => CampaignStatus::ACTIVE]);
+        $list = $this->assignedList();
+        $this->destination($list);
+
+        $viaCampaign = $this->actingAs($this->user)->deleteJson($this->url('/'.$list->id))
+            ->assertForbidden()
+            ->assertJsonPath('message', AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE);
+
+        $viaList = $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id.'/unassign')
+            ->assertForbidden();
+
+        $this->assertSame($viaCampaign->json(), $viaList->json());
+        $this->assertSame($this->campaign->id, $list->fresh()->campaign_id);
+    }
+
+    public function test_an_active_campaign_reports_its_lists_as_not_unassignable(): void
+    {
+        $this->campaign->update(['status' => CampaignStatus::ACTIVE]);
+        $list = $this->assignedList();
+
+        $this->actingAs($this->user)->getJson($this->url())
+            ->assertOk()
+            ->assertJsonPath('data.0.can_unassign', false)
+            ->assertJsonPath('data.0.unassign_refusal', AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE);
+
+        $this->actingAs($this->user)->getJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
+            ->assertOk()
+            ->assertJsonPath('data.can_unassign', false)
+            ->assertJsonPath('data.unassign_refusal', AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE);
+    }
+
+    public function test_a_started_list_explains_why_it_cannot_be_unassigned(): void
+    {
+        $list = $this->assignedList();
+        $this->destination($list, ['status' => DestinationStatus::COMPLETED, 'dial_attempts' => 1]);
+
+        $this->actingAs($this->user)->getJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
+            ->assertOk()
+            ->assertJsonPath('data.can_unassign', false)
+            ->assertJsonPath('data.unassign_refusal', AutoDialerList::STARTED_PROCESSING_MESSAGE);
+    }
+
     public function test_assigning_a_second_list_keeps_the_first(): void
     {
         $first = $this->assignedList();

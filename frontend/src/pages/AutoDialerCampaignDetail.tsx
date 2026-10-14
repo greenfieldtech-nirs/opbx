@@ -135,7 +135,7 @@ export default function AutoDialerCampaignDetail() {
   const distributionLists = distributionListsData?.data || [];
   const unassignMutation = useUnassignListFromCampaign();
 
-  // A list can be unassigned only until its entries have started processing (can_unassign).
+  // A list can be unassigned only while the campaign is not active and its entries have not started processing (can_unassign).
   const handleUnassignList = async (listId: number) => {
     try {
       await unassignMutation.mutateAsync(listId);
@@ -551,7 +551,7 @@ export default function AutoDialerCampaignDetail() {
                                     ) : (
                                       <span
                                         className="text-xs text-muted-foreground"
-                                        title="Cannot unassign: this list's entries have started processing"
+                                        title={list.unassign_refusal ?? 'Cannot unassign this list'}
                                       >
                                         Locked
                                       </span>

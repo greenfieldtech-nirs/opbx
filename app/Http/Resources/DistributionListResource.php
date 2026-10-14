@@ -47,7 +47,8 @@ class DistributionListResource extends JsonResource
             'can_upload' => $this->status->canUpload(),
             'can_copy' => $this->status->canCopy(),
             'can_delete' => $this->canDelete(),
-            'can_unassign' => $this->canUnassign(),
+            'can_unassign' => ($unassignRefusal = $this->unassignRefusal()) === null,
+            'unassign_refusal' => $this->campaign_id ? $unassignRefusal : null,
 
             // Timestamps
             'created_at' => $this->created_at->format('Y-m-d H:i:s'),
