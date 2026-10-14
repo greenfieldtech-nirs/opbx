@@ -71,6 +71,13 @@ class SeedDocsDemoTest extends TestCase
         $this->assertSame(0, DB::table('users')->where('organization_id', $id)->where('email', 'not like', '%@example.com')->count());
         $this->assertSame(1, DB::table('did_numbers')->where('organization_id', $id)->where('routing_type', 'unavailable')->count());
         $this->assertSame(0, DB::table('auto_dialer_campaigns')->where('organization_id', $id)->where('status', 'active')->count());
+        // Each campaign's caller ID is a DID in its caller ID pool, as the campaign form saves it
+        $this->assertSame(0, DB::table('auto_dialer_campaigns')->where('auto_dialer_campaigns.organization_id', $id)
+            ->whereNotExists(fn ($q) => $q->from('auto_dialer_campaign_caller_ids as p')
+                ->join('did_numbers as d', 'd.id', '=', 'p.did_number_id')
+                ->whereColumn('p.campaign_id', 'auto_dialer_campaigns.id')
+                ->whereColumn('d.phone_number', 'auto_dialer_campaigns.caller_id'))
+            ->count());
         // A list assigned to a campaign is In Use, as the assign flow leaves it
         $this->assertSame(0, DB::table('auto_dialer_lists')->where('organization_id', $id)->whereNotNull('campaign_id')->where('status', '!=', 'in_use')->count());
         $this->assertSame(1, Organization::count());

@@ -64,6 +64,7 @@ use App\Models\RingGroupMember;
 use App\Models\SessionUpdate;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Services\AutoDialer\CallerIdPoolService;
 use Illuminate\Console\Command;
 use Illuminate\Console\ConfirmableTrait;
 use Illuminate\Database\Eloquent\Model;
@@ -632,6 +633,8 @@ class SeedDocsDemo extends Command
             'record_calls' => false, 'retry_on_voicemail' => false, 'voicemail_calls' => 0,
             'total_destinations' => 20, 'completed_calls' => 0, 'failed_calls' => 0, 'pending_calls' => 20,
         ]);
+        // The campaign form keeps caller_id as the first pool DID; the pool is what the dialer uses
+        app(CallerIdPoolService::class)->syncCallerIdPool($campaign, [['did_id' => $this->id['did_main'], 'weight' => 1]], false);
 
         $list = AutoDialerList::create([
             'organization_id' => $this->org, 'campaign_id' => $campaign->id, 'name' => 'Fall Webinar Leads',
