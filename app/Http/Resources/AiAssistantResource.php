@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\AiAssistant;
+use App\Services\AiAssistant\ProviderRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,7 +33,10 @@ class AiAssistantResource extends JsonResource
             'status' => $this->status->value,
             'provider' => $this->provider,
             'protocol' => $this->protocol,
-            'configuration' => $this->configuration,
+            // A SIP number says whether it is E.164 (false) or non-E.164 (true), derived so legacy rows re-save.
+            'configuration' => isset($this->configuration['phone_number'])
+                ? [...$this->configuration, 'enable_non_e164' => ! preg_match(ProviderRegistry::E164_REGEX, (string) $this->configuration['phone_number'])]
+                : $this->configuration,
 
             // Usage information
             'usage_count' => $this->when(

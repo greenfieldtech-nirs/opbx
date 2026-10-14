@@ -29,5 +29,18 @@ properties:
       present on create (may be `{}` for providers without required fields). Each field's
       `validation_rules` (from `GET /v1/ai-assistant/providers`) are enforced and a breach is a 422
       on `configuration.<field>`: for example DeepDub `bot_id` up to 255 and `auth_token` up to
-      512 characters, `agent_uuid` up to 255, and a SIP `phone_number` must match `^\+[1-9]\d{1,14}$`.
+      512 characters, `agent_uuid` up to 255. A SIP `phone_number` must be E.164
+      (`^\+[1-9]\d{1,14}$`) unless `enable_non_e164` is true, in which case it is a non-E.164 number:
+      digits, `+` and `#`, up to 20 characters (the phone-number non-E.164 rule). A number that is
+      not E.164 without the flag is a 422 asking to mark it as non-E.164. `enable_non_e164` is not
+      stored; the response derives it from the number.
+    properties:
+      phone_number:
+        type: string
+        description: SIP providers. E.164, or a non-E.164 number when `enable_non_e164` is true.
+        example: '+12025550170'
+      enable_non_e164:
+        type: boolean
+        default: false
+        description: SIP providers. Marks `phone_number` as a non-E.164 number (digits, `+` and `#`, up to 20).
     additionalProperties: true

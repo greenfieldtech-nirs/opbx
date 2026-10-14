@@ -405,7 +405,7 @@ class AiAssistantControllerTest extends TestCase
             ->assertJsonFragment([
                 'name' => 'Retell Agent',
                 'provider' => 'retell',
-                'configuration' => ['phone_number' => '+12133287400'],
+                'configuration' => ['phone_number' => '+12133287400', 'enable_non_e164' => false],
             ]);
 
         $this->assertDatabaseHas('ai_assistants', [

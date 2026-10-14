@@ -78,13 +78,13 @@ class AiAssistantProviderFieldRulesTest extends TestCase
             ->assertOk();
     }
 
-    public function test_a_sip_number_without_the_plus_breaks_its_regex_rule(): void
+    public function test_a_sip_number_without_the_plus_must_be_marked_non_e164(): void
     {
         $this->postJson('/api/v1/ai-assistants', [
             'name' => 'SIP',
             'provider' => 'vapi',
             'configuration' => ['phone_number' => '12025550170'],
-        ])->assertUnprocessable()->assertJsonValidationErrors(['configuration.phone_number' => 'format is invalid']);
+        ])->assertUnprocessable()->assertJsonValidationErrors(['configuration.phone_number' => 'mark it as non-E.164']);
 
         $this->postJson('/api/v1/ai-assistants', [
             'name' => 'SIP',

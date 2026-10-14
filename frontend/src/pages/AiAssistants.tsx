@@ -49,7 +49,7 @@ import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 type AssistantFormData = {
   name: string;
   provider: string;
-  configuration: Record<string, string>;
+  configuration: Record<string, string | boolean>;
 };
 
 const emptyFormData: AssistantFormData = {
@@ -296,7 +296,20 @@ export default function AiAssistants() {
       header: 'Provider',
       cell: (assistant) => {
         const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
-        return <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>;
+        const phoneNumber = assistant.configuration?.phone_number;
+        return (
+          <div>
+            <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>
+            {phoneNumber && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {phoneNumber}
+                {assistant.configuration?.enable_non_e164 === true && (
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">non-E.164</Badge>
+                )}
+              </div>
+            )}
+          </div>
+        );
       }
     },
     {

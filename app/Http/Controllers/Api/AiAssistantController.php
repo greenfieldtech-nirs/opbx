@@ -261,6 +261,9 @@ class AiAssistantController extends AbstractApiCrudController
     {
         $provider = $data['provider'] ?? $existingProvider;
 
+        // enable_non_e164 only relaxes validation; the resource derives it from the stored number.
+        unset($data['configuration']['enable_non_e164']);
+
         if ($provider === 'dograh-cloud') {
             $data['configuration'] = $data['configuration'] ?? [];
             $data['configuration']['websocket_endpoint'] = 'wss://api.dograh.com/api/v1/agent-stream/cloudonix';

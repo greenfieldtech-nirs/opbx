@@ -29,7 +29,18 @@ properties:
     type:
       - object
       - 'null'
-    description: Provider-specific configuration
+    description: >-
+      Provider-specific configuration. For a SIP assistant it also carries `enable_non_e164`,
+      derived from the stored `phone_number`.
+    properties:
+      phone_number:
+        type: string
+        description: SIP providers. The number dialled at the provider, exactly as stored.
+      enable_non_e164:
+        type: boolean
+        description: >-
+          SIP providers. `false` when `phone_number` is valid E.164 (`^\+[1-9]\d{1,14}$`), `true`
+          for any other (non-E.164) number.
     additionalProperties: true
   usage_count:
     type: integer

@@ -141,6 +141,18 @@ class StoreAiAssistantRequest extends FormRequest
                     continue;
                 }
 
+                // A SIP number marked non-E.164 (enable_non_e164, as for phone numbers) skips the E.164 checks.
+                if ($field->type === 'tel' && filter_var($configuration['enable_non_e164'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    if (! is_string($value) || ! preg_match(ProviderRegistry::NON_E164_REGEX, $value)) {
+                        $validator->errors()->add(
+                            "configuration.{$field->name}",
+                            "{$field->label} can only contain digits, +, and # characters (at most 20)"
+                        );
+                    }
+
+                    continue;
+                }
+
                 // Type-specific validation
                 $this->validateFieldType($validator, $field, $value);
 
@@ -173,8 +185,8 @@ class StoreAiAssistantRequest extends FormRequest
                 }
                 break;
             case 'tel':
-                if (! preg_match('/^\+?[1-9]\d{1,14}$/', $value)) {
-                    $errorMessage = "{$field->label} must be a valid phone number (E.164 format)";
+                if (! is_string($value) || ! preg_match(ProviderRegistry::E164_REGEX, $value)) {
+                    $errorMessage = "{$field->label} must be in E.164 format (e.g. +12125551234); to use another number, mark it as non-E.164 (enable_non_e164)";
                 }
                 break;
             case 'number':

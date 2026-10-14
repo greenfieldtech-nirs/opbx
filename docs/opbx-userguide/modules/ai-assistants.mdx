@@ -23,7 +23,7 @@ Use this module to:
 
 ## Prerequisites
 
-- An agent set up with the provider. For a SIP provider you need the agent's phone number (E.164) at that provider. For a WebSocket provider you need the agent identifier (and, for some providers, the endpoint or token).
+- An agent set up with the provider. For a SIP provider you need the agent's phone number at that provider, in E.164 form or (marked as non-E.164) as the provider gives it. For a WebSocket provider you need the agent identifier (and, for some providers, the endpoint or token).
 - You are the **Owner** or a **PBX Admin** to create, edit or delete. Reporters can open the page read-only.
 
 ## Permissions
@@ -44,7 +44,7 @@ The provider list comes from the server (`config/ai-providers.php`), so a deploy
 
 | Group | Count | Examples | Configuration fields |
 |-------|------:|----------|----------------------|
-| **SIP Providers** | 42 | Retell (plus UDP, TCP and TLS variants), VAPI (plus UDP and No Proxy), ElevenLabs, Ultravox, Synthflow, Telnyx, OpenAI, Millis (US and EU), X (x.ai) | **Phone Number**: the agent's number at the provider, E.164, for example `+12025550170` |
+| **SIP Providers** | 42 | Retell (plus UDP, TCP and TLS variants), VAPI (plus UDP and No Proxy), ElevenLabs, Ultravox, Synthflow, Telnyx, OpenAI, Millis (US and EU), X (x.ai) | **Phone Number**: the agent's number at the provider, E.164 (for example `+12025550170`), or a non-E.164 number with **Enable non-E.164 Phone Number** ticked |
 | **WebSocket Providers** | 5 | DeepDub, Dograh Cloud, Dograh OSS, AssemblyAI, Cloudonix | Depends on the provider (table below) |
 | **Test Providers** | 1 | Dummy Test | None |
 
@@ -91,12 +91,12 @@ The dialog closes, the toast **AI Assistant created successfully** appears and t
 
 Use this for any provider under **SIP Providers** (Retell, VAPI, ElevenLabs, Ultravox, Synthflow, Telnyx, OpenAI, Millis, X and the others).
 
-1. In the provider's console, give your agent a phone number (or SIP-reachable number) and copy it in E.164 form, for example `+12025550170`.
+1. In the provider's console, give your agent a phone number (or SIP-reachable number) and copy it, in E.164 form when it has one, for example `+12025550170`.
 2. In OPBX, follow [Create an AI assistant](#create-an-ai-assistant) and choose the provider under **SIP Providers**. For Retell and VAPI, pick the transport variant your provider account uses (for example **Retell (TLS)** or **VAPI (No Proxy)**).
-3. Enter the agent's number in **Phone Number**.
+3. Enter the agent's number in **Phone Number**. If the provider's number is not E.164 (no leading `+`, for example `12121212`), tick **Enable non-E.164 Phone Number** below the field.
 4. Click **Create AI Assistant**.
 
-When a call reaches the assistant, OPBX dials that number at the provider's SIP service and bridges the caller.
+When a call reaches the assistant, OPBX dials that number, exactly as entered, at the provider's SIP service and bridges the caller. The list shows the number under the provider name, with a **non-E.164** badge when it is marked so.
 
 {/* SCREENSHOT: ai-assistants-sip-fields — Create AI Assistant dialog with Name "Aria - Front Desk Receptionist", provider VAPI selected and Phone Number +12025550170 filled in */}
 
@@ -210,7 +210,12 @@ Change or remove those references, then delete again. Call history (call logs an
 | Status | No | Active or Inactive. Default: Active | Calls to an inactive assistant are disconnected with a message |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
-The phone number of a SIP provider must be E.164 with the plus sign, for example `+12025550170`. A value without the plus sign, such as `2025550170`, is refused.
+The phone number of a SIP provider is either:
+
+- **E.164**: `+`, then 2 to 15 digits not starting with 0, for example `+12025550170`; or
+- **non-E.164**, when **Enable non-E.164 Phone Number** is ticked (`enable_non_e164: true` in the API configuration): up to 20 characters of digits, `+` and `#`, for example `12121212`. This is the same rule as a non-E.164 phone number.
+
+A number that is not E.164, such as `2025550170`, is refused unless it is marked as non-E.164. The API returns `enable_non_e164` in the assistant's configuration: `false` for an E.164 number, `true` for any other number. It is worked out from the stored number, so an assistant saved before the option existed opens with the box already ticked and saves again unchanged.
 
 ## Common errors
 
@@ -220,10 +225,10 @@ The phone number of a SIP provider must be E.164 with the plus sign, for example
 | Please select a provider | No provider was chosen | Pick a provider |
 | Unknown AI provider: *key* | The provider key is not in the server's list (API) | Use a key from `GET /v1/ai-assistant/providers` |
 | *Field* is required | A required configuration field is empty | Fill it in |
-| Phone Number must be a valid phone number (E.164 format) | The SIP number is not a valid number | Enter it as `+` and country code, for example `+12025550170` |
+| Phone Number must be in E.164 format (e.g. +12125551234); to use another number, mark it as non-E.164 (enable_non_e164) | The SIP number is not E.164 and is not marked as non-E.164 | Enter it as `+` and country code, for example `+12025550170`, or tick **Enable non-E.164 Phone Number** |
+| Phone Number can only contain digits, +, and # characters (at most 20) | The number is marked as non-E.164 but has other characters or is too long | Use digits, `+` and `#` only, up to 20 characters |
 | *Field* must be a valid URL | The Dograh OSS endpoint is not a URL | Enter the full `wss://…` address |
 | The *Field* field must not be greater than *N* characters. | A configuration value is longer than the provider allows, for example a DeepDub Bot ID over 255 or Authentication Token over 512 characters | Shorten it to the limit |
-| The Phone Number field format is invalid. | The SIP number has no leading `+` | Enter it as `+` and country code |
 | Cannot delete: still in use | Routing configuration points at the assistant | Change the listed references, then delete |
 
 ## Key data fields
@@ -238,7 +243,7 @@ The phone number of a SIP provider must be E.164 with the plus sign, for example
 | `description` | Optional, up to 1000 characters |
 | `provider` | Provider key, for example `vapi` or `dograh-cloud` |
 | `protocol` | `sip`, `websocket` or `dummy`. Set from the provider |
-| `configuration` | JSON with the provider's fields, for example `{"phone_number": "+12025550170"}` |
+| `configuration` | JSON with the provider's fields, for example `{"phone_number": "+12025550170"}`. The non-E.164 flag is not stored; the API derives `enable_non_e164` from the number |
 | `status` | `active` or `inactive` (there is no `pending`; other values are refused with 422) |
 | `deleted_at` | Deletes are soft deletes |
 
