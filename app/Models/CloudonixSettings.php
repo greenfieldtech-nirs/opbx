@@ -30,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property int $no_answer_timeout
  * @property string $call_recording_mode
  * @property string $recording_format
- * @property string|null $cloudonix_package
+ * @property string|null $cloudonix_package Unused: the package tier is read live (CloudonixPackageService)
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Organization $organization
@@ -89,7 +89,6 @@ class CloudonixSettings extends Model
         'no_answer_timeout',
         'call_recording_mode',
         'recording_format',
-        'cloudonix_package',
     ];
 
     /**

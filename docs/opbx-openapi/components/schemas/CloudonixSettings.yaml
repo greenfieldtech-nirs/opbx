@@ -50,7 +50,10 @@ properties:
     type:
     - string
     - 'null'
-    description: GET only
+    description: >-
+      GET only. The Cloudonix package tier, read live from the domain profile
+      (`tenant.billingPlan.package.name`) and cached per organization for one hour; null
+      when unknown. Not stored and not accepted on update.
   is_configured:
     type: boolean
     description: True when both `domain_uuid` and `domain_api_key` are set

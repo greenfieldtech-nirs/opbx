@@ -108,6 +108,7 @@ Redis supports fast, transient state. It is configured with AOF persistence in t
 - Distributed locks (for example `cdr:create:{org}:{call_id}`, `lock:ring_group:{id}` and `lock:call_queue:{id}`)
 - IVR call state (`ivr:call:*`) and dialer CAC counters (`dialer:cac:{campaign_id}:active`)
 - Voice routing cache (`routing:extension:*`, `routing:business_hours:*`)
+- Cloudonix package tier per organization (`cloudonix:package:{organization_id}`, one hour; warmed on sign-in, refreshed by Settings **Validate and Save**) and the TTS voice list (`cloudonix-voices:{domain_uuid}`, one hour)
 - Call queue state owned by the ACD worker (`acd:*` keys) and extension presence (`acd:presence:{org}:{extension}`)
 
 Redis data is preserved in host bind mounts (`./volumes/redis`).

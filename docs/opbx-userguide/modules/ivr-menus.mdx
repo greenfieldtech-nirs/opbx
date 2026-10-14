@@ -42,7 +42,7 @@ A menu needs **exactly one** prompt source. On the **Audio** tab, **Audio Resour
 | Remote URL | **Remote Audio URL**: a full URL to an audio file (MP3, WAV and so on) | Up to 500 characters; the form shows a counter and warns from 450 |
 | Text-to-Speech | **Text to Speak** (SSML tags are accepted) and a **Voice** | Text up to 1000 characters, voice name up to 50 |
 
-The voice list comes from the Cloudonix voice catalogue. Each entry shows the voice name, its language, provider and pricing, and its gender. Narrow the list with the **Language**, **Gender** and **Provider** filters and the **Voice Tiers** switch (**All Voices** or **Standard Only**). If your organization has no Cloudonix package, or the Free Tier, only standard voices are listed and the switch is locked. **Refresh** reloads the catalogue.
+The voice list comes from the Cloudonix voice catalogue. Each entry shows the voice name, its language, provider and pricing, and its gender. Narrow the list with the **Language**, **Gender** and **Provider** filters and the **Voice Tiers** switch (**All Voices** or **Standard Only**). If your organization's Cloudonix package is the Free Tier, or it cannot be determined, only standard voices are listed and the switch is locked. OPBX reads the package live from your Cloudonix domain profile when you sign in and keeps it for one hour; it is never stored in the database. Clicking **Validate and Save Settings** on the [Settings](/opbx/modules/settings) page refreshes it. **Refresh** reloads the catalogue.
 
 If no source is set, the form shows "Choose an audio source: a recording, an audio URL, or text to speak". The API refuses such a menu with "An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured."
 
@@ -189,7 +189,7 @@ Recording and call-log history never blocks a delete.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/ivr-menus/voices` | Voices for text-to-speech |
+| GET | `/v1/ivr-menus/voices` | Voices for text-to-speech, plus the organization's Cloudonix package tier (`cloudonix_package`, null when unknown) |
 | GET | `/v1/ivr-menus` | List |
 | POST | `/v1/ivr-menus` | Create (rejects "Destination unavailable" on any route) |
 | GET | `/v1/ivr-menus/{ivrMenu}` | One menu |

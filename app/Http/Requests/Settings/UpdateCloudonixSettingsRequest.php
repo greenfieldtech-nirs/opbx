@@ -42,7 +42,6 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'no_answer_timeout' => ['required', 'integer', 'min:5', 'max:120'],
             'call_recording_mode' => ['required', 'string', 'in:disabled,inbound,outbound,internal,inbound_outbound,all'],
             'recording_format' => ['required', 'string', 'in:wav,mp3'],
-            'cloudonix_package' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -62,7 +61,6 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'no_answer_timeout' => 'no answer timeout',
             'call_recording_mode' => 'call recording',
             'recording_format' => 'recording format',
-            'cloudonix_package' => 'Cloudonix package',
         ];
     }
 

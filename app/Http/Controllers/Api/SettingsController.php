@@ -9,6 +9,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
+use App\Services\Cloudonix\CloudonixPackageService;
 use App\Services\CloudonixClient\CloudonixClient;
 use App\Services\CloudonixClient\CloudonixProfileSync;
 use App\Services\Logging\AuditLogger;
@@ -87,7 +88,8 @@ class SettingsController extends Controller
                 'no_answer_timeout' => $settings->no_answer_timeout,
                 'call_recording_mode' => $settings->call_recording_mode,
                 'recording_format' => $settings->recording_format,
-                'cloudonix_package' => $settings->cloudonix_package,
+                // Live from Cloudonix via the per-organization cache; the DB column is unused.
+                'cloudonix_package' => app(CloudonixPackageService::class)->get((int) $user->organization_id),
                 'is_configured' => $settings->isConfigured(),
                 'has_webhook_auth' => $settings->hasWebhookAuth(),
                 'created_at' => $settings->created_at->toIso8601String(),
@@ -362,8 +364,9 @@ class SettingsController extends Controller
                 }
 
                 // Extract tenant billing package information
-                if (isset($domainProfile['tenant']['billingPlan']['package']['name'])) {
-                    $profileSettings['cloudonix_package'] = $domainProfile['tenant']['billingPlan']['package']['name'];
+                $package = CloudonixPackageService::packageFromProfile($domainProfile);
+                if ($package !== null) {
+                    $profileSettings['cloudonix_package'] = $package;
                 }
             }
 
@@ -378,6 +381,9 @@ class SettingsController extends Controller
             ]);
 
             if ($isValid) {
+                // Validate and Save refreshes the cached package tier.
+                app(CloudonixPackageService::class)->put((int) $user->organization_id, CloudonixPackageService::packageFromProfile($domainProfile));
+
                 return response()->json([
                     'valid' => true,
                     'message' => 'Cloudonix credentials are valid.',

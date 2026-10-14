@@ -30,7 +30,7 @@ The `CloudonixSettings` model stores per-organization Cloudonix CPaaS credential
 | `no_answer_timeout` | int | No | Default ring timeout, seconds. Default 60 |
 | `call_recording_mode` | enum | No | `disabled`, `inbound`, `outbound`, `internal`, `inbound_outbound`, `all`. Default `disabled` |
 | `recording_format` | enum | No | `wav` or `mp3`. Default `mp3` |
-| `cloudonix_package` | varchar(255) | Yes | Cloudonix package of the domain |
+| `cloudonix_package` | varchar(255) | Yes | Unused; never written. The package tier is read live from Cloudonix and cached (`cloudonix:package:{organization_id}`, one hour) |
 | `created_at` | timestamp | Yes | |
 | `updated_at` | timestamp | Yes | |
 

@@ -13,6 +13,7 @@ use App\Http\Requests\UpdateIvrMenuRequest;
 use App\Http\Resources\IvrMenuResource;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
+use App\Services\Cloudonix\CloudonixPackageService;
 use App\Services\Cloudonix\CloudonixVoiceService;
 use App\Services\CloudonixClient\CloudonixApiException;
 use App\ValueObjects\IvrAudioConfig;
@@ -40,7 +41,8 @@ class IvrMenuController extends AbstractApiCrudController
     private array $optionsData = [];
 
     public function __construct(
-        private CloudonixVoiceService $voiceService
+        private CloudonixVoiceService $voiceService,
+        private CloudonixPackageService $packageService,
     ) {}
 
     /**
@@ -337,6 +339,8 @@ class IvrMenuController extends AbstractApiCrudController
             return response()->json([
                 'data' => $voices,
                 'filters' => $filters,
+                // Cloudonix package tier (null = unknown); the IVR voice picker limits premium voices by it.
+                'cloudonix_package' => $this->packageService->get((int) $currentUser->organization_id),
             ]);
 
         } catch (\RuntimeException $e) {

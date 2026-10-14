@@ -134,11 +134,6 @@ paths:
                 recording_format:
                   type: string
                   enum: [wav, mp3]
-                cloudonix_package:
-                  type:
-                    - string
-                    - 'null'
-                  maxLength: 255
               required: [no_answer_timeout, call_recording_mode, recording_format]
       responses:
         '200':

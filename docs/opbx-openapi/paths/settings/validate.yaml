@@ -8,7 +8,8 @@ paths:
         Checks a domain UUID and API key against Cloudonix without saving anything. Owner
         only. A `domain_api_key` containing `***` (a masked key) is replaced by the stored
         key. On success, `profile_settings` carries values read from the domain profile that
-        the settings form can prefill.
+        the settings form can prefill. On success the domain's package tier is also written
+        to the organization's package cache (see `GET /v1/ivr-menus/voices`).
       operationId: validateCloudonixCredentials
       security:
         - bearerAuth: []

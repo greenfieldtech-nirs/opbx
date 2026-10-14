@@ -12,7 +12,6 @@ import { toast } from 'sonner';
 import { ivrMenusService } from '@/services/createResourceService';
 import { createResourceService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
-import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
 import api from '@/services/api';
 import { cn } from '@/lib/utils';
@@ -107,12 +106,8 @@ export default function IVRMenus() {
   const voices = voicesData?.data || [];
   const filters = voicesData?.filters || { languages: [], genders: [], providers: [] };
 
-  // Fetch Cloudonix settings to check package tier
-  const { data: cloudonixSettings } = useQuery({
-    queryKey: queryKeys.cloudonix.settings(),
-    queryFn: () => settingsService.getCloudonixSettings(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  // Cloudonix package tier (limits premium voices); returned with the voices
+  const cloudonixPackage = voicesData?.cloudonix_package ?? null;
 
 
 
@@ -468,7 +463,7 @@ export default function IVRMenus() {
             voices={voices}
             voiceFilters={filters}
             onRefreshVoices={refreshVoices}
-            cloudonixSettings={cloudonixSettings}
+            cloudonixPackage={cloudonixPackage}
           />
 
         </DialogContent>
@@ -496,7 +491,7 @@ export default function IVRMenus() {
             voices={voices}
             voiceFilters={filters}
             onRefreshVoices={refreshVoices}
-            cloudonixSettings={cloudonixSettings}
+            cloudonixPackage={cloudonixPackage}
           />
 
         </DialogContent>

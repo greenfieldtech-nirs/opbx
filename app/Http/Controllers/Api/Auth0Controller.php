@@ -13,6 +13,7 @@ use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0AccountResolver;
 use App\Services\Auth0\Auth0Config;
 use App\Services\Auth0\Auth0Service;
+use App\Services\Cloudonix\CloudonixPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -254,6 +255,9 @@ class Auth0Controller extends Controller
                 'error' => ['code' => 'ACCOUNT_INACTIVE', 'message' => 'Account is not active.'],
             ], Response::HTTP_FORBIDDEN);
         }
+
+        // Warm the Cloudonix package tier after the response is sent; never fails the login.
+        defer(fn () => rescue(fn () => app(CloudonixPackageService::class)->refresh((int) $user->organization_id)));
 
         $token = $this->issueToken($user, 'auth0-token', $user->role->tokenAbilities((bool) $user->is_platform_manager), self::TOKEN_EXPIRATION_MINUTES);
 

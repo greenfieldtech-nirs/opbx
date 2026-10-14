@@ -985,7 +985,6 @@ export interface UpdateCloudonixSettingsRequest {
   no_answer_timeout?: number;
   call_recording_mode?: CallRecordingMode;
   recording_format?: RecordingFormat;
-  cloudonix_package?: string;
 }
 
 export interface ValidateCloudonixCredentialsRequest {

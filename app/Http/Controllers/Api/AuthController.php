@@ -10,6 +10,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Services\Cloudonix\CloudonixPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -126,6 +127,9 @@ class AuthController extends Controller
                 $requestId
             );
         }
+
+        // Warm the Cloudonix package tier after the response is sent; never fails the login.
+        defer(fn () => rescue(fn () => app(CloudonixPackageService::class)->refresh((int) $user->organization_id)));
 
         // Detect authentication mode based on request
         $useCookieAuth = $this->shouldUseCookieAuth($request);

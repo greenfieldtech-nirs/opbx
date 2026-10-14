@@ -43,7 +43,7 @@ The page has a single save button, **Validate and Save Settings**, next to the c
 What happens on **Validate and Save Settings**:
 
 1. The UUID and key are checked against Cloudonix. If they are wrong, the badge next to the button shows **Invalid**, a "Validation failed" toast says "Invalid Cloudonix credentials. Please check your domain UUID and API key." and nothing is saved.
-2. Values from your Cloudonix domain profile are copied into the form: the domain name, the call timeout (if it is between 5 and 120 seconds) and the recording format (if it is WAV or MP3). These replace what you typed in those two fields.
+2. Values from your Cloudonix domain profile are copied into the form: the domain name, the call timeout (if it is between 5 and 120 seconds) and the recording format (if it is WAV or MP3). These replace what you typed in those two fields. The domain's Cloudonix package tier is refreshed in the cache (used by the IVR voice picker).
 3. The settings are saved. The domain name always comes from Cloudonix; it cannot be typed in. It is shown under the UUID as "Cloudonix Domain: …".
 4. If the organization has no webhook key yet, OPBX generates one.
 5. OPBX pushes the call timeout, recording format, session-update URL, CDR URL and webhook key to the Cloudonix domain.
@@ -235,7 +235,7 @@ Voice calls are sent to `{base}/api/voice/route` through the voice application c
 | `no_answer_timeout` | 5 to 120 seconds |
 | `call_recording_mode` | `disabled`, `inbound`, `outbound`, `internal`, `inbound_outbound` or `all` |
 | `recording_format` | `wav` or `mp3` |
-| `cloudonix_package` | Billing package name from Cloudonix |
+| `cloudonix_package` | Unused. The package tier is not stored: it is read live from the Cloudonix domain profile when a user signs in, kept in the cache for one hour per organization, and refreshed by **Validate and Save Settings**. `GET /v1/settings/cloudonix` returns the cached value (null when unknown) |
 | `voice_application_id`, `voice_application_uuid`, `voice_application_name` | The Cloudonix voice application OPBX manages |
 
 ## Related API endpoints

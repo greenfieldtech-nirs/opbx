@@ -13,7 +13,6 @@ import {
 } from '@/schemas/ivrMenu';
 import type { CreateIvrMenuRequest, IvrDestinationType, IvrMenu } from '@/types/api.types';
 import type {
-  CloudonixSettings,
   CloudonixVoice,
   CloudonixVoiceFilters,
   CloudonixVoiceLanguage,
@@ -60,8 +59,8 @@ const VoiceSelector: React.FC<{
   voices: CloudonixVoice[];
   filters: CloudonixVoiceFilters;
   onRefresh?: () => void;
-  cloudonixSettings?: CloudonixSettings;
-}> = ({ value, onChange, voices, filters, onRefresh, cloudonixSettings }) => {
+  cloudonixPackage?: string | null;
+}> = ({ value, onChange, voices, filters, onRefresh, cloudonixPackage }) => {
   // Helper function to get language name from code
   const getLanguageName = (languageCode: string): string => {
     const language = filters?.languages?.find((lang: CloudonixVoiceLanguage) => lang.code === languageCode);
@@ -73,10 +72,8 @@ const VoiceSelector: React.FC<{
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [providerFilter, setProviderFilter] = useState<string>('all');
 
-  // Restrict to standard voices only for users with limited packages
-  const isLimitedTier = !cloudonixSettings?.cloudonix_package ||
-    cloudonixSettings?.cloudonix_package === 'Free Tier' ||
-    (typeof cloudonixSettings?.cloudonix_package === 'boolean' && cloudonixSettings.cloudonix_package === false);
+  // Restrict to standard voices only for limited packages; an unknown package (null) counts as limited
+  const isLimitedTier = !cloudonixPackage || cloudonixPackage === 'Free Tier';
   const [pricingFilter, setPricingFilter] = useState<'all' | 'standard' | 'premium'>(isLimitedTier ? 'standard' : 'all');
 
   const filteredVoices = voices.filter((voice: CloudonixVoice) => {
@@ -239,7 +236,8 @@ export interface IvrMenuFormProps {
   voices: CloudonixVoice[];
   voiceFilters: CloudonixVoiceFilters;
   onRefreshVoices: () => void;
-  cloudonixSettings?: CloudonixSettings;
+  /** Cloudonix package tier from GET /ivr-menus/voices (null = unknown) */
+  cloudonixPackage?: string | null;
 }
 
 export const EMPTY_IVR_FORM: IvrMenuFormValues = {
@@ -293,7 +291,7 @@ export function IvrMenuForm({
   voices,
   voiceFilters: filters,
   onRefreshVoices,
-  cloudonixSettings,
+  cloudonixPackage,
 }: IvrMenuFormProps) {
   const isEdit = mode === 'edit';
   const [isMenuSettingsOpen, setIsMenuSettingsOpen] = useState(false);
@@ -489,7 +487,7 @@ export function IvrMenuForm({
                           voices={voices}
                           filters={filters}
                           onRefresh={onRefreshVoices}
-                          cloudonixSettings={cloudonixSettings}
+                          cloudonixPackage={cloudonixPackage}
                         />
                         <FormMessage />
                       </FormItem>

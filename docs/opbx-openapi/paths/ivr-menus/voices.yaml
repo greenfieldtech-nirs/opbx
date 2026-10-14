@@ -12,7 +12,8 @@ paths:
       x-api-key-scope: ivr-menus:read
       description: |
         TTS voices available from Cloudonix for the organization's domain (any role).
-        Errors carry `error` and a `troubleshooting` list.
+        The response also carries the organization's Cloudonix package tier, which the IVR
+        voice picker uses to limit premium voices. Errors carry `error` and a `troubleshooting` list.
       responses:
         '200':
           description: Voices retrieved
@@ -30,6 +31,17 @@ paths:
                     type: object
                     description: Filter options derived from the voice list
                     additionalProperties: true
+                  cloudonix_package:
+                    type:
+                      - string
+                      - 'null'
+                    description: >-
+                      Cloudonix package tier of the organization's domain (domain profile
+                      `tenant.billingPlan.package.name`), read live from Cloudonix and cached per
+                      organization for one hour. Never stored in the database. Null when unknown
+                      (Cloudonix unreachable or no package in the profile); the IVR voice picker
+                      then offers standard voices only, as it does for `Free Tier`.
+                    example: Business
         '401':
           description: |
             Not authenticated, or Cloudonix rejected the organization's domain API key
