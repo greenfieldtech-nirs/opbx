@@ -48,7 +48,7 @@ Queue offers always dial the agent's extension directly. Follow-me / forward cha
 ## Consistency Rules
 
 - **Atomic transitions.** Agent state changes on call events run as Lua scripts in Redis and are conditional: an event never recreates a logged-out agent and never overrides a pause.
-- **Idempotent events.** Each lifecycle event carries an event ID, and replays from Laravel (its retry window is about 6.5 minutes) are ignored.
+- **Idempotent events.** Each lifecycle event carries an event ID, remembered for 24 hours, and replays from Laravel (its retry window is about 6.5 minutes) are ignored.
 - **Requeue keeps the place.** If the agent who answered never connects, a `requeue` event releases the agent and puts the call back at its **original position with its original enqueue time**. A requeued call already past the max wait overflows on its next poll.
 - **Tombstones.** A dequeued call leaves a 10-minute marker, so a late poll cannot add it back.
 - **Recovery.** A poll for a call the worker does not know (for example after a restart) enqueues it again.
@@ -87,7 +87,7 @@ All routes except health require `Authorization: Bearer {ACD_WORKER_API_TOKEN}`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ACD_WORKER_URL` | `http://acd-worker:8084` | Base URL Laravel uses to reach the worker |
-| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required: the worker refuses to start when it is empty or a shipped placeholder |
+| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required: the worker refuses to start when it is empty or a shipped placeholder, and Laravel refuses to boot in production without it |
 | `ACD_HTTP_PORT` | `8084` | API port |
 | `ACD_HEALTH_PORT` | `8085` | Health port |
 | `ACD_REDIS_HOST` / `ACD_REDIS_PORT` | `redis` / `6379` | Redis server |
@@ -101,6 +101,7 @@ Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue c
 - Image: `eclipse-temurin:21-jre`, runs as a non-root user (uid 10001).
 - No published ports; Laravel reaches it on the internal network.
 - Docker healthcheck: `GET http://localhost:8085/health` every 30 seconds. Because health fails when Redis is unreachable, Docker restarts a worker that lost Redis.
+- The [Platform Status](/opbx/administration/platform-management#platform-status) page probes the same address every minute (`PLATFORM_STATUS_ACD_URL`, default `http://acd-worker:8085/health`).
 
 ## Common Commands
 
