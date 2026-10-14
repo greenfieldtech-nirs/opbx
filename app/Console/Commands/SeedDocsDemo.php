@@ -587,7 +587,8 @@ class SeedDocsDemo extends Command
             ]);
             $did = DidNumber::create([
                 'organization_id' => $this->org, 'phone_number' => '+1202555011'.($i + 5),
-                'friendly_name' => $name.' tracking line', 'routing_type' => 'call_tracking',
+                // Neutral names: these DIDs show up in every caller ID picker
+                'friendly_name' => 'Marketing line '.chr(ord('A') + $i), 'routing_type' => 'call_tracking',
                 'routing_config' => ['call_tracking_campaign_id' => $c->id], 'status' => 'active',
             ]);
             $number = CallTrackingNumber::create([
