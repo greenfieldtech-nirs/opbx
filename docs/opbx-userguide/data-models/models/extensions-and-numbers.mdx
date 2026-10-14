@@ -84,7 +84,7 @@ A phone number (DID) and how inbound calls to it are routed.
 | `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
 | `phone_number` | varchar(20) | No | - | Number in E.164 |
 | `friendly_name` | varchar(255) | Yes | null | Display name |
-| `routing_type` | enum | No | `extension` | Where inbound calls go. Values: `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_tracking`, `call_queue`, `unavailable` |
+| `routing_type` | enum | No | `extension` | Where inbound calls go. Values: `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_queue`, `unavailable` |
 | `routing_config` | json | Yes | null | Target of the route: `extension_id`, `ring_group_id`, `business_hours_schedule_id`, `conference_room_id`, `ai_assistant_id`, `ai_load_balancer_id`, `ivr_menu_id` or `call_queue_id`, depending on `routing_type` |
 | `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` |
 | `cloudonix_config` | json | Yes | null | Cloudonix-side settings of the number |

@@ -513,7 +513,7 @@ The resources an API key may be granted. The value is the resource slug, which m
 
 **File:** `App\Enums\GrantableResource`
 
-`users`, `extensions`, `conference-rooms`, `ai-assistants`, `ai-assistant-providers`, `ring-groups`, `call-queues`, `queue-calls`, `ai-assistant-load-balancers`, `ivr-menus`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`, `call-tracking-campaigns`, `call-tracking-analytics`, `call-tracking-sessions`, `call-tracking-ad-platform-integrations`, `supervisors`, `auto-dialer-campaigns`, `distribution-lists`, `session-updates`, `call-notifications`, `dashboard`, `trunks`.
+`users`, `extensions`, `conference-rooms`, `ai-assistants`, `ai-assistant-providers`, `ring-groups`, `call-queues`, `queue-calls`, `ai-assistant-load-balancers`, `ivr-menus`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`, `supervisors`, `auto-dialer-campaigns`, `distribution-lists`, `session-updates`, `call-notifications`, `dashboard`, `trunks`.
 
 ### EmbedIconPosition
 
@@ -528,7 +528,7 @@ These columns are MySQL `enum` columns, but the model does not cast them to a PH
 
 | Column | Values |
 |--------|--------|
-| `did_numbers.routing_type` | `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_tracking`, `call_queue`, `unavailable` |
+| `did_numbers.routing_type` | `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_queue`, `unavailable` |
 | `did_numbers.status`, `recordings.status`, `ai_assistant_load_balancer_members.status` | `active`, `inactive` |
 | `organizations.status` | `active`, `suspended`, `deleted` (the values of `OrganizationStatus`) |
 | `ai_assistants.protocol` | `sip`, `websocket`, `dummy` |
