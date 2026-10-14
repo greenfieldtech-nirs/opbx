@@ -31,22 +31,135 @@ Use this module to:
 | View schedules | Yes | Yes | Yes (API) | Yes (API) |
 | Create, edit, delete, duplicate, change status | Yes | Yes | No | No |
 
-## Create a schedule
+## How a call is routed
 
-1. Open **Business Hours** in the sidebar.
-2. Click **New Schedule**.
+1. A call arrives on a phone number routed to the schedule.
+2. If the schedule is Inactive, it is closed: go to step 4.
+3. If today's date has an exception, the exception decides: closed, or open only within its ranges.
+4. Otherwise the day's time ranges decide.
+5. Open: the open-hours action runs. Closed: the closed-hours action runs.
+6. If the target no longer exists or is inactive, the caller hears a short "not available" message and the call ends.
+
+## Workflows
+
+### Create a schedule
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Business Hours** in the sidebar (under **PBX Configuration**).
+2. Click **New Schedule**. The **Create Schedule** dialog opens.
 3. Enter the **Name**.
-4. Choose the **Open Hours Action** type and its destination.
-5. Choose the **Closed Hours Action** type and its destination.
-6. Set the weekly hours (see [Weekly schedule](#weekly-schedule)).
-7. Optionally add exception dates.
+4. Under **Open Hours Action**, choose the type, then the **Destination**.
+5. Under **Closed Hours Action**, choose the type, then the **Destination**.
+6. Set the weekly hours (see [Set the weekly hours](#set-the-weekly-hours)).
+7. Optionally add exception dates (see [Add an exception date](#add-an-exception-date) and [Import public holidays](#import-public-holidays)).
 8. Click **Create Schedule**.
 
-The schedule is saved as **Active**. It becomes available as a routing type on phone numbers.
+The toast "Business hours schedule has been created successfully." appears and the schedule is listed as **Active**. It becomes available as a routing type on phone numbers. If the name or an action is missing, the dialog marks the field and shows "Please fix the errors in the form."
 
 ![Business Hours list with Holiday Hotline Hours (Unprovisioned), Main Office Hours and Support Desk Hours, showing timezone, exception count, last-modified date and status, with the Unprovisioned filter in the toolbar](../img/screens/business-hours-list.jpg)
 
 ![Schedule dialog for Main Office Hours with the open-hours action IVR Menu Main Menu, the closed-hours action IVR Menu After Hours Menu and the weekly calendar](../img/screens/business-hours-create-dialog.jpg)
+
+### Set the weekly hours
+
+**Who can do this:** Owner, PBX Admin.
+
+The **Weekly Schedule** section of the schedule dialog is a grid with one column per weekday and one row per hour (`0:00 - 1:00` to `23:00 - 24:00`). Open hours are green with a check mark.
+
+1. To start from a common pattern, pick one under **Template:** (see [Weekly schedule](#weekly-schedule)). It replaces the whole week.
+2. Click an hour cell to open or close that hour. Adjacent open hours join into one time range.
+3. Click **Clear All** to close every day.
+4. Save the schedule (**Create Schedule** or **Save Changes**). The hours are only stored when you save.
+
+### Add an exception date
+
+**Who can do this:** Owner, PBX Admin.
+
+1. In the schedule dialog, under **Exception Dates**, click **Add Exception**. The **Add Exception Date** dialog opens.
+2. Pick the **Date** and enter the **Name**, for example `Christmas Day`.
+3. Choose the **Type**: **Closed All Day** or **Special Hours**. For Special Hours, set the times under **Time Ranges:**; click **Add Time Range** for more.
+4. Click **Add Exception**. The toast "Exception date has been added." appears and the date is listed in the **Exception Dates** table.
+5. Save the schedule. Exception dates are only stored when you save.
+
+To change a date, click its edit (pencil) icon, change it and click **Update Exception** ("Exception date has been updated."). To remove one, click its delete icon ("Exception date has been removed."). Both take effect when you save the schedule.
+
+{/* SCREENSHOT: business-hours-exception-dialog — Add Exception Date dialog for Main Office Hours: date 2026-12-24, name Christmas Eve, type Special Hours with the range 09:00 to 13:00 */}
+
+![Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed)](../img/screens/business-hours-exceptions.jpg)
+
+### Import public holidays
+
+**Who can do this:** Owner, PBX Admin.
+
+1. In the schedule dialog, under **Exception Dates**, click **Import Holidays**.
+2. Choose the **Country** and the **Year**. The list of public holidays loads.
+3. Tick the holidays to add under **Select Holidays** (**Select All** and **Clear** help).
+4. Click **Import (*n*)**. The toast "Imported *n* holidays" appears. Each holiday is added as a **Closed** exception; dates already in the list are skipped.
+5. Save the schedule.
+
+The holidays come from the public `date.nager.at` service. The browser calls it directly.
+
+{/* SCREENSHOT: business-hours-import-holidays — Import Holidays dialog with Country United States, Year 2026 and the US public holidays listed, several ticked */}
+
+### Edit a schedule
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the schedule's row or name in the list. The **Edit Schedule** dialog opens.
+2. Change the fields, hours or exception dates.
+3. Click **Save Changes**.
+
+The toast "Business hours schedule has been updated successfully." appears. Editing keeps the schedule's time zone.
+
+### Activate or deactivate a schedule
+
+**Who can do this:** Owner, PBX Admin.
+
+1. In the **Status** column, click the **Active** or **Disabled** badge.
+
+The toast "Business hours schedule status updated" appears and the badge switches. **Disabled** is how the list shows an Inactive schedule. An Inactive schedule always uses its closed-hours action.
+
+### Disconnect an action
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the schedule (click its row).
+2. In **Open Hours Action** or **Closed Hours Action**, choose **Disconnect** as the type.
+3. Click **Save Changes**.
+
+The action now stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule shows the **Unprovisioned** badge in the list and in the dialog title. See [Disconnect and unprovisioned schedules](#disconnect-and-unprovisioned-schedules).
+
+### Find unprovisioned schedules
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the **Unprovisioned** button in the filter bar.
+
+Only schedules with an action set to Destination unavailable are listed. Open each one and choose a new destination. Click **Unprovisioned** again to show all schedules. The bar also has a search box, a status filter (**All Statuses**, **Active**, **Inactive**), a sort menu (**Name**, **Created Date**, **Status**, **Last Modified**) and a **Refresh** button.
+
+### Delete a schedule
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the delete (trash) icon on the row.
+2. Confirm with **Delete** in the **Delete Schedule** dialog.
+
+The toast "Business hours schedule has been deleted." appears and the row disappears. The delete is refused while a phone number, an IVR menu option or failover, or a call-tracking campaign still routes to the schedule: the **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
+
+![Cannot delete: still in use dialog for Main Office Hours listing the phone number +12025550100 as a routing target](../img/screens/business-hours-in-use-dialog.jpg)
+
+## Disconnect and unprovisioned schedules
+
+On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows the **Unprovisioned** badge in the list and the dialog title.
+
+The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
+
+An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Use the **Unprovisioned** filter to find these schedules, then choose a new destination.
+
+## Duplicate a schedule
+
+The API and the MCP server (`duplicate_business_hours`) can copy a schedule with its days and exceptions. The copy is named "*original* (Copy)" and starts **Inactive**. The page has no Duplicate button.
 
 ## Fields
 
@@ -57,14 +170,14 @@ The schedule is saved as **Active**. It becomes available as a routing type on p
 | Closed Hours Action | Required. A type and one destination | Where calls go while it is closed |
 | Weekly schedule | Each day on or off. An enabled day needs at least one time range | The regular opening hours |
 | Exceptions | Up to 100 dates | Holidays and special hours |
-| Status | Active or Inactive. Default: Active | Changed from the list |
+| Status | Active or Inactive (the list shows **Disabled**). Default: Active | Changed from the list |
 | Timezone | Shown in the list; see the caution below | The time zone of the hours |
 
 ### Action types
 
-| Type | Destination |
-|------|-------------|
-| Extension | One extension |
+| Type (dialog label) | Destination |
+|---------------------|-------------|
+| PBX User Extension | One extension |
 | Ring Group | A ring group |
 | Conference | A conference room |
 | IVR Menu | A menu |
@@ -85,10 +198,9 @@ There is no "Hangup" action. Use Disconnect on an existing schedule, or route to
 
 Each day of the week is either closed or has one or more time ranges in `HH:mm` format. The end time must be after the start time. A call at the end time is already closed.
 
-Helpers in the dialog:
+The dialog shows the week as an hour grid. Click an hour to open or close it. Helpers:
 
 - **Template**: Monday-Friday 9:00-17:00, Monday-Friday all day, Sunday-Thursday 9:00-17:00, Sunday-Thursday all day, or 24 x 7. "All day" and 24 x 7 use 00:00 to 23:59.
-- **Copy hours**: copies one day's ranges to the days you tick, in the **Copy Hours To Multiple Days** dialog.
 - **Clear All**: closes every day.
 
 ### Exception dates
@@ -100,48 +212,9 @@ An exception replaces the weekly hours for one date.
 | Closed All Day | Closed for the whole date. No time ranges allowed |
 | Special Hours | Open only during the time ranges you give. At least one range |
 
-Each exception has a date and a name (up to 255 characters). A date can only appear once; duplicates in one request are dropped silently.
+Each exception has a date and a name (up to 255 characters). The server does not stop two exceptions on the same date, so keep one entry per date; **Import Holidays** skips dates already in the list.
 
-**Import Holidays** loads public holidays from the public `date.nager.at` service for the country and year you choose. Tick the holidays to add them as Closed exceptions. The browser calls that service directly.
-
-![Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed)](../img/screens/business-hours-exceptions.jpg)
-
-## How a call is routed
-
-1. A call arrives on a phone number routed to the schedule.
-2. If the schedule is Inactive, it is closed: go to step 4.
-3. If today's date has an exception, the exception decides: closed, or open only within its ranges.
-4. Otherwise the day's time ranges decide.
-5. Open: the open-hours action runs. Closed: the closed-hours action runs.
-6. If the target no longer exists or is inactive, the caller hears a short "not available" message and the call ends.
-
-## Edit a schedule
-
-1. Click the schedule in the list.
-2. Change the fields and click **Save Changes**.
-
-**Status:** click the status badge in the list to switch between Active and Inactive.
-
-### Disconnect and unprovisioned schedules
-
-On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows the **Unprovisioned** badge in the list and the dialog title.
-
-The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
-
-An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. Use the **Unprovisioned** filter to find these schedules, then choose a new destination.
-
-## Duplicate a schedule
-
-The API and the MCP server (`duplicate_business_hours`) can copy a schedule with its days and exceptions. The copy is named "*original* (Copy)" and starts **Inactive**. The page has no Duplicate button.
-
-## Delete a schedule
-
-1. Click the delete icon on the row.
-2. Confirm in the **Delete Schedule** dialog.
-
-The delete is refused while a phone number, an IVR menu option or failover, or a call-tracking campaign still routes to the schedule. The **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
-
-![Cannot delete: still in use dialog for Main Office Hours listing the phone number +12025550100 as a routing target](../img/screens/business-hours-in-use-dialog.jpg)
+**Import Holidays** adds public holidays as Closed exceptions. See [Import public holidays](#import-public-holidays).
 
 ## Common errors
 
