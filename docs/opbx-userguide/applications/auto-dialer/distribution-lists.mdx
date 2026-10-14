@@ -38,7 +38,7 @@ Open **Auto Dialer → Distribution Lists**. Each row shows the **Name**, **Stat
 
 A Reporter sees the page and **Example CSV**, but not **Create List**, **Assign Campaign** or the change actions in the row menu.
 
-![Distribution Lists page with Fall Webinar Leads, 20 destinations, assigned to Fall Webinar Follow-up](../../img/screens/auto-dialer-lists-list.jpg)
+![Distribution Lists page with Fall Webinar Leads, In Use, 20 destinations, assigned to Fall Webinar Follow-up](../../img/screens/auto-dialer-lists-list.jpg)
 
 ## Create a list and upload numbers
 
@@ -159,7 +159,7 @@ Tabs:
 | Parts (*n*) | A large file was split into parts | The [parts](#see-a-lists-parts) the file was split into |
 | Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
-![Detail page of Fall Webinar Leads as the Owner: Refresh, Upload, Copy, Download and a disabled Archive button, the cards, and the pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
+![Detail page of Fall Webinar Leads, In Use, as the Owner: Refresh, Copy, Download and a disabled Archive button, the cards, the Campaign Assignment card, the Destinations and Upload Info tabs, and the pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
 
 To read the rejected rows of a Failed list, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu. Numbers cannot be removed from a list in the app; upload a new version or copy the list instead.
 
@@ -198,7 +198,7 @@ Each time you [upload a new file over a list's numbers](#replacing-the-numbers-o
 
 A previous version is deleted automatically 30 days after it was replaced (the period is the `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` setting, see [Configuration](/opbx/data-models/configuration#data-retention)). Download it before then if you need to keep it. Deleting the list deletes its previous versions at once.
 
-![Version History tab of Spring Leads (now v3) with the 30-day note and versions v2 and v1 with their file names, entries, Replaced and Deleted On dates](../../img/screens/auto-dialer-lists-version-history.jpg)
+![Version History tab of Spring Leads (now v3), next to the Destinations and Upload Info tabs, with the 30-day note and versions v2 and v1 with their file names, entries, Replaced and Deleted On dates](../../img/screens/auto-dialer-lists-version-history.jpg)
 
 ### Browse a previous version
 
@@ -275,7 +275,7 @@ Result: the toast "List deleted successfully" (row menu) or "List deleted" (deta
 
 If the server is asked to delete a list that a campaign still uses, or a list one of whose parts a campaign still uses, it refuses, deletes nothing, and the **Cannot delete: still in use** dialog names the campaign (and the part, for a part). Unassign the list or part first, then delete the list.
 
-![Delete List confirmation dialog for Fall Webinar Leads](../../img/screens/auto-dialer-lists-delete-dialog.jpg)
+![Delete List confirmation dialog for the Ready list Spring Leads, with the warning that only Owners can delete lists that are not failed](../../img/screens/auto-dialer-lists-delete-dialog.jpg)
 
 ## Permissions
 
