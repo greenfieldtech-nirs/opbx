@@ -131,8 +131,12 @@ export default function Announcements() {
 
       const data = await response.json();
 
-      // Step 2: Download from the secure MinIO URL
-      const downloadResponse = await fetch(data.download_url);
+      // Step 2: Download the file; the short-lived recording token goes in the Authorization header
+      const downloadResponse = await fetch(data.download_endpoint, {
+        headers: {
+          'Authorization': `Bearer ${data.token}`,
+        },
+      });
       if (!downloadResponse.ok) {
         throw new Error('Failed to download file from storage');
       }
