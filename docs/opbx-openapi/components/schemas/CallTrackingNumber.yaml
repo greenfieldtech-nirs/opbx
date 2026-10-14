@@ -19,10 +19,8 @@ properties:
     description: ID of the underlying DID number
     example: 12
   phone_number:
-    type:
-    - string
-    - 'null'
-    description: Phone number in E.164 format (included when DID is loaded)
+    type: string
+    description: Phone number of the DID in E.164 format
     example: '+12127773456'
   friendly_name:
     type:

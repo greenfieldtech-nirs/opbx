@@ -14,16 +14,15 @@ paths:
       - Call Tracking Campaigns
       summary: List campaign tracking numbers
       description: |
-        Get a paginated list of tracking numbers assigned to a campaign.
+        Get all tracking numbers assigned to a campaign. The list is not
+        paginated (no `meta`). Each item includes `phone_number`. Available to
+        every role.
       operationId: listCallTrackingNumbers
       security:
       - bearerAuth: []
       - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: call-tracking-campaigns:read
-      parameters:
-      - $ref: ../../components/parameters/query/Page.yaml
-      - $ref: ../../components/parameters/query/PerPage.yaml
       responses:
         '200':
           description: List of tracking numbers
@@ -36,8 +35,6 @@ paths:
                     type: array
                     items:
                       $ref: ../../components/schemas/CallTrackingNumber.yaml
-                  meta:
-                    $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -50,8 +47,10 @@ paths:
       summary: Assign tracking number
       description: |
         Assign an active DID number to a call tracking campaign. The DID must
-        belong to the same organization and cannot already be assigned to
-        another tracking campaign.
+        belong to the same organization and cannot already be a tracking number
+        of any campaign. Assigning the number also re-routes the DID to the
+        campaign (its routing type becomes `call_tracking`, replacing its
+        previous routing). Owner and PBX Admin only.
       operationId: createCallTrackingNumber
       security:
       - bearerAuth: []
@@ -96,7 +95,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Tracking number assigned successfully
+                    example: Call tracking number created successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingNumber.yaml
         '401':
@@ -130,7 +129,9 @@ paths:
       - Call Tracking Campaigns
       summary: Update tracking number
       description: |
-        Update an assigned tracking number (friendly name or status).
+        Update an assigned tracking number (friendly name or status). Both
+        fields are optional. Calls to an `inactive` tracking number are answered
+        as unavailable. Owner and PBX Admin only.
       operationId: updateCallTrackingNumber
       security:
       - bearerAuth: []
@@ -168,7 +169,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Tracking number updated successfully
+                    example: Call tracking number updated successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingNumber.yaml
         '401':
@@ -224,7 +225,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Tracking number updated successfully
+                    example: Call tracking number updated successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingNumber.yaml
         '401':
@@ -240,7 +241,9 @@ paths:
       - Call Tracking Campaigns
       summary: Remove tracking number
       description: |
-        Remove a tracking number assignment from a campaign.
+        Remove a tracking number assignment from a campaign. The call tracking
+        sessions recorded for this number are deleted with it. Owner and PBX
+        Admin only.
       operationId: deleteCallTrackingNumber
       security:
       - bearerAuth: []
