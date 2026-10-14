@@ -1,8 +1,8 @@
 type: object
 description: |
-  Call queue create/update request. Create and update use the same rules: `name` and `agents`
-  are required, and an omitted field that has a default is set to that default (on update too,
-  overwriting the stored value).
+  Call queue create/update request. On create, `name` and `agents` are required and an omitted
+  field that has a default is set to that default. On update (PUT or PATCH) every field is
+  optional: only the fields sent are validated and saved, and the others keep their stored values.
 properties:
   name:
     type: string
@@ -101,4 +101,3 @@ properties:
     description: Agent user IDs (distinct). Each must be an active user of the organization with an extension. Replaces the whole agent list.
     items:
       type: integer
-required: [name, agents]

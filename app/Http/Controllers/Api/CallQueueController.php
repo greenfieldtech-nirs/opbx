@@ -204,9 +204,11 @@ class CallQueueController extends AbstractApiCrudController
     }
 
     /**
-     * @var array<int>
+     * Agent ids to sync after save; null when an update leaves the agents untouched.
+     *
+     * @var array<int>|null
      */
-    private array $tempAgentIds = [];
+    private ?array $tempAgentIds = null;
 
     protected function beforeStore(array $validated, Request $request): array
     {
@@ -232,10 +234,15 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        $this->tempAgentIds = $validated['agents'] ?? [];
+        $this->tempAgentIds = $validated['agents'] ?? null;
         unset($validated['agents']);
 
         $validated = $this->normalizeAnnounceFields($validated);
+
+        // Partial update: leave the fallback columns alone unless the request touches the fallback.
+        if (! collect($validated)->keys()->contains(fn (string $key) => str_starts_with($key, 'fallback_'))) {
+            return $validated;
+        }
 
         return $this->normalizeFallbackFields($validated, $model);
     }
@@ -268,6 +275,10 @@ class CallQueueController extends AbstractApiCrudController
      */
     private function syncAgents(CallQueue $callQueue): void
     {
+        if ($this->tempAgentIds === null) {
+            return;
+        }
+
         CallQueueAgent::where('call_queue_id', $callQueue->id)->delete();
 
         foreach ($this->tempAgentIds as $userId) {

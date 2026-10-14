@@ -27,6 +27,20 @@ use Illuminate\Validation\Rules\Enum;
 class StoreCallQueueRequest extends FormRequest
 {
     /**
+     * Fallback action => [target column, target model].
+     *
+     * @var array<string, array{0: string, 1: class-string}>
+     */
+    protected const FALLBACK_TARGETS = [
+        'extension' => ['fallback_extension_id', Extension::class],
+        'ring_group' => ['fallback_ring_group_id', RingGroup::class],
+        'ivr_menu' => ['fallback_ivr_menu_id', IvrMenu::class],
+        'ai_assistant' => ['fallback_ai_assistant_id', AiAssistant::class],
+        'ai_load_balancer' => ['fallback_ai_load_balancer_id', AiAssistantLoadBalancer::class],
+        'call_queue' => ['fallback_call_queue_id', CallQueue::class],
+    ];
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
@@ -92,8 +106,7 @@ class StoreCallQueueRequest extends FormRequest
             'immediate_connect' => [
                 'boolean',
             ],
-            // No prepareForValidation default on purpose: updates inherit the
-            // defaults, and an omitted flag must not silently switch it off.
+            // No prepareForValidation default on purpose: an omitted flag must not silently switch it off.
             'conference_ring_all' => [
                 'sometimes',
                 'boolean',
@@ -245,23 +258,14 @@ class StoreCallQueueRequest extends FormRequest
      */
     protected function validateFallbackTargets($validator, int $organizationId): void
     {
-        $fallbackAction = $this->input('fallback_action');
+        $fallbackAction = $this->fallbackValue('fallback_action');
 
-        $targets = [
-            RingGroupFallbackAction::EXTENSION->value => ['fallback_extension_id', Extension::class],
-            RingGroupFallbackAction::RING_GROUP->value => ['fallback_ring_group_id', RingGroup::class],
-            RingGroupFallbackAction::IVR_MENU->value => ['fallback_ivr_menu_id', IvrMenu::class],
-            RingGroupFallbackAction::AI_ASSISTANT->value => ['fallback_ai_assistant_id', AiAssistant::class],
-            RingGroupFallbackAction::AI_LOAD_BALANCER->value => ['fallback_ai_load_balancer_id', AiAssistantLoadBalancer::class],
-            RingGroupFallbackAction::CALL_QUEUE->value => ['fallback_call_queue_id', CallQueue::class],
-        ];
-
-        if (! isset($targets[$fallbackAction])) {
+        if (! isset(self::FALLBACK_TARGETS[$fallbackAction])) {
             return;
         }
 
-        [$field, $modelClass] = $targets[$fallbackAction];
-        $id = $this->input($field);
+        [$field, $modelClass] = self::FALLBACK_TARGETS[$fallbackAction];
+        $id = $this->fallbackValue($field);
 
         if (! $id) {
             return;
@@ -284,6 +288,14 @@ class StoreCallQueueRequest extends FormRequest
         if ($model instanceof CallQueue) {
             $this->validateFallbackQueueChain($validator, $model);
         }
+    }
+
+    /**
+     * The value a fallback field will have once saved (on create: the request value).
+     */
+    protected function fallbackValue(string $field): mixed
+    {
+        return $this->input($field);
     }
 
     /**

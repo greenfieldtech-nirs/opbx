@@ -287,7 +287,7 @@ The fallback must belong to your organization and be active when you save. A que
 
 ## API and automation
 
-- **REST API**: create, read, update and delete queues and agent membership. Statistics, live state and per-call reports are read-only endpoints.
+- **REST API**: create, read, update and delete queues and agent membership. An update (`PUT` or `PATCH /v1/call-queues/{id}`) changes only the fields it sends; omitted settings and the agent list keep their stored values. Statistics, live state and per-call reports are read-only endpoints.
 - **Scoped API keys**: the `call-queues` and `queue-calls` resources, with read access meaning GET only. See [API Keys](/opbx/modules/api-keys).
 - **MCP server**: read-only tools `list_call_queues`, `get_call_queue`, `get_call_queue_stats`, `get_call_queue_live` and `list_queue_calls`. See [MCP Server](/opbx/modules/mcp-server).
 

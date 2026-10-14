@@ -82,7 +82,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueueInput.yaml'
+              allOf:
+                - $ref: '../../components/schemas/CallQueueInput.yaml'
+                - required: [name, agents]
       responses:
         '201':
           description: Call queue created
@@ -179,12 +181,17 @@ paths:
         - Call Queues
       summary: Update call queue
       description: &updDesc |
-        Owner and PBX Admin only. Validated with the same rules as create: `name` and `agents`
-        are required, and every omitted setting that has a default is reset to that default
-        (for example an omitted `status` becomes `active`, an omitted `fallback_action` becomes
-        `hangup`). `description`, `announce_position_language`, `moh_recording_id` and
-        `conference_ring_all` keep their stored values when omitted. `agents` replaces the
-        whole agent list. `fallback_action: unavailable` is accepted on update. A
+        Owner and PBX Admin only. PUT and PATCH both update only the fields sent: every field
+        is optional, an omitted field keeps its stored value, and no create default is applied
+        (a body with just `name` renames the queue and changes nothing else). A field that is
+        sent is validated as on create, so `name`, `strategy`, `status` and the other required
+        settings cannot be blanked, and `agents`, when sent, replaces the whole agent list (at
+        least one agent). The fallback columns change only when `fallback_action` or a
+        `fallback_*_id` is sent; the rules then use the stored value of the half that is left
+        out: sending `fallback_action: extension` alone keeps the stored
+        `fallback_extension_id` (422 when none is stored), and sending a target id alone is
+        checked against the stored action. The target columns of the other actions are cleared.
+        `fallback_action: unavailable` is accepted on update. A
         `fallback_call_queue_id` must not be this queue, and the chain of call queue fallbacks
         must not lead back to it (422 "Fallback loop detected: ...").
       operationId: updateCallQueue
