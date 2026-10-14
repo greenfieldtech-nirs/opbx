@@ -95,6 +95,7 @@ class CallQueueController extends AbstractApiCrudController
             'fallbackIvrMenu:id,name',
             'fallbackAiAssistant:id,name',
             'fallbackAiLoadBalancer:id,name',
+            'fallbackCallQueue:id,name',
         ])->withCount('agents');
     }
 
@@ -175,6 +176,7 @@ class CallQueueController extends AbstractApiCrudController
             'fallback_ivr_menu_id' => $validated['fallback_ivr_menu_id'] ?? null,
             'fallback_ai_assistant_id' => $validated['fallback_ai_assistant_id'] ?? null,
             'fallback_ai_load_balancer_id' => $validated['fallback_ai_load_balancer_id'] ?? null,
+            'fallback_call_queue_id' => $validated['fallback_call_queue_id'] ?? null,
         ];
 
         $validated['fallback_extension_id'] = null;
@@ -182,6 +184,7 @@ class CallQueueController extends AbstractApiCrudController
         $validated['fallback_ivr_menu_id'] = null;
         $validated['fallback_ai_assistant_id'] = null;
         $validated['fallback_ai_load_balancer_id'] = null;
+        $validated['fallback_call_queue_id'] = null;
 
         $field = match ($action) {
             'extension' => 'fallback_extension_id',
@@ -189,6 +192,7 @@ class CallQueueController extends AbstractApiCrudController
             'ivr_menu' => 'fallback_ivr_menu_id',
             'ai_assistant' => 'fallback_ai_assistant_id',
             'ai_load_balancer' => 'fallback_ai_load_balancer_id',
+            'call_queue' => 'fallback_call_queue_id',
             default => null,
         };
 

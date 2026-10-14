@@ -18,6 +18,7 @@ export function DestinationTypeAndSelector({
   layout = 'grid',
   gridColumns = { type: 3, destination: 8 },
   extensionTypes,
+  excludeIds,
   showDescriptions = false,
   showSubLabel = true,
   className,
@@ -69,6 +70,7 @@ export function DestinationTypeAndSelector({
             label={destinationLabel}
             disabled={disabled}
             extensionTypes={extensionTypes}
+            excludeIds={excludeIds}
             showBadges
           />
         </div>

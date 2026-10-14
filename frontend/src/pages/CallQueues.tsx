@@ -63,6 +63,7 @@ interface QueueFormState {
   fallback_ivr_menu_id: string;
   fallback_ai_assistant_id: string;
   fallback_ai_load_balancer_id: string;
+  fallback_call_queue_id: string;
   status: 'active' | 'inactive';
   agents: number[];
 }
@@ -86,6 +87,7 @@ const emptyForm: QueueFormState = {
   fallback_ivr_menu_id: '',
   fallback_ai_assistant_id: '',
   fallback_ai_load_balancer_id: '',
+  fallback_call_queue_id: '',
   status: 'active',
   agents: [],
 };
@@ -230,6 +232,7 @@ export default function CallQueues() {
       fallback_ai_load_balancer_id: queue.fallback_ai_load_balancer_id
         ? String(queue.fallback_ai_load_balancer_id)
         : '',
+      fallback_call_queue_id: queue.fallback_call_queue_id ? String(queue.fallback_call_queue_id) : '',
       // Status is not editable in the dialog; preserve the existing value.
       status: queue.status,
       agents: (queue.agents ?? []).map((a) => a.id),
@@ -257,6 +260,7 @@ export default function CallQueues() {
     fallback_ai_load_balancer_id: form.fallback_ai_load_balancer_id
       ? Number(form.fallback_ai_load_balancer_id)
       : null,
+    fallback_call_queue_id: form.fallback_call_queue_id ? Number(form.fallback_call_queue_id) : null,
     // New queues are always created active.
     status: editing ? editing.status : 'active',
     agents: form.agents,
@@ -283,6 +287,8 @@ export default function CallQueues() {
         return q.fallback_ai_assistant?.name ?? '—';
       case 'ai_load_balancer':
         return q.fallback_ai_load_balancer?.name ?? '—';
+      case 'call_queue':
+        return q.fallback_call_queue?.name ?? '—';
       case 'hangup':
         return 'Hang Up';
       case 'unavailable':
@@ -649,7 +655,9 @@ export default function CallQueues() {
                             ? form.fallback_ai_assistant_id
                             : form.fallback_action === 'ai_load_balancer'
                               ? form.fallback_ai_load_balancer_id
-                              : ''
+                              : form.fallback_action === 'call_queue'
+                                ? form.fallback_call_queue_id
+                                : ''
                   }
                   onChange={(type, destinationId) =>
                     setForm((prev) => ({
@@ -660,9 +668,11 @@ export default function CallQueues() {
                       fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : '',
                       fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : '',
                       fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : '',
+                      fallback_call_queue_id: type === 'call_queue' ? destinationId : '',
                     }))
                   }
-                  allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup']}
+                  allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'call_queue', 'hangup']}
+                  excludeIds={editing && form.fallback_action === 'call_queue' ? [String(editing.id)] : undefined}
                 />
                 <p className="text-xs text-muted-foreground">
                   Used when a caller exceeds max wait or no agents are available.

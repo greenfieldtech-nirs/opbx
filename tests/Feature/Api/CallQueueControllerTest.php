@@ -13,6 +13,7 @@ use App\Models\Organization;
 use App\Models\Recording;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -229,6 +230,77 @@ class CallQueueControllerTest extends TestCase
         $this->assertNull($queue->fallback_ring_group_id);
     }
 
+    public function test_store_with_call_queue_fallback_saves_the_target(): void
+    {
+        $target = CallQueue::factory()->create(['organization_id' => $this->organization->id]);
+
+        Sanctum::actingAs($this->owner);
+
+        $response = $this->postJson('/api/v1/call-queues', $this->validPayload([
+            'fallback_action' => 'call_queue',
+            'fallback_call_queue_id' => $target->id,
+        ]));
+
+        $response->assertCreated()->assertJsonPath('data.fallback_call_queue_id', $target->id);
+        $this->assertSame($target->id, CallQueue::findOrFail($response->json('data.id'))->fallback_call_queue_id);
+    }
+
+    public function test_call_queue_fallback_requires_an_active_queue_of_the_organization(): void
+    {
+        $foreign = CallQueue::factory()->create(['organization_id' => Organization::factory()->create()->id]);
+        $inactive = CallQueue::factory()->create(['organization_id' => $this->organization->id, 'status' => 'inactive']);
+
+        Sanctum::actingAs($this->owner);
+
+        foreach ([null, $foreign->id, $inactive->id] as $targetId) {
+            $this->postJson('/api/v1/call-queues', $this->validPayload([
+                'fallback_action' => 'call_queue',
+                'fallback_call_queue_id' => $targetId,
+            ]))->assertUnprocessable()->assertJsonValidationErrors('fallback_call_queue_id');
+        }
+    }
+
+    public function test_call_queue_cannot_fall_back_to_itself(): void
+    {
+        $queue = CallQueue::factory()->create(['organization_id' => $this->organization->id]);
+
+        Sanctum::actingAs($this->owner);
+
+        $this->putJson("/api/v1/call-queues/{$queue->id}", $this->validPayload([
+            'name' => $queue->name,
+            'fallback_action' => 'call_queue',
+            'fallback_call_queue_id' => $queue->id,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('fallback_call_queue_id');
+    }
+
+    public function test_call_queue_fallback_loop_is_refused(): void
+    {
+        $a = CallQueue::factory()->create(['organization_id' => $this->organization->id, 'name' => 'Queue A']);
+        $b = CallQueue::factory()->create(['organization_id' => $this->organization->id, 'name' => 'Queue B']);
+        $c = CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'name' => 'Queue C',
+            'fallback_action' => 'call_queue',
+            'fallback_call_queue_id' => $a->id,
+        ]);
+        $b->update(['fallback_action' => 'call_queue', 'fallback_call_queue_id' => $c->id]);
+
+        Sanctum::actingAs($this->owner);
+
+        $response = $this->putJson("/api/v1/call-queues/{$a->id}", $this->validPayload([
+            'name' => $a->name,
+            'fallback_action' => 'call_queue',
+            'fallback_call_queue_id' => $b->id,
+        ]));
+
+        $response->assertUnprocessable();
+        $this->assertStringContainsString(
+            'Fallback loop detected: Queue A -> Queue B -> Queue C -> Queue A',
+            $response->json('errors.fallback_call_queue_id.0')
+        );
+        $this->assertSame('hangup', $a->refresh()->fallback_action->value);
+    }
+
     public function test_pbx_user_cannot_create_queue(): void
     {
         Sanctum::actingAs($this->pbxUser);
@@ -330,7 +402,7 @@ class CallQueueControllerTest extends TestCase
             'user_id' => $agent->id,
         ]);
 
-        \Illuminate\Support\Facades\Http::fake(['http://acd-worker:8084/*' => \Illuminate\Support\Facades\Http::response([], 204)]);
+        Http::fake(['http://acd-worker:8084/*' => Http::response([], 204)]);
 
         Sanctum::actingAs($agent);
 

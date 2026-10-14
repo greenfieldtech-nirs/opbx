@@ -52,6 +52,7 @@ class ResourceReferenceChecker
         ['call_queues', 'fallback_ivr_menu_id', 'ivr_menu', 'call_queue', 'name', null, false],
         ['call_queues', 'fallback_ai_assistant_id', 'ai_assistant', 'call_queue', 'name', null, false],
         ['call_queues', 'fallback_ai_load_balancer_id', 'ai_load_balancer', 'call_queue', 'name', null, false],
+        ['call_queues', 'fallback_call_queue_id', 'call_queue', 'call_queue', 'name', null, false],
         ['ai_assistant_load_balancers', 'fallback_extension_id', 'extension', 'ai_load_balancer', 'name', null, true],
         ['ai_assistant_load_balancers', 'fallback_ring_group_id', 'ring_group', 'ai_load_balancer', 'name', null, true],
         ['ai_assistant_load_balancers', 'fallback_ivr_menu_id', 'ivr_menu', 'ai_load_balancer', 'name', null, true],

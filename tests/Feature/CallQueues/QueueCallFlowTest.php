@@ -590,6 +590,60 @@ class QueueCallFlowTest extends TestCase
             && $request['type'] === 'overflow');
     }
 
+    public function test_poll_overflow_to_call_queue_enqueues_caller_in_target_queue(): void
+    {
+        $target = CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'name' => 'Overflow Desk',
+            'moh_recording_id' => null,
+            'immediate_connect' => false,
+        ]);
+        $this->queue->update([
+            'fallback_action' => 'call_queue',
+            'fallback_call_queue_id' => $target->id,
+        ]);
+
+        $queueCall = QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'overflow'], 200)]);
+
+        $response = app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()));
+        $content = (string) $response->getContent();
+
+        $this->assertSame(QueueCallDisposition::OVERFLOW, $queueCall->refresh()->disposition);
+        $this->assertTrue(QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('call_queue_id', $target->id)->where('call_id', self::CALL_ID)->whereNull('disposition')->exists());
+        $this->assertStringContainsString('Please hold while we redirect your call', $content);
+        $this->assertStringContainsString('<Redirect', $content);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/enqueue')
+            && (int) $request['queueId'] === $target->id);
+    }
+
+    public function test_poll_overflow_to_inactive_call_queue_hangs_up(): void
+    {
+        $target = CallQueue::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => 'inactive',
+        ]);
+        $this->queue->update(['fallback_action' => 'call_queue', 'fallback_call_queue_id' => $target->id]);
+        QueueCall::factory()->create([
+            'call_queue_id' => $this->queue->id,
+            'organization_id' => $this->organization->id,
+            'call_id' => self::CALL_ID,
+        ]);
+
+        Http::fake(['http://acd-worker:8084/*' => Http::response(['action' => 'overflow'], 200)]);
+
+        $content = (string) app(QueuePollController::class)->handle($this->callbackRequest($this->sessionData()))->getContent();
+
+        $this->assertStringContainsString('<Hangup', $content);
+        $this->assertFalse(QueueCall::withoutGlobalScope(OrganizationScope::class)->where('call_queue_id', $target->id)->exists());
+    }
+
     public function test_dial_callback_failed_returns_caller_to_hold(): void
     {
         app(QueueCallLifecycleService::class)->markDial($this->queue->id, self::CALL_ID, $this->agent->id);

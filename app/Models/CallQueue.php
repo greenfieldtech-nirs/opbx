@@ -49,6 +49,7 @@ class CallQueue extends Model
         'fallback_ivr_menu_id',
         'fallback_ai_assistant_id',
         'fallback_ai_load_balancer_id',
+        'fallback_call_queue_id',
         'status',
     ];
 
@@ -167,6 +168,11 @@ class CallQueue extends Model
     public function fallbackAiLoadBalancer(): BelongsTo
     {
         return $this->belongsTo(AiAssistantLoadBalancer::class, 'fallback_ai_load_balancer_id');
+    }
+
+    public function fallbackCallQueue(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'fallback_call_queue_id');
     }
 
     public function isActive(): bool

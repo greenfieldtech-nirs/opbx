@@ -10,6 +10,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\Recording;
@@ -143,6 +144,11 @@ class StoreCallQueueRequest extends FormRequest
                 'nullable',
                 Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
+            'fallback_call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
+                'nullable',
+                Rule::exists('call_queues', 'id')->where('organization_id', $this->user()?->organization_id),
+            ],
             'status' => [
                 'required',
                 new Enum(CallQueueStatus::class),
@@ -247,6 +253,7 @@ class StoreCallQueueRequest extends FormRequest
             RingGroupFallbackAction::IVR_MENU->value => ['fallback_ivr_menu_id', IvrMenu::class],
             RingGroupFallbackAction::AI_ASSISTANT->value => ['fallback_ai_assistant_id', AiAssistant::class],
             RingGroupFallbackAction::AI_LOAD_BALANCER->value => ['fallback_ai_load_balancer_id', AiAssistantLoadBalancer::class],
+            RingGroupFallbackAction::CALL_QUEUE->value => ['fallback_call_queue_id', CallQueue::class],
         ];
 
         if (! isset($targets[$fallbackAction])) {
@@ -270,6 +277,57 @@ class StoreCallQueueRequest extends FormRequest
 
         if (method_exists($model, 'isActive') && ! $model->isActive()) {
             $validator->errors()->add($field, 'The selected fallback target must be active.');
+
+            return;
+        }
+
+        if ($model instanceof CallQueue) {
+            $this->validateFallbackQueueChain($validator, $model);
+        }
+    }
+
+    /**
+     * A queue must not fall back to itself, and following call_queue fallbacks must never come
+     * back to it (an overflowing caller would bounce between the queues forever).
+     */
+    protected function validateFallbackQueueChain($validator, CallQueue $target): void
+    {
+        $self = $this->route('call_queue');
+        $self = $self instanceof CallQueue ? $self : ($self ? CallQueue::find($self) : null);
+
+        if (! $self) {
+            return; // a new queue cannot be referenced yet, so no chain can return to it
+        }
+
+        if ((int) $target->id === (int) $self->id) {
+            $validator->errors()->add('fallback_call_queue_id', 'A call queue cannot fall back to itself.');
+
+            return;
+        }
+
+        $path = [$self->name, $target->name];
+        $seen = [(int) $target->id];
+        $next = $target;
+
+        while ($next->fallback_action === RingGroupFallbackAction::CALL_QUEUE && $next->fallback_call_queue_id) {
+            $nextId = (int) $next->fallback_call_queue_id;
+
+            if ($nextId === (int) $self->id) {
+                $path[] = $self->name;
+                $validator->errors()->add(
+                    'fallback_call_queue_id',
+                    'Fallback loop detected: '.implode(' -> ', $path).'. A call queue fallback chain must not return to itself.'
+                );
+
+                return;
+            }
+
+            if (in_array($nextId, $seen, true) || ! ($next = CallQueue::find($nextId))) {
+                return;
+            }
+
+            $seen[] = $nextId;
+            $path[] = $next->name;
         }
     }
 

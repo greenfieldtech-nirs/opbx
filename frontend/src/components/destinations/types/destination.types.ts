@@ -125,6 +125,8 @@ export interface DestinationSelectorProps {
   organizationId?: string;
   /** Filter extensions by type (default: ['user', 'forward']) */
   extensionTypes?: ExtensionType[];
+  /** Destination IDs to leave out (e.g. the record being edited) */
+  excludeIds?: string[];
   /** Show type badges in dropdown */
   showBadges?: boolean;
   /** Show the description line (subLabel) in dropdown options (default: true) */
@@ -168,6 +170,8 @@ export interface DestinationTypeAndSelectorProps {
   };
   /** Filter extensions by type */
   extensionTypes?: ExtensionType[];
+  /** Destination IDs to leave out (e.g. the record being edited) */
+  excludeIds?: string[];
   /** Show type descriptions */
   showDescriptions?: boolean;
   /** Additional CSS classes for container */

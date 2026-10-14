@@ -40,6 +40,7 @@ class CallQueueResource extends JsonResource
             'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
             'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
+            'fallback_call_queue_id' => $this->fallback_call_queue_id,
             'status' => $this->status->value,
             'is_unprovisioned' => $this->is_unprovisioned,
             'agents' => $this->whenLoaded('agents', function () {
@@ -81,6 +82,12 @@ class CallQueueResource extends JsonResource
                 return [
                     'id' => $this->fallbackAiAssistant->id,
                     'name' => $this->fallbackAiAssistant->name,
+                ];
+            }),
+            'fallback_call_queue' => $this->whenLoaded('fallbackCallQueue', function () {
+                return [
+                    'id' => $this->fallbackCallQueue->id,
+                    'name' => $this->fallbackCallQueue->name,
                 ];
             }),
             'created_at' => $this->created_at?->toIso8601String(),

@@ -140,6 +140,16 @@ final class ResourceInUseDeleteTest extends TestCase
         $this->deleteJson("/api/v1/call-queues/{$queue->id}")->assertNoContent();
     }
 
+    public function test_in_use_call_queue_is_blocked_by_another_queues_fallback(): void
+    {
+        $queue = CallQueue::factory()->create($this->o());
+        $other = CallQueue::factory()->create($this->o() + ['fallback_action' => 'call_queue', 'fallback_call_queue_id' => $queue->id]);
+        $this->assertBlocked("/api/v1/call-queues/{$queue->id}", 'call_queue', $other->id, $other->name);
+
+        $other->update(['fallback_action' => 'hangup', 'fallback_call_queue_id' => null]);
+        $this->deleteJson("/api/v1/call-queues/{$queue->id}")->assertNoContent();
+    }
+
     public function test_in_use_business_hours_is_blocked_by_did_routing(): void
     {
         $hours = BusinessHoursSchedule::factory()->create($this->o());

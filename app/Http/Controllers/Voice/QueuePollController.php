@@ -334,6 +334,7 @@ class QueuePollController extends Controller
             RingGroupFallbackAction::IVR_MENU => $this->fallbackToIvrMenu($callQueue, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->fallbackToAiAssistant($callQueue, $request),
             RingGroupFallbackAction::AI_LOAD_BALANCER => $this->fallbackToAiLoadBalancer($callQueue, $request),
+            RingGroupFallbackAction::CALL_QUEUE => $this->fallbackToCallQueue($callQueue, $request),
             RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => response(CxmlBuilder::unavailable('No agents available. Goodbye.'), 200, ['Content-Type' => 'application/xml']),
         };
@@ -442,6 +443,27 @@ class QueuePollController extends Controller
             $request,
             new DidNumber,
             ['ai_load_balancer' => $aiLoadBalancer]
+        );
+    }
+
+    /** Enqueue the caller in the target queue exactly like an inbound call to that queue. */
+    private function fallbackToCallQueue(CallQueue $callQueue, QueueCallbackRequest $request): Response
+    {
+        $targetQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $callQueue->fallback_call_queue_id)
+            ->where('organization_id', $callQueue->organization_id)
+            ->first();
+
+        // Save-time validation refuses loops; the id check is a last guard against bouncing in place.
+        if (! $targetQueue || ! $targetQueue->isActive() || $targetQueue->id === $callQueue->id) {
+            return response(CxmlBuilder::unavailable('No agents available. Goodbye.'), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::QUEUE,
+            $request,
+            new DidNumber,
+            ['call_queue' => $targetQueue]
         );
     }
 }

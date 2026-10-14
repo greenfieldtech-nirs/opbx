@@ -35,6 +35,7 @@ export interface CallQueue {
   fallback_ivr_menu_id?: number | null;
   fallback_ai_assistant_id?: number | null;
   fallback_ai_load_balancer_id?: number | null;
+  fallback_call_queue_id?: number | null;
   status: 'active' | 'inactive';
   agents?: CallQueueAgent[];
   agents_count?: number;
@@ -44,6 +45,7 @@ export interface CallQueue {
   fallback_ivr_menu?: { id: number; name: string } | null;
   fallback_ai_assistant?: { id: number; name: string } | null;
   fallback_ai_load_balancer?: { id: number; name: string } | null;
+  fallback_call_queue?: { id: number; name: string } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -67,6 +69,7 @@ export interface CallQueuePayload {
   fallback_ivr_menu_id?: number | null;
   fallback_ai_assistant_id?: number | null;
   fallback_ai_load_balancer_id?: number | null;
+  fallback_call_queue_id?: number | null;
   status: 'active' | 'inactive';
   agents: number[];
 }
