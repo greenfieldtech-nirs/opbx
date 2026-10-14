@@ -81,7 +81,7 @@ Every assistant is created the same way; only the configuration fields differ by
 
 The dialog closes, the toast **AI Assistant created successfully** appears and the assistant is listed as **Active**. OPBX sets its protocol (SIP, WebSocket or Dummy) from the provider, and the assistant is offered in every destination picker that accepts an AI assistant. If a field is wrong, the dialog stays open and a toast shows the server's message (see [Common errors](#common-errors)).
 
-![AI Assistants list with Aria - Front Desk Receptionist (VAPI, SIP) and Max - Support Triage (Retell, SIP), both Active, with the status, protocol and provider filters](../img/screens/ai-assistants-list.jpg)
+![AI Assistants list with Aria - Front Desk Receptionist (VAPI, +12025550170) and Max - Support Triage (Retell, +12025550171), both SIP and Active, with the status, protocol and provider filters](../img/screens/ai-assistants-list.jpg)
 
 ![Create AI Assistant dialog with the provider dropdown open, showing the end of the SIP providers and the WebSocket Providers and Test Providers groups](../img/screens/ai-assistants-create-dialog.jpg)
 
@@ -98,7 +98,7 @@ Use this for any provider under **SIP Providers** (Retell, VAPI, ElevenLabs, Ult
 
 When a call reaches the assistant, OPBX dials that number, exactly as entered, at the provider's SIP service and bridges the caller. The list shows the number under the provider name, with a **non-E.164** badge when it is marked so.
 
-{/* SCREENSHOT: ai-assistants-sip-fields — Create AI Assistant dialog with Name "Aria - Front Desk Receptionist", provider VAPI selected and Phone Number +12025550170 filled in */}
+![Create AI Assistant dialog with Name Aria - Front Desk Receptionist, provider VAPI, Phone Number +12025550170 and the Enable non-E.164 Phone Number checkbox](../img/screens/ai-assistants-sip-fields.jpg)
 
 ### Connect a remote AI voice assistant over WebSocket
 
@@ -146,7 +146,7 @@ Reporters see a **Read-Only** badge next to the page title, no **Add AI Assistan
 
 The toast **AI Assistant updated successfully** appears. Changing the provider also changes the protocol, and the configuration fields are replaced by the new provider's fields. Routing that points at the assistant is not changed.
 
-{/* SCREENSHOT: ai-assistants-edit-dialog — Edit AI Assistant dialog for "Max - Support Triage" with provider Retell and its Phone Number filled in */}
+![Edit AI Assistant dialog for Max - Support Triage with provider Retell and Phone Number +12025550171](../img/screens/ai-assistants-edit-dialog.jpg)
 
 ### Activate or deactivate
 
@@ -172,7 +172,7 @@ Calls already connected are not affected.
 
 The toast **AI Assistant deleted successfully** appears and the row disappears.
 
-{/* SCREENSHOT: ai-assistants-delete-dialog — Delete AI Assistant? confirmation for "Max - Support Triage" with the Cancel and Delete buttons */}
+![Delete AI Assistant? confirmation for Max - Support Triage with the Cancel and Delete buttons](../img/screens/ai-assistants-delete-dialog.jpg)
 
 If anything still points at the assistant, the delete is refused and the **Cannot delete: still in use** dialog lists every place, for example:
 
