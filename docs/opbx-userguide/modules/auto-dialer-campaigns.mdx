@@ -8,7 +8,7 @@ description: "Outbound calling campaigns: fields, statuses, permissions, data an
 
 # Auto Dialer Campaigns
 
-An auto-dialer campaign dials every number on its [distribution list](/opbx/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference. The step-by-step walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
+An auto-dialer campaign dials every number on its [distribution list](/opbx/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference and the list of workflows. The step-by-step screen walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
 
 ## Purpose
 
@@ -27,19 +27,75 @@ Use this module to:
 - At least one **active** [phone number](/opbx/modules/phone-numbers) for the caller ID.
 - The [dialer worker](/opbx/workers/dialer-worker) running (single replica), and the [AMD worker](/opbx/workers/amd-worker) for voicemail detection.
 
-## Walk-through
+## Permissions
 
-| Task | Guide |
-|------|-------|
-| Create, edit, start, pause, resume, archive, delete | [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) |
-| Upload and assign the numbers | [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) |
-| Dates, weekly hours, timezone, auto-start | [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) |
-| CAC, CPS, attempts, retries | [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) |
-| Voicemail detection | [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
-| Where answered calls go | [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
-| Live view | [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See the Auto Dialer pages | Yes | Yes | No | Yes (read-only) | No |
+| List campaigns, destinations and the monitor | Yes | Yes | No | Yes | No |
+| Create, edit, start, pause, resume | Yes | Yes | No | No | No |
+| Archive | Yes | No | No | No | No |
+| Delete (Draft only) | Yes | No | No | No | No |
+
+## Workflows
+
+The Auto Dialer screens are documented step by step in the **Auto Dialer** application guide. Each workflow below says who can do it and links to the steps.
 
 ![Campaign Manager with Fall Webinar Follow-up (Paused, AI Assistant routing)](../img/screens/auto-dialer-campaign-list.jpg)
+
+### Find a campaign
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+Open **Auto Dialer → Campaign Manager**, type in **Search campaigns...** or pick a status (the default is **All (except Archived)**), and click **Clear Filters** to reset. See [The Campaign Manager page](/opbx/applications/auto-dialer/campaigns#the-campaign-manager-page).
+
+A Reporter sees the list with a **Read-Only** badge and no action buttons, and clicking a row does not open the campaign.
+
+### Create a campaign
+
+**Who can do this:** Owner, PBX Admin.
+
+Click **Create Campaign**, fill in the **Basic Info**, **Schedule**, **Answering Machine Detection** and **Advanced** tabs, and save. The campaign is stored as **Draft**. See [Create a campaign](/opbx/applications/auto-dialer/campaigns#create-a-campaign), and for the tabs [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling#set-the-schedule), [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection#turn-detection-on), [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) and [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations#set-the-destination).
+
+### Assign a distribution list to a campaign
+
+**Who can do this:** Owner, PBX Admin.
+
+See [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign). A campaign needs a Ready list before it can start.
+
+### Start, pause or resume a campaign
+
+**Who can do this:** Owner, PBX Admin.
+
+Click the status badge on the row (Draft starts, Running pauses, Paused resumes; the list confirms "Campaign status updated"), or use **Start**, **Pause** or **Resume** on the campaign's detail page, or **Pause** and **Resume** on the [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor#pause-and-resume-from-the-monitor). See [Start, pause, resume](/opbx/applications/auto-dialer/campaigns#start-pause-resume).
+
+### Edit a campaign
+
+**Who can do this:** Owner, PBX Admin. The campaign must not be Running.
+
+See [Edit a campaign](/opbx/applications/auto-dialer/campaigns#edit-a-campaign).
+
+### View a campaign's progress
+
+**Who can do this:** Owner, PBX Admin (from the list). A Reporter can open the detail page only by its address; the list rows are not clickable for them.
+
+Click the campaign's row or name. See [The campaign detail page](/opbx/applications/auto-dialer/campaigns#the-campaign-detail-page) and the [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor#drill-down).
+
+### Archive a campaign
+
+**Who can do this:** Owner. The **Archive** buttons are hidden from other roles.
+
+See [Archive a campaign](/opbx/applications/auto-dialer/campaigns#archive-a-campaign). The list confirms "Campaign archived successfully".
+
+### Delete a campaign
+
+**Who can do this:** Owner, and only for a Draft campaign. The delete button is hidden from other roles.
+
+See [Delete a campaign](/opbx/applications/auto-dialer/campaigns#delete-a-campaign). The list confirms "Campaign deleted successfully".
+
+### API-only tasks
+
+Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID round robin (`reset-caller-id-cycle`) have no button. Use the API endpoints below.
 
 ## Fields at a glance
 
@@ -57,9 +113,9 @@ Use this module to:
 | Dial timeout | 1 to 300 seconds. Form default: 60 |
 | Connect when | Call Connected or Immediately. Sent to Cloudonix as `execute` |
 | Time limit | 30 to 14400 seconds. Default: 3600 |
-| Concurrent active calls (CAC) | 1 to 50 |
+| Concurrent active calls (CAC) | 1 to 50. Form default: 1 |
 | Calls per second (CPS) | 1 to 30. Default: 1 |
-| Max dial attempts | 1 to 5 |
+| Max dial attempts | 1 to 5. Form default: 1 |
 | Record calls | Off by default |
 | Voicemail, human and unknown actions | `HANGUP` or `CONTINUE`, or empty (treated as Continue). Empty on all three means no detection |
 | Retry on voicemail | Off by default |
@@ -77,17 +133,7 @@ Use this module to:
 | `completed` | Completed | Every number finished. Set automatically only for auto-started campaigns |
 | `archived` | Archived | Kept for history |
 
-A Draft campaign becomes **Active** when a Ready list is assigned to it.
-
-## Permissions
-
-| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
-|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See the Auto Dialer pages | Yes | Yes | No | Yes (read-only) | No |
-| List campaigns, destinations and the monitor | Yes | Yes | No | Yes | No |
-| Create, edit, start, pause, resume | Yes | Yes | No | No | No |
-| Archive | Yes | No | No | No | No |
-| Delete (Draft only) | Yes | No | No | No | No |
+Assigning a Ready list does not start a campaign: it stays **Draft** until someone starts it, or until auto-start does.
 
 ## What a campaign blocks
 
