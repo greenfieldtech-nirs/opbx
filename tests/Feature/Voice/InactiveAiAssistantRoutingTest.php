@@ -153,7 +153,7 @@ final class InactiveAiAssistantRoutingTest extends TestCase
     public function test_ring_group_fallback(): void
     {
         $group = RingGroup::factory()->create(['organization_id' => $this->org->id]);
-        $group->update(['fallback_action' => RingGroupFallbackAction::AI_ASSISTANT, 'fallback_ai_assistant_id' => $this->aiExtension()->id]);
+        $group->update(['fallback_action' => RingGroupFallbackAction::AI_ASSISTANT, 'fallback_ai_assistant_id' => $this->assistant->id]);
 
         $this->assertEnded($this->invoke(app(RingGroupRoutingStrategy::class), 'handleFallback', $group->fresh(), $this->request()));
     }

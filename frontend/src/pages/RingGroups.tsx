@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { ringGroupsService,aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
 import { extensionsService } from '@/services/extensions.service';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -257,17 +258,13 @@ export default function RingGroups() {
     queryFn: () => extensionsService.getAll({ type: 'forward', status: 'active', per_page: 100 }),
   });
 
-  // Fetch available AI Assistants (type: ai_assistant, status: active)
+  // Fetch available AI Assistants (status: active)
   const { data: aiAssistantsData } = useQuery({
-    queryKey: [...queryKeys.extensions.all, { type: 'ai_assistant', status: 'active', per_page: 100 }],
-    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+    queryKey: [...queryKeys.aiAssistants.all, { status: 'active', per_page: 100 }],
+    queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
   });
 
-  // Filter to only include ai_assistant type (client-side safety)
-  const availableAiAssistants = useMemo(() => {
-    const allAssistants = aiAssistantsData?.data || [];
-    return allAssistants.filter((ext) => ext.type === 'ai_assistant');
-  }, [aiAssistantsData]);
+  const availableAiAssistants = aiAssistantsData?.data || [];
 
   // Fetch available AI Load Balancers (status: active)
   const { data: aiLoadBalancersData } = useQuery({
@@ -1236,12 +1233,8 @@ export default function RingGroups() {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
                               <Bot className="h-3.5 w-3.5" />
-                              Ext {assistant.extension_number} - {assistant.ai_assistant?.name || 'Unnamed Assistant'}
-                              {assistant.configuration?.phone_number && (
-                                <span className="text-muted-foreground text-xs">
-                                  ({assistant.configuration?.phone_number} @ {assistant.configuration?.provider || 'Unknown'})
-                                </span>
-                              )}
+                              {assistant.name}
+                              <span className="text-muted-foreground text-xs">({assistant.provider})</span>
                             </Badge>
                           </div>
                         </SelectItem>

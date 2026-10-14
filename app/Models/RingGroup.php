@@ -111,7 +111,7 @@ class RingGroup extends Model
      */
     public function fallbackAiAssistant(): BelongsTo
     {
-        return $this->belongsTo(Extension::class, 'fallback_ai_assistant_id');
+        return $this->belongsTo(AiAssistant::class, 'fallback_ai_assistant_id');
     }
 
     /**

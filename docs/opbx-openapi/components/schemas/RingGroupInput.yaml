@@ -67,7 +67,7 @@ properties:
     type:
     - integer
     - 'null'
-    description: Required when fallback_action is `ai_assistant` (an extension ID)
+    description: Required when fallback_action is `ai_assistant`. ID of an active AI assistant of the organization (not an AI Assistant extension)
   fallback_ai_load_balancer_id:
     type:
     - integer

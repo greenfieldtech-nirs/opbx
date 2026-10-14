@@ -369,7 +369,7 @@ class SeedDocsDemo extends Command
     private function ringGroups(): void
     {
         foreach ([
-            ['sales', 'Sales Team', RingGroupStrategy::SIMULTANEOUS, ['emma', 'frank', 'grace'], RingGroupFallbackAction::AI_ASSISTANT, ['fallback_ai_assistant_id' => $this->x['aria']]],
+            ['sales', 'Sales Team', RingGroupStrategy::SIMULTANEOUS, ['emma', 'frank', 'grace'], RingGroupFallbackAction::AI_ASSISTANT, ['fallback_ai_assistant_id' => $this->id['ai_aria']]],
             ['support', 'Support Team', RingGroupStrategy::SEQUENTIAL, ['henry', 'isabel', 'jack'], RingGroupFallbackAction::EXTENSION, ['fallback_extension_id' => $this->x['forward']]],
             ['exec', 'Executive Line', RingGroupStrategy::ROUND_ROBIN, ['alice', 'brian'], RingGroupFallbackAction::UNAVAILABLE, []], // shows the Unprovisioned badge
         ] as [$key, $name, $strategy, $members, $fallback, $fallbackAttrs]) {

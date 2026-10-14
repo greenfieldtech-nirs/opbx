@@ -42,7 +42,7 @@ class ResourceReferenceChecker
      */
     private const COLUMNS = [
         ['ring_groups', 'fallback_extension_id', 'extension', 'ring_group', 'name', null, false],
-        ['ring_groups', 'fallback_ai_assistant_id', 'extension', 'ring_group', 'name', null, false], // FK is to extensions
+        ['ring_groups', 'fallback_ai_assistant_id', 'ai_assistant', 'ring_group', 'name', null, false],
         ['ring_groups', 'fallback_ring_group_id', 'ring_group', 'ring_group', 'name', null, false],
         ['ring_groups', 'fallback_ivr_menu_id', 'ivr_menu', 'ring_group', 'name', null, false],
         ['ring_groups', 'fallback_ai_load_balancer_id', 'ai_load_balancer', 'ring_group', 'name', null, false],

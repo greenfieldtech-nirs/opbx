@@ -7,6 +7,7 @@ namespace App\Services\VoiceRouting\Strategies;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStrategy as StrategyEnum;
+use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\CallQueue;
 use App\Models\DidNumber;
@@ -553,32 +554,19 @@ class RingGroupRoutingStrategy implements RoutingStrategy
 
     private function handleFallbackAiAssistant(RingGroup $ringGroup, Request $request): Response
     {
-        $fallbackAiAssistantId = $ringGroup->fallback_ai_assistant_id;
+        $fallbackAiAssistant = $ringGroup->fallback_ai_assistant_id
+            ? AiAssistant::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $ringGroup->fallback_ai_assistant_id)
+                ->where('organization_id', $ringGroup->organization_id)
+                ->first()
+            : null;
 
-        if (! $fallbackAiAssistantId) {
+        if (! $fallbackAiAssistant) {
             return $this->handleFallbackHangup($ringGroup);
         }
 
-        $fallbackAiAssistant = Extension::withoutGlobalScope(OrganizationScope::class)
-            ->with(['aiAssistant' => function ($query) {
-                $query->withoutGlobalScope(OrganizationScope::class);
-            }])
-            ->where('id', $fallbackAiAssistantId)
-            ->where('organization_id', $ringGroup->organization_id)
-            ->where('type', ExtensionType::AI_ASSISTANT)
-            ->first();
-
-        if (! $fallbackAiAssistant || ! $fallbackAiAssistant->isActive()) {
-            return $this->handleFallbackHangup($ringGroup);
-        }
-
-        // Use the same routing logic as normal AI assistant dialing
-        $destination = ['extension' => $fallbackAiAssistant];
-
-        // Get the VoiceRoutingManager instance and delegate to it
-        $voiceRoutingManager = app(VoiceRoutingManager::class);
-
-        return $voiceRoutingManager->executeStrategy($fallbackAiAssistant->type, $request, new DidNumber, $destination);
+        // Same routing as any other path to an assistant: an inactive one ends the call with the unavailable message.
+        return app(VoiceRoutingManager::class)->executeStrategy(ExtensionType::AI_ASSISTANT, $request, new DidNumber, ['ai_assistant' => $fallbackAiAssistant]);
     }
 
     private function handleFallbackAiLoadBalancer(RingGroup $ringGroup, Request $request): Response

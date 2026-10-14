@@ -32,7 +32,6 @@ class UserDeletionImpactService
     /** [table, extension FK column, fallback_action value it belongs to, referencing type, soft-deleting]. */
     private const FALLBACKS = [
         ['ring_groups', 'fallback_extension_id', 'extension', 'ring_group', false],
-        ['ring_groups', 'fallback_ai_assistant_id', 'ai_assistant', 'ring_group', false], // FK is to extensions
         ['call_queues', 'fallback_extension_id', 'extension', 'call_queue', false],
         ['ai_assistant_load_balancers', 'fallback_extension_id', 'extension', 'ai_load_balancer', true],
     ];

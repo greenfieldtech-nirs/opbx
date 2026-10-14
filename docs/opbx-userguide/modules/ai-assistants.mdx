@@ -156,7 +156,7 @@ Click the **Active** or **Inactive** badge in the **Status** column. The change 
 
 An inactive assistant stays configured but is not used:
 
-- every call sent to it is disconnected with a spoken message instead of reaching the provider. This holds on every path: a phone number, an AI Assistant extension, an IVR option or failover, a business-hours action, and a ring group, call queue or AI load balancer fallback. Most paths say "The AI assistant you are trying to reach is unavailable. Goodbye."; an IVR option says "Destination is no longer available." and a fallback says that no agents or AI assistants are available;
+- every call sent to it is disconnected with a spoken message instead of reaching the provider. This holds on every path: a phone number, an AI Assistant extension, an IVR option or failover, a business-hours action, and a ring group, call queue or AI load balancer fallback. Most paths, including a ring group fallback, say "The AI assistant you are trying to reach is unavailable. Goodbye."; an IVR option says "Destination is no longer available." and a call-queue or AI load balancer fallback says that no agents or AI assistants are available;
 - an AI load balancer skips it as a member;
 - it cannot be added as a load-balancer member or chosen as a load-balancer fallback while it is inactive.
 
@@ -179,7 +179,7 @@ If anything still points at the assistant, the delete is refused and the **Canno
 - an extension of type AI Assistant;
 - a phone number, IVR option or IVR failover;
 - a business-hours action;
-- a call-queue fallback;
+- a ring-group or call-queue fallback;
 - an AI load balancer, as a member or as its fallback;
 - an auto-dialer campaign.
 
@@ -197,7 +197,7 @@ Change or remove those references, then delete again. Call history (call logs an
 | [Call Queues](/opbx/modules/call-queues) | The overflow fallback |
 | [AI Load Balancers](/opbx/modules/ai-load-balancers) | As a member, or as the fallback |
 | [Extensions](/opbx/modules/extensions) | An extension of type **AI Assistant**, so it can be dialled internally |
-| [Ring Groups](/opbx/modules/ring-groups) | The **AI assistant** fallback of a ring group points at an AI Assistant extension, not at the assistant itself |
+| [Ring Groups](/opbx/modules/ring-groups) | The **AI assistant** fallback |
 | [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) | The routing destination for answered calls |
 
 ## Fields

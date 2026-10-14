@@ -70,7 +70,7 @@ properties:
     type:
     - integer
     - 'null'
-    description: AI assistant ID for fallback
+    description: AI assistant ID for the `ai_assistant` fallback (references ai_assistants; set to null when the assistant is deleted)
   fallback_ai_load_balancer_id:
     type:
     - integer

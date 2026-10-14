@@ -34,7 +34,7 @@ A group of extensions rung together or in turn.
 | `updated_at` | timestamp | Yes | null |  |
 | `fallback_ring_group_id` | bigint unsigned | Yes | null | Fallback ring group. Foreign key to `ring_groups`, on delete set null |
 | `fallback_ivr_menu_id` | bigint unsigned | Yes | null | Fallback IVR menu. Foreign key to `ivr_menus`, on delete set null |
-| `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant. Stores an **extension** ID (the AI assistant extension), unlike call queues and load balancers, which store an `ai_assistants` ID. Foreign key to `extensions`, on delete set null |
+| `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant, like call queues and load balancers. Foreign key to `ai_assistants`, on delete set null. Migration `2026_10_15_100000_point_ring_group_ai_assistant_fallback_at_ai_assistants` converted older values, which held an AI Assistant extension ID, to that extension's assistant (null when it had none) |
 | `fallback_ai_load_balancer_id` | bigint unsigned | Yes | null | Fallback AI load balancer. Foreign key to `ai_assistant_load_balancers`, on delete set null |
 | `fallback_call_queue_id` | bigint unsigned | Yes | null | Fallback call queue. Foreign key to `call_queues`, on delete set null |
 
@@ -58,7 +58,7 @@ $ringGroup->members() → RingGroupMember (ring_group_id) [HasMany]
 $ringGroup->fallbackExtension() → Extension (fallback_extension_id) [BelongsTo]
 $ringGroup->fallbackRingGroup() → RingGroup (fallback_ring_group_id) [BelongsTo]
 $ringGroup->fallbackIvrMenu() → IvrMenu (fallback_ivr_menu_id) [BelongsTo]
-$ringGroup->fallbackAiAssistant() → Extension (fallback_ai_assistant_id) [BelongsTo]
+$ringGroup->fallbackAiAssistant() → AiAssistant (fallback_ai_assistant_id) [BelongsTo]
 $ringGroup->fallbackAiLoadBalancer() → AiAssistantLoadBalancer (fallback_ai_load_balancer_id) [BelongsTo]
 $ringGroup->fallbackCallQueue() → CallQueue (fallback_call_queue_id) [BelongsTo]
 ```

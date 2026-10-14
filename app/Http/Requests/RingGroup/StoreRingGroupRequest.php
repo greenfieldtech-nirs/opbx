@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\RingGroup;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
+use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\CallQueue;
 use App\Models\Extension;
@@ -105,7 +107,7 @@ class StoreRingGroupRequest extends FormRequest
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                Rule::exists('extensions', 'id')->where('organization_id', $user->organization_id),
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ai_load_balancer_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
@@ -340,9 +342,9 @@ class StoreRingGroupRequest extends FormRequest
                 }
             }
 
-            // Validate fallback AI assistant belongs to organization, is active, and is AI assistant type
+            // Validate fallback AI assistant belongs to organization and is active
             if ($fallbackAction === RingGroupFallbackAction::AI_ASSISTANT->value && $fallbackAiAssistantId) {
-                $fallbackAiAssistant = Extension::find($fallbackAiAssistantId);
+                $fallbackAiAssistant = AiAssistant::find($fallbackAiAssistantId);
                 if ($fallbackAiAssistant) {
                     if ($fallbackAiAssistant->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
@@ -351,17 +353,10 @@ class StoreRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackAiAssistant->status !== UserStatus::ACTIVE) {
+                    if ($fallbackAiAssistant->status !== AiAssistantStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_ai_assistant_id',
                             'Fallback AI assistant must be active.'
-                        );
-                    }
-
-                    if ($fallbackAiAssistant->type !== ExtensionType::AI_ASSISTANT) {
-                        $validator->errors()->add(
-                            'fallback_ai_assistant_id',
-                            'The selected extension is not an AI assistant.'
                         );
                     }
                 }

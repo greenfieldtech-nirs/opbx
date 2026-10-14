@@ -170,13 +170,13 @@ Because the caller is answered as soon as the members start ringing, the call re
 | Extension | One extension |
 | Ring Group | Another ring group. The group being edited is not offered |
 | IVR Menu | A menu |
-| AI Assistant | An extension of type AI Assistant |
+| AI Assistant | An AI assistant (the assistant itself, picked by name; no AI Assistant extension is needed) |
 | AI Load Balancer | An AI load balancer |
 | Call Queue | A call queue |
 | Hangup | The caller hears "No agents available" and the call ends |
 | Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-the-fallback) |
 
-The fallback target must belong to your organization and be **active** when you save. If it becomes inactive or is removed later, the call ends with the Hangup message instead.
+The fallback target must belong to your organization and be **active** when you save. If it becomes inactive or is removed later, the call ends with the Hangup message instead, except an AI assistant that has become inactive: the caller hears "The AI assistant you are trying to reach is unavailable. Goodbye." and the call ends. An AI assistant used as a ring-group fallback cannot be deleted; the delete dialog lists the ring group (see [Delete an assistant](/opbx/modules/ai-assistants#delete-an-assistant)).
 
 ## Routing calls to a ring group
 
@@ -215,7 +215,7 @@ A ring group appears as a destination in:
 | `timeout` | Ring timeout in seconds |
 | `ring_turns` | Rounds through the member list |
 | `fallback_action` | `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `call_queue`, `hangup` or `unavailable` |
-| `fallback_extension_id`, `fallback_ring_group_id`, `fallback_ivr_menu_id`, `fallback_ai_assistant_id`, `fallback_ai_load_balancer_id`, `fallback_call_queue_id` | Only the one matching the action is kept. `fallback_ai_assistant_id` points at an extension of type AI Assistant |
+| `fallback_extension_id`, `fallback_ring_group_id`, `fallback_ivr_menu_id`, `fallback_ai_assistant_id`, `fallback_ai_load_balancer_id`, `fallback_call_queue_id` | Only the one matching the action is kept. `fallback_ai_assistant_id` is an AI assistant ID (as for call queues and AI load balancers) |
 | `status` | `active` or `inactive` |
 
 ### `ring_group_members`
