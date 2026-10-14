@@ -8,7 +8,7 @@ description: "Lists of numbers for auto-dialer campaigns: statuses, limits, perm
 
 # Distribution Lists
 
-A distribution list holds the phone numbers an [auto-dialer campaign](/opbx/modules/auto-dialer-campaigns) dials, with an optional name, batch identifier and metadata per number. This page is the reference. The step-by-step walk-through is [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) in the Auto Dialer guide.
+A distribution list holds the phone numbers an [auto-dialer campaign](/opbx/modules/auto-dialer-campaigns) dials, with an optional name, batch identifier and metadata per number. This page is the reference and the list of workflows. The step-by-step screen walk-through is [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) in the Auto Dialer guide.
 
 ## Purpose
 
@@ -51,7 +51,7 @@ Use this module to:
 | `used` | A campaign has finished with it |
 | `archived` | Kept for history |
 
-Assigning a list to a **Draft** campaign also makes that campaign **Active**. See [Assign a list](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
+Assigning a list does not change the campaign's status: a **Draft** campaign stays Draft until it is started. See [Assign a list](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
 
 ## Number statuses
 
@@ -70,6 +70,7 @@ Assigning a list to a **Draft** campaign also makes that campaign **Active**. Se
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | See the page, list lists and their numbers | Yes | Yes | No | Yes (read-only) | No |
 | Create, upload, copy, download | Yes | Yes | No | No | No |
+| Download the example CSV | Yes | Yes | No | Yes | No |
 | Assign and unassign | Yes | Yes | No | No | No |
 | Reset dial attempts | Yes | Yes | No | No | No |
 | Archive (Ready or Used, not assigned to a campaign) | Yes | Yes | No | No | No |
@@ -77,6 +78,88 @@ Assigning a list to a **Draft** campaign also makes that campaign **Active**. Se
 | Delete any other list | Yes | No | No | No | No |
 
 Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list and all its numbers and asks for confirmation first. A list that is assigned to a campaign cannot be deleted: the delete is refused and a dialog names the campaign. Unassign the list first.
+
+## Workflows
+
+The Distribution Lists screens are documented step by step in the **Auto Dialer** application guide. Each workflow below says who can do it and links to the steps.
+
+### Find a list
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+Open **Auto Dialer → Distribution Lists**, type in the search box or pick a status (the default hides archived lists). See [The Distribution Lists page](/opbx/applications/auto-dialer/distribution-lists#the-distribution-lists-page).
+
+### Download the example CSV
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+Click **Example CSV** at the top of the page. The format is described in [CSV format](/opbx/applications/auto-dialer/distribution-lists#csv-format).
+
+### Create a list and upload numbers
+
+**Who can do this:** Owner, PBX Admin.
+
+Click **Create List**, then **Upload Destinations** in the row menu, map the columns and click **Start Upload**. See [Create a list and upload numbers](/opbx/applications/auto-dialer/distribution-lists#create-a-list-and-upload-numbers). When processing ends the detail page confirms "Upload completed successfully".
+
+### Replace the numbers of a list
+
+**Who can do this:** Owner, PBX Admin. Not while the list is In Use.
+
+Click **Upload** on the list's detail page. On a Ready or Used list this creates a new version. See [Replacing the numbers of a Ready or Used list](/opbx/applications/auto-dialer/distribution-lists#replacing-the-numbers-of-a-ready-or-used-list).
+
+### Assign a list to a campaign
+
+**Who can do this:** Owner, PBX Admin. The list must be Ready.
+
+Click **Assign Campaign** on the list's row. See [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
+
+### Unassign a list from a campaign
+
+**Who can do this:** Owner, PBX Admin. Only while no number has been dialed.
+
+Click the unassign icon next to the campaign name. The page confirms "List unassigned from campaign successfully". See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
+
+### View a list's numbers and results
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+Click the list's name to open its detail page, then search and filter the **Destinations** tab (All Statuses, Pending, Completed, Failed or Invalid). See [The list detail page](/opbx/applications/auto-dialer/distribution-lists#the-list-detail-page). For a Failed list, **View Errors** in the row menu shows the rejected rows. The detail page's **Validation Errors** tab does not list the rows yet, and its **Download Errors CSV** button does nothing; use **View Errors** instead.
+
+### Reset numbers so they are dialed again
+
+**Who can do this:** Owner, PBX Admin. Reporters see the buttons, but the server refuses the change and the page shows "Failed to reset dial attempts".
+
+On the detail page's **Destinations** tab, use **Reset Dial Attempts** on a row, select rows and click **Reset Dial Attempts (*n*)**, or click **Reset Pending Entries**. A toast reports the server's result. See [The list detail page](/opbx/applications/auto-dialer/distribution-lists#the-list-detail-page).
+
+The **Delete** button that appears when rows are selected does not delete anything yet: it only shows "Deleting *n* destinations..." and clears the selection.
+
+### Copy a list
+
+**Who can do this:** Owner, PBX Admin.
+
+Choose **Copy List** in the row menu or **Copy** on the detail page. See [Copy a list](/opbx/applications/auto-dialer/distribution-lists#copy-a-list).
+
+### Download a list
+
+**Who can do this:** Owner, PBX Admin. Reporters see the **Download** button, but the server refuses and the page shows "Failed to download list".
+
+Click **Download** on the detail page. The page confirms "List downloaded successfully". See [Download a list](/opbx/applications/auto-dialer/distribution-lists#download-a-list).
+
+### Archive a list
+
+**Who can do this:** Owner, PBX Admin. The list must be Ready or Used and not assigned to a campaign.
+
+Choose **Archive** in the row menu or on the detail page. The page confirms "List archived successfully" (row menu) or "List archived" (detail page). See [Archive a list](/opbx/applications/auto-dialer/distribution-lists#archive-a-list).
+
+### Delete a list
+
+**Who can do this:** Owner (any list not assigned to a campaign); PBX Admin (Failed lists only). The **Delete** action is hidden from everyone else.
+
+Choose **Delete** and confirm with **Permanently Delete**. The page confirms "List deleted successfully" (row menu) or "List deleted" (detail page). See [Delete a list](/opbx/applications/auto-dialer/distribution-lists#delete-a-list).
+
+### API-only tasks
+
+Adding single numbers or batches of up to 1000 numbers (`destinations`, `destinations/batch`), the CSV preview and the version and validation-error endpoints have no separate button beyond those above. Use the API endpoints below.
 
 ## Key data fields
 
