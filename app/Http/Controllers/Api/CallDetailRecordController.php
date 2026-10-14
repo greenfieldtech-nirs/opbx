@@ -116,9 +116,9 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Supervisors are always restricted to their scope (the legacy ?supervisor= flag is ignored).
+        // Supervisors and PBX Users are always restricted to their scope (the legacy ?supervisor= flag is ignored).
         if ($request->user() !== null) {
-            $this->applySupervisorFilter($query, $request->user());
+            $this->applyCallRecordScope($query, $request->user());
         }
 
         // From/To number filters: both must match (all, the default) or either (any).
@@ -204,15 +204,15 @@ class CallDetailRecordController extends AbstractApiCrudController
     }
 
     /**
-     * Apply Supervisor resource filter to a CDR query.
+     * Restrict a CDR query to the user's call-record scope (Supervisor: assigned resources; PBX User: own extensions).
      */
-    private function applySupervisorFilter(Builder $query, User|ApiKey $user): void
+    private function applyCallRecordScope(Builder $query, User|ApiKey $user): void
     {
-        if (! $user->isSupervisor()) {
+        $identifiers = app(SupervisorFilterService::class)->callRecordScopeFor($user);
+
+        if ($identifiers === null) {
             return;
         }
-
-        $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
 
         if (count($identifiers) === 0) {
             $query->whereRaw('1 = 0');
@@ -231,7 +231,7 @@ class CallDetailRecordController extends AbstractApiCrudController
      *
      * Route model binding scopes this to the authenticated user's
      * organization via CallDetailRecord's OrganizationScope, but that alone
-     * doesn't apply the supervisor resource-scoping CallDetailRecordPolicy::view()
+     * doesn't apply the Supervisor / PBX User scoping CallDetailRecordPolicy::view()
      * enforces - authorize() below is required, not just defense in depth.
      */
     public function recording(CallDetailRecord $call_detail_record): StreamedResponse|JsonResponse
@@ -367,7 +367,7 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     /**
      * Build the base CDR query for statistics, scoped to the organization,
-     * date range, and Supervisor-assigned resources.
+     * date range, and the user's call-record scope (Supervisor / PBX User).
      */
     private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate): Builder
     {
@@ -375,7 +375,7 @@ class CallDetailRecordController extends AbstractApiCrudController
             ->whereDate('session_timestamp', '>=', $fromDate)
             ->whereDate('session_timestamp', '<=', $toDate);
 
-        $this->applySupervisorFilter($query, $user);
+        $this->applyCallRecordScope($query, $user);
 
         return $query;
     }

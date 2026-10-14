@@ -31,14 +31,16 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Open Call Logs (sidebar) | Yes | Yes | Yes | Yes | Yes |
-| See the call records | All in the organization | All in the organization | All in the organization; the page starts filtered to calls from or to their own extension | All in the organization | Only calls to or from their assigned users and ring groups |
+| See the call records | All in the organization | All in the organization | Only calls from or to their own extension(s), enforced by the server | All in the organization | Only calls to or from their assigned users and ring groups |
 | Export CSV (button) | Yes | Yes | No | No | No |
 | Play a recording | Yes | Yes | No | Yes | Only calls in their scope |
 
 :::note
-The PBX User's own-extension filter (From Number and To Number set to their extension, **Match** set to **Any**) is only a default on the page; **Clear Filters** removes it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but ignored.
+A PBX User's list, single call, statistics and CSV export are always limited to calls from or to their own extension(s), decided by role on the server. The page also starts with From Number and To Number set to their extension (**Match** set to **Any**); **Clear Filters** removes those filters but still shows only their own calls, and no filter can widen the list. Opening another user's call returns 403. A PBX User without an extension sees no calls.
 
-The **Export** button is hidden for PBX Users, Reporters and Supervisors, but the export endpoint itself accepts every role (a Supervisor's export is limited to their scope).
+A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but ignored.
+
+The **Export** button is hidden for PBX Users, Reporters and Supervisors, but the export endpoint itself accepts every role (a PBX User's or Supervisor's export is limited to their scope).
 :::
 
 :::note Recording playback for PBX Users

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\UserRole;
 use App\Models\CallDetailRecord;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
@@ -24,7 +25,8 @@ final class CallDetailRecordFilterTest extends TestCase
     {
         parent::setUp();
         $this->org = Organization::factory()->create();
-        $this->user = User::factory()->create(['organization_id' => $this->org->id]);
+        // An unrestricted role: PBX Users only see calls from or to their own extensions.
+        $this->user = User::factory()->create(['organization_id' => $this->org->id, 'role' => UserRole::OWNER]);
     }
 
     private function cdr(array $attrs = []): CallDetailRecord

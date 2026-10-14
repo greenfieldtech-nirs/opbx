@@ -14,7 +14,8 @@ paths:
         Streams all matching CDRs as CSV, newest first, as `call-detail-records-YYYY-MM-DD-HHMMSS.csv`.
         Accepts the same filters as the list endpoint (from, to, disposition, direction, user,
         session_token, from_date, to_date); `sort_by`, `sort_order` and pagination are ignored.
-        Any role can export; Supervisors are always limited to the resources they supervise.
+        Any role can export; Supervisors are always limited to the resources they supervise and
+        PBX Users to calls from or to their own extensions.
         Columns: Timestamp, From, To, Call Start Time, Call Answer Time, Call End Time, Domain,
         Session Token, Duration (sec), Billable (sec), Status. Times are `Y-m-d H:i:s`; the call
         times, session token and status come from the raw CDR session.

@@ -34,19 +34,15 @@ class CallDetailRecordPolicy
             return false;
         }
 
-        // Supervisors can only view CDRs for their assigned resources
-        if ($user->isSupervisor()) {
-            $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
+        // Supervisors only view CDRs of their assigned resources, PBX Users only CDRs from or to their own extension(s)
+        $identifiers = app(SupervisorFilterService::class)->callRecordScopeFor($user);
 
-            if (count($identifiers) === 0) {
-                return false;
-            }
-
-            return in_array((string) $callDetailRecord->from, $identifiers, true)
-                || in_array((string) $callDetailRecord->to, $identifiers, true);
+        if ($identifiers === null) {
+            return true;
         }
 
-        return true;
+        return in_array((string) $callDetailRecord->from, $identifiers, true)
+            || in_array((string) $callDetailRecord->to, $identifiers, true);
     }
 
     /**

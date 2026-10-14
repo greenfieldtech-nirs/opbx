@@ -60,8 +60,11 @@ final class CdrRecordingStreamTest extends TestCase
         $org = Organization::factory()->create();
         $user = User::factory()->create(['organization_id' => $org->id, 'role' => $role]);
         Storage::disk('recordings')->put("{$org->id}/cdr/2.mp3", 'abc');
+        // The call is the user's own, so a PBX User may view it (just not play its recording).
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $user->id, 'type' => 'user', 'extension_number' => '7001']);
         $cdr = CallDetailRecord::factory()->create([
             'organization_id' => $org->id,
+            'from' => '7001',
             'recording_status' => 'available',
             'recording_stored_path' => 'cdr/2.mp3',
         ]);

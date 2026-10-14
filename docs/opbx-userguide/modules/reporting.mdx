@@ -37,7 +37,7 @@ Use this page to find:
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Dashboard | Organization | Organization | Organization | Organization | Assigned scope |
 | Live Calls | Yes | Yes | No | Yes, read-only | Assigned scope |
-| Call Logs | Yes | Yes | Yes, read-only | Yes, read-only | Assigned scope, read-only |
+| Call Logs | Yes | Yes | Own calls only, read-only | Yes, read-only | Assigned scope, read-only |
 | Call Logs CSV export (button) | Yes | Yes | No | No | No |
 | Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | No |
 | Auto Dialer Real Time Monitor | Yes | Yes | No | Yes | No |
@@ -45,6 +45,8 @@ Use this page to find:
 | Inbound Blacklist counts | Yes | Yes | No | No | No |
 
 "Assigned scope" means calls to or from the users and ring groups assigned to the Supervisor. See [Supervisors](/opbx/modules/supervisors).
+
+"Own calls only" means calls from or to the PBX User's own extension(s); the server enforces it on the list, single call, statistics and CSV export. See [Call Logs](/opbx/modules/call-logs).
 
 The table shows what each role reaches through the sidebar. Several of these endpoints are readable by more roles through the API; the module pages describe the exact server rules.
 

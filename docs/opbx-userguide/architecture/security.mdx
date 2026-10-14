@@ -82,6 +82,14 @@ CDRs, the supervisor dashboard) restrict results to that set. Supervisors are al
 denied the organization-wide WebSocket channel to prevent event leakage for
 unassigned resources.
 
+### PBX User Call-Record Scope
+
+A PBX User's call records (`/v1/call-detail-records` list, single record, statistics,
+CSV export and recording) are limited by role on the server to calls whose From or
+To is one of their own extension numbers (bare or `+`-prefixed). Another user's call
+returns 403. Owners, PBX Admins and Reporters are unrestricted; API keys follow
+their scopes.
+
 ### Call Coaching Authorization
 
 Live call coaching (spy/whisper/barge) is protected by two independent layers

@@ -8,7 +8,9 @@ paths:
         Paginated, filterable list of the organization's Call Detail Records, newest
         `session_timestamp` first by default. Any role can list; a Supervisor always sees only
         CDRs whose `from` or `to` matches a resource they supervise (none when nothing is
-        assigned). An unknown `sort_by` falls back to `session_timestamp`.
+        assigned), and a PBX User only CDRs whose `from` or `to` is one of their own extension
+        numbers (bare or `+`-prefixed; none without an extension). The server enforces both
+        scopes by role; filters only narrow them. An unknown `sort_by` falls back to `session_timestamp`.
       operationId: listCallDetailRecords
       security:
         - bearerAuth: []
@@ -145,7 +147,8 @@ paths:
       summary: Get Call Detail Record
       description: >-
         Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they
-        supervise. With an organisation API key, `archive=1` looks the CDR up in the warm archive
+        supervise, and a PBX User gets 403 for a CDR not from or to one of their own extensions.
+        A CDR of another organization, or an unknown ID, is 404. With an organisation API key, `archive=1` looks the CDR up in the warm archive
         instead of the live table.
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'

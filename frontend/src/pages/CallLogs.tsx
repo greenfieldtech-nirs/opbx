@@ -239,7 +239,11 @@ export default function CallLogs() {
             <Database className="h-8 w-8" />
             Call Logs
           </h1>
-          <p className="text-muted-foreground mt-1">View call detail records and history</p>
+          <p className="text-muted-foreground mt-1">
+            {isPbxUser
+              ? 'Calls from and to your own extensions'
+              : 'View call detail records and history'}
+          </p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
             <span>/</span>

@@ -86,6 +86,31 @@ final class SupervisorFilterService
     }
 
     /**
+     * Call-record (CDR) scope of a user by role: a Supervisor sees their assigned users/groups and their own
+     * extension, a PBX User only calls from or to their own extension(s); every other role (and API keys) is
+     * unrestricted (null). Live Calls deliberately use scopeFor(), which leaves PBX Users unrestricted.
+     *
+     * @return array<int, string>|null
+     */
+    public function callRecordScopeFor(User|ApiKey $user): ?array
+    {
+        if ($user->isPBXUser()) {
+            $numbers = Extension::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $user->organization_id)
+                ->where('type', ExtensionType::USER)
+                ->where('user_id', $user->id)
+                ->pluck('extension_number')
+                ->filter()
+                ->map(fn ($number) => (string) $number);
+
+            // Same bare and "+"-prefixed forms as resourceIdentifiers().
+            return $numbers->merge($numbers->map(fn ($number) => '+'.$number))->unique(null, true)->values()->all();
+        }
+
+        return $this->scopeFor($user);
+    }
+
+    /**
      * Call queues a Supervisor may read: those where an assigned user, or the supervisor, is an agent.
      *
      * @return array<int, int>
