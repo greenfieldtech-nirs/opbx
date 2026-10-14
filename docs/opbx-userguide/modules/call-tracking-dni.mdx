@@ -17,7 +17,7 @@ DNI has two parts: a public OPBX endpoint that picks the number, and a small scr
 - A [call-tracking campaign](/opbx/modules/call-tracking-campaigns) whose **Source** and **Medium** match your UTM values, with at least one **active** tracking number.
 - Your organization's numeric ID. The API returns it as `organization_id`, for example in `GET /v1/call-tracking-campaigns`.
 - Your website's origin must be allowed to call the OPBX API from the browser. The deployment's CORS configuration (`config/cors.php`) allows only the OPBX front-end and a few fixed origins by default; ask the platform operator to add your site, otherwise the browser blocks the request and the page keeps its default number.
-- To open **Call Tracking → DNI Snippet**, you are the **Owner** or a **PBX Admin**.
+- To find **Call Tracking → DNI Snippet** in the sidebar, you are the **Owner** or a **PBX Admin**.
 
 ## How the number is chosen
 
@@ -43,22 +43,31 @@ The response has `tracking_number` and, when a campaign matched, `campaign_id`, 
 Step 2 can return a number whose campaign is inactive. Calls to it are not routed. Deactivate the tracking numbers of inactive campaigns, or always pass `utm_source` and `utm_medium`.
 :::
 
-## Mark the numbers on your page
+## Workflows
 
-Mark every element that shows your phone number, and keep your normal number as its content so visitors without a match still see it:
+### Mark the phone numbers on your website
+
+**Who can do this:** whoever edits your website; no OPBX role is needed.
+
+1. Find every element that shows your phone number.
+2. Add the `data-ct-phone` attribute to it, and keep your normal number as its content so visitors without a match still see it:
 
 ```html
 <a href="tel:+12025550100" data-ct-phone>+1 202 555 0100</a>
 ```
 
-## Install the snippet from the DNI Snippet page
+### Generate and install the DNI snippet
+
+**Who can do this:** Owner, PBX Admin (the sidebar shows **DNI Snippet** to them only; other roles who open the page's address directly see it with a **Read-Only** badge but can still copy a snippet).
 
 1. Open **Call Tracking → DNI Snippet**.
 2. Check the **API URL**. It defaults to this OPBX server's `…/api/v1/call-tracking-dni/swap`.
-3. Enter the **Default Number** in E.164 form, for example `+12025550100`.
-4. Enter the **Organization ID** (digits only).
-5. Click **Copy**. The button is disabled while the organization ID or the default number is not valid.
+3. Enter the **Default Number** in E.164 form, for example `+12025550100`. A value in another form shows "Default number must be in E.164 format (e.g. +14155551234)."
+4. Enter the **Organization ID**. Anything but digits shows "Organization ID must be numeric."
+5. Click **Copy**. The button shows **Copied** for two seconds; if the browser refuses, the toast "Failed to copy snippet to clipboard" appears. **Copy** is disabled while either field holds an invalid value. An empty field does not disable it, but a snippet without the organization ID never finds a number.
 6. Paste the snippet into every page, before the closing `</body>` tag.
+
+The **JavaScript Snippet** box updates as you type; you can also select its text by hand.
 
 ![DNI Snippet page with the API URL, Default Number +12025550100 and Organization ID filled in, and the generated JavaScript snippet with the Copy button](../img/screens/call-tracking-dni-snippet.jpg)
 
@@ -70,6 +79,20 @@ The generated snippet:
 - leaves the page unchanged if the request fails or returns no number.
 
 It asks the endpoint on every page load.
+
+### Test the number swap
+
+**Who can do this:** anyone; the endpoint needs no login.
+
+1. Open your page with the UTM parameters in the address, for example `https://www.example.com/?utm_source=google&utm_medium=cpc`.
+2. Check the number shown in every marked element.
+3. To test the endpoint directly, open:
+
+```text
+https://opbx.example.com/api/v1/call-tracking-dni/swap?organization_id=1&utm_source=google&utm_medium=cpc&default_number=%2B12025550100
+```
+
+The response shows the `tracking_number` and, when a campaign matched, its `campaign_name`.
 
 ## The hosted script
 
@@ -100,11 +123,7 @@ Differences from the generated snippet:
 
 The demo organization's campaign **Fall Promo - Search Ads** has source `google`, medium `cpc` and the tracking number +1 202 555 0115. A visitor opening `https://www.example.com/?utm_source=google&utm_medium=cpc` sees +1 202 555 0115 in every marked element. A visitor arriving with `utm_source=newsletter&utm_medium=email` sees the **Partner Newsletter** number, +1 202 555 0116.
 
-To test, open your page with the UTM parameters in the address and check the number shown. To test the endpoint directly:
-
-```text
-https://opbx.example.com/api/v1/call-tracking-dni/swap?organization_id=1&utm_source=google&utm_medium=cpc&default_number=%2B12025550100
-```
+To check it, follow [Test the number swap](#test-the-number-swap).
 
 ## Troubleshooting
 
@@ -114,6 +133,7 @@ https://opbx.example.com/api/v1/call-tracking-dni/swap?organization_id=1&utm_sou
 | A number from the wrong campaign shows | `utm_source` or `utm_medium` was missing or did not match, so the organization's first active number was used |
 | Requests fail with 429 | More than 60 requests a minute from one visitor IP |
 | Requests fail with 422 | The organization ID does not exist, or the default number is not E.164 |
+| The default number shows for visitors without `utm_source` | The snippet then sends the referring page address as `utm_source`; an address longer than 100 characters is refused with 422 |
 
 ## Related modules
 
