@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -60,6 +61,8 @@ use Illuminate\Support\Facades\Schema;
 class CallDetailRecord extends Model
 {
     use HasFactory;
+
+    private const ANSWERER_TTL_SECONDS = 86400;
 
     /**
      * The table associated with the model.
@@ -220,7 +223,7 @@ class CallDetailRecord extends Model
             'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
         ];
-        $attributes['extension_number'] = self::extensionNumberFor($organizationId, $subscriber, $from, $attributes['to']);
+        $attributes['extension_number'] = self::extensionNumberFor($organizationId, $subscriber, $from, $attributes['to'], $attributes['session_token']);
 
         // No unique DB index on (organization_id, call_id) by owner decision (D9):
         // dedupe here, serialised per call so concurrent deliveries create one row.
@@ -263,9 +266,10 @@ class CallDetailRecord extends Model
      * The organization's extension a call belongs to, independent of the Caller ID it presented:
      * the subscriber that placed it (CDR `subscriber` = extensions.cloudonix_uuid), else an extension
      * number used as the caller ID (API-initiated calls), else the extension its destination DID routes to
-     * directly (inbound). Null when none applies (e.g. a DID routed to a ring group, IVR or queue).
+     * directly (inbound), else the extension OPBX recorded as answering the call (ring group member, IVR /
+     * business-hours target, queue agent; see recordAnsweringExtension()). Null when none applies.
      */
-    public static function extensionNumberFor(int $organizationId, ?string $subscriber, string $from, string $to): ?string
+    public static function extensionNumberFor(int $organizationId, ?string $subscriber, string $from, string $to, ?string $sessionToken = null): ?string
     {
         $extensions = fn () => Extension::withoutGlobalScope(OrganizationScope::class)->where('organization_id', $organizationId);
 
@@ -282,7 +286,37 @@ class CallDetailRecord extends Model
             $number = $extensionId ? $extensions()->whereKey($extensionId)->value('extension_number') : null;
         }
 
-        return $number === null ? null : (string) $number;
+        $number ??= $sessionToken ? Redis::get(self::answererKey($organizationId, $sessionToken)) : null;
+
+        return $number === null || $number === false ? null : (string) $number;
+    }
+
+    /**
+     * Remember the extension that answered (or, for a single-target dial, was handed) an inbound call, keyed by
+     * the session token its CDR will carry. First answerer wins. A CDR stored before the answer was known
+     * (race) and still unassigned is updated now.
+     */
+    public static function recordAnsweringExtension(int $organizationId, ?string $sessionToken, ?string $extensionNumber): void
+    {
+        if (! $sessionToken || ! $extensionNumber) {
+            return;
+        }
+
+        // Outlives the longest call plus CDR delivery delay; the CDR row is the durable copy.
+        if (! Redis::set(self::answererKey($organizationId, $sessionToken), $extensionNumber, 'EX', self::ANSWERER_TTL_SECONDS, 'NX')) {
+            return;
+        }
+
+        self::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('session_token', $sessionToken)
+            ->whereNull('extension_number')
+            ->update(['extension_number' => $extensionNumber]);
+    }
+
+    private static function answererKey(int $organizationId, string $sessionToken): string
+    {
+        return "cdr:answerer:{$organizationId}:{$sessionToken}";
     }
 
     /**

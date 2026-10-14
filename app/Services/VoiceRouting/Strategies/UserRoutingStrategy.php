@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
+use App\Models\CallDetailRecord;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Services\CallRecording\CallRecordingDecisionService;
@@ -33,6 +34,13 @@ class UserRoutingStrategy implements RoutingStrategy
         if (! $extension->isActive()) {
             return response(CxmlBuilder::unavailable('Extension is not available'), 200, ['Content-Type' => 'application/xml']);
         }
+
+        // A single-target dial (DID, IVR option, business hours, fallbacks): this extension takes the call.
+        CallDetailRecord::recordAnsweringExtension(
+            (int) $request->input('_organization_id'),
+            $request->input('Session') ?: $request->input('CallSid'),
+            (string) $extension->extension_number,
+        );
 
         // Check if this user extension has forwarding configuration
         $config = $extension->configuration ?? [];

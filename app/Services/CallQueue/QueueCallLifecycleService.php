@@ -6,7 +6,9 @@ namespace App\Services\CallQueue;
 
 use App\Enums\QueueCallDisposition;
 use App\Jobs\ReconcileQueueCallDispositionJob;
+use App\Models\CallDetailRecord;
 use App\Models\CallQueue;
+use App\Models\Extension;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
@@ -338,6 +340,18 @@ class QueueCallLifecycleService
                 'disposition' => QueueCallDisposition::ANSWERED,
             ])) {
                 return;
+            }
+
+            // The call belongs to the agent who took it (null for a ring_all <Dial>: the winning leg is unknown).
+            if ($queueCall->agent_user_id !== null) {
+                CallDetailRecord::recordAnsweringExtension(
+                    $queueCall->organization_id,
+                    $queueCall->session_token ?: $queueCall->call_id,
+                    Extension::withoutGlobalScope(OrganizationScope::class)
+                        ->where('organization_id', $queueCall->organization_id)
+                        ->where('user_id', $queueCall->agent_user_id)
+                        ->value('extension_number'),
+                );
             }
 
             $this->worker->event(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting;
 
 use App\Enums\ExtensionType;
+use App\Models\CallDetailRecord;
 use App\Models\DidNumber;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
@@ -76,6 +77,14 @@ class RingGroupRoutingService
             'ring_group_name' => $ringGroup->name,
             'strategy' => $ringGroup->strategy->value,
         ]);
+
+        // A sequential/round-robin member answered: the call belongs to it (simultaneous dials don't report the winner).
+        $dialed = (string) $request->query('dialed_extension', '');
+        if ($dialed !== ''
+            && in_array($request->input('DialCallStatus') ?? $request->input('CallStatus'), ['answered', 'completed'], true)
+            && $ringGroup->getMembers()->contains('extension_number', $dialed)) {
+            CallDetailRecord::recordAnsweringExtension($orgId, $request->input('Session') ?: $callSid, $dialed);
+        }
 
         // Create destination array for the strategy
         $destination = ['ring_group' => $ringGroup];

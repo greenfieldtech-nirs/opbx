@@ -258,6 +258,8 @@ class RingGroupRoutingStrategy implements RoutingStrategy
             'ring_group_id' => $ringGroup->id,
             'attempt_number' => $nextAttempt,
             'rr_start' => $request->input('rr_start'),
+            // The member this <Dial> rings: the callback credits it when the dial was answered.
+            'dialed_extension' => $member->extension_number,
             // Pass necessary context
             'session_data' => json_encode(['ring_group_id' => $ringGroup->id, 'attempt_number' => $nextAttempt]),
         ], false); // Get relative URL
