@@ -90,7 +90,7 @@ The dialog closes, the toast "Blacklist entry created successfully" appears and 
 | Match Type | Yes | Exact Match, Prefix Match or Wildcard Pattern | How the pattern is compared (see [Match types](#match-types)) |
 | Rejection Strategy | Yes | Drop (Silent), Reject (Message) or Torment (Music) | What the blocked caller experiences |
 | Global Blacklist | No | On or off. Default: on | On: the rule applies to every phone number. Off: pick the numbers under **Select Phone Numbers** |
-| Select Phone Numbers | When Global is off | At least one | The phone numbers the rule protects, shown by friendly name or number |
+| Select Phone Numbers | When Global is off | At least one. Saving with none shows "Please select at least one phone number when not using global scope." under the list | The phone numbers the rule protects, shown by friendly name or number |
 
 ![Add Blacklist Entry dialog with pattern +1202555019, Prefix Match, Torment (Music) with the 600-second note, and Global Blacklist off with two phone numbers ticked](../img/screens/inbound-blacklist-create-dialog.jpg)
 
@@ -186,9 +186,9 @@ The blocked-call log and the statistics are available through the API only; the 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/v1/inbound-blacklist` | List (`search`, `match_type`, `rejection_strategy`, `scope` = `global` or `did_specific`, `status`, `per_page` up to 100) |
-| POST | `/v1/inbound-blacklist` | Create |
+| POST | `/v1/inbound-blacklist` | Create. `is_global` defaults to `false`, so a rule without `"is_global": true` needs at least one `did_number_ids` entry (422 otherwise) |
 | GET | `/v1/inbound-blacklist/{id}` | One rule |
-| PUT | `/v1/inbound-blacklist/{id}` | Update |
+| PUT | `/v1/inbound-blacklist/{id}` | Update. A rule that ends up non-global must keep at least one phone number (422 otherwise) |
 | PATCH | `/v1/inbound-blacklist/{id}/toggle-status` | Switch between active and inactive |
 | DELETE | `/v1/inbound-blacklist/{id}` | Delete |
 | GET | `/v1/inbound-blacklist/blocked-logs` | Blocked-call log |

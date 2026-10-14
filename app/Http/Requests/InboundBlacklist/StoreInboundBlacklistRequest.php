@@ -8,9 +8,12 @@ use App\Enums\InboundBlacklistMatchType;
 use App\Enums\InboundBlacklistRejectionStrategy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreInboundBlacklistRequest extends FormRequest
 {
+    public const NUMBERS_REQUIRED = 'Please select at least one phone number when not using global scope.';
+
     public function authorize(): bool
     {
         return true;
@@ -27,11 +30,8 @@ class StoreInboundBlacklistRequest extends FormRequest
             ],
             'match_type' => ['required', Rule::enum(InboundBlacklistMatchType::class)],
             'rejection_strategy' => ['required', Rule::enum(InboundBlacklistRejectionStrategy::class)],
-            'did_number_ids' => [
-                'nullable',
-                'array',
-                'required_if:is_global,false',
-            ],
+            // At least one number when the rule is not global: see after()
+            'did_number_ids' => ['nullable', 'array'],
             'did_number_ids.*' => [
                 'integer',
                 Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id),
@@ -46,8 +46,19 @@ class StoreInboundBlacklistRequest extends FormRequest
     {
         return [
             'caller_id_pattern.regex' => 'The caller ID pattern must be a valid phone number or pattern (digits, +, *, ? only).',
-            'did_number_ids.required_if' => 'Please select at least one phone number when not using global scope.',
         ];
+    }
+
+    /**
+     * A rule that is not global (is_global omitted defaults to false) needs at least one phone number.
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if (! $this->boolean('is_global') && empty($this->input('did_number_ids'))) {
+                $validator->errors()->add('did_number_ids', self::NUMBERS_REQUIRED);
+            }
+        }];
     }
 
     protected function prepareForValidation(): void

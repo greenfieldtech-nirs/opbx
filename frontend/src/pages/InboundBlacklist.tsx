@@ -215,6 +215,12 @@ const InboundBlacklistPage: React.FC = () => {
     e.preventDefault();
     setFormErrors({});
 
+    // Mirrors the server: a rule for specific numbers needs at least one number
+    if (!formData.is_global && formData.did_number_ids.length === 0) {
+      setFormErrors({ did_number_ids: 'Please select at least one phone number when not using global scope.' });
+      return;
+    }
+
     const data: CreateInboundBlacklistRequest = {
       caller_id_pattern: formData.caller_id_pattern,
       match_type: formData.match_type,

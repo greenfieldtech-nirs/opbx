@@ -8,6 +8,7 @@ use App\Enums\InboundBlacklistMatchType;
 use App\Enums\InboundBlacklistRejectionStrategy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class UpdateInboundBlacklistRequest extends FormRequest
 {
@@ -27,11 +28,8 @@ class UpdateInboundBlacklistRequest extends FormRequest
             ],
             'match_type' => ['sometimes', Rule::enum(InboundBlacklistMatchType::class)],
             'rejection_strategy' => ['sometimes', Rule::enum(InboundBlacklistRejectionStrategy::class)],
-            'did_number_ids' => [
-                'nullable',
-                'array',
-                'required_if:is_global,false',
-            ],
+            // At least one number when the rule is not global: see after()
+            'did_number_ids' => ['nullable', 'array'],
             'did_number_ids.*' => [
                 'integer',
                 Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id),
@@ -46,8 +44,25 @@ class UpdateInboundBlacklistRequest extends FormRequest
     {
         return [
             'caller_id_pattern.regex' => 'The caller ID pattern must be a valid phone number or pattern (digits, +, *, ? only).',
-            'did_number_ids.required_if' => 'Please select at least one phone number when not using global scope.',
         ];
+    }
+
+    /**
+     * The resulting rule (sent values, else the stored ones) must be global or have at least one phone number.
+     */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $entry = $this->route('inbound_blacklist');
+            $isGlobal = $this->has('is_global') ? $this->boolean('is_global') : (bool) $entry?->is_global;
+            $hasNumbers = $this->has('did_number_ids')
+                ? ! empty($this->input('did_number_ids'))
+                : (bool) $entry?->didNumbers()->exists();
+
+            if (! $isGlobal && ! $hasNumbers) {
+                $validator->errors()->add('did_number_ids', StoreInboundBlacklistRequest::NUMBERS_REQUIRED);
+            }
+        }];
     }
 
     protected function prepareForValidation(): void

@@ -105,7 +105,11 @@ paths:
                     - array
                     - 'null'
                   description: |
-                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    DIDs the entry applies to. At least one is required whenever the resulting
+                    entry is not global: on create when `is_global` is `false` or omitted; on update
+                    when the entry stays or becomes non-global (the stored DIDs count when the field
+                    is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                    number when not using global scope."
                     Each ID must be a DID of the organization. On update, sending the field
                     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
@@ -205,7 +209,11 @@ paths:
                     - array
                     - 'null'
                   description: |
-                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    DIDs the entry applies to. At least one is required whenever the resulting
+                    entry is not global: on create when `is_global` is `false` or omitted; on update
+                    when the entry stays or becomes non-global (the stored DIDs count when the field
+                    is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                    number when not using global scope."
                     Each ID must be a DID of the organization. On update, sending the field
                     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
@@ -271,7 +279,11 @@ paths:
                     - array
                     - 'null'
                   description: |
-                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    DIDs the entry applies to. At least one is required whenever the resulting
+                    entry is not global: on create when `is_global` is `false` or omitted; on update
+                    when the entry stays or becomes non-global (the stored DIDs count when the field
+                    is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                    number when not using global scope."
                     Each ID must be a DID of the organization. On update, sending the field
                     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
