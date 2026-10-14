@@ -150,7 +150,7 @@ Per-organization credentials, including the webhook key, are stored in `cloudoni
 
 Cloudonix webhook and voice routing routes are intentionally **not rate-limited**: with many organisations Cloudonix sends hundreds of events per second, and throttling them would drop calls and CDRs. They are protected by authentication and idempotency instead.
 
-The values above are in `config/rate_limiting.php`. Other limits are fixed in code: `registration` (10 per hour per IP; `config('rate_limiting.registration')` has no key, so the fallback applies), `call-tracking-dni` (60 per minute per organization and IP), `embed` (60 per minute per token and IP), `dialer-worker` (`DIALER_WORKER_RATE_LIMIT`, default 1000 per minute per IP), the public status page (`throttle:60,1`), and a few routes with inline `throttle:<n>,1` values.
+The values above are in `config/rate_limiting.php`. Other limits are fixed in code: `registration` (10 per hour per IP; `config('rate_limiting.registration')` has no key, so the fallback applies), `embed` (60 per minute per token and IP), `dialer-worker` (`DIALER_WORKER_RATE_LIMIT`, default 1000 per minute per IP), the public status page (`throttle:60,1`), and a few routes with inline `throttle:<n>,1` values.
 
 See [Webhooks](/opbx/architecture/webhooks) for the authentication flow.
 
@@ -362,7 +362,6 @@ Retention periods are set in days (or hours where noted) and enforced by the sch
 | `RETENTION_EMAIL_LOGS_DAYS` | `90` | Email logs |
 | `RETENTION_BLOCKED_CALL_LOGS_DAYS` | `90` | Blocked-call logs |
 | `RETENTION_QUEUE_CALLS_DAYS` | `183` | Call-queue call records (deleted, not archived) |
-| `RETENTION_CALL_TRACKING_SESSIONS_DAYS` | `183` | Call-tracking sessions (deleted) |
 | `RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS` | `183` | Auto-dialer call sessions (deleted) |
 | `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` | `365` | Platform audit log |
 | `PLATFORM_HEALTH_RETENTION_HOURS` | `24` | Platform Status history, in **hours** |
