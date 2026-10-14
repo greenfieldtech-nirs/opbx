@@ -15,10 +15,12 @@ paths:
         - Auto Dialer Campaigns
       summary: Reset CAC counter
       description: |
-        Reset the Concurrent Active Calls (CAC) counter for a campaign.
+        Reset the Concurrent Active Calls (CAC) counter for a campaign to 0, in any status.
+        Owner and PBX Admin only.
 
         Useful when the CAC counter gets stuck due to missed CDR webhooks,
-        preventing new calls from being initiated.
+        preventing new calls from being initiated. (A scheduled job also reconciles the
+        counter every minute.)
       operationId: resetCampaignCac
       security:
         - bearerAuth: []
@@ -41,6 +43,7 @@ paths:
                     example: 1
                   previous_value:
                     type: integer
+                    description: Counter value before the reset (0 when unset)
                     example: 5
                   new_value:
                     type: integer
@@ -52,7 +55,14 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '500':
-          $ref: '../../components/responses/ServerError.yaml'
+          description: The dialer Redis could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: "Failed to reset CAC counter"
+                error: "Connection refused"
 
   /v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle:
     parameters:
@@ -70,10 +80,9 @@ paths:
         - Auto Dialer Campaigns
       summary: Reset caller ID cycle
       description: |
-        Reset the Caller ID cycle for Round-Robin strategies.
-
-        Only applicable when the campaign uses a Round-Robin caller ID
-        strategy. Resets the next index to the start of the pool.
+        Reset the Caller ID cycle position to the start of the pool, so Round Robin starts over
+        from the first Caller ID. Owner and PBX Admin only. The campaign must be `paused`
+        (otherwise 409); the reset is not limited to the Round Robin strategy.
       operationId: resetCampaignCallerIdCycle
       security:
         - bearerAuth: []
@@ -96,6 +105,7 @@ paths:
                     example: 1
                   strategy:
                     type: string
+                    enum: [round_robin, random, least_recently_used]
                     example: "round_robin"
                   next_index:
                     type: integer
@@ -107,8 +117,24 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '409':
-          description: Cannot reset cycle
+          description: The campaign is not paused
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                $ref: '../../components/schemas/ValidationError.yaml'
+              example:
+                message: "Caller ID cycle can only be reset when campaign is PAUSED"
+                errors:
+                  status:
+                  - "Caller ID cycle can only be reset when campaign is PAUSED"
+        '500':
+          description: The dialer Redis could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'
+              example:
+                message: "Failed to reset Caller ID cycle"
+                errors:
+                  status:
+                  - "Failed to reset Caller ID cycle"

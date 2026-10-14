@@ -14,9 +14,10 @@ paths:
       - Auto Dialer Campaigns
       summary: List campaign destinations
       description: >-
-        Paginated destinations of a campaign (per_page defaults to 50). `data` is the raw
-        Laravel paginator: the rows are in `data.data`, with `current_page`, `per_page`,
-        `total`, `last_page` and the page URLs next to them.
+        Paginated destinations from every list assigned to the campaign (per_page defaults to 50,
+        max 100). Owner, PBX Admin and Reporter only. `data` is the raw Laravel paginator: the rows
+        are in `data.data`, with `current_page`, `per_page`, `total`, `last_page` and the page URLs
+        next to them. Rows are the raw destination records (no resource formatting), in database order.
       operationId: listCampaignDestinations
       security:
       - bearerAuth: []
@@ -38,7 +39,7 @@ paths:
           - failed
           - completed
           - invalid
-        description: Filter by destination status
+        description: Filter by destination status (not validated; an unknown value returns no rows)
       responses:
         '200':
           description: List of destinations
@@ -74,14 +75,29 @@ paths:
                             id:
                               type: integer
                               example: 1
+                            organization_id:
+                              type: integer
+                              example: 1
+                            list_id:
+                              type: integer
+                              example: 12
                             phone_number:
                               type: string
                               example: '+14155551212'
-                            description:
+                            name:
                               type:
                               - string
                               - 'null'
-                              example: John Doe - Sales Lead
+                              example: John Doe
+                            batch_identifier:
+                              type:
+                              - string
+                              - 'null'
+                            metadata:
+                              type:
+                              - object
+                              - 'null'
+                              additionalProperties: true
                             status:
                               type: string
                               enum:
@@ -95,16 +111,69 @@ paths:
                             dial_attempts:
                               type: integer
                               example: 0
+                            consecutive_initiate_failures:
+                              type: integer
+                              example: 0
+                            priority:
+                              type: integer
+                              example: 1
+                            last_session_token:
+                              type:
+                              - string
+                              - 'null'
+                            last_call_id:
+                              type:
+                              - string
+                              - 'null'
                             last_dialed_at:
                               type:
                               - string
                               - 'null'
                               format: date-time
                               example: null
+                            next_retry_at:
+                              type:
+                              - string
+                              - 'null'
+                              format: date-time
+                              description: When a busy / no-answer retry is due
+                              example: null
+                            last_disposition:
+                              type:
+                              - string
+                              - 'null'
+                              example: null
+                            duration:
+                              type: integer
+                              description: Seconds, last attempt
+                              example: 0
+                            total_duration:
+                              type: integer
+                              description: Seconds, all attempts
+                              example: 0
+                            billsec:
+                              type: integer
+                              example: 0
+                            last_cdr_id:
+                              type:
+                              - integer
+                              - 'null'
+                            last_error:
+                              type:
+                              - string
+                              - 'null'
                             created_at:
                               type: string
                               format: date-time
                               example: '2024-01-10T08:00:00.000000Z'
+                            updated_at:
+                              type: string
+                              format: date-time
+                              example: '2024-01-10T08:00:00.000000Z'
+                            laravel_through_key:
+                              type: integer
+                              description: Campaign ID (added by the list-to-destination join)
+                              example: 1
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -125,14 +194,11 @@ paths:
       tags:
       - Auto Dialer Campaigns
       summary: Get concurrency information
-      description: 'Get real-time concurrency status for a campaign.
-
+      description: |
+        Get real-time concurrency status for a campaign. Owner, PBX Admin and Reporter only.
 
         Returns current CAC utilization, active sessions,
-
         and rate limit status for real-time monitoring.
-
-        '
       operationId: getCampaignConcurrency
       security:
       - bearerAuth: []
@@ -164,13 +230,11 @@ paths:
                         example: 5
                       utilization_percentage:
                         type: number
-                        format: float
-                        description: CAC utilization percentage
+                        description: active_calls / cac_limit x 100, one decimal
                         example: 50.0
                       api_interval_seconds:
                         type: number
-                        format: float
-                        description: API interval between calls
+                        description: Seconds between call initiations (1 / calls_per_second)
                         example: 1.0
                       active_sessions:
                         type: array
@@ -189,9 +253,12 @@ paths:
                               example: 456
                             phone_number:
                               type: string
+                              description: Destination number, or `unknown`
                               example: '+14155551212'
                             started_at:
-                              type: string
+                              type:
+                              - string
+                              - 'null'
                               format: date-time
                               example: '2024-01-15T14:30:00Z'
                             duration_seconds:
@@ -202,7 +269,7 @@ paths:
                         properties:
                           is_rate_limited:
                             type: boolean
-                            description: Whether campaign is rate limited
+                            description: True when the campaign is paused with pause_reason `cloudonix_rate_limit`
                             example: false
                           pause_reason:
                             type:
@@ -217,7 +284,7 @@ paths:
                             example: null
                           can_resume_now:
                             type: boolean
-                            description: Whether campaign can be resumed
+                            description: True when resumes_at is null or already passed
                             example: true
         '401':
           $ref: ../../components/responses/Unauthorized.yaml

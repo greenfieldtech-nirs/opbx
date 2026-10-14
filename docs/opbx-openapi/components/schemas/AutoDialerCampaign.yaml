@@ -32,7 +32,7 @@ properties:
     example: active
   status_label:
     type: string
-    description: Human-readable status label
+    description: Human-readable status label (Draft, Active, Paused, Completed, Archived)
     example: Active
   auto_start:
     type: boolean
@@ -48,7 +48,7 @@ properties:
     example: ai_assistant
   routing_destination_label:
     type: string
-    description: Human-readable label for routing destination type
+    description: Label of the routing destination type (AI Assistant, AI Load Balancer, Hangup)
     example: AI Assistant
   routing_destination_id:
     type:
@@ -73,7 +73,7 @@ properties:
     example: '+14155551212'
   caller_id_pool_enabled:
     type: boolean
-    description: Whether Caller ID Pooling is enabled
+    description: Whether Caller ID Pooling is enabled (always true for campaigns created through the API)
     example: true
   caller_id_strategy:
     type: string
@@ -85,11 +85,13 @@ properties:
     example: round_robin
   caller_id_strategy_label:
     type: string
-    description: Human-readable label for the strategy
+    description: Human-readable label for the strategy (Round Robin, Random, Least Recently Used)
     example: Round Robin
   caller_id_pool:
     type: array
-    description: Array of Caller IDs in the pool
+    description: |
+      Caller IDs in the pool. Filled by list, get, create and update; the start, pause,
+      resume and archive responses (and the dialer worker endpoints) return an empty array.
     items:
       type: object
       properties:
@@ -111,44 +113,6 @@ properties:
           type: integer
           description: Weight for distribution (default 1)
           example: 1
-  caller_id_stats:
-    type: object
-    description: Statistics for Caller ID usage
-    properties:
-      total_calls:
-        type: integer
-        description: Total calls across all Caller IDs
-        example: 150
-      by_did:
-        type: array
-        description: Breakdown per Caller ID
-        items:
-          type: object
-          properties:
-            did_id:
-              type: integer
-              example: 1
-            phone_number:
-              type: string
-              example: '+12127773456'
-            friendly_name:
-              type:
-              - string
-              - 'null'
-              example: Sales Line 1
-            total_calls:
-              type: integer
-              example: 50
-            completed:
-              type: integer
-              example: 45
-            failed:
-              type: integer
-              example: 5
-            success_rate:
-              type: number
-              format: float
-              example: 90.0
   max_dial_attempts:
     type: integer
     minimum: 1
@@ -176,14 +140,14 @@ properties:
     description: Maximum allowed CPS value
     example: 30
   api_interval_ms:
-    type: integer
+    type: number
     description: API interval in milliseconds (1000 / CPS)
     example: 1000
   days_active:
     type: array
     items:
       type: string
-    description: Days of the week when campaign is active
+    description: Legacy. Days whose `schedule` entry is enabled (derived from `schedule` on create and on any update that sends it)
     example:
     - monday
     - tuesday
@@ -191,12 +155,16 @@ properties:
     - thursday
     - friday
   start_time:
-    type: integer
-    description: Start hour (0-23)
+    type:
+    - integer
+    - 'null'
+    description: Legacy. Hour of the first time range of the first enabled day in `schedule` (9 when there is none)
     example: 9
   end_time:
-    type: integer
-    description: End hour (0-23)
+    type:
+    - integer
+    - 'null'
+    description: Legacy. Hour of the end of that same time range (17 when there is none)
     example: 17
   start_date:
     type: string
@@ -213,8 +181,10 @@ properties:
     description: Timezone for scheduling
     example: America/New_York
   schedule:
-    type: object
-    description: Full schedule configuration with daily time ranges
+    type:
+    - object
+    - 'null'
+    description: Full schedule configuration with daily time ranges (in `timezone`). Calls are placed only while the current time falls inside an enabled day's range; an end_time of 24:00 means 23:59
     properties:
       monday:
         type: object
@@ -331,10 +301,8 @@ properties:
                 end_time:
                   type: string
   time_limit:
-    type:
-    - integer
-    - 'null'
-    description: Maximum call duration in seconds
+    type: integer
+    description: Maximum call duration in seconds (3600 when not set on create)
     example: 300
   record_calls:
     type: boolean
@@ -371,7 +339,7 @@ properties:
     description: Minutes to wait before the FIRST busy / no-answer retry (default 15). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours).
   lists_count:
     type: integer
-    description: Number of distribution lists assigned (0 when not loaded)
+    description: Number of distribution lists assigned. Only the list endpoint counts them; every other response returns 0
   statistics:
     type: object
     description: Campaign statistics
@@ -388,46 +356,45 @@ properties:
         type: integer
         description: Number of failed calls
         example: 50
+      voicemail_calls:
+        type: integer
+        description: Number of calls where the AMD worker detected a voicemail
+        example: 20
       pending_calls:
         type: integer
         description: Number of pending calls
         example: 200
       progress_percentage:
-        type: number
-        format: float
-        description: Campaign progress percentage
-        example: 75.0
+        type: integer
+        description: (completed_calls + failed_calls) / total_destinations x 100, rounded; 0 when total_destinations is 0
+        example: 80
   started_at:
     type:
     - string
     - 'null'
-    format: date-time
-    description: When the campaign started
+    description: When the campaign was last started (`YYYY-MM-DD HH:MM:SS`, UTC)
     example: '2024-01-15 09:00:00'
   completed_at:
     type:
     - string
     - 'null'
-    format: date-time
-    description: When the campaign completed
+    description: When the campaign completed (`YYYY-MM-DD HH:MM:SS`, UTC)
     example: '2024-01-20 17:00:00'
   is_runnable:
     type: boolean
-    description: Whether the campaign can be started
+    description: True when the campaign is `active` and, in its timezone, today is within start_date..end_date and the current time is inside an enabled `schedule` range
     example: true
   has_list:
     type: boolean
-    description: Whether the campaign has a distribution list assigned
+    description: Whether at least one distribution list is assigned to the campaign
     example: true
   created_at:
     type: string
-    format: date-time
-    description: Creation timestamp
+    description: Creation timestamp (`YYYY-MM-DD HH:MM:SS`, UTC)
     example: '2024-01-10 08:00:00'
   updated_at:
     type: string
-    format: date-time
-    description: Last update timestamp
+    description: Last update timestamp (`YYYY-MM-DD HH:MM:SS`, UTC)
     example: '2024-01-15 12:00:00'
 required:
 - id

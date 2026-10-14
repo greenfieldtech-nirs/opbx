@@ -13,12 +13,11 @@ paths:
       tags:
       - Auto Dialer Campaigns
       summary: Get campaign list
-      description: 'Get the distribution list currently assigned to a campaign.
+      description: |
+        Get the distribution list assigned to a campaign. Owner, PBX Admin and Reporter only.
+        When several lists are assigned, one of them is returned.
 
-
-        Returns 404 if no list has been uploaded or assigned.
-
-        '
+        Returns 404 with `{"message": "No list uploaded for this campaign"}` when no list is assigned.
       operationId: getCampaignList
       security:
       - bearerAuth: []
@@ -35,25 +34,58 @@ paths:
                 properties:
                   data:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      id:
+                        type: integer
+                        example: 12
+                      name:
+                        type: string
+                        example: leads.csv
+                      status:
+                        type: string
+                        enum: [draft, pending, processing, ready, failed, in_use, used, archived]
+                        example: in_use
+                      total_rows:
+                        type: integer
+                        example: 120
+                      valid_rows:
+                        type: integer
+                        example: 118
+                      invalid_rows:
+                        type: integer
+                        example: 2
+                      processed_at:
+                        type:
+                        - string
+                        - 'null'
+                        format: date-time
+                        example: '2026-04-10T14:35:00+00:00'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
           $ref: ../../components/responses/Forbidden.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Campaign not found, or no list is assigned to the campaign
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                message: No list uploaded for this campaign
     post:
       tags:
       - Auto Dialer Campaigns
       summary: Upload campaign list
-      description: 'Upload a CSV distribution list directly to a campaign.
+      description: |
+        Upload a CSV distribution list directly to a campaign. Owner and PBX Admin only, and only
+        while the campaign has no list assigned (otherwise 403).
 
-
-        The file must be a valid CSV or TXT file up to 10 MB.
-
-        An optional list name can be provided.
-
-        '
+        The file must be a CSV or TXT file up to 10 MB. The first row is a header and is skipped.
+        Only the first column is read: it must be an E.164 number (`+` then 2-15 digits);
+        other rows count as invalid. Duplicate numbers are removed (and counted as invalid).
+        The file is processed during the request: the list is created with status `ready`, and
+        the campaign's `total_destinations` and `pending_calls` are set to the number of
+        valid rows. The list name defaults to the uploaded file name.
       operationId: uploadCampaignList
       security:
       - bearerAuth: []
@@ -70,13 +102,13 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: CSV/TXT file containing phone numbers and optional descriptions
+                  description: CSV/TXT file (max 10 MB); header row, then one E.164 number in the first column of each row
                 name:
                   type:
                   - string
                   - 'null'
                   maxLength: 255
-                  description: Optional name for the uploaded list
+                  description: List name (defaults to the uploaded file name)
               required:
               - file
       responses:
@@ -92,7 +124,22 @@ paths:
                     example: List uploaded successfully
                   data:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      list_id:
+                        type: integer
+                        example: 12
+                      total_rows:
+                        type: integer
+                        description: Data rows read (header excluded)
+                        example: 120
+                      valid_rows:
+                        type: integer
+                        description: Unique valid numbers stored as destinations
+                        example: 118
+                      invalid_rows:
+                        type: integer
+                        description: Rows with an invalid number plus removed duplicates
+                        example: 2
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -105,9 +152,10 @@ paths:
       tags:
       - Auto Dialer Campaigns
       summary: Delete campaign list
-      description: 'Remove the distribution list currently assigned to a campaign.
-
-        '
+      description: |
+        Delete the distribution list assigned to a campaign, together with its destinations.
+        Owner and PBX Admin only. Refused with 403 while the campaign is `active` or when it has
+        no list.
       operationId: deleteCampaignList
       security:
       - bearerAuth: []
