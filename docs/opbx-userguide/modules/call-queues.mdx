@@ -35,8 +35,8 @@ Before you create a queue, prepare these:
 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See **Call Queues** in the sidebar | Yes | Yes | No | Yes | Yes |
-| View queues, the detail page and statistics | Yes | Yes | Yes (API) | Yes | Only queues where their assigned users are agents |
+| See **Call Queues** in the sidebar | Yes | Yes | No | Yes | Yes (opening it shows **Access denied**) |
+| View queues, the detail page and statistics | Yes | Yes | Yes (API) | Yes | API only, read-only, for queues where their assigned users (or they) are agents |
 | Create, edit, delete, activate or deactivate a queue | Yes | Yes | No | No | No |
 | Log any agent in or out (detail page **Agents** tab) | Yes | Yes | No | No | No |
 | Change your own agent state (header **Queues** menu or `*45`) | If an agent | If an agent | If an agent | If an agent | If an agent |
@@ -174,7 +174,7 @@ To add or remove agents, edit the queue.
 
 ### Watch a queue live
 
-**Who can do this:** Owner, PBX Admin, Reporter; Supervisors for queues of their assigned users.
+**Who can do this:** Owner, PBX Admin, Reporter.
 
 1. On **Call Queues**, click the queue's row.
 2. The **Live** tab shows **Waiting Callers**, **Available Agents**, **Handled (60m)** and **Abandoned (60m)**, and a table of waiting callers with position, wait time, average wait (24h), caller ID, destination and call start. It refreshes every 5 seconds.
@@ -183,7 +183,7 @@ To add or remove agents, edit the queue.
 
 ### View queue statistics
 
-**Who can do this:** Owner, PBX Admin, Reporter; Supervisors for queues of their assigned users.
+**Who can do this:** Owner, PBX Admin, Reporter.
 
 1. Open the queue's detail page and the **Statistics** tab.
 2. Read **Waiting Time (answered calls)** and **Handling Time (answered calls)** (Min, Max, Average, Std Dev) and **Totals (last 24 hours)**: Handled, Abandoned and Overflowed.
@@ -306,4 +306,4 @@ Common causes of "nobody gets the call":
 - [IVR Menus](/opbx/modules/ivr-menus) — route callers into a queue from a menu option
 - [Phone Numbers](/opbx/modules/phone-numbers) — route a number directly to a queue
 - [Recordings](/opbx/modules/recordings) — hold music
-- [Supervisors](/opbx/modules/supervisors) — supervisors can read the queues where their assigned users are agents
+- [Supervisors](/opbx/modules/supervisors) — supervisors have no Call Queues pages; through the API they can read the queues where their assigned users are agents
