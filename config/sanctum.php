@@ -1,5 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
 use Laravel\Sanctum\Sanctum;
 
 return [
@@ -46,11 +51,13 @@ return [
     | "expires_at" attribute, but first-party sessions are not affected.
     |
     | Disabled: every token OPBX issues carries its own "expires_at" (24 hours,
-    | or 30 days for a "Remember me" login), so no global cap is applied.
+    | or 30 days for a "Remember me" login). The global cap equals the longest
+    | lifetime, so a token created without its own expiry (e.g. one issued before
+    | per-token expiry existed) still expires.
     |
     */
 
-    'expiration' => null,
+    'expiration' => 60 * 24 * 30,
 
     /*
     |--------------------------------------------------------------------------
@@ -79,9 +86,9 @@ return [
     */
 
     'middleware' => [
-        'authenticate_session' => Laravel\Sanctum\Http\Middleware\AuthenticateSession::class,
-        'encrypt_cookies' => Illuminate\Cookie\Middleware\EncryptCookies::class,
-        'validate_csrf_token' => Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        'authenticate_session' => AuthenticateSession::class,
+        'encrypt_cookies' => EncryptCookies::class,
+        'validate_csrf_token' => ValidateCsrfToken::class,
     ],
 
 ];
