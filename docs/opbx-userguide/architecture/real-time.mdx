@@ -141,7 +141,7 @@ Laravel's broadcasting auth route is registered inside the `v1` group of `routes
 Broadcast::routes(['middleware' => ['auth:sanctum', 'tenant.scope']]);
 ```
 
-To subscribe to a private or presence channel, the client must first authenticate. The Echo client posts the auth request to `/api/v1/broadcasting/auth`, where Sanctum validates the session or Bearer token and `EnsureTenantScope` validates the organization.
+To subscribe to a private or presence channel, the client must first authenticate. The Echo client posts the auth request to `/api/v1/broadcasting/auth`, where Sanctum validates the Bearer token and `EnsureTenantScope` validates the organization.
 
 ---
 

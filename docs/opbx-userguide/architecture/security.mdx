@@ -16,36 +16,15 @@ For the complete webhook authentication reference, see [`docs/WEBHOOK-AUTHENTICA
 
 ## Authentication
 
-OPBX uses Laravel Sanctum with dual authentication modes. Two more principals exist: [API keys](/opbx/data-models/models/api-access#apikey) (`opbxk_` Bearer tokens, resolved by `ResolveApiKey` before `auth:sanctum` and limited by `EnforceApiKeyScope` to their per-resource permissions) and embed tokens (`opbxd_`, resolved by `ResolveEmbedToken` for the embeddable dialer).
+OPBX uses Laravel Sanctum Bearer tokens. The React web app and API clients authenticate the same way, with `Authorization: Bearer <token>`; the API routes do not use session cookies. Two more principals exist: [API keys](/opbx/data-models/models/api-access#apikey) (`opbxk_` Bearer tokens, resolved by `ResolveApiKey` before `auth:sanctum` and limited by `EnforceApiKeyScope` to their per-resource permissions) and embed tokens (`opbxd_`, resolved by `ResolveEmbedToken` for the embeddable dialer).
 
-### Cookie-Based SPA Authentication
+### Bearer Token Authentication
 
-- Used by the React SPA.
-- Requires a CSRF cookie from `/api/sanctum/csrf-cookie` before login (`web` middleware, `throttle:60,1`).
-- Login creates an `httpOnly` session cookie.
-- CSRF protection is enforced by Sanctum's web guard.
-- Stateless on the SPA side; the browser sends the session cookie automatically.
-
-### Token-Based API Authentication
-
-- Used by API clients, scripts, and third-party integrations.
-- Login returns a Bearer token if the request does not trigger cookie mode.
+- Used by the React web app, API clients, scripts and third-party integrations.
+- `POST /api/v1/auth/login` returns a Bearer token; the web app stores it and sends it on every request.
 - Tokens are role-scoped with Sanctum abilities instead of wildcard `*`.
 - Tokens expire after 24 hours (`SANCTUM_EXPIRATION=1440`).
 - `POST /api/v1/auth/refresh` revokes the current token and issues a new one.
-
-### How Auth Mode Is Selected
-
-`AuthController::shouldUseCookieAuth()` selects cookie mode when:
-
-- The `X-Auth-Mode: cookie` header is present, **or**
-- The request includes `X-Requested-With` (typical AJAX/SPA request).
-
-Token mode is selected when:
-
-- A Bearer token is already present (logout/refresh), **or**
-- `X-Auth-Mode: token` is present, **or**
-- Neither cookie indicator is present (default).
 
 ### Role-Scoped Token Abilities
 
@@ -67,7 +46,7 @@ Platform managers get `platform:read`, `platform:write`, `platform:manage-users`
 
 Authorization combines three layers:
 
-1. **Authentication** — Sanctum cookie or Bearer token.
+1. **Authentication** — Sanctum Bearer token (or an API key / embed token where allowed).
 2. **Tenant scope** — `EnsureTenantScope` ensures the user belongs to an active organization.
 3. **Policies** — Eloquent policies enforce role-based permissions on resources.
 
@@ -204,14 +183,7 @@ Recordings and IVR audio files stored in SeaweedFS (S3 API) are not served direc
 
 ## CSRF Protection
 
-CSRF protection applies to cookie-based SPA authentication:
-
-- The SPA calls `/api/sanctum/csrf-cookie` before login.
-- Laravel sets the CSRF cookie and session token.
-- Subsequent requests include the CSRF token in the `X-XSRF-TOKEN` header or `_token` field.
-- Sanctum validates the token against the session.
-
-Token-based clients are not affected by CSRF because they authenticate with a Bearer token in the `Authorization` header.
+CSRF does not apply: every client, including the web app, authenticates with a Bearer token in the `Authorization` header, which a browser never attaches on its own. `/api/sanctum/csrf-cookie` exists as a Laravel Sanctum framework route, but the API does not need it.
 
 ---
 
@@ -302,7 +274,7 @@ For production deployments:
 - Rotate `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` and `ACD_WORKER_API_TOKEN` regularly.
 - Configure `domain_requests_api_key` per organization in Settings → Cloudonix.
 - Do not expose MySQL, Redis, or SeaweedFS ports publicly. Never use `docker-compose.ports.yml` in production.
-- Run HTTPS in production so Sanctum cookies and HSTS are effective.
+- Run HTTPS in production so Bearer tokens are never sent in clear text and HSTS is effective.
 - Keep `APP_DEBUG=false` in production.
 - Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domains.
 

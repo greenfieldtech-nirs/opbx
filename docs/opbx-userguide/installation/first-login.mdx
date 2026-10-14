@@ -91,14 +91,9 @@ When reCAPTCHA is enabled (`RECAPTCHA_ENABLED=true`), the form is also checked w
 Use a strong, unique password for the admin account. This account has full access to your organization.
 :::
 
-## Authentication Modes
+## Authentication
 
-OPBX supports dual-mode authentication via Laravel Sanctum:
-
-| Mode | Best For | Behavior |
-|------|----------|----------|
-| Bearer token | API clients, SPA default | Returns `access_token` in JSON; store in localStorage |
-| Cookie | Browser SPA sessions | Uses Sanctum cookie/session auth |
+OPBX authenticates with Laravel Sanctum Bearer tokens, for the web app and API clients alike. Login returns an `access_token` in JSON, valid for 24 hours; the API does not use session cookies.
 
 The frontend (`AuthContext`) stores the token in `localStorage` as `opbx_token` and attaches it to every API request via an Axios interceptor.
 
