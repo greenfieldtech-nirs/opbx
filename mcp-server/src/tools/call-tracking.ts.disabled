@@ -1,5 +1,6 @@
 // DISABLED (owner 2026-10-14): call tracking is under development, so these tools are not
-// registered — src/tools/index.ts does not import this file. Re-enable by importing it there.
+// registered: the file is renamed to .ts.disabled so it is not compiled. Re-enable by renaming it
+// back to call-tracking.ts, importing it in src/tools/index.ts and regenerating the OpenAPI types.
 import { defineListTool, defineGetTool, defineRawReadTool } from "./factory.js";
 import { z } from "zod";
 
