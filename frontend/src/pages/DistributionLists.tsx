@@ -6,7 +6,6 @@ import {
   Search,
   MoreVertical,
   Download,
-  Upload,
   Copy,
   Archive,
   FileSpreadsheet,
@@ -55,7 +54,6 @@ import { DistributionListsEmpty } from './DistributionLists/components/Distribut
 import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
-import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
@@ -87,7 +85,6 @@ export default function DistributionLists() {
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
   const [archiveList, setArchiveList] = useState<AutoDialerList | null>(null);
   const [deleteList, setDeleteList] = useState<AutoDialerList | null>(null);
-  const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
   const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
@@ -157,19 +154,6 @@ export default function DistributionLists() {
       if (showIfInUse(err)) return;
       toast.error('Failed to delete list');
     }
-  };
-
-  const handleUploadSuccess = () => {
-    // Force immediate refetch of the list to show updated status after upload
-    queryClient.invalidateQueries({
-      queryKey: distributionListKeys.all,
-      refetchType: 'all',
-    });
-    // Also force a direct refetch to ensure the UI updates immediately
-    queryClient.refetchQueries({
-      queryKey: distributionListKeys.all,
-      type: 'active',
-    });
   };
 
   if (isLoading) {
@@ -395,15 +379,6 @@ export default function DistributionLists() {
                             }}>
                               View Details
                             </DropdownMenuItem>
-                            {list.can_upload && canManage && (
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                setUploadList(list);
-                              }}>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Destinations
-                              </DropdownMenuItem>
-                            )}
                             {list.can_copy && canManage && (
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();
@@ -510,18 +485,6 @@ export default function DistributionLists() {
           onOpenChange={() => setArchiveList(null)}
           onConfirm={handleArchive}
           isArchiving={archiveMutation.isPending}
-        />
-      )}
-
-      {uploadList && (
-        <UnifiedUploadDialog
-          list={uploadList}
-          open={!!uploadList}
-          onOpenChange={() => setUploadList(null)}
-          onSuccess={() => {
-            handleUploadSuccess();
-            // Same list is updated, no navigation needed
-          }}
         />
       )}
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ export function CreateListDialog({ open, onOpenChange }: CreateListDialogProps) 
   const [description, setDescription] = useState('');
 
   const createMutation = useCreateList();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +35,13 @@ export function CreateListDialog({ open, onOpenChange }: CreateListDialogProps) 
     }
 
     try {
-      await createMutation.mutateAsync({ name, description });
+      const created = await createMutation.mutateAsync({ name, description });
       toast.success('List created successfully');
       setName('');
       setDescription('');
       onOpenChange(false);
+      // Uploading into a list happens on its detail page (its Upload button), so open it.
+      navigate(`/ui/auto-dialer/distribution-lists/${created.data.id}`);
     } catch {
       toast.error('Failed to create list');
     }

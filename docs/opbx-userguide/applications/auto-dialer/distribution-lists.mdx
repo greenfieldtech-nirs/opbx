@@ -34,7 +34,7 @@ Open **Auto Dialer → Distribution Lists**. Each row shows the **Name**, **Stat
 - **Example CSV** downloads a sample file (`distribution_list_example.csv`).
 - **Create List** opens the create dialog.
 - Clicking a row opens the [list detail page](#the-list-detail-page).
-- The row menu (⋮) offers **View Details**, **Upload Destinations**, **Copy List**, **View Errors**, **Delete** and **Archive**, each only when the list's status and your role allow it (see [List statuses](#list-statuses)). For a list assigned to a campaign it shows a disabled **Archive (unassign first)**.
+- The row menu (⋮) offers **View Details**, **Copy List**, **View Errors**, **Delete** and **Archive**, each only when the list's status and your role allow it (see [List statuses](#list-statuses)). For a list assigned to a campaign it shows a disabled **Archive (unassign first)**. Numbers are uploaded only from the [list detail page](#the-list-detail-page), with its **Upload** button, not from the row menu.
 
 A Reporter sees the page and **Example CSV**, but not **Create List**, **Assign Campaign** or the change actions in the row menu.
 
@@ -45,8 +45,8 @@ A Reporter sees the page and **Example CSV**, but not **Create List**, **Assign 
 Who can do this: Owner and PBX Admin.
 
 1. Open **Auto Dialer → Distribution Lists** and click **Create List**.
-2. In the **Create Distribution List** dialog, enter a **Name** (required, up to 255 characters, for example "Sales Leads Q1") and an optional **Description** (up to 1000 characters). Click **Create List**. The toast "List created successfully" appears and the list is added as **Draft**.
-3. Open the list's row menu (⋮) and choose **Upload Destinations**.
+2. In the **Create Distribution List** dialog, enter a **Name** (required, up to 255 characters, for example "Sales Leads Q1") and an optional **Description** (up to 1000 characters). Click **Create List**. The toast "List created successfully" appears, the list is added as **Draft** and its detail page opens.
+3. On the list's detail page, click **Upload**. The **Upload Destinations** dialog opens. (To upload into a list later, click its row to open the detail page, then **Upload**.)
 4. Click **Click to select a CSV file** and choose the file (`.csv`, up to 50 MB). Leave **File has a header row** ticked if the first row holds column names.
 5. Click **Continue to Mapping**. The dialog shows how many rows were detected and guesses the columns whose names contain "phone", "name" and "batch".
 6. Check the mapping:
@@ -105,7 +105,7 @@ Who can do this: Owner and PBX Admin.
 
 Result: the toast "Version *n+1* created. The previous entries are in Version History. Processing..." appears; when processing ends the dialog shows "Version *n+1* created and uploaded successfully!" and the page shows the toast "Upload completed successfully". The new file is processed into the same list with its version number increased by one. The numbers it replaces are kept, exactly as they were at that moment (status, dial attempts, last result), as a [previous version](#previous-versions) you can browse and download for 30 days.
 
-On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers like **Upload Destinations**. On a Processing, In Use or Archived list the **Upload** button is not shown.
+On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers as described in [Create a list and upload numbers](#create-a-list-and-upload-numbers). On a Processing, In Use or Archived list the **Upload** button is not shown.
 
 ## Assign a list to a campaign
 
@@ -181,7 +181,7 @@ Who can do this: Owner, PBX Admin and Reporter.
 
 1. On a **Failed** list's row, open the row menu (⋮) and choose **View Errors**.
 
-Result: the **Validation Errors** dialog lists each rejected row with its row number, phone number and error, and the total. **Download CSV** saves them as *name*`_validation_errors.csv`; **Close** closes the dialog. Fix the file and upload it again with **Upload Destinations**, or delete the list.
+Result: the **Validation Errors** dialog lists each rejected row with its row number, phone number and error, and the total. **Download CSV** saves them as *name*`_validation_errors.csv`; **Close** closes the dialog. Fix the file and upload it again with **Upload** on the list's detail page, or delete the list.
 
 ## Previous versions
 
