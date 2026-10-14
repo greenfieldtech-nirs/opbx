@@ -83,14 +83,14 @@ If the agent hangs up after the caller has joined, the call ends.
 4. Set **Agent Ring Timeout**, **Max Wait** and **Wrap-up**.
 5. Optionally choose **Hold Music (MOH)**, switch on **Announce Position** (then pick the interval and language) and **Immediate Connect**. For Ring All, **Ring Agents in Separate Calls** is already on; switch it off only if you need it.
 6. Under **Agents**, pick each agent from **Add an agent (user with extension)…**. Each one appears as a chip; click **×** on a chip to remove it.
-7. Under **Overflow Fallback**, choose the type and the destination. While no type is chosen, the destination reads "Call will end": an overflowing caller is hung up. For **Call Queue**, pick the target queue in the destination list.
+7. Under **Overflow Fallback**, choose the type and the destination. The type starts as **Hang Up**, and the destination reads "Call will end": an overflowing caller is hung up. For **Call Queue**, pick the target queue in the destination list.
 8. Click **Create Queue**. The button stays disabled until the queue has a name and at least one agent.
 
 The toast "Call queue created" appears and the queue is listed as **Active**. It becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Join a queue as an agent](#join-a-queue-as-an-agent)).
 
 ![Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the filter bar with search, refresh, All Strategies, All Status and Unprovisioned](../img/screens/call-queues-list.jpg)
 
-![New Call Queue dialog showing the timeouts, hold music, the option switches with Ring Agents in Separate Calls on, agents and the overflow fallback with no type and Call will end](../img/screens/call-queues-create-dialog.jpg)
+![New Call Queue dialog showing hold music, the option switches with Ring Agents in Separate Calls on, agents and the Overflow Fallback type list open with Hang Up selected and the destination Call will end](../img/screens/call-queues-create-dialog.jpg)
 
 ### Edit a call queue
 
@@ -166,7 +166,7 @@ To pause, click **Wrap-up**: you stay in Wrap-up, without new offers, until you 
 
 **Who can do this:** any user who is an agent of the queue, calling from their own extension.
 
-1. Find the queue's login code in the **Agent Login** column of the **Call Queues** list, for example `*457` for queue 7.
+1. Find the queue's login code in the **Agent Login** column of the **Call Queues** list, for example `*459` for queue 9.
 2. From your own extension, dial that code.
 
 The code toggles your state: Logged Out becomes Available, any other state becomes Logged Out. A voice confirms "You are now logged in to queue *name*." or "You have logged out of queue *name*." A call from a phone that is not your extension, or for an inactive queue, only plays a short message.
