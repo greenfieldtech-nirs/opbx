@@ -1,0 +1,192 @@
+---
+sidebar_position: 21
+slug: /data-models/models/business-hours
+sidebar_class_name: cxGuidesSidebar
+title: "Business Hours"
+---
+
+# Business Hours
+
+Business hours schedules and their days, time ranges and exceptions.
+
+## BusinessHoursSchedule
+
+A business hours schedule: weekly open hours, date exceptions, and where calls go when open and when closed.
+
+**Table:** `business_hours_schedules`  
+**Model:** `App\Models\BusinessHoursSchedule`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`, `SoftDeletes`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Schedule name |
+| `status` | enum | No | `active` | Active or inactive. An inactive schedule is never open. Values: `active`, `inactive` (cast to `BusinessHoursStatus`) |
+| `timezone` | varchar(50) | No | `UTC` | Time zone the hours are evaluated in |
+| `open_hours_action` | varchar(255) | No | - | Open-hours target, JSON such as `{"target_id": "ext-12"}` |
+| `open_hours_action_type` | enum | No | `extension` | Open-hours destination kind. Values: `extension`, `ring_group`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `unavailable`, `call_queue` (cast to `BusinessHoursActionType`) |
+| `closed_hours_action` | varchar(255) | No | - | Closed-hours target, same format |
+| `closed_hours_action_type` | enum | No | `extension` | Closed-hours destination kind. Values: `extension`, `ring_group`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `unavailable`, `call_queue` (cast to `BusinessHoursActionType`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `deleted_at` | timestamp | Yes | null | Soft-delete timestamp |
+
+**Indexes**
+
+- `bh_schedules_deleted_idx`: `deleted_at`
+- `bh_schedules_org_status_idx`: `organization_id`, `status`
+
+**Casts:** `open_hours_action` (json), `closed_hours_action` (json)  
+
+**Relationships**
+
+```php
+$businessHoursSchedule->organization() → Organization (organization_id) [BelongsTo]
+$businessHoursSchedule->scheduleDays() → BusinessHoursScheduleDay (business_hours_schedule_id) [HasMany]
+$businessHoursSchedule->exceptions() → BusinessHoursException (business_hours_schedule_id) [HasMany]
+```
+
+**Scopes:** `forOrganization()`, `withStatus()`, `search()`, `active()`, `unprovisioned()`  
+**Methods:** `isActive()`, `isInactive()`, `getCurrentStatusAttribute()`, `isCurrentlyOpen()`, `getExceptionForDate()`, `getCurrentRouting()`, `parseTargetId()` (static), `isValidTargetId()` (static), `getOpenHoursActionType()`, `getClosedHoursActionType()`, `getOpenHoursTargetId()`, `getClosedHoursTargetId()`, `getCurrentRoutingType()`, `getCurrentRoutingTargetId()`  
+
+`isCurrentlyOpen()` converts the time to the schedule's `timezone`, checks the exception for that date first, then the enabled day's time ranges (start inclusive, end exclusive). `getCurrentRouting()` returns the open or closed action. Target IDs use the prefixes `ext-`, `rg-`, `conf-`, `ivr-` and `queue-` (`parseTargetId()`). `unprovisioned()` is true when either action type is `unavailable`.
+
+## BusinessHoursScheduleDay
+
+One weekday of a schedule.
+
+**Table:** `business_hours_schedule_days`  
+**Model:** `App\Models\BusinessHoursScheduleDay`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `business_hours_schedule_id` | bigint unsigned | No | - | Schedule. Foreign key to `business_hours_schedules`, on delete cascade |
+| `day_of_week` | enum | No | - | Weekday. Values: `monday`, `tuesday`, `wednesday`, `thursday`, `friday`, `saturday`, `sunday` (cast to `DayOfWeek`) |
+| `enabled` | boolean | No | `false` | Open on this day |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `bh_schedule_days_schedule_idx`: `business_hours_schedule_id`
+- `bh_schedule_days_unique` (unique): `business_hours_schedule_id`, `day_of_week`
+
+
+**Relationships**
+
+```php
+$businessHoursScheduleDay->schedule() → BusinessHoursSchedule (business_hours_schedule_id) [BelongsTo]
+$businessHoursScheduleDay->timeRanges() → BusinessHoursTimeRange (business_hours_schedule_day_id) [HasMany]
+```
+
+**Methods:** `isEnabled()`  
+
+## BusinessHoursTimeRange
+
+An open period on a weekday.
+
+**Table:** `business_hours_time_ranges`  
+**Model:** `App\Models\BusinessHoursTimeRange`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `business_hours_schedule_day_id` | bigint unsigned | No | - | Weekday row. Foreign key to `business_hours_schedule_days`, on delete cascade |
+| `start_time` | time | No | - | Opens at |
+| `end_time` | time | No | - | Closes at |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `bh_time_ranges_day_idx`: `business_hours_schedule_day_id`
+
+
+**Relationships**
+
+```php
+$businessHoursTimeRange->scheduleDay() → BusinessHoursScheduleDay (business_hours_schedule_day_id) [BelongsTo]
+```
+
+**Methods:** `includes()`  
+
+## BusinessHoursException
+
+A date that overrides the weekly hours (a holiday or special hours).
+
+**Table:** `business_hours_exceptions`  
+**Model:** `App\Models\BusinessHoursException`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `business_hours_schedule_id` | bigint unsigned | No | - | Schedule. Foreign key to `business_hours_schedules`, on delete cascade |
+| `date` | date | No | - | Date |
+| `name` | varchar(255) | No | - | Label |
+| `type` | enum | No | `closed` | Closed all day, or special hours. Values: `closed`, `special_hours` (cast to `BusinessHoursExceptionType`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `bh_exceptions_date_idx`: `date`
+- `bh_exceptions_schedule_idx`: `business_hours_schedule_id`
+
+**Casts:** `date` (date)  
+
+**Relationships**
+
+```php
+$businessHoursException->schedule() → BusinessHoursSchedule (business_hours_schedule_id) [BelongsTo]
+$businessHoursException->timeRanges() → BusinessHoursExceptionTimeRange (business_hours_exception_id) [HasMany]
+```
+
+**Methods:** `isClosed()`, `isSpecialHours()`, `isOpen()`  
+
+## BusinessHoursExceptionTimeRange
+
+An open period on a special-hours exception date.
+
+**Table:** `business_hours_exception_time_ranges`  
+**Model:** `App\Models\BusinessHoursExceptionTimeRange`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `business_hours_exception_id` | bigint unsigned | No | - | Exception. Foreign key to `business_hours_exceptions`, on delete cascade |
+| `start_time` | time | No | - | Opens at |
+| `end_time` | time | No | - | Closes at |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `bh_exception_time_ranges_idx`: `business_hours_exception_id`
+
+
+**Relationships**
+
+```php
+$businessHoursExceptionTimeRange->exception() → BusinessHoursException (business_hours_exception_id) [BelongsTo]
+```
+
+**Methods:** `includes()`  
+
+## BusinessHours (legacy)
+
+Legacy model on the same `business_hours_schedules` table. Its `$fillable` and casts name columns that no longer exist (`schedules`, `holidays`, `open_hours_routing`, `closed_hours_routing`). The only current use is the IVR request, which checks that a `business_hours` destination ID exists in the organization. Use `BusinessHoursSchedule`.
+
+**Table:** `business_hours_schedules`  
+**Model:** `App\Models\BusinessHours`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+## Related Documentation
+
+- [Business Hours](/opbx/modules/business-hours)

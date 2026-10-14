@@ -1,0 +1,162 @@
+---
+sidebar_position: 22
+slug: /data-models/models/call-queues
+sidebar_class_name: cxGuidesSidebar
+title: "Call Queues"
+---
+
+# Call Queues
+
+Call queues, their agents, and per-call queue records.
+
+## CallQueue
+
+A call queue. Live state (waiting callers, agent states) is kept by the [ACD worker](/opbx/workers/acd-worker) in Redis, not in MySQL.
+
+**Table:** `call_queues`  
+**Model:** `App\Models\CallQueue`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Queue name |
+| `description` | varchar(255) | Yes | null | Description |
+| `strategy` | enum | No | `ring_all` | How agents are offered calls. Values: `ring_all`, `round_robin`, `least_talk_time`, `fewest_calls` (cast to `CallQueueStrategy`) |
+| `agent_ring_timeout` | smallint unsigned | No | `20` | Seconds an agent rings |
+| `max_wait_seconds` | smallint unsigned | No | `300` | Longest wait before the fallback (overflow) |
+| `wrap_up_seconds` | smallint unsigned | No | `15` | Agent wrap-up time after a call |
+| `announce_position` | boolean | No | `false` | Announce the caller's position |
+| `announce_position_timeout` | smallint unsigned | No | `60` | Seconds between position announcements |
+| `announce_position_language` | varchar(20) | Yes | null | Language of the announcements |
+| `immediate_connect` | boolean | No | `false` | When an agent becomes available, connect the first waiting caller at once instead of waiting for the next poll |
+| `conference_ring_all` | boolean | No | `false` | With the `ring_all` strategy, offer the call to the agents as per-agent conference sessions |
+| `moh_recording_id` | bigint unsigned | Yes | null | Music-on-hold recording. Foreign key to `recordings`, on delete set null |
+| `fallback_action` | enum | No | `hangup` | Where the call goes when the queue gives up. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `unavailable` (cast to `RingGroupFallbackAction`) |
+| `fallback_extension_id` | bigint unsigned | Yes | null | Fallback extension. Foreign key to `extensions`, on delete set null |
+| `fallback_ring_group_id` | bigint unsigned | Yes | null | Fallback ring group. Foreign key to `ring_groups`, on delete set null |
+| `fallback_ivr_menu_id` | bigint unsigned | Yes | null | Fallback IVR menu. Foreign key to `ivr_menus`, on delete set null |
+| `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant. Foreign key to `ai_assistants`, on delete set null |
+| `fallback_ai_load_balancer_id` | bigint unsigned | Yes | null | Fallback AI load balancer. Foreign key to `ai_assistant_load_balancers`, on delete set null |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `CallQueueStatus`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `call_queues_fallback_ai_assistant_id_foreign`: `fallback_ai_assistant_id`
+- `call_queues_fallback_ai_load_balancer_id_foreign`: `fallback_ai_load_balancer_id`
+- `call_queues_fallback_extension_id_foreign`: `fallback_extension_id`
+- `call_queues_fallback_ivr_menu_id_foreign`: `fallback_ivr_menu_id`
+- `call_queues_fallback_ring_group_id_foreign`: `fallback_ring_group_id`
+- `call_queues_moh_recording_id_foreign`: `moh_recording_id`
+- `cq_org_status_idx`: `organization_id`, `status`
+
+
+**Relationships**
+
+```php
+$callQueue->organization() → Organization (organization_id) [BelongsTo]
+$callQueue->agentRecords() → CallQueueAgent (call_queue_id) [HasMany]
+$callQueue->agents() → User (pivot call_queue_agents) [BelongsToMany]
+$callQueue->mohRecording() → Recording (moh_recording_id) [BelongsTo]
+$callQueue->fallbackExtension() → Extension (fallback_extension_id) [BelongsTo]
+$callQueue->fallbackRingGroup() → RingGroup (fallback_ring_group_id) [BelongsTo]
+$callQueue->fallbackIvrMenu() → IvrMenu (fallback_ivr_menu_id) [BelongsTo]
+$callQueue->fallbackAiAssistant() → AiAssistant (fallback_ai_assistant_id) [BelongsTo]
+$callQueue->fallbackAiLoadBalancer() → AiAssistantLoadBalancer (fallback_ai_load_balancer_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `withStrategy()`, `withStatus()`, `active()`, `search()`, `unprovisioned()`  
+**Methods:** `isActive()`  
+
+`fallback_action` is cast to `RingGroupFallbackAction`, but the column has no `call_queue` value: a queue cannot overflow to a queue. `unprovisioned()` is true when `fallback_action` is `unavailable`.
+
+## CallQueueAgent
+
+Membership of a user (agent) in a queue.
+
+**Table:** `call_queue_agents`  
+**Model:** `App\Models\CallQueueAgent`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `call_queue_id` | bigint unsigned | No | - | Queue. Foreign key to `call_queues`, on delete cascade |
+| `user_id` | bigint unsigned | No | - | Agent. Foreign key to `users`, on delete cascade |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `call_queue_agents_call_queue_id_user_id_unique` (unique): `call_queue_id`, `user_id`
+- `call_queue_agents_organization_id_foreign`: `organization_id`
+- `call_queue_agents_user_id_foreign`: `user_id`
+
+
+**Relationships**
+
+```php
+$callQueueAgent->organization() → Organization (organization_id) [BelongsTo]
+$callQueueAgent->callQueue() → CallQueue (call_queue_id) [BelongsTo]
+$callQueueAgent->user() → User (user_id) [BelongsTo]
+```
+
+
+## QueueCall
+
+One call that entered a queue, kept for reports.
+
+**Table:** `queue_calls`  
+**Model:** `App\Models\QueueCall`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `PrunesByRetention`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `call_queue_id` | bigint unsigned | No | - | Queue. Foreign key to `call_queues`, on delete cascade |
+| `call_id` | varchar(255) | No | - | Cloudonix call ID |
+| `session_token` | varchar(255) | Yes | null | Cloudonix session token |
+| `from_number` | varchar(255) | Yes | null | Caller |
+| `to_number` | varchar(255) | Yes | null | Called number |
+| `entered_at` | timestamp | No | - | When the call entered the queue |
+| `answered_at` | timestamp | Yes | null | When an agent answered |
+| `abandoned_at` | timestamp | Yes | null | When the caller hung up while waiting |
+| `ended_at` | timestamp | Yes | null | When the call ended |
+| `agent_user_id` | bigint unsigned | Yes | null | Agent who answered. Foreign key to `users`, on delete set null |
+| `waiting_seconds` | int unsigned | Yes | null | Seconds waited |
+| `handling_seconds` | int unsigned | Yes | null | Seconds with the agent |
+| `disposition` | enum | Yes | null | Outcome; null while the call is in progress. Values: `answered`, `abandoned`, `overflow` (cast to `QueueCallDisposition`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `queue_calls_agent_user_id_foreign`: `agent_user_id`
+- `queue_calls_call_queue_id_call_id_unique` (unique): `call_queue_id`, `call_id`
+- `queue_calls_call_queue_id_entered_at_index`: `call_queue_id`, `entered_at`
+- `queue_calls_organization_id_entered_at_index`: `organization_id`, `entered_at`
+
+
+**Relationships**
+
+```php
+$queueCall->organization() → Organization (organization_id) [BelongsTo]
+$queueCall->callQueue() → CallQueue (call_queue_id) [BelongsTo]
+$queueCall->agent() → User (agent_user_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `pending()`  
+
+`pending()` returns rows with no `disposition`. Rows whose `created_at` is older than `RETENTION_QUEUE_CALLS_DAYS` (default 183) are deleted daily by `model:prune`.
+
+## Related Documentation
+
+- [Call Queues](/opbx/modules/call-queues)
+- [ACD Worker](/opbx/workers/acd-worker)

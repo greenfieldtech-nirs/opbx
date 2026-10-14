@@ -1,0 +1,277 @@
+---
+sidebar_position: 26
+slug: /data-models/models/users-and-organizations
+sidebar_class_name: cxGuidesSidebar
+title: "Users and Organizations"
+---
+
+# Users and Organizations
+
+Users, organizations, social sign-in and supervisor assignments. Cloudonix credentials are on [CloudonixSettings](/opbx/data-models/models/cloudonix-settings).
+
+## User
+
+A user account. Every user belongs to one organization.
+
+**Table:** `users`  
+**Model:** `App\Models\User` (extends `User`)  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasApiTokens`, `Notifiable`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Full name |
+| `email` | varchar(255) | No | - | Email, unique across the platform |
+| `phone` | varchar(20) | Yes | null | Phone |
+| `street_address` | text | Yes | null | Address |
+| `city` | varchar(100) | Yes | null | City |
+| `state_province` | varchar(100) | Yes | null | State or province |
+| `postal_code` | varchar(20) | Yes | null | Postal code |
+| `country` | varchar(100) | Yes | null | Country |
+| `role` | enum | No | - | Role in the organization. Values: `owner`, `pbx_admin`, `pbx_user`, `reporter`, `supervisor` (cast to `UserRole`) |
+| `is_platform_manager` | boolean | No | `false` | Platform manager (cross-tenant administration) |
+| `status` | enum | No | `active` | Account state. Values: `active`, `inactive`, `pending` (cast to `UserStatus`) |
+| `email_verified_at` | timestamp | Yes | null | When the email was verified |
+| `password` | varchar(255) | Yes | null | Password hash. Null for users who only sign in through Auth0 (`hashed` cast) |
+| `password_reset_required` | boolean | No | `false` | Must change the password at next sign-in |
+| `password_last_changed_at` | timestamp | Yes | null | When the password was last changed (used by the password-age policy command) |
+| `remember_token` | varchar(100) | Yes | null | Remember-me token |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `idx_users_is_platform_manager`: `is_platform_manager`
+- `users_email_index`: `email`
+- `users_email_unique` (unique): `email`
+- `users_organization_id_status_index`: `organization_id`, `status`
+
+**Hidden from serialization:** `password`, `remember_token`  
+**Not mass assignable:** `is_platform_manager`, `email_verified_at`, `password_reset_required`, `password_last_changed_at`, `remember_token`  
+
+**Relationships**
+
+```php
+$user->organization() → Organization (organization_id) [BelongsTo]
+$user->socialIdentities() → UserSocialIdentity (user_id) [HasMany]
+$user->extension() → Extension (user_id) [HasOne]
+$user->embedToken() → UserEmbedToken (user_id) [HasOne]
+$user->supervisedUsers() → User (pivot supervisor_user_assignments) [BelongsToMany]
+$user->supervisingSupervisors() → User (pivot supervisor_user_assignments) [BelongsToMany]
+$user->supervisedRingGroups() → RingGroup (pivot supervisor_ring_group_assignments) [BelongsToMany]
+$user->platformAuditLogs() → PlatformAuditLog (platform_manager_user_id) [HasMany]
+```
+
+**Scopes:** `forOrganization()`, `withRole()`, `withStatus()`, `search()`  
+**Methods:** `hasRole()`, `isOwner()`, `isPBXAdmin()`, `isPBXUser()`, `isReporter()`, `isSupervisor()`, `isAssignableAsSupervisor()`, `isInactive()`, `isPlatformManager()`, `revokeAllTokens()`, `canManageUser()`, `isActive()`, `isPending()`  
+
+`is_platform_manager` and `password_reset_required` are not mass assignable. The `supervisor_user_assignments` and `supervisor_ring_group_assignments` pivots (below) back `supervisedUsers()`, `supervisingSupervisors()` and `supervisedRingGroups()`.
+
+## supervisor_user_assignments
+
+Users a supervisor may monitor.
+
+**Table:** `supervisor_user_assignments` (no Eloquent model)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `supervisor_id` | bigint unsigned | No | - | Supervisor user. Foreign key to `users`, on delete cascade |
+| `user_id` | bigint unsigned | No | - | Supervised user. Foreign key to `users`, on delete cascade |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `supervisor_user_assignments_organization_id_supervisor_id_index`: `organization_id`, `supervisor_id`
+- `supervisor_user_assignments_supervisor_id_user_id_unique` (unique): `supervisor_id`, `user_id`
+- `supervisor_user_assignments_user_id_foreign`: `user_id`
+
+## supervisor_ring_group_assignments
+
+Ring groups a supervisor may monitor.
+
+**Table:** `supervisor_ring_group_assignments` (no Eloquent model)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `supervisor_id` | bigint unsigned | No | - | Supervisor user. Foreign key to `users`, on delete cascade |
+| `ring_group_id` | bigint unsigned | No | - | Ring group. Foreign key to `ring_groups`, on delete cascade |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `supervisor_ring_group_assignments_ring_group_id_foreign`: `ring_group_id`
+- `supervisor_ring_group_org_idx`: `organization_id`, `supervisor_id`
+- `supervisor_ring_group_unique` (unique): `supervisor_id`, `ring_group_id`
+
+## Organization
+
+A tenant. All tenant data references an organization and is deleted with it.
+
+**Table:** `organizations`  
+**Model:** `App\Models\Organization`  
+**Tenant scoped:** no  
+**Traits:** `SoftDeletes`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `name` | varchar(255) | No | - | Organization name |
+| `slug` | varchar(255) | No | - | Unique slug |
+| `status` | enum | No | `active` | `active`, `suspended` or `deleted`. Suspended and deleted organizations are refused by the `tenant.scope` middleware. Values: `active`, `suspended`, `deleted` |
+| `public_queues_token` | char(36) | Yes | null | Unguessable token for the public call-queue wallboard (`/api/v1/public/queues-dashboard/{token}/...`) |
+| `timezone` | varchar(255) | No | `UTC` | Default time zone |
+| `settings` | json | Yes | null | Organization settings |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `deleted_at` | timestamp | Yes | null | Soft-delete timestamp |
+
+**Indexes**
+
+- `organizations_created_at_index`: `created_at`
+- `organizations_public_queues_token_unique` (unique): `public_queues_token`
+- `organizations_slug_unique` (unique): `slug`
+- `organizations_status_index`: `status`
+
+**Casts:** `settings` (array)  
+**Not mass assignable:** `public_queues_token`  
+
+**Relationships**
+
+```php
+$organization->users() → User (organization_id) [HasMany]
+$organization->extensions() → Extension (organization_id) [HasMany]
+$organization->didNumbers() → DidNumber (organization_id) [HasMany]
+$organization->ringGroups() → RingGroup (organization_id) [HasMany]
+$organization->businessHoursSchedules() → BusinessHoursSchedule (organization_id) [HasMany]
+$organization->callLogs() → CallLog (organization_id) [HasMany]
+$organization->cloudonixSettings() → CloudonixSettings (organization_id) [HasOne]
+```
+
+**Methods:** `isActive()`  
+
+`status` is not cast to `OrganizationStatus`. The model is not tenant scoped.
+
+## OrganizationJoinRequest
+
+A request from a person who signed in with a social identity to join an organization.
+
+**Table:** `organization_join_requests`  
+**Model:** `App\Models\OrganizationJoinRequest`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `SoftDeletes`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `email` | varchar(255) | No | - | Requester email |
+| `name` | varchar(255) | Yes | null | Requester name |
+| `provider` | varchar(32) | No | - | Identity provider (cast to `SocialIdentityProvider`) |
+| `provider_subject` | varchar(255) | No | - | Subject ID at the provider |
+| `status` | varchar(32) | No | `pending` | Request state (cast to `OrganizationJoinRequestStatus`) |
+| `role` | varchar(32) | No | `pbx_user` | Role granted on approval |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `deleted_at` | timestamp | Yes | null | Soft-delete timestamp |
+
+**Indexes**
+
+- `organization_join_requests_organization_id_email_status_unique` (unique): `organization_id`, `email`, `status`
+- `organization_join_requests_organization_id_status_index`: `organization_id`, `status`
+
+
+**Relationships**
+
+```php
+$organizationJoinRequest->organization() → Organization (organization_id) [BelongsTo]
+```
+
+
+Unique on (`organization_id`, `email`, `status`).
+
+## UserSocialIdentity
+
+A social identity (through Auth0) linked to a user.
+
+**Table:** `user_social_identities`  
+**Model:** `App\Models\UserSocialIdentity`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `user_id` | bigint unsigned | No | - | User. Foreign key to `users`, on delete cascade |
+| `provider` | varchar(32) | No | - | Identity provider (cast to `SocialIdentityProvider`) |
+| `provider_subject` | varchar(255) | No | - | Subject ID at the provider |
+| `provider_email` | varchar(255) | Yes | null | Email reported by the provider |
+| `provider_data` | json | Yes | null | Raw profile data |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `user_social_identities_provider_email_index`: `provider_email`
+- `user_social_identities_provider_provider_subject_unique` (unique): `provider`, `provider_subject`
+- `user_social_identities_user_id_provider_unique` (unique): `user_id`, `provider`
+
+**Casts:** `provider_data` (array)  
+
+**Relationships**
+
+```php
+$userSocialIdentity->user() → User (user_id) [BelongsTo]
+```
+
+
+Unique on (`provider`, `provider_subject`) and on (`user_id`, `provider`): one identity per provider per user.
+
+## UserEmbedToken
+
+The token that lets a user's embeddable dialer call the API. One per user.
+
+**Table:** `user_embed_tokens`  
+**Model:** `App\Models\UserEmbedToken`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `user_id` | bigint unsigned | No | - | User (unique). Foreign key to `users`, on delete cascade |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `token` | varchar(64) | No | - | SHA-256 hash of the `opbxd_` token; the plain token is shown once |
+| `icon_position` | varchar(255) | No | `bottom-right` | Launcher icon position (cast to `EmbedIconPosition`) |
+| `icon_background_color` | varchar(255) | No | `#007acc` | Launcher icon color |
+| `last_used_at` | timestamp | Yes | null | Last use, updated at most every 5 seconds |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `user_embed_tokens_organization_id_index`: `organization_id`
+- `user_embed_tokens_token_unique` (unique): `token`
+- `user_embed_tokens_user_id_unique` (unique): `user_id`
+
+**Hidden from serialization:** `token`  
+
+**Relationships**
+
+```php
+$userEmbedToken->user() → User (user_id) [BelongsTo]
+$userEmbedToken->organization() → Organization (organization_id) [BelongsTo]
+```
+
+## Related Documentation
+
+- [User Management](/opbx/modules/user-management)
+- [Supervisors](/opbx/modules/supervisors)
+- [Auth0 Syndicated Authentication](/opbx/modules/auth0-syndicated-auth)
+- [Embeddable Dialer](/opbx/modules/embedded-dialer)
+- [Multi-Tenancy](/opbx/architecture/multi-tenancy)

@@ -46,27 +46,27 @@ Configuration files and environment variables:
 - [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign) — Campaign configuration
 - [AutoDialerCampaignCallerId](/opbx/data-models/models/auto-dialer-campaign-caller-id) — Caller ID pool entries
 - [AutoDialerCallerIdStat](/opbx/data-models/models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
-- AutoDialerList (`App\Models\AutoDialerList`) — Distribution lists
-- AutoDialerDestination (`App\Models\AutoDialerDestination`) — List destinations
+- [AutoDialerList](/opbx/data-models/models/auto-dialer-lists#autodialerlist) — Distribution lists
+- [AutoDialerDestination](/opbx/data-models/models/auto-dialer-lists#autodialerdestination) — List destinations
 
 ### Core PBX
 
-- Extension (`App\Models\Extension`) — PBX extensions
-- DidNumber (`App\Models\DidNumber`) — Phone numbers
-- RingGroup (`App\Models\RingGroup`) — Ring group configuration
-- IvrMenu (`App\Models\IvrMenu`) — IVR menu structure
-- BusinessHoursSchedule (`App\Models\BusinessHoursSchedule`) — Business hours
-- CallQueue (`App\Models\CallQueue`) — Call queues (live state is in the ACD worker)
+- [Extension](/opbx/data-models/models/extensions-and-numbers#extension) — PBX extensions
+- [DidNumber](/opbx/data-models/models/extensions-and-numbers#didnumber) — Phone numbers
+- [RingGroup](/opbx/data-models/models/ring-groups#ringgroup) — Ring group configuration
+- [IvrMenu](/opbx/data-models/models/ivr-menus#ivrmenu) — IVR menu structure
+- [BusinessHoursSchedule](/opbx/data-models/models/business-hours#businesshoursschedule) — Business hours
+- [CallQueue](/opbx/data-models/models/call-queues#callqueue) — Call queues (live state is in the ACD worker)
 
 ### AI Integration
 
-- AiAssistant (`App\Models\AiAssistant`) — AI assistant configuration
-- AiAssistantLoadBalancer (`App\Models\AiAssistantLoadBalancer`) — Load balancer setup
+- [AiAssistant](/opbx/data-models/models/ai-assistants#aiassistant) — AI assistant configuration
+- [AiAssistantLoadBalancer](/opbx/data-models/models/ai-assistants#aiassistantloadbalancer) — Load balancer setup
 
 ### Users & Organizations
 
-- User (`App\Models\User`) — User accounts
-- Organization (`App\Models\Organization`) — Multi-tenant organizations
+- [User](/opbx/data-models/models/users-and-organizations#user) — User accounts
+- [Organization](/opbx/data-models/models/users-and-organizations#organization) — Multi-tenant organizations
 - [CloudonixSettings](/opbx/data-models/models/cloudonix-settings) — Cloudonix credentials per org
 
 ### Call & Logging
@@ -74,7 +74,7 @@ Configuration files and environment variables:
 - [CallDetailRecord](/opbx/data-models/models/call-detail-record) — CDR from Cloudonix, with the warm archive table
 - [SessionUpdate](/opbx/data-models/models/session-updates) — Real-time session events
 - [CallNotificationsSettings](/opbx/data-models/models/call-notifications-settings) — Webhook notification config
-- CallNotificationLog (`App\Models\CallNotificationLog`) — Notification delivery log
+- [CallNotificationLog](/opbx/data-models/models/logs-and-integrations#callnotificationlog) — Notification delivery log
 - [EmailLog](/opbx/data-models/models/email-logs) — Transactional email log
 - [PlatformAuditLog](/opbx/data-models/models/platform-audit-logs) — Cross-tenant audit trail
 - [PlatformHealthCheck](/opbx/data-models/models/platform-health-check) — Platform Status history
@@ -85,14 +85,14 @@ Configuration files and environment variables:
 - [CallTrackingNumber](/opbx/data-models/models/call-tracking-number) — DID-to-campaign assignment
 - [CallTrackingSession](/opbx/data-models/models/call-tracking-session) — Attributed call session
 - [CallTrackingNotificationSettings](/opbx/data-models/models/call-tracking-notification-settings) — Per-campaign webhook settings
-- CallTrackingNotificationLog (`App\Models\CallTrackingNotificationLog`) — Notification delivery log
-- CallTrackingAdPlatformIntegration (`App\Models\CallTrackingAdPlatformIntegration`) — Google Ads / Meta settings
+- [CallTrackingNotificationLog](/opbx/data-models/models/logs-and-integrations#calltrackingnotificationlog) — Notification delivery log
+- [CallTrackingAdPlatformIntegration](/opbx/data-models/models/logs-and-integrations#calltrackingadplatformintegration) — Google Ads / Meta settings
 
 ### Security
 
-- InboundBlacklist (`App\Models\InboundBlacklist`) — Blocked caller patterns
-- OutboundWhitelist (`App\Models\OutboundWhitelist`) — Outbound routing rules
-- BlockedCallLog (`App\Models\BlockedCallLog`) — Log of blocked calls
+- [InboundBlacklist](/opbx/data-models/models/security#inboundblacklist) — Blocked caller patterns
+- [OutboundWhitelist](/opbx/data-models/models/security#outboundwhitelist) — Outbound routing rules
+- [BlockedCallLog](/opbx/data-models/models/security#blockedcalllog) — Log of blocked calls
 
 ## Recently Added
 

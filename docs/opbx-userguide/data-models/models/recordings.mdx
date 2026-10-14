@@ -1,0 +1,62 @@
+---
+sidebar_position: 24
+slug: /data-models/models/recordings
+sidebar_class_name: cxGuidesSidebar
+title: "Recordings"
+---
+
+# Recordings
+
+Audio files.
+
+## Recording
+
+An audio file used for prompts and music on hold: an uploaded file in the recordings bucket, or a remote URL.
+
+**Table:** `recordings`  
+**Model:** `App\Models\Recording`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Display name |
+| `type` | enum | No | - | Uploaded file or remote URL. Values: `upload`, `remote` |
+| `file_path` | varchar(255) | Yes | null | Object path of an uploaded file |
+| `remote_url` | varchar(255) | Yes | null | URL of a remote file |
+| `original_filename` | varchar(255) | Yes | null | Uploaded file name |
+| `file_size` | bigint unsigned | Yes | null | Bytes |
+| `mime_type` | varchar(255) | Yes | null | MIME type |
+| `duration_seconds` | int | Yes | null | Length in seconds |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` |
+| `is_moh` | boolean | No | `false` | Usable as call-queue music on hold |
+| `created_by` | bigint unsigned | Yes | null | User who created it. Foreign key to `users`, on delete set null |
+| `updated_by` | bigint unsigned | Yes | null | User who last changed it. Foreign key to `users`, on delete set null |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `recordings_created_by_index`: `created_by`
+- `recordings_organization_id_status_index`: `organization_id`, `status`
+- `recordings_organization_id_type_index`: `organization_id`, `type`
+- `recordings_updated_by_foreign`: `updated_by`
+
+
+**Relationships**
+
+```php
+$recording->organization() → Organization (organization_id) [BelongsTo]
+$recording->creator() → User (created_by) [BelongsTo]
+$recording->updater() → User (updated_by) [BelongsTo]
+```
+
+**Methods:** `isActive()`, `isUploaded()`, `isRemote()`, `getPublicUrl()`, `getPlaybackUrl()`, `getDownloadUrl()`, `getFormattedFileSize()`, `getFormattedDuration()`  
+
+`getPlaybackUrl()` and `getDownloadUrl()` return the remote URL for remote files and a tokenized URL (`RecordingAccessService`) for uploaded files. Call recordings are not rows in this table; they are referenced from [call detail records](/opbx/data-models/models/call-detail-record).
+
+## Related Documentation
+
+- [Recordings](/opbx/modules/recordings)
+- [Configuration: Recordings](/opbx/data-models/configuration/index#recordings)

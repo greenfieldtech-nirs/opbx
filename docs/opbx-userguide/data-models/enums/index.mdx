@@ -110,6 +110,8 @@ Types of PBX extensions.
 | `CUSTOM_LOGIC` | custom_logic | Custom routing logic |
 | `QUEUE` | queue | Call queue endpoint |
 
+The `extensions.type` column also allows `virtual`, which has no enum case.
+
 ### RoutingDestinationType
 
 Where an answered auto-dialer call is sent.
@@ -150,7 +152,7 @@ Ring group states.
 
 ### RingGroupFallbackAction
 
-Actions when a ring group fails. The same values are used for `call_queues.fallback_action` and `ai_assistant_load_balancers.fallback_action`.
+Actions when a ring group fails. The enum is also the cast for `call_queues.fallback_action` and `ai_assistant_load_balancers.fallback_action`. The `call_queues.fallback_action` column has no `call_queue` value: a queue cannot overflow to another queue.
 
 **File:** `App\Enums\RingGroupFallbackAction`  
 **Table Column:** `ring_groups.fallback_action`
@@ -463,7 +465,7 @@ IVR option routing types.
 | `HANGUP` | hangup | End call |
 | `UNAVAILABLE` | unavailable | Say "Destination doesn't exist" and hang up. Set when the target (for example a deleted user's extension) is gone |
 
-`ivr_menus.failover_destination_type` is cast to the same enum and also accepts `unavailable`.
+`ivr_menus.failover_destination_type` is cast to the same enum. The columns do not allow every case: `ivr_menu_options.destination_type` has no `hangup`, and `ivr_menus.failover_destination_type` has no `business_hours`.
 
 ## Call Queue Enums
 
@@ -566,6 +568,29 @@ The resources an API key may be granted. The value is the resource slug, which m
 **Table Column:** `user_embed_tokens.icon_position`
 
 Where the embeddable dialer's launcher icon sits: `bottom-right`, `bottom-left`, `top-right`, `top-left`.
+
+## Column Enums Without a PHP Enum
+
+These columns are MySQL `enum` columns, but the model does not cast them to a PHP enum:
+
+| Column | Values |
+|--------|--------|
+| `did_numbers.routing_type` | `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_tracking`, `call_queue`, `unavailable` |
+| `did_numbers.status`, `recordings.status`, `ai_assistant_load_balancer_members.status` | `active`, `inactive` |
+| `organizations.status` | `active`, `suspended`, `deleted` (the values of `OrganizationStatus`) |
+| `ai_assistants.protocol` | `sip`, `websocket`, `dummy` |
+| `auto_dialer_campaigns.destination_connect` | `connected`, `immediately` |
+| `auto_dialer_call_sessions.status` | `initiated`, `ringing`, `answered`, `completed`, `failed` |
+| `auto_dialer_call_sessions.amd_result` | `human`, `voicemail`, `unknown` |
+| `call_detail_records.recording_status` | `none`, `pending`, `available`, `failed` |
+| `call_logs.direction` | `inbound`, `outbound` |
+| `call_notifications_settings.auth_method` | `hmac_sha256`, `bearer_token`, `basic_auth`, `none` (the API accepts only the last three) |
+| `call_tracking_notification_settings.auth_method` | `none`, `bearer_token`, `basic_auth` |
+| `cloudonix_settings.call_recording_mode` | `disabled`, `inbound`, `outbound`, `internal`, `inbound_outbound`, `all` |
+| `cloudonix_settings.recording_format` | `wav`, `mp3` |
+| `email_logs.status` | `queued`, `sent`, `delivered`, `bounced`, `failed` |
+| `recordings.type` | `upload`, `remote` |
+| `session_updates.direction` | `incoming`, `outgoing`, `internal`, `application` |
 
 ## Using Enums
 

@@ -1,0 +1,166 @@
+---
+sidebar_position: 18
+slug: /data-models/models/extensions-and-numbers
+sidebar_class_name: cxGuidesSidebar
+title: "Extensions, Phone Numbers and Conference Rooms"
+---
+
+# Extensions, Phone Numbers and Conference Rooms
+
+Core routing destinations.
+
+## Extension
+
+A PBX extension. User extensions are SIP subscribers on Cloudonix; the other types are virtual destinations.
+
+**Table:** `extensions`  
+**Model:** `App\Models\Extension`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `user_id` | bigint unsigned | Yes | null | User the extension belongs to. Foreign key to `users`, on delete set null |
+| `extension_number` | varchar(5) | No | - | Extension number (up to 5 digits) |
+| `password` | varchar(32) | Yes | null | SIP password |
+| `cloudonix_subscriber_id` | varchar(50) | Yes | null | Cloudonix subscriber ID |
+| `cloudonix_uuid` | varchar(100) | Yes | null | Cloudonix subscriber UUID (matched against `call_detail_records.subscriber`) |
+| `cloudonix_synced` | boolean | No | `false` | Whether the subscriber is synced to Cloudonix |
+| `type` | enum | No | `user` | Extension type. `virtual` exists in the column but not in `ExtensionType`. Values: `user`, `virtual`, `conference`, `ring_group`, `ivr`, `ai_assistant`, `custom_logic`, `forward`, `queue`, `ai_load_balancer` (cast to `ExtensionType`) |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `UserStatus`) |
+| `voicemail_enabled` | boolean | No | `false` | Voicemail on |
+| `configuration` | json | Yes | null | Type-specific settings, for example `forward_to`, `ring_group_id`, `ivr_id`, `conference_room_id`, `call_queue_id`, `ai_assistant_id`, `ai_load_balancer_id`, `container_application_name`, `container_block_name`, `sip_uri` |
+| `service_url` | varchar(255) | Yes | null | Service URL for AI assistant extensions (preferred over the legacy configuration) |
+| `service_token` | varchar(255) | Yes | null | Service token |
+| `service_params` | json | Yes | null | Service parameters |
+| `ai_assistant_id` | bigint unsigned | Yes | null | AI assistant. Foreign key to `ai_assistants`, on delete set null |
+| `default_caller_id_did_id` | bigint unsigned | Yes | null | Default outbound Caller ID. Foreign key to `did_numbers`, on delete set null |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `ext_org_extnum_status_idx`: `organization_id`, `extension_number`, `status`
+- `extensions_ai_assistant_id_index`: `ai_assistant_id`
+- `extensions_cloudonix_subscriber_id_index`: `cloudonix_subscriber_id`
+- `extensions_default_caller_id_did_id_foreign`: `default_caller_id_did_id`
+- `extensions_organization_id_extension_number_unique` (unique): `organization_id`, `extension_number`
+- `extensions_organization_id_status_index`: `organization_id`, `status`
+- `extensions_organization_id_type_index`: `organization_id`, `type`
+- `extensions_user_id_index`: `user_id`
+- `idx_org_ext_number`: `organization_id`, `extension_number`
+
+**Casts:** `configuration` (array), `service_params` (array)  
+**Hidden from serialization:** `password`  
+
+**Relationships**
+
+```php
+$extension->organization() → Organization (organization_id) [BelongsTo]
+$extension->user() → User (user_id) [BelongsTo]
+$extension->aiAssistant() → AiAssistant (ai_assistant_id) [BelongsTo]
+$extension->aiLoadBalancer() → AiAssistantLoadBalancer (configuration->ai_load_balancer_id) [BelongsTo]
+$extension->defaultCallerId() → DidNumber (default_caller_id_did_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `withType()`, `withStatus()`, `forUser()`, `search()`, `active()`, `unassigned()`  
+**Methods:** `isActive()`, `isInactive()`, `belongsToUser()`, `getFormattedNumberAttribute()`, `getSipUri()`, `hasSipUri()`, `getSipPassword()`, `regeneratePassword()`, `generateSecurePassword()`  
+
+`aiLoadBalancer()` uses the JSON path `configuration->ai_load_balancer_id`.
+
+## DidNumber
+
+A phone number (DID) and how inbound calls to it are routed.
+
+**Table:** `did_numbers`  
+**Model:** `App\Models\DidNumber`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `phone_number` | varchar(20) | No | - | Number in E.164 |
+| `friendly_name` | varchar(255) | Yes | null | Display name |
+| `routing_type` | enum | No | `extension` | Where inbound calls go. Values: `extension`, `ring_group`, `business_hours`, `conference_room`, `ai_assistant`, `ai_load_balancer`, `ivr_menu`, `call_tracking`, `call_queue`, `unavailable` |
+| `routing_config` | json | Yes | null | Target of the route: `extension_id`, `ring_group_id`, `business_hours_schedule_id`, `conference_room_id`, `ai_assistant_id`, `ai_load_balancer_id`, `ivr_menu_id`, `call_queue_id` or `call_tracking_campaign_id`, depending on `routing_type` |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` |
+| `cloudonix_config` | json | Yes | null | Cloudonix-side settings of the number |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `did_numbers_organization_id_status_index`: `organization_id`, `status`
+- `did_numbers_phone_number_index`: `phone_number`
+- `did_numbers_phone_number_unique` (unique): `phone_number`
+- `idx_did_org_phone_status`: `organization_id`, `phone_number`, `status`
+
+**Casts:** `routing_config` (array), `cloudonix_config` (array)  
+
+**Relationships**
+
+```php
+$didNumber->organization() → Organization (organization_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `unprovisioned()`  
+**Methods:** `isActive()`, `getTargetId()`, `getTargetExtensionId()`, `getTargetRingGroupId()`, `getTargetCallQueueId()`, `getTargetBusinessHoursId()`, `getTargetConferenceRoomId()`, `getTargetAiAssistantId()`, `getTargetIvrMenuId()`, `getTargetAiLoadBalancerId()`, `getExtensionAttribute()`, `getRingGroupAttribute()`, `getCallQueueAttribute()`, `getBusinessHoursScheduleAttribute()`, `getConferenceRoomAttribute()`, `getAiAssistantAttribute()`, `getIvrMenuAttribute()`, `getAiLoadBalancerAttribute()`, `setExtension()`, `setRingGroup()`, `setBusinessHoursSchedule()`, `setConferenceRoom()`, `setAiAssistant()`, `setIvrMenu()`, `setAiLoadBalancer()`  
+
+`unprovisioned()` and `is_unprovisioned` are true when `routing_type` is `unavailable`. The `getTarget*Id()` methods read the matching key from `routing_config`, the `extension`, `ring_group`, `call_queue`, ... accessors load the target, and the `set*()` methods write `routing_type` and `routing_config` together.
+
+## ConferenceRoom
+
+A conference room.
+
+**Table:** `conference_rooms`  
+**Model:** `App\Models\ConferenceRoom`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Room name |
+| `description` | text | Yes | null | Description |
+| `max_participants` | int | No | `25` | Participant limit |
+| `status` | varchar(255) | No | `active` | Active or inactive (cast to `UserStatus`) (cast to `UserStatus`) |
+| `pin` | varchar(20) | Yes | null | Participant PIN |
+| `pin_required` | boolean | No | `false` | Require the PIN |
+| `host_pin` | varchar(20) | Yes | null | Host PIN |
+| `recording_enabled` | boolean | No | `false` | Record the conference |
+| `recording_auto_start` | boolean | No | `false` | Start recording automatically |
+| `recording_webhook_url` | varchar(255) | Yes | null | Webhook for recording events |
+| `wait_for_host` | boolean | No | `false` | Hold participants until the host joins |
+| `mute_on_entry` | boolean | No | `false` | Mute participants when they join |
+| `announce_join_leave` | boolean | No | `false` | Announce joins and leaves |
+| `music_on_hold` | boolean | No | `false` | Play music while waiting |
+| `talk_detection_enabled` | boolean | No | `false` | Send talk-detection events |
+| `talk_detection_webhook_url` | varchar(255) | Yes | null | Webhook for talk-detection events |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `conference_rooms_organization_id_name_index`: `organization_id`, `name`
+- `conference_rooms_organization_id_status_index`: `organization_id`, `status`
+
+
+**Relationships**
+
+```php
+$conferenceRoom->organization() → Organization (organization_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `active()`, `inactive()`, `withStatus()`, `search()`  
+**Methods:** `isActive()`  
+
+`status` is a plain `varchar` column (default `active`) cast to `UserStatus`.
+
+## Related Documentation
+
+- [Extensions](/opbx/modules/extensions)
+- [Phone Numbers](/opbx/modules/phone-numbers)
+- [Conference Rooms](/opbx/modules/conference-rooms)
