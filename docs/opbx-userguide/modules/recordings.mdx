@@ -30,18 +30,35 @@ Use this module to:
 | List, play and download recordings | Yes | Yes | No | Yes |
 | Upload, add remote, edit, tag as hold music, delete | Yes | Yes | No | No |
 
-Reporters can list, play and download recordings through the API, and by opening `/ui/announcements` directly; the sidebar does not show them the link. The page shows the upload, tag and delete controls to everyone who opens it, but the server refuses those actions for Reporters.
+Reporters can list, play and download recordings through the API, and by opening `/ui/announcements` directly; the sidebar does not show them the link. For them the page hides **Upload File**, **Remote URL** and the delete action, and the **Hold Music** switch is disabled.
 
 Creating a recording needs a signed-in user. API keys cannot create recordings ("Creating recordings requires a user token; API keys cannot create recordings.").
 
-## Add a recording
+## Workflows
 
-### Upload a file
+### Find a recording
+
+**Who can do this:** Owner and PBX Admin from the sidebar; a Reporter by opening `/ui/announcements` (`RecordingPolicy::viewAny`).
+
+1. Open **Announcements** in the sidebar.
+2. Type in **Search announcements...** to filter by name.
+3. Narrow the list with the type filter (**All Types**, **Uploaded**, **Remote**) and the status filter (**All Status**, **Active**, **Inactive**). **Clear Filters** resets all three.
+4. Click the refresh button to reload the list.
+
+![Announcements list with Welcome Greeting, After Hours Message and Hold Music - Smooth Jazz (Remote type), the Hold Music switch on for the last one, and the Upload File and Remote URL buttons](../img/screens/recordings-list.jpg)
+
+### Upload a recording
+
+**Who can do this:** Owner and PBX Admin (`RecordingPolicy::create`; the button is shown to these roles only).
 
 1. Open **Announcements** in the sidebar.
 2. Click **Upload File**.
-3. Enter the **Announcement Name** and choose the **Audio File**.
-4. Click **Upload**.
+3. In **Upload Announcement**, enter the **Announcement Name** and choose the **Audio File** (the picker offers `.mp3` and `.wav` files).
+4. Click **Upload**. The button stays disabled until both fields are filled.
+
+The dialog closes, the toast "Announcement created successfully" appears and the recording is listed as **Local**. If the server refuses the file, the toast shows its message (see [Common errors](#common-errors)).
+
+![Upload Announcement dialog with a name entered and the audio file picker](../img/screens/recordings-upload-dialog.jpg)
 
 | Rule | Limit |
 |------|-------|
@@ -52,30 +69,71 @@ Creating a recording needs a signed-in user. API keys cannot create recordings (
 
 Uploaded files are stored in the deployment's S3-compatible storage (SeaweedFS in the standard Docker setup) under a folder for your organization.
 
-### Add a remote URL
+### Add a remote recording
 
-1. Click **Remote URL**.
-2. Enter the **Announcement Name** and the **Remote URL**, for example `https://media.example.com/audio/welcome.mp3`.
-3. Click **Add Announcement**.
+**Who can do this:** Owner and PBX Admin (`RecordingPolicy::create`; the button is shown to these roles only).
+
+1. Open **Announcements** in the sidebar.
+2. Click **Remote URL**.
+3. In **Add Remote Announcement**, enter the **Announcement Name** and the **Remote URL**, for example `https://media.example.com/audio/welcome.mp3`. The URL must be reachable and point to an MP3 or WAV file.
+4. Click **Add Announcement**.
+
+The dialog closes, the toast "Announcement created successfully" appears and the recording is listed as **Remote**.
+
+{/* SCREENSHOT: recordings-remote-dialog — Add Remote Announcement dialog with "Hold Music - Smooth Jazz" as the name and https://media.example.com/audio/smooth-jazz.mp3 as the Remote URL */}
 
 The URL must start with `http://` or `https://`. If the deployment sets `RECORDINGS_ALLOWED_DOMAINS`, the host must be on that list, or the recording is refused with "Domain not allowed. Please contact administrator." OPBX does not copy the file; callers hear whatever the URL serves when the recording is played.
 
-![Announcements list with Welcome Greeting, After Hours Message and Hold Music - Smooth Jazz (Remote type), the Hold Music switch on for the last one, and the Upload File and Remote URL buttons](../img/screens/recordings-list.jpg)
+### Listen to a recording
 
-![Upload Announcement dialog with a name entered and the audio file picker](../img/screens/recordings-upload-dialog.jpg)
+**Who can do this:** Owner, PBX Admin and Reporter (`RecordingPolicy::view`).
+
+1. Click the row's **Play** action. The recording plays in the browser and the action turns into **Pause**.
+2. Click **Pause** to stop.
+
+### View recording details
+
+**Who can do this:** Owner, PBX Admin and Reporter.
+
+1. Click the recording's row or name.
+
+A dialog titled with the recording name shows its **Type**, **Status**, **MIME Type**, **Created** date and the **Remote URL** or **Original Filename**.
+
+{/* SCREENSHOT: recordings-details-dialog — details dialog for the Welcome Greeting uploaded recording showing Type, Status, MIME Type, Created and Original Filename */}
+
+### Tag a recording as hold music
+
+**Who can do this:** Owner and PBX Admin (`RecordingPolicy::update`). For other roles the switch is disabled.
+
+1. In the Announcements list, turn on the recording's **Hold Music** switch.
+
+The toast "Tagged as hold music" appears and call queues now offer the recording as hold music. Turn the switch off to remove the tag; the toast is "Removed hold music tag".
+
+### Delete a recording
+
+**Who can do this:** Owner and PBX Admin (`RecordingPolicy::delete`; the action is shown to these roles only).
+
+1. Click the row's **Delete** action.
+2. In **Delete announcement**, click **Delete**.
+
+The toast "Announcement deleted successfully" appears. The uploaded file is removed from storage and the recording is deleted.
+
+:::note Recordings in use cannot be deleted
+If an IVR menu still plays the recording as its greeting, or a call queue uses it as hold music, the delete is refused and a dialog lists every place it is used. Change those first, then delete again. Call records never block a delete.
+:::
+
+![Delete announcement confirmation for Welcome Greeting](../img/screens/recordings-delete-dialog.jpg)
 
 ## The list
 
 | Column | Meaning |
 |--------|---------|
-| Name and type | Uploaded or Remote |
+| Name and type | **Local** (uploaded) or **Remote** |
 | Status | Active or Inactive |
 | Hold Music | Switch that adds or removes the hold-music tag |
 | Size / Duration | For uploaded files |
 | Created By, Created At | Who added it and when |
-| Actions | Play or pause, download (uploaded files only), delete |
-
-Filter by type (All Types, Uploaded, Remote) and status, or search by name. Click a row to see its details: type, status, creation date and the remote URL or original file name.
+| Actions | **Play** or **Pause**, **Download** (uploaded files only), **Delete** (Owner and PBX Admin) |
 
 ## Use a recording
 
@@ -84,7 +142,7 @@ Filter by type (All Types, Uploaded, Remote) and status, or search by name. Clic
 | [IVR Menus](/opbx/modules/ivr-menus) | The menu greeting, instead of text-to-speech |
 | [Call Queues](/opbx/modules/call-queues) | Hold music. Only recordings with the **Hold Music** tag are offered |
 
-Turn on the **Hold Music** switch in the list to tag a recording. A queue refuses a recording that is not tagged or belongs to another organization.
+A queue refuses a recording that is not tagged or belongs to another organization.
 
 ## Download
 
@@ -94,19 +152,6 @@ Turn on the **Hold Music** switch in the list to tag a recording. A queue refuse
 
 The API can change a recording's **name**, **status** and **hold-music tag**. The page changes the hold-music tag only. The file or URL cannot be replaced: add a new recording instead.
 
-## Delete a recording
-
-1. Click the delete icon on the row.
-2. Confirm in the **Delete announcement** dialog.
-
-The uploaded file is removed from storage and the recording is deleted.
-
-:::note Recordings in use cannot be deleted
-If an IVR menu still plays the recording as its greeting, or a call queue uses it as hold music, the delete is refused and a dialog lists every place it is used. Change those first, then delete again. Call records never block a delete.
-:::
-
-![Delete announcement confirmation for Welcome Greeting](../img/screens/recordings-delete-dialog.jpg)
-
 ## Common errors
 
 | Message | What it means | What to do |
@@ -115,7 +160,9 @@ If an IVR menu still plays the recording as its greeting, or a call queue uses i
 | File size must not exceed 5MB. | File too big | Compress or shorten it |
 | URL must start with http:// or https://. | Remote URL in another form | Use a web address |
 | Domain not allowed. Please contact administrator. | The host is not on the deployment allow-list | Use an allowed host, or ask the operator to add it |
-| This action is unauthorized. | A Reporter or PBX User tried to change recordings | Ask an Owner or PBX Admin |
+| Please select a file to upload. / Please provide a remote URL. | The file or URL is missing | Fill it in |
+| Please provide a valid URL. | The remote URL is not a valid address | Correct the URL |
+| This action is unauthorized. | A Reporter or PBX User tried to change recordings through the API | Ask an Owner or PBX Admin |
 
 ## Key data fields
 
