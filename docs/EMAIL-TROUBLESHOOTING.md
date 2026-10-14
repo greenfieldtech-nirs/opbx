@@ -190,7 +190,7 @@ Configuration Error: 2 transactional email providers are enabled (mailgun, mailj
 Only ONE provider can be active at a time.
 ```
 
-Fix: set only one `EMAIL_*_ENABLED=true` in `.env` and restart containers.
+Fix: set only one of `MAILGUN_ENABLED`, `MAILJET_ENABLED`, `MAILERLITE_ENABLED` and `SENDINBLUE_ENABLED` to `true` in `.env` and restart the containers.
 
 ### Provider rejects the sender domain
 

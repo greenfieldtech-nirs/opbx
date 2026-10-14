@@ -51,7 +51,7 @@ AUTH0_REDIRECT_URI=https://your-opbx-domain/ui/auth/callback
 AUTH0_PROVIDERS=google,facebook,microsoft,github,x
 ```
 
-The `AUTH0_PROVIDERS` list controls which provider buttons appear on the login and register pages.
+`AUTH0_PROVIDERS` lists the providers the backend accepts. The web pages only have buttons for **Google** and **GitHub** (`frontend/src/components/Auth/SocialAuthButtons.tsx`), shown when they are in the list; the profile's Linked Accounts card never shows Microsoft, Facebook or X. Those three work only through the API (`POST /api/v1/auth/auth0/redirect`).
 
 ## 5. Reload the Configuration
 
@@ -77,7 +77,7 @@ Open the browser dev tools and check the `/api/v1/config/application` response. 
 }
 ```
 
-If `auth0.enabled` is `false`, verify that `OPBX_SAAS_ENABLED=true` and the `AUTH0_*` variables are set, and that the containers were recreated.
+`saas_enabled` and `auth0.enabled` both follow `OPBX_SAAS_ENABLED` alone. If they are `false`, verify `OPBX_SAAS_ENABLED=true` and that the containers were recreated. Empty `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` or `AUTH0_REDIRECT_URI` does not change this flag; the Auth0 endpoints then fail with "Auth0 is enabled but missing required configuration."
 
 ## User Flows
 
@@ -85,16 +85,18 @@ If `auth0.enabled` is `false`, verify that `OPBX_SAAS_ENABLED=true` and the `AUT
 
 1. Clicks a social provider button on `/ui/register`.
 2. Authenticates with Auth0 and returns to `/ui/auth/callback`.
-3. Backend creates a new organization and user with role **Owner**.
+3. Backend creates a new organization (named `<email> Organization`, time zone UTC) and a user with role **Owner**.
 4. User is logged in and redirected to the dashboard.
 
 ### New User — Request to Join Existing Organization
 
-1. Clicks a social provider button on `/ui/register`.
-2. After Auth0 callback, the onboarding page offers **Request to join an organization**.
-3. User enters the target organization's **slug** (for example `acme-corp`).
+1. Clicks a social provider button on `/ui/login` with an email that has no OPBX account. (From `/ui/register` the backend always creates a new organization.)
+2. After the Auth0 callback, the **Complete your account** page (`/ui/auth/onboarding`) opens. The onboarding session lasts 60 minutes and can be used once.
+3. User enters the target organization's **Organization slug** (for example `acme-corp`) and clicks **Request to join organization**.
 4. An Owner or PBX Admin of that organization approves or rejects the request. There is no screen for this yet; use the API (`GET /api/v1/organizations/join-requests`, then `POST .../{id}/approve` or `.../{id}/reject`).
-5. User receives a session token and can log in.
+5. Approval creates an active **PBX User** linked to that social account. The user then signs in with the same provider. No email is sent about the decision.
+
+The same page also offers **Create a new organization**, which restarts the provider sign-in with the register intent.
 
 ### Existing Password User — Link Auth0 Identity
 
@@ -119,24 +121,27 @@ If `auth0.enabled` is `false`, verify that `OPBX_SAAS_ENABLED=true` and the `AUT
 
 ## Troubleshooting
 
-### "Auth0 is not configured" error
+### `AUTH0_NOT_CONFIGURED` ("Auth0 is not enabled.") error
 
-- Verify all `AUTH0_*` environment variables are set.
-- Recreate the PHP containers (see step 5).
+- Set `OPBX_SAAS_ENABLED=true` and recreate the PHP containers (see step 5).
+
+### "Auth0 is enabled but missing required configuration."
+
+- Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` and `AUTH0_REDIRECT_URI`, then recreate the PHP containers.
 
 ### "Invalid state" error
 
 - The OAuth state expired (10-minute TTL) or the callback URL was reused.
 - Try logging in again.
 
-### "Email not verified" error
+### `AUTH0_EMAIL_UNVERIFIED` ("Please verify your email with the provider before continuing.")
 
 - The social provider did not return `email_verified=true`.
 - Verify the email in the Auth0/social provider account.
 
 ### Provider button does not appear
 
-- Check that the provider is included in `AUTH0_PROVIDERS`.
+- Only Google and GitHub have buttons. Check that the provider is included in `AUTH0_PROVIDERS`.
 - Check that the provider is enabled in Auth0 **Authentication > Social**.
 
 ## Related Documentation
