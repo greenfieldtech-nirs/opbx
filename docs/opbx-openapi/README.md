@@ -32,7 +32,6 @@ docker run --rm -v "$PWD/docs/opbx-openapi":/spec docker.io/redocly/cli:2.58.2 \
 docs/opbx-openapi/
 ├── openapi.yaml                # Entry point: info, servers, path $refs, security schemes, tags
 ├── README.md                   # This file
-├── generate_endpoints.sh       # Obsolete one-off generator (do not run, it overwrites path files)
 ├── components/
 │   ├── schemas/                # Data models (User.yaml, Extension.yaml, Error.yaml, ...)
 │   │   ├── cxml/              # CXML response schema
