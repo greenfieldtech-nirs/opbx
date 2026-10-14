@@ -25,11 +25,13 @@ interface ApiKeyPermissionBuilderProps {
 
 type Selection = 'none' | ApiKeyPermissionLevel;
 
-/** "business-hours" -> "Business Hours" */
+const ACRONYMS = new Set(['ai', 'ivr']);
+
+/** "business-hours" -> "Business Hours", "ivr-menus" -> "IVR Menus" */
 function humanize(slug: string): string {
   return slug
     .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => (ACRONYMS.has(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
     .join(' ');
 }
 
