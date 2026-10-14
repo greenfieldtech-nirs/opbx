@@ -33,10 +33,10 @@ properties:
     additionalProperties: true
   usage_count:
     type: integer
-    description: Show endpoint only. Number of extensions in `used_by_extensions` (the show endpoint loads at most 10).
+    description: Number of extensions that use the assistant (the true total, also when `used_by_extensions` lists only some of them).
   used_by_extensions:
     type: array
-    description: Show endpoint only, omitted when no extension uses the assistant. At most 10 extensions.
+    description: Show endpoint only, omitted when no extension uses the assistant. Lists up to 10 of the extensions; `usage_count` gives the total.
     items:
       type: object
       properties:

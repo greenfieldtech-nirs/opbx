@@ -711,4 +711,28 @@ class AiAssistantControllerTest extends TestCase
             'configuration' => [],
         ])->assertCreated()->assertJsonPath('data.status', 'active');
     }
+
+    public function test_usage_count_is_the_real_count_beyond_the_ten_listed_extensions(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $assistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        Extension::factory()->count(12)->create([
+            'organization_id' => $this->organization->id,
+            'type' => 'ai_assistant',
+            'ai_assistant_id' => $assistant->id,
+        ]);
+
+        $this->getJson("/api/v1/ai-assistants/{$assistant->id}")
+            ->assertOk()
+            ->assertJsonPath('data.usage_count', 12)
+            ->assertJsonCount(10, 'data.used_by_extensions');
+
+        $this->getJson('/api/v1/ai-assistants')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $assistant->id)
+            ->assertJsonPath('data.0.usage_count', 12);
+    }
 }
