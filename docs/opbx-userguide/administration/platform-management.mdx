@@ -28,6 +28,8 @@ An organization detail page (`/ui/platform/organizations/{id}`) opens from the d
 
 The public status page at `/status` is separate. It needs no login and shows only coarse group health. See [Public status page](#public-status-page).
 
+When the server refuses an action on these pages, the toast at the top of the screen names what failed (for example "Failed to delete user") and the line below it gives the server's reason (for example "Cannot delete the last owner of an organization.").
+
 ## Access Requirements
 
 The `is_platform_manager` flag on a user account grants access. It is separate from the organization role. Set it from the server:
@@ -83,7 +85,7 @@ Who can do this: platform managers.
 3. Change **Organization Name** (up to 255 characters) or **Timezone** (type a valid IANA time zone, for example `America/New_York`).
 4. Click **Save Changes**.
 
-The toast "Organization updated" appears. An invalid time zone is refused ("Failed to update organization"). The change is written to the audit log as `organization.settings.updated`.
+The toast "Organization updated" appears. An invalid time zone is refused: the toast "Failed to update organization" shows the server's validation message. The change is written to the audit log as `organization.settings.updated`.
 
 You can also edit the name and time zone on the organization detail page, **Settings** tab, with **Save Changes** ("Organization settings updated").
 
@@ -117,9 +119,17 @@ Who can do this: platform managers.
 2. Click the delete (trash) icon on the organization's row.
 3. In the **Delete Organization** dialog ("Are you sure you want to delete … ? This action cannot be undone."), click **Delete**.
 
-The toast "Organization deleted" appears and the row disappears. OPBX revokes the users' API tokens and removes the organization's extensions, ring groups, business-hours schedules, phone numbers, call logs and users, then the organization itself. The deletion is written to the audit log as `organization.deleted`.
+The toast "Organization deleted" appears, the dialog closes and the row disappears. OPBX revokes the users' API tokens and removes the organization's extensions, ring groups, business-hours schedules, phone numbers, call logs and users, then the organization itself. The deletion is written to the audit log as `organization.deleted`.
 
-The delete is refused when **any user in the organization is a platform manager** ("Cannot delete organization: one or more users in this organization are Platform Managers. …"). Revoke their platform-manager flag first. The page shows the toast "Failed to update status".
+The delete is refused when **any user in the organization is a platform manager** ("Cannot delete organization: one or more users in this organization are Platform Managers. …"). Revoke their platform-manager flag first. The page shows the toast "Failed to update status" with that message below it.
+
+#### Delete from the organization detail page
+
+1. Open the organization's detail page (for example from **Recent Organizations** on the dashboard).
+2. Click **Delete** in the page header.
+3. The same **Delete Organization** dialog opens. Click **Delete** to confirm, or **Cancel** to keep the organization.
+
+After the delete you return to the Organizations page. Nothing is deleted until you confirm.
 
 {/* SCREENSHOT: platform-org-delete-blocked — Organization delete refused because one user is a platform manager */}
 
@@ -162,7 +172,20 @@ The Users page lists the **Owner** accounts of every organization (other roles a
 
 The platform console has no action to create a user. Users of an organization are managed by its Owner and PBX Admins on the [Users](/opbx/modules/user-management) page (or by you, after [operating as the organization](#operate-as-an-organization)).
 
-Click a row to open the **Edit User** dialog. It shows the name, email, an **Owner** badge, the **Platform Manager** switch, the status and a **Change Password** button.
+Click a row to open the **Edit User** dialog. It shows the name, email, an **Owner** badge, the **Platform Manager** switch, a **Status** list and a **Change Password** button.
+
+### Edit a user
+
+Who can do this: platform managers.
+
+1. Open **Platform Management → Users**.
+2. Click the user's row. The **Edit User** dialog opens.
+3. Change **Name**, **Email** or **Status** (**Active**, **Inactive** or **Pending**). The role stays as shown (**Owner**).
+4. Click **Save Changes**. The button reads **Saving...** while the change is sent.
+
+The toast "User updated" appears, the dialog closes and the list shows the new values. When the server refuses the change (for example an invalid email address), the toast "Failed to update user" shows the server's reason and the dialog stays open. The change is written to the audit log as `user.updated` with the before and after values.
+
+The **Platform Manager** switch and **Change Password** take effect on their own; **Save Changes** is not needed for them.
 
 ### Grant or revoke platform-manager rights
 
@@ -172,7 +195,7 @@ Who can do this: platform managers.
 2. Click the user's row.
 3. Turn the **Platform Manager** switch on or off ("Grant cross-tenant administrative access").
 
-The change applies immediately: the toast "Platform manager rights granted" or "Platform manager rights revoked" appears. Revoking also signs the user out of every session. Revoking the last platform manager is refused (toast "Failed to update platform manager status"). The change is written to the audit log.
+The change applies immediately: the toast "Platform manager rights granted" or "Platform manager rights revoked" appears. Revoking also signs the user out of every session. Revoking the last platform manager is refused: the toast "Failed to update platform manager status" shows "Cannot revoke the last platform manager." The change is written to the audit log.
 
 ### Set a user's password
 
@@ -196,7 +219,7 @@ Who can do this: platform managers.
 
 The toast "User deleted" appears. The deletion is written to the audit log as `user.deleted`.
 
-Platform-level guards (the page shows the toast "Failed to delete user"; the API returns the message below):
+Platform-level guards (the page shows the toast "Failed to delete user" with the message below as its reason):
 
 | Guard | API message |
 |-------|-------------|
@@ -253,7 +276,7 @@ Who can do this: platform managers.
 1. Open **Platform Management → Platform Status**.
 2. Click **Check now**. The button reads **Checking...** while the checks run.
 
-The cards and the "Last check" time update. The action is limited to 6 requests per minute; above that the page shows "Check failed. You may have hit the rate limit (6 per minute); try again shortly."
+The cards and the "Last check" time update. The action is limited to 6 requests per minute; above that the page shows "Check failed: …" with the server's message, followed by "You may have hit the rate limit (6 per minute); try again shortly."
 
 ### History
 
@@ -291,12 +314,26 @@ Every platform action is recorded with:
 |-------|-------------|
 | Timestamp | When it happened |
 | Actor | The platform manager who did it ("by …", or "System") |
-| Action | For example `operate_as.started`, `organization.status.updated` or `user.deleted` |
+| Action | What was done, shown by its label (see the table below) |
 | Target | The organization or user affected |
 | Reason | When one was given through the API |
 | Before / After | The changed values |
 
-Actions written today: `operate_as.started`, `operate_as.stopped`, `organization.settings.updated`, `organization.status.updated`, `organization.deleted`, `user.created`, `user.updated`, `user.deleted`, `user.password.updated`, `user.platform_manager.granted` and `user.platform_manager.revoked`.
+Actions written today, with the label the Audit Log shows and offers in its action filter:
+
+| Label | Action name (API `action` filter) | Written when |
+|-------|-----------------------------------|--------------|
+| User Created | `user.created` | A user is created through the API |
+| User Updated | `user.updated` | **Save Changes** in **Edit User** |
+| User Deleted | `user.deleted` | A user is deleted |
+| User Password Changed | `user.password.updated` | **Update Password** |
+| Platform Manager Granted | `user.platform_manager.granted` | The **Platform Manager** switch is turned on |
+| Platform Manager Revoked | `user.platform_manager.revoked` | The switch is turned off |
+| Organization Settings Updated | `organization.settings.updated` | An organization's name or time zone is saved |
+| Organization Status Changed | `organization.status.updated` | An organization is suspended or reactivated |
+| Organization Deleted | `organization.deleted` | An organization is deleted |
+| Operate As Started | `operate_as.started` | **Operate as** starts a session |
+| Operate As Stopped | `operate_as.stopped` | **Exit organization** ends it |
 
 ### Review the audit log
 
@@ -304,11 +341,12 @@ Who can do this: platform managers.
 
 1. Open **Platform Management → Audit Log**.
 2. Optionally type a platform manager's user ID in **Search by platform manager user ID...**.
-3. Click an entry to expand it. The expanded entry shows the reason (when given) and the before and after values; "No changes recorded" when there are none.
+3. Optionally pick an action in the action filter (**All Actions** or one of the labels above). Only entries of that action are listed.
+4. Click an entry to expand it. The expanded entry shows the reason (when given) and the before and after values; "No changes recorded" when there are none.
 
 Entries are listed newest first, 25, 50 or 100 per page.
 
-{/* SCREENSHOT: platform-audit-log — Audit Log page with one organization.status.updated entry expanded, showing the before and after status */}
+{/* SCREENSHOT: platform-audit-log — Audit Log page with one Organization Status Changed entry expanded, showing the before and after status */}
 
 Audit entries are kept for `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) and then pruned. See [Data retention](/opbx/data-models/configuration/index#data-retention).
 
