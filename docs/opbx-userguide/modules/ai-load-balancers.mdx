@@ -49,7 +49,7 @@ Use a load balancer to:
 5. Under **AI Assistant Members**, click **Add Member** once per assistant. Each click adds the next active assistant that is not yet a member and shows the toast **Added *name* to load balancer**. To use a different assistant, pick it in the member's dropdown. Click **X** on a member to remove it.
 6. For **Priority Based**, [order the members](#order-members-for-priority-based); for **Percentage Based**, [set the weights](#set-weights-for-percentage-based).
 7. Turn **Follow Through** on (**Enabled**) to try the next member when one fails, or leave it **Disabled**.
-8. Under **Fallback Action**, choose the **Action** and, when it needs one, the **Destination** (for example a ring group of people).
+8. Under **Fallback Action**, choose the **Action** and, when it needs one, the **Destination** (for example a ring group of people). The action starts as **Hang Up** ("Call will end").
 9. Click **Create AI Load Balancer**.
 
 The dialog closes, the toast **AI Load Balancer created successfully** appears and the load balancer is listed as **Active**. It is now offered everywhere an AI load balancer can be chosen. A new load balancer must have a real fallback: the create dialog does not offer **Disconnect**.
@@ -58,7 +58,7 @@ If something is missing, the dialog stays open and shows the problem under the f
 
 ![AI Load Balancers list with Front Desk AI Pool: strategy Round Robin, members 2 / 2 active, fallback hangup, status Active, and the strategy, status and Unprovisioned filters](../img/screens/ai-load-balancers-list.jpg)
 
-![Create AI Load Balancer dialog with Round Robin selected, the members Aria - Front Desk Receptionist and Max - Support Triage, Follow Through Enabled and the Fallback Action Ring Group Support Team](../img/screens/ai-load-balancers-create-dialog.jpg)
+![Create AI Load Balancer dialog with Round Robin selected, the members Aria - Front Desk Receptionist and Max - Support Triage, Follow Through Enabled and the Fallback Action list open with Hang Up selected](../img/screens/ai-load-balancers-create-dialog.jpg)
 
 **Add Member** is disabled when every active assistant is already a member; the dialog then says **All available AI Assistants have been added to this load balancer.** A load balancer has at most 50 members.
 
