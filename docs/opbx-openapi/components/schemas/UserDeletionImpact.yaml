@@ -54,7 +54,7 @@ properties:
       properties:
         type:
           type: string
-          description: Kind of routing entry (for example `business_hours`, `did_number`, `call_tracking_campaign`).
+          description: Kind of routing entry (for example `business_hours`, `did_number`).
         id:
           type: integer
         name:

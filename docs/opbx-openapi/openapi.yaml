@@ -58,7 +58,6 @@ info:
       | **AI Assistants** | AI assistant configuration and providers |
       | **AI Load Balancers** | AI assistant load balancer configuration |
       | **Call Detail Records** | CDR records, statistics, export and recording |
-      | **Call Tracking** | Campaigns, numbers, DNI, sessions, analytics, notifications, ad-platform integrations |
       | **Recordings** | Recording management and download |
       | **Inbound Blacklist** | Blocked caller management |
       | **Outbound Whitelist** | Outbound dialing restrictions |
@@ -123,7 +122,6 @@ info:
       | Registration | 10 requests/hour per IP |
       | Email validation | 10 requests/minute per IP |
       | Embedded Dialer API | 60 requests/minute per token and IP |
-      | Call tracking DNI swap | 60 requests/minute per organization and IP |
       | Public status / public queues wallboard / platform status check | 60 / 120 / 6 requests/minute |
       | Dialer worker API | 1000 requests/minute per IP (`DIALER_WORKER_RATE_LIMIT`) |
       | Cloudonix webhooks, voice routing and voice callbacks | Not rate-limited |
@@ -294,43 +292,6 @@ paths:
 
   /v1/broadcasting/auth:
     $ref: './paths/broadcasting/auth.yaml#/paths/~1v1~1broadcasting~1auth'
-
-  /v1/call-tracking-ad-platform-integrations:
-    $ref: './paths/call-tracking-ad-platform-integrations/index.yaml#/paths/~1v1~1call-tracking-ad-platform-integrations'
-
-
-  /v1/call-tracking-analytics:
-    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics'
-
-  /v1/call-tracking-analytics/export:
-    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics~1export'
-
-  /v1/call-tracking-campaigns:
-    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}:
-    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers:
-    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}:
-    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers~1{call_tracking_number}'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-logs:
-    $ref: './paths/call-tracking-campaigns/notification-logs.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-logs'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings:
-    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings/test:
-    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings~1test'
-
-  /v1/call-tracking-dni/swap:
-    $ref: './paths/call-tracking-dni/index.yaml#/paths/~1v1~1call-tracking-dni~1swap'
-
-  /v1/call-tracking-sessions:
-    $ref: './paths/call-tracking-campaigns/sessions.yaml#/paths/~1v1~1call-tracking-sessions'
 
   /v1/auto-dialer-campaigns:
     $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns'
@@ -998,20 +959,6 @@ components:
       $ref: './components/schemas/SupervisorAssignment.yaml'
     AutoDialerCampaign:
       $ref: './components/schemas/AutoDialerCampaign.yaml'
-    CallTrackingCampaign:
-      $ref: './components/schemas/CallTrackingCampaign.yaml'
-    CallTrackingNumber:
-      $ref: './components/schemas/CallTrackingNumber.yaml'
-    CallTrackingSession:
-      $ref: './components/schemas/CallTrackingSession.yaml'
-    CallTrackingAnalytics:
-      $ref: './components/schemas/CallTrackingAnalytics.yaml'
-    CallTrackingNotificationSettings:
-      $ref: './components/schemas/CallTrackingNotificationSettings.yaml'
-    CallTrackingNotificationLog:
-      $ref: './components/schemas/CallTrackingNotificationLog.yaml'
-    CallTrackingAdPlatformIntegration:
-      $ref: './components/schemas/CallTrackingAdPlatformIntegration.yaml'
     DistributionList:
       $ref: './components/schemas/DistributionList.yaml'
     ListDestination:
@@ -1137,16 +1084,6 @@ tags:
     description: Call notification configuration
   - name: Auto Dialer Campaigns
     description: Outbound campaign management with rate limiting and scheduling
-  - name: Call Tracking Campaigns
-    description: Marketing campaign call attribution and tracking
-  - name: Call Tracking Sessions
-    description: Call tracking visitor sessions
-  - name: Call Tracking DNI
-    description: Public dynamic number insertion (DNI) swap endpoint for websites
-  - name: Call Tracking Analytics
-    description: Call tracking analytics, reporting, and conversion tracking
-  - name: Call Tracking Ad Platform Integrations
-    description: Google Ads and Meta conversion upload integrations
   - name: Distribution Lists
     description: Phone number list management for auto-dialer campaigns
   - name: Trunks

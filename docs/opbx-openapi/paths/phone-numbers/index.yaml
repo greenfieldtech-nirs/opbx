@@ -213,7 +213,7 @@ paths:
       tags:
         - Phone Numbers
       summary: Delete phone number
-      description: Owner and PBX Admin only. Refused with 409 when the DID is still referenced (for example by routing, a call tracking number, an auto-dialer caller ID pool, or a blocked-DID entry). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the DID is still referenced (for example by routing, an auto-dialer caller ID pool, or a blocked-DID entry). The 409 body lists the references.
       operationId: deletePhoneNumber
       security:
         - bearerAuth: []

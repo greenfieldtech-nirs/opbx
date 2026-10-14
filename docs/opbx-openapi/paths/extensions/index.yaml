@@ -529,7 +529,7 @@ paths:
       description: >-
         Owner and PBX Admin only (only an Owner can delete an extension assigned to an Owner).
         Refused with 409 when the extension is still referenced (for example by a ring group
-        member, a queue membership, or a call-tracking or blacklist entry); the 409 body lists
+        member, a queue membership, or a blacklist entry); the 409 body lists
         the references. A `user` extension is removed from Cloudonix first.
       operationId: deleteExtension
       security:

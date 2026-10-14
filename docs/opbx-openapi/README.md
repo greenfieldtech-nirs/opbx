@@ -93,7 +93,6 @@ or Redoc. Validate it with the Redocly command under [Validation](#validation).
 | **AI Assistants** | AI assistant configuration and providers |
 | **AI Load Balancers** | Load balancer configuration |
 | **Call Detail Records** | CDR records, statistics, export and recording |
-| **Call Tracking** | Campaigns, numbers, DNI, sessions, analytics, notifications, ad-platform integrations |
 | **Recordings** | Recording management and download |
 | **Inbound Blacklist** | Blocked caller management |
 | **Outbound Whitelist** | Outbound dialing restrictions |
@@ -161,7 +160,6 @@ All platform routes require a Sanctum user with the platform-manager flag
 | Registration | 10 requests/hour per IP |
 | Email validation | 10 requests/minute per IP |
 | Embedded Dialer API | 60 requests/minute per token and IP |
-| Call tracking DNI swap | 60 requests/minute per organization and IP |
 | Public status / public queues wallboard / platform status check | 60 / 120 / 6 requests/minute |
 | Dialer worker API | 1000 requests/minute per IP (`DIALER_WORKER_RATE_LIMIT`) |
 | Cloudonix webhooks, voice routing and voice callbacks | Not rate-limited |

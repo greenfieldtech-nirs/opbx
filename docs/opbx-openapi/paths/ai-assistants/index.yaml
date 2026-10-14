@@ -240,8 +240,8 @@ paths:
       description: |
         Delete an AI assistant. Owner and PBX Admin only. Refused with 409 while anything still
         points at it: an AI assistant extension, a call queue or AI load balancer fallback, AI
-        load balancer membership, or other routing (DID routing, IVR options, business hours,
-        call tracking). The 409 body lists the references.
+        load balancer membership, or other routing (DID routing, IVR options, business
+        hours). The 409 body lists the references.
       operationId: deleteAiAssistant
       security:
       - bearerAuth: []

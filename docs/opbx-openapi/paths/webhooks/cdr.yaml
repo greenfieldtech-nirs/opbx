@@ -8,9 +8,8 @@ paths:
         Call Detail Record webhook sent by Cloudonix after a call ends. Validated by
         `CdrRequest` and processed synchronously: stores the call detail record (a replay of
         an already stored CDR answers `CDR already recorded`), updates the call log
-        (recording URL, duration), records a final session status, finalizes auto-dialer and
-        call queue calls, and creates call tracking sessions when the number is a tracking
-        number. The AMD result in `session.profile.amd` is read for auto-dialer calls.
+        (recording URL, duration), records a final session status, and finalizes auto-dialer
+        and call queue calls. The AMD result in `session.profile.amd` is read for auto-dialer calls.
 
         Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
         `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400

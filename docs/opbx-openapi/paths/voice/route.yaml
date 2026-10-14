@@ -24,7 +24,7 @@ paths:
         - `Direction` `outbound`: outbound whitelist routing only.
         - `Direction` `inbound` (or missing/other): inbound blacklist check on the DID, then
           the DID's configured destination (extension, ring group, IVR menu, business hours,
-          conference room, call queue, AI assistant, AI load balancer, call tracking). A call
+          conference room, call queue, AI assistant, AI load balancer). A call
           from one of the organization's own DIDs is routed like a subscriber call.
 
         When nothing matches, the response is 200 CXML that says the reason (for example
