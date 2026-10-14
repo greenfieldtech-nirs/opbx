@@ -573,14 +573,14 @@ export default function PhoneNumbers() {
                             "text-xs transition-all",
                             updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id
                               ? 'opacity-50 cursor-wait'
-                              : 'cursor-pointer hover:scale-105 active:scale-95',
+                              : canManage && 'cursor-pointer hover:scale-105 active:scale-95',
                             phoneNumber.status === 'active'
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!updateMutation.isPending) {
+                            if (canManage && !updateMutation.isPending) {
                               handleToggleStatus(phoneNumber);
                             }
                           }}
@@ -596,7 +596,7 @@ export default function PhoneNumbers() {
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Click to toggle status</p>
+                        <p>{canManage ? 'Click to toggle status' : 'Only Owners and PBX Admins can change the status'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
