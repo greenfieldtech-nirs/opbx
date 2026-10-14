@@ -15,7 +15,6 @@ paths:
       operationId: listCallDetailRecords
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-detail-records:read
       parameters:
@@ -160,7 +159,6 @@ paths:
       operationId: getCallDetailRecord
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-detail-records:read
       responses:

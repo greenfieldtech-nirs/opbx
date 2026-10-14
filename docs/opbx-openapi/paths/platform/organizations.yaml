@@ -11,7 +11,6 @@ paths:
       operationId: listOrganizations
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
@@ -103,7 +102,6 @@ paths:
       operationId: getOrganization
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Organization with its users, counts and masked Cloudonix settings
@@ -176,7 +174,6 @@ paths:
       operationId: updatePlatformOrganization
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:

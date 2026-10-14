@@ -7,7 +7,6 @@ paths:
       operationId: testNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
       description: |

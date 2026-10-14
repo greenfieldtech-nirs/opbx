@@ -15,7 +15,6 @@ paths:
       operationId: getDefaultCallerId
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: phone-numbers:read
       responses:
@@ -59,7 +58,6 @@ paths:
       operationId: setDefaultCallerId
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: phone-numbers:write
       requestBody:

@@ -13,7 +13,6 @@ paths:
       operationId: getCdrStatistics
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-detail-records:read
       parameters:

@@ -12,7 +12,6 @@ paths:
       operationId: listCallQueues
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:read
       parameters:
@@ -74,7 +73,6 @@ paths:
       operationId: createCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:write
       requestBody:
@@ -114,7 +112,6 @@ paths:
       operationId: listMyQueueMemberships
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:read
       responses:
@@ -150,7 +147,6 @@ paths:
       operationId: getCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:read
       parameters:
@@ -197,7 +193,6 @@ paths:
       operationId: updateCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:write
       parameters:
@@ -242,7 +237,6 @@ paths:
       operationId: patchCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:write
       parameters:
@@ -287,7 +281,6 @@ paths:
       operationId: deleteCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:write
       parameters:
@@ -320,7 +313,6 @@ paths:
       operationId: updateMyQueueAgentState
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:write
       parameters:
@@ -379,7 +371,6 @@ paths:
       operationId: getCallQueueStats
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:read
       parameters:
@@ -417,7 +408,6 @@ paths:
       operationId: getCallQueueLive
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-queues:read
       parameters:
@@ -448,7 +438,6 @@ paths:
       operationId: listQueueCalls
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: queue-calls:read
       parameters:
@@ -508,7 +497,6 @@ paths:
       operationId: exportQueueCalls
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: queue-calls:read
       parameters:

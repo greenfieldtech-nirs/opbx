@@ -8,7 +8,6 @@ paths:
       operationId: getPlatformDashboard
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Cross-tenant counts plus the latest organizations and audit log entries

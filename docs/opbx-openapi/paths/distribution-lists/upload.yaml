@@ -39,7 +39,6 @@ paths:
       operationId: uploadDistributionListCsv
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       requestBody:
@@ -188,7 +187,6 @@ paths:
       operationId: previewDistributionListCsv
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       requestBody:
@@ -273,7 +271,6 @@ paths:
       operationId: getUploadProgress
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       responses:

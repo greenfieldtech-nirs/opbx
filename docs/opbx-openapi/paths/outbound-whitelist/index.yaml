@@ -12,7 +12,6 @@ paths:
       operationId: listOutboundWhitelistEntrys
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:read
       parameters:
@@ -72,7 +71,6 @@ paths:
         here: new entries are `active` (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:write
       requestBody:
@@ -144,7 +142,6 @@ paths:
       operationId: getOutboundWhitelistEntry
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:read
       responses:
@@ -172,7 +169,6 @@ paths:
       description: Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:write
       requestBody:
@@ -238,7 +234,6 @@ paths:
       description: Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:write
       requestBody:
@@ -305,7 +300,6 @@ paths:
       description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:write
       responses:

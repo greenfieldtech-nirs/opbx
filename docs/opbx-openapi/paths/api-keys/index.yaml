@@ -12,7 +12,6 @@ paths:
       operationId: listApiKeys
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: List of API keys
@@ -41,7 +40,6 @@ paths:
       operationId: createApiKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -97,7 +95,6 @@ paths:
       operationId: listGrantableResources
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: List of grantable resource slugs
@@ -155,7 +152,6 @@ paths:
       operationId: getApiKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: API key details
@@ -184,7 +180,6 @@ paths:
       operationId: updateApiKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -233,7 +228,6 @@ paths:
       operationId: patchApiKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -281,7 +275,6 @@ paths:
       operationId: revokeApiKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: API key revoked

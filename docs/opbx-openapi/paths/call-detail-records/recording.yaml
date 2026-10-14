@@ -21,7 +21,6 @@ paths:
       operationId: streamCallDetailRecordRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-detail-records:read
       responses:

@@ -20,7 +20,6 @@ paths:
       operationId: getPlatformUserDeleteImpact
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Deletion impact preview

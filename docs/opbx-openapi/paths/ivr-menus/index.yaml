@@ -11,7 +11,6 @@ paths:
       operationId: listIVRMenus
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:read
       parameters:
@@ -67,7 +66,6 @@ paths:
       operationId: createIVRMenu
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:write
       requestBody:
@@ -111,7 +109,6 @@ paths:
       operationId: getIVRMenu
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:read
       responses:
@@ -141,7 +138,6 @@ paths:
       operationId: updateIVRMenu
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:write
       requestBody:
@@ -179,7 +175,6 @@ paths:
       operationId: deleteIVRMenu
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:write
       responses:

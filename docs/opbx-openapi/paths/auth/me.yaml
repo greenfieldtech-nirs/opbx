@@ -17,7 +17,6 @@ paths:
       operationId: getCurrentUser
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Current user details

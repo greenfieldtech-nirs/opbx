@@ -67,7 +67,6 @@ paths:
       operationId: downloadRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:read
       parameters:

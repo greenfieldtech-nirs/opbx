@@ -13,7 +13,6 @@ paths:
       operationId: validateCloudonixCredentials
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:

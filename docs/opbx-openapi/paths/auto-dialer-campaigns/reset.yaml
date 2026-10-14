@@ -24,7 +24,6 @@ paths:
       operationId: resetCampaignCac
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:
@@ -86,7 +85,6 @@ paths:
       operationId: resetCampaignCallerIdCycle
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:

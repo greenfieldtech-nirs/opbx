@@ -10,7 +10,6 @@ paths:
       operationId: compareSyncStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: extensions:read
       responses:
@@ -50,7 +49,6 @@ paths:
       operationId: syncExtensions
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: extensions:write
       responses:

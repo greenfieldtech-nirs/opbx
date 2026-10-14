@@ -14,7 +14,6 @@ paths:
       operationId: getWebPhoneCallsLog
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Recent calls for the authenticated user

@@ -10,7 +10,6 @@ paths:
       operationId: getOutboundTrunks
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Outbound trunks of the Cloudonix domain

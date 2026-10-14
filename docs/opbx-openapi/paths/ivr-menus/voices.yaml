@@ -7,7 +7,6 @@ paths:
       operationId: getIvrVoices
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:read
       description: |

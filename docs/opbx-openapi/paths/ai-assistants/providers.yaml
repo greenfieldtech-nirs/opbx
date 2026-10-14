@@ -10,7 +10,6 @@ paths:
       operationId: listAiAssistantProviders
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ai-assistant-providers:read
       responses:
@@ -101,7 +100,6 @@ paths:
       operationId: getAiAssistantProvider
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ai-assistant-providers:read
       parameters:
@@ -140,7 +138,6 @@ paths:
       operationId: getProvidersByProtocol
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ai-assistant-providers:read
       parameters:

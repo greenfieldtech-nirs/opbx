@@ -10,7 +10,6 @@ paths:
       operationId: listExtensions
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:read
       parameters:
@@ -89,7 +88,6 @@ paths:
       operationId: createExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:write
       requestBody:
@@ -226,7 +224,6 @@ paths:
       operationId: getExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:read
       parameters:
@@ -260,7 +257,6 @@ paths:
       operationId: updateExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:write
       parameters:
@@ -395,7 +391,6 @@ paths:
       operationId: patchExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:write
       parameters:
@@ -534,7 +529,6 @@ paths:
       operationId: deleteExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: extensions:write
       parameters:

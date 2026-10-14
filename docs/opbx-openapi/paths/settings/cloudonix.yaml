@@ -12,7 +12,6 @@ paths:
       operationId: getCloudonixSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Settings (settings is null when not configured yet)
@@ -85,7 +84,6 @@ paths:
       operationId: updateCloudonixSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:

@@ -7,7 +7,6 @@ paths:
       operationId: getBlockedCallLogs
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:read
       description: |

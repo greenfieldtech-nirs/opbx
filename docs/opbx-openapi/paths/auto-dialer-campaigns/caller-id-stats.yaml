@@ -21,7 +21,6 @@ paths:
       operationId: getCampaignCallerIdStats
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       responses:

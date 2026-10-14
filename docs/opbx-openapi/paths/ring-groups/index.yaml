@@ -7,7 +7,6 @@ paths:
       operationId: listRingGroups
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:read
       parameters:
@@ -86,7 +85,6 @@ paths:
       operationId: createRingGroup
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:write
       requestBody:
@@ -136,7 +134,6 @@ paths:
       operationId: getRingGroup
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:read
       responses:
@@ -168,7 +165,6 @@ paths:
       operationId: updateRingGroup
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:write
       requestBody:
@@ -214,7 +210,6 @@ paths:
       operationId: patchRingGroup
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:write
       requestBody:
@@ -261,7 +256,6 @@ paths:
       operationId: deleteRingGroup
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ring-groups:write
       responses:

@@ -12,7 +12,6 @@ paths:
       operationId: listAiLoadBalancers
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:read
       parameters:
@@ -82,7 +81,6 @@ paths:
       operationId: createAiLoadBalancer
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
@@ -129,7 +127,6 @@ paths:
       operationId: getAiLoadBalancer
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:read
       responses:
@@ -160,7 +157,6 @@ paths:
       operationId: updateAiLoadBalancer
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
@@ -207,7 +203,6 @@ paths:
       operationId: patchAiLoadBalancer
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:write
       requestBody:
@@ -254,7 +249,6 @@ paths:
       operationId: deleteAiLoadBalancer
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistant-load-balancers:write
       responses:

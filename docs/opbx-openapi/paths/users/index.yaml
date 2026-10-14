@@ -13,7 +13,6 @@ paths:
       operationId: listUsers
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:read
       parameters:
@@ -80,7 +79,6 @@ paths:
       operationId: createUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:write
       requestBody:
@@ -202,7 +200,6 @@ paths:
       operationId: getUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:read
       parameters:
@@ -248,7 +245,6 @@ paths:
       operationId: updateUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:write
       parameters:
@@ -370,7 +366,6 @@ paths:
       operationId: patchUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:write
       parameters:
@@ -484,7 +479,6 @@ paths:
       operationId: deleteUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: users:write
       parameters:

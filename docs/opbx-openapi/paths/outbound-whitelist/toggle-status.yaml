@@ -8,7 +8,6 @@ paths:
       description: Owner and PBX Admin only. Flips `status` between `active` and `inactive`.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: outbound-whitelist:write
       parameters:

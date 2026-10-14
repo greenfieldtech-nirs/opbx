@@ -31,7 +31,6 @@ paths:
       operationId: copyDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       requestBody:
@@ -114,7 +113,6 @@ paths:
       operationId: archiveDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       responses:
@@ -172,7 +170,6 @@ paths:
       operationId: downloadDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       responses:
@@ -224,7 +221,6 @@ paths:
       operationId: getListValidationErrors
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       responses:
@@ -301,7 +297,6 @@ paths:
       operationId: assignListToCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       requestBody:
@@ -397,7 +392,6 @@ paths:
       operationId: unassignListFromCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       responses:
@@ -481,7 +475,6 @@ paths:
       operationId: resetListPendingDestinations
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       responses:

@@ -11,7 +11,6 @@ paths:
       operationId: listConferenceRooms
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:read
       parameters:
@@ -69,7 +68,6 @@ paths:
       operationId: createConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:write
       requestBody:
@@ -117,7 +115,6 @@ paths:
       operationId: getConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:read
       responses:
@@ -145,7 +142,6 @@ paths:
       operationId: updateConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:write
       requestBody:
@@ -182,7 +178,6 @@ paths:
       operationId: patchConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:write
       requestBody:
@@ -223,7 +218,6 @@ paths:
       operationId: deleteConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: conference-rooms:write
       responses:

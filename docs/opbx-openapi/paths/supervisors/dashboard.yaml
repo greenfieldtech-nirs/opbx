@@ -14,7 +14,6 @@ paths:
       operationId: getSupervisorDashboard
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: dashboard:read
       responses:

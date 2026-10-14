@@ -21,7 +21,6 @@ paths:
       operationId: listCampaignDestinations
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       parameters:
@@ -209,7 +208,6 @@ paths:
       operationId: getCampaignConcurrency
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       responses:

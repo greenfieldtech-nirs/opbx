@@ -10,7 +10,6 @@ paths:
       operationId: listBusinessHoursSchedules
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:read
       parameters:
@@ -54,7 +53,6 @@ paths:
       operationId: createBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:write
       requestBody:
@@ -100,7 +98,6 @@ paths:
       operationId: getBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:read
       responses:
@@ -133,7 +130,6 @@ paths:
       operationId: updateBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:write
       requestBody:
@@ -173,7 +169,6 @@ paths:
       operationId: patchBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:write
       requestBody:
@@ -212,7 +207,6 @@ paths:
       operationId: deleteBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:write
       responses:

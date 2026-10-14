@@ -29,7 +29,6 @@ paths:
       operationId: getUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Embed token settings
@@ -62,7 +61,6 @@ paths:
       operationId: updateUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -131,7 +129,6 @@ paths:
       operationId: regenerateUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Token regenerated. `token` and `snippet` are one-time values.

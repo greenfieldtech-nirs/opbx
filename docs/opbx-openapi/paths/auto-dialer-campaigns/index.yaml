@@ -10,7 +10,6 @@ paths:
       operationId: listAutoDialerCampaigns
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       parameters:
@@ -86,7 +85,6 @@ paths:
       operationId: createAutoDialerCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
@@ -534,7 +532,6 @@ paths:
       operationId: getAutoDialerCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       responses:
@@ -568,7 +565,6 @@ paths:
       operationId: updateAutoDialerCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
@@ -982,7 +978,6 @@ paths:
       operationId: patchAutoDialerCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
@@ -1392,7 +1387,6 @@ paths:
       operationId: deleteAutoDialerCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:
@@ -1421,7 +1415,6 @@ paths:
       operationId: getAvailableCallerIds
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       parameters:

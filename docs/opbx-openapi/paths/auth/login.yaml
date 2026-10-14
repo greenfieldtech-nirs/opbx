@@ -5,19 +5,11 @@ paths:
         - Authentication
       summary: User login
       description: |
-        Authenticate user and issue authentication credentials.
-        
-        Supports two authentication modes:
-        - **Cookie-based (SPA)**: Returns user data, sets httpOnly session cookie
-        - **Token-based (API)**: Returns API token for bearer authentication
-        
-        Mode is automatically detected based on request headers, in this order:
-        - Token auth if an `Authorization: Bearer` header is present
-        - Cookie auth if `X-Auth-Mode: cookie`; token auth if `X-Auth-Mode: token`
-        - Cookie auth if an `X-Requested-With` header is present (any value)
-        - Otherwise token-based auth
+        Authenticate a user and issue a Sanctum Bearer token. The web app and API
+        clients both authenticate with `Authorization: Bearer <token>`; the API
+        does not use session cookies.
 
-        Token-based login revokes all of the user's existing tokens and issues a
+        Login revokes all of the user's existing tokens and issues a
         new one with role-scoped abilities, valid for 24 hours.
 
         Rate limited to 5 attempts per minute per IP (`RATE_LIMIT_AUTH`).
@@ -51,61 +43,33 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - title: Cookie Auth Response
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Login successful
-                      user:
-                        description: >-
-                          Subset of the User object: `id`, `organization_id`, `name`, `email`,
-                          `role`, `status`, `is_platform_manager` and `social_identities`
-                          (`[{provider, provider_email}]`). `phone`, `extension` and
-                          timestamps are not returned.
-                        allOf:
-                          - $ref: '../../components/schemas/User.yaml'
-                    required:
-                      - message
-                      - user
-                  - title: Token Auth Response
-                    type: object
-                    properties:
-                      access_token:
-                        type: string
-                        description: Bearer token for API authentication
-                        example: 1|laravel_sanctum_token_xyz123
-                      token_type:
-                        type: string
-                        example: Bearer
-                      expires_in:
-                        type: integer
-                        description: Token expiration in seconds
-                        example: 86400
-                      user:
-                        description: Same user subset as the cookie response.
-                        allOf:
-                          - $ref: '../../components/schemas/User.yaml'
-                    required:
-                      - access_token
-                      - token_type
-                      - expires_in
-                      - user
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: Bearer token for API authentication
+                    example: 1|laravel_sanctum_token_xyz123
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    description: Token expiration in seconds
+                    example: 86400
+                  user:
+                    description: >-
+                      Subset of the User object: `id`, `organization_id`, `name`, `email`,
+                      `role`, `status`, `is_platform_manager` and `social_identities`
+                      (`[{provider, provider_email}]`). `phone`, `extension` and
+                      timestamps are not returned.
+                    allOf:
+                      - $ref: '../../components/schemas/User.yaml'
+                required:
+                  - access_token
+                  - token_type
+                  - expires_in
+                  - user
               examples:
-                cookieAuth:
-                  summary: Cookie-based authentication
-                  value:
-                    message: Login successful
-                    user:
-                      id: 123
-                      organization_id: 1
-                      name: John Doe
-                      email: john@example.com
-                      role: owner
-                      status: active
-                      is_platform_manager: false
-                      social_identities: []
                 tokenAuth:
                   summary: Token-based authentication
                   value:
@@ -121,11 +85,6 @@ paths:
                       status: active
                       is_platform_manager: false
                       social_identities: []
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-              description: Session cookie (only in cookie auth mode)
         '401':
           description: Invalid credentials
           content:

@@ -16,7 +16,6 @@ paths:
       operationId: getTrunk
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:read
       responses:
@@ -71,7 +70,6 @@ paths:
       operationId: updateTrunk
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:write
       requestBody:
@@ -171,7 +169,6 @@ paths:
       operationId: patchTrunk
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:write
       requestBody:
@@ -264,7 +261,6 @@ paths:
       operationId: deleteTrunk
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:write
       responses:

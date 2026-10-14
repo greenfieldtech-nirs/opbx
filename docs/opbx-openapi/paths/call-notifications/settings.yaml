@@ -7,7 +7,6 @@ paths:
       operationId: getNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
       description: Owner and PBX Admin only. The organization has at most one settings record.
@@ -38,7 +37,6 @@ paths:
       operationId: createNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
       description: |
@@ -94,7 +92,6 @@ paths:
       operationId: updateNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
       description: |
@@ -146,7 +143,6 @@ paths:
       operationId: deleteNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
       description: Owner and PBX Admin only.

@@ -8,7 +8,6 @@ paths:
       operationId: toggleIvrMenuStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: ivr-menus:write
       parameters:

@@ -21,7 +21,6 @@ paths:
       operationId: getUserDeleteImpact
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: users:read
       responses:

@@ -24,7 +24,6 @@ paths:
       operationId: getCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:read
       responses:
@@ -100,7 +99,6 @@ paths:
       operationId: uploadCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
@@ -202,7 +200,6 @@ paths:
       operationId: deleteCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:

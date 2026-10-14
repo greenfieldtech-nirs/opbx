@@ -12,7 +12,6 @@ paths:
       operationId: listPlatformCdrArchive
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'

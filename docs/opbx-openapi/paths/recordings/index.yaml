@@ -7,7 +7,6 @@ paths:
       operationId: listRecordings
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:read
       description: |
@@ -60,7 +59,6 @@ paths:
       operationId: createRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:write
       description: |
@@ -132,7 +130,6 @@ paths:
       operationId: getRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:read
       responses:
@@ -160,7 +157,6 @@ paths:
       operationId: updateRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:write
       requestBody:
@@ -206,7 +202,6 @@ paths:
       operationId: patchRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:write
       requestBody:
@@ -255,7 +250,6 @@ paths:
       operationId: deleteRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: recordings:write
       responses:

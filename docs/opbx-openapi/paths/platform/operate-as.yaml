@@ -32,7 +32,6 @@ paths:
       operationId: startOperateAsOrganization
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: false
         content:
@@ -119,7 +118,6 @@ paths:
       operationId: stopOperateAsOrganization
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: false
         content:

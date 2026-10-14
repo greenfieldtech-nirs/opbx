@@ -20,7 +20,6 @@ paths:
       operationId: listDistributionLists
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       parameters:
@@ -102,7 +101,6 @@ paths:
       operationId: createDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       requestBody:
@@ -162,7 +160,6 @@ paths:
       operationId: downloadExampleCsv
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       responses:
@@ -216,7 +213,6 @@ paths:
       operationId: getDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:read
       responses:
@@ -253,7 +249,6 @@ paths:
       operationId: deleteDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: distribution-lists:write
       responses:

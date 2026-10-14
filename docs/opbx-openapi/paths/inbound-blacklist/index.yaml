@@ -7,7 +7,6 @@ paths:
       operationId: listInboundBlacklistEntrys
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:read
       description: |
@@ -73,7 +72,6 @@ paths:
         and `torment_music_timeout` for non-torment entries) are absent from it.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:write
       requestBody:
@@ -147,7 +145,6 @@ paths:
       operationId: getInboundBlacklistEntry
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:read
       responses:
@@ -175,7 +172,6 @@ paths:
       description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:write
       requestBody:
@@ -242,7 +238,6 @@ paths:
       description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:write
       requestBody:
@@ -310,7 +305,6 @@ paths:
       description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:write
       responses:

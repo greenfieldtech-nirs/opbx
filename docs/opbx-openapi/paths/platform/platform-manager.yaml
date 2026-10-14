@@ -12,7 +12,6 @@ paths:
       operationId: setPlatformManager
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: user
           in: path

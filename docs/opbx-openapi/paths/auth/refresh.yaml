@@ -5,49 +5,31 @@ paths:
         - Authentication
       summary: Refresh authentication
       description: |
-        Refresh authentication credentials.
-        
-        Supports both authentication modes:
-        - Cookie-based (session authenticated and no bearer token): regenerates
-          the session and returns the user
-        - Token-based: revokes the current token and issues a new one with
-          role-scoped abilities (no `user` in the response)
+        Refresh the Bearer token: revokes the current token and issues a new one
+        with role-scoped abilities (no `user` in the response).
 
         Token expires in 24 hours (1440 minutes). Not rate limited.
       operationId: refreshAuth
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Authentication refreshed successfully
           content:
             application/json:
               schema:
-                oneOf:
-                  - title: Cookie Auth Response
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Session refreshed successfully
-                      user:
-                        description: Same user subset as `POST /v1/auth/login`.
-                        allOf:
-                          - $ref: '../../components/schemas/User.yaml'
-                  - title: Token Auth Response
-                    type: object
-                    properties:
-                      access_token:
-                        type: string
-                        description: New bearer token
-                        example: 1|new_laravel_sanctum_token_abc456
-                      token_type:
-                        type: string
-                        example: Bearer
-                      expires_in:
-                        type: integer
-                        description: Token expiration in seconds
-                        example: 86400
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: New bearer token
+                    example: 1|new_laravel_sanctum_token_abc456
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    description: Token expiration in seconds
+                    example: 86400
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'

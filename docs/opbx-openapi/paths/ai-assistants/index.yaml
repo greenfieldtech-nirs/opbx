@@ -12,7 +12,6 @@ paths:
       operationId: listAiAssistants
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:read
       parameters:
@@ -85,7 +84,6 @@ paths:
       operationId: createAiAssistant
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:write
       requestBody:
@@ -135,7 +133,6 @@ paths:
       operationId: getAiAssistant
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:read
       responses:
@@ -165,7 +162,6 @@ paths:
       operationId: updateAiAssistant
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:write
       requestBody:
@@ -203,7 +199,6 @@ paths:
       operationId: patchAiAssistant
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:write
       requestBody:
@@ -245,7 +240,6 @@ paths:
       operationId: deleteAiAssistant
       security:
       - bearerAuth: []
-      - cookieAuth: []
       - apiKeyAuth: []
       x-api-key-scope: ai-assistants:write
       responses:

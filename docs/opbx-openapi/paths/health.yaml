@@ -40,7 +40,6 @@ paths:
       operationId: storageHealthCheck
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Storage is healthy
@@ -91,7 +90,6 @@ paths:
       operationId: websocketHealthCheck
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: WebSocket is healthy

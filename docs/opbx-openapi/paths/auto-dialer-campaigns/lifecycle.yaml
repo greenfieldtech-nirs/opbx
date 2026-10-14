@@ -25,7 +25,6 @@ paths:
       operationId: startAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:
@@ -81,7 +80,6 @@ paths:
       operationId: pauseAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:
@@ -128,7 +126,6 @@ paths:
       operationId: resumeAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:
@@ -175,7 +172,6 @@ paths:
       operationId: archiveAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: auto-dialer-campaigns:write
       responses:

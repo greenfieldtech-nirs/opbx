@@ -16,7 +16,6 @@ paths:
       operationId: getWebPhoneConfig
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: SIP provisioning for the browser softphone

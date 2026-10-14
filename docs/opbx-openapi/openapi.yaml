@@ -15,11 +15,9 @@ info:
     Each operation lists the schemes it accepts in `security`:
 
     - **Bearer token** (`bearerAuth`, used by API clients and by the web app):
-      `POST /v1/auth/login` without `X-Requested-With` (or with `X-Auth-Mode: token`) returns
-      a Sanctum personal access token that expires after 24 hours. Send it as
-      `Authorization: Bearer <token>`.
-    - **Cookie session** (`cookieAuth`): httpOnly session cookie + CSRF protection
-      (`GET /sanctum/csrf-cookie`, then the `X-XSRF-TOKEN` header).
+      `POST /v1/auth/login` returns a Sanctum personal access token that expires after
+      24 hours. Send it as `Authorization: Bearer <token>`. The API does not use session
+      cookies.
     - **Organization API key** (`apiKeyAuth`, `opbxk_...`): only on operations that carry
       `x-api-key-scope`; every other operation answers API keys with 403.
     - **Embedded Dialer token** (`embedTokenAuth`, `opbxd_...`): only for `/v1/embed/*`.
@@ -201,7 +199,6 @@ servers:
 
 security:
   - bearerAuth: []
-  - cookieAuth: []
 
 paths:
   /callbacks/voice/albs-follow-through:
@@ -825,18 +822,9 @@ components:
       scheme: bearer
       bearerFormat: Sanctum
       description: |
-        Laravel Sanctum personal access token returned by `POST /v1/auth/login` in token mode
+        Laravel Sanctum personal access token returned by `POST /v1/auth/login`
         (also by `POST /v1/auth/refresh` and the Auth0 callback). Login revokes the user's
         previous tokens; a token expires after 24 hours.
-    cookieAuth:
-      type: apiKey
-      in: header
-      name: X-XSRF-TOKEN
-      description: |
-        Cookie-based SPA authentication. The browser sends the httpOnly session cookie
-        automatically (name from `SESSION_COOKIE`, by default the slug of `APP_NAME` plus
-        `-session`); the `X-XSRF-TOKEN` header must contain the decoded value of the
-        `XSRF-TOKEN` cookie for CSRF protection.
     webhookBearer:
       type: http
       scheme: bearer

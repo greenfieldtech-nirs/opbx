@@ -15,7 +15,6 @@ paths:
       operationId: getQueuesDashboardLink
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Dashboard link
@@ -47,7 +46,6 @@ paths:
       operationId: regenerateQueuesDashboardLink
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: New dashboard link (previous link is revoked)

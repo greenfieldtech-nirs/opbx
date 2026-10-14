@@ -7,7 +7,6 @@ paths:
       operationId: getNotificationRateLimit
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
       description: Owner and PBX Admin only. Webhook deliveries counted in the current one-minute window against the organization's `rate_limit_per_minute` (500 when no settings exist).

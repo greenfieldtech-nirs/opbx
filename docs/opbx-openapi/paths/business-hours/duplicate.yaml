@@ -12,7 +12,6 @@ paths:
       operationId: duplicateBusinessHours
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: business-hours:write
       parameters:

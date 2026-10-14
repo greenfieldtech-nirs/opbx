@@ -7,7 +7,6 @@ paths:
       operationId: getNotificationLogs
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
       description: >-

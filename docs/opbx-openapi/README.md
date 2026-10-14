@@ -53,8 +53,7 @@ Each operation lists the schemes it accepts in `security`:
 
 | Scheme | Used by |
 |--------|---------|
-| `bearerAuth` | Sanctum personal access token (`Authorization: Bearer <token>`) |
-| `cookieAuth` | SPA session: `GET /sanctum/csrf-cookie`, then the session cookie plus `X-XSRF-TOKEN` |
+| `bearerAuth` | Sanctum personal access token (`Authorization: Bearer <token>`), used by the web app and API clients |
 | `apiKeyAuth` | Organization API key (`Authorization: Bearer opbxk_...`). Only on operations that carry `x-api-key-scope: <resource>:<read\|write>`; GET needs `read`, other methods `write`. Everything else answers API keys with 403. |
 | `embedTokenAuth` | Embedded Dialer token (`opbxd_...`) for `/v1/embed/*` |
 | `webhookBearer` | Cloudonix webhooks: `Authorization: Bearer <domain_requests_api_key>` of the organization named in the payload. Organizations without a key are accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. |
@@ -243,7 +242,7 @@ routing (`/api/voice/...`, `/api/callbacks/voice/...`) are not versioned.
 
 ## Security
 
-- Authenticated endpoints require a Sanctum token or session cookie (or an API key / Embedded Dialer token where the operation allows it)
+- Authenticated endpoints require a Sanctum Bearer token (or an API key / Embedded Dialer token where the operation allows it)
 - Cloudonix webhooks use the organization's `domain_requests_api_key` as a Bearer token (no HMAC)
 - Voice routing uses the same organization-specific Bearer token
 - Platform endpoints require the platform manager flag

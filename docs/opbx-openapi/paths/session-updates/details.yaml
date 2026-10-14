@@ -10,7 +10,6 @@ paths:
       operationId: getSessionDetails
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: session-updates:read
       parameters:

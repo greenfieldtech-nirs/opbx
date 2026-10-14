@@ -10,7 +10,6 @@ paths:
       operationId: generateRequestsKey
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: A new random key (not stored)

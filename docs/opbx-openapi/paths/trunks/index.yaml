@@ -11,7 +11,6 @@ paths:
       operationId: listTrunks
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:read
       parameters:
@@ -82,7 +81,6 @@ paths:
       operationId: createTrunk
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: trunks:write
       requestBody:

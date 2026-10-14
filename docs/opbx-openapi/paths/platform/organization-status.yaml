@@ -17,7 +17,6 @@ paths:
       operationId: updateOrganizationStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: organization
           in: path

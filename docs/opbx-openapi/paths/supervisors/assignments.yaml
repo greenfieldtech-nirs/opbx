@@ -12,7 +12,6 @@ paths:
       operationId: getSupervisorAssignments
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: supervisors:read
       parameters:
@@ -50,7 +49,6 @@ paths:
       operationId: updateSupervisorAssignments
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: supervisors:write
       parameters:
