@@ -20,11 +20,16 @@ Use the **Schedule** tab of the campaign form to keep calls inside legal and pol
 
 ## Set the schedule
 
-1. Open the campaign's **Edit** form (or **Create Campaign**) and select the **Schedule** tab.
-2. Choose the **Timezone**.
-3. Set the **Start Date** and **End Date**.
-4. In **Active Hours**, click hour slots to turn them on (green) or off.
-5. Save.
+Who can do this: Owner and PBX Admin.
+
+1. Open **Auto Dialer → Campaign Manager**. Pause the campaign if it is Running.
+2. Click **Edit** on the campaign (or **Create Campaign** for a new one) and select the **Schedule** tab.
+3. Choose the **Timezone**.
+4. Set the **Start Date** and **End Date**.
+5. In **Active Hours**, click time slots to turn them on (green) or off ("Click on time slots to toggle active hours. Green = Active, Empty = Inactive.").
+6. Click **Update Campaign** (or **Create Campaign**).
+
+Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears. The detail page shows the **Timezone**, **Date Range** and **Active Days**. The dialer worker applies the new window from its next poll.
 
 ![Schedule tab weekly grid with Monday to Friday 09:00 to 17:00 highlighted](../../img/screens/auto-dialer-schedule-tab.jpg)
 
@@ -33,8 +38,8 @@ Use the **Schedule** tab of the campaign form to keep calls inside legal and pol
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Timezone | Required. The form lists common zones grouped by region (Americas, Europe, Asia, Africa, Australia, Pacific, UTC); the API accepts any IANA name such as `America/New_York`. Default: UTC | All dates and hours are read in this zone |
-| Start Date | Required. Today or later when you create; any date when you edit | First calendar day dialing is allowed |
-| End Date | Required. On or after the start date | Last calendar day dialing is allowed (inclusive) |
+| Start Date | Required. Default: today. Today or later when you create; any date when you edit | First calendar day dialing is allowed |
+| End Date | Required. Default: 30 days from today. On or after the start date | Last calendar day dialing is allowed (inclusive) |
 | Active Hours | One-hour slots, per weekday. New campaigns start with Monday to Friday, 09:00 to 17:00 | When dialing is allowed each day |
 
 Set the timezone of the people you are calling, not your own. A campaign in `America/New_York` with 09:00 to 17:00 dials 09:00 to 17:00 New York time wherever OPBX runs.
@@ -63,11 +68,13 @@ Campaign: `America/New_York`, 1 to 31 October 2026, Monday to Friday 09:00 to 17
 
 ## Auto-start
 
-The **Auto-start** option (Advanced tab) lets OPBX start a **Draft** campaign by itself. Every minute the scheduler looks for Draft campaigns with auto-start on and a **Ready** list linked to them, and starts each one whose window is open.
+The **Auto-start** option (Advanced tab, **Enabled** or **Disabled**) lets OPBX start a **Draft** campaign by itself. Every minute the scheduler looks for Draft campaigns with auto-start on and an assigned list that is **In Use** (or Ready), and starts each one whose window is open. The campaign's header then shows the **Auto-start** badge next to its status.
+
+To use it: set **Auto-start** to **Enabled** on the Advanced tab, save, then [assign a Ready list](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign). Leave the campaign in Draft.
 
 :::caution Auto-start uses the older schedule fields
 - Assigning a list through **Distribution Lists** leaves the campaign in **Draft** (the list becomes **In Use**), so auto-start can pick it up.
-- The auto-start check reads the older single daily window (the first enabled range's start and end hour, and the enabled weekdays), not every range in the grid. The end date itself is a valid day.
+- The auto-start check reads the older single daily window (the first enabled range's start and end hour, and the enabled weekdays), not every range in the grid. It starts a campaign from the start hour up to, but not including, the end hour. The end date itself is a valid day.
 - An auto-started campaign is dialed by the dialer worker, exactly like one you start by hand. There is no second dialing path.
 
 Treat auto-start as a convenience for simple Monday-to-Friday style windows, and verify on the [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) that the campaign behaves as expected.
