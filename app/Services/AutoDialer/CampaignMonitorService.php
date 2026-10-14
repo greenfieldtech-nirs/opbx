@@ -60,9 +60,8 @@ class CampaignMonitorService
     public function getConcurrencyStatus(AutoDialerCampaign $campaign): array
     {
         $cac = $campaign->concurrent_active_calls;
-        $activeCount = $this->getActiveCallCount($campaign->id);
-        $sessionTokens = Redis::smembers("campaign:{$campaign->id}:active_sessions") ?? [];
-        $activeSessions = $this->getActiveSessionDetails($campaign->id, $sessionTokens);
+        // Same live sources as the monitor detail: the worker's CAC counter and the call-session rows
+        $activeCount = $campaign->status === CampaignStatus::PAUSED ? 0 : $this->getWorkerActiveCalls($campaign->id);
 
         return [
             'cac_limit' => $cac,
@@ -70,7 +69,7 @@ class CampaignMonitorService
             'available_slots' => max(0, $cac - $activeCount),
             'utilization_percentage' => $this->calculateUtilization($activeCount, $cac),
             'api_interval_seconds' => $campaign->getApiIntervalMilliseconds() / 1000,
-            'active_sessions' => $activeSessions,
+            'active_sessions' => $this->getActiveSessions($campaign),
             'rate_limit_status' => $this->getRateLimitStatus($campaign),
         ];
     }
@@ -208,18 +207,6 @@ class CampaignMonitorService
     }
 
     /**
-     * Get the active call count from Redis.
-     *
-     * @param  int  $campaignId  The campaign ID
-     */
-    private function getActiveCallCount(int $campaignId): int
-    {
-        $count = (int) Redis::get("campaign:{$campaignId}:concurrency_counter");
-
-        return max(0, $count);
-    }
-
-    /**
      * Get active calls from the worker's Redis key.
      *
      * @param  int  $campaignId  The campaign ID
@@ -238,34 +225,6 @@ class CampaignMonitorService
 
             return 0;
         }
-    }
-
-    /**
-     * Get active session details from the database.
-     *
-     * @param  int  $campaignId  The campaign ID
-     * @param  array<int, string>  $sessionTokens  The session tokens to look up
-     * @return array<int, array<string, mixed>>
-     */
-    private function getActiveSessionDetails(int $campaignId, array $sessionTokens): array
-    {
-        if (empty($sessionTokens)) {
-            return [];
-        }
-
-        $sessions = AutoDialerCallSession::whereIn('session_token', $sessionTokens)
-            ->with('destination')
-            ->where('campaign_id', $campaignId)
-            ->get();
-
-        return $sessions->map(fn ($session) => [
-            'session_id' => $session->id,
-            'session_token' => $session->session_token,
-            'destination_id' => $session->destination_id,
-            'phone_number' => $session->destination?->phone_number ?? 'unknown',
-            'started_at' => $session->started_at?->toIso8601String(),
-            'duration_seconds' => $session->started_at ? now()->diffInSeconds($session->started_at) : 0,
-        ])->toArray();
     }
 
     /**
