@@ -10,7 +10,9 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:read
-      description: Paginated blocked-call log, newest first.
+      description: |
+        Paginated blocked-call log, newest first. Every authenticated user of the organization
+        can read it. Filters are applied only when present and are not validated.
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
@@ -31,12 +33,12 @@ paths:
           in: query
           schema:
             type: string
-          description: blocked_at lower bound
+          description: Inclusive `blocked_at` lower bound (any date/time string MySQL can compare, e.g. `2026-10-01` or `2026-10-01 00:00:00`)
         - name: to_date
           in: query
           schema:
             type: string
-          description: blocked_at upper bound
+          description: Inclusive `blocked_at` upper bound (same format as `from_date`)
         - name: rejection_strategy
           in: query
           schema:
@@ -70,9 +72,7 @@ paths:
                         caller_id:
                           type: string
                         called_number:
-                          type:
-                            - string
-                            - 'null'
+                          type: string
                         call_sid:
                           type:
                             - string
@@ -83,6 +83,7 @@ paths:
                             - 'null'
                         rejection_strategy:
                           type: string
+                          enum: [drop, reject, torment]
                         torment_room_id:
                           type:
                             - string
@@ -91,6 +92,11 @@ paths:
                           type:
                             - integer
                             - 'null'
+                        webhook_payload:
+                          type:
+                            - object
+                            - 'null'
+                          description: Voice-routing request payload recorded when the call was blocked
                         source_ip:
                           type:
                             - string

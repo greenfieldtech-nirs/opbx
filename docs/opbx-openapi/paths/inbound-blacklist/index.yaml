@@ -3,19 +3,23 @@ paths:
     get:
       tags:
         - Inbound Blacklist
-      summary: List Inbound Blacklist Entrys
+      summary: List inbound blacklist entries
       operationId: listInboundBlacklistEntrys
       security:
         - bearerAuth: []
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: inbound-blacklist:read
-      description: Paginated list, newest first. `meta` has current_page, last_page, per_page and total.
+      description: |
+        Paginated list, newest first. `meta` has current_page, last_page, per_page and total.
+        Every authenticated user of the organization can list entries. Filters are applied
+        only when the parameter is present; values are not validated.
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
         - name: search
           in: query
+          description: Substring match on `caller_id_pattern`
           schema:
             type: string
         - name: rejection_strategy
@@ -30,6 +34,7 @@ paths:
             enum: [exact, prefix, wildcard]
         - name: scope
           in: query
+          description: '`global` = `is_global` true, `did_specific` = `is_global` false; other values are ignored'
           schema:
             type: string
             enum: [global, did_specific]
@@ -40,7 +45,7 @@ paths:
             enum: [active, inactive]
       responses:
         '200':
-          description: List of Inbound Blacklist Entrys
+          description: List of inbound blacklist entries
           content:
             application/json:
               schema:
@@ -54,12 +59,18 @@ paths:
                     $ref: '../../components/schemas/PaginationMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
 
     post:
       tags:
         - Inbound Blacklist
       summary: Create Inbound Blacklist Entry
       operationId: createInboundBlacklistEntry
+      description: |
+        Owner and PBX Admin only. New entries are `active`. The 201 body is the created model
+        before a reload, so columns left at their database default (for example `blocked_count`,
+        and `torment_music_timeout` for non-torment entries) are absent from it.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -83,13 +94,22 @@ paths:
                 rejection_strategy:
                   type: string
                   enum: [drop, reject, torment]
+                  description: |
+                    Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                    and sets `torment_music_timeout` to 600 seconds.
                 is_global:
                   type: boolean
+                  description: |
+                    Apply the entry to every DID of the organization. Forced to `false` when a
+                    non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
                 did_number_ids:
                   type:
                     - array
                     - 'null'
-                  description: Required when is_global is false
+                  description: |
+                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    Each ID must be a DID of the organization. On update, sending the field
+                    replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
                     type: integer
               required: [caller_id_pattern, match_type, rejection_strategy]
@@ -107,6 +127,8 @@ paths:
                     $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -140,6 +162,8 @@ paths:
                     $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -148,6 +172,7 @@ paths:
         - Inbound Blacklist
       summary: Update Inbound Blacklist Entry
       operationId: updateInboundBlacklistEntry
+      description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -171,13 +196,22 @@ paths:
                 rejection_strategy:
                   type: string
                   enum: [drop, reject, torment]
+                  description: |
+                    Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                    and sets `torment_music_timeout` to 600 seconds.
                 is_global:
                   type: boolean
+                  description: |
+                    Apply the entry to every DID of the organization. Forced to `false` when a
+                    non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
                 did_number_ids:
                   type:
                     - array
                     - 'null'
-                  description: Required when is_global is false
+                  description: |
+                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    Each ID must be a DID of the organization. On update, sending the field
+                    replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
                     type: integer
       responses:
@@ -194,6 +228,8 @@ paths:
                     $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -203,6 +239,7 @@ paths:
         - Inbound Blacklist
       summary: Partially update Inbound Blacklist Entry
       operationId: patchInboundBlacklistEntry
+      description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -226,13 +263,22 @@ paths:
                 rejection_strategy:
                   type: string
                   enum: [drop, reject, torment]
+                  description: |
+                    Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                    and sets `torment_music_timeout` to 600 seconds.
                 is_global:
                   type: boolean
+                  description: |
+                    Apply the entry to every DID of the organization. Forced to `false` when a
+                    non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
                 did_number_ids:
                   type:
                     - array
                     - 'null'
-                  description: Required when is_global is false
+                  description: |
+                    DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                    Each ID must be a DID of the organization. On update, sending the field
+                    replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                   items:
                     type: integer
       responses:
@@ -249,6 +295,8 @@ paths:
                     $ref: '../../components/schemas/InboundBlacklist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -259,6 +307,7 @@ paths:
         - Inbound Blacklist
       summary: Delete Inbound Blacklist Entry
       operationId: deleteInboundBlacklistEntry
+      description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -276,5 +325,7 @@ paths:
                     type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
