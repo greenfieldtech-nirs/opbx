@@ -30,88 +30,128 @@ Create the destinations first, so you can pick them in the menu:
 | Edit or change status | Yes | Yes | No | No |
 | Delete | Yes | Yes | No | No |
 
+Supervisors do not see the page. Through the API every role of the organization can read menus; only Owner and PBX Admin can change them.
+
 ## Audio source
 
-A menu needs **exactly one** prompt source. The form does not accept two at once.
+A menu needs **exactly one** prompt source. On the **Audio** tab, **Audio Resource** picks between **Audio File** and **Text-to-Speech**; for an audio file, **Audio Source** picks between **From Recordings** and **Remote URL**. Only the source you picked is saved.
 
 | Source | Field | Limit |
 |--------|-------|-------|
-| Recording | Choose an uploaded recording from your organization | Must belong to your organization |
-| Remote URL | Audio file URL | Up to 500 characters |
-| Text-to-speech | Text to read | Up to 1000 characters |
+| From Recordings | **Select Recording**: an uploaded recording of your organization | Must belong to your organization |
+| Remote URL | **Remote Audio URL**: a full URL to an audio file (MP3, WAV and so on) | Up to 500 characters; the form shows a counter and warns from 450 |
+| Text-to-Speech | **Text to Speak** (SSML tags are accepted) and a **Voice** | Text up to 1000 characters, voice name up to 50 |
 
-For text-to-speech, choose a voice. The list comes from the Cloudonix voice catalogue and shows the language provider, price and gender of each voice. Voice names are up to 50 characters.
+The voice list comes from the Cloudonix voice catalogue. Each entry shows the voice name, its language, provider and pricing, and its gender. Narrow the list with the **Language**, **Gender** and **Provider** filters and the **Voice Tiers** switch (**All Voices** or **Standard Only**). If your organization has no Cloudonix package, or the Free Tier, only standard voices are listed and the switch is locked. **Refresh** reloads the catalogue.
 
-If you choose none of the three, saving is refused with "An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured."
+If no source is set, the form shows "Choose an audio source: a recording, an audio URL, or text to speak". The API refuses such a menu with "An IVR menu must have either a recording, direct audio URL, or Text-to-Speech text configured."
 
 ## Menu settings
 
-| Setting | Required | Range | Meaning |
-|---------|----------|-------|---------|
-| Max timeout | Yes | 1 to 30 seconds | How long to wait for the first digit |
-| Inter-digit timeout | Yes | 1 to 30 seconds | How long to wait between digits of a multi-digit option |
-| Max turns | Yes | 1 to 9 | How many times the prompt plays before the failover is used |
-| Status | Yes | Active or Inactive | Inactive menus are not used for routing |
-| Failover destination | Yes | See below | Where the caller goes after the last turn |
+The **Menu Settings** panel sits at the bottom of the **Menu Options** tab and is collapsed by default.
+
+| Setting | Range | Default for a new menu | Meaning |
+|---------|-------|------------------------|---------|
+| Max Timeout (seconds) | 1 to 30 | 1 | How long to wait for the caller's first input |
+| Inter-digit Timeout (seconds) | 1 to 30 | 1 | How long to wait between digits of a multi-digit option |
+| Maximum Turns | 1 to 9 | 1 | How many times the menu replays on invalid or missing input before the failover is used |
+| Failover Action / Failover Destination | See below | Hang Up | Where the caller goes after the last turn |
+
+A new menu is created **Active**. Change the status from the list (see [Activate or deactivate an IVR menu](#activate-or-deactivate-an-ivr-menu)). Inactive menus are not used for routing.
 
 ## Options
 
 Each option maps digits to one destination. A menu has **1 to 20 options**.
 
-| Field | Required | Limit | Meaning |
-|-------|----------|-------|---------|
-| Input digits | Yes | 1 to 10 characters | The digits the caller presses |
-| Description | No | Up to 255 characters | Your note, for example "Sales" |
-| Destination type | Yes | See the list below | What kind of target |
-| Destination | Yes | Pick one existing item | The target itself |
-| Priority | Yes | 1 to 20 | Display order in the menu |
+| Field | Limit | Meaning |
+|-------|-------|---------|
+| Digits | 1 to 10 characters. The form accepts only `0`-`9`, `*` and `#` | The digits the caller presses |
+| Destination type and destination | Pick one existing item | Where the caller goes |
 
-Destination types for an option: **Extension**, **Ring group**, **Conference room**, **IVR menu** (a sub-menu), **AI assistant**, **AI load balancer**, **Business hours**, **Call queue**.
+**Add Option** fills in the next digit for you (the highest numeric digit so far plus one); you can change it. The order of the rows is the option priority. Each option can also carry a description of up to 255 characters, which is set through the API only.
 
-A menu may point at itself, for example to repeat. Such loops are bounded by the max turns setting.
+Destination types for an option: **PBX User Extension** (user and forward extensions), **Ring Group**, **Conference**, **IVR Menu** (a sub-menu), **AI Assistant**, **AI Load Balancer**, **Business Hours**, **Call Queue**.
+
+A menu may point at itself, for example to repeat. Such loops are bounded by the maximum turns setting.
 
 ## Failover
 
 The failover is used after the last turn with no valid input. Its choices are the same destination types as the options, plus:
 
-- **Hangup**: the call ends. This is the default for a new menu.
-- **Destination unavailable**: only available when editing (see below).
+- **Hang Up**: the call ends. This is the default for a new menu.
+- **Disconnect**: only offered when editing (see [Edit an IVR menu](#edit-an-ivr-menu)).
+
+## Find an IVR menu
+
+**Who can do this:** Owner and PBX Admin (the only roles with **IVR Menus** in the sidebar).
+
+1. Open **IVR Menus** in the sidebar.
+2. Type in **Search IVR menus...** to filter by name.
+3. Use the status filter (**All Status**, **Active**, **Inactive**) and the **Unprovisioned** button to show only menus with a route set to Destination unavailable.
+4. Click the refresh button to reload the list.
+
+The list shows each menu's name and option count, **Options**, **Max Turns**, **Created** and **Status**. Click the **Name** or **Status** column header to sort.
+
+{/* SCREENSHOT: ivr-menus-list — IVR Menus list with Main Menu, Support Menu and After Hours Menu rows showing option counts, Max Turns and Active/Inactive status badges */}
 
 ## Create an IVR menu
 
+**Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::create`; the **Create IVR Menu** button is shown to these roles only).
+
 1. Open **IVR Menus** in the sidebar.
 2. Click **Create IVR Menu**.
-3. On the **Menu** tab, enter a name and an optional description, and choose the prompt source.
-4. Open **Menu Settings** and set the timeouts, max turns and status. Set the failover destination.
-5. On the **Menu Options** tab, add options. Set digits, destination and priority for each.
-6. Save.
+3. Enter a **Name**.
+4. On the **Audio** tab, choose the prompt source (see [Audio source](#audio-source)) and fill in its field.
+
+{/* SCREENSHOT: ivr-menus-create-audio — Create IVR Menu dialog, Audio tab, Audio Resource set to Text-to-Speech, a voice selected and "Thank you for calling Acme Corp. For sales press 1, for support press 2." in Text to Speak */}
+
+5. Open the **Menu Options** tab and click **Add Option** for each choice. Set the digits, the destination type and the destination of each row. Remove a row with its trash icon.
 
 ![Create IVR Menu dialog, Menu Options tab, with digit 1 to extension 1005 and digit 2 to the Sales Team ring group](../img/screens/ivr-menus-create-options.jpg)
 
-When you save, the menu is validated and stored. Any phone number, option or queue that points at the menu sends callers to it.
+6. Click **Menu Settings** to open the panel. Set **Max Timeout (seconds)**, **Inter-digit Timeout (seconds)** and **Maximum Turns**, then pick the **Failover Action** and, unless it is **Hang Up**, the **Failover Destination**.
+7. Click **Create Menu**.
+
+The dialog closes, the toast "IVR menu created successfully" appears and the menu is listed. Any phone number, option or queue that points at the menu now sends callers to it.
 
 ### Error display
 
-Each problem is shown next to the field it belongs to. If the problem is in the timeouts, max turns or the failover, the **Menu Settings** panel opens by itself so you can see it.
+Each problem is shown next to the field it belongs to, and a tab that holds an error is marked **(!)**. On save the dialog switches to the first tab with an error. If the problem is in the timeouts, the maximum turns or the failover, the **Menu Settings** panel opens by itself so you can see it. An error returned by the server is shown as a toast.
 
 {/* SCREENSHOT: ivr-menus-field-errors — Edit IVR Menu dialog with the Menu Settings panel auto-opened and an inline error under Max turns */}
 
 ## Edit an IVR menu
 
-1. Click the menu's row, or its **Edit** action.
-2. Change what you need and save.
+**Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::update`).
 
-**Disconnect** (edit only): an option or the failover can be set to **Destination unavailable**. The menu is then marked **Unprovisioned** (see the badge below). A caller who presses that option hears "Destination doesn't exist" and the call ends. A new menu must have a destination for every option and for the failover.
+1. Click the menu's row, or its **Edit** (pencil) action.
+2. Change the name, the audio, the options or the menu settings.
+3. Click **Update Menu**.
 
-{/* SCREENSHOT: ivr-menus-unprovisioned — IVR Menus list filtered to Unprovisioned, one row with the badge and an option set to Destination unavailable */}
+The toast "IVR menu updated successfully" appears. Saving replaces the whole option list with the rows in the dialog.
 
-## Change status
+**Disconnect** (edit only): the destination type list of an option or of the failover also offers **Disconnect**. It sets that route to **Destination unavailable**: the form shows "No destination (unprovisioned). Callers hear "Destination doesn't exist". Choose a type to provision this route." Once saved, the menu is unprovisioned: the **Edit IVR Menu** dialog title carries the **Unprovisioned** badge and the **Unprovisioned** list filter finds it. A caller who reaches that route hears "Destination doesn't exist" and the call ends. A new menu must have a destination for every option and for the failover; to provision the route again, choose a destination type.
 
-Use the status switch on the list, or set **Status** in the editor. Disabled menus are not used for routing.
+{/* SCREENSHOT: ivr-menus-unprovisioned — Edit IVR Menu dialog with the Unprovisioned badge in the title and one option row showing the Destination unavailable notice; IVR Menus list behind it filtered to Unprovisioned */}
+
+## Activate or deactivate an IVR menu
+
+**Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::update`).
+
+1. In the IVR Menus list, click the menu's **Status** badge (**active** or **inactive**).
+
+The status flips, the toast "IVR menu status updated" appears and the badge changes colour. An inactive menu is not used for routing.
 
 ## Delete an IVR menu
 
-Deletion asks for confirmation. If other configuration still points at the menu, the delete is refused with a dialog that lists every place the menu is used: a phone number, a ring group or queue fallback, an option of another menu, or the failover of another menu. Change those, then delete again.
+**Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::delete`).
+
+1. Click the menu's **Delete** (trash) action.
+2. In **Delete IVR Menu**, click **Delete**.
+
+The toast "IVR menu deleted successfully" appears and the row disappears.
+
+If other configuration still points at the menu, the delete is refused with a dialog that lists every place the menu is used: a phone number, an extension that routes to it, a ring group, call queue or AI load balancer fallback, an option or the failover of another menu, a business-hours action, a call tracking campaign or an auto-dialer campaign. Change those, then delete again. A menu that only points at itself does not block its own delete.
 
 ![Cannot delete: still in use dialog for Main Menu listing the phone number +12025550107 and the Main Office Hours open-hours action](../img/screens/ivr-menus-in-use-dialog.jpg)
 
