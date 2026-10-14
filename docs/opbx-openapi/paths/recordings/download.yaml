@@ -7,8 +7,15 @@ paths:
       operationId: downloadRecordingWithToken
       description: >-
         Streams (or downloads) a recording using the access token issued by
-        `GET /v1/recordings/{recording}/download`. The token is sent as
-        `Authorization: Bearer <token>` (preferred) or `?token=`. No Sanctum session is required.
+        `GET /v1/recordings/{recording}/download` (also embedded in a recording's `playback_url`).
+        The token is sent as `Authorization: Bearer <token>` (preferred) or `?token=`. No Sanctum
+        session, API key or rate limit applies. The token is valid for
+        `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30).
+
+        `Content-Type` is the recording's stored MIME type (`application/octet-stream` when unknown).
+        The file is sent inline with `Accept-Ranges: bytes` when the request has
+        `Sec-Fetch-Dest: audio` or an `Accept` header containing `audio`; otherwise it is sent as an
+        attachment (`Content-Disposition: attachment; filename="<original filename>"`).
       security: []
       parameters:
         - name: token
@@ -29,17 +36,34 @@ paths:
                 type: string
                 format: binary
         '401':
-          description: No token supplied
+          description: No token supplied (`{error, message}`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '403':
-          description: Access denied or token expired
+          description: 'Token invalid or expired (`{error: Access denied or token expired}`)'
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
-          description: File not found
+          description: The recording has no stored file, or the file is missing from storage (`{error}`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
 
   /v1/recordings/{recording}/download:
     get:
       tags:
         - Recordings
       summary: Download specific recording
+      description: |
+        Issues an access token for `GET /v1/recordings/download`. Owner, PBX Admin and Reporter
+        only. `expires_in` is always reported as 1800; the token's real lifetime is
+        `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30). `filename` is the original upload
+        name, or the stored file name when that is unknown.
       operationId: downloadRecording
       security:
         - bearerAuth: []
@@ -76,8 +100,14 @@ paths:
                   security_note:
                     type: string
         '400':
-          description: Only uploaded recordings can be downloaded
+          description: Only uploaded recordings can be downloaded (`{error}`); remote recordings are refused
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
