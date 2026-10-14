@@ -29,8 +29,9 @@ properties:
   routing_config:
     type: object
     description: >-
-      The target ID for the routing type. Required (may be `{}` for `unavailable`);
-      the referenced resource must exist in the organization.
+      The target ID for the routing type (the key matching `routing_type`). Required (may be
+      `{}` for `unavailable`); the referenced resource must exist in the organization and be
+      active, and a ring group must have at least one active member.
     properties:
       extension_id:
         type: integer
@@ -53,8 +54,9 @@ properties:
     enum:
     - active
     - inactive
+    description: Defaults to `active` on create when omitted.
   enable_non_e164:
     type:
     - boolean
     - 'null'
-    description: Create only. Allow non-E.164 numbers.
+    description: Create only (validation flag, not stored). Allow non-E.164 numbers.

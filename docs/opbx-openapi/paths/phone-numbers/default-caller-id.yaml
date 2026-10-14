@@ -11,7 +11,7 @@ paths:
         no longer consulted during outbound call routing. See the Outbound Calling Overview.
 
         Returns the organization's default outbound caller ID DID, or `null` if none
-        is configured. Requires the DID `viewAny` ability.
+        is configured. Every authenticated user of the organization can read it.
       operationId: getDefaultCallerId
       security:
         - bearerAuth: []
@@ -102,8 +102,12 @@ paths:
         '403':
           $ref: '../../openapi.yaml#/components/responses/Forbidden'
         '422':
-          description: DID does not belong to the organization or is inactive
+          description: |
+            `did_id` missing or not an integer (validation error body), or the DID does not
+            exist in the organization (`error: Invalid DID`) or is inactive (`error: Inactive DID`).
           content:
             application/json:
               schema:
-                $ref: '../../openapi.yaml#/components/schemas/Error'
+                oneOf:
+                  - $ref: '../../openapi.yaml#/components/schemas/Error'
+                  - $ref: '../../openapi.yaml#/components/schemas/ValidationError'

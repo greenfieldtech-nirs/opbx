@@ -27,7 +27,7 @@ properties:
     - unavailable
   routing_config:
     type: object
-    description: "Routing target keyed by type, for example `{\"extension_id\": 12}`; empty for `unavailable`"
+    description: "Routing target keyed by type, for example `{\"extension_id\": 12}`; empty for `unavailable` (`{}` when null)"
     additionalProperties: true
   status:
     type: string
@@ -37,10 +37,11 @@ properties:
   is_unprovisioned:
     type: boolean
     readOnly: true
-    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+    description: True when `routing_type` is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   cloudonix_config:
     type: object
     additionalProperties: true
+    description: Read-only Cloudonix data for the DID (`{}` when not set). Not settable through the API.
   created_at:
     type: string
     format: date-time
@@ -48,7 +49,9 @@ properties:
     type: string
     format: date-time
   extension:
-    description: Routing target when routing_type is `extension` (present when loaded)
+    description: >-
+      Routing target when routing_type is `extension`. Each nested target below is present only
+      for its own routing_type and only while the target exists in the organization.
     $ref: ./Extension.yaml
   ring_group:
     description: Routing target when routing_type is `ring_group`
