@@ -4,6 +4,9 @@ paths:
       tags:
         - Extensions
       summary: Compare sync status
+      description: >-
+        Compares the organization's local extensions with the Cloudonix subscribers of its
+        domain. Any role can call it.
       operationId: compareSyncStatus
       security:
         - bearerAuth: []
@@ -38,6 +41,12 @@ paths:
       tags:
         - Extensions
       summary: Sync extensions with Cloudonix
+      description: >-
+        Two-way sync, Owner and PBX Admin only. Local `user` extensions missing in Cloudonix are
+        created there; Cloudonix subscribers with no local extension (MSISDN of up to 5
+        characters) are imported as unassigned `user` extensions; local active/inactive status
+        is updated from Cloudonix. Returns 500 when Cloudonix settings are missing or Cloudonix
+        cannot be queried.
       operationId: syncExtensions
       security:
         - bearerAuth: []

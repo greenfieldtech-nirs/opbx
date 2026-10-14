@@ -57,8 +57,12 @@ properties:
     description: Whether voicemail is enabled (USER type only)
     example: true
   configuration:
-    type: object
-    description: Type-specific configuration (see the create request for the keys each type uses)
+    type:
+    - object
+    - array
+    description: >-
+      Type-specific configuration (see the create request for the keys each type uses). An
+      empty configuration is returned as an empty JSON array `[]`.
     additionalProperties: true
     example:
       forward_to: '+1234567890'
@@ -78,11 +82,12 @@ properties:
     description: Assigned user (present when loaded)
     $ref: ./User.yaml
   ai_assistant:
-    description: Assigned AI assistant (present when loaded; null when none)
+    description: Assigned AI assistant (present in the list and create responses; null when none)
     oneOf:
     - $ref: ./AiAssistant.yaml
     - type: 'null'
   ai_load_balancer:
+    description: Assigned AI load balancer (present in the list and create responses; null when none)
     type:
     - object
     - 'null'
@@ -117,14 +122,14 @@ properties:
     - integer
     - 'null'
     description: >-
-      ID of an active DID owned by the organization to present as the caller ID when
-      this extension places an outbound call. Takes precedence over the matched
-      outbound whitelist rule's caller ID. See the Outbound Calling Overview.
+      ID of a DID of the organization to present as the caller ID when this extension
+      places an outbound call (used only while the DID is active). Takes precedence over
+      the matched outbound whitelist rule's caller ID. See the Outbound Calling Overview.
   default_caller_id:
     type:
     - object
     - 'null'
-    description: Nested DID summary, present only when the relationship is loaded.
+    description: Nested DID summary, present only in the list response.
     properties:
       id:
         type: integer
