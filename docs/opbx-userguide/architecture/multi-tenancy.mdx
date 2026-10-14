@@ -16,7 +16,7 @@ OPBX is multi-tenant. Every data record belongs to exactly one organization, and
 
 All tenant models use Laravel's `#[ScopedBy([OrganizationScope::class])]` attribute. When any query runs, `OrganizationScope` automatically adds a `where organization_id = :current_org` clause.
 
-- If a user is authenticated, the scope reads `auth()->user()->organization_id`.
+- If a user is authenticated, the scope reads `auth()->user()->organization_id`. An [API key](/opbx/data-models/models/api-access#apikey) is its own principal and also carries `organization_id`, so key requests are scoped the same way.
 - If no user is authenticated, the scope forces `where 1 = 0`, returning no rows. In console commands and jobs this also logs a warning (`OrganizationScope: console query without bypass matches zero rows`).
 - Webhooks and CLI commands have no authenticated user, so they must explicitly bypass the scope.
 
@@ -91,13 +91,16 @@ A platform manager is a user with `is_platform_manager = true`. Platform manager
 
 ### Capabilities
 
-- Access platform admin routes in `routes/platform.php` (`auth:sanctum` + `platform.manager`).
+- Access platform admin routes in `routes/platform.php` (`/api/v1/platform/*`, middleware `auth:sanctum`, `platform.manager` and `bypass.organization.scope`).
 - Bypass `EnsureTenantScope` organization checks.
 - Manage organizations, users, and audit logs across tenants.
 
 ### What Platform Managers Are Not
 
-Platform managers are not regular tenant users. They do not have an `organization_id`-scoped view of data by default. Any cross-tenant query a platform manager performs must explicitly use `OrganizationScope::bypass()` or request the target organization context.
+Platform managers are not regular tenant users. On the normal API they see their own organization's data. Cross-tenant access happens in one of two ways:
+
+- **Platform routes.** The `bypass.organization.scope` middleware runs the whole request inside `OrganizationScope::bypass()`, so every query on `/api/v1/platform/*` sees all organizations.
+- **Operate as an organization.** On the tenant API, a platform manager can send the `X-Operate-As-Organization: <organization id>` header. The `operate.as` middleware (after `tenant.scope`, before `rate_limit_org:api`) swaps the request's user for an in-memory copy with that `organization_id`, the Owner role and `is_platform_manager = false`, so scoping and policies follow the target organization. The copy is never saved. The header from anyone else (including an API key) returns 403 `OPERATE_AS_FORBIDDEN`; an unknown organization returns 404 `OPERATE_AS_ORG_NOT_FOUND`; an organization that is not active returns 403 `OPERATE_AS_ORG_INACTIVE`. Without a platform-manager token the header does nothing.
 
 ---
 
@@ -107,8 +110,8 @@ Within each organization, users have one of five roles. `OrganizationScope` isol
 
 | Role | Scope |
 |------|-------|
-| Owner | Full access to the organization, including billing and user management. |
-| PBX Admin | Manage extensions, DIDs, routing, and most settings. Cannot manage owners. |
+| Owner | Full access to the organization, including organization settings and all users. |
+| PBX Admin | Manage extensions, DIDs, routing, and most settings. Can manage only PBX User and Reporter accounts. |
 | PBX User | Limited access; can update own extension and view assigned resources. |
 | Reporter | Read-only access to call logs and reports. |
 | Supervisor | Read-only access plus live monitoring and coaching of the users, extensions and ring groups assigned to them. |
