@@ -15,7 +15,8 @@ paths:
       summary: List notification logs
       description: |
         Get a paginated list of webhook notification delivery logs for a
-        call tracking campaign.
+        call tracking campaign, newest first. `from` and `to` cover whole days
+        and `to` must not be before `from`. Available to every role.
       operationId: listCallTrackingNotificationLogs
       security:
       - bearerAuth: []
@@ -49,14 +50,14 @@ paths:
         schema:
           type: string
           format: date
-        description: Filter from date
+        description: Only logs created on or after this date
       - name: to
         in: query
         required: false
         schema:
           type: string
           format: date
-        description: Filter to date
+        description: Only logs created on or before this date
       responses:
         '200':
           description: List of notification logs

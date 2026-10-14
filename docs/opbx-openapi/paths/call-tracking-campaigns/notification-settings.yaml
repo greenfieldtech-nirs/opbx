@@ -15,6 +15,9 @@ paths:
       summary: Get notification settings
       description: |
         Get webhook notification settings for a call tracking campaign.
+        Returns 404 ("Notification settings not found.") until settings are
+        saved. The stored `auth_secret` is never returned. Owner and PBX Admin
+        only.
       operationId: getCallTrackingNotificationSettings
       security:
       - bearerAuth: []
@@ -43,9 +46,11 @@ paths:
       summary: Update notification settings
       description: |
         Create or update webhook notification settings for a call tracking
-        campaign. When `auth_method` is `bearer_token` or `basic_auth`,
-        `auth_secret` is required. When `auth_method` is `basic_auth`,
-        `auth_username` is also required.
+        campaign (returns 200 in both cases). When `auth_method` is
+        `bearer_token` or `basic_auth`, `auth_secret` is required unless a
+        secret is already stored; omit `auth_secret` to keep the stored one.
+        When `auth_method` is `basic_auth`, `auth_username` is also required.
+        Owner and PBX Admin only.
       operationId: updateCallTrackingNotificationSettings
       security:
       - bearerAuth: []
@@ -78,7 +83,7 @@ paths:
                   - string
                   - 'null'
                   maxLength: 2048
-                  description: Auth secret/token (required when auth_method is not none)
+                  description: Auth secret/token (required when auth_method is not none and no secret is stored yet). Stored encrypted, never returned.
                   example: sk_live_abc123
                 auth_username:
                   type:
@@ -89,7 +94,8 @@ paths:
                   example: webhook_user
                 enabled_events:
                   type: array
-                  description: Event types that trigger webhook notifications
+                  description: Event types that trigger webhook notifications (at least one)
+                  minItems: 1
                   items:
                     type: string
                     enum:
@@ -103,13 +109,13 @@ paths:
                   - call.converted
                 is_active:
                   type: boolean
+                  default: true
                   description: Whether webhook notifications are active
                   example: true
               required:
               - webhook_url
               - auth_method
               - enabled_events
-              - is_active
       responses:
         '200':
           description: Notification settings updated
@@ -120,7 +126,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Notification settings updated successfully
+                    example: Notification settings updated successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingNotificationSettings.yaml
         '401':
@@ -147,7 +153,13 @@ paths:
       summary: Test notification settings
       description: |
         Send a test webhook event to the configured notification URL for a
-        campaign. If no event_type is provided, a default test event is used.
+        campaign, built from a synthetic call (caller `+15550000000`, called
+        `+15551111111`). If no `event_type` is provided, `call.received` is
+        used. The test is sent even when the event type is not in
+        `enabled_events`. Returns 200 with the delivery log entry whether or not
+        the receiver accepted it (check `is_success`); returns 422 when the
+        settings are missing, inactive or have no webhook URL. Limited to 5
+        requests per minute. Owner and PBX Admin only.
       operationId: testCallTrackingNotificationSettings
       security:
       - bearerAuth: []
@@ -170,27 +182,19 @@ paths:
                   - call.missed
                   - call.converted
                   - call.failed
+                  default: call.received
                   description: Event type to test
                   example: call.received
       responses:
         '200':
-          description: Test notification sent
+          description: Test notification attempted; the delivery log entry
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-                    example: Test notification sent successfully
-                  success:
-                    type: boolean
-                    example: true
-                  response_status_code:
-                    type:
-                    - integer
-                    - 'null'
-                    example: 200
+                  data:
+                    $ref: ../../components/schemas/CallTrackingNotificationLog.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -199,3 +203,5 @@ paths:
           $ref: ../../components/responses/NotFound.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
+        '429':
+          $ref: ../../components/responses/TooManyRequests.yaml

@@ -32,7 +32,7 @@ properties:
     type:
     - string
     - 'null'
-    description: Basic auth username (only present when auth_method is basic_auth)
+    description: Basic auth username (used when auth_method is basic_auth)
     maxLength: 255
     example: webhook_user
   enabled_events:

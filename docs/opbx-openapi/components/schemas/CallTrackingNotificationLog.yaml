@@ -7,12 +7,14 @@ properties:
     readOnly: true
     example: 1
   call_id:
-    type: string
-    description: Cloudonix call identifier
+    type:
+    - string
+    - 'null'
+    description: Cloudonix call identifier (`test_call_...` for test sends)
     example: call-abc123
   event_id:
     type: string
-    description: Unique event identifier
+    description: Unique event identifier (`ct_test_<uuid>` for test sends)
     example: evt-abc123
   event_type:
     type: string
