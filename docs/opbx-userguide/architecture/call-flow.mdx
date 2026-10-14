@@ -43,7 +43,7 @@ sequenceDiagram
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/session-update
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/cdr
     Laravel->>MySQL: Store CDR / session update
-    Laravel->>Soketi: Broadcast call events
+    Laravel->>Soketi: Broadcast call.initiated
 ```
 
 ---
@@ -68,10 +68,10 @@ Cloudonix sends a JSON payload that includes:
 
 1. Extracts the Bearer token from the `Authorization` header.
 2. Extracts `Domain` and the `to`/`from` numbers.
-3. Looks up `CloudonixSettings` by `domain_name` or `domain_uuid`.
+3. Looks up `CloudonixSettings` by `domain_name`, then `domain_uuid`.
 4. Compares the Bearer token to `domain_requests_api_key` with `hash_equals()`.
 5. Injects `_organization_id` into the request.
-6. Returns CXML unauthorized response on failure.
+6. Returns a CXML response on failure: 401 for a token or domain problem, 400 when `Domain` or the `to` number is missing.
 
 If authentication succeeds, the request reaches `VoiceRoutingController@handleInbound`.
 
@@ -80,6 +80,10 @@ If authentication succeeds, the request reaches `VoiceRoutingController@handleIn
 ## Step 3: VoiceRoutingManager
 
 `VoiceRoutingController` delegates to `App\Services\VoiceRouting\VoiceRoutingManager`.
+
+### Coach Calls
+
+Before anything else, `CoachRoutingService::tryHandle()` checks whether the call is a supervisor coaching call (`spy_{token}`, `whisper_{party}_{token}` or `barge_{token}`, dialed from the supervisor's Web Phone) and, if so, answers it with a Cloudonix `<Coach>` verb.
 
 ### Direction Dispatch
 
@@ -93,13 +97,17 @@ The manager dispatches by the `Direction` field:
 | `application` | `handleApplicationDirection()` | API-initiated calls. |
 | default | `handleUnknownDirection()` | Falls back to inbound. |
 
+A `subscriber` call tries, in order: a direct extension dial, the DID routing of the dialed number, then outbound routing (outbound whitelist). The calls are marked `internal` for `call_recording_mode`; inbound calls are marked `inbound`.
+
+For an `inbound` call, the manager first checks the [inbound blacklist](/opbx/modules/inbound-blacklist) against the dialed DID and, on a match, returns the rejection CXML. If the caller (`From`) is itself one of the organization's numbers, the call is handled as an internal call from a DID.
+
 ### DID Resolution
 
 For inbound calls, the manager resolves the called DID (`To` number):
 
-1. Look up `did_numbers` by phone number.
-2. Read the DID's `routing_type` and `routing_type_id`.
-3. Load the destination model based on the routing type.
+1. Look up an active `did_numbers` row with that phone number in the organization (`InboundRoutingService::handleDidRouting()`).
+2. Read the DID's `routing_type`, and the target ID from `routing_config` (for example `routing_config.ring_group_id`).
+3. Load the destination model based on the routing type, then pick the strategy for it.
 
 ### Destination Types
 
@@ -112,19 +120,19 @@ The DID's `routing_type` selects the destination. The routing config holds the t
 | `call_queue` | `CallQueue` | `QueueRoutingStrategy` |
 | `ivr_menu` | `IvrMenu` | `IvrRoutingStrategy` |
 | `conference_room` | `ConferenceRoom` | `ConferenceRoutingStrategy` |
-| `business_hours` | `BusinessHoursSchedule` | `BusinessHoursRoutingService` |
+| `business_hours` | `BusinessHoursSchedule` | `InboundRoutingService` resolves the schedule's current open or closed target, then that target's strategy runs |
 | `ai_assistant` | `AiAssistant` | `AiAgentRoutingStrategy` |
 | `ai_load_balancer` | `AiAssistantLoadBalancer` | `AiLoadBalancerRoutingStrategy` |
-| `call_tracking` | `CallTrackingCampaign` | `CallTrackingRoutingStrategy` |
+| `call_tracking` | `CallTrackingCampaign` | `CallTrackingRoutingStrategy` (called directly, before the other types) |
 | `unavailable` | none | Plays the "destination unavailable" prompt and hangs up |
 
-A DID with no valid destination gets an error prompt.
+A DID with no valid destination gets a spoken error prompt (`Destination not configured` or `Unsupported routing configuration`) and a hangup.
 
 ---
 
 ## Step 4: Strategy Execution
 
-`VoiceRoutingStrategyExecutor` iterates registered strategies and picks the first one whose `canHandle()` method matches the destination. The selected strategy returns a CXML response via `CxmlBuilder`.
+`InboundRoutingService` maps the resolved destination to an `ExtensionType` (the extension's own type, or `RING_GROUP`, `CONFERENCE`, `QUEUE`, `IVR`, `AI_ASSISTANT`, `AI_LOAD_BALANCER`). `VoiceRoutingStrategyExecutor` iterates the registered strategies and runs the first one whose `canHandle()` accepts that type. The selected strategy returns a CXML response via `CxmlBuilder`.
 
 ### CxmlBuilder
 
@@ -186,7 +194,7 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 
 - Normalizes `from` and `to` to E.164.
 - Identifies the organization from the middleware-injected `_organization_id` or by DID lookup.
-- Dispatches `ProcessInboundCallJob` to create a `CallLog` and broadcast `CallInitiated`.
+- Dispatches `ProcessInboundCallJob` to create a `CallLog` and broadcast `CallInitiated` (`call.initiated` on the `presence-org.{organization_id}` channel).
 
 ### session-update
 
@@ -196,14 +204,15 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 - Filters statuses to the allowed notification list.
 - Creates a `SessionUpdate` record.
 - Triggers call notification webhooks if configured.
-- Broadcasts `CallAnswered` and `CallEnded` events via Soketi.
+- Does not broadcast. The `CallAnswered` and `CallEnded` event classes exist, but no code dispatches them; the Live Calls page polls the API instead (see [Real-Time](/opbx/architecture/real-time)).
 
 ### CDR
 
 `POST /api/webhooks/cloudonix/cdr`
 
 - Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update.
-- Backfills the legacy `CallLog` record.
+- Updates the legacy `CallLog` record if one exists.
+- Creates a [call-tracking session](/opbx/data-models/models/call-tracking-session) when the number is a tracking number.
 - Creates a final `SessionUpdate` with `action = 'cdr_final_status'`.
 - Triggers call notification webhooks for the final status.
 - For auto-dialer calls:
@@ -216,7 +225,7 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 ## Call State in Redis
 
 - `cdr:create:{organization_id}:{call_id}` — lock that keeps a CDR from being created twice
-- IVR state — turn count and digit history
+- IVR state — turn count and digit history (`ivr:call:{call_sid}`), with `ivr:idempotency:{event_id}`
 - Dialer CAC counters — `dialer:cac:{campaign_id}:active`
 - Call queue state — `acd:*` keys owned by the ACD worker, and extension presence `acd:presence:{organization_id}:{extension}`
 
