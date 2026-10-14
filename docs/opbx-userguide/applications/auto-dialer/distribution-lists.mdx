@@ -17,42 +17,50 @@ Use **Distribution Lists** to:
 - create a list and upload numbers from a CSV file;
 - see each number's status, attempts and last call;
 - assign a list to a campaign, or take it back;
+- reset numbers so they are dialed again;
 - copy, download, archive or delete a list.
 
 ## Prerequisites
 
-- You are the **Owner** or a **PBX Admin**.
+- You are the **Owner** or a **PBX Admin**. A **Reporter** can look at lists but cannot change them (see [Permissions](#permissions)).
 - A CSV file with one column of phone numbers (with or without a header row).
 
 ## The Distribution Lists page
 
-Open **Auto Dialer → Distribution Lists**. Each row shows the name, status, version, number of destinations, the assigned campaign (or an **Assign Campaign** button) and the creation date. Only the latest version of each list is shown.
+Open **Auto Dialer → Distribution Lists**. Each row shows the **Name**, **Status**, **Version**, number of **Destinations** (with the invalid count in red), the **Campaign** (or an **Assign Campaign** button) and the **Created** date. Only the latest version of each list is shown.
 
-- **Search** filters by name. The **status filter** defaults to All (except Archived); **All Statuses** also lists archived lists, and **Archived** shows only those.
-- **Example CSV** downloads a sample file.
+- **Search lists...** filters by name. The refresh button reloads the list.
+- The **status filter** defaults to **All (except Archived)**; **All Statuses** also lists archived lists, and **Draft**, **Ready**, **Processing**, **Failed**, **In Use**, **Used** and **Archived** show only that status.
+- **Example CSV** downloads a sample file (`distribution_list_example.csv`).
 - **Create List** opens the create dialog.
-- The row menu offers **View Details**, **Upload Destinations**, **Copy List**, **View Errors**, **Delete** and **Archive**, each only when the list's status allows it (see [List statuses](#list-statuses)).
+- Clicking a row opens the [list detail page](#the-list-detail-page).
+- The row menu (⋮) offers **View Details**, **Upload Destinations**, **Copy List**, **View Errors**, **Delete** and **Archive**, each only when the list's status and your role allow it (see [List statuses](#list-statuses)). For a list assigned to a campaign it shows a disabled **Archive (unassign first)**.
+
+A Reporter sees the page and **Example CSV**, but not **Create List**, **Assign Campaign** or the change actions in the row menu.
 
 ![Distribution Lists page with Fall Webinar Leads, 20 destinations, assigned to Fall Webinar Follow-up](../../img/screens/auto-dialer-lists-list.jpg)
 
 ## Create a list and upload numbers
 
-1. Click **Create List**.
-2. Enter a **Name** (required, up to 255 characters) and an optional **Description** (up to 1000 characters). Click **Create List**. The list is saved as **Draft**.
-3. Open the row menu and choose **Upload Destinations**.
-4. Choose the CSV file (`.csv`, up to 50 MB) and click **Continue to Mapping**.
-5. Map the columns:
+Who can do this: Owner and PBX Admin.
+
+1. Open **Auto Dialer → Distribution Lists** and click **Create List**.
+2. In the **Create Distribution List** dialog, enter a **Name** (required, up to 255 characters, for example "Sales Leads Q1") and an optional **Description** (up to 1000 characters). Click **Create List**. The toast "List created successfully" appears and the list is added as **Draft**.
+3. Open the list's row menu (⋮) and choose **Upload Destinations**.
+4. Click **Click to select a CSV file** and choose the file (`.csv`, up to 50 MB). Leave **File has a header row** ticked if the first row holds column names.
+5. Click **Continue to Mapping**. The dialog shows how many rows were detected and guesses the columns whose names contain "phone", "name" and "batch".
+6. Check the mapping:
 
 | Mapping | Required | Meaning |
 |---------|----------|---------|
-| Phone Number | Yes | The number to dial |
+| Phone Number * | Yes | The number to dial |
 | Full Name | No | Shown in the list and passed to the assistant |
 | Batch Identifier | No | A label to group numbers, for example `batch-a` |
 | Metadata columns | No, any number | Every ticked column is stored per number and passed to the assistant |
 
-6. Check the preview (first 5 rows) and click **Start Upload**.
+7. Check the preview of the first three mapped rows (**Back** returns to the file choice) and click **Start Upload**.
 
-The file is processed in the background and the list shows **Processing**. When it finishes, the list is **Ready** if at least one number was valid, or **Failed** if none was. Invalid rows are counted and, on a Failed list, listed under **View Errors**.
+Result: the toast "Upload started. Processing..." appears and the dialog shows a progress bar. When processing ends it shows "Upload completed successfully!" and closes by itself after two seconds; if it fails it shows "Upload failed. Check validation errors." (or "CSV validation failed. Check the file format and mapping."). The list is **Ready** if at least one number was valid, or **Failed** if none was. Invalid rows are counted and, on a Failed list, listed under **View Errors**.
 
 {/* SCREENSHOT: auto-dialer-lists-upload-mapping — Upload Destinations dialog with a CSV selected, phone_number mapped to Phone Number, name to Full Name, batch_identifier to Batch Identifier, and the preview table */}
 
@@ -82,83 +90,141 @@ A list holds at most **100,000** numbers. A file with more rows is split automat
 | Pending | Waiting to be re-processed | Yes (adds) | No | No | No |
 | Processing | Upload being processed | No | No | No | No |
 | Ready | Has valid numbers, not assigned | Replaces (see below) | Yes | Yes | Yes |
-| Failed | No valid number, or processing failed | Yes (adds) | No | No | Delete instead |
+| Failed | No valid number, or processing failed | Yes (adds) | No | No | Not offered in the app (the API allows it); delete instead |
 | In Use | Assigned to a campaign | No | No | Yes | No |
-| Used | The campaign finished with it | Replaces | No | Yes | Only after you unassign it |
+| Used | The campaign finished with it | Replaces | No | Yes | Only when it is not assigned to a campaign |
 | Archived | Kept for history | No | No | Yes | No |
 
-### Replacing the numbers of a Ready or Used list
+## Replacing the numbers of a Ready or Used list
 
-On a list's detail page, **Upload** on a Ready or Used list **replaces** its numbers (the dialog's button reads **Create Version & Upload**): the existing numbers are backed up on the server, removed, and the new file is processed into the same list with its version number increased by one. Download the list first if you need its current numbers and statuses.
+Who can do this: Owner and PBX Admin.
+
+1. Open the list's detail page and click **Upload**. The dialog warns "Current version (v*n*) will be archived and version *n+1* will be created."
+2. Choose the file, map the columns as for a [new upload](#create-a-list-and-upload-numbers).
+3. Click **Create Version & Upload**.
+
+Result: the toast "Version *n+1* created. Old data backed up. Processing..." appears; when processing ends the dialog shows "Version *n+1* created and uploaded successfully!" and the page shows the toast "Upload completed successfully". The existing numbers are backed up on the server, removed, and the new file is processed into the same list with its version number increased by one. Download the list first if you need its current numbers and statuses.
+
+On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers like **Upload Destinations**. On a Processing or Archived list the server refuses the upload ("Cannot upload to list in status: …").
 
 ## Assign a list to a campaign
 
-1. On a **Ready** list's row, click **Assign Campaign**.
-2. Choose the campaign. Only campaigns that are **Draft**, **Paused**, or **Active but outside their schedule window** are offered.
-3. Confirm.
+Who can do this: Owner and PBX Admin.
 
-The list becomes **In Use**. The campaign's status does not change: a **Draft** campaign stays Draft until you start it (or auto-start does). A campaign that is currently dialing is refused: "Pause the campaign first, then assign the list."
+1. On a **Ready** list's row, click **Assign Campaign**.
+2. In the **Assign to Campaign** dialog, choose the campaign under **Select a campaign**. Only campaigns that are **Draft**, **Paused**, or **Active with a start date still in the future** are offered; with none, the dialog says "No available campaigns found."
+3. Click **Assign**.
+
+Result: the toast "List assigned to campaign successfully" appears, the list becomes **In Use** and the row shows the campaign's name. The campaign's status does not change: a **Draft** campaign stays Draft until you [start it](/opbx/applications/auto-dialer/campaigns#start-a-campaign) (or auto-start does). A campaign that is currently dialing is refused with "Assignment failed" and "Cannot assign list to "*name*" because it is currently running. Pause the campaign first, then assign the list."
 
 {/* SCREENSHOT: auto-dialer-lists-assign-dialog — Assign to Campaign dialog with the campaign picker open */}
 
 ## Take a list back from a campaign
 
-Click the unassign icon next to the campaign name on the list row. This works only while **every number is still pending with zero attempts**; otherwise the icon is disabled with "Cannot unassign: some destinations have been dialed". The list returns to **Ready**. The campaign's status is not changed.
+Who can do this: Owner and PBX Admin.
+
+1. On the list's row, click the unassign icon (title "Unassign from campaign") next to the campaign name.
+
+Result: the toast "List unassigned from campaign successfully" appears and the list returns to **Ready**. The campaign's status is not changed.
+
+This works only while **every number is still pending with zero attempts**. Otherwise the row shows **Locked** instead of the icon ("Cannot unassign: some destinations have been dialed"). Use [Copy a list](#copy-a-list) to dial the same numbers with another campaign.
 
 ## The list detail page
 
-Click a list name. The header has **Refresh**, **Upload**, **Copy**, **Download**, **Archive** and **Delete**. **Delete** is shown only when the list is not assigned to a campaign; for an assigned list **Archive** is disabled and explains that you must unassign first. Cards show the total and valid or invalid numbers, the connection rate, the average call duration and the total dial attempts. When the list is assigned, a card shows the campaign and the assignment date.
+Click a list's row or name, or choose **View Details** in the row menu. The header shows the name, status, version (and **Old Version** for an older version) and, for a copy, "Copied from Version *n*". The buttons are:
+
+| Button | Shown when | Does |
+|--------|-----------|------|
+| **Back** | Always | Returns to the list page |
+| **Refresh** | Always | Reloads the list and its numbers |
+| **Upload** | Owner and PBX Admin, list not In Use | Adds numbers, or [replaces them](#replacing-the-numbers-of-a-ready-or-used-list) on a Ready or Used list |
+| **Copy** | Owner and PBX Admin, status allows | [Copies the list](#copy-a-list) |
+| **Download** | Always (the server allows it for the Owner and PBX Admins only) | [Downloads the list](#download-a-list) |
+| **Archive** | Owner and PBX Admin, Ready or Used and not assigned | [Archives the list](#archive-a-list). For an assigned list a disabled **Archive** explains "Unassign it first to archive or delete it." |
+| **Delete** | Not assigned, and the Owner (any status) or a PBX Admin (Failed only) | [Deletes the list](#delete-a-list) |
+
+Cards show the **Total Destinations** (valid and invalid), the **Connection Rate**, the **Avg. Call Duration** and the total **Dial Attempts**. When the list is assigned, the **Campaign Assignment** card shows the campaign, the **Assigned On** date and the campaign's status.
 
 Tabs:
 
 | Tab | Shown when | Content |
 |-----|-----------|---------|
-| Destinations | Always | Phone number, name, batch, metadata (hover to see), status, attempts, last call, duration. Search by number and filter by status |
-| Version History | The list has versions | Every version of the list |
-| Validation Errors | The list is Failed | The rejected rows and why |
-| Upload Info | A file was uploaded | The original file name and counts |
-
-On the Destinations tab:
-
-- **Reset Dial Attempts** (per row, or for the selected rows) sets the number back to pending with zero attempts and clears its last result, so it is dialed again.
-- **Reset Pending Entries** sets every number that is still pending back to zero attempts and clears its retry time.
+| Destinations | Always | Phone number, name, batch, metadata (click **_n_ fields** to see them), status, dial attempts, last call (date and last result), duration. **Search phone numbers or descriptions...** searches the phone number; the filter offers All Statuses, Pending, Completed, Failed and Invalid |
+| Version History | The list has versions | Every version with its status, valid numbers and date; **View** opens it |
+| Validation Errors | The list is Failed | A **Download Errors CSV** button. To read the rejected rows, use **View Errors** in the list page's row menu |
+| Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
 ![Detail page of Fall Webinar Leads: 20 pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
 
+### Reset dial attempts
+
+Who can do this: Owner and PBX Admin. The buttons are visible to Reporters too, but the server refuses them.
+
+Resetting sets a number back to **pending** with zero attempts and clears its last result, retry time and last call, so the dialer picks it up again (it is dialed only while its campaign is Active and inside its schedule).
+
+- **One number:** on the **Destinations** tab, click the reset icon (tooltip "Reset Dial Attempts") on the number's row. The icon is shown only for numbers that were dialed.
+- **Several numbers:** tick their check boxes (or the header box for the whole page) and click **Reset Dial Attempts (*n*)**.
+- **Every pending number:** click **Reset Pending Entries**. This sets every number that is still pending back to zero attempts and clears its retry time; completed and failed numbers are not touched.
+
+Result: a toast with the server's message, for example "Dial attempts reset for 3 destinations" or "Reset 20 pending destinations".
+
 ## Copy a list
 
-1. Choose **Copy List** (row menu) or **Copy** (detail page).
-2. Enter a new name. It must be unique among your lists that are not archived.
+Who can do this: Owner and PBX Admin.
 
-The copy is a new, unassigned **Ready** list with the same numbers, names, batches and metadata, all reset to pending with zero attempts. Use it to call the same audience again with another campaign.
+1. Choose **Copy List** in the row menu, or **Copy** on the detail page.
+2. In the **Copy List** dialog, enter the **New List Name**. It must be unique among your lists that are not archived.
+3. Click **Copy List**. The dialog shows "Copying List" while the numbers are duplicated.
+
+Result: the toast "List copied successfully" names the source, the copy and the number of destinations, and the dialog closes. The copy is a new, unassigned **Ready** list (version 1) with the same numbers, names, batches and metadata, all reset to pending with zero attempts. Use it to call the same audience again with another campaign. A name already in use gives "Copy failed" with "A list with this name already exists".
 
 ## Download a list
 
-**Download** on the detail page gives a CSV with `phone_number`, `name`, `batch_identifier`, `metadata` (JSON), `status` and `dial_attempts`.
+Who can do this: Owner and PBX Admin.
+
+1. On the list's detail page, click **Download**.
+
+Result: the browser saves *name*`.csv` with the columns `phone_number`, `name`, `batch_identifier`, `metadata` (JSON), `status` and `dial_attempts`, and the toast "List downloaded successfully" appears.
 
 ## Archive a list
 
-Choose **Archive** and confirm. Allowed for **Ready** and **Used** lists that are **not assigned to a campaign**. Archiving an assigned list is refused with a message naming the campaign; unassign the list first. An archived list is hidden by the default filter (choose **Archived** or **All Statuses** to see it) and can still be copied.
+Who can do this: Owner and PBX Admin.
+
+1. Choose **Archive** in the row menu or on the detail page.
+2. In the **Archive List** dialog ("Are you sure you want to archive "*name*"? This action cannot be undone. Archived lists cannot be used in campaigns."), click **Archive List**.
+
+Result: the toast "List archived successfully" (row menu) or "List archived" (detail page) appears. The list is hidden by the default filter (choose **Archived** or **All Statuses** to see it) and can still be copied.
+
+Archiving is offered for **Ready** and **Used** lists that are **not assigned to a campaign**. Archiving an assigned list is refused with a message naming the campaign; unassign the list first.
 
 ## Delete a list
 
-Choose **Delete** and confirm with **Permanently Delete**. The list and all its numbers are removed.
+Who can do this: the Owner for any list that is not assigned to a campaign; a PBX Admin for **Failed** lists only. **Delete** is shown only to those roles.
 
-| Who | Can delete |
-|-----|-----------|
-| Owner | Any list that is not assigned to a campaign |
-| PBX Admin | **Failed** lists only |
+1. Choose **Delete** in the row menu or on the detail page.
+2. In the **Delete List** dialog, click **Permanently Delete**. For a list that is not Failed the dialog warns that only Owners can delete such lists.
 
-**Delete** is offered only for lists that are not assigned to a campaign. If the server is asked to delete an assigned list anyway, it refuses and names the campaign. Unassign the list first, then delete it.
+Result: the toast "List deleted successfully" (row menu) or "List deleted" (detail page, which then returns to the list page) appears. The list and all its numbers are removed.
 
-A PBX Admin may see **Delete** on other lists in the row menu, but the server refuses it. Use **Archive** for lists that were dialed.
+If the server is asked to delete a list that a campaign still uses, it refuses and the **Cannot delete: still in use** dialog names the campaign. Unassign the list first, then delete it.
 
 ![Delete List confirmation dialog for Fall Webinar Leads](../../img/screens/auto-dialer-lists-delete-dialog.jpg)
+
+## Permissions
+
+| Action | Owner | PBX Admin | Reporter | PBX User | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See lists, numbers and versions | Yes | Yes | Yes (read-only) | No | No |
+| Create, upload, assign, unassign, copy, archive | Yes | Yes | No | No | No |
+| Reset dial attempts, download | Yes | Yes | No | No | No |
+| Delete | Any unassigned list | Failed lists only | No | No | No |
 
 ## Common errors
 
 | Message (summary) | What it means | What to do |
 |-------------------|---------------|-----------|
+| Name is required | The name field is empty | Enter a name |
+| Please upload a CSV file | The file does not end in `.csv` | Choose a CSV file |
 | CSV must contain a column mapped to phone_number | The phone column was not mapped | Map the phone column (use the header-row switch to match your file) |
 | Cannot upload to list in status: In Use | The list is assigned | Unassign it, or copy it and upload to the copy |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
