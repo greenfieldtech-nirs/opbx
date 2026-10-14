@@ -62,7 +62,7 @@ Who can do this: Owner and PBX Admin.
 
 Result: the toast "Upload started. Processing..." appears and the dialog shows a progress bar. When processing ends it shows "Upload completed successfully!" and closes by itself after two seconds; if it fails it shows "Upload failed. Check validation errors." (or "CSV validation failed. Check the file format and mapping."). The list is **Ready** if at least one number was valid, or **Failed** if none was. Invalid rows are counted and, on a Failed list, listed under **View Errors**.
 
-{/* SCREENSHOT: auto-dialer-lists-upload-mapping — Upload Destinations dialog with a CSV selected, phone_number mapped to Phone Number, name to Full Name, batch_identifier to Batch Identifier, and the preview table */}
+![Upload Destinations dialog with 12 rows detected, phone_number mapped to Phone Number, name to Full Name, batch_identifier to Batch Identifier, company ticked as metadata and the preview table](../../img/screens/auto-dialer-lists-upload-mapping.jpg)
 
 ### CSV format
 
@@ -119,7 +119,7 @@ Result: the toast "List assigned to campaign successfully" appears, the list bec
 
 A campaign can hold several lists: assigning another list adds it next to the ones already assigned. The dialer takes pending numbers from all of the campaign's lists together, the numbers added earliest first; it does not finish one list before starting the next.
 
-{/* SCREENSHOT: auto-dialer-lists-assign-dialog — Assign to Campaign dialog with the campaign picker open */}
+![Assign to Campaign dialog for Spring Leads with the campaign picker open](../../img/screens/auto-dialer-lists-assign-dialog.jpg)
 
 ## Take a list back from a campaign
 
@@ -159,7 +159,7 @@ Tabs:
 | Parts (*n*) | A large file was split into parts | The [parts](#see-a-lists-parts) the file was split into |
 | Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
-{/* SCREENSHOT: auto-dialer-lists-detail — Detail page of Fall Webinar Leads as the Owner: Refresh, Upload, Copy, Download and Archive buttons, 20 pending destinations with names, the status filter and Reset Pending Entries */}
+![Detail page of Fall Webinar Leads as the Owner: Refresh, Upload, Copy, Download and a disabled Archive button, the cards, and the pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
 
 To read the rejected rows of a Failed list, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu. Numbers cannot be removed from a list in the app; upload a new version or copy the list instead.
 
@@ -198,7 +198,7 @@ Each time you [upload a new file over a list's numbers](#replacing-the-numbers-o
 
 A previous version is deleted automatically 30 days after it was replaced (the period is the `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` setting, see [Configuration](/opbx/data-models/configuration#data-retention)). Download it before then if you need to keep it. Deleting the list deletes its previous versions at once.
 
-{/* SCREENSHOT: auto-dialer-lists-version-history — Version History tab of a list re-uploaded twice: the 30-day note and two versions with their Deleted On dates */}
+![Version History tab of Spring Leads (now v3) with the 30-day note and versions v2 and v1 with their file names, entries, Replaced and Deleted On dates](../../img/screens/auto-dialer-lists-version-history.jpg)
 
 ### Browse a previous version
 
@@ -212,7 +212,7 @@ Who can do this: Owner, PBX Admin and Reporter.
 
 Result: a card titled **Version *n*** opens under the list of versions. It shows each number with its name, status, dial attempts, last result and when it was last dialed, as they were when the version was replaced. A previous version is read-only: it cannot be assigned, dialed or edited. To call its numbers again, download it and upload the file to a list.
 
-{/* SCREENSHOT: auto-dialer-lists-version-browse — an open previous version: search box, entries with status, dial attempts, last result and last dialed, and the Download CSV button */}
+![Version 2 of Spring Leads opened under the version list: the Download CSV button, the search box and entries with status, dial attempts, last result and last dialed](../../img/screens/auto-dialer-lists-version-browse.jpg)
 
 ### Download a previous version
 
