@@ -126,7 +126,7 @@ Switching **Enable Detection** off clears the actions and **Retry on Voicemail**
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Auto-start | Disabled by default | Lets the scheduler start a Draft campaign on schedule (see [Auto-start](/opbx/applications/auto-dialer/scheduling#auto-start)) |
-| Time Limit (sec) | 30 to 14400. Default: 3600 | Maximum length of one call |
+| Time Limit (sec) | 30 to 14400. Default: 600 (also when the field is left empty) | Maximum length of one call |
 | Dial Timeout (sec) | 1 to 300. Default: 60 | How long the callee's phone rings before the attempt is given up |
 | Connect When | Call Connected (default) or Immediately | Sent to Cloudonix as `execute`. **Call Connected** starts the call flow (routing, AMD) when the callee answers; **Immediately** starts it while the callee's phone is still ringing |
 | Concurrent Active Calls (CAC) | 1 to 50. Default: 1 | Most calls in progress at once |

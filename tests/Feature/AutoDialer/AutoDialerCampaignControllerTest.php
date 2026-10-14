@@ -551,4 +551,67 @@ class AutoDialerCampaignControllerTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('exclude_campaign_id');
     }
+
+    // ==================== TIME LIMIT ====================
+
+    public function test_store_defaults_time_limit_to_600_when_omitted_or_null(): void
+    {
+        $omitted = $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload())
+            ->assertCreated()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload(['name' => 'Null Limit', 'time_limit' => null]))
+            ->assertCreated()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->assertSame(600, AutoDialerCampaign::find($omitted->json('data.id'))->time_limit);
+    }
+
+    public function test_update_with_null_time_limit_resets_it_to_600(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'time_limit' => 1800,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['time_limit' => null])
+            ->assertOk()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->assertSame(600, $campaign->fresh()->time_limit);
+    }
+
+    public function test_update_without_time_limit_keeps_it(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'time_limit' => 1800,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['name' => 'Renamed'])
+            ->assertOk();
+
+        $this->assertSame(1800, $campaign->fresh()->time_limit);
+    }
+
+    public function test_time_limit_bounds_are_validated(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+
+        foreach ([29, 14401] as $bad) {
+            $this->actingAs($this->user)
+                ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload(['time_limit' => $bad]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('time_limit');
+
+            $this->actingAs($this->user)
+                ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['time_limit' => $bad])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('time_limit');
+        }
+    }
 }

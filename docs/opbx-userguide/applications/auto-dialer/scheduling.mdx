@@ -87,7 +87,7 @@ These are on the **Advanced** tab but affect timing:
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Dial Timeout (sec) | 1 to 300. Default: 60 | How long the callee's phone rings before the attempt counts as not answered |
-| Time Limit (sec) | 30 to 14400. Default: 3600 | Longest a connected call may last |
+| Time Limit (sec) | 30 to 14400. Default: 600 (also when the field is left empty) | Longest a connected call may last |
 
 Each call is also sent with a **5-minute start deadline**: if Cloudonix cannot start it within 5 minutes, it is dropped rather than placed late.
 

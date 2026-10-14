@@ -581,7 +581,7 @@ export default function AutoDialerCampaignDetail() {
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Time Limit</span>
-                    <span className="font-medium">{campaign.time_limit || 3600} seconds</span>
+                    <span className="font-medium">{campaign.time_limit || 600} seconds</span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Record Calls</span>

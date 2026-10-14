@@ -112,7 +112,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 | Weekly schedule | Per weekday: enabled, and time ranges `HH:MM` to `HH:MM` (end may be `24:00`) |
 | Dial timeout | 1 to 300 seconds. Form default: 60 |
 | Connect when | Call Connected or Immediately. Sent to Cloudonix as `execute` |
-| Time limit | 30 to 14400 seconds. Default: 3600 |
+| Time limit | 30 to 14400 seconds. Default: 600, also when the field is left empty or the API receives null |
 | Concurrent active calls (CAC) | 1 to 50. Form default: 1 |
 | Calls per second (CPS) | 1 to 30. Default: 1 |
 | Max dial attempts | 1 to 5. Form default: 1 |

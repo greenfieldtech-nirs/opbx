@@ -45,6 +45,11 @@ class AutoDialerCampaign extends Model
     public const MAX_CPS = 30;
 
     /**
+     * Call time limit (seconds) used when a campaign defines none.
+     */
+    public const DEFAULT_TIME_LIMIT = 600;
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>

@@ -87,7 +87,7 @@ const campaignSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
-  time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 3600),
+  time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 600),
   record_calls: z.boolean().nullish().transform(v => v ?? false),
   amd_enabled: z.boolean().nullish().transform(v => v ?? false),
   action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
@@ -216,7 +216,7 @@ export default function AutoDialerCampaignForm() {
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       timezone: 'UTC',
-      time_limit: 3600,
+      time_limit: 600,
       record_calls: false,
       amd_enabled: false,
       action_voicemail: undefined,
@@ -271,7 +271,7 @@ export default function AutoDialerCampaignForm() {
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
-        time_limit: existingCampaign.time_limit ?? 3600,
+        time_limit: existingCampaign.time_limit ?? 600,
         record_calls: existingCampaign.record_calls ?? false,
         amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
@@ -723,12 +723,13 @@ export default function AutoDialerCampaignForm() {
                     <Input
                       id="time_limit"
                       type="number"
-                      {...register('time_limit', { valueAsNumber: true })}
+                      // An empty field means "no limit defined": the 600 s default applies
+                      {...register('time_limit', { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
                       min={30}
                       max={14400}
-                      placeholder="3600"
+                      placeholder="600"
                     />
-                    <p className="text-sm text-muted-foreground">Max call duration</p>
+                    <p className="text-sm text-muted-foreground">Max call duration. Empty: 600 seconds</p>
                   </div>
 
                   <div className="space-y-2">

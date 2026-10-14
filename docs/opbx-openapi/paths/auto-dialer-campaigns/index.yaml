@@ -420,7 +420,7 @@ paths:
                   - 'null'
                   minimum: 30
                   maximum: 14400
-                  description: Maximum call duration in seconds (3600 when omitted or null)
+                  description: Maximum call duration in seconds (600 when omitted or null)
                   example: 300
                 auto_start:
                   type: boolean
@@ -877,7 +877,7 @@ paths:
                   - 'null'
                   minimum: 30
                   maximum: 14400
-                  description: Maximum call duration in seconds
+                  description: Maximum call duration in seconds. Omit to keep the current value; null sets the default 600
                   example: 300
                 auto_start:
                   type: boolean
@@ -1280,7 +1280,7 @@ paths:
                   - 'null'
                   minimum: 30
                   maximum: 14400
-                  description: Maximum call duration in seconds
+                  description: Maximum call duration in seconds. Omit to keep the current value; null sets the default 600
                   example: 300
                 auto_start:
                   type: boolean

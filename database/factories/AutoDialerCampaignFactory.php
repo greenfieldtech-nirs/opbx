@@ -43,7 +43,7 @@ class AutoDialerCampaignFactory extends Factory
             'start_date' => now(),
             'end_date' => now()->addDays(30),
             'timezone' => 'UTC',
-            'time_limit' => 3600,
+            'time_limit' => 600,
             'record_calls' => false,
             'action_voicemail' => null,
             'action_human' => null,

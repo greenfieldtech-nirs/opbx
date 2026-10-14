@@ -302,7 +302,7 @@ properties:
                   type: string
   time_limit:
     type: integer
-    description: Maximum call duration in seconds (3600 when not set on create)
+    description: Maximum call duration in seconds (600 when not defined, on create or when set to null on update)
     example: 300
   record_calls:
     type: boolean

@@ -161,6 +161,11 @@ class AutoDialerCampaignController extends Controller
             ], 422);
         }
 
+        // An explicit null time limit means "no limit defined": the default applies.
+        if (array_key_exists('time_limit', $data) && $data['time_limit'] === null) {
+            $data['time_limit'] = AutoDialerCampaign::DEFAULT_TIME_LIMIT;
+        }
+
         // Extract schedule data if provided
         if (isset($data['schedule'])) {
             $scheduleData = $this->scheduleExtractor->processSchedule($data['schedule']);
@@ -515,7 +520,7 @@ class AutoDialerCampaignController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
             'timezone' => $data['timezone'],
-            'time_limit' => $data['time_limit'] ?? 3600,
+            'time_limit' => $data['time_limit'] ?? AutoDialerCampaign::DEFAULT_TIME_LIMIT,
             'record_calls' => $data['record_calls'] ?? false,
             'action_voicemail' => $data['action_voicemail'] ?? null,
             'action_human' => $data['action_human'] ?? null,

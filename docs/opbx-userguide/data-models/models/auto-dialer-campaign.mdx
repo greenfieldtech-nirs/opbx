@@ -40,7 +40,7 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `end_date` | date | No | - | Campaign end date |
 | `timezone` | varchar(255) | No | UTC | Schedule timezone |
 | `schedule` | json | Yes | null | Full weekly schedule |
-| `time_limit` | mediumint unsigned | No | 3600 | Max call duration in seconds (API: 30-14400) |
+| `time_limit` | mediumint unsigned | No | 600 | Max call duration in seconds (API: 30-14400; omitted or null on create, or null on update, stores 600) |
 | `record_calls` | boolean | No | false | Enable recording |
 | `action_voicemail` | varchar(255) | Yes | null | AMD action for voicemail (`HANGUP` or `CONTINUE`) |
 | `action_human` | varchar(255) | Yes | null | AMD action for human |
