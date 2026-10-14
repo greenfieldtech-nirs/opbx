@@ -26,6 +26,7 @@ use App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -71,8 +72,9 @@ class AlbsFollowThroughController extends Controller
             ],
         ]);
 
-        // Merge query string parameters into request for easier access
-        $queryParams = $request->query();
+        // Merge query string parameters into request for easier access. Never let the query
+        // string override the organization the auth middleware resolved.
+        $queryParams = Arr::except($request->query(), ['_organization_id']);
         if (! empty($queryParams)) {
             $request->merge($queryParams);
         }
@@ -163,6 +165,7 @@ class AlbsFollowThroughController extends Controller
                     }]);
             }])
             ->where('id', $albsId)
+            ->where('organization_id', (int) $request->input('_organization_id'))
             ->first();
 
         if (! $albs || $albs->status->value !== AlbsStatus::ACTIVE->value) {
