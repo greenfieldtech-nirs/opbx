@@ -49,7 +49,7 @@ What happens on **Validate and Save Settings**:
 5. OPBX pushes the call timeout, recording format, session-update URL, CDR URL and webhook key to the Cloudonix domain.
 6. OPBX creates or updates the Cloudonix voice application that sends calls to OPBX (named `opbx-routing-application-…` when it is created) and makes it the domain's default.
 
-A full-page "Saving Settings" overlay ("Validating and applying your configuration...") is shown while this runs. The badge then shows **Saved** and a "Settings validated and saved successfully" toast confirms the save. When the page loads for an organization that is already configured, the badge shows **Saved** straight away.
+A full-page "Saving Settings" overlay ("Validating and applying your configuration...") is shown while this runs. The badge then shows **Saved** and a "Settings validated and saved successfully" toast confirms the save. The **Saved** badge appears only once the save request has succeeded; if it fails, a "Failed to save settings" toast explains why and no badge is shown. When the page loads for an organization that is already configured, the badge shows **Saved** straight away.
 
 If saving locally works but the push to Cloudonix or the voice application setup fails, the API answers with a `warning` (for example "Settings saved locally, but failed to sync to Cloudonix: …" or "Failed to create voice application: …") and the page shows a warning toast, "Settings saved, but not synced to Cloudonix", with that text, instead of the success message. Check the logs if calls do not reach OPBX after a save.
 
