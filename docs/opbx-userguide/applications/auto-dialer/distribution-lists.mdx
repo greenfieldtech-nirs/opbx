@@ -112,10 +112,10 @@ On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers l
 Who can do this: Owner and PBX Admin.
 
 1. On a **Ready** list's row, click **Assign Campaign**.
-2. In the **Assign to Campaign** dialog, choose the campaign under **Select a campaign**. Only campaigns that are **Draft**, **Paused**, or **Active with a start date still in the future** are offered; with none, the dialog says "No available campaigns found."
+2. In the **Assign to Campaign** dialog, choose the campaign under **Select a campaign**. Only campaigns that are **Draft**, **Paused**, or **Active with a start date still in the future** are offered; with none, the dialog says "No available campaigns found." The server applies the same rule (the start date is checked in the campaign's timezone), also to a list uploaded straight into a campaign through the API.
 3. Click **Assign**.
 
-Result: the toast "List assigned to campaign successfully" appears, the list becomes **In Use** and the row shows the campaign's name. The campaign's status does not change: a **Draft** campaign stays Draft until you [start it](/opbx/applications/auto-dialer/campaigns#start-a-campaign) (or auto-start does). A campaign that is currently dialing is refused with "Assignment failed" and "Cannot assign list to "*name*" because it is currently running. Pause the campaign first, then assign the list."
+Result: the toast "List assigned to campaign successfully" appears, the list becomes **In Use** and the row shows the campaign's name. The campaign's status does not change: a **Draft** campaign stays Draft until you [start it](/opbx/applications/auto-dialer/campaigns#start-a-campaign) (or auto-start does). An **Active** campaign whose start date has been reached is refused with "Assignment failed" and "Cannot assign list to "*name*" because it has already started. Pause the campaign first, then assign the list.", even outside its calling hours.
 
 A campaign can hold several lists: assigning another list adds it next to the ones already assigned. The dialer takes pending numbers from all of the campaign's lists together, the numbers added earliest first; it does not finish one list before starting the next.
 
@@ -294,7 +294,7 @@ If the server is asked to delete a list that a campaign still uses, or a list on
 | Please upload a CSV file | The file does not end in `.csv` | Choose a CSV file |
 | CSV must contain a column mapped to phone_number | The phone column was not mapped | Map the phone column (use the header-row switch to match your file) |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
-| Cannot assign list … because it is currently running. Pause the campaign first | The campaign is dialing | Pause the campaign, assign, then resume |
+| Cannot assign list … because it has already started. Pause the campaign first | The campaign is Active and its start date has been reached | Pause the campaign, assign, then resume |
 | Cannot unassign list: its campaign is active. Pause the campaign first. | The list's campaign is Active | Pause the campaign, unassign, then resume |
 | Cannot unassign list: its entries have started processing for this campaign … | Calls were made from the list, or a number is no longer pending | Leave it, or copy the list |
 | A list with this name already exists | Copy name in use | Choose another name |

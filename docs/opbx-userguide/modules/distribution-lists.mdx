@@ -110,7 +110,7 @@ Click **Upload** on the list's detail page. On a Ready or Used list this creates
 
 ### Assign a list to a campaign
 
-**Who can do this:** Owner, PBX Admin. The list must be Ready.
+**Who can do this:** Owner, PBX Admin. The list must be Ready, and the campaign Draft, Paused, or Active with a start date still in the future (in the campaign's timezone). An Active campaign that has started is refused (HTTP 422, "… because it has already started. Pause the campaign first, then assign the list."); pause it first. The same rule applies to a list uploaded straight into a campaign.
 
 Click **Assign Campaign** on the list's row. See [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
 

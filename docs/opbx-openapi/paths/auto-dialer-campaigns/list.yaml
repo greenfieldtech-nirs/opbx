@@ -87,8 +87,9 @@ paths:
       summary: Upload campaign list
       description: |
         Upload a CSV as another distribution list of a campaign; the campaign's existing lists
-        are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active but
-        outside its schedule window right now (otherwise 422).
+        are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active with a
+        start date still in the future in the campaign's timezone (otherwise 422; an Active
+        campaign that has started must be paused first).
 
         The file must be a CSV or TXT file up to 10 MB. The first row is a header and is skipped.
         Only the first column is read: it must be an E.164 number (`+` then 2-15 digits);
@@ -159,7 +160,7 @@ paths:
         '422':
           description: >-
             Request validation failed, or the campaign cannot take a list now
-            (`{"error": "Cannot assign list to \"…\" because it is currently running. Pause the campaign first, then assign the list."}`).
+            (`{"error": "Cannot assign list to \"…\" because it has already started. Pause the campaign first, then assign the list."}`).
           content:
             application/json:
               schema:

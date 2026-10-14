@@ -261,15 +261,19 @@ class AutoDialerCampaign extends Model
     {
         if (! $this->canAcceptList()) {
             return sprintf(
-                'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
+                'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (before their start date).',
                 $this->name,
                 $this->status->label()
             );
         }
 
-        if ($this->status === CampaignStatus::ACTIVE && $this->isRunnable()) {
+        // An Active campaign takes a list only before its start date (the Assign dialog's rule), in the campaign's timezone.
+        $startsLater = $this->start_date !== null
+            && now($this->timezone ?? 'UTC')->format('Y-m-d') < $this->start_date->format('Y-m-d');
+
+        if ($this->status === CampaignStatus::ACTIVE && ! $startsLater) {
             return sprintf(
-                'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
+                'Cannot assign list to "%s" because it has already started. Pause the campaign first, then assign the list.',
                 $this->name
             );
         }

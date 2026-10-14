@@ -286,9 +286,9 @@ paths:
 
         The list must be in ''ready'' status (otherwise 403). The campaign must be
 
-        Draft, Paused, or Active but outside its schedule window right now (otherwise
+        Draft, Paused, or Active with a start date still in the future in the campaign''s
 
-        422). On success the list moves to ''in_use'' and `campaign_id`,
+        timezone (otherwise 422; an Active campaign that has started must be paused first). On success the list moves to ''in_use'' and `campaign_id`,
 
         `used_by_campaign_id` and `used_at` are set. A campaign can hold several
 
@@ -358,7 +358,7 @@ paths:
                 - $ref: ../../components/schemas/ValidationError.yaml
                 - $ref: ../../components/schemas/Error.yaml
               example:
-                error: Cannot assign list to "Q1 Sales Campaign" because it is currently running. Pause the campaign first, then assign the list.
+                error: Cannot assign list to "Q1 Sales Campaign" because it has already started. Pause the campaign first, then assign the list.
         '500':
           description: Assignment failed
           content:
