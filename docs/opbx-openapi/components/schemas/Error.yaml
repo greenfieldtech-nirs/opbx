@@ -6,7 +6,9 @@ description: |
     `NotFoundHttpException`), plus `message` (and `status` for HTTP exceptions).
   - Controller errors (`errorResponse()`): `error` is an object
     `{code, message, details}` and there is no top-level `message`.
-  - API-key scope denials and some guards: only `message`.
+  - API-key scope denials, tenant-scope checks (suspended or inactive organization)
+    and some guards: only `message`.
+  - Rate-limit responses: string `error`, `message` and `retry_after`.
 properties:
   error:
     oneOf:

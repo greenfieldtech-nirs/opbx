@@ -1,4 +1,8 @@
-description: Too Many Requests - Rate limit exceeded
+description: |
+  Too Many Requests - Rate limit exceeded. The per-organization API limiter answers
+  `Maximum <n> requests per <m> minute(s) allowed`; named throttles (`auth`, `sensitive`,
+  and so on) answer with their own `error` and `message` text. Every 429 carries
+  `retry_after` and a `Retry-After` header.
 content:
   application/json:
     schema:
@@ -12,6 +16,8 @@ headers:
     $ref: ../headers/X-RateLimit-Limit.yaml
   X-RateLimit-Remaining:
     $ref: ../headers/X-RateLimit-Remaining.yaml
+  X-RateLimit-Reset:
+    $ref: ../headers/X-RateLimit-Reset.yaml
   Retry-After:
     schema:
       type: integer

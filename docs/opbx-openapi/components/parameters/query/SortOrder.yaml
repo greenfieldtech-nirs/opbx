@@ -1,11 +1,13 @@
 name: sort_order
 in: query
 required: false
-description: Sort order direction
+description: >-
+  Sort order direction. The default depends on the endpoint (for example ascending for
+  extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load
+  balancers and outbound whitelist entries); any other value falls back to that default.
 schema:
   type: string
   enum:
     - asc
     - desc
-  default: asc
 example: desc

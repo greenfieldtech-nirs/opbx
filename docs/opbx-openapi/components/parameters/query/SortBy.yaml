@@ -1,8 +1,9 @@
 name: sort_by
 in: query
 required: false
-description: Field to sort by
+description: >-
+  Field to sort by. Each endpoint has its own allowed fields and default; a value that is
+  not allowed falls back to the default.
 schema:
   type: string
-  default: id
 example: created_at

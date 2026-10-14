@@ -5,5 +5,5 @@ content:
       $ref: ../schemas/Error.yaml
     example:
       error: NotFoundHttpException
-      message: Resource not found
+      message: Resource not found.
       status: 404

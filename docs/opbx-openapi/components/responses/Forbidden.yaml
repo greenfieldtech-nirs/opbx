@@ -1,4 +1,4 @@
-description: Forbidden - Insufficient permissions (role/policy denial, or an API key without the required grant)
+description: Forbidden - Insufficient permissions (role/policy denial, an API key without the required grant, or a suspended or inactive organization)
 content:
   application/json:
     schema:
