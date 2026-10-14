@@ -1408,7 +1408,11 @@ paths:
         required: false
         schema:
           type: integer
-        description: Campaign ID to exclude DIDs already in that campaign's pool
+          minimum: 1
+        description: >-
+          Campaign ID whose Caller ID pool is left out of the list (the numbers already in
+          that campaign's pool are not returned). Must be a positive integer, otherwise 422.
+          An id that is not a campaign of the organization excludes nothing.
       responses:
         '200':
           description: List of available Caller IDs
@@ -1446,3 +1450,5 @@ paths:
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
           $ref: ../../components/responses/Forbidden.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

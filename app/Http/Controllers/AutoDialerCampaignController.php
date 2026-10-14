@@ -430,8 +430,11 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
+        $validated = $request->validate(['exclude_campaign_id' => ['nullable', 'integer', 'min:1']]);
+
         $organizationId = Auth::user()->organization_id;
-        $excludeCampaignId = $request->query('exclude_campaign_id');
+        // Another organization's campaign id is harmless: its pool holds only that organization's DIDs.
+        $excludeCampaignId = isset($validated['exclude_campaign_id']) ? (int) $validated['exclude_campaign_id'] : null;
 
         $dids = $this->callerIdService->getAvailableDids($organizationId, $excludeCampaignId);
         $formattedDids = $this->callerIdService->formatAvailableDids($dids);

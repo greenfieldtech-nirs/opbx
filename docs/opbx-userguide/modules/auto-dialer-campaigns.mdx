@@ -188,7 +188,7 @@ One row per call attempt: campaign, destination, session token, status, disposit
 | GET | `/v1/auto-dialer-campaigns/{campaign}/concurrency` | Live CAC use |
 | GET | `/v1/auto-dialer-campaigns/monitor/summary` | Monitor overview |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/monitor/detail` | Monitor drill-down |
-| GET | `/v1/auto-dialer-campaigns/available-caller-ids` | Active numbers that can join a pool |
+| GET | `/v1/auto-dialer-campaigns/available-caller-ids` | Active numbers that can join a pool. Optional `exclude_campaign_id` (integer) leaves out the numbers already in that campaign's pool |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/caller-id-stats` | Per-number usage |
 | POST | `/v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle` | Restart round robin (Paused only) |
 

@@ -10,9 +10,11 @@ use App\Enums\UserRole;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\DidNumber;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AutoDialerCampaignControllerTest extends TestCase
@@ -517,5 +519,36 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertDatabaseHas('auto_dialer_destinations', [
             'id' => $destination->id,
         ]);
+    }
+
+    // ==================== AVAILABLE CALLER IDS ====================
+
+    public function test_available_caller_ids_excludes_the_given_campaign_pool(): void
+    {
+        $pooled = DidNumber::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $free = DidNumber::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        DB::table('auto_dialer_campaign_caller_ids')->insert([
+            'campaign_id' => $campaign->id,
+            'did_number_id' => $pooled->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $ids = $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/available-caller-ids?exclude_campaign_id='.$campaign->id)
+            ->assertOk()
+            ->json('data.*.id');
+
+        $this->assertContains($free->id, $ids);
+        $this->assertNotContains($pooled->id, $ids);
+    }
+
+    public function test_available_caller_ids_rejects_a_non_integer_exclude_campaign_id(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/available-caller-ids?exclude_campaign_id=abc')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('exclude_campaign_id');
     }
 }
