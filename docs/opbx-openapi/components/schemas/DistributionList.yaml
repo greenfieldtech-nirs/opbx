@@ -43,7 +43,9 @@ properties:
     example: Ready
   status_color:
     type: string
-    description: Status color for UI display
+    enum: [gray, yellow, blue, green, red, purple, orange]
+    description: Badge color for the status (draft and archived are gray, pending yellow, processing
+      blue, ready green, failed red, in_use purple, used orange)
     example: green
   campaign_id:
     type:
@@ -61,23 +63,28 @@ properties:
     type:
     - string
     - 'null'
-    format: date-time
-    description: When the list was last used
+    description: When the list was assigned to a campaign (`Y-m-d H:i:s`)
     example: '2024-01-15 14:30:00'
   statistics:
     type: object
-    description: List statistics
+    description: List statistics (the counters are `null` in the create response)
     properties:
       total_rows:
-        type: integer
+        type:
+        - integer
+        - 'null'
         description: Total number of rows in the list
         example: 1000
       valid_rows:
-        type: integer
+        type:
+        - integer
+        - 'null'
         description: Number of valid rows
         example: 950
       invalid_rows:
-        type: integer
+        type:
+        - integer
+        - 'null'
         description: Number of invalid rows
         example: 50
   parent_list_id:
@@ -88,52 +95,55 @@ properties:
     example: null
   has_versions:
     type: boolean
-    description: Whether this list has version history
+    description: Whether other lists point to this one as their parent (always `false` in the
+      versions endpoint response)
     example: false
   can_archive:
     type: boolean
-    description: Whether the list can be archived
+    description: Status is ready, failed or used, and the list is not assigned to a campaign
     example: true
   can_assign:
     type: boolean
-    description: Whether the list can be assigned to a campaign
+    description: Status is ready
     example: true
   can_upload:
     type: boolean
-    description: Whether the list can accept uploads
+    description: Status is draft, pending or failed (destinations can be uploaded or added)
     example: true
   can_delete:
     type: boolean
+    description: The list is not assigned to a campaign (role rules still apply, see Delete distribution list)
+    example: true
   can_unassign:
     type: boolean
+    description: The list is assigned to a campaign and every destination is still pending with zero dial attempts
+    example: false
   can_copy:
     type: boolean
-    description: Whether the list can be copied
+    description: Status is ready, in_use, used or archived
     example: true
   created_at:
     type: string
-    format: date-time
-    description: Creation timestamp
+    description: Creation timestamp (`Y-m-d H:i:s`)
     example: '2024-01-10 08:00:00'
   processed_at:
     type:
     - string
     - 'null'
-    format: date-time
-    description: When the list was last processed
+    description: When the last upload finished processing (`Y-m-d H:i:s`)
     example: '2024-01-10 08:05:00'
   archived_at:
     type:
     - string
     - 'null'
-    format: date-time
-    description: When the list was archived
+    description: When the list was archived (`Y-m-d H:i:s`)
     example: null
   campaign:
     type:
     - object
     - 'null'
-    description: Associated campaign (when loaded)
+    description: Assigned campaign. Present in the list and show responses;
+      omitted in the create, copy and versions responses.
     properties:
       id:
         type: integer
@@ -145,7 +155,8 @@ properties:
     type:
     - object
     - 'null'
-    description: Campaign that used this list (when loaded)
+    description: Campaign that used this list. Present in the list and show responses;
+      omitted in the create, copy and versions responses.
     properties:
       id:
         type: integer
