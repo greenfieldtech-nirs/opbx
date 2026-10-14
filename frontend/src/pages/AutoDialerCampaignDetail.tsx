@@ -26,6 +26,7 @@ import {
   ListOrdered,
   Timer,
   Voicemail,
+  Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +60,8 @@ import {
   useArchiveCampaign,
   autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
-import { useDistributionLists } from '@/hooks/useDistributionLists';
+import { useDistributionLists, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
+import { getApiErrorMessage } from '@/services/api';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function getStatusBadge(status: string) {
@@ -131,6 +133,18 @@ export default function AutoDialerCampaignDetail() {
     { campaign_id: id ? parseInt(id, 10) : undefined, per_page: 100 }
   );
   const distributionLists = distributionListsData?.data || [];
+  const unassignMutation = useUnassignListFromCampaign();
+
+  // A list can be unassigned only until its entries have started processing (can_unassign).
+  const handleUnassignList = async (listId: number) => {
+    try {
+      await unassignMutation.mutateAsync(listId);
+      queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      toast.success('List unassigned from campaign');
+    } catch (err) {
+      toast.error('Unassign failed', { description: getApiErrorMessage(err) });
+    }
+  };
 
   // Get Caller ID pool from campaign data
   const callerIdPool = (campaign as any)?.caller_id_pool || [];
@@ -486,6 +500,7 @@ export default function AutoDialerCampaignDetail() {
                             <TableHead className="text-center">Version</TableHead>
                             <TableHead className="text-right">Records</TableHead>
                             <TableHead className="text-right">Invalid</TableHead>
+                            {canManageCampaigns && <TableHead className="w-24" />}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -519,6 +534,30 @@ export default function AutoDialerCampaignDetail() {
                                     <span className="text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
+                                {canManageCampaigns && (
+                                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    {list.can_unassign ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-red-600 hover:text-red-800"
+                                        onClick={() => handleUnassignList(list.id)}
+                                        disabled={unassignMutation.isPending}
+                                        title="Unassign from campaign"
+                                      >
+                                        <Unlink className="h-4 w-4 mr-1" />
+                                        Unassign
+                                      </Button>
+                                    ) : (
+                                      <span
+                                        className="text-xs text-muted-foreground"
+                                        title="Cannot unassign: this list's entries have started processing"
+                                      >
+                                        Locked
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                         </TableBody>

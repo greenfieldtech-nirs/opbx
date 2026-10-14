@@ -55,19 +55,6 @@ class CampaignListService
     }
 
     /**
-     * Delete a list from a campaign.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign to delete the list from
-     */
-    public function deleteList(AutoDialerCampaign $campaign): void
-    {
-        if ($campaign->list) {
-            $campaign->list->destinations()->delete();
-            $campaign->list->delete();
-        }
-    }
-
-    /**
      * Process a CSV file and create destinations.
      *
      * @param  string  $path  The storage path to the CSV file
@@ -145,18 +132,20 @@ class CampaignListService
 
         $uniqueCount = AutoDialerDestination::where('list_id', $list->id)->count();
 
+        // The uploaded list is assigned to the campaign, like a list assigned from Distribution Lists.
         $list->update([
-            'status' => 'ready',
+            'status' => ListStatus::IN_USE,
+            'used_by_campaign_id' => $campaign->id,
+            'used_at' => now(),
             'processed_at' => now(),
             'total_rows' => $stats['total_rows'],
             'valid_rows' => $uniqueCount,
             'invalid_rows' => $stats['invalid_rows'] + ($stats['valid_rows'] - $uniqueCount),
         ]);
 
-        $campaign->update([
-            'total_destinations' => $uniqueCount,
-            'pending_calls' => $uniqueCount,
-        ]);
+        // The campaign may already have other lists: add this list's entries to its totals.
+        $campaign->increment('total_destinations', $uniqueCount);
+        $campaign->increment('pending_calls', $uniqueCount);
 
         return [
             'total_rows' => $stats['total_rows'],
@@ -207,29 +196,26 @@ class CampaignListService
     public function hasValidList(AutoDialerCampaign $campaign): bool
     {
         // An assigned list is IN_USE (assignment flips READY to IN_USE), so both count as startable.
-        return in_array($campaign->list?->status, [ListStatus::READY, ListStatus::IN_USE], true);
+        return $campaign->lists()->whereIn('status', [ListStatus::READY, ListStatus::IN_USE])->exists();
     }
 
     /**
-     * Get list details for a campaign.
+     * Get the lists assigned to a campaign, oldest first.
      *
-     * @param  AutoDialerCampaign  $campaign  The campaign to get list details for
-     * @return array<string, mixed>|null The list details or null if no list exists
+     * @param  AutoDialerCampaign  $campaign  The campaign to get the lists for
+     * @return array<int, array<string, mixed>>
      */
-    public function getListDetails(AutoDialerCampaign $campaign): ?array
+    public function getListsDetails(AutoDialerCampaign $campaign): array
     {
-        if (! $campaign->list) {
-            return null;
-        }
-
-        return [
-            'id' => $campaign->list->id,
-            'name' => $campaign->list->name,
-            'status' => $campaign->list->status->value ?? $campaign->list->status,
-            'total_rows' => $campaign->list->total_rows,
-            'valid_rows' => $campaign->list->valid_rows,
-            'invalid_rows' => $campaign->list->invalid_rows,
-            'processed_at' => $campaign->list->processed_at?->toIso8601String(),
-        ];
+        return $campaign->lists()->orderBy('id')->get()->map(fn (AutoDialerList $list) => [
+            'id' => $list->id,
+            'name' => $list->name,
+            'status' => $list->status->value ?? $list->status,
+            'total_rows' => $list->total_rows,
+            'valid_rows' => $list->valid_rows,
+            'invalid_rows' => $list->invalid_rows,
+            'processed_at' => $list->processed_at?->toIso8601String(),
+            'can_unassign' => $list->canUnassign(),
+        ])->all();
     }
 }

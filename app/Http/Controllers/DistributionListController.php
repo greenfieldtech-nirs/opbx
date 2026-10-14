@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\CampaignStatus;
 use App\Enums\ListStatus;
 use App\Exceptions\ResourceInUseException;
 use App\Http\Resources\DistributionListResource;
@@ -468,25 +467,8 @@ class DistributionListController extends Controller
             ], 403);
         }
 
-        // Check if campaign can accept a list
-        if (! $campaign->canAcceptList()) {
-            return response()->json([
-                'error' => sprintf(
-                    'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
-                    $campaign->name,
-                    $campaign->status->label()
-                ),
-            ], 422);
-        }
-
-        // Additional check: active campaigns can only accept lists if they haven't started running yet
-        if ($campaign->status === CampaignStatus::ACTIVE && $campaign->isRunnable()) {
-            return response()->json([
-                'error' => sprintf(
-                    'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
-                    $campaign->name
-                ),
-            ], 422);
+        if ($refusal = $campaign->listAssignmentRefusal()) {
+            return response()->json(['error' => $refusal], 422);
         }
 
         // Check if list is ready for assignment
@@ -605,30 +587,10 @@ class DistributionListController extends Controller
     {
         $this->authorize('unassign', $list);
 
-        // Check if list is assigned to a campaign
-        if (! $list->campaign_id) {
-            return response()->json([
-                'error' => 'List is not assigned to any campaign',
-            ], 422);
-        }
-
-        // Check if all destinations are pending with zero dial attempts
-        if (! $list->canUnassign()) {
-            return response()->json([
-                'error' => 'Cannot unassign list: some destinations have already been dialed or are not in pending status. All entries must be pending with zero dial attempts.',
-            ], 422);
-        }
+        $campaignName = $list->campaign?->name;
 
         try {
-            $campaignName = $list->campaign?->name;
-
-            // Update the list to unassign it
-            $list->update([
-                'campaign_id' => null,
-                'status' => ListStatus::READY,
-                'used_by_campaign_id' => null,
-                'used_at' => null,
-            ]);
+            $this->listService->unassignList($list);
 
             return response()->json([
                 'message' => 'List unassigned from campaign successfully',
@@ -637,10 +599,10 @@ class DistributionListController extends Controller
                     'previous_campaign_name' => $campaignName,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             return response()->json([
-                'error' => 'Failed to unassign list from campaign: '.$e->getMessage(),
-            ], 500);
+                'error' => $e->getMessage(),
+            ], 422);
         }
     }
 }

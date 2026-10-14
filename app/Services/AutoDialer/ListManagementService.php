@@ -575,4 +575,34 @@ class ListManagementService
             'campaign_id' => $campaignId,
         ]);
     }
+
+    /**
+     * Unassign a list from its campaign, keeping the list and its entries.
+     *
+     * @throws \InvalidArgumentException when the list is not assigned or its entries have started processing
+     */
+    public function unassignList(AutoDialerList $list): void
+    {
+        if (! $list->campaign_id) {
+            throw new \InvalidArgumentException('List is not assigned to any campaign');
+        }
+
+        if (! $list->canUnassign()) {
+            throw new \InvalidArgumentException(AutoDialerList::STARTED_PROCESSING_MESSAGE);
+        }
+
+        $campaignId = $list->campaign_id;
+
+        $list->update([
+            'campaign_id' => null,
+            'status' => ListStatus::READY,
+            'used_by_campaign_id' => null,
+            'used_at' => null,
+        ]);
+
+        Log::info('ListManagementService: Unassigned list from campaign', [
+            'list_id' => $list->id,
+            'campaign_id' => $campaignId,
+        ]);
+    }
 }

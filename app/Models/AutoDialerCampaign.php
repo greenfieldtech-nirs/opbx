@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -149,16 +148,6 @@ class AutoDialerCampaign extends Model
     }
 
     /**
-     * Get the first/primary list for this campaign (backward compatibility).
-     *
-     * @deprecated Use lists() instead
-     */
-    public function list(): HasOne
-    {
-        return $this->hasOne(AutoDialerList::class, 'campaign_id');
-    }
-
-    /**
      * Get the destinations for this campaign through the list.
      */
     public function destinations(): HasManyThrough
@@ -266,6 +255,29 @@ class AutoDialerCampaign extends Model
     }
 
     /**
+     * Why a list cannot be added to this campaign right now, or null when it can.
+     */
+    public function listAssignmentRefusal(): ?string
+    {
+        if (! $this->canAcceptList()) {
+            return sprintf(
+                'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
+                $this->name,
+                $this->status->label()
+            );
+        }
+
+        if ($this->status === CampaignStatus::ACTIVE && $this->isRunnable()) {
+            return sprintf(
+                'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
+                $this->name
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * Check if the campaign is currently runnable.
      *
      * Uses the schedule object to check if current time falls within
@@ -346,7 +358,7 @@ class AutoDialerCampaign extends Model
      */
     public function hasList(): bool
     {
-        return $this->list !== null;
+        return $this->lists()->exists();
     }
 
     /**

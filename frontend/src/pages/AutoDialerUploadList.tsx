@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { useUploadCampaignList, useAutoDialerCampaign } from '@/hooks/useAutoDialerCampaigns';
+import { getApiErrorMessage } from '@/services/api';
 
 export default function AutoDialerUploadList() {
   const { id } = useParams<{ id: string }>();
@@ -76,8 +77,8 @@ export default function AutoDialerUploadList() {
       });
       toast.success('List uploaded successfully');
       navigate(`/ui/auto-dialer/campaigns/${id}`);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to upload list');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error) || 'Failed to upload list');
     }
   };
 

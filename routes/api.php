@@ -641,7 +641,7 @@ Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scop
         ->name('auto-dialer-campaigns.list.upload');
     Route::get('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'getList'])
         ->name('auto-dialer-campaigns.list.get');
-    Route::delete('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'deleteList'])
+    Route::delete('auto-dialer-campaigns/{campaign}/list/{list}', [AutoDialerCampaignController::class, 'deleteList'])
         ->name('auto-dialer-campaigns.list.delete');
     Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
         ->name('auto-dialer-campaigns.destinations');

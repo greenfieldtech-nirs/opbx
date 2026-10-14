@@ -107,7 +107,7 @@ class CampaignQueryService
         return OrganizationScope::bypass(function () {
             return AutoDialerCampaign::where('auto_start', true)
                 ->where('status', CampaignStatus::DRAFT)
-                ->whereHas('list', function ($query) {
+                ->whereHas('lists', function ($query) {
                     $query->whereIn('status', ['ready', 'in_use']);
                 })
                 ->get();

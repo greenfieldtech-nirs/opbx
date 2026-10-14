@@ -20,6 +20,8 @@ class AutoDialerList extends Model
 {
     use HasFactory;
 
+    public const string STARTED_PROCESSING_MESSAGE = 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).';
+
     /**
      * The table associated with the model.
      */
@@ -191,10 +193,7 @@ class AutoDialerList extends Model
      */
     public function allDestinationsArePendingAndFresh(): bool
     {
-        if ($this->statistics['total_rows'] ?? $this->total_rows === 0) {
-            return true;
-        }
-
+        // Query the entries themselves: the row counters can lag behind them.
         return $this->destinations()
             ->where(function ($query) {
                 $query->where('status', '!=', 'pending')
@@ -220,7 +219,8 @@ class AutoDialerList extends Model
     }
 
     /**
-     * Check if the list can be unassigned from its campaign.
+     * Check if the list can be unassigned from its campaign: refused once any of its
+     * entries has started processing (dialled, or no longer pending).
      */
     public function canUnassign(): bool
     {

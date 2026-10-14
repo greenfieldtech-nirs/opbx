@@ -11,11 +11,13 @@ use App\Http\Requests\UpdateCampaignRequest;
 use App\Http\Requests\UploadListRequest;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerList;
 use App\Services\AutoDialer\CallerIdPoolService;
 use App\Services\AutoDialer\CampaignLifecycleService;
 use App\Services\AutoDialer\CampaignListService;
 use App\Services\AutoDialer\CampaignManagementService;
 use App\Services\AutoDialer\CampaignMonitorService;
+use App\Services\AutoDialer\ListManagementService;
 use App\Services\AutoDialer\ScheduleExtractorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -323,6 +325,10 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('uploadList', $campaign);
 
+        if ($refusal = $campaign->listAssignmentRefusal()) {
+            return response()->json(['error' => $refusal], 422);
+        }
+
         $file = $request->file('file');
         $name = $request->input('name');
 
@@ -335,36 +341,35 @@ class AutoDialerCampaignController extends Controller
     }
 
     /**
-     * Get list for a campaign.
+     * Get the lists assigned to a campaign.
      */
     public function getList(AutoDialerCampaign $campaign): JsonResponse
     {
         $this->authorize('view', $campaign);
 
-        $listDetails = $this->listService->getListDetails($campaign);
-
-        if ($listDetails === null) {
-            return response()->json([
-                'message' => 'No list uploaded for this campaign',
-            ], 404);
-        }
-
         return response()->json([
-            'data' => $listDetails,
+            'data' => $this->listService->getListsDetails($campaign),
         ]);
     }
 
     /**
-     * Delete list from a campaign.
+     * Unassign one list from a campaign (the list and its entries are kept).
      */
-    public function deleteList(AutoDialerCampaign $campaign): JsonResponse
+    public function deleteList(AutoDialerCampaign $campaign, AutoDialerList $list, ListManagementService $listManagement): JsonResponse
     {
         $this->authorize('deleteList', $campaign);
 
-        $this->listService->deleteList($campaign);
+        abort_unless($list->campaign_id === $campaign->id, 404);
+
+        try {
+            $listManagement->unassignList($list);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         return response()->json([
-            'message' => 'List deleted successfully',
+            'message' => 'List unassigned from campaign successfully',
+            'data' => ['list_id' => $list->id],
         ]);
     }
 

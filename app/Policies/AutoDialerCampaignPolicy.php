@@ -162,16 +162,11 @@ class AutoDialerCampaignPolicy
             return false;
         }
 
-        // Cannot upload if campaign already has a list
-        if ($campaign->hasList()) {
-            return false;
-        }
-
         return true;
     }
 
     /**
-     * Determine whether the user can delete the list from the campaign.
+     * Determine whether the user can unassign a list from the campaign.
      *
      * User must have manage permission and campaign must not be active.
      */
@@ -190,6 +185,6 @@ class AutoDialerCampaignPolicy
             return false;
         }
 
-        return $campaign->hasList();
+        return true;
     }
 }
