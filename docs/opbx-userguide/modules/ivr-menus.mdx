@@ -85,9 +85,11 @@ Missing and wrong input count toward the same total. For example, with **Maximum
 
 ## Failover
 
-The failover is used after the last turn with no valid input. If the menu has no other failover set, the default is **Hang Up**: the **Failover Action** list shows no type and **Failover Destination** reads "Call will end". The list offers the same destination types as the options (it has no Hang Up entry; once you pick a type, a destination is required), plus:
+The failover is used after the last turn with no valid input. If the menu has no other failover set, the default is **Hang Up**: the **Failover Action** list shows **Hang Up** and **Failover Destination** reads "Call will end". The list offers the same destination types as the options (once you pick one of them, a destination is required), plus:
 
 - **Disconnect**: only offered when editing (see [Edit an IVR menu](#edit-an-ivr-menu)).
+
+![Create IVR Menu dialog, Menu Options tab, with Menu Settings open and the Failover Action list showing the destination types and Hang Up selected](../img/screens/ivr-menus-failover.jpg)
 
 ## Workflows
 
@@ -119,7 +121,7 @@ The list shows each menu's name and option count, **Options**, **Max Turns**, **
 
 ![Create IVR Menu dialog, Menu Options tab, with digit 1 to extension 1005 and digit 2 to the Sales Team ring group](../img/screens/ivr-menus-create-options.jpg)
 
-6. Click **Menu Settings** to open the panel. Set **Max Timeout (seconds)**, **Inter-digit Timeout (seconds)** and **Maximum Turns**, then pick the **Failover Action** and the **Failover Destination**, or leave the action empty to hang up ("Call will end").
+6. Click **Menu Settings** to open the panel. Set **Max Timeout (seconds)**, **Inter-digit Timeout (seconds)** and **Maximum Turns**, then pick the **Failover Action** and the **Failover Destination**, or keep **Hang Up** ("Call will end").
 7. Click **Create Menu**.
 
 The dialog closes, the toast "IVR menu created successfully" appears and the menu is listed. Any phone number, option or queue that points at the menu now sends callers to it.
