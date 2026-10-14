@@ -23,45 +23,52 @@ properties:
           description: Campaign status
           example: active
         progress_percentage:
-          type: number
-          format: float
-          description: Campaign completion percentage
-          example: 75.5
+          type: integer
+          description: (completed + failed) / total_destinations x 100, rounded; 0 when the campaign has no destinations
+          example: 76
         total_destinations:
           type: integer
-          description: Total number of destinations
+          description: Destinations across all lists assigned to the campaign
           example: 1000
         completed_calls:
           type: integer
-          description: Number of completed calls
+          description: Destinations in `completed` status
           example: 755
         failed_calls:
           type: integer
-          description: Number of failed calls
+          description: Destinations in `failed` status
           example: 45
+        voicemail_calls:
+          type: integer
+          description: Calls where the AMD worker detected a voicemail
+          example: 12
         pending_calls:
           type: integer
-          description: Number of pending calls
+          description: Destinations in `pending` status
           example: 200
+        dialing_calls:
+          type: integer
+          description: Destinations in `dialing` status
+          example: 3
         concurrent_active_calls:
           type: integer
           description: Maximum allowed concurrent calls
           example: 10
         active_calls:
           type: integer
-          description: Currently active calls
+          description: Active calls reported by the dialer worker (always 0 for a paused campaign)
           example: 5
         cac_utilization:
           type: number
           format: float
-          description: CAC utilization percentage
+          description: active_calls / concurrent_active_calls x 100, one decimal
           example: 50.0
         rate_limit_status:
           type: object
           properties:
             is_rate_limited:
               type: boolean
-              description: Whether campaign is rate limited
+              description: True when the campaign is paused with pause_reason `cloudonix_rate_limit`
               example: false
             pause_reason:
               type:
@@ -82,12 +89,16 @@ properties:
           example: '+14155551212'
         routing_destination_type:
           type: string
+          enum:
+          - ai_assistant
+          - ai_load_balancer
+          - hangup
           description: Routing destination type
           example: ai_assistant
         routing_destination_label:
           type: string
-          description: Routing destination label
-          example: Sales AI Assistant
+          description: Label of the routing destination type (AI Assistant, AI Load Balancer or Hangup)
+          example: AI Assistant
         start_date:
           type: string
           format: date
@@ -120,33 +131,33 @@ properties:
         example: 50
       overall_utilization:
         type: number
-        format: float
-        description: Overall CAC utilization percentage
+        description: total_active_calls / total_cac_capacity x 100, one decimal (0 when there is no capacity)
         example: 30.0
   worker_health:
     type: object
-    description: Dialer worker health status
+    description: |
+      Dialer worker health, read from the worker's health URL (`DIALER_WORKER_HEALTH_URL`, 5-second timeout).
+      The worker reports only its status, so the three counters are 0.
     properties:
       status:
         type: string
         enum:
         - healthy
-        - degraded
         - offline
         - unknown
-        description: Worker health status
+        description: '`healthy` when the health check answers 200, `offline` when it fails, `unknown` when no health URL is configured'
         example: healthy
       active_campaigns:
         type: integer
-        description: Number of campaigns being processed
-        example: 4
+        description: Taken from the health response when present, otherwise 0
+        example: 0
       active_calls:
         type: integer
-        description: Number of active calls
-        example: 15
+        description: Taken from the health response when present, otherwise 0
+        example: 0
       queue_depth:
         type: integer
-        description: Current queue depth
+        description: Taken from the health response when present, otherwise 0
         example: 0
 required:
 - campaigns
