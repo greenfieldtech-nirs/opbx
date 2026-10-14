@@ -44,31 +44,65 @@ The role does not decide whether the Web Phone works; the extension does. Withou
 When the organization has no Cloudonix domain configured, the panel instead says "Cloudonix isn't configured for your organization" and asks you to have your Owner complete Settings > Cloudonix (the server answers 409 `cloudonix_not_configured`, while a missing extension is 404).
 :::
 
-## Open the Web Phone
+## Workflows
+
+No role check applies to these tasks; the Web Phone only needs your user extension.
+
+### Open the Web Phone
+
+Who can do this: any user with a user extension.
 
 1. Click the round phone button in the bottom-right corner of any page (tooltip **Web Phone**).
 2. The panel opens. Its header shows **Web Phone** and the registration status: "Initializing...", "Connecting...", "Connected, registering..." and then **Registered**.
-3. When it reads **Registered**, the keypad is ready.
+3. When it reads **Registered**, the **Keypad** tab is ready.
 
-Close the panel with **X**. While a call is active, **X** is disabled ("End the call before closing").
+Close the panel with **X**. While a call is ringing or active, **X** is disabled ("End the call before closing").
 
 :::note The phone stays registered
 The Web Phone registers when you sign in to OPBX and stays registered while you are signed in, whether the panel is open or not. An incoming call opens the panel and rings. Closing the panel does not unregister the phone; signing out does.
-
-Only one browser tab holds the registration. In another tab the panel says "Web Phone is active in another tab" and offers **Use here** to move the phone to that tab. When the tab holding the registration closes, the next open tab takes over automatically.
 :::
 
 {/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, header status Registered, a number entered in the display */}
 
-## Place a call
+### Place a call
 
-1. On the **Keypad** tab, type the number or click the keys (`0`–`9`, `*`, `#`). Use the backspace button to correct.
-2. Click the green call button, or press **Enter** in the number field.
-3. You hear country-specific call-progress tones (ringing, busy, congestion).
-4. When the call connects, a timer starts: `M:SS`, then `H:MM:SS` after one hour.
-5. Hang up with the red button.
+Who can do this: any user with a user extension.
 
-### During a call
+1. [Open the Web Phone](#open-the-web-phone).
+2. On the **Keypad** tab, type the number or click the keys (`0`–`9`, `*`, `#`). Use the backspace button to correct. A number is dialled at your Cloudonix domain; an entry that contains `@` is dialled as that SIP address.
+3. Click the green call button, or press **Enter** in the number field. The green button stays disabled while the number is empty.
+4. The status reads "Calling..." and then "Ringing...", and you hear the ringing tone of your country (see [Call-progress tones](#call-progress-tones)). Click the red button to cancel.
+5. When the call connects, the status reads "On call" and a timer starts: `M:SS`, then `H:MM:SS` after one hour.
+6. Hang up with the red button.
+
+The panel returns to **Registered**. If the call fails because the other side is busy or the network is congested, the matching tone plays.
+
+While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** tab bar is locked. The keypad is not shown once the call connects, so you cannot send touch tones (DTMF) from the Web Phone. Transferring a call is not available in the Web Phone.
+
+### Answer an incoming call
+
+Who can do this: any user with a user extension.
+
+1. While the phone is registered, an incoming call opens the panel by itself and shows **Incoming call** with the caller's SIP address.
+2. Click the green **Answer** button. The browser asks for microphone access the first time.
+
+The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts.
+
+{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller address such as sip:+12025550142@acme.example.com and the green Answer and red Reject buttons */}
+
+### Reject an incoming call
+
+Who can do this: any user with a user extension.
+
+1. When the panel shows **Incoming call**, click the red **Reject** button.
+
+The call is ended and the panel returns to **Registered**.
+
+### Use the call controls
+
+Who can do this: any user with a user extension.
+
+During a connected call the panel shows the timer, the number and these controls:
 
 | Control | What it does |
 |---------|--------------|
@@ -78,26 +112,51 @@ Only one browser tab holds the registration. In another tab the panel says "Web 
 | Volume slider | Sets the incoming audio level |
 | Hang up (red) | Ends the call |
 
-While a call is active the rest of the page is dimmed and blocked, the panel cannot be closed, and the tab bar is locked. The keypad is not shown during a call, so you cannot send touch tones (DTMF) from the Web Phone.
+1. Click **Mute** to stop sending your microphone; the button turns blue and reads **Unmute**. Click it again to resume.
+2. Click **Hold** to put the other party on hold; the button reads **Resume**. Click it again to take the call off hold.
+3. Drag the volume slider, or click the speaker button to silence and restore the incoming audio.
+4. Click the red button to hang up.
 
 {/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the timer, Mute, Hold, Hangup and the volume slider, and the page behind dimmed */}
 
-## Answer a call
+### Redial a recent call
 
-While the phone is registered, an incoming call opens the panel and shows **Incoming call** with the caller's number and two buttons: **Answer** and **Reject**.
+Who can do this: any user with a user extension.
 
-## Recents
+1. [Open the Web Phone](#open-the-web-phone).
+2. Click the **Recents** tab.
+3. Click the row of the number you want to call.
+
+The Web Phone switches to **Keypad**, fills in the number and places the call.
 
 The **Recents** tab lists the last **50** calls placed **from your extension**, newest first. Each row shows the number, when it was placed and, for calls with a duration, how long it lasted. The icon is green when the disposition is `ANSWER` or `CONNECTED` and red otherwise.
 
-- Click a row to redial: the Web Phone switches to **Keypad**, fills in the number and places the call.
-- The list is reloaded each time you open the tab.
+- The list is reloaded each time you open the tab ("Loading recent calls...").
 - Coaching calls are left out.
 - Only your own extension's calls are shown, never another user's.
 
-When there are none, the tab reads "No recent calls yet."
+When there are none, the tab reads "No recent calls yet." If the list cannot be loaded, it reads "Could not load recent calls."
 
 {/* SCREENSHOT: web-phone-recents — Web Phone Recents tab listing several recent outbound calls with time, duration and coloured dispositions */}
+
+### Move the Web Phone to this tab
+
+Who can do this: any user with a user extension.
+
+Only one browser tab holds the registration. In any other tab the panel says "Web Phone is active in another tab".
+
+1. Open the Web Phone in the tab you want to use.
+2. Click **Use here**.
+
+This tab takes the registration and the other tab shows "Web Phone is active in another tab". When the tab holding the registration closes, the next open tab takes over automatically.
+
+### Retry after an error
+
+Who can do this: any user with a user extension.
+
+1. When the panel shows an error (see [Common errors](#common-errors)), click **Retry**.
+
+The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the header goes back to "Initializing...". **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
 
 ## Coaching from Live Calls
 
@@ -105,20 +164,23 @@ When an Owner or Supervisor clicks **Spy**, **Whisper** or **Barge** on [Live Ca
 
 ## Call-progress tones
 
-Ringing, busy, congestion and dial tones follow the conventions of the organization's country, taken from the organization's `country` setting (default `us`). The cadences come from the standard Asterisk indications table.
+The ringing, busy and congestion tones follow the conventions of the organization's country, taken from the organization's `country` setting (default `us`; it cannot be changed from the UI). The cadences come from the standard Asterisk indications table.
 
 ## Common errors
 
 | Message | What it means | What to do |
 |---------|---------------|-----------|
-| Web Phone Unavailable — No extension is assigned to your account | No user extension | Assign a user extension |
-| Web Phone Unavailable — Cloudonix isn't configured for your organization | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/opbx/modules/settings) |
-| Connection Failed — Could not open a connection to the voice server | The browser cannot reach `wss://webrtc.cloudonix.io` | Check the network and firewall, then **Retry** |
+| Web Phone Unavailable — No extension is assigned to your account. Web Phone cannot be used. | No user extension | Assign a user extension, then reload the page |
+| Web Phone Unavailable — Cloudonix isn't configured for your organization. | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/opbx/modules/settings) |
+| Web Phone Unavailable — Could not load the Web Phone configuration from the server. | Any other failure of `GET /v1/webphone/config` | **Retry**; if it persists, contact your administrator |
+| Web Phone Error — The Web Phone engine failed to load. | The bundled SIP library did not load | Reload the page |
+| Connection Failed — Could not open a connection to the voice server. | The browser cannot reach `wss://webrtc.cloudonix.io` | Check the network and firewall, then **Retry** |
 | Authentication Rejected | Cloudonix refused the extension's password | Reset the extension password on [Extensions](/opbx/modules/extensions) |
 | Extension Not Found | The subscriber does not exist in Cloudonix | Check that the extension is synced to Cloudonix |
-| Web Phone Error — no reply came back in time | Registration timed out | **Retry** in a moment |
+| Web Phone Error — …no reply came back in time. | Registration timed out | **Retry** in a moment |
+| Web Phone Error — Registration with the voice server failed. | Any other registration failure | **Retry**; if it persists, contact your administrator |
 
-Every error screen shows the raw cause from the SIP library and a **Retry** button.
+Registration errors also show the raw cause from the SIP library (for example `Request Timeout`). Every error screen except the missing-extension one has a **Retry** button.
 
 ## How it works
 
@@ -146,7 +208,7 @@ The config contains your SIP password. It is returned only to you, for your own 
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 `No extension is assigned to this user` when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
+| GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 "No extension is assigned to this user." when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
 | GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
 
