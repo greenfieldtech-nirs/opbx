@@ -177,6 +177,10 @@ Result: the toast "Extensions synchronized! Created *N* in Cloudonix, imported *
 2. creates an unassigned, active PBX User extension for each Cloudonix subscriber whose number OPBX does not have. Subscriber numbers longer than 5 characters are treated as phone numbers and skipped;
 3. sets the local status of extensions that exist on both sides to the Cloudonix status.
 
+:::note The button can stay enabled
+The comparison counts every Cloudonix subscriber that has no matching extension, including subscribers whose number is longer than 5 characters (phone numbers registered as subscribers). The sync deliberately never imports those, because they are not PBX extensions. So when your Cloudonix domain has such a subscriber, **Sync Extensions** is enabled again after every page load even though a sync has nothing to import for it. This is expected: run the sync when you have added extensions or subscribers, and ignore the button otherwise.
+:::
+
 When the sync fails (for example Cloudonix is not configured), the toast reads "An error occurred while syncing extensions."
 
 ### Find an extension
