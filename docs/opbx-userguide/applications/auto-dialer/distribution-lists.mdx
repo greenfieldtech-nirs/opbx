@@ -117,17 +117,19 @@ Who can do this: Owner and PBX Admin.
 
 Result: the toast "List assigned to campaign successfully" appears, the list becomes **In Use** and the row shows the campaign's name. The campaign's status does not change: a **Draft** campaign stays Draft until you [start it](/opbx/applications/auto-dialer/campaigns#start-a-campaign) (or auto-start does). A campaign that is currently dialing is refused with "Assignment failed" and "Cannot assign list to "*name*" because it is currently running. Pause the campaign first, then assign the list."
 
+A campaign can hold several lists: assigning another list adds it next to the ones already assigned. The dialer takes pending numbers from all of the campaign's lists together, the numbers added earliest first; it does not finish one list before starting the next.
+
 {/* SCREENSHOT: auto-dialer-lists-assign-dialog — Assign to Campaign dialog with the campaign picker open */}
 
 ## Take a list back from a campaign
 
 Who can do this: Owner and PBX Admin.
 
-1. On the list's row, click the unassign icon (title "Unassign from campaign") next to the campaign name.
+1. On the list's row, click the unassign icon (title "Unassign from campaign") next to the campaign name. You can also click **Unassign** next to the list on the [campaign's detail page](/opbx/applications/auto-dialer/campaigns#the-campaign-detail-page).
 
-Result: the toast "List unassigned from campaign successfully" appears and the list returns to **Ready**. The campaign's status is not changed.
+Result: the toast "List unassigned from campaign successfully" (on the campaign page, "List unassigned from campaign") appears and the list returns to **Ready**. The campaign's other lists and its status are not changed.
 
-This works only while **every number is still pending with zero attempts**. Otherwise the row shows **Locked** instead of the icon ("Cannot unassign: some destinations have been dialed"). Use [Copy a list](#copy-a-list) to dial the same numbers with another campaign.
+This works only while **every number is still pending with zero attempts**. Once the campaign has started processing the list's entries (a number was dialed, or is no longer pending), the list stays with the campaign for good: the row shows **Locked** instead of the icon ("Cannot unassign: some destinations have been dialed"), and the server refuses with "Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending)." Use [Copy a list](#copy-a-list) to dial the same numbers with another campaign.
 
 ## The list detail page
 
@@ -239,7 +241,7 @@ If the server is asked to delete a list that a campaign still uses, it refuses a
 | Cannot upload to list in status: In Use | The list is assigned | Unassign it, or copy it and upload to the copy |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
 | Cannot assign list … because it is currently running. Pause the campaign first | The campaign is dialing | Pause the campaign, assign, then resume |
-| Cannot unassign list: some destinations have already been dialed | Calls were made from the list | Leave it, or copy the list |
+| Cannot unassign list: its entries have started processing for this campaign … | Calls were made from the list, or a number is no longer pending | Leave it, or copy the list |
 | A list with this name already exists | Copy name in use | Choose another name |
 | Batch would exceed maximum list size of 100000 | Adding numbers through the API would pass the limit | Use another list |
 

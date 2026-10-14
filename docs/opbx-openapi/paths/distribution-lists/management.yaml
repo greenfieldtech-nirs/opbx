@@ -341,7 +341,9 @@ paths:
 
         422). On success the list moves to ''in_use'' and `campaign_id`,
 
-        `used_by_campaign_id` and `used_at` are set.
+        `used_by_campaign_id` and `used_at` are set. A campaign can hold several
+
+        lists: assigning another list adds it next to the lists already assigned.
 
 
         Roles: Owner and PBX Admin.
@@ -433,13 +435,15 @@ paths:
       description: 'Unassign a distribution list from its campaign.
 
 
-        The list must be assigned to a campaign (otherwise 403) and every destination
+        The list must be assigned to a campaign (otherwise 403). Once the campaign has
 
-        must still be pending with zero dial attempts (otherwise 422). After
+        started processing the list''s entries (any destination dialed or no longer
 
-        unassignment the list returns to ''ready'' status and `campaign_id`,
+        pending), the list can no longer be unassigned (422). After unassignment the
 
-        `used_by_campaign_id` and `used_at` are cleared.
+        list returns to ''ready'' status and `campaign_id`, `used_by_campaign_id` and
+
+        `used_at` are cleared; the campaign''s other lists are not affected.
 
 
         Roles: Owner and PBX Admin.
@@ -486,15 +490,7 @@ paths:
               schema:
                 $ref: ../../components/schemas/Error.yaml
               example:
-                error: 'Cannot unassign list: some destinations have already been dialed or are not in pending status. All entries must be pending with zero dial attempts.'
-        '500':
-          description: Unassignment failed
-          content:
-            application/json:
-              schema:
-                $ref: ../../components/schemas/Error.yaml
-              example:
-                error: 'Failed to unassign list from campaign: ...'
+                error: 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).'
   /v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations:
     parameters:
     - name: list

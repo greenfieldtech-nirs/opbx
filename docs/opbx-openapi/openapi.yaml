@@ -373,6 +373,8 @@ paths:
 
   /v1/auto-dialer-campaigns/{campaign}/list:
     $ref: './paths/auto-dialer-campaigns/list.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1list'
+  /v1/auto-dialer-campaigns/{campaign}/list/{list}:
+    $ref: './paths/auto-dialer-campaigns/list.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1list~1{list}'
 
   /v1/auto-dialer-campaigns/{campaign}/monitor/detail:
     $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1monitor~1detail'

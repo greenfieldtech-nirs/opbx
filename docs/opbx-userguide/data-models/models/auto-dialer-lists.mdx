@@ -21,7 +21,7 @@ A distribution list of phone numbers. Lists are versioned: a new version is a ne
 |--------|------|----------|---------|-------------|
 | `id` | bigint unsigned | No | auto | Primary key |
 | `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
-| `campaign_id` | bigint unsigned | Yes | null | Campaign the list is assigned to. Foreign key to `auto_dialer_campaigns`, on delete set null |
+| `campaign_id` | bigint unsigned | Yes | null | Campaign the list is assigned to; several lists can share a campaign. Foreign key to `auto_dialer_campaigns`, on delete set null |
 | `name` | varchar(255) | No | - | List name |
 | `description` | text | Yes | null | Description |
 | `version_number` | int unsigned | No | `1` | Version number, starting at 1 |
@@ -64,6 +64,8 @@ $autoDialerList->usedByCampaign() → AutoDialerCampaign (used_by_campaign_id) [
 
 **Scopes:** `ready()`, `processing()`, `archived()`, `latestVersion()`, `assignable()`  
 **Methods:** `canBeArchived()`, `isReady()`, `allDestinationsArePendingAndFresh()`, `canDelete()`, `isAssigned()`, `canUnassign()`, `isLocked()`, `getVersionHistory()`, `markAsInUse()`, `markAsUsed()`, `archive()`, `createNewVersion()`, `copy()`  
+
+`canUnassign()` is true while the list is assigned and every destination is still `pending` with zero `dial_attempts` (`allDestinationsArePendingAndFresh()`); once the campaign has started processing the list's entries, the list can no longer be unassigned.
 
 `ready()`, `processing()` and `archived()` filter by status, `latestVersion()` by `is_latest_version`, and `assignable()` returns `ready` lists. The `ListStatus` rules (which states can be assigned, uploaded to, archived, copied or versioned) are listed in [Enumerations](/opbx/data-models/enums/index#liststatus).
 

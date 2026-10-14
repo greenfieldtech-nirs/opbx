@@ -84,16 +84,10 @@ campaign.aiLoadBalancer() → AiAssistantLoadBalancer (routing_destination_id, w
 ### Has Many
 
 ```php
-campaign.lists() → AutoDialerList[]
-campaign.destinations() → AutoDialerDestination[] (through list)
+campaign.lists() → AutoDialerList[] (a campaign can hold several lists)
+campaign.destinations() → AutoDialerDestination[] (through its lists)
 campaign.callSessions() → AutoDialerCallSession[]
 campaign.callerIdStats() → AutoDialerCallerIdStat[]
-```
-
-### Has One
-
-```php
-campaign.list() → AutoDialerList (deprecated: the first list; use lists())
 ```
 
 ### Belongs To Many
@@ -180,10 +174,11 @@ $campaign->getProgressPercentage(): int
 $campaign->getApiIntervalMilliseconds(): float
 $campaign->hasValidCac(): bool
 $campaign->hasValidCps(): bool
-$campaign->hasList(): bool
+$campaign->hasList(): bool               // at least one list assigned
 $campaign->canStart(): bool
 $campaign->canPause(): bool
 $campaign->canAcceptList(): bool
+$campaign->listAssignmentRefusal(): ?string // why a list cannot be added now (status, or running), or null
 $campaign->getPendingCount(): int          // destinations with status pending
 $campaign->getRoutingDestinationLabel(): string
 $campaign->clearRedisKeys(): void          // deletes dialer:cac:{id}:active and campaign:{id}:caller_id_index on the dialer Redis

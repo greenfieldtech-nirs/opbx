@@ -8,7 +8,7 @@ description: "Outbound calling campaigns: fields, statuses, permissions, data an
 
 # Auto Dialer Campaigns
 
-An auto-dialer campaign dials every number on its [distribution list](/opbx/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference and the list of workflows. The step-by-step screen walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
+An auto-dialer campaign dials every number on its [distribution lists](/opbx/modules/distribution-lists) (a campaign can hold several) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference and the list of workflows. The step-by-step screen walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
 
 ## Purpose
 
@@ -61,7 +61,7 @@ Click **Create Campaign**, fill in the **Basic Info**, **Schedule**, **Answering
 
 **Who can do this:** Owner, PBX Admin.
 
-See [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign). A campaign needs a Ready list before it can start.
+See [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign). A campaign needs a Ready list before it can start, and can hold several lists; their pending numbers are dialed together, the numbers added earliest first. A list can be taken back (from Distribution Lists or the campaign's detail page) only until the campaign has started processing its entries; after that it stays with the campaign. See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
 
 ### Start, pause or resume a campaign
 
@@ -184,6 +184,9 @@ One row per call attempt: campaign, destination, session token, status, disposit
 | PATCH | `/v1/auto-dialer-campaigns/{campaign}/resume` | Resume |
 | PATCH | `/v1/auto-dialer-campaigns/{campaign}/archive` | Archive (Owner) |
 | POST | `/v1/auto-dialer-campaigns/{campaign}/reset-cac` | Reset the concurrent-call counter |
+| GET | `/v1/auto-dialer-campaigns/{campaign}/list` | Every list assigned to the campaign, with `can_unassign` |
+| POST | `/v1/auto-dialer-campaigns/{campaign}/list` | Upload a CSV as another list of the campaign |
+| DELETE | `/v1/auto-dialer-campaigns/{campaign}/list/{list}` | Unassign one list (422 once its entries have started processing) |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/destinations` | Numbers of the campaign's lists |
 | GET | `/v1/auto-dialer-campaigns/{campaign}/concurrency` | Live CAC use |
 | GET | `/v1/auto-dialer-campaigns/monitor/summary` | Monitor overview |
