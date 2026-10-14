@@ -153,7 +153,7 @@ The page header has a **Default Outbound Caller ID** selector with **None (Unkno
 Result: the toast "Default outbound caller ID updated" appears.
 
 :::note
-This selector stores the organization-wide default caller ID (`GET` and `PUT /v1/phone-numbers/default-caller-id`), which is deprecated. Call routing no longer reads it. Set the caller ID on each [extension](/opbx/modules/extensions#default-caller-id) or [outbound whitelist](/opbx/modules/outbound-whitelist) rule instead.
+This selector stores the organization-wide default caller ID (`GET` and `PUT /v1/phone-numbers/default-caller-id`). Outbound calls present it when neither the calling [extension](/opbx/modules/extensions#default-caller-id) nor the matched [outbound whitelist](/opbx/modules/outbound-whitelist) rule has a caller ID of its own. Only an active number of your organization counts; otherwise the call presents `Unknown`. See the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 {/* SCREENSHOT: phone-numbers-default-caller-id — Phone Numbers page header with the Default Outbound Caller ID selector open, showing None (Unknown) and the demo numbers */}
@@ -185,7 +185,7 @@ The refusal opens the **Cannot delete: still in use** dialog, which lists each p
 
 ## Using a number as an outbound caller ID
 
-Besides receiving calls, an **active** number can be shown as the caller ID on outbound calls. Assign it as the default caller ID on an [extension](/opbx/modules/extensions#default-caller-id) or on an [outbound whitelist](/opbx/modules/outbound-whitelist) rule.
+Besides receiving calls, an **active** number can be shown as the caller ID on outbound calls. Assign it as the default caller ID on an [extension](/opbx/modules/extensions#default-caller-id), on an [outbound whitelist](/opbx/modules/outbound-whitelist) rule, or as the organization-wide **Default Outbound Caller ID** above.
 
 Only active numbers owned by your organization can be used this way. When the chosen number is not usable, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 
@@ -211,7 +211,7 @@ Only active numbers owned by your organization can be used this way. When the ch
 | POST | `/v1/phone-numbers` | Create. Rejects "Destination unavailable" |
 | GET | `/v1/phone-numbers/{phoneNumber}` | One number |
 | PUT | `/v1/phone-numbers/{phoneNumber}` | Update routing, status or friendly name. The number itself is refused if sent ("Phone number cannot be changed after creation.") |
-| GET, PUT | `/v1/phone-numbers/default-caller-id` | Deprecated organization default caller ID. Not used by call routing |
+| GET, PUT | `/v1/phone-numbers/default-caller-id` | Organization default outbound caller ID, used after the extension's and the whitelist rule's caller ID |
 | DELETE | `/v1/phone-numbers/{phoneNumber}` | Delete. Returns 409 with the list of uses when in use |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.

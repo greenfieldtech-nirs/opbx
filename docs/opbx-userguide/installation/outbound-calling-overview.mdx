@@ -64,10 +64,13 @@ graph TD
     B -->|Yes, active & owned| C["Present the extension's DID<br/>phone number"]
     B -->|No| D{Does the matched whitelist rule<br/>have a Default Caller ID DID?}
     D -->|Yes, active & owned| E["Present the whitelist rule's DID<br/>phone number"]
-    D -->|No| F["Present the fallback: 'Unknown'"]
+    D -->|No| G{Is an organization Default<br/>Outbound Caller ID set?}
+    G -->|Yes, active & owned| H["Present the organization<br/>default DID phone number"]
+    G -->|No| F["Present the fallback: 'Unknown'"]
 
     C --> Z[callerId set on &lt;Dial&gt;]
     E --> Z
+    H --> Z
     F --> Z
 ```
 
@@ -75,7 +78,8 @@ graph TD
 |----------|--------|------------------------|--------------|
 | 1 | The **calling extension's** Default Caller ID DID | [Extensions](/opbx/modules/extensions) — per-extension setting | The extension has an active, organization-owned DID selected |
 | 2 | The **matched whitelist rule's** Default Caller ID DID | [Outbound Whitelist](/opbx/modules/outbound-whitelist) — per-rule setting | The extension has none, but the whitelist rule that authorized the call has one |
-| 3 | The literal fallback `Unknown` | Built-in | Nothing is configured at either level |
+| 3 | The **organization's** Default Outbound Caller ID | [Phone Numbers](/opbx/modules/phone-numbers) — the **Default Outbound Caller ID** selector in the page header (`PUT /v1/phone-numbers/default-caller-id`) | Neither the extension nor the rule has one, and the organization default is an active, organization-owned DID |
+| 4 | The literal fallback `Unknown` | Built-in | Nothing is configured at any level |
 
 At every level, OPBX only uses a DID that is **active** and **belongs to your organization**. A selected DID that has been deactivated or is otherwise unavailable is skipped, and resolution falls through to the next level.
 
@@ -85,6 +89,7 @@ The order goes from **most specific to most general**, so the closest, most inte
 
 - **Extension first** lets you give an individual (or a specific desk phone) their own outbound identity — for example, a salesperson presenting their direct DID so customers can call them back directly.
 - **Whitelist rule second** provides a sensible default for a whole class of destinations — for example, all calls to a given country presenting the main company number — without configuring every extension individually.
+- **Organization default third** covers every outbound call that has no more specific caller ID, whatever the destination.
 - **Fallback last** guarantees a call is never sent with an undefined caller ID. OPBX presents the literal string `Unknown` rather than an all-zeros number, because some carriers reject calls that present `00000000` as the caller ID.
 
 The caller **name** is never set on outbound calls — only the caller ID number is presented.
@@ -97,9 +102,10 @@ To present a specific number on outbound calls:
 2. Assign it as a **Default Caller ID** at the level you want:
    - On an [Extension](/opbx/modules/extensions) — applies to calls from that extension.
    - On an [Outbound Whitelist](/opbx/modules/outbound-whitelist) rule — applies to calls matching that rule when the extension has no caller ID of its own.
+   - As the organization's **Default Outbound Caller ID** on the [Phone Numbers](/opbx/modules/phone-numbers) page — applies when neither the extension nor the rule has one.
 
 :::tip
-Set the caller ID on the **whitelist rule** for an organization-wide default, and override it on **individual extensions** only where a person or device needs its own outbound identity.
+Set the organization's **Default Outbound Caller ID** for a company-wide default, set it on a **whitelist rule** where a class of destinations needs a different number, and override it on **individual extensions** only where a person or device needs its own outbound identity.
 :::
 
 :::warning

@@ -3,12 +3,12 @@ paths:
     get:
       tags:
         - Phone Numbers
-      summary: Get default outbound caller ID (deprecated)
-      deprecated: true
+      summary: Get default outbound caller ID
       description: |
-        **Deprecated.** The organization-wide default caller ID has been superseded by the
-        per-extension and per-outbound-whitelist `default_caller_id_did_id` settings, and is
-        no longer consulted during outbound call routing. See the Outbound Calling Overview.
+        The organization-wide default outbound caller ID. Outbound call routing presents it
+        when neither the calling extension nor the matched outbound whitelist rule has an
+        active `default_caller_id_did_id`; only an active DID of the organization counts,
+        otherwise the call presents `Unknown`. See the Outbound Calling Overview.
 
         Returns the organization's default outbound caller ID DID, or `null` if none
         is configured. Every authenticated user of the organization can read it.
@@ -46,12 +46,12 @@ paths:
     put:
       tags:
         - Phone Numbers
-      summary: Set default outbound caller ID (deprecated)
-      deprecated: true
+      summary: Set default outbound caller ID
       description: |
-        **Deprecated.** The organization-wide default caller ID has been superseded by the
-        per-extension and per-outbound-whitelist `default_caller_id_did_id` settings, and is
-        no longer consulted during outbound call routing. See the Outbound Calling Overview.
+        The organization-wide default outbound caller ID. Outbound call routing presents it
+        when neither the calling extension nor the matched outbound whitelist rule has an
+        active `default_caller_id_did_id`; only an active DID of the organization counts,
+        otherwise the call presents `Unknown`. See the Outbound Calling Overview.
 
         Sets or clears the organization's default outbound caller ID. When `did_id`
         is non-null the DID must exist in the organization and be active; when null the

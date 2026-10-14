@@ -33,8 +33,9 @@ properties:
     - 'null'
     description: >-
       Free-form organization settings (JSON). Returned only by the platform manager
-      endpoints. Known key: `default_outbound_caller_id_did_id` (deprecated organization-wide
-      default caller ID, see `GET /v1/phone-numbers/default-caller-id`).
+      endpoints. Known key: `default_outbound_caller_id_did_id` (organization-wide default
+      outbound caller ID, used after the extension's and the whitelist rule's caller ID;
+      see `GET /v1/phone-numbers/default-caller-id`).
     additionalProperties: true
   public_queues_token:
     type:

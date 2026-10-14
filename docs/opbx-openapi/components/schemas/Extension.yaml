@@ -124,7 +124,7 @@ properties:
     description: >-
       ID of a DID of the organization to present as the caller ID when this extension
       places an outbound call (used only while the DID is active). Takes precedence over
-      the matched outbound whitelist rule's caller ID. See the Outbound Calling Overview.
+      the matched outbound whitelist rule's caller ID and the organization default. See the Outbound Calling Overview.
   default_caller_id:
     type:
     - object

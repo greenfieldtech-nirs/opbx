@@ -66,7 +66,8 @@ The caller ID presented on the call is chosen in this order:
 
 1. the calling extension's own **Default Caller ID**, if set and the number is active;
 2. the matching rule's **Default Caller ID**, if set and the number is active;
-3. otherwise the literal caller ID `Unknown`.
+3. the organization's **Default Outbound Caller ID** (set on the [Phone Numbers](/opbx/modules/phone-numbers) page), if set and the number is active;
+4. otherwise the literal caller ID `Unknown`.
 
 A number that has been set to Inactive is skipped and the next step is used.
 

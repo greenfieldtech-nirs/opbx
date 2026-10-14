@@ -29,7 +29,8 @@ properties:
     description: >-
       ID of a DID owned by the organization to present as the caller ID on
       outbound calls matching this rule (used only while that DID is active). Overridden
-      by the calling extension's own default caller ID when set. See the Outbound Calling Overview in the user guide.
+      by the calling extension's own default caller ID when set; wins over the
+      organization default outbound caller ID. See the Outbound Calling Overview in the user guide.
   default_caller_id:
     type:
     - object
