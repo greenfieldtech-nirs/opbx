@@ -34,10 +34,12 @@ Use this module to:
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | See Extensions in the sidebar | Yes | Yes | Yes | Yes | No |
 | View extensions | Yes | Yes | Yes (read-only page) | Yes (read-only page) | Only extensions of their assigned users (API) |
-| Create, delete, sync | Yes | Yes | No | No | No |
-| Edit | Yes | Yes | Own extension, through the API only | No | No |
-| Toggle status from the list | Yes | Yes | No | No | No |
-| See SIP passwords on the page | Yes (any extension; a PBX Admin not an Owner's) | Yes (not an Owner's) | Own extension only | Own extension only | Own extension only |
+| Create, sync | Yes | Yes | No | No | No |
+| Edit, toggle status, delete | Yes | Yes, except an Owner's extension | Edit own extension, through the API only | No | No |
+| See SIP passwords on the page | Yes | Yes, except an Owner's extension | Own extension only | Own extension only | Own extension only |
+| Reset a SIP password | Yes | Yes, except an Owner's extension | Own extension, through the API only | No | No |
+
+An Owner's extension is the PBX User extension assigned to an Owner account. A PBX Admin cannot open, toggle, delete or reset it, and does not see its password.
 
 A PBX User may change their own extension through the API but cannot change its type, its assigned user or its status.
 
@@ -58,36 +60,17 @@ The API also has a `custom_logic` type (a Cloudonix container application and bl
 
 A **Call Queue** extension lets agents transfer callers into a queue by number. See [Call Queues](/opbx/modules/call-queues).
 
-## Create an extension
-
-1. Open **Extensions** in the sidebar.
-2. Click **Add Extension**. The dialog suggests the next free number.
-3. Check or change the **Extension Number**.
-4. Choose the **Extension Type**, then the **Assignment** (the user, group, room and so on, or the forward-to number).
-5. Optionally choose a **Default Caller ID**.
-6. Click **Create Extension**.
-
-What happens on save:
-
-- The extension is stored as **Active**.
-- For **PBX User** extensions, OPBX generates a 32-character SIP password and creates the subscriber in Cloudonix. If the Cloudonix call fails, the extension is still saved; run **Sync Extensions** later.
-- The extension becomes available as a routing destination.
-
-![Extensions list: PBX User extensions with 1011 (Karen Patel) inactive, the Forward extension 1012 and the AI Assistant extension 1013](../img/screens/extensions-list.jpg)
-
-![Create Extension dialog with the suggested number 1014, type PBX User, a user under Assignment and Default Caller ID Main Line (+12025550100)](../img/screens/extensions-create-dialog.jpg)
-
 ## Fields
 
 | Field | Required | Limits | Meaning |
 |-------|----------|--------|---------|
 | Extension Number | Yes | 3 to 5 digits, unique within the organization. Cannot be changed later | The number people dial |
 | Extension Type | Yes | See the table above | What the extension reaches |
-| Assignment | Yes, except for PBX User | One item of the chosen type, from your organization. Forward: up to 50 characters | The target |
-| Default Caller ID | No | A phone number of your organization; the list shows active numbers | Caller ID for outbound calls from this extension |
+| Assignment | Yes, except for PBX User | One item of the chosen type, from your organization. Forward: a typed number or address, up to 50 characters. PBX User: leave it empty for an unassigned extension | The target |
+| Default Caller ID | No | **None** or a phone number of your organization; the list shows active numbers | Caller ID for outbound calls from this extension |
 | Status | Set in the list | Active or Inactive. Default: Active | Inactive extensions are not routed to |
 
-The API also accepts `voicemail_enabled` (PBX User only; any other type is refused with "Voicemail can only be enabled for user extensions.").
+The API also accepts `voicemail_enabled` (PBX User only; any other type is refused with "Voicemail can only be enabled for user extensions."). The page always sends it as off.
 
 :::warning Extension numbers cannot be changed
 The number is fixed after creation. To use another number, create a new extension and delete the old one. The delete is refused while the old extension is still used in routing.
@@ -99,39 +82,121 @@ The default caller ID is the number presented when someone calls out from this e
 
 A phone number used as a default caller ID cannot be deleted until you clear it here.
 
-## Edit an extension
+## Workflows
 
-1. Click the extension number or its row.
-2. Change the type, assignment or default caller ID. The number is shown but cannot be edited. Changing the type **to** PBX User creates the Cloudonix subscriber; changing it **from** PBX User removes the subscriber, so its SIP credentials stop working. Other edits of a PBX User extension do not call Cloudonix.
+### Create an extension
+
+Who can do this: Owner and PBX Admin. Other roles do not see **Add Extension**.
+
+1. Open **Extensions** in the sidebar.
+2. Click **Add Extension**. The **Create Extension** dialog opens with the next number after the highest existing one (1001 when there are none).
+3. Check or change the **Extension Number** (3 to 5 digits).
+4. Choose the **Extension Type**.
+5. Under **Assignment**, pick the target: the user, ring group, queue, conference room, IVR menu, AI assistant or load balancer. For **Forward**, type the outside number or SIP address. For **PBX User** you may leave it empty to create an unassigned extension.
+6. Optionally choose a **Default Caller ID**, or leave **None**.
+7. Click **Create Extension**.
+
+![Create Extension dialog with the suggested number 1014, type PBX User, a user under Assignment and Default Caller ID Main Line (+12025550100)](../img/screens/extensions-create-dialog.jpg)
+
+Result: the toast "Extension created successfully" appears and the extension is added to the list. When a field is wrong, the field shows the problem (for example "Extension must be 3-5 digits") and the toast "Please fix form errors" appears.
+
+What happens on save:
+
+- The extension is stored as **Active**.
+- For **PBX User** extensions, OPBX generates a 32-character hexadecimal SIP password and creates the subscriber in Cloudonix. If the Cloudonix call fails, the extension is still saved; run [Sync Extensions](#sync-extensions-with-cloudonix) later.
+- The extension becomes available as a routing destination.
+
+![Extensions list: PBX User extensions with 1011 (Karen Patel) inactive, the Forward extension 1012 and the AI Assistant extension 1013](../img/screens/extensions-list.jpg)
+
+### Edit an extension
+
+Who can do this: Owner and PBX Admin (a PBX Admin not an Owner's extension). A PBX User can change their own extension through the API only.
+
+1. In the **Extensions** list, click the extension number or its row. The **Edit Extension** dialog opens. The number is shown but cannot be edited ("Extension number cannot be changed").
+2. Change the **Extension Type**, the **Assignment** or the **Default Caller ID**.
 3. Click **Save Changes**.
 
-**Status:** click the status badge in the list to switch between active and inactive. Calls to an inactive extension are not connected, and an inactive extension is skipped as a ring-group member.
+Result: the toast "Extension updated successfully" appears and the list shows the new values.
+
+Changing the type **to** PBX User generates a SIP password and creates the Cloudonix subscriber; changing it **from** PBX User removes the password and the subscriber, so its SIP credentials stop working. Other edits of a PBX User extension do not call Cloudonix.
 
 ![Edit Extension dialog for the Forward extension 1012 with the read-only number and the forward-to number +12025550180](../img/screens/extensions-edit-dialog.jpg)
 
-## SIP passwords
+### Activate or deactivate an extension
 
-The **Password** column appears when the list contains an extension whose password you may read. Owners and PBX Admins may read any PBX User extension's password (a PBX Admin never an Owner's). PBX Users, Supervisors and Reporters may read only the password of the extension linked to their own user; the server refuses every other one with 403.
+Who can do this: Owner and PBX Admin (a PBX Admin not an Owner's extension).
 
-- Click the eye icon to load and show the password. Click again to hide it.
-- Click the copy icon to copy it.
+1. In the **Extensions** list, find the extension.
+2. Click its **Status** badge (**active** or **inactive**).
 
-Only PBX User extensions have a password. Owners and PBX Admins can reset it with the key icon next to the password or the **Reset password** (key) button in the row's actions: after a confirmation OPBX generates a new password and pushes it to Cloudonix (the same as the reset endpoint below). After a reset, every registered phone must be configured with the new password.
+Result: the badge switches and the toast "Extension updated successfully" appears. Calls to an inactive extension are not connected, and an inactive extension is skipped as a ring-group member.
+
+### Show and copy a SIP password
+
+Who can do this: Owner (any PBX User extension), PBX Admin (any except an Owner's), and every other role for the extension linked to their own user.
+
+The **Password** column appears when the list contains an extension whose password you may read. Only PBX User extensions have a password; the others show "-".
+
+1. In the **Extensions** list, click the eye icon (**Show password**) in the **Password** column. OPBX loads the password and shows it. "Not set" means the extension has no password.
+2. Click the copy icon (**Copy password**).
+3. Click the eye icon again (**Hide password**) to hide it.
+
+Result: the toast "Password for extension *number* copied to clipboard" appears.
 
 {/* SCREENSHOT: extensions-password-shown — Extensions list with the password of extension 1005 revealed and the copy icon next to it */}
 
-## Sync with Cloudonix
+### Reset an extension's SIP password
 
-**Sync Extensions** is enabled when OPBX finds a difference between its PBX User extensions and the Cloudonix subscribers. A sync:
+Who can do this: Owner and PBX Admin on the page (a PBX Admin not an Owner's extension). A PBX User can reset their own extension's password through the API.
+
+1. In the **Extensions** list, click the key icon (**Reset password**) next to the extension's password in the **Password** column.
+2. Read the **Reset Extension Password?** dialog. It shows the extension number and the user it is assigned to.
+3. Click **Reset Password**.
+
+{/* SCREENSHOT: extensions-reset-password-dialog — Reset Extension Password? dialog for PBX User extension 1005, showing the warning box, the extension number and "Assigned to" with the demo user name */}
+
+Result: OPBX generates a new password (a 16 to 32 character passphrase of words, digits and a symbol) and pushes it to Cloudonix. The toast "Password reset successfully! New password: …" shows it for 10 seconds with a **Copy** button. Every phone registered with this extension must be configured with the new password.
+
+If Cloudonix cannot be updated, the toast reads "The password was reset locally but could not be synced to the voice provider. The extension may fail to register until this is resolved."
+
+### Sync extensions with Cloudonix
+
+Who can do this: Owner and PBX Admin.
+
+When the page opens, OPBX compares its PBX User extensions with the Cloudonix subscribers. **Sync Extensions** is enabled only when a PBX User extension has no subscriber, or a subscriber has no extension with its number. A status difference alone does not enable it.
+
+1. Open **Extensions** in the sidebar.
+2. Click **Sync Extensions**. The toast "Synchronizing extensions with Cloudonix..." appears.
+
+{/* SCREENSHOT: extensions-sync-enabled — Extensions page header with the Sync Extensions button enabled next to Add Extension */}
+
+Result: the toast "Extensions synchronized! Created *N* in Cloudonix, imported *M* from Cloudonix" appears and the button is disabled again. A sync:
 
 1. creates a Cloudonix subscriber for each PBX User extension that has none;
-2. creates an unassigned PBX User extension for each Cloudonix subscriber with a 3 to 5 character number that OPBX does not have (longer numbers are treated as phone numbers and skipped);
-3. sets the local status of matching extensions to the Cloudonix status.
+2. creates an unassigned, active PBX User extension for each Cloudonix subscriber whose number OPBX does not have. Subscriber numbers longer than 5 characters are treated as phone numbers and skipped;
+3. sets the local status of extensions that exist on both sides to the Cloudonix status.
 
-## Delete an extension
+When the sync fails (for example Cloudonix is not configured), the toast reads "An error occurred while syncing extensions."
 
-1. Click the delete icon on the row.
-2. Confirm in the **Delete Extension?** dialog. It warns when the extension is assigned to a user.
+### Find an extension
+
+Who can do this: every role that sees the page.
+
+1. Type in **Search by extension number, user name...**.
+2. Narrow the list with the filters: type (**All Types**, PBX User, Conference, Ring Group, IVR Menu, AI Assistant, AI Load Balancer, Forward), status (**All Statuses**, Active, Inactive) and assignment (**All Extensions**, Assigned, Unassigned).
+3. Click a column header (Type, Created, Status) to sort. Click **Clear Filters** to reset, or the refresh icon to reload.
+
+### Delete an extension
+
+Who can do this: Owner and PBX Admin (a PBX Admin not an Owner's extension).
+
+1. In the **Extensions** list, click the trash icon in the extension's **Actions** column.
+2. In the **Delete Extension?** dialog, check the number. It warns "This extension is currently assigned to a user." when it has a user.
+3. Click **Delete Extension**.
+
+{/* SCREENSHOT: extensions-delete-dialog — Delete Extension? dialog for extension 1011 showing the "This extension is currently assigned to a user." warning */}
+
+Result: the toast "Extension deleted successfully" appears and the extension leaves the list. A PBX User extension's Cloudonix subscriber is removed with it. Call history never blocks a delete.
 
 The delete is refused while routing still points at the extension. The **Cannot delete: still in use** dialog lists each place, for example:
 
@@ -140,9 +205,10 @@ The delete is refused while routing still points at the extension. The **Cannot 
 - an IVR menu option or failover;
 - a phone number routed to it;
 - a business-hours open or closed action;
-- a call-tracking campaign destination.
+- a call-tracking campaign destination;
+- an auto-dialer campaign routing destination.
 
-Change those first, then delete again. Call history never blocks a delete. A PBX User extension's Cloudonix subscriber is removed with it.
+Change those first, then delete again.
 
 ![Cannot delete: still in use dialog for extension 1012 listing the Support Team, Billing Queue, After Hours Menu and Support Desk Hours references](../img/screens/extensions-in-use-dialog.jpg)
 
@@ -154,14 +220,15 @@ Deleting a user does **not** delete their extension. It is kept, unassigned, and
 
 | Message | What it means | What to do |
 |---------|---------------|-----------|
-| Extension number must be 3-5 digits. | Wrong format | Use 3 to 5 digits |
+| Extension must be 3-5 digits (under the field), or Extension number must be 3-5 digits. (from the server) | Wrong format | Use 3 to 5 digits |
 | This extension number is already in use within your organization. | Duplicate | Choose another number |
 | Extension number cannot be changed after creation. | The API request tried to change it | Create a new extension instead |
 | *Ring group / call queue / IVR / conference room …* ID is required for … extensions. | No assignment for that type | Pick the target |
 | The selected call queue must be active. | Queue extension pointing at an inactive queue | Activate the queue first |
 | User ID should only be set for user extensions. | A user was sent with another type | Remove the user or change the type |
 | The selected caller ID does not belong to your organization. | Wrong default caller ID | Pick one of your numbers |
-| This extension is still used by: … | The delete was refused | Change the listed references, then delete |
+| This extension is still used by: … (API), the **Cannot delete: still in use** dialog (page) | The delete was refused | Change the listed references, then delete |
+| The password was reset locally but could not be synced to the voice provider. … | Cloudonix refused or did not answer the password update | Try the reset again; phones fail to register until Cloudonix has the new password |
 
 ## Key data fields
 
@@ -173,7 +240,7 @@ Deleting a user does **not** delete their extension. It is kept, unassigned, and
 | `organization_id` | Tenant scope |
 | `user_id` | The assigned user. PBX User type only, may be empty |
 | `extension_number` | 3 to 5 digits, unique within the organization, fixed |
-| `password` | SIP password, PBX User only. Never in list responses |
+| `password` | SIP password, PBX User only. 32 hexadecimal characters when created; a word passphrase after a reset. Never in list responses |
 | `type` | `user`, `forward`, `ring_group`, `queue`, `conference`, `ivr`, `ai_assistant`, `ai_load_balancer` or `custom_logic` |
 | `status` | `active` or `inactive` |
 | `voicemail_enabled` | PBX User only |
@@ -192,9 +259,9 @@ Deleting a user does **not** delete their extension. It is kept, unassigned, and
 | PUT | `/v1/extensions/{extension}` | Update |
 | DELETE | `/v1/extensions/{extension}` | Delete. Returns 409 with `references` when in use |
 | GET | `/v1/extensions/{extension}/password` | SIP password (PBX User type only; 204 for other types). Owner and PBX Admin: any extension (a PBX Admin not an Owner's); every other role: only its own |
-| PUT | `/v1/extensions/{extension}/reset-password` | New SIP password, pushed to Cloudonix |
+| PUT | `/v1/extensions/{extension}/reset-password` | New SIP password, pushed to Cloudonix. Same rights as Update. 400 for other types; 502 when Cloudonix is not updated |
 | GET | `/v1/extensions/sync/compare` | Differences between OPBX and Cloudonix |
-| POST | `/v1/extensions/sync` | Run the sync |
+| POST | `/v1/extensions/sync` | Run the sync (Owner and PBX Admin) |
 
 Scoped API keys use the `extensions` resource. The MCP server has `list_extensions`, `get_extension`, `create_extension`, `update_extension` and `delete_extension`.
 
