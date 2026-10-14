@@ -37,22 +37,38 @@ Use this module to:
 
 Reporters and supervisors see the page with a **Read-Only** badge. Supervisor assignments are made on [Supervisors](/opbx/modules/supervisors).
 
+## Find a ring group
+
+**Who can do this:** Owner, PBX Admin and Reporter from the sidebar; a Supervisor sees only the groups assigned to them.
+
+1. Open **Ring Groups** in the sidebar.
+2. Type in **Search ring groups...** to filter by name.
+3. Narrow the list with the strategy filter (**All Strategies**, **Simultaneous**, **Round Robin**, **Sequential**), the status filter (**All Status**, **Active**, **Disabled**) and the **Unprovisioned** button.
+4. Click the refresh button to reload the list.
+
+The list shows each group's name, **Strategy**, **Members** (count), **Timeout / Turns**, **Fallback** and **Status**. Click the **Strategy**, **Members** or **Status** column header to sort. An unprovisioned group carries the **Unprovisioned** badge next to its name.
+
+![Ring Groups list with Support Team (Sequential), Sales Team (Simultaneous) and Executive Line (Round Robin, Unprovisioned), with the Strategy, Status and Unprovisioned filters](../img/screens/ring-groups-list.jpg)
+
 ## Create a ring group
+
+**Who can do this:** Owner and PBX Admin (`RingGroupPolicy::create`; the **Create Ring Group** button is shown to these roles only).
 
 1. Open **Ring Groups** in the sidebar.
 2. Click **Create Ring Group**.
 3. Enter the **Ring Group Name**.
-4. Choose the **strategy** (see [Strategies](#strategies)).
-5. Click **Add Member** for each extension and pick it from the list.
-6. Set **Extension Ring Timeout** and **Ring Turns**.
-7. Choose the **Fallback Action** and, if it needs one, the destination.
-8. Click **Create Ring Group**.
+4. Under **Ring Strategy**, click the **Simultaneous**, **Round Robin** or **Sequential** card (see [Strategies](#strategies)).
+5. Click **Add Member** for each extension. Each click adds the next unused extension; change it with the row's list, which shows **Ext** *number* and the user's name (or **Forward to** *number* for a forward extension). Remove a row with its trash icon.
+6. Set the ring order: for Sequential, drag rows by their handle; for the other strategies, use the up and down arrows.
+7. Set **Extension Ring Timeout (seconds)** and **Ring Turns**.
+8. Under **Fallback Action**, choose the **Action** and, unless it is **Hangup** ("No destination needed"), the **Destination**.
+9. Click **Create Ring Group**.
 
-On save the group is stored as **Active** and becomes available as a destination everywhere in OPBX.
-
-![Ring Groups list with Support Team (Sequential), Sales Team (Simultaneous) and Executive Line (Round Robin, Unprovisioned), with the Strategy, Status and Unprovisioned filters](../img/screens/ring-groups-list.jpg)
+The dialog closes, the toast "Ring group created successfully" appears and the group is listed as **Active**. It is now available as a destination everywhere in OPBX.
 
 ![Create Ring Group dialog with three members, the strategy cards, timeout 25, ring turns 2 and the fallback action list open](../img/screens/ring-groups-create-dialog.jpg)
+
+The form checks the name (2 to 100 characters), the member count (1 to 50), the timeout, the ring turns and that the fallback has a destination before it sends anything; errors appear under the field. Errors from the server appear as a toast (see [Common errors](#common-errors)). **Add Member** is disabled at 50 members or when every eligible extension is already in the group.
 
 ## Fields
 
@@ -76,7 +92,7 @@ The API also accepts a **description** (up to 1000 characters) and a **status**;
 | Sequential | Members ring one at a time, in the order shown in the dialog, each for the ring timeout. The list is tried **Ring Turns** times, then the fallback runs |
 | Round Robin | Rings members one at a time like Sequential, but each new call starts at the next member after the one the previous call started at. Retries for the same call continue from that member |
 
-For Sequential, drag members by their handle to change the order. The top member rings first.
+For Sequential, drag members by their handle to change the order; for Simultaneous and Round Robin the rows have up and down arrows instead. The top member rings first.
 
 Only **active** member extensions are rung. An inactive member is skipped without an error. A **Forward** member rings its forward-to number or SIP address.
 
@@ -97,16 +113,25 @@ The fallback target must belong to your organization and be **active** when you 
 
 ## Edit a ring group
 
+**Who can do this:** Owner and PBX Admin (`RingGroupPolicy::update`). For other roles the rows do not open.
+
 1. Click the group's name or row in the list.
-2. Change the fields and click **Save Changes**.
+2. Change the fields in **Edit Ring Group**.
+3. Click **Save Changes**.
 
-Saving the dialog replaces the whole member list with the one shown.
+The toast "Ring group updated successfully" appears. Saving the dialog replaces the whole member list with the one shown.
 
-**Status:** click the **Active** or **Disabled** badge in the list to switch it straight away. A disabled group does not ring anybody: callers hear "Ring group is inactive" and the call ends.
+## Enable or disable a ring group
+
+**Who can do this:** Owner and PBX Admin (`RingGroupPolicy::update`). For Reporters and Supervisors the badge is not clickable.
+
+1. In the Ring Groups list, click the group's **Active** or **Disabled** badge.
+
+The status switches straight away and the toast "Ring group updated successfully" appears. A disabled group does not ring anybody: callers hear "Ring group is inactive" and the call ends.
 
 ### Disconnect and unprovisioned groups
 
-On the edit dialog only, the fallback action list has a **Disconnect** choice. It sets the fallback to **Destination unavailable**: when nobody answers, callers hear "Destination doesn't exist" and the call ends. The group then shows the **Unprovisioned** badge in the list and in the dialog title.
+On the edit dialog only, the fallback action list has a **Disconnect** choice. It sets the fallback to **Destination unavailable**: when nobody answers, callers hear "Destination doesn't exist" and the call ends. The group then shows the **Unprovisioned** badge next to its name in the list and in the dialog title. The Action list then shows the stored value as **Destination unavailable**.
 
 The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination." A new group must have a real fallback.
 
@@ -118,8 +143,12 @@ To find these groups, click the **Unprovisioned** filter in the toolbar. To fix 
 
 ## Delete a ring group
 
-1. Click the delete icon on the row.
-2. Confirm in the **Delete Ring Group** dialog.
+**Who can do this:** Owner and PBX Admin (`RingGroupPolicy::delete`; the **Delete** action is shown to these roles only).
+
+1. Click the **Delete** (trash) action on the row.
+2. In **Delete Ring Group**, click **Delete**.
+
+The toast "Ring group deleted successfully" appears and the row disappears.
 
 The delete is refused while other configuration still routes calls to the group. The dialog **Cannot delete: still in use** lists each place, for example:
 
