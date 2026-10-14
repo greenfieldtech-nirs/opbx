@@ -48,7 +48,7 @@ Cloudonix stores a trunk created as Inbound as `public-inbound`, and one created
 
 Authentication is optional. When you create a trunk, a username without a password, or a password without a username, is refused ("A password is required when a username is provided." / "A username is required when a password is provided.").
 
-The password is write-only: the page never shows a stored password. When you edit a trunk, the **Password** field says "Leave blank to keep unchanged". A username alone keeps the stored password; a password needs a username.
+The password is write-only: the page never shows a stored password. When you edit a trunk, the **Password** field says "Leave blank to keep unchanged". A username alone keeps the stored password; a password needs a username. Emptying the username removes the stored username and password.
 
 ## SIP addresses: the configuration cheatsheet
 
@@ -86,7 +86,7 @@ Result: the toast "Trunk created successfully" appears and the trunk is listed. 
 Who can do this: Owner and PBX Admin.
 
 1. In the **Trunks** list, click the trunk's name or row. The **Edit Trunk** dialog opens; its description says "Name and direction cannot be changed."
-2. Change the **Address**, **Port**, **Transport**, **Prefix (optional)** or the **Authentication** fields. Leave **Password** empty to keep the stored one.
+2. Change the **Address**, **Port**, **Transport**, **Prefix (optional)** or the **Authentication** fields. Leave **Password** empty to keep the stored one. Empty **Prefix (optional)** to remove the prefix. Empty **Username** (and leave **Password** empty) to remove the stored username and password.
 3. Click **Update Trunk**.
 
 {/* SCREENSHOT: trunks-edit-dialog — Edit Trunk dialog for an outbound demo trunk with the Authentication section open, the username filled and the Password field showing "Leave blank to keep unchanged" */}

@@ -289,10 +289,13 @@ const TrunksPage: React.FC = () => {
         ip: formData.ip.trim(),
         port,
         transport: formData.transport,
-        prefix: formData.prefix.trim() || undefined,
+        // Always sent so an emptied field clears the prefix.
+        prefix: formData.prefix.trim(),
         overwrite_from: formData.overwrite_from,
       };
       if (formData.username.trim()) data.username = formData.username.trim();
+      // An emptied username on a trunk with credentials clears them.
+      else if (editingTrunk.has_credentials) data.username = '';
       if (formData.password) data.password = formData.password;
       updateMutation.mutate({ id: editingTrunk.id, data });
     } else {

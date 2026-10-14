@@ -63,7 +63,9 @@ paths:
         Update a trunk in Cloudonix. `name` and `direction` are immutable
         post-create. All fields are optional. Omitting `password` leaves the
         stored credential untouched; `password` is write-only and is never
-        returned in responses. `overwrite_from` is sent to Cloudonix only together
+        returned in responses. Sending `prefix` as an empty string or null clears the
+        prefix; omitting it leaves it unchanged. Sending `username` as an empty string or
+        null (without a `password`) clears the stored username and password. `overwrite_from` is sent to Cloudonix only together
         with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always
         empty in the response.
       operationId: updateTrunk
@@ -97,12 +99,15 @@ paths:
                   - string
                   - 'null'
                   maxLength: 20
+                  description: Empty string or null clears the prefix; omit to keep it.
                 username:
                   type:
                   - string
                   - 'null'
                   maxLength: 128
-                  description: May be sent alone (keeps the stored password).
+                  description: >-
+                    May be sent alone (keeps the stored password). Empty string or null
+                    clears the stored username and password.
                 password:
                   type:
                   - string
@@ -158,7 +163,9 @@ paths:
         Update a trunk in Cloudonix. `name` and `direction` are immutable
         post-create. All fields are optional. Omitting `password` leaves the
         stored credential untouched; `password` is write-only and is never
-        returned in responses. `overwrite_from` is sent to Cloudonix only together
+        returned in responses. Sending `prefix` as an empty string or null clears the
+        prefix; omitting it leaves it unchanged. Sending `username` as an empty string or
+        null (without a `password`) clears the stored username and password. `overwrite_from` is sent to Cloudonix only together
         with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always
         empty in the response.
       operationId: patchTrunk
@@ -192,12 +199,15 @@ paths:
                   - string
                   - 'null'
                   maxLength: 20
+                  description: Empty string or null clears the prefix; omit to keep it.
                 username:
                   type:
                   - string
                   - 'null'
                   maxLength: 128
-                  description: May be sent alone (keeps the stored password).
+                  description: >-
+                    May be sent alone (keeps the stored password). Empty string or null
+                    clears the stored username and password.
                 password:
                   type:
                   - string
