@@ -561,9 +561,10 @@ paths:
         Update a campaign. Owner and PBX Admin only. PUT and PATCH behave the same: every field
         is optional and only the fields sent are changed.
 
-        A campaign in any status except `active` can be updated. While the campaign is `active`
-        the request cannot change it: sending `name` returns 422 (`Cannot modify an active
-        campaign. Please pause it first.`).
+        A campaign in any status except `active` can be updated. An `active` campaign cannot be
+        edited: pause it first (`PATCH /v1/auto-dialer-campaigns/{campaign}/pause`), edit it, then
+        resume it. A request for an `active` campaign changes nothing and returns 409
+        (`Pause the campaign before editing it.`).
       operationId: updateAutoDialerCampaign
       security:
       - bearerAuth: []
@@ -580,7 +581,7 @@ paths:
                 name:
                   type: string
                   maxLength: 255
-                  description: Campaign name. Sending it while the campaign is active returns 422.
+                  description: Campaign name
                   example: Q1 Sales Campaign
                 description:
                   type:
@@ -954,6 +955,16 @@ paths:
           $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '409':
+          description: The campaign is active; nothing was changed. Pause it first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Pause the campaign before editing it.
         '422':
           $ref: ../../components/responses/ValidationError.yaml
     patch:
@@ -964,9 +975,10 @@ paths:
         Update a campaign. Owner and PBX Admin only. PUT and PATCH behave the same: every field
         is optional and only the fields sent are changed.
 
-        A campaign in any status except `active` can be updated. While the campaign is `active`
-        the request cannot change it: sending `name` returns 422 (`Cannot modify an active
-        campaign. Please pause it first.`).
+        A campaign in any status except `active` can be updated. An `active` campaign cannot be
+        edited: pause it first (`PATCH /v1/auto-dialer-campaigns/{campaign}/pause`), edit it, then
+        resume it. A request for an `active` campaign changes nothing and returns 409
+        (`Pause the campaign before editing it.`).
       operationId: patchAutoDialerCampaign
       security:
       - bearerAuth: []
@@ -983,7 +995,7 @@ paths:
                 name:
                   type: string
                   maxLength: 255
-                  description: Campaign name. Sending it while the campaign is active returns 422.
+                  description: Campaign name
                   example: Q1 Sales Campaign
                 description:
                   type:
@@ -1357,6 +1369,16 @@ paths:
           $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '409':
+          description: The campaign is active; nothing was changed. Pause it first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Pause the campaign before editing it.
         '422':
           $ref: ../../components/responses/ValidationError.yaml
     delete:

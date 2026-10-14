@@ -38,7 +38,7 @@ Open **Auto Dialer → Campaign Manager**. Each row shows the campaign name (wit
 | Status | Actions on the row |
 |--------|--------------------|
 | Draft | Edit (pencil) and, for the Owner, Delete (bin) |
-| Running | **Edit**, disabled, with the hint "Pause the campaign to edit" |
+| Running | **Edit**, disabled, with the hint "Pause the campaign to edit it" |
 | Paused | **Edit** |
 | Completed | **Archive** (Owner only; other roles see "-") |
 | Archived | None |
@@ -197,16 +197,16 @@ Result: the toast "Campaign status updated" (row) or "Campaign resumed successfu
 
 ## Edit a campaign
 
-Who can do this: Owner and PBX Admin.
+Who can do this: Owner and PBX Admin, on a Draft or Paused campaign. A Running (Active) campaign cannot be edited: pause it first.
 
-1. Pause the campaign if it is Running. **Edit** is disabled on Running campaigns ("Pause the campaign to edit") and the server refuses the change with "Cannot modify an active campaign. Please pause it first."
+1. If the campaign is Running, pause it: click its **Running (Pause)** badge, or **Pause** on the detail page or the monitor. **Edit** stays disabled while it runs, with the hint "Pause the campaign to edit it". Opening the edit form of a Running campaign shows "Campaign is running" and disables **Update Campaign**.
 2. Click **Edit** on the row or on the detail page. The **Edit Campaign** form opens with the campaign's values.
 3. Change the fields on any tab.
 4. Click **Update Campaign**.
 
-Result: the toast "Campaign updated successfully" appears and you return to the page you came from.
+Result: the toast "Campaign updated successfully" appears and you return to the page you came from. Resume the campaign to dial again.
 
-The start date may be in the past when you edit. The caller-ID pool can be changed only while the campaign is Draft or Paused; on an Active campaign the server answers 409 "Cannot modify Caller ID pool on an active campaign".
+The start date may be in the past when you edit. An edit sent for an Active campaign (for example through the API) changes nothing: the server answers 409 "Pause the campaign before editing it."
 
 ## Archive a campaign
 
@@ -270,8 +270,7 @@ Below the cards: the full configuration (routing, caller ID strategy and pool, d
 | Invalid Caller ID pool: some DIDs do not exist, do not belong to your organization, or are not active | A pool number is inactive or not yours | Activate the number or remove it |
 | A destination ID is required when routing to AI Assistant or AI Load Balancer | No destination picked | Pick the assistant or load balancer |
 | The start date must be a date after or equal to today | Start date in the past on create | Pick today or later |
-| Cannot modify an active campaign. Please pause it first | Edit sent while Running | Pause, then edit |
-| Cannot modify Caller ID pool on an active campaign | Pool change while Running | Pause first |
+| Pause the campaign before editing it. | Edit sent while Running; nothing was changed | Pause, then edit |
 | Cannot start campaign without a destination list | No list assigned, or the assigned list is not Ready or In Use | Assign a Ready list |
 | This action is unauthorized | The action is not allowed for your role or for the campaign's status (for example deleting a campaign that is not Draft through the API) | Ask the Owner, or archive instead of delete |
 
