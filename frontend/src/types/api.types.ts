@@ -642,7 +642,8 @@ export interface CallDetailRecord {
   session_id: string;
 
   // Call participants
-  from: string;
+  extension_number: string | null; // the extension the call belongs to
+  from: string; // Caller ID (display only)
   to: string;
   direction: string | null;
 
@@ -699,9 +700,9 @@ export interface CallDetailRecord {
 export interface CDRFilters {
   page?: number;
   per_page?: number;
-  from?: string; // partial match on 'from' number
-  to?: string; // partial match on 'to' number
-  from_to_match?: 'any' | 'all'; // with both from and to: either matches (any) or both must (all, default)
+  extension?: string; // starts-with match on the call's extension number
+  to?: string; // starts-with match on the destination number
+  extension_destination_match?: 'any' | 'all'; // with both: either matches (any) or both must (all, default)
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;

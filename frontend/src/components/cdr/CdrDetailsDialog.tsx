@@ -35,11 +35,15 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
             <div className="space-y-4 min-w-0">
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-muted-foreground">From</div>
+                  <div className="text-sm font-medium text-muted-foreground">Extension</div>
+                  <div className="text-base break-words">{cdr.extension_number || '-'}</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-muted-foreground">Caller ID</div>
                   <div className="text-base break-words">{formatPhoneNumber(cdr.from)}</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-muted-foreground">To</div>
+                  <div className="text-sm font-medium text-muted-foreground">Destination</div>
                   <div className="text-base break-words">{formatPhoneNumber(cdr.to)}</div>
                 </div>
                 <div className="min-w-0">
