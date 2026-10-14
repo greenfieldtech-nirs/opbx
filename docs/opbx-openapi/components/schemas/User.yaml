@@ -55,6 +55,12 @@ properties:
       properties:
         provider:
           type: string
+          enum:
+            - google
+            - facebook
+            - microsoft
+            - github
+            - x
           example: google
         provider_email:
           type:
@@ -62,7 +68,9 @@ properties:
           - 'null'
           format: email
   extension:
-    description: The user's assigned extension. Present only when loaded (user list and detail); null when none is assigned.
+    description: >-
+      The user's assigned extension. Present only where the endpoint loads it (the
+      `/v1/users` list, detail, create and update responses); null when none is assigned.
     oneOf:
     - $ref: ./Extension.yaml
     - type: 'null'
