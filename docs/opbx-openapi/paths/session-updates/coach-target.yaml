@@ -9,11 +9,11 @@ paths:
         whisper to, or barge into a live call via the in-browser Web Phone.
 
         This is the UI-facing authorization layer. It enforces:
-        - `owner`/`supervisor` role (403 otherwise);
+        - `owner`/`supervisor` role (403 otherwise; API keys always get 403);
         - for Supervisors, the session must be within their assigned scope (403 otherwise);
         - tenant isolation via an explicit `organization_id` filter (cross-org lookups return 404);
-        - the session must be active (`processing`/`ringing`/`connected`) with a
-          non-empty session token (422 otherwise).
+        - the latest stored update of the session must be `processing`/`ringing`/`connected`
+          with a non-empty session token (422 otherwise).
 
         The returned `destination` embeds the target session's secret token and the
         coaching policy. Dialing it triggers the `/voice/route` webhook, where
@@ -85,10 +85,21 @@ paths:
               schema:
                 $ref: '../../openapi.yaml#/components/schemas/Error'
         '404':
-          $ref: '../../openapi.yaml#/components/responses/NotFound'
-        '422':
-          description: Call is not active, has no session token, or whisper_party missing
+          description: No session with this ID in the organization
           content:
             application/json:
               schema:
                 $ref: '../../openapi.yaml#/components/schemas/Error'
+              example:
+                error: Session not found
+        '422':
+          description: |
+            Validation error (`policy` missing or invalid, `whisper_party` missing for
+            `whisper` or invalid), or the call is not active / has no session token
+            (`{"error": "Unprocessable", "message": "This call is not active or has no session token"}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '../../openapi.yaml#/components/schemas/ValidationError'
+                  - $ref: '../../openapi.yaml#/components/schemas/Error'

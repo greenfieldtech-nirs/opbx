@@ -4,6 +4,15 @@ paths:
       tags:
         - Session Updates
       summary: Get active calls
+      description: |
+        Live calls of the organization (any role; Supervisors see only calls whose caller or
+        destination is in their assigned scope). A call is active when the latest
+        session-update row of its session has status `processing`, `ringing`, `connected` or
+        `answer`, was updated in the last 30 minutes, and the session has no `cdr_final_status`
+        or `deleted` event in the last 24 hours. Calls are ordered by last update (newest
+        first) and capped at 100. Not rate-limited.
+
+        `meta` counts are computed over the returned (filtered, capped) list.
       operationId: getActiveSessions
       security:
         - bearerAuth: []
@@ -14,13 +23,14 @@ paths:
         - name: supervisor
           in: query
           required: false
-          description: When true, scope results to the supervisor's assigned resources.
+          deprecated: true
+          description: Ignored. Supervisors are always scoped by role.
           schema:
             type: boolean
         - name: status
           in: query
           required: false
-          description: Filter by call status.
+          description: Filter by call status; other values are ignored.
           schema:
             type: string
             enum:
@@ -30,7 +40,7 @@ paths:
         - name: direction
           in: query
           required: false
-          description: Filter by call direction.
+          description: Filter by call direction; other values are ignored.
           schema:
             type: string
             enum:
@@ -53,30 +63,54 @@ paths:
                           type: integer
                         caller_id:
                           type: string
+                          description: Caller (E.164, or a plain extension number when it is one of the organization's extensions)
                         destination:
                           type: string
+                          description: Destination (same formatting as `caller_id`)
                         direction:
                           type: string
+                          enum:
+                            - incoming
+                            - outgoing
+                            - application
+                            - internal
                         status:
                           type: string
+                          enum:
+                            - processing
+                            - ringing
+                            - connected
+                            - answer
                         session_created_at:
                           type: string
+                          description: Session start as stored (`YYYY-MM-DD HH:MM:SS`)
                         last_updated_at:
                           type: string
+                          description: Time of the latest session update (`YYYY-MM-DD HH:MM:SS`)
                         duration_seconds:
                           type: integer
                         formatted_duration:
                           type: string
+                          example: 2m 5s
                         domain:
                           type: string
                         subscriber_id:
-                          type: string
+                          type:
+                            - integer
+                            - 'null'
+                          description: Cloudonix subscriber ID of the extension leg
                         call_ids:
                           type: array
                           items:
                             type: string
                         has_qos_data:
                           type: boolean
+                        user_full_name:
+                          type: string
+                          description: Name of the user whose extension matches `subscriber_id`, or `Unassigned`
+                        error:
+                          type: string
+                          description: Only on an item that could not be processed (`Data processing error`); such an item carries only `session_id`, `caller_id`, `destination`, `direction`, `status`, `user_full_name` and `error`.
                   meta:
                     type: object
                     properties:
@@ -100,5 +134,20 @@ paths:
                             type: integer
                       last_updated:
                         type: string
+                        format: date-time
                       cache_expires_in:
                         type: integer
+                        description: Always 5
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
+        '500':
+          description: Query failed
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+              example:
+                error: Failed to retrieve active calls
+                message: SQLSTATE[...]

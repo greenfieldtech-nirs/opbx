@@ -1,21 +1,52 @@
 type: object
-description: Session Update
+description: |
+  A stored session-update event (one row of `session_updates`), written by the Cloudonix
+  session-update webhook. No endpoint returns this object as is: the Session Updates
+  endpoints return derived views of these rows.
 properties:
   id:
     type: integer
-  session_token:
-    type: string
+  organization_id:
+    type: integer
   session_id:
     type: integer
-  call_id:
+    description: Cloudonix numeric session ID
+  session_token:
+    type:
+      - string
+      - 'null'
+    description: Cloudonix session token (never returned in list responses)
+  event_id:
     type: string
+  domain_id:
+    type: integer
+  domain:
+    type: string
+  subscriber_id:
+    type:
+      - integer
+      - 'null'
+  outgoing_subscriber_id:
+    type:
+      - integer
+      - 'null'
+  caller_id:
+    type: string
+  destination:
+    type: string
+  direction:
+    type: string
+    enum: [incoming, outgoing, application, internal]
   status:
     type: string
-    enum: [initiated, active, on_hold, transferred, completed, failed]
-  from_number:
+    description: Cloudonix session status (for example `processing`, `ringing`, `connected`, `answer`)
+  action:
     type: string
-  to_number:
+  reason:
     type: string
+  session_created_at:
+    type: string
+    format: date-time
   created_at:
     type: string
     format: date-time
@@ -24,5 +55,5 @@ properties:
     format: date-time
 required:
   - id
-  - session_token
+  - session_id
   - status
