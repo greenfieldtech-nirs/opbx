@@ -69,6 +69,8 @@ paths:
         user of the organization with an extension. `moh_recording_id` must be a recording
         tagged as hold music. The fallback target must belong to the organization and be active.
         Only the fallback_*_id matching `fallback_action` is stored; the others are cleared.
+        With `fallback_action: call_queue`, `fallback_call_queue_id` names the queue overflow
+        callers join (as new callers, at the back of its line).
       operationId: createCallQueue
       security:
         - bearerAuth: []
@@ -182,7 +184,9 @@ paths:
         (for example an omitted `status` becomes `active`, an omitted `fallback_action` becomes
         `hangup`). `description`, `announce_position_language`, `moh_recording_id` and
         `conference_ring_all` keep their stored values when omitted. `agents` replaces the
-        whole agent list. `fallback_action: unavailable` is accepted on update.
+        whole agent list. `fallback_action: unavailable` is accepted on update. A
+        `fallback_call_queue_id` must not be this queue, and the chain of call queue fallbacks
+        must not lead back to it (422 "Fallback loop detected: ...").
       operationId: updateCallQueue
       security:
         - bearerAuth: []
@@ -272,7 +276,7 @@ paths:
       tags:
         - Call Queues
       summary: Delete call queue
-      description: Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, or a ring group / AI load balancer fallback). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, or a ring group / AI load balancer / call queue fallback). The 409 body lists the references.
       operationId: deleteCallQueue
       security:
         - bearerAuth: []

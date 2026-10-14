@@ -34,12 +34,13 @@ A call queue. Live state (waiting callers, agent states) is kept by the [ACD wor
 | `immediate_connect` | boolean | No | `false` | When an agent becomes available, connect the first waiting caller at once instead of waiting for the next poll |
 | `conference_ring_all` | boolean | No | `false` | With the `ring_all` strategy, offer the call to the agents as per-agent conference sessions |
 | `moh_recording_id` | bigint unsigned | Yes | null | Music-on-hold recording. Foreign key to `recordings`, on delete set null |
-| `fallback_action` | enum | No | `hangup` | Where the call goes when the queue gives up. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `unavailable` (cast to `RingGroupFallbackAction`) |
+| `fallback_action` | enum | No | `hangup` | Where the call goes when the queue gives up. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `unavailable`, `call_queue` (cast to `RingGroupFallbackAction`) |
 | `fallback_extension_id` | bigint unsigned | Yes | null | Fallback extension. Foreign key to `extensions`, on delete set null |
 | `fallback_ring_group_id` | bigint unsigned | Yes | null | Fallback ring group. Foreign key to `ring_groups`, on delete set null |
 | `fallback_ivr_menu_id` | bigint unsigned | Yes | null | Fallback IVR menu. Foreign key to `ivr_menus`, on delete set null |
 | `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant. Foreign key to `ai_assistants`, on delete set null |
 | `fallback_ai_load_balancer_id` | bigint unsigned | Yes | null | Fallback AI load balancer. Foreign key to `ai_assistant_load_balancers`, on delete set null |
+| `fallback_call_queue_id` | bigint unsigned | Yes | null | Fallback call queue (never the queue itself). Foreign key to `call_queues`, on delete set null |
 | `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `CallQueueStatus`) |
 | `created_at` | timestamp | Yes | null |  |
 | `updated_at` | timestamp | Yes | null |  |
@@ -48,6 +49,7 @@ A call queue. Live state (waiting callers, agent states) is kept by the [ACD wor
 
 - `call_queues_fallback_ai_assistant_id_foreign`: `fallback_ai_assistant_id`
 - `call_queues_fallback_ai_load_balancer_id_foreign`: `fallback_ai_load_balancer_id`
+- `call_queues_fallback_call_queue_id_foreign`: `fallback_call_queue_id`
 - `call_queues_fallback_extension_id_foreign`: `fallback_extension_id`
 - `call_queues_fallback_ivr_menu_id_foreign`: `fallback_ivr_menu_id`
 - `call_queues_fallback_ring_group_id_foreign`: `fallback_ring_group_id`
@@ -67,12 +69,13 @@ $callQueue->fallbackRingGroup() → RingGroup (fallback_ring_group_id) [BelongsT
 $callQueue->fallbackIvrMenu() → IvrMenu (fallback_ivr_menu_id) [BelongsTo]
 $callQueue->fallbackAiAssistant() → AiAssistant (fallback_ai_assistant_id) [BelongsTo]
 $callQueue->fallbackAiLoadBalancer() → AiAssistantLoadBalancer (fallback_ai_load_balancer_id) [BelongsTo]
+$callQueue->fallbackCallQueue() → CallQueue (fallback_call_queue_id) [BelongsTo]
 ```
 
 **Scopes:** `forOrganization()`, `withStrategy()`, `withStatus()`, `active()`, `search()`, `unprovisioned()`  
 **Methods:** `isActive()`  
 
-`fallback_action` is cast to `RingGroupFallbackAction`, but the column has no `call_queue` value: a queue cannot overflow to a queue. `unprovisioned()` is true when `fallback_action` is `unavailable`.
+`fallback_action` is cast to `RingGroupFallbackAction`. With `call_queue` the target is `fallback_call_queue_id`; the API refuses the queue itself and any chain of call queue fallbacks that returns to the queue. `unprovisioned()` is true when `fallback_action` is `unavailable`.
 
 ## CallQueueAgent
 

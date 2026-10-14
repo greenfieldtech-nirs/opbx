@@ -64,7 +64,7 @@ properties:
     type: string
     enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
     default: hangup
-    description: '`unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant and ai_load_balancer, and the target must belong to the organization and be active. `call_queue` has no target field.'
+    description: '`unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer and call_queue, and the target must belong to the organization and be active. A call_queue target must not be the queue itself, and the chain of call queue fallbacks must not lead back to it (422 "Fallback loop detected: ...").'
   fallback_extension_id:
     type:
       - integer
@@ -85,6 +85,11 @@ properties:
     type:
       - integer
       - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+    description: Target queue, required when fallback_action is `call_queue`. An active queue of the organization, not this queue.
   status:
     type: string
     enum: [active, inactive]

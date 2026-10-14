@@ -97,6 +97,11 @@ properties:
     type:
       - integer
       - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+    description: Target queue when fallback_action is `call_queue` (never this queue)
   status:
     type: string
     enum:
@@ -138,9 +143,11 @@ properties:
   fallback_ai_assistant:
     $ref: '#/$defs/Ref'
     description: |
-      List endpoint only (as are `fallback_extension`, `fallback_ring_group` and
-      `fallback_ivr_menu`). Null when that target is not set. There is no
+      List endpoint only (as are `fallback_extension`, `fallback_ring_group`,
+      `fallback_ivr_menu` and `fallback_call_queue`). Null when that target is not set. There is no
       `fallback_ai_load_balancer` summary; use `fallback_ai_load_balancer_id`.
+  fallback_call_queue:
+    $ref: '#/$defs/Ref'
   created_at:
     type: string
     format: date-time

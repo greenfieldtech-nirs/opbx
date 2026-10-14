@@ -59,7 +59,7 @@ An available agent who is already on another call is skipped automatically. Pres
 
 ## Queue behaviour in practice
 
-1. A call reaches the queue (from a phone number, an IVR option, a ring group or AI load balancer fallback, business hours or a Call Queue extension).
+1. A call reaches the queue (from a phone number, an IVR option, a ring group, AI load balancer or call queue fallback, business hours or a Call Queue extension).
 2. The caller hears the hold music and, if enabled, their position.
 3. The strategy picks an agent, whose extension rings for the agent ring timeout.
 4. If the agent answers, the call connects and is recorded as answered.
@@ -83,7 +83,7 @@ If the agent hangs up after the caller has joined, the call ends.
 4. Set **Agent Ring Timeout**, **Max Wait** and **Wrap-up**.
 5. Optionally choose **Hold Music (MOH)**, switch on **Announce Position** (then pick the interval and language), **Immediate Connect** and, for Ring All, **Ring Agents in Separate Calls**.
 6. Under **Agents**, pick each agent from **Add an agent (user with extension)…**. Each one appears as a chip; click **×** on a chip to remove it.
-7. Under **Overflow Fallback**, choose the type and the destination, or keep **Hang Up**.
+7. Under **Overflow Fallback**, choose the type and the destination, or keep **Hang Up**. For **Call Queue**, pick the target queue in the destination list.
 8. Click **Create Queue**. The button stays disabled until the queue has a name and at least one agent.
 
 The toast "Call queue created" appears and the queue is listed as **Active**. It becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Join a queue as an agent](#join-a-queue-as-an-agent)).
@@ -97,7 +97,7 @@ The toast "Call queue created" appears and the queue is listed as **Active**. It
 **Who can do this:** Owner, PBX Admin.
 
 1. On **Call Queues**, click the edit (pencil) icon on the queue's row. Clicking the row itself opens the detail page.
-2. Change the settings, agents or fallback in the **Edit Call Queue** dialog.
+2. Change the settings, agents or fallback in the **Edit Call Queue** dialog. With a **Call Queue** fallback, the destination list leaves out the queue you are editing.
 3. Click **Save Changes**.
 
 The toast "Call queue updated" appears.
@@ -135,7 +135,7 @@ Only queues whose fallback is Destination unavailable are listed. Click **Unprov
 1. On **Call Queues**, click the delete (trash) icon on the queue's row, or click **Delete** in the **Edit Call Queue** dialog.
 2. Confirm with **Delete** in the **Delete call queue** dialog.
 
-The toast "Call queue deleted" appears and the row disappears. If other configuration still points at the queue, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, ring-group and AI load-balancer fallbacks, business-hours actions and extensions of type **Call Queue**. Change those first, then delete again. Past call records never block a delete.
+The toast "Call queue deleted" appears and the row disappears. If other configuration still points at the queue, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, ring-group, AI load-balancer and call-queue fallbacks, business-hours actions and extensions of type **Call Queue**. Change those first, then delete again. Past call records never block a delete.
 
 ![Cannot delete: still in use dialog for Billing Queue listing a Main Menu IVR option](../img/screens/call-queues-in-use-dialog.jpg)
 
@@ -269,9 +269,21 @@ Agents are always dialed **at their extension**. Call-forwarding and follow-me s
 
 ### Fallback destination
 
-Overflow (max wait reached) goes to one of: **PBX User Extension**, **Ring Group**, **IVR Menu**, **AI Assistant**, **AI Load Balancer**, or **Hang Up**. Queue-to-queue fallback is not supported. A caller only overflows when the max wait is reached; while no agent is available, callers keep waiting until then.
+Overflow (max wait reached) goes to one of these:
 
-The fallback must be active when you save. A fallback that is deleted later is protected by the in-use check.
+| Fallback | Destination |
+|----------|-------------|
+| PBX User Extension | An extension |
+| Ring Group | A ring group |
+| IVR Menu | An IVR menu |
+| AI Assistant | An AI assistant |
+| AI Load Balancer | An AI load balancer |
+| Call Queue | Another call queue. The caller joins it as a new caller, at the back of the line, with that queue's hold music, max wait and fallback |
+| Hang Up | None: the call ends |
+
+Before a fallback other than Hang Up, the caller hears "We're sorry, but no one is available to take your call. Please hold while we redirect your call." A caller only overflows when the max wait is reached; while no agent is available, callers keep waiting until then.
+
+The fallback must belong to your organization and be active when you save. A queue cannot fall back to itself, and a chain of call queue fallbacks must not lead back to the queue (for example Support → Billing → Support). If the target is inactive or gone when a caller overflows, the call ends. A queue that is another queue's fallback cannot be deleted until that fallback is changed.
 
 ## API and automation
 
@@ -287,6 +299,9 @@ The fallback must be active when you save. A fallback that is deleted later is p
 | Only active users can be queue agents. *name* is not active | The user is inactive | Activate the user or remove them from the agents |
 | Queue agents must have an extension assigned. *name* has no extension | The user has no extension | Assign an extension to the user first |
 | The selected fallback target must be active | The fallback is inactive | Activate it or pick another fallback |
+| The fallback call queue id field is required. | **Call Queue** was chosen without a target queue | Pick the target queue |
+| A call queue cannot fall back to itself. | The target is the queue being edited | Pick another queue |
+| Fallback loop detected: *A* -> *B* -> *A*. A call queue fallback chain must not return to itself. | The chain of queue fallbacks leads back to this queue | Change one of the fallbacks in the chain |
 | Choose a destination | You tried to create a route as "unavailable" | Pick a destination. "Destination unavailable" is only available when editing |
 | This call queue is still used by: … | Other configuration points at the queue | Change the listed references, then delete |
 
