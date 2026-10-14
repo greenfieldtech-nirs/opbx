@@ -6,7 +6,20 @@ paths:
       summary: Dialer worker health check
       description: 'Health check endpoint for the Go-based dialer worker service.
 
-        Used by the worker to verify connectivity to the API.
+
+        All `/v1/dialer/worker/*` endpoints authenticate with `Authorization: Bearer
+
+        <DIALER_WORKER_API_TOKEN>` (or `DIALER_WORKER_API_TOKEN_SECONDARY` during token
+
+        rotation). When no primary token is configured they return 503. They are rate
+
+        limited to `DIALER_WORKER_RATE_LIMIT` requests per minute per client IP
+
+        (default 1000); over the limit they return 429 with `{"error": "Too Many Requests",
+
+        "message": "Dialer worker rate limit exceeded.", "retry_after": ...}`. They act
+
+        across all organizations.
 
         '
       operationId: dialerWorkerHealth
@@ -25,20 +38,37 @@ paths:
                     example: healthy
                   active_campaigns:
                     type: integer
+                    description: Campaigns in active status
                   active_calls:
                     type: integer
+                    description: Call sessions in progress
                   queue_depth:
                     type: integer
+                    description: Destinations (all organizations) whose last disposition is busy,
+                      no-answer or cancelled and whose retry time has been reached
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '503':
+          description: DIALER_WORKER_API_TOKEN is not configured
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Service Unavailable
+                message: Worker authentication not configured
   /v1/dialer/worker/campaigns/active:
     get:
       tags:
       - Dialer Worker
       summary: Get active campaigns
-      description: 'Retrieve all active auto-dialer campaigns that are ready for dialing.
+      description: 'Retrieve all auto-dialer campaigns (all organizations) in active status
 
-        Used by the dialer worker to discover campaigns to execute.
+        whose date range and schedule window, evaluated in the campaign timezone,
+
+        include the current time. Used by the dialer worker to discover campaigns to
+
+        execute.
 
         '
       operationId: getActiveCampaigns
@@ -72,11 +102,13 @@ paths:
       tags:
       - Dialer Worker
       summary: Pause campaign
-      description: 'Pause an active campaign from the worker side.
+      description: 'Pause a campaign from the worker side (for example a circuit breaker or
 
-        Typically called when the campaign reaches its daily/hourly limits
+        the schedule). Sets the status to paused and stores `reason` as the pause reason
 
-        or encounters errors.
+        and `resume_at`, marks the campaign''s in-flight call sessions as failed and resets
+
+        its pending-calls counter. The current status is not checked.
 
         '
       operationId: pauseCampaignFromWorker
@@ -114,13 +146,27 @@ paths:
                     example: Campaign paused
                   data:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      campaign_id:
+                        type: integer
+                        example: 1
+                      status:
+                        type: string
+                        example: paused
+                      reason:
+                        type: string
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Campaign not found
   /v1/dialer/worker/campaigns/{campaign}/destinations/pending:
     parameters:
     - name: campaign
@@ -135,9 +181,13 @@ paths:
       tags:
       - Dialer Worker
       summary: Get pending destinations
-      description: 'Retrieve pending destinations for a campaign.
+      description: 'Retrieve destinations to dial for a campaign: destinations of the lists
 
-        Returns destinations that are ready to be dialed.
+        assigned to the campaign that are pending, have fewer than `max_dial_attempts`
+
+        attempts and whose retry time (if any) has been reached, oldest first.
+
+        `meta.total` is the number of rows returned; `meta.offset` is always 0.
 
         '
       operationId: getPendingDestinations
@@ -146,6 +196,7 @@ paths:
       parameters:
       - name: limit
         in: query
+        description: Maximum number of destinations to return
         schema:
           type: integer
           default: 50
@@ -173,7 +224,13 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Campaign not found
   /v1/dialer/worker/campaigns/{campaign}/destinations/retry:
     parameters:
     - name: campaign
@@ -188,9 +245,15 @@ paths:
       tags:
       - Dialer Worker
       summary: Get retry destinations
-      description: 'Retrieve destinations that need to be retried.
+      description: 'Retrieve destinations of the lists assigned to the campaign whose last
 
-        Returns destinations that failed previously and are eligible for retry.
+        disposition is busy, no-answer or cancelled, that have fewer than
+
+        `max_dial_attempts` attempts and whose retry time (if any) has been reached,
+
+        ordered by retry time. The status is not checked. `meta.total` is the number of
+
+        rows returned; `meta.offset` is always 0. Not called by the current Go worker.
 
         '
       operationId: getRetryDestinations
@@ -199,6 +262,7 @@ paths:
       parameters:
       - name: limit
         in: query
+        description: Maximum number of destinations to return
         schema:
           type: integer
           default: 50
@@ -226,15 +290,30 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Campaign not found
   /v1/dialer/worker/calls/initiate:
     post:
       tags:
       - Dialer Worker
       summary: Initiate call
-      description: 'Initiate an outbound call through Cloudonix.
+      description: 'Place an outbound call through Cloudonix and create a call session.
 
-        Creates a call session and returns the call SID.
+
+        The destination is first claimed atomically (pending -> dialing, `dial_attempts`
+
+        + 1, `last_dialed_at` set); if it is not pending the request returns 409 and no
+
+        call is placed. When Cloudonix rejects the call the claim is released (the
+
+        attempt stays counted) and the request returns 500. On success the campaign
+
+        pending-calls counter is incremented.
 
         '
       operationId: initiateCall
@@ -245,7 +324,7 @@ paths:
         in: header
         schema:
           type: string
-        description: Replays of the same key for the same destination return the original 201 response instead of placing a second call
+        description: Replays of the same key for the same destination within one hour return the original 201 response instead of placing a second call
       requestBody:
         required: true
         content:
@@ -259,6 +338,7 @@ paths:
                   type: integer
                 phone_number:
                   type: string
+                  description: Stored on the call session
                 worker_id:
                   type: string
                 initiated_at:
@@ -268,11 +348,12 @@ paths:
                   type:
                   - string
                   - 'null'
-                  description: Defaults to the campaign caller ID
+                  description: Caller ID to present (selected from the pool). Defaults to the campaign caller ID
                 caller_did_id:
                   type:
                   - integer
                   - 'null'
+                  description: Phone number (DID) ID of the selected caller ID
               required:
               - campaign_id
               - destination_id
@@ -296,30 +377,57 @@ paths:
                         type: integer
                       call_id:
                         type:
+                        - integer
+                        - 'null'
+                        description: Cloudonix call ID
+                      caller_id:
+                        type:
                         - string
                         - 'null'
-                      caller_id:
-                        type: string
                       caller_did_id:
                         type:
                         - integer
                         - 'null'
                       callback_url:
                         type: string
+                        description: Status callback URL given to Cloudonix (`<webhook base>/api/webhooks/cloudonix/call-status`)
         '500':
           description: Cloudonix rejected the call
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                message: 'Failed to initiate call: ...'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '409':
+          description: The destination is not pending (already claimed or finished); no call was placed
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                message: Destination is not pending (already claimed or finished)
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, the campaign or destination does not exist (validation
+            error body naming `campaign_id` / `destination_id`), or Cloudonix is not configured
+            for the organization (`{"message": "Cloudonix not configured for this organization"}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
   /v1/dialer/worker/calls/generate-cxml:
     post:
       tags:
       - Dialer Worker
       summary: Generate CXML for call
-      description: 'Generate CXML document for an outbound call.
+      description: 'Generate the CXML document for an answered outbound call, based on the
 
-        Returns the CXML that will be used to connect the call.
+        campaign routing destination (AI assistant, AI load balancer, or hangup).
 
         '
       operationId: generateCxml
@@ -365,6 +473,20 @@ paths:
                         enum: [ai_assistant, ai_load_balancer, hangup, null]
         '404':
           description: Campaign not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Campaign not found
+        '500':
+          description: CXML generation failed
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: 'Failed to generate CXML: ...'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '422':
@@ -374,17 +496,29 @@ paths:
     - name: session
       in: path
       required: true
-      description: Call session ID
+      description: Call session ID (`session_id` returned by initiate)
       schema:
-        type: string
-      example: CA550e8400e29b41d4a716446655440000
+        type: integer
+        minimum: 1
+      example: 42
     patch:
       tags:
       - Dialer Worker
       summary: Update call status
-      description: 'Update the status of an active call session.
+      description: 'Update the status of a call session.
 
-        Used to track call progress and outcomes.
+
+        Stores the session fields (`duration` / `billsec` default to 0) and decrements
+
+        the campaign pending-calls counter. When `disposition` is set, the server decides
+
+        the destination outcome: answered / completed -> completed; busy / no-answer ->
+
+        pending with a retry time when the campaign retries on busy / no-answer and the
+
+        destination has attempts left; anything else -> failed. Not called by the current
+
+        Go worker.
 
         '
       operationId: updateCallStatus
@@ -439,26 +573,48 @@ paths:
                         type: integer
                       destination_status:
                         type: string
+                        enum: [pending, completed, failed]
+                        description: '`pending` when no disposition was sent'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Session not found
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/dialer/worker/calls/{session}/disposition:
     parameters:
     - name: session
       in: path
       required: true
-      description: Call session ID
+      description: Call session ID (`session_id` returned by initiate)
       schema:
-        type: string
-      example: CA550e8400e29b41d4a716446655440000
+        type: integer
+        minimum: 1
+      example: 42
     post:
       tags:
       - Dialer Worker
       summary: Set call disposition
-      description: 'Set the final disposition of a call.
+      description: 'Set the final disposition of a call and apply the retry rules.
 
-        Records the outcome for reporting and analytics.
+
+        The server decides the outcome; `should_retry` and `next_retry_at` are validated
+
+        but ignored. answered / completed -> destination completed; busy / no-answer ->
+
+        destination pending with a back-off retry time when the campaign retries on busy /
+
+        no-answer and the destination has attempts left; anything else -> destination
+
+        failed. The session is marked completed or failed and the campaign counters are
+
+        updated. Not called by the current Go worker.
 
         '
       operationId: setDisposition
@@ -476,14 +632,17 @@ paths:
                   enum: [answered, completed, busy, no-answer, failed, cancelled, congestion]
                 should_retry:
                   type: boolean
+                  description: Ignored (the server decides)
                 next_retry_at:
                   type:
                   - string
                   - 'null'
                   format: date-time
+                  description: Ignored (the server computes the retry time)
                 attempt_number:
                   type: integer
                   minimum: 1
+                  description: Logged only
                 duration:
                   type:
                   - integer
@@ -515,20 +674,34 @@ paths:
                         type: string
                       destination_status:
                         type: string
+                        enum: [pending, completed, failed]
                       will_retry:
                         type: boolean
+                        description: True when destination_status is pending
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: Session, or its campaign or destination, not found
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Session not found
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/dialer/worker/state/persist:
     post:
       tags:
       - Dialer Worker
       summary: Persist worker state
-      description: 'Persist the current state of a dialer worker.
+      description: 'Persist the current state of a dialer worker in the cache for 10 minutes
 
-        Used for worker recovery and load balancing.
+        (key: `worker_id`). The validated body is stored as-is. `active_calls`,
+
+        `retry_queue` and `campaign_states` must be present (they may be empty). Not called
+
+        by the current Go worker.
 
         '
       operationId: persistState
@@ -574,6 +747,8 @@ paths:
                     example: State persisted successfully
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
   /v1/dialer/worker/state/{workerId}:
     parameters:
     - name: workerId
@@ -587,9 +762,9 @@ paths:
       tags:
       - Dialer Worker
       summary: Get worker state
-      description: 'Retrieve the persisted state of a dialer worker.
+      description: 'Retrieve the state last persisted for a dialer worker (kept for 10 minutes).
 
-        Used during worker startup to resume from previous state.
+        Not called by the current Go worker.
 
         '
       operationId: getState
@@ -603,14 +778,30 @@ paths:
               schema:
                 type: object
                 properties:
-                  worker_id:
-                    type: string
-                  state:
+                  data:
                     type: object
-                  updated_at:
-                    type: string
-                    format: date-time
+                    description: The body stored by `POST /v1/dialer/worker/state/persist`
+                    properties:
+                      worker_id:
+                        type: string
+                      active_calls:
+                        type: array
+                        items: {}
+                      retry_queue:
+                        type: array
+                        items: {}
+                      campaign_states:
+                        type: array
+                        items: {}
+                      last_updated:
+                        type: string
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
-          $ref: ../../components/responses/NotFound.yaml
+          description: No state stored for this worker (or it expired)
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: State not found
