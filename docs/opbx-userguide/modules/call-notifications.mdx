@@ -35,19 +35,108 @@ Use this module to:
 
 Other roles get `403` from the API, so the page shows an error state if they open its address directly.
 
-## Set up notifications
+## Workflows
 
-1. Open **Call Notifications** in the sidebar. The page opens on the **Delivery Logs** tab.
+### Set up notifications
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Call Notifications** in the sidebar (under **Analytics**). The page opens on the **Delivery Logs** tab.
 2. Open the **Settings** tab.
-3. Under **Webhook Configuration**, enter the **Webhook URL** and choose the **Authentication Method**.
-4. Set the retry, timeout and rate-limit values (or keep the defaults).
-5. Under **Event Types**, switch on the statuses you want.
-6. Click **Create Settings** (or **Update Settings** once a configuration exists).
-7. Click **Test Webhook** to send a sample event.
+3. Under **Webhook Configuration**, enter the **Webhook URL**. An `http://` address shows the warning "HTTP is insecure. Use HTTPS in production environments."
+4. Choose the **Authentication Method**. For **Bearer Token** enter the token; for **Basic Authentication** enter the **Username** and **Password**.
+5. Under **Retry & Timeout Settings**, set **Retry Attempts**, **Retry Backoff**, **Timeout** and **Rate Limit**, or keep the defaults.
+6. Under **Event Types**, switch on the statuses you want. All eight are on to begin with.
+7. Click **Create Settings**. The button stays disabled while the Webhook URL is empty.
+
+The toast "Notification settings created successfully" appears. The **Active** badge shows next to the page title, and the **Notifications Enabled**, **Update Settings** and **Test Webhook** buttons appear.
 
 ![Settings tab with the webhook URL, Bearer Token authentication, Retry & Timeout values 3 / 60 / 30 / 500, the Event Types switches, and the Notifications Enabled, Update Settings and Test Webhook buttons](../img/screens/call-notifications-settings.jpg)
 
-### Settings
+### Change the settings
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the **Settings** tab.
+2. Change the fields. The secret field reads **Bearer Token (Leave blank to keep current)** or **Password (Leave blank to keep current)**: leave it empty to keep the saved secret.
+3. Click **Update Settings**.
+
+The toast "Notification settings updated successfully" appears.
+
+### Turn notifications on or off
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the **Settings** tab of a saved configuration.
+2. Click **Notifications Enabled** to stop sending, or **Notifications Disabled** to start again.
+
+The change is saved at once (with the other values currently in the form) and the toast "Notification settings updated successfully" appears. The badge next to the page title shows **Active** or **Inactive**. While inactive, nothing is sent and nothing is logged.
+
+There is no delete button on the page. To remove the configuration, use `DELETE /v1/call-notifications/settings`.
+
+### Test the webhook
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the **Settings** tab of a saved configuration.
+2. Click **Test Webhook**.
+
+OPBX posts a sample event with `"test": true`, a `new` status, the caller name `Test Caller` and the fictional numbers `+12125551234` and `+12125555678`. When your endpoint answers `2xx`, the toast "Test webhook sent successfully" appears; otherwise the toast shows the error, for example "Test webhook delivery failed". The attempt is listed in the delivery logs. The test is refused with "Notification settings not configured" while notifications are disabled.
+
+### View delivery logs
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Call Notifications**. The **Delivery Logs** tab lists deliveries with **Time**, **Session Token**, **From**, **To**, **Status** (green for success, red for failure) and **Response** (HTTP code and response time).
+2. Leave the switch on **Latest only** to see the latest delivery per call, or switch to **All attempts** to see every delivery.
+3. Click **Refresh** to reload the list.
+
+The `Authorization` header is never stored: the logs show it as `[redacted]`. Logs are kept for 90 days by default (server setting `RETENTION_CALL_NOTIFICATION_LOGS_DAYS`).
+
+![Delivery Logs tab in Latest only mode with the Refresh button (empty in the demo organization: no deliveries yet)](../img/screens/call-notifications-logs.jpg)
+
+### Inspect a delivery
+
+**Who can do this:** Owner, PBX Admin.
+
+1. On the **Delivery Logs** tab, click a session token or the debug (bug) icon on its row.
+2. The **Call Notification Debug** dialog opens. The **Notifications** list on the left has every notification for that call; click one to select it.
+3. Read the **Request** (URL, method, headers, body) and the **Response** (status, time, headers, body). "No response received" means the request timed out or could not connect.
+
+{/* SCREENSHOT: call-notifications-debug-dialog — debug dialog for one call session showing the request headers with Authorization: [redacted], the JSON body and the response */}
+
+## Payload
+
+```json
+{
+  "event_type": "call.status_update",
+  "event_id": "…",
+  "timestamp": "2026-10-13T09:15:02+00:00",
+  "organization_id": 12,
+  "session": {
+    "call_session_token": "…",
+    "from": "+12025550131",
+    "to": "+12025550100",
+    "direction": "inbound",
+    "call_start_time": "…",
+    "call_answer_time": null,
+    "call_end_time": null,
+    "call_duration": 0,
+    "call_billable_duration": 0,
+    "status": "ringing",
+    "previous_status": "new"
+  },
+  "metadata": { "caller_name": null, "extension_id": 5, "did_id": 1 }
+}
+```
+
+Your endpoint should answer with a `2xx` status. A `5xx`, a `429`, a timeout or a connection error is retried; any other `4xx` is not.
+
+## Rate limit
+
+The **Rate Limit Status** bar at the top shows events sent in the current minute, the limit, the remaining count and when the window resets. Events above the limit are dropped (not queued and not retried).
+
+## Settings
 
 | Field | Required | Limits and default | Meaning |
 |-------|----------|--------------------|---------|
@@ -99,61 +188,6 @@ The URL is checked when you save and again before every delivery. It is refused 
 - the scheme is not `http` or `https`;
 - the host is `localhost` or a name of an OPBX service (for example `mysql`, `redis`, `app`, `nginx`);
 - the host resolves to a private, loopback or link-local address.
-
-## Turn notifications on or off
-
-When a configuration exists, the **Notifications Enabled** / **Notifications Disabled** button switches sending on or off and saves at once. The badge next to the page title shows **Active** or **Inactive**. While inactive, nothing is sent and nothing is logged.
-
-There is no delete button on the page. To remove the configuration, use `DELETE /v1/call-notifications/settings`.
-
-## Test the webhook
-
-**Test Webhook** posts a sample event with `"test": true`, a `new` status and the fictional numbers `+12125551234` and `+12125555678`. The result appears as a toast and in the delivery logs. The test is refused with "Notification settings not configured" while notifications are disabled.
-
-## Payload
-
-```json
-{
-  "event_type": "call.status_update",
-  "event_id": "…",
-  "timestamp": "2026-10-13T09:15:02+00:00",
-  "organization_id": 12,
-  "session": {
-    "call_session_token": "…",
-    "from": "+12025550131",
-    "to": "+12025550100",
-    "direction": "inbound",
-    "call_start_time": "…",
-    "call_answer_time": null,
-    "call_end_time": null,
-    "call_duration": 0,
-    "call_billable_duration": 0,
-    "status": "ringing",
-    "previous_status": "new"
-  },
-  "metadata": { "caller_name": null, "extension_id": 5, "did_id": 1 }
-}
-```
-
-Your endpoint should answer with a `2xx` status. A `5xx`, a `429`, a timeout or a connection error is retried; any other `4xx` is not.
-
-## Delivery logs
-
-The **Delivery Logs** tab lists deliveries with time, session token, from, to, status and response code.
-
-- **Latest only** (default) shows the latest delivery per call. Switch to **All attempts** to see every delivery.
-- Click a session token or the debug icon to open the session's timeline: every notification for that call with the request (method, URL, headers, body) and the response.
-- **Refresh** reloads the list.
-
-The `Authorization` header is never stored: the logs show it as `[redacted]`. Logs are kept for 90 days.
-
-![Delivery Logs tab in Latest only mode with the Refresh button (empty in the demo organization: no deliveries yet)](../img/screens/call-notifications-logs.jpg)
-
-{/* SCREENSHOT: call-notifications-debug-dialog — debug dialog for one call session showing the request headers with Authorization: [redacted], the JSON body and the response */}
-
-## Rate limit
-
-The **Rate Limit Status** bar at the top shows events sent in the current minute, the limit, the remaining count and when the window resets. Events above the limit are dropped (not queued and not retried).
 
 ## Common errors
 
