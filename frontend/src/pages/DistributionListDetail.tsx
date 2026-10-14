@@ -12,12 +12,9 @@ import {
   BarChart3,
   AlertCircle,
   CheckCircle,
-  XCircle,
   RotateCcw,
-  ExternalLink,
   Filter,
   Search,
-  History,
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,13 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -65,7 +55,6 @@ import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploa
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
-import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { ListVersionHistory } from './DistributionLists/components/ListVersionHistory';
 import { ListParts } from './DistributionLists/components/ListParts';
 import { toast } from 'sonner';
@@ -130,7 +119,6 @@ export default function DistributionListDetail() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selectedDestinations, setSelectedDestinations] = useState<number[]>([]);
-  const [cdrPhoneNumber, setCdrPhoneNumber] = useState<string | null>(null);
 
   // Dialog states
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -140,7 +128,6 @@ export default function DistributionListDetail() {
   const deleteListMutation = useDeleteList();
   const archiveListMutation = useArchiveList();
   const { showIfInUse, inUseDialog } = useResourceInUse();
-  const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { isError: loadFailed, error: loadError, refetch: retryLoad, data: listData, isLoading: isListLoading } = useDistributionList(id!);
@@ -268,17 +255,6 @@ export default function DistributionListDetail() {
     );
   };
 
-  const handleDeleteDestination = (_destinationId: number) => {
-    // TODO: Implement delete destination
-    toast.info('Delete destination functionality coming soon');
-  };
-
-  const handleBulkDelete = () => {
-    // TODO: Implement bulk delete
-    toast.info(`Deleting ${selectedDestinations.length} destinations...`);
-    setSelectedDestinations([]);
-  };
-
   const toggleDestinationSelection = (id: number) => {
     setSelectedDestinations(prev => 
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
@@ -291,10 +267,6 @@ export default function DistributionListDetail() {
     } else {
       setSelectedDestinations(destinations.map(d => d.id));
     }
-  };
-
-  const openCDRHistory = (phoneNumber: string) => {
-    setCdrPhoneNumber(phoneNumber);
   };
 
   if (loadFailed) {
@@ -441,7 +413,6 @@ export default function DistributionListDetail() {
           <TabsTrigger value="destinations">Destinations</TabsTrigger>
           {list.has_versions && <TabsTrigger value="versions">Version History</TabsTrigger>}
           {!!list.parts_count && <TabsTrigger value="parts">Parts ({list.parts_count})</TabsTrigger>}
-          {list.status === 'failed' && <TabsTrigger value="errors">Validation Errors</TabsTrigger>}
           {list.original_filename && <TabsTrigger value="upload">Upload Info</TabsTrigger>}
         </TabsList>
 
@@ -482,16 +453,10 @@ export default function DistributionListDetail() {
                   Reset Pending Entries
                 </Button>
                 {selectedDestinations.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset Dial Attempts ({selectedDestinations.length})
-                    </Button>
-                    <Button variant="destructive" className="h-10" onClick={handleBulkDelete}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
+                  <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Dial Attempts ({selectedDestinations.length})
+                  </Button>
                 )}
               </div>
             </CardContent>
@@ -543,13 +508,7 @@ export default function DistributionListDetail() {
                           />
                         </TableCell>
                         <TableCell>
-                          <button
-                            className="font-mono text-sm hover:underline hover:text-primary flex items-center gap-1"
-                            onClick={() => openCDRHistory(destination.phone_number)}
-                          >
-                            {destination.phone_number}
-                            <ExternalLink className="h-3 w-3" />
-                          </button>
+                          <span className="font-mono text-sm">{destination.phone_number}</span>
                         </TableCell>
                         <TableCell className="max-w-[200px]">
                           {destination.name || '-'}
@@ -607,34 +566,24 @@ export default function DistributionListDetail() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            {destination.dial_attempts > 0 && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleResetDialAttempts(destination.id)}
-                                    >
-                                      <RotateCcw className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Reset Dial Attempts</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteDestination(destination.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {destination.dial_attempts > 0 && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleResetDialAttempts(destination.id)}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Reset Dial Attempts</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -676,25 +625,6 @@ export default function DistributionListDetail() {
 
         <TabsContent value="parts">
           <ListParts listId={id!} />
-        </TabsContent>
-
-        <TabsContent value="errors">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600">
-                <XCircle className="h-5 w-5" />
-                Validation Errors
-              </CardTitle>
-              <CardDescription>Errors found during CSV validation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="mb-4">
-                <Download className="h-4 w-4 mr-2" />
-                Download Errors CSV
-              </Button>
-              {/* Errors table would go here */}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="upload">
@@ -785,34 +715,6 @@ export default function DistributionListDetail() {
         isDeleting={deleteListMutation.isPending}
       />
 
-      <ValidationErrorsDialog
-        list={list}
-        open={isErrorsOpen}
-        onOpenChange={setIsErrorsOpen}
-      />
-
-      {/* CDR History Dialog */}
-      <Dialog open={!!cdrPhoneNumber} onOpenChange={() => setCdrPhoneNumber(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Call History
-            </DialogTitle>
-            <DialogDescription>
-              Recent calls to {cdrPhoneNumber}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              CDR integration coming soon. This will show the call detail records for this phone number.
-            </p>
-            <Button variant="outline" className="w-full" onClick={() => setCdrPhoneNumber(null)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       {inUseDialog}
     </div>
   );
