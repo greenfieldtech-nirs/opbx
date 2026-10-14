@@ -24,7 +24,13 @@ paths:
               - created_at
               - updated_at
             default: created_at
-        - $ref: '../../components/parameters/query/SortOrder.yaml'
+          description: Sort field; other values fall back to `created_at`.
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
         - name: strategy
           in: query
           schema:
@@ -44,9 +50,12 @@ paths:
           in: query
           schema:
             type: string
-          description: Free-text search
+          description: Matches name or description (substring). Unknown `strategy` or `status` values are ignored.
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
-      description: Supervisors see only the ring groups assigned to them.
+      description: |
+        Any role. Supervisors see only the ring groups assigned to them. Each item includes
+        its members (ordered by priority), `fallback_extension`, `members_count` and
+        `active_members_count`.
       responses:
         '200':
           description: List of ring groups
@@ -68,6 +77,12 @@ paths:
       tags:
         - Ring Groups
       summary: Create ring group
+      description: |
+        Owner and PBX Admin only. Omitted fields get defaults: `strategy` simultaneous,
+        `timeout` 30, `ring_turns` 2, `fallback_action` hangup, `status` active. Members must
+        be active `user` or `forward` extensions of the organization; a fallback target
+        (extension, ring group, IVR menu, AI assistant, AI load balancer, call queue) must be
+        active and, for `ai_assistant`, an AI assistant extension.
       operationId: createRingGroup
       security:
         - bearerAuth: []
@@ -83,11 +98,6 @@ paths:
                 - $ref: '../../components/schemas/RingGroupInput.yaml'
                 - required:
                     - name
-                    - strategy
-                    - timeout
-                    - ring_turns
-                    - fallback_action
-                    - status
                     - members
       responses:
         '201':
@@ -120,6 +130,9 @@ paths:
       tags:
         - Ring Groups
       summary: Get ring group
+      description: |
+        Owner, PBX Admin, PBX User and Reporter; a Supervisor only for an assigned ring
+        group (otherwise 403). Includes members and `fallback_extension`.
       operationId: getRingGroup
       security:
         - bearerAuth: []
@@ -138,6 +151,8 @@ paths:
                     $ref: '../../components/schemas/RingGroup.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -145,6 +160,11 @@ paths:
       tags:
         - Ring Groups
       summary: Update ring group
+      description: |
+        Owner and PBX Admin only. Every field is optional (no defaults are applied); sent
+        `members` replace the member list, omitted `members` are kept. The `fallback_*_id`
+        matching the effective `fallback_action` is kept or replaced; the others are cleared.
+        Answers 409 when another update of the same ring group holds its lock.
       operationId: updateRingGroup
       security:
         - bearerAuth: []
@@ -175,12 +195,22 @@ paths:
           $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          description: The ring group is being modified by another request
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Conflict
+                message: Ring group is currently being modified. Please try again.
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
     patch:
       tags:
         - Ring Groups
       summary: Partially update ring group
+      description: Same as PUT.
       operationId: patchRingGroup
       security:
         - bearerAuth: []
@@ -211,6 +241,15 @@ paths:
           $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          description: The ring group is being modified by another request
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Conflict
+                message: Ring group is currently being modified. Please try again.
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -218,7 +257,7 @@ paths:
       tags:
         - Ring Groups
       summary: Delete ring group
-      description: Refused with 409 when the ring group is still referenced (for example as a fallback or from an extension). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the ring group is still referenced (for example as a fallback or from an extension). The 409 body lists the references.
       operationId: deleteRingGroup
       security:
         - bearerAuth: []
@@ -230,6 +269,8 @@ paths:
           description: Ring group deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '409':

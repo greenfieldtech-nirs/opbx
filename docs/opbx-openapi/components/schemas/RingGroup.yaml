@@ -4,7 +4,7 @@ properties:
   is_unprovisioned:
     type: boolean
     readOnly: true
-    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+    description: True when `fallback_action` is `unavailable` (saved for future use, or set when a deleted user's extension was the fallback). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
     readOnly: true
@@ -36,7 +36,7 @@ properties:
     example: 30
   ring_turns:
     type: integer
-    description: Number of ring cycles before fallback (for round_robin)
+    description: Passes through the member list before fallback (sequential and round_robin)
     example: 2
   fallback_action:
     type: string
@@ -89,7 +89,7 @@ properties:
     example: active
   members:
     type: array
-    description: Ring group members ordered by priority (present when loaded)
+    description: Ring group members (ordered by priority in list responses). Absent where not loaded (supervisor assignments).
     items:
       type: object
       properties:
@@ -114,20 +114,14 @@ properties:
     type: integer
     description: Members whose extension is active (list only)
   fallback_extension:
-    type: object
-    description: Fallback extension summary (present when loaded)
+    type:
+    - object
+    - 'null'
+    description: Fallback extension summary (null when there is no fallback extension). Absent where not loaded (supervisor assignments).
     properties:
       id:
         type: integer
       extension_number:
-        type: string
-  fallback_ai_load_balancer:
-    type: object
-    description: Fallback AI load balancer summary (present when loaded)
-    properties:
-      id:
-        type: integer
-      name:
         type: string
   created_at:
     type: string

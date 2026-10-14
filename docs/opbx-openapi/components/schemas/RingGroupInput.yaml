@@ -1,5 +1,8 @@
 type: object
-description: Writable ring group fields (create and update requests)
+description: |
+  Writable ring group fields (create and update requests). On create, omitted `strategy`,
+  `timeout`, `ring_turns`, `fallback_action` and `status` default to simultaneous, 30, 2,
+  hangup and active.
 properties:
   name:
     type: string
@@ -85,7 +88,7 @@ properties:
     type: array
     minItems: 1
     maxItems: 50
-    description: Replaces the member list
+    description: Replaces the member list. Each extension must be an active `user` or `forward` extension of the organization.
     items:
       type: object
       properties:
