@@ -38,18 +38,17 @@ export default function Dashboard() {
     enabled: isSupervisor,
   });
 
-  // Fetch active calls count
+  // Active calls: the Live Calls page's query (same key and request), so both count the same calls
   const { isError: loadFailed, error: loadError, refetch: retryLoad, data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching } = useQuery({
-    queryKey: queryKeys.dashboard.activeCalls(),
-    queryFn: async () => {
-      return await sessionUpdatesService.getActiveCalls();
-    },
+    queryKey: queryKeys.activeCalls.list('all'),
+    queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: false }),
     refetchInterval: 15000, // Refresh every 15 seconds for dashboard
     staleTime: 10000, // Consider data fresh for 10 seconds
     enabled: !isSupervisor,
   });
 
-  const activeCalls = activeCallsResponse?.meta.total_active_calls || 0;
+  // Count the rows: Live Calls writes { data: [] } (no meta) into this entry when it clears its calls
+  const activeCalls = activeCallsResponse?.data?.length ?? 0;
 
   // Fetch extensions count
   const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching } = useQuery({

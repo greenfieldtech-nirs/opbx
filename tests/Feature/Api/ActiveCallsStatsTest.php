@@ -36,4 +36,23 @@ final class ActiveCallsStatsTest extends TestCase
         $this->assertSame(['incoming' => 1, 'outgoing' => 1], $data['by_direction']);
         $this->assertGreaterThanOrEqual(100, $data['longest_call']);
     }
+
+    public function test_live_calls_list_dashboard_count_and_stats_use_one_definition(): void
+    {
+        $org = Organization::factory()->create();
+        $user = User::factory()->create(['organization_id' => $org->id]);
+
+        SessionUpdate::factory()->create(['organization_id' => $org->id, 'session_id' => 2001, 'status' => 'ringing']);
+        SessionUpdate::factory()->create(['organization_id' => $org->id, 'session_id' => 2001, 'status' => 'connected']);
+        SessionUpdate::factory()->create(['organization_id' => $org->id, 'session_id' => 2002, 'status' => 'connected']);
+        // Last updated 31 minutes ago: outside the 30-minute window, so not active anywhere.
+        $stale = SessionUpdate::factory()->create(['organization_id' => $org->id, 'session_id' => 2003, 'status' => 'connected']);
+        DB::table('session_updates')->where('id', $stale->id)->update(['updated_at' => now()->subMinutes(31)]);
+
+        // Live Calls lists `data`; the Dashboard's Active Calls card counts the same response.
+        $list = $this->actingAs($user)->getJson('/api/v1/session-updates/active')->assertOk();
+        $this->assertEqualsCanonicalizing([2001, 2002], array_column($list->json('data'), 'session_id'));
+        $this->assertSame(2, $list->json('meta.total_active_calls'));
+        $this->assertSame(2, $this->actingAs($user)->getJson('/api/v1/session-updates/active/stats')->json('data.total_active'));
+    }
 }

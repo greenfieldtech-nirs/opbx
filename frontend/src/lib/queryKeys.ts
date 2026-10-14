@@ -35,7 +35,6 @@ export const queryKeys = {
   dashboard: {
     all: ['dashboard'] as const,
     supervisor: () => ['dashboard', 'supervisor'] as const,
-    activeCalls: () => ['dashboard', 'active-calls'] as const,
     extensionsCount: () => ['dashboard', 'extensions-count'] as const,
     conferenceRoomsCount: () => ['dashboard', 'conference-rooms-count'] as const,
     phoneNumbersCount: () => ['dashboard', 'phone-numbers-count'] as const,
