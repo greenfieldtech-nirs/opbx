@@ -222,7 +222,9 @@ class CampaignMultipleListsTest extends TestCase
         $this->actingAs($this->user)->getJson('/api/v1/auto-dialer-campaigns/lists/'.$list->id)
             ->assertOk()
             ->assertJsonPath('data.can_unassign', false)
-            ->assertJsonPath('data.unassign_refusal', AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE);
+            ->assertJsonPath('data.unassign_refusal', AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE)
+            ->assertJsonPath('data.used_by_campaign.status', 'active')
+            ->assertJsonPath('data.used_by_campaign.status_label', 'Active');
     }
 
     public function test_a_started_list_explains_why_it_cannot_be_unassigned(): void

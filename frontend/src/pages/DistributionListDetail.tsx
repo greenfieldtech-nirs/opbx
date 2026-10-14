@@ -71,6 +71,8 @@ const statusColors: Record<string, string> = {
   in_use: 'bg-purple-100 text-purple-800',
   used: 'bg-orange-100 text-orange-800',
   archived: 'bg-gray-100 text-gray-500',
+  active: 'bg-green-100 text-green-800',
+  paused: 'bg-yellow-100 text-yellow-800',
   completed: 'bg-green-100 text-green-800',
   connected: 'bg-blue-100 text-blue-800',
   invalid: 'bg-red-100 text-red-800',
@@ -411,7 +413,7 @@ export default function DistributionListDetail() {
               <div>
                 <p className="text-sm text-muted-foreground">Status</p>
                 <Badge className={statusColors[list.used_by_campaign.status] || 'bg-gray-100'}>
-                  {list.used_by_campaign.status}
+                  {list.used_by_campaign.status_label}
                 </Badge>
               </div>
             </div>

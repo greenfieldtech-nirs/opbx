@@ -68,6 +68,8 @@ class DistributionListResource extends JsonResource
             'used_by_campaign' => $this->whenLoaded('usedByCampaign', fn () => [
                 'id' => $this->usedByCampaign->id,
                 'name' => $this->usedByCampaign->name,
+                'status' => $this->usedByCampaign->status->value,
+                'status_label' => $this->usedByCampaign->status->label(),
             ]),
         ];
     }

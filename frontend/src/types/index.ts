@@ -1324,6 +1324,7 @@ export interface AutoDialerList {
     id: number;
     name: string;
     status: string;
+    status_label: string;
   };
 }
 
