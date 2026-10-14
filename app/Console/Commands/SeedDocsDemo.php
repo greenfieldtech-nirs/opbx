@@ -673,7 +673,7 @@ class SeedDocsDemo extends Command
                 'direction' => $incoming ? 'incoming' : 'outgoing', 'disposition' => $disposition,
                 'duration' => $billsec + ($disposition === 'CONNECTED' ? random_int(2, 12) : random_int(5, 45)),
                 'billsec' => $billsec, 'call_id' => (string) Str::uuid(), 'domain' => self::DOMAIN,
-                'subscriber' => $uuids[$mine] ?? null, 'session_id' => 700000 + $i, 'raw_cdr' => [],
+                'subscriber' => $uuids[$mine] ?? null, 'extension_number' => $mine, 'session_id' => 700000 + $i, 'raw_cdr' => [],
             ]);
         }
 

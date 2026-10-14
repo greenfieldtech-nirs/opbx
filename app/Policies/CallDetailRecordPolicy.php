@@ -34,15 +34,21 @@ class CallDetailRecordPolicy
             return false;
         }
 
-        // Supervisors only view CDRs of their assigned resources, PBX Users only CDRs from or to their own extension(s)
-        $identifiers = app(SupervisorFilterService::class)->callRecordScopeFor($user);
+        // Supervisors only view CDRs of their assigned resources, PBX Users only CDRs of or to their own extension(s)
+        $scope = app(SupervisorFilterService::class);
+        $identifiers = $scope->callRecordScopeFor($user);
 
         if ($identifiers === null) {
             return true;
         }
 
-        return in_array((string) $callDetailRecord->from, $identifiers, true)
-            || in_array((string) $callDetailRecord->to, $identifiers, true);
+        foreach ($scope->callRecordScopeColumns($user) as $column) {
+            if (in_array((string) $callDetailRecord->{$column}, $identifiers, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

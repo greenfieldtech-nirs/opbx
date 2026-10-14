@@ -71,41 +71,41 @@ final class CallDetailRecordFilterTest extends TestCase
 
     public function test_number_filters_match_prefix_with_or_without_plus(): void
     {
-        $a = $this->cdr(['from' => '+15551234567', 'to' => '1001']);
-        $b = $this->cdr(['from' => '15559999999', 'to' => '1002']);
-        $c = $this->cdr(['from' => '+442071234567', 'to' => '2001']);
+        $a = $this->cdr(['to' => '+15551234567', 'extension_number' => '1001']);
+        $b = $this->cdr(['to' => '15559999999', 'extension_number' => '1002']);
+        $c = $this->cdr(['to' => '+442071234567', 'extension_number' => '2001']);
 
-        $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('from=1555'));
-        $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('from=%2B1555'));
-        $this->assertSame([$c->id], $this->ids('to=20'));
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('to=1555'));
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->ids('to=%2B1555'));
+        $this->assertSame([$c->id], $this->ids('extension=20'));
     }
 
     public function test_number_filters_support_star_and_percent_wildcards_anywhere(): void
     {
-        $a = $this->cdr(['from' => '+15551234567']);
-        $b = $this->cdr(['from' => '15559999999']);
-        $c = $this->cdr(['from' => '+442071234567']);
+        $a = $this->cdr(['to' => '+15551234567']);
+        $b = $this->cdr(['to' => '15559999999']);
+        $c = $this->cdr(['to' => '+442071234567']);
         $both = [$a->id, $b->id];
 
         foreach (['*', '%25'] as $w) {
-            $this->assertEqualsCanonicalizing($both, $this->ids("from=1555{$w}"), 'trailing');
-            $this->assertEqualsCanonicalizing([$a->id, $c->id], $this->ids("from={$w}4567"), 'leading');
-            $this->assertSame([$a->id], $this->ids("from=1555{$w}67"), 'middle');
-            $this->assertSame([$b->id], $this->ids("from=15{$w}9999"), 'middle');
-            $this->assertEqualsCanonicalizing([$a->id, $b->id, $c->id], $this->ids("from={$w}"), 'only wildcard');
-            $this->assertEqualsCanonicalizing($both, $this->ids("from=%2B1555{$w}"), 'plus + trailing');
+            $this->assertEqualsCanonicalizing($both, $this->ids("to=1555{$w}"), 'trailing');
+            $this->assertEqualsCanonicalizing([$a->id, $c->id], $this->ids("to={$w}4567"), 'leading');
+            $this->assertSame([$a->id], $this->ids("to=1555{$w}67"), 'middle');
+            $this->assertSame([$b->id], $this->ids("to=15{$w}9999"), 'middle');
+            $this->assertEqualsCanonicalizing([$a->id, $b->id, $c->id], $this->ids("to={$w}"), 'only wildcard');
+            $this->assertEqualsCanonicalizing($both, $this->ids("to=%2B1555{$w}"), 'plus + trailing');
         }
     }
 
     public function test_underscore_and_backslash_in_number_filters_are_literal(): void
     {
-        $a = $this->cdr(['from' => '1a2']);
-        $b = $this->cdr(['from' => '1_2']);
+        $a = $this->cdr(['to' => '1a2']);
+        $b = $this->cdr(['to' => '1_2']);
 
-        $this->assertSame([$b->id], $this->ids('from=1_'));
-        $this->assertSame([$b->id], $this->ids('from=1_*'));
-        $this->assertSame([], $this->ids('from=1%5C'));
-        $this->assertNotContains($a->id, $this->ids('from=1_2'));
+        $this->assertSame([$b->id], $this->ids('to=1_'));
+        $this->assertSame([$b->id], $this->ids('to=1_*'));
+        $this->assertSame([], $this->ids('to=1%5C'));
+        $this->assertNotContains($a->id, $this->ids('to=1_2'));
     }
 
     public function test_direction_filter_and_sort_use_the_stored_column(): void
@@ -135,8 +135,8 @@ final class CallDetailRecordFilterTest extends TestCase
 
     public function test_export_applies_the_same_filters(): void
     {
-        $keep = $this->cdr(['session_timestamp' => '2026-03-10 12:00:00', 'from' => '5551']);
-        $this->cdr(['session_timestamp' => '2026-04-10 12:00:00', 'from' => '5551']);
+        $keep = $this->cdr(['session_timestamp' => '2026-03-10 12:00:00', 'to' => '5551']);
+        $this->cdr(['session_timestamp' => '2026-04-10 12:00:00', 'to' => '5551']);
 
         $csv = $this->actingAs($this->user)
             ->get('/api/v1/call-detail-records/export?from_date=2026-03-01&to_date=2026-03-31')

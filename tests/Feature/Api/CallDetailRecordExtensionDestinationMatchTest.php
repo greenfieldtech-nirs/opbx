@@ -12,9 +12,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * ?from_to_match=any|all decides whether the From and To filters must both match (all, the default) or either (any).
+ * ?extension_destination_match=any|all decides whether the Extension and Destination filters must both match (all, the default) or either (any).
  */
-final class CallDetailRecordFromToMatchTest extends TestCase
+final class CallDetailRecordExtensionDestinationMatchTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -37,14 +37,14 @@ final class CallDetailRecordFromToMatchTest extends TestCase
         $this->owner = User::factory()->create(['organization_id' => $this->org->id, 'role' => UserRole::OWNER]);
 
         $this->out = $this->cdr('1001', '+15551234567');
-        $this->in = $this->cdr('+15559876543', '1001');
+        $this->in = $this->cdr('2005', '1001');
         $this->self = $this->cdr('1001', '1001');
         $this->other = $this->cdr('1002', '2001');
     }
 
-    private function cdr(string $from, string $to): CallDetailRecord
+    private function cdr(string $extension, string $to): CallDetailRecord
     {
-        return CallDetailRecord::factory()->create(['organization_id' => $this->org->id, 'from' => $from, 'to' => $to]);
+        return CallDetailRecord::factory()->create(['organization_id' => $this->org->id, 'extension_number' => $extension, 'from' => '+19999999999', 'to' => $to]);
     }
 
     /** @return list<int> */
@@ -56,15 +56,15 @@ final class CallDetailRecordFromToMatchTest extends TestCase
 
     public function test_all_is_the_default_and_needs_both_numbers_to_match(): void
     {
-        $this->assertSame([$this->self->id], $this->ids('from=1001&to=1001'));
-        $this->assertSame([$this->self->id], $this->ids('from=1001&to=1001&from_to_match=all'));
+        $this->assertSame([$this->self->id], $this->ids('extension=1001&to=1001'));
+        $this->assertSame([$this->self->id], $this->ids('extension=1001&to=1001&extension_destination_match=all'));
     }
 
-    public function test_any_matches_calls_from_or_to_the_number(): void
+    public function test_any_matches_calls_of_or_to_the_extension(): void
     {
         $this->assertEqualsCanonicalizing(
             [$this->out->id, $this->in->id, $this->self->id],
-            $this->ids('from=1001&to=1001&from_to_match=any'),
+            $this->ids('extension=1001&to=1001&extension_destination_match=any'),
         );
     }
 
@@ -74,25 +74,25 @@ final class CallDetailRecordFromToMatchTest extends TestCase
         $this->in->update(['disposition' => 'NOANSWER']);
         $this->self->update(['disposition' => 'NOANSWER']);
 
-        $this->assertSame([$this->out->id], $this->ids('from=1001&to=1001&from_to_match=any&disposition=ANSWER'));
+        $this->assertSame([$this->out->id], $this->ids('extension=1001&to=1001&extension_destination_match=any&disposition=ANSWER'));
     }
 
     public function test_any_with_one_number_is_that_filter_alone(): void
     {
-        $this->assertEqualsCanonicalizing([$this->out->id, $this->self->id], $this->ids('from=1001&from_to_match=any'));
+        $this->assertEqualsCanonicalizing([$this->out->id, $this->self->id], $this->ids('extension=1001&extension_destination_match=any'));
     }
 
     public function test_an_unknown_value_is_rejected(): void
     {
-        $this->actingAs($this->owner)->getJson('/api/v1/call-detail-records?from=1001&to=1001&from_to_match=either')
+        $this->actingAs($this->owner)->getJson('/api/v1/call-detail-records?extension=1001&to=1001&extension_destination_match=either')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('from_to_match');
+            ->assertJsonValidationErrors('extension_destination_match');
     }
 
     public function test_export_honours_the_match(): void
     {
         $csv = fn (string $match) => $this->actingAs($this->owner)
-            ->get("/api/v1/call-detail-records/export?from=1001&to=1001&from_to_match={$match}")
+            ->get("/api/v1/call-detail-records/export?extension=1001&to=1001&extension_destination_match={$match}")
             ->assertOk()
             ->streamedContent();
 
@@ -100,10 +100,10 @@ final class CallDetailRecordFromToMatchTest extends TestCase
         $all = $csv('all');
 
         $this->assertStringContainsString('+15551234567', $any);
-        $this->assertStringContainsString('+15559876543', $any);
+        $this->assertStringContainsString('2005', $any);
         $this->assertStringNotContainsString('2001', $any);
         $this->assertStringNotContainsString('+15551234567', $all);
-        $this->assertStringNotContainsString('+15559876543', $all);
+        $this->assertStringNotContainsString('2005', $all);
         $this->assertSame(2, substr_count(trim($all), "\n") + 1); // header + the one call from and to 1001
     }
 
@@ -112,7 +112,7 @@ final class CallDetailRecordFromToMatchTest extends TestCase
         $supervisor = User::factory()->create(['organization_id' => $this->org->id, 'role' => UserRole::SUPERVISOR]);
 
         // A supervisor with no assigned resources sees nothing, whatever the match.
-        $this->actingAs($supervisor)->getJson('/api/v1/call-detail-records?from=1001&to=1001&from_to_match=any')
+        $this->actingAs($supervisor)->getJson('/api/v1/call-detail-records?extension=1001&to=1001&extension_destination_match=any')
             ->assertOk()
             ->assertJsonCount(0, 'data');
     }

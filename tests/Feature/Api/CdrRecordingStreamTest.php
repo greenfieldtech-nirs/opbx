@@ -65,6 +65,7 @@ final class CdrRecordingStreamTest extends TestCase
         $cdr = CallDetailRecord::factory()->create([
             'organization_id' => $org->id,
             'from' => '7001',
+            'extension_number' => '7001',
             'recording_status' => 'available',
             'recording_stored_path' => 'cdr/2.mp3',
         ]);

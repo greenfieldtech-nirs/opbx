@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Schema;
  * @property string|null $session_token
  * @property string $from
  * @property string $to
+ * @property string|null $extension_number The OPBX extension the call belongs to (see extensionNumberFor()); `from` is the Caller ID
  * @property string|null $direction incoming|outgoing|internal|application, copied from the session update at ingest
  * @property string $disposition
  * @property int $duration Total call duration in seconds
@@ -78,6 +79,7 @@ class CallDetailRecord extends Model
         'session_token',
         'from',
         'to',
+        'extension_number',
         'disposition',
         'duration',
         'billsec',
@@ -218,6 +220,7 @@ class CallDetailRecord extends Model
             'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
         ];
+        $attributes['extension_number'] = self::extensionNumberFor($organizationId, $subscriber, $from, $attributes['to']);
 
         // No unique DB index on (organization_id, call_id) by owner decision (D9):
         // dedupe here, serialised per call so concurrent deliveries create one row.
@@ -254,6 +257,32 @@ class CallDetailRecord extends Model
             ->value('direction');
 
         return ['direction' => $direction];
+    }
+
+    /**
+     * The organization's extension a call belongs to, independent of the Caller ID it presented:
+     * the subscriber that placed it (CDR `subscriber` = extensions.cloudonix_uuid), else an extension
+     * number used as the caller ID (API-initiated calls), else the extension its destination DID routes to
+     * directly (inbound). Null when none applies (e.g. a DID routed to a ring group, IVR or queue).
+     */
+    public static function extensionNumberFor(int $organizationId, ?string $subscriber, string $from, string $to): ?string
+    {
+        $extensions = fn () => Extension::withoutGlobalScope(OrganizationScope::class)->where('organization_id', $organizationId);
+
+        $number = ($subscriber ? $extensions()->where('cloudonix_uuid', $subscriber)->value('extension_number') : null)
+            ?? $extensions()->where('extension_number', ltrim($from, '+'))->value('extension_number');
+
+        if ($number === null && $to !== '') {
+            $extensionId = DidNumber::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
+                ->whereIn('phone_number', [$to, '+'.ltrim($to, '+')])
+                ->first()
+                ?->getTargetExtensionId();
+
+            $number = $extensionId ? $extensions()->whereKey($extensionId)->value('extension_number') : null;
+        }
+
+        return $number === null ? null : (string) $number;
     }
 
     /**

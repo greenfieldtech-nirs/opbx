@@ -67,4 +67,20 @@ final class SupervisorCallLogsTest extends TestCase
         $this->actingAs($owner)->getJson('/api/v1/call-detail-records')
             ->assertOk()->assertJsonCount(3, 'data');
     }
+
+    public function test_supervisor_sees_an_assigned_users_call_by_its_extension_whatever_the_caller_id(): void
+    {
+        $org = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $assignedUser = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $assignedUser->id, 'type' => 'user', 'extension_number' => '1001']);
+        $supervisor->supervisedUsers()->attach($assignedUser->id, ['organization_id' => $org->id]);
+
+        $didCallerId = CallDetailRecord::factory()->create(['organization_id' => $org->id, 'extension_number' => '1001', 'from' => '+12025550100', 'to' => '+15551234567']);
+        CallDetailRecord::factory()->create(['organization_id' => $org->id, 'extension_number' => '9999', 'from' => '+12025550100', 'to' => '+15551234567']);
+
+        $this->actingAs($supervisor)->getJson('/api/v1/call-detail-records')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $didCallerId->id);
+        $this->actingAs($supervisor)->getJson("/api/v1/call-detail-records/{$didCallerId->id}")->assertOk();
+    }
 }

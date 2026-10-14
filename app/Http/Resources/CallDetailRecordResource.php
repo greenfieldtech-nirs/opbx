@@ -30,7 +30,8 @@ class CallDetailRecordResource extends JsonResource
             'session_token' => $this->session_token,
             'session_id' => $this->session_id,
 
-            // Call participants
+            // Call participants: the extension the call belongs to; `from` is the Caller ID it presented
+            'extension_number' => $this->extension_number,
             'from' => $this->from,
             'to' => $this->to,
             'direction' => $this->direction,

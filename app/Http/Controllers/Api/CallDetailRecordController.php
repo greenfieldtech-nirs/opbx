@@ -57,17 +57,17 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['from', 'to', 'from_to_match', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
+        return ['extension', 'to', 'extension_destination_match', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
     }
 
     protected function getAllowedSortFields(): array
     {
         // user_full_name needs a join to extensions/users on the main connection, which the warm tier is not on.
         if ($this->wantsArchive()) {
-            return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'direction'];
+            return ['session_timestamp', 'extension_number', 'from', 'to', 'duration', 'billsec', 'disposition', 'direction'];
         }
 
-        return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
+        return ['session_timestamp', 'extension_number', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
     }
 
     protected function getDefaultSortField(): string
@@ -121,24 +121,7 @@ class CallDetailRecordController extends AbstractApiCrudController
             $this->applyCallRecordScope($query, $request->user());
         }
 
-        // From/To number filters: both must match (all, the default) or either (any).
-        $match = $request->validate(['from_to_match' => ['nullable', Rule::in(['any', 'all'])]])['from_to_match'] ?? 'all';
-        $from = $request->filled('from') ? (string) $request->input('from') : null;
-        $to = $request->filled('to') ? (string) $request->input('to') : null;
-
-        if ($match === 'any' && $from !== null && $to !== null) {
-            $query->where(function (Builder $q) use ($from, $to): void {
-                $this->wherePhonePrefix($q, 'from', $from);
-                $q->orWhere(fn (Builder $q) => $this->wherePhonePrefix($q, 'to', $to));
-            });
-        } else {
-            if ($from !== null) {
-                $this->wherePhonePrefix($query, 'from', $from);
-            }
-            if ($to !== null) {
-                $this->wherePhonePrefix($query, 'to', $to);
-            }
-        }
+        $this->applyExtensionDestinationFilter($query, $request);
 
         // Filter by disposition
         if ($request->filled('disposition')) {
@@ -171,6 +154,33 @@ class CallDetailRecordController extends AbstractApiCrudController
 
         if ($request->filled('to_date') && ($end = $this->parseDay((string) $request->input('to_date'))) !== null) {
             $query->where('session_timestamp', '<=', $end->endOfDay());
+        }
+    }
+
+    /**
+     * Extension (extension_number) and Destination (to) filters: both must match (all, the default) or either (any).
+     * The Caller ID (`from`) is display-only and not a filter.
+     */
+    private function applyExtensionDestinationFilter(Builder $query, Request $request): void
+    {
+        $match = $request->validate(['extension_destination_match' => ['nullable', Rule::in(['any', 'all'])]])['extension_destination_match'] ?? 'all';
+        $extension = $request->filled('extension') ? (string) $request->input('extension') : null;
+        $to = $request->filled('to') ? (string) $request->input('to') : null;
+
+        if ($match === 'any' && $extension !== null && $to !== null) {
+            $query->where(function (Builder $q) use ($extension, $to): void {
+                $this->wherePhonePrefix($q, 'extension_number', $extension);
+                $q->orWhere(fn (Builder $q) => $this->wherePhonePrefix($q, 'to', $to));
+            });
+
+            return;
+        }
+
+        if ($extension !== null) {
+            $this->wherePhonePrefix($query, 'extension_number', $extension);
+        }
+        if ($to !== null) {
+            $this->wherePhonePrefix($query, 'to', $to);
         }
     }
 
@@ -208,7 +218,9 @@ class CallDetailRecordController extends AbstractApiCrudController
      */
     private function applyCallRecordScope(Builder $query, User|ApiKey $user): void
     {
-        $identifiers = app(SupervisorFilterService::class)->callRecordScopeFor($user);
+        $scope = app(SupervisorFilterService::class);
+        $identifiers = $scope->callRecordScopeFor($user);
+        $columns = $scope->callRecordScopeColumns($user);
 
         if ($identifiers === null) {
             return;
@@ -220,9 +232,10 @@ class CallDetailRecordController extends AbstractApiCrudController
             return;
         }
 
-        $query->where(function ($q) use ($identifiers): void {
-            $q->whereIn('from', $identifiers)
-                ->orWhereIn('to', $identifiers);
+        $query->where(function ($q) use ($identifiers, $columns): void {
+            foreach ($columns as $column) {
+                $q->orWhereIn($column, $identifiers);
+            }
         });
     }
 
@@ -286,6 +299,7 @@ class CallDetailRecordController extends AbstractApiCrudController
             // CSV Headers - using raw_cdr session data as requested
             fputcsv($handle, [
                 'Timestamp',
+                'Extension',
                 'From',
                 'To',
                 'Call Start Time',
@@ -318,6 +332,7 @@ class CallDetailRecordController extends AbstractApiCrudController
 
                     fputcsv($handle, [
                         $record->session_timestamp?->format('Y-m-d H:i:s'),
+                        $record->extension_number,
                         $record->from,
                         $record->to,
                         $callStartTime,
@@ -350,13 +365,15 @@ class CallDetailRecordController extends AbstractApiCrudController
         $fromDate = $request->input('from_date', now()->subDays(30)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
 
+        $base = fn (): Builder => $this->buildStatisticsQuery($user, $fromDate, $toDate, $request);
+
         $stats = [
-            'total_calls' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->count(),
-            'total_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('duration'),
-            'total_billsec' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('billsec'),
-            'average_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->where('duration', '>', 0)->avg('duration'),
-            'total_cost' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('sell_cost'),
-            'by_disposition' => $this->buildStatisticsQuery($user, $fromDate, $toDate)
+            'total_calls' => $base()->count(),
+            'total_duration' => $base()->sum('duration'),
+            'total_billsec' => $base()->sum('billsec'),
+            'average_duration' => $base()->where('duration', '>', 0)->avg('duration'),
+            'total_cost' => $base()->sum('sell_cost'),
+            'by_disposition' => $base()
                 ->selectRaw('disposition, COUNT(*) as count')
                 ->groupBy('disposition')
                 ->pluck('count', 'disposition'),
@@ -367,15 +384,16 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     /**
      * Build the base CDR query for statistics, scoped to the organization,
-     * date range, and the user's call-record scope (Supervisor / PBX User).
+     * date range, the user's call-record scope (Supervisor / PBX User) and the Extension / Destination filters.
      */
-    private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate): Builder
+    private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate, Request $request): Builder
     {
         $query = $this->getModelClass()::forOrganization($user->organization_id)
             ->whereDate('session_timestamp', '>=', $fromDate)
             ->whereDate('session_timestamp', '<=', $toDate);
 
         $this->applyCallRecordScope($query, $user);
+        $this->applyExtensionDestinationFilter($query, $request);
 
         return $query;
     }

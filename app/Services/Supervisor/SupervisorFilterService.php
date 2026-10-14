@@ -87,8 +87,9 @@ final class SupervisorFilterService
 
     /**
      * Call-record (CDR) scope of a user by role: a Supervisor sees their assigned users/groups and their own
-     * extension, a PBX User only calls from or to their own extension(s); every other role (and API keys) is
+     * extension, a PBX User only calls of or to their own extension(s); every other role (and API keys) is
      * unrestricted (null). Live Calls deliberately use scopeFor(), which leaves PBX Users unrestricted.
+     * callRecordScopeColumns() names the CDR columns these identifiers are matched against.
      *
      * @return array<int, string>|null
      */
@@ -108,6 +109,18 @@ final class SupervisorFilterService
         }
 
         return $this->scopeFor($user);
+    }
+
+    /**
+     * CDR columns matched against callRecordScopeFor(): a PBX User's calls are those of their extension
+     * (extension_number) or to it; the Caller ID (`from`) does not count, since an outbound call may present a
+     * DID or another number. A Supervisor additionally keeps the `from` match they had before extension_number.
+     *
+     * @return list<string>
+     */
+    public function callRecordScopeColumns(User|ApiKey $user): array
+    {
+        return $user->isPBXUser() ? ['extension_number', 'to'] : ['extension_number', 'from', 'to'];
     }
 
     /**
