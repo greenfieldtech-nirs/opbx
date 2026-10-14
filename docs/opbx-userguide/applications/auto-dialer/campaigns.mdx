@@ -181,7 +181,7 @@ Who can do this: Owner and PBX Admin.
 
 Result: from the row, the toast "Campaign status updated" appears and the badge reads **Running**; from the detail page, the toast reads "Campaign started successfully" and the badge reads **Active**. Without a usable list the toast shows "Cannot start campaign without a destination list" and the campaign stays Draft.
 
-{/* SCREENSHOT: auto-dialer-campaign-start-dialog — campaign detail page of a Draft campaign in Acme Corp (Demo) with the Start Campaign confirmation dialog open */}
+![Detail page of the Draft campaign Spring Renewal Reminders with the Start Campaign confirmation dialog open](../../img/screens/auto-dialer-campaign-start-dialog.jpg)
 
 ### Pause a campaign
 
@@ -225,7 +225,7 @@ Result: the toast "Campaign archived successfully" appears. From the detail page
 
 Archiving an Active campaign pauses it first. Archived campaigns cannot be restored from the app.
 
-{/* SCREENSHOT: auto-dialer-campaign-archive-dialog — Campaign Manager in Acme Corp (Demo) with the Archive Campaign confirmation dialog open for a Completed campaign */}
+![Archive Campaign confirmation dialog on a campaign detail page, asking Are you sure you want to archive this campaign? with Cancel and Confirm](../../img/screens/auto-dialer-campaign-archive-dialog.jpg)
 
 ## Delete a campaign
 
@@ -236,7 +236,7 @@ Who can do this: the Owner only, and only for **Draft** campaigns. Other roles d
 
 Result: the toast "Campaign deleted successfully" appears and the row disappears. Use **Archive** for campaigns that have dialed.
 
-{/* SCREENSHOT: auto-dialer-campaign-delete-dialog — Delete Campaign confirmation dialog for a Draft campaign */}
+![Delete Campaign confirmation dialog for the Draft campaign Spring Renewal Reminders](../../img/screens/auto-dialer-campaign-delete-dialog.jpg)
 
 ## The campaign detail page
 
@@ -255,7 +255,7 @@ Below the cards: the full configuration (routing, caller ID strategy and pool, d
 
 For an Owner or PBX Admin each assigned list has **Unassign**, which takes the list back from the campaign (the list and its numbers are kept and it returns to **Ready**). While the campaign is **Active** every list shows **Locked** (pause the campaign to unassign one), and once the campaign has started processing a list's entries, that list shows **Locked** for good; the hover text gives the reason. See [Take a list back from a campaign](/opbx/applications/auto-dialer/distribution-lists#take-a-list-back-from-a-campaign).
 
-![Detail page of Fall Webinar Follow-up: Paused badge, Resume button, the list Fall Webinar Leads with 20 records, routing AI Assistant and the Monday to Friday America/New_York schedule](../../img/screens/auto-dialer-campaign-detail.jpg)
+![Detail page of Fall Webinar Follow-up: Paused badge, Resume button, the list Fall Webinar Leads with 20 records, the Unassign link, routing AI Assistant and the America/New_York schedule](../../img/screens/auto-dialer-campaign-detail.jpg)
 
 ## Permissions
 
