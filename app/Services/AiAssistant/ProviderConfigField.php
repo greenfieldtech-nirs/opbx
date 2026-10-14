@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\AiAssistant;
 
+use Illuminate\Support\Facades\Validator;
+
 /**
  * Represents a configuration field for an AI Assistant provider.
  */
@@ -20,6 +22,22 @@ class ProviderConfigField
         public readonly bool $readOnly = false,
         public readonly ?string $defaultValue = null,
     ) {}
+
+    /**
+     * Messages for a value that breaks this field's configured validation_rules (e.g. max:255), labelled with the field label.
+     *
+     * @return list<string>
+     */
+    public function ruleErrors(mixed $value): array
+    {
+        if ($this->validationRules === []) {
+            return [];
+        }
+
+        return Validator::make(['value' => $value], ['value' => $this->validationRules], [], ['value' => $this->label])
+            ->errors()
+            ->get('value');
+    }
 
     /**
      * Convert to array representation.

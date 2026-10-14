@@ -53,12 +53,14 @@ WebSocket providers:
 | Provider | Fields |
 |----------|--------|
 | DeepDub | **Bot ID** (up to 255 characters) and **Authentication Token** (up to 512 characters) |
-| Dograh Cloud | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
-| AssemblyAI | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
-| Cloudonix | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** |
-| Dograh OSS | **WebSocket Endpoint** (your own server, a URL) and **Agent UUID** |
+| Dograh Cloud | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** (up to 255 characters) |
+| AssemblyAI | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** (up to 255 characters) |
+| Cloudonix | **WebSocket Endpoint** (fixed, read-only) and **Agent UUID** (up to 255 characters) |
+| Dograh OSS | **WebSocket Endpoint** (your own server, a URL) and **Agent UUID** (up to 255 characters) |
 
 For the endpoint-and-UUID providers the stream URL is `{endpoint}/{agent UUID}`.
+
+The limits come from each field's `validation_rules` in `config/ai-providers.php`. The server enforces them on create and update (a longer value is refused with a 422), and the dialog stops typing at the limit.
 
 **Dummy Test** connects to nothing. The caller hears a short spoken (text-to-speech) message saying the routing works, and the call ends. Use it to test a routing path before the real agent is ready.
 
@@ -204,11 +206,11 @@ Change or remove those references, then delete again. Call history (call logs an
 |-------|----------|--------|---------|
 | Name | Yes | Up to 255 characters; unique within the organization | Shown in lists and destination pickers |
 | AI Service Provider | Yes | One of the providers above | Decides the protocol and the configuration fields |
-| Configuration fields | Per provider | See [Providers](#providers) | How OPBX reaches the agent |
+| Configuration fields | Per provider | See [Providers](#providers). DeepDub: Bot ID up to 255 characters, Authentication Token up to 512 | How OPBX reaches the agent |
 | Status | No | Active or Inactive. Default: Active | Inactive assistants are not used for calls |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
-The phone number of a SIP provider must be E.164. A value such as `2025550170` without the plus sign is accepted by the server, but use the full `+12025550170` form.
+The phone number of a SIP provider must be E.164 with the plus sign, for example `+12025550170`. A value without the plus sign, such as `2025550170`, is refused.
 
 ## Common errors
 
@@ -220,6 +222,8 @@ The phone number of a SIP provider must be E.164. A value such as `2025550170` w
 | *Field* is required | A required configuration field is empty | Fill it in |
 | Phone Number must be a valid phone number (E.164 format) | The SIP number is not a valid number | Enter it as `+` and country code, for example `+12025550170` |
 | *Field* must be a valid URL | The Dograh OSS endpoint is not a URL | Enter the full `wss://…` address |
+| The *Field* field must not be greater than *N* characters. | A configuration value is longer than the provider allows, for example a DeepDub Bot ID over 255 or Authentication Token over 512 characters | Shorten it to the limit |
+| The Phone Number field format is invalid. | The SIP number has no leading `+` | Enter it as `+` and country code |
 | Cannot delete: still in use | Routing configuration points at the assistant | Change the listed references, then delete |
 
 ## Key data fields

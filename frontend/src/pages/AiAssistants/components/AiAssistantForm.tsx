@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Wifi, Phone, Bot } from 'lucide-react';
 import { useEffect } from 'react';
-import type { ProviderDefinition } from '@/types/aiAssistant';
+import type { ProviderConfigField, ProviderDefinition } from '@/types/aiAssistant';
 
 interface FormData {
   name: string;
@@ -184,6 +184,7 @@ export function AiAssistantForm({
                 onChange={(e) => handleConfigChange(field.name, e.target.value)}
                 placeholder={field.placeholder || ''}
                 disabled={disabled || field.read_only}
+                maxLength={maxLengthOf(field)}
               />
               {field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>
@@ -194,6 +195,12 @@ export function AiAssistantForm({
       )}
     </div>
   );
+}
+
+/** The provider field's `max:N` validation rule (enforced by the API) as an input maxLength. */
+function maxLengthOf(field: ProviderConfigField): number | undefined {
+  const rule = field.validation_rules?.find((r) => /^max:\d+$/.test(r));
+  return rule ? Number(rule.slice(4)) : undefined;
 }
 
 export default AiAssistantForm;

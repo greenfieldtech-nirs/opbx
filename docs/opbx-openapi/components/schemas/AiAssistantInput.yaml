@@ -26,5 +26,8 @@ properties:
     type: object
     description: |
       Provider-specific configuration, keyed by the provider's `config_fields` names. Must be
-      present on create (may be `{}` for providers without required fields).
+      present on create (may be `{}` for providers without required fields). Each field's
+      `validation_rules` (from `GET /v1/ai-assistant/providers`) are enforced and a breach is a 422
+      on `configuration.<field>`: for example DeepDub `bot_id` up to 255 and `auth_token` up to
+      512 characters, `agent_uuid` up to 255, and a SIP `phone_number` must match `^\+[1-9]\d{1,14}$`.
     additionalProperties: true

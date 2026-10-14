@@ -143,6 +143,13 @@ class StoreAiAssistantRequest extends FormRequest
 
                 // Type-specific validation
                 $this->validateFieldType($validator, $field, $value);
+
+                // The field's configured validation_rules (e.g. max length), unless the type check already failed.
+                if (! $validator->errors()->has("configuration.{$field->name}")) {
+                    foreach ($field->ruleErrors($value) as $message) {
+                        $validator->errors()->add("configuration.{$field->name}", $message);
+                    }
+                }
             }
         });
     }
