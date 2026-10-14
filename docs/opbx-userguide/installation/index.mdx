@@ -95,13 +95,13 @@ The `app` container checks the values again on every start and exits when one fa
 
 | Check | Fails when |
 |-------|-----------|
-| Weak passwords | `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MINIO_ACCESS_KEY` or `MINIO_SECRET_KEY` is exactly `secret`, `password`, `rootsecret`, `minioadmin`, `admin` or `123456` |
+| Weak passwords | `DB_PASSWORD`, `MINIO_ACCESS_KEY` or `MINIO_SECRET_KEY` is exactly `secret`, `password`, `rootsecret`, `minioadmin`, `admin` or `123456` |
 | Required secrets | `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET`, `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` or `ACD_WORKER_API_TOKEN` is empty, is `admin`, or **contains** a placeholder word: `CHANGE_ME`, `GENERATE_32_CHAR`, `64_CHAR_SECRET`, `default123`, `password`, `secret`, `change-in-production` or `pbxappsecret` |
 | Grafana | Same rule for `GRAFANA_ADMIN_PASSWORD`, only when the log stack is enabled (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`) |
 | Password length | `DB_PASSWORD` is shorter than 8 characters |
 | Production | `APP_ENV=production` with `APP_DEBUG=true`, or with `REDIS_EXPOSE_PORT` set |
 
-Because the check looks for the words inside the value, a generated secret must not contain `password` or `secret`. Values from `openssl rand` never do.
+`DB_ROOT_PASSWORD` is not checked (MySQL falls back to `rootsecret` when it is unset), so make sure you set it. Because the check looks for the words inside the value, a generated secret must not contain `password` or `secret`. Values from `openssl rand` never do.
 
 Optional but commonly configured variables:
 
