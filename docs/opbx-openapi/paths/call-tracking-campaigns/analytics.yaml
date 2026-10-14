@@ -5,9 +5,11 @@ paths:
       - Call Tracking Analytics
       summary: Get analytics
       description: |
-        Get aggregated call tracking analytics for a date range. Supports
-        filtering by campaign, source, medium and grouping by day, week or
-        month.
+        Get aggregated call tracking analytics for a date range (whole days,
+        by call start time). Supports filtering by campaign, source, medium and
+        grouping by day, week or month (default `day`). Each `campaign_ids`
+        value must be a campaign of the caller's organization (else 422). The
+        response is not wrapped in `data`. Available to every role.
       operationId: getCallTrackingAnalytics
       security:
       - bearerAuth: []
@@ -64,6 +66,7 @@ paths:
           - day
           - week
           - month
+          default: day
         description: Time grouping for the time series
         example: day
       responses:
@@ -72,10 +75,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  data:
-                    $ref: ../../components/schemas/CallTrackingAnalytics.yaml
+                $ref: ../../components/schemas/CallTrackingAnalytics.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -88,8 +88,12 @@ paths:
       - Call Tracking Analytics
       summary: Export analytics
       description: |
-        Export call tracking analytics as a downloadable file. Accepts the same
-        filters as the analytics endpoint.
+        Export call tracking analytics as a CSV file. Accepts the same filters
+        as the analytics endpoint. One row per period, campaign name, source and
+        medium, with the columns `date`, `campaign_name`, `source`, `medium`,
+        `calls`, `answered`, `missed`, `conversions`, `avg_duration` (seconds).
+        `date` uses the `group_by` format (`YYYY-MM-DD`, ISO `YYYY-WW`, or
+        `YYYY-MM`). Available to every role.
       operationId: exportCallTrackingAnalytics
       security:
       - bearerAuth: []
@@ -146,6 +150,7 @@ paths:
           - day
           - week
           - month
+          default: day
         description: Time grouping for the export
         example: day
       responses:
@@ -160,7 +165,7 @@ paths:
               schema:
                 type: string
               description: Attachment filename for the exported file
-              example: attachment; filename="call-tracking-analytics.csv"
+              example: attachment; filename="call-tracking-analytics-2024-01-31-142530.csv"
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
