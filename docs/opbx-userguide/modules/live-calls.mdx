@@ -32,7 +32,7 @@ For finished calls, use [Call Logs](/opbx/modules/call-logs).
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | See Live Calls in the sidebar | Yes | Yes | No | Yes | Yes |
-| See the calls | All in the organization | All in the organization | Not in the sidebar (see the caution below) | All, read-only | Only calls to or from their assigned users and ring groups |
+| See the calls | All in the organization | All in the organization | All, read-only, by opening the page's address (see below) | All, read-only | Only calls to or from their assigned users and ring groups |
 | Spy, Whisper, Barge | Yes | No | No | No | Yes, calls in their scope |
 | Disconnect one call | Yes | No (the button is hidden) | No | No | No (the button is hidden) |
 | Disconnect All Calls | Yes | No (the button is hidden) | No | No | No |
@@ -40,8 +40,8 @@ For finished calls, use [Call Logs](/opbx/modules/call-logs).
 
 The server allows only the **Owner** to disconnect a call. The **Disconnect** icon and **Disconnect All Calls** are shown to the Owner only; any other role that calls the API directly is refused with "This action is unauthorized." The **Actions** column (Spy, Whisper, Barge) is shown to Owners and Supervisors only, so PBX Admins and Reporters see no actions on the rows. Reporters, PBX Users and Supervisors see a **Read-Only** badge next to the page title.
 
-:::caution PBX Users
-Live Calls is not in a PBX User's sidebar, but the page (`/ui/live-calls`) and the API are not blocked for that role. A PBX User who opens the page directly sees every active call of the organization, read-only.
+:::note Wall display for PBX Users
+Live Calls is not in a PBX User's sidebar, but the page (`/ui/live-calls`) and its API are open to that role on purpose, so a PBX User account can drive a wall-mounted dashboard. A PBX User who opens the page sees every active call of the organization, read-only, with no actions.
 :::
 
 The Supervisor scope is applied by the server on role alone: a Supervisor always gets only the calls of their assigned users and ring groups plus their own, whether or not the request carries `supervisor=true` (still accepted, no longer needed). The same holds for the active-call statistics and the call detail view. Owners, PBX Admins and Reporters see all of the organization's calls.
