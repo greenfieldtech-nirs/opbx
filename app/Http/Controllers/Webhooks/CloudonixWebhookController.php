@@ -1035,10 +1035,8 @@ class CloudonixWebhookController extends Controller
 
                 if ($shouldRetryVoicemail) {
                     // Schedule retry for voicemail
-                    $nextRetry = now()->addMinutes(5 * (2 ** ($destination->dial_attempts - 1)));
-                    if ($nextRetry->diffInMinutes(now()) > 60) {
-                        $nextRetry = now()->addMinutes(60);
-                    }
+                    // 5 min x 2^(attempts-1), capped at 60 minutes.
+                    $nextRetry = now()->addMinutes(min(60, 5 * (2 ** max(0, $destination->dial_attempts - 1))));
 
                     $destination->update([
                         'status' => DestinationStatus::PENDING,

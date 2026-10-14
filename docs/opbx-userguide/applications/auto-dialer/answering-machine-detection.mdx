@@ -67,7 +67,7 @@ The current detector only listens for a beep. It never reports **Human**, so **I
 
 ## Retry on Voicemail
 
-When a beep is heard, **Retry on Voicemail** is on and the number still has attempts left (see Max Dial Attempts on the Advanced tab), the number goes back to **pending** and is retried after 5 minutes, then 10, 20 and 40 minutes (the wait doubles with each attempt). The attempt still counts. When the attempts are used up, the number is closed according to the call's outcome, normally **Completed** because the voicemail box answered.
+When a beep is heard, **Retry on Voicemail** is on and the number still has attempts left (see Max Dial Attempts on the Advanced tab), the number goes back to **pending** and is retried after 5 minutes, then 10, 20 and 40 minutes (the wait doubles with each attempt), and never waits more than **60 minutes**: from the fifth attempt on, every retry is 60 minutes apart. The attempt still counts. When the attempts are used up, the number is closed according to the call's outcome, normally **Completed** because the voicemail box answered.
 
 ## Where the result appears
 
