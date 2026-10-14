@@ -90,6 +90,10 @@ Round Robin and Random take each number's **weight** into account: a number with
 
 When a number is **retried**, the dialer prefers a caller ID that has not yet been tried for that number in the last hour.
 
+### Caller ID stats
+
+Each number in the pool keeps a count of the calls placed from it: total calls, completed calls, failed calls, a success rate (completed / total) and when it was last used. A call is counted once, when it ends: as completed if it was connected and ended normally, as failed otherwise (busy, no answer, failed, or a call attempt that will be retried). Calls that are still ringing or connected are not counted yet. Calls cut off in bulk because the campaign was paused or stopped are not counted. Removing a number from the pool deletes its counts. The stats are read through the API only: `GET /v1/auto-dialer-campaigns/{campaign}/caller-id-stats` (Owner, PBX Admin and Reporter).
+
 :::note Caller-ID numbers are protected
 A phone number in a campaign's caller-ID pool cannot be deleted. The delete is refused and the dialog lists the campaign as a "caller ID pool" use. Remove the number from the pool first. See [Phone Numbers](/opbx/modules/phone-numbers#delete).
 :::

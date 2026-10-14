@@ -18,6 +18,13 @@ paths:
         Get per-Caller-ID usage statistics for a campaign's Caller ID pool (one row per DID
         in the pool; removing a DID from the pool deletes its row). Owner, PBX Admin and
         Reporter only. The response is not wrapped in `data`.
+
+        A call is counted once, when its session first reaches a final status, against the pool
+        DID it was placed from: `completed` adds to `completed_calls`, `failed` (busy, no answer,
+        failed, or an attempt that will be retried) adds to `failed_calls`, and both add to
+        `total_calls` and set `last_used_at`. Retried webhooks do not count a call twice. Calls
+        still in progress, and sessions failed in bulk when the campaign is paused or stopped,
+        are not counted.
       operationId: getCampaignCallerIdStats
       security:
         - bearerAuth: []

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerCallSession extends Model
@@ -29,6 +30,8 @@ class AutoDialerCallSession extends Model
         'organization_id',
         'campaign_id',
         'destination_id',
+        'caller_id',
+        'caller_did_id',
         'phone_number',
         'worker_id',
         'session_token',
@@ -56,6 +59,33 @@ class AutoDialerCallSession extends Model
         'completed_at' => 'datetime',
         'amd_confidence' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::updated(fn (self $session) => $session->recordCallerIdOutcome());
+    }
+
+    /**
+     * Count this call once in its pool caller ID's stats, on its first move to a final
+     * status. Every path that finalises a session (webhooks, worker, AMD) passes here, and
+     * a retried webhook or a later status change does not count it again.
+     */
+    private function recordCallerIdOutcome(): void
+    {
+        if (! $this->wasChanged('status') || ! $this->caller_did_id || ! in_array($this->status, ['completed', 'failed'], true)) {
+            return;
+        }
+
+        if (! Cache::add("autodialer:session:{$this->id}:caller-id-stat", true, now()->addDays(7))) {
+            return;
+        }
+
+        $stat = AutoDialerCallerIdStat::where('campaign_id', $this->campaign_id)
+            ->where('did_number_id', $this->caller_did_id)
+            ->first();
+
+        $this->status === 'completed' ? $stat?->recordCompleted() : $stat?->recordFailed();
+    }
 
     /**
      * Get the campaign that owns the session.

@@ -21,7 +21,7 @@ Tracks usage statistics for each Caller ID (DID) within a campaign's pool. Provi
 | `id` | bigint unsigned | No | auto | Primary key |
 | `campaign_id` | bigint unsigned | No | - | FK to auto_dialer_campaigns |
 | `did_number_id` | bigint unsigned | No | - | FK to did_numbers |
-| `total_calls` | int unsigned | No | 0 | Total calls attempted |
+| `total_calls` | int unsigned | No | 0 | Calls placed from this DID that have ended (completed + failed) |
 | `completed_calls` | int unsigned | No | 0 | Successfully completed calls |
 | `failed_calls` | int unsigned | No | 0 | Failed calls |
 | `last_used_at` | timestamp | Yes | null | When this DID was last used |
@@ -121,7 +121,9 @@ $mostUsed = $campaign->callerIdStats->sortByDesc('total_calls')->first();
 
 `CallerIdPoolService` creates one row per pool DID, with all counters at 0, when a campaign's Caller ID pool is created or synced, and deletes the rows of DIDs removed from the pool. The service's `getCallerIdStats()` builds the API response shown above.
 
-`recordCompleted()` and `recordFailed()` are defined on the model, but no webhook handler, job or the dialer worker calls them in the current code, so `total_calls`, `completed_calls`, `failed_calls` and `last_used_at` are not updated after the rows are created.
+`AutoDialerCallSession` keeps the caller ID each call was placed from (`caller_id`, `caller_did_id`, set from the dialer worker's initiate-call request). When a session's `status` first changes to `completed` or `failed`, an `updated` model hook on `AutoDialerCallSession` calls `recordCompleted()` or `recordFailed()` on the stats row of that campaign and `caller_did_id`. Every path that finalises a session (Cloudonix call-status webhooks, the dialer-worker status and disposition endpoints, AMD actions) goes through that hook, and a cache key per session (kept 7 days) makes sure a call is counted only once, even when a webhook is retried or a later update changes the status again. Each call attempt is its own session, so a busy or no-answer attempt that is retried counts as one failed call, and the retry is counted separately.
+
+Not counted: sessions with no `caller_did_id` (no pool number), sessions whose DID has no stats row (removed from the pool), and sessions marked failed in bulk when a campaign is paused or stopped (a query update that does not fire model hooks).
 
 ## Analytics Queries
 
