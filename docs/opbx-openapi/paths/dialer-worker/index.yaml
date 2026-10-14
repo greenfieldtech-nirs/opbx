@@ -516,9 +516,13 @@ paths:
 
         pending with a retry time when the campaign retries on busy / no-answer and the
 
-        destination has attempts left; anything else -> failed. Not called by the current
+        destination has attempts left; anything else -> failed. `disposition` is optional:
 
-        Go worker.
+        when it is omitted or null the stored session disposition is left unchanged, the
+
+        destination is not touched and `destination_status` is `pending`. Not called by the
+
+        current Go worker.
 
         '
       operationId: updateCallStatus
@@ -537,6 +541,7 @@ paths:
                   type:
                   - string
                   - 'null'
+                  description: Optional. Omit (or send null) on updates that carry no disposition
                 duration:
                   type:
                   - integer

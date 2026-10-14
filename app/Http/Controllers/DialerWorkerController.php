@@ -284,15 +284,18 @@ class DialerWorkerController extends Controller
         $campaign = $sessionModel->campaign;
         $destination = $sessionModel->destination;
 
-        // Update session
-        $this->callSessionService->updateSession($sessionModel, [
+        // Update session. Not every status update carries a disposition: only set it when sent.
+        $sessionUpdate = [
             'status' => $validated['status'],
-            'disposition' => $validated['disposition'],
             'duration' => $validated['duration'] ?? 0,
             'billsec' => $validated['billsec'] ?? 0,
             'recording_url' => $validated['recording_url'] ?? null,
             'completed_at' => $validated['completed_at'] ?? null,
-        ]);
+        ];
+        if (isset($validated['disposition'])) {
+            $sessionUpdate['disposition'] = $validated['disposition'];
+        }
+        $this->callSessionService->updateSession($sessionModel, $sessionUpdate);
 
         // Handle destination status based on disposition
         $this->handleDispositionUpdate($campaign, $destination, $validated);

@@ -804,4 +804,40 @@ class DialerWorkerApiTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_update_call_status_without_disposition(): void
+    {
+        [$campaign] = $this->createCampaignWithDestinations([
+            'status' => CampaignStatus::ACTIVE,
+        ], 1, [
+            'status' => DestinationStatus::DIALING,
+        ]);
+
+        $destinationId = OrganizationScope::bypass(
+            fn () => AutoDialerDestination::where('status', DestinationStatus::DIALING)->first()?->id
+        );
+
+        $session = AutoDialerCallSession::factory()->create([
+            'organization_id' => $this->organization->id,
+            'campaign_id' => $campaign->id,
+            'destination_id' => $destinationId,
+            'status' => 'initiated',
+            'disposition' => 'answered',
+        ]);
+
+        $this->workerRequest('PATCH', "/calls/{$session->id}/status", ['status' => 'ringing'])
+            ->assertOk()
+            ->assertJsonPath('data.destination_status', DestinationStatus::PENDING->value);
+
+        $fresh = OrganizationScope::bypass(fn () => $session->fresh());
+        $this->assertSame('ringing', $fresh->status);
+        // An update without a disposition leaves the stored one alone.
+        $this->assertSame('answered', $fresh->disposition);
+
+        // ...and does not touch the destination.
+        $this->assertEquals(
+            DestinationStatus::DIALING,
+            OrganizationScope::bypass(fn () => AutoDialerDestination::find($destinationId)?->status)
+        );
+    }
 }

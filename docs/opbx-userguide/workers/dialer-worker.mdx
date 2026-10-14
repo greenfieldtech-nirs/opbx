@@ -151,7 +151,7 @@ All calls go to `LARAVEL_API_URL` with `Authorization: Bearer <LARAVEL_API_TOKEN
 6. Laravel receives the call result from Cloudonix and owns the active-call count; it decrements the count when the call ends
 7. Retries are scheduled by Laravel from the result as well (see [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting#attempts-and-retries))
 
-The worker API also has routes the current worker does not call (`/campaigns/{id}/pause`, `/destinations/retry`, `/calls/generate-cxml`, `/calls/{session}/status`, `/calls/{session}/disposition`, `/state/persist`, `/state/{workerId}` and `/health`).
+The worker API also has routes the current worker does not call (`/campaigns/{id}/pause`, `/destinations/retry`, `/calls/generate-cxml`, `/calls/{session}/status`, `/calls/{session}/disposition`, `/state/persist`, `/state/{workerId}` and `/health`). `PATCH /calls/{session}/status` takes an optional `disposition`: an update without one only stores the session status and leaves the destination alone.
 
 ## Redis Key Patterns
 
