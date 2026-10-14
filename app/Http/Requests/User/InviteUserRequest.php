@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\User;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Form request validator for inviting a new user by email.
@@ -22,12 +23,20 @@ class InviteUserRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email', 'max:255'],
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                // Emails are globally unique. Same-organization duplicates are handled by the
+                // invitation service (a pending user is re-invited, an active one is refused).
+                Rule::unique('users', 'email')->where(fn ($query) => $query->where('organization_id', '!=', $this->user()->organization_id)),
+            ],
         ];
     }
 

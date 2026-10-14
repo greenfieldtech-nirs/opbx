@@ -31,7 +31,7 @@ class PlatformUpdateUserRequest extends FormRequest
     {
         return [
             'name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
             'password' => ['nullable', 'string', 'min:8'],
             'role' => ['nullable', 'string', Rule::in(array_map(fn ($r) => $r->value, UserRole::cases()))],
             'status' => ['nullable', 'string', Rule::in(array_map(fn ($s) => $s->value, UserStatus::cases()))],

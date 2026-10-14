@@ -59,7 +59,8 @@ paths:
         '422':
           description: >-
             Validation error, or a non-pending user with this email already exists in the
-            organization (or in another organization)
+            organization (`USER_ALREADY_EXISTS`). An email that belongs to a user of another
+            organization is a validation error on `email` ("The email has already been taken.")
           content:
             application/json:
               schema:

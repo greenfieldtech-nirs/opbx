@@ -91,7 +91,7 @@ A toast confirms "User created successfully" and the user appears in the list. W
 | Field | Required | Limit | Notes |
 |-------|----------|-------|-------|
 | Name | Yes | 2 to 255 characters | |
-| Email | Yes | Valid email, up to 255 characters, unique within the organization | Used to sign in |
+| Email | Yes | Valid email, up to 255 characters, not used by any user in any organization | Used to sign in. An email belongs to one organization only; a taken email is refused with "The email has already been taken." |
 | Password | Yes | At least 8 characters, with letters (upper and lower case) and numbers | Set by the admin when you create the account |
 | Role | Yes | PBX Admin, PBX User (default), Reporter, Supervisor | A PBX Admin who picks PBX Admin is refused with "PBX Admins can only create PBX Users or Reporters." The Owner role is not offered and the API refuses it |
 | Status | No | Active (default), Inactive or Pending | Only Active users can sign in |
@@ -114,7 +114,7 @@ Without Auth0, **Invite User** is disabled and its tooltip reads "Invitations ne
 
 A toast confirms "Invitation sent successfully." The person is added to the list as a **PBX User** with status **Pending** and a name taken from the email address. The email link is valid for 24 hours; the person becomes Active when they accept it and sign in through Auth0. Change the role afterwards if needed.
 
-Inviting the email of a user who is still Pending sends a new invitation. Inviting the email of any other existing user is refused with "A user with this email already exists in the organization." An organization can send at most 10 invitations per hour ("Invitation rate limit exceeded. Please try again later.").
+Inviting the email of a user who is still Pending sends a new invitation. Inviting the email of any other user of your organization is refused with "A user with this email already exists in the organization." An email that belongs to a user of another organization is refused with "The email has already been taken.", because an email can belong to one organization only. An organization can send at most 10 invitations per hour ("Invitation rate limit exceeded. Please try again later.").
 
 {/* SCREENSHOT: users-invite-dialog — Invite User dialog with Email colleague@example.com filled in, Send Invitation button visible */}
 

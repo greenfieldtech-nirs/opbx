@@ -44,10 +44,13 @@ export default function Auth0Onboarding() {
       toast.success('Join request submitted. Please wait for approval.');
       navigate('/ui/login');
     } catch (error: any) {
+      const emailError = error?.response?.data?.errors?.email?.[0];
       toast.error(
-        error?.response?.status === 422
-          ? 'Your sign-in session expired. Please sign in again.'
-          : 'Failed to submit join request.'
+        emailError
+          ? emailError
+          : error?.response?.status === 422
+            ? 'Your sign-in session expired. Please sign in again.'
+            : 'Failed to submit join request.'
       );
     } finally {
       setIsSubmitting(false);

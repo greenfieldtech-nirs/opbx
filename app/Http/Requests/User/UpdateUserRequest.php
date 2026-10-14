@@ -23,7 +23,6 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $currentUser = $this->user();
         $targetUser = $this->route('user');
 
         // Role changes need the owner-only gate; password changes the dedicated gate.
@@ -65,10 +64,8 @@ class UpdateUserRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
-                // Email must be unique within the organization, excluding current user
-                Rule::unique('users', 'email')->where(function ($query) use ($currentUser) {
-                    return $query->where('organization_id', $currentUser->organization_id);
-                })->ignore($targetUser->id),
+                // Email is globally unique across all organizations, excluding this user
+                Rule::unique('users', 'email')->ignore($targetUser->id),
             ],
             'password' => [
                 'nullable',

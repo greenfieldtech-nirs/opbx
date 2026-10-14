@@ -69,7 +69,7 @@ The **Complete your account** page opens by itself and offers two choices:
 - **Create a new organization**: click it to sign in at the provider again; OPBX then creates the organization with you as Owner (as in [Sign up](#sign-up-create-a-new-organization)).
 - **Request to join organization**: enter the **Organization slug** (for example `acme-corp`; ask an Owner of that organization for it) and click **Request to join organization**. The toast says "Join request submitted. Please wait for approval." and the sign-in page opens.
 
-The onboarding session is valid for 60 minutes and can be used for one request. When it has expired the toast says "Your sign-in session expired. Please sign in again." The slug must belong to an existing, active organization; otherwise the toast says "Failed to submit join request."
+The onboarding session is valid for 60 minutes and can be used for one request. When it has expired the toast says "Your sign-in session expired. Please sign in again." The slug must belong to an existing, active organization; otherwise the toast says "Failed to submit join request." If the email of the social account already belongs to an OPBX user, the toast says "The email has already been taken."
 
 {/* SCREENSHOT: auth0-onboarding — Complete your account page with the Create a new organization button and the Organization slug field with Request to join organization */}
 
@@ -85,7 +85,7 @@ A join request records the target organization, the person's email and name, and
 | Approve | `POST /v1/organizations/join-requests/{id}/approve` | Creates an **active PBX User** with a random password and links the social account. The person can then sign in with that provider |
 | Reject | `POST /v1/organizations/join-requests/{id}/reject` | Marks the request rejected |
 
-A request that is no longer pending cannot be approved again (`JOIN_REQUEST_NOT_PENDING`). OPBX does not email the requester about the decision.
+A request that is no longer pending cannot be approved again (`JOIN_REQUEST_NOT_PENDING`). Approving a request whose email meanwhile belongs to a user (of any organization) is refused with a 422 on `email`, "The email has already been taken.", and the request stays pending. OPBX does not email the requester about the decision.
 
 ### Link a social account to your profile
 
@@ -126,7 +126,7 @@ Rules:
 - When Auth0 is not configured, the **Invite User** button is disabled.
 - The link is valid for 24 hours (`OPBX_INVITE_TOKEN_TTL_HOURS`) and can be used once.
 - Inviting an email that is still pending sends a new link; the old one stops working.
-- Inviting an email that already belongs to a user is refused: "A user with this email already exists in the organization."
+- Inviting an email that already belongs to a user of your organization is refused: "A user with this email already exists in the organization." An email that belongs to a user of another organization is refused with "The email has already been taken." (an email can belong to one organization only).
 - Each organization can send at most 10 invitations per hour (`OPBX_INVITE_RATE_LIMIT_PER_HOUR`): "Invitation rate limit exceeded. Please try again later."
 - Change the invited user's role afterwards on the Users page if PBX User is not right.
 

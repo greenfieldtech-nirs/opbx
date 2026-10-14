@@ -12,6 +12,7 @@ use App\Http\Requests\OrganizationJoinRequest\StoreRequest;
 use App\Models\OrganizationJoinRequest;
 use App\Models\User;
 use App\Models\UserSocialIdentity;
+use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0AccountResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class OrganizationJoinRequestController extends Controller
 {
@@ -47,6 +49,8 @@ class OrganizationJoinRequestController extends Controller
             ], 422);
         }
 
+        $this->ensureEmailIsFree((string) ($profile['email'] ?? ''));
+
         $joinRequest = app(Auth0AccountResolver::class)->createJoinRequest($validated['organization_slug'], $profile);
         Cache::forget($key); // single use
 
@@ -62,6 +66,8 @@ class OrganizationJoinRequestController extends Controller
                 'error' => ['code' => 'JOIN_REQUEST_NOT_PENDING', 'message' => 'Request is not pending.'],
             ], 422);
         }
+
+        $this->ensureEmailIsFree($joinRequest->email);
 
         $user = User::create([
             'organization_id' => $joinRequest->organization_id,
@@ -95,5 +101,15 @@ class OrganizationJoinRequestController extends Controller
         $joinRequest->update(['status' => OrganizationJoinRequestStatus::REJECTED]);
 
         return response()->json(['message' => 'Join request rejected.']);
+    }
+
+    /**
+     * Emails are globally unique: a user belongs to exactly one organization.
+     */
+    private function ensureEmailIsFree(string $email): void
+    {
+        if (User::withoutGlobalScope(OrganizationScope::class)->where('email', $email)->exists()) {
+            throw ValidationException::withMessages(['email' => 'The email has already been taken.']);
+        }
     }
 }

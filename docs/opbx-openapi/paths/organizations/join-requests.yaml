@@ -35,7 +35,8 @@ paths:
         The request must be approved by an Owner or PBX Admin of the organization before
         the user is created. Public; rate limited to 5 requests per minute per IP. An
         unknown `organization_slug` fails validation (422); an organization that exists but
-        is not active returns 404.
+        is not active returns 404. When the onboarding email already belongs to a user of any
+        organization, the request is refused with 422 on `email` ("The email has already been taken.").
       operationId: createOrganizationJoinRequest
       security: []
       requestBody:
@@ -160,11 +161,16 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
-          description: Request is not pending
+          description: >-
+            Request is not pending (`JOIN_REQUEST_NOT_PENDING`), or its email meanwhile belongs to a
+            user of any organization (validation error on `email`, "The email has already been taken.";
+            the request stays pending)
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                anyOf:
+                  - $ref: '../../components/schemas/Error.yaml'
+                  - $ref: '../../components/schemas/ValidationError.yaml'
               example:
                 error:
                   code: JOIN_REQUEST_NOT_PENDING

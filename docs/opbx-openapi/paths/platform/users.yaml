@@ -187,6 +187,7 @@ paths:
                   type: string
                   format: email
                   maxLength: 255
+                  description: 'Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."'
                 password:
                   type: string
                   format: password
