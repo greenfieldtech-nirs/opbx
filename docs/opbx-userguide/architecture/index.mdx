@@ -105,8 +105,9 @@ Redis supports fast, transient state. It is configured with AOF persistence in t
 - Application cache (`CACHE_STORE=redis`)
 - Rate-limit counters (`rate_limit:org:{id}:{type}`)
 - Webhook idempotency keys (`idem:webhook:{key}`)
-- Distributed locks (for example `cdr:create:{org}:{call_id}` and `lock:ring_group:{id}`)
-- IVR call state and dialer CAC counters (`dialer:cac:{campaign_id}:active`)
+- Distributed locks (for example `cdr:create:{org}:{call_id}`, `lock:ring_group:{id}` and `lock:call_queue:{id}`)
+- IVR call state (`ivr:call:*`) and dialer CAC counters (`dialer:cac:{campaign_id}:active`)
+- Voice routing cache (`routing:extension:*`, `routing:business_hours:*`)
 - Call queue state owned by the ACD worker (`acd:*` keys) and extension presence (`acd:presence:{org}:{extension}`)
 
 Redis data is preserved in host bind mounts (`./volumes/redis`).
@@ -132,10 +133,12 @@ Data is stored in host bind mounts (`./volumes/seaweedfs`). External access to r
 | REST API | Nginx :80 `/api/*` | Laravel controllers | JSON |
 | Voice routing | Nginx :80 `/api/voice/*`, `/api/callbacks/voice/*` | `VoiceRoutingController` and the queue/ALB callback controllers | CXML |
 | Status/CDR webhooks | Nginx :80 `/api/webhooks/cloudonix/*` | `CloudonixWebhookController` | JSON |
-| Auto-dialer webhooks | Nginx :80 `/api/webhooks/auto-dialer/*` | `AutoDialerWebhookController` | JSON |
+| Auto-dialer webhooks | Nginx :80 `/api/webhooks/auto-dialer/*`, `/api/webhooks/cloudonix/dialer` | `AutoDialerWebhookController`, `DialerWebhookProxyController` | JSON |
+| Audio for Cloudonix | Nginx :80 `/api/storage/recordings/{path}` | `RecordingsController` (HMAC-signed, expiring URL) | Audio |
 | Real-time | Nginx :80 `/app/` | Soketi | WebSocket |
 | AMD audio stream | Nginx :80 `/ws/amd/` | AMD Worker | WebSocket |
 | MCP clients | Nginx :80 `/mcp` | MCP Server | MCP (Streamable HTTP) |
+| Embeddable dialer | Nginx :80 `/embed/loader.js`, `/embed/dialer` | Laravel (own framing and permissions headers) | JS / HTML |
 | Log viewer (profile `logs`) | Nginx :80 `/logs/` | Grafana | HTML |
 
 ---
