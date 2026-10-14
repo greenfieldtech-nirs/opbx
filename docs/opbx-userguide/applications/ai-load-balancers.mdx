@@ -46,7 +46,7 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 - Strategy **Priority Based**, with the primary assistant at the top of the list.
 - **Follow Through** on, so a busy or failed primary moves the call to the next member.
 - Members from different providers, so one provider's outage does not stop every member.
-- A **Ring Group**, **Call Queue** or **Extension** fallback, so the last resort is a person.
+- A **Ring Group**, **Call Queue** or **PBX User Extension** fallback, so the last resort is a person.
 
 ### Gradual roll-out of a new assistant
 
@@ -63,7 +63,7 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 
 | Fallback | Result |
 |----------|--------|
-| Extension | Rings an extension |
+| PBX User Extension | Rings an extension |
 | Ring Group | Sends the call to a ring group |
 | IVR Menu | Plays a menu |
 | AI Assistant | One more assistant, tried without Follow Through. It must not be a member of the same load balancer |
