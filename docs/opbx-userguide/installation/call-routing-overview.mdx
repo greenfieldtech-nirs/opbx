@@ -56,8 +56,8 @@ OPBX can route calls to these destination types:
 | AI Assistant | AI assistant from a supported provider |
 | AI Load Balancer | Distributed AI agent routing |
 | Call Queue | Callers wait on hold until an agent is free |
-| Call Tracking | A tracking campaign that records the source, then routes the call |
-| Unavailable | Plays a "destination unavailable" message and hangs up |
+| Call Tracking | A tracking campaign that records the source, then routes the call. The number is attached from the campaign, not from the Phone Numbers page |
+| Unavailable | Says "Destination doesn't exist" and hangs up. Set only when you edit a route (**Disconnect**) |
 
 ## Routing Chains
 
@@ -94,13 +94,15 @@ graph LR
 
 ## Inbound Blacklist
 
-Before routing, OPBX checks if the caller is on the inbound blacklist:
+Before routing a call from an external number, OPBX checks if the caller is on an active inbound blacklist entry. Each entry has a rejection strategy:
 
-| Action | Behavior |
-|--------|----------|
-| Drop | Call ends without notification |
-| Reject | Caller hears a busy or error message |
-| Torment | Call connects to a "torment" conference (hold music loop) |
+| Strategy | Behavior |
+|----------|----------|
+| Drop | The call is hung up silently |
+| Reject | The caller hears "Your call has been rejected" and the call ends |
+| Torment | The caller is put in a "torment" conference with hold music until the entry's timeout |
+
+See [Inbound Blacklist](/opbx/modules/inbound-blacklist).
 
 :::tip
 Use the blacklist to block spam callers, competitors, or harassing callers.

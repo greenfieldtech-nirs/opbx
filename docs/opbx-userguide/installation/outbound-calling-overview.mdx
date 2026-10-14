@@ -108,13 +108,13 @@ A DID must be **active and owned by your organization** to be used as a caller I
 
 ## Outbound Whitelist Matching
 
-The destination must match an Outbound Whitelist rule for the call to proceed. OPBX scores candidate rules and selects the best match:
+The destination must match an **active** Outbound Whitelist rule for the call to proceed. A rule must match the destination's country (ISO code or calling code); when the rule also has a prefix, the number must start with it. OPBX scores the candidate rules and selects the best match:
 
 - Country match: `+10`
 - International prefix match: `+length of the prefix`
 - Local prefix match: `+length of the prefix`
 
-The highest-scoring rule wins, and its outbound trunk carries the call. If no rule matches, the call is rejected.
+The highest-scoring rule wins, and its outbound trunk carries the call. If no rule matches, the call is rejected. A matched rule with no trunk configured also fails the call.
 
 See [Outbound Whitelist](/opbx/modules/outbound-whitelist) for rule configuration details.
 

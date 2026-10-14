@@ -28,7 +28,7 @@ If you are a service provider, create separate organizations for each of your cu
 
 ## Extensions
 
-Extensions are numbered endpoints in your phone system. They are typically 3-5 digits long and serve as internal phone numbers.
+Extensions are numbered endpoints in your phone system. Each extension number is 3 to 5 digits, unique within the organization, and serves as an internal phone number.
 
 ### Extension Types
 
@@ -62,8 +62,8 @@ Each DID has a destination that determines where incoming calls route:
 - Conference room
 - AI assistant
 - AI load balancer
-- Call tracking campaign
-- Unavailable (plays a "destination unavailable" message and hangs up)
+- Call tracking campaign (attached from the campaign, not from the Phone Numbers page)
+- Unavailable (set only when editing a number: says "Destination doesn't exist" and hangs up)
 
 :::note DID Management
 DIDs are configured in OPBX but must be purchased and assigned through your Cloudonix account or telecom provider.
@@ -190,7 +190,7 @@ The Auto Dialer manages outbound campaigns for sales, surveys, or notifications.
 - **Rate Limiting**: CAC (concurrent active calls) and CPS (calls per second) limits
 - **Scheduling**: Set active calling hours and date ranges
 - **AMD**: Answering Machine Detection via the Java/Vert.x AMD worker
-- **Retry Logic**: Automatic redial on busy, no-answer, or cancelled dispositions
+- **Retry Logic**: Optional redial on busy or no answer, and on voicemail detected by AMD, after a delay of 1 to 1440 minutes
 
 The Go-based dialer worker processes campaigns and initiates calls through Cloudonix.
 
