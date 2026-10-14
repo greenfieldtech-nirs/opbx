@@ -6,7 +6,10 @@ paths:
       summary: List campaigns
       description: |
         Get a paginated list of call tracking campaigns for the authenticated
-        user's organization.
+        user's organization. Available to every role. `search` matches name,
+        source or medium (substring). Each item includes `tracking_numbers_count`.
+        An unknown `sort_by` falls back to `created_at`; `per_page` is clamped
+        to 1-100.
       operationId: listCallTrackingCampaigns
       security:
       - bearerAuth: []
@@ -72,7 +75,13 @@ paths:
       summary: Create campaign
       description: |
         Create a new call tracking campaign. The campaign name must be unique
-        within the organization.
+        within the organization. Owner and PBX Admin only.
+
+        Defaults when a field is omitted: `status` = `active`,
+        `destination_type` = `forward`, `conversion_rule` =
+        `{"min_answered_duration_seconds": 0, "requires_answered_disposition": false}`.
+        The ID in `destination_config` must reference a resource of the
+        caller's organization.
       operationId: createCallTrackingCampaign
       security:
       - bearerAuth: []
@@ -116,6 +125,7 @@ paths:
                   enum:
                   - active
                   - inactive
+                  default: active
                   description: Campaign status
                   example: active
                 destination_type:
@@ -130,7 +140,8 @@ paths:
                   - ai_assistant
                   - ai_load_balancer
                   - unavailable
-                  description: Destination type for incoming calls (`unavailable` is rejected on create with 422)
+                  default: forward
+                  description: Destination type for incoming calls (`unavailable` is rejected on create with 422, "Choose a destination.")
                   example: forward
                 destination_config:
                   type: object
@@ -208,8 +219,6 @@ paths:
                   example: false
               required:
               - name
-              - status
-              - destination_type
               - destination_config
       responses:
         '201':
@@ -221,7 +230,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Campaign created successfully
+                    example: Call tracking campaign created successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingCampaign.yaml
         '401':
@@ -272,8 +281,12 @@ paths:
       - Call Tracking Campaigns
       summary: Update campaign
       description: |
-        Update an existing call tracking campaign. The campaign name must remain
-        unique within the organization.
+        Update an existing call tracking campaign. Every field is optional;
+        only the fields sent are changed. The campaign name must remain unique
+        within the organization. When `destination_config` is sent it must be a
+        non-empty object (it may be empty when `destination_type` is
+        `unavailable`); it is checked against `destination_type` only when both
+        are sent. Owner and PBX Admin only.
       operationId: updateCallTrackingCampaign
       security:
       - bearerAuth: []
@@ -409,7 +422,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Campaign updated successfully
+                    example: Call tracking campaign updated successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingCampaign.yaml
         '401':
@@ -563,7 +576,7 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Campaign updated successfully
+                    example: Call tracking campaign updated successfully.
                   data:
                     $ref: ../../components/schemas/CallTrackingCampaign.yaml
         '401':
@@ -578,7 +591,11 @@ paths:
       tags:
       - Call Tracking Campaigns
       summary: Delete campaign
-      description: Delete a call tracking campaign from the organization.
+      description: |
+        Delete a call tracking campaign from the organization. Owner and PBX
+        Admin only. Returns 409 while the campaign still has tracking numbers;
+        remove them first. Deleting the campaign also deletes its call tracking
+        sessions, notification settings and notification logs.
       operationId: deleteCallTrackingCampaign
       security:
       - bearerAuth: []

@@ -125,10 +125,8 @@ properties:
         description: Optional monetary value assigned to each conversion
         example: 25.5
   tracking_numbers_count:
-    type:
-    - integer
-    - 'null'
-    description: Number of tracking numbers assigned to the campaign (when counted)
+    type: integer
+    description: Number of tracking numbers assigned to the campaign. Present only in the list and get responses (omitted after create and update).
     example: 3
   google_ads_upload_enabled:
     type: boolean
