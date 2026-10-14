@@ -321,7 +321,7 @@ export default function PlatformUsers() {
               Users
             </h1>
             <p className="text-muted-foreground mt-1">
-              {totalUsers} user{totalUsers !== 1 ? 's' : ''} across all organizations
+              {totalUsers} owner{totalUsers !== 1 ? 's' : ''} across all organizations
             </p>
           </div>
         </div>
