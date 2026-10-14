@@ -155,8 +155,8 @@ export default function PlatformUsers() {
       toast.success(isManager ? 'Platform manager rights granted' : 'Platform manager rights revoked');
       // Update the selected user so the dialog toggle reflects the new state immediately
       setSelectedUser((prev) => (prev ? { ...prev, is_platform_manager: isManager } : null));
-    } catch {
-      toast.error('Failed to update platform manager status');
+    } catch (error) {
+      toast.error('Failed to update platform manager status', { description: getApiErrorMessage(error) });
     }
   };
 
@@ -166,8 +166,8 @@ export default function PlatformUsers() {
       await deleteMutation.mutateAsync(selectedUser.id);
       toast.success('User deleted');
       setShowDeleteDialog(false);
-    } catch {
-      toast.error('Failed to delete user');
+    } catch (error) {
+      toast.error('Failed to delete user', { description: getApiErrorMessage(error) });
     }
   };
 
@@ -215,9 +215,8 @@ export default function PlatformUsers() {
       toast.success('Password updated successfully');
       setShowPasswordDialog(false);
       setPasswordFormData({ password: '', password_confirmation: '' });
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to update password';
-      toast.error(message);
+    } catch (error) {
+      toast.error('Failed to update password', { description: getApiErrorMessage(error) });
     }
   };
 

@@ -16,6 +16,7 @@ import { OrganizationStatusBadge } from '@/components/platform';
 import { usePlatformOrganization, useUpdateOrganizationSettings, useUpdateOrganizationStatus } from '@/hooks/platform';
 import { useOperateAs } from '@/context/OperateAsContext';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/services/api';
 import { useState, useEffect } from 'react';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
@@ -50,8 +51,8 @@ export default function PlatformOrganizationDetail() {
         data: formData,
       });
       toast.success('Organization settings updated');
-    } catch {
-      toast.error('Failed to update settings');
+    } catch (error) {
+      toast.error('Failed to update settings', { description: getApiErrorMessage(error) });
     }
   };
 
@@ -74,8 +75,8 @@ export default function PlatformOrganizationDetail() {
       });
       toast.success(`Organization ${newStatus}`);
       return true;
-    } catch {
-      toast.error('Failed to update status');
+    } catch (error) {
+      toast.error('Failed to update status', { description: getApiErrorMessage(error) });
       return false;
     }
   };

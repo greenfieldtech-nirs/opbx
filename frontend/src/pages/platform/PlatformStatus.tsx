@@ -12,6 +12,7 @@ import { PlatformLayout } from '@/components/platform';
 import { ComponentStatusCard } from '@/components/platform/ComponentStatusCard';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 import { usePlatformStatus, useRunPlatformStatusCheck } from '@/hooks/platform';
+import { getApiErrorMessage } from '@/services/api';
 
 export default function PlatformStatus() {
   const { data, isLoading, isError, error, refetch } = usePlatformStatus();
@@ -49,7 +50,7 @@ export default function PlatformStatus() {
 
         {check.isError && (
           <p role="alert" className="text-sm text-destructive">
-            Check failed. You may have hit the rate limit (6 per minute); try again shortly.
+            Check failed: {getApiErrorMessage(check.error)}. You may have hit the rate limit (6 per minute); try again shortly.
           </p>
         )}
 

@@ -24,6 +24,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
@@ -145,8 +146,8 @@ export default function PlatformOrganizations() {
       });
       toast.success(`Organization ${newStatus === 'active' ? 'activated' : newStatus === 'suspended' ? 'suspended' : 'deleted'}`);
       return true;
-    } catch {
-      toast.error('Failed to update status');
+    } catch (error) {
+      toast.error('Failed to update status', { description: getApiErrorMessage(error) });
       return false;
     }
   };
@@ -175,8 +176,8 @@ export default function PlatformOrganizations() {
       });
       toast.success('Organization updated');
       setShowEditDialog(false);
-    } catch {
-      toast.error('Failed to update organization');
+    } catch (error) {
+      toast.error('Failed to update organization', { description: getApiErrorMessage(error) });
     }
   };
 
