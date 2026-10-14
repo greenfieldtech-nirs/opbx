@@ -16,7 +16,7 @@ Use the monitor while a campaign runs to check that it dials, that it stays with
 
 ## Prerequisites
 
-- You are the **Owner**, a **PBX Admin** or a **Reporter**. Only the Owner and PBX Admins can pause and resume campaigns.
+- You are the **Owner**, a **PBX Admin** or a **Reporter**. Only the Owner and PBX Admins can pause and resume campaigns; a Reporter sees the monitor without the **Pause** and **Resume** buttons.
 - For the **Worker Health** card, OPBX calls the dialer worker's health address, `DIALER_WORKER_HEALTH_URL` in `.env` (default `http://dialer-worker:8081/webhooks/health`). When it is set to an empty value the card shows **unknown**.
 
 ## Open the monitor
@@ -55,7 +55,7 @@ The server caches the overview for 5 seconds and a campaign's statistics for 10 
 
 One card per campaign:
 
-- **Header**: name, status, routing destination, and a **Pause** or **Resume** button.
+- **Header**: name, status, routing destination, and, for the Owner and PBX Admins, a **Pause** (Active) or **Resume** (Paused) button.
 - **Counters**: Destinations, Active Calls (shown as *active*/*CAC limit*), Completed, Failed, Voicemail, Dialing, Pending.
 - **Footer**: a progress bar and a **Rate** indicator. "OK" is normal; "Limited" means the campaign was paused with the reason `cloudonix_rate_limit` (through the dialer-worker pause endpoint), with the time it resumes. The bundled dialer worker does not call that endpoint, so with the standard stack the indicator shows "OK".
 
@@ -71,7 +71,7 @@ Who can do this: anyone who can open the monitor.
 
 1. Click a campaign card (anywhere except its **Pause** or **Resume** button).
 
-Result: the drill-down for that campaign opens, with its name, status and routing destination in the header, the refresh picker and the **Pause** or **Resume** button. The back arrow returns to the overview.
+Result: the drill-down for that campaign opens, with its name, status and routing destination in the header, the refresh picker and, for the Owner and PBX Admins, the **Pause** or **Resume** button. The back arrow returns to the overview.
 
 | Section | Content |
 |---------|---------|
@@ -90,7 +90,7 @@ Result: the drill-down for that campaign opens, with its name, status and routin
 
 ## Pause and resume from the monitor
 
-Who can do this: Owner and PBX Admin. The buttons are shown to Reporters too, but the server refuses the change and the toast "Failed to pause campaign" (or "Failed to resume campaign") appears.
+Who can do this: Owner and PBX Admin. The buttons are hidden from Reporters.
 
 1. Click **Pause** (on an Active campaign) or **Resume** (on a Paused one), on the campaign card or in the drill-down header. There is no confirmation dialog.
 
