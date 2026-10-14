@@ -22,6 +22,7 @@ properties:
     - active
     - inactive
     - pending
+    description: Defaults to `active` on create
     example: active
   pin:
     type:
@@ -29,6 +30,7 @@ properties:
     - 'null'
     maxLength: 20
     pattern: ^[0-9]+$
+    description: Digits only. Required when `pin_required` is true.
   pin_required:
     type: boolean
   host_pin:
@@ -37,6 +39,9 @@ properties:
     - 'null'
     maxLength: 20
     pattern: ^[0-9]+$
+    description: >-
+      Digits only. Required when `wait_for_host` is true (on update, checked only
+      when the request sends `wait_for_host` or `host_pin`).
   recording_enabled:
     type: boolean
   recording_auto_start:
