@@ -16,18 +16,27 @@ Use the monitor while a campaign runs to check that it dials, that it stays with
 
 ## Prerequisites
 
-- You are the **Owner** or a **PBX Admin**.
-- For the **Worker Health** card: the dialer worker's health address is configured in OPBX (`services.dialer_worker.health_url`). Without it the card shows **unknown**.
+- You are the **Owner**, a **PBX Admin** or a **Reporter**. Only the Owner and PBX Admins can pause and resume campaigns.
+- For the **Worker Health** card, OPBX calls the dialer worker's health address, `DIALER_WORKER_HEALTH_URL` in `.env` (default `http://dialer-worker:8081/webhooks/health`). When it is set to an empty value the card shows **unknown**.
 
 ## Open the monitor
 
-Open **Auto Dialer → Real Time Monitor**. Draft, Completed and Archived campaigns are not shown. With no Active or Paused campaign, the page says "No active campaigns".
+Who can do this: Owner, PBX Admin and Reporter.
+
+1. Open **Auto Dialer → Real Time Monitor**.
+
+Result: the **Real-Time Monitor** page ("Auto Dialer Campaign Command Center") shows the [summary cards](#summary-cards) and one card per **Active** or **Paused** campaign. Draft, Completed and Archived campaigns are not shown. With no Active or Paused campaign, the page says "No active campaigns" and offers **Go to Campaigns**.
 
 ![Monitor overview with the summary cards (Active Campaigns, Total Active Calls, CAC Utilization, Worker Health) and the Fall Webinar Follow-up campaign card, Paused, with 20 destinations and 20 pending](../../img/screens/auto-dialer-monitor-overview.jpg)
 
-## Refresh
+## Change the refresh interval
 
-The refresh picker in the header offers **Manual**, 1s, 5s, **10s** (default), 20s, 30s, 40s, 50s and 60s. Your choice is remembered in this browser. Polling stops while the browser tab is hidden and resumes when you come back. With **Manual**, use the refresh button.
+Who can do this: anyone who can open the monitor.
+
+1. In the header, open the refresh picker and choose **Manual**, **1s**, **5s**, **10s** (default), **20s**, **30s**, **40s**, **50s** or **60s**.
+2. With **Manual**, click the refresh button next to the picker whenever you want new numbers.
+
+Result: the overview and the drill-down reload at the chosen interval. Your choice is remembered in this browser. Polling stops while the browser tab is hidden and resumes when you come back.
 
 The server caches the overview for 5 seconds and a campaign's statistics for 10 seconds, so faster settings mostly show the same numbers.
 
@@ -48,36 +57,44 @@ One card per campaign:
 
 - **Header**: name, status, routing destination, and a **Pause** or **Resume** button.
 - **Counters**: Destinations, Active Calls (shown as *active*/*CAC limit*), Completed, Failed, Voicemail, Dialing, Pending.
-- **Footer**: a progress bar and a **Rate** indicator. "OK" is normal; "Limited" means the dialer asked OPBX to hold the campaign, with the time it resumes.
+- **Footer**: a progress bar and a **Rate** indicator. "OK" is normal; "Limited" means the campaign was paused with the reason `cloudonix_rate_limit` (through the dialer-worker pause endpoint), with the time it resumes. The bundled dialer worker does not call that endpoint, so with the standard stack the indicator shows "OK".
 
 A **Paused** campaign always shows 0 active calls.
 
-:::note The monitor tidies up stuck numbers
-Loading the monitor (overview or drill-down) also corrects stuck numbers of the campaigns it shows: a number left in **Dialing** for more than 5 minutes (or any Dialing number of a paused campaign) goes back to **Pending**, or to **Failed** when it has no attempts left; a pending number with no attempts left becomes **Failed**.
+:::note Stuck numbers are corrected every minute
+A scheduled job (every minute) corrects stuck numbers of Active and Paused campaigns: a number left in **Dialing** for more than 5 minutes (or any Dialing number of a paused campaign) goes back to **Pending**, or to **Failed** when it has no attempts left; a pending number with no attempts left becomes **Failed**. The monitor shows the result on its next refresh.
 :::
 
 ## Drill-down
 
-Click a campaign card. The back arrow returns to the overview.
+Who can do this: anyone who can open the monitor.
+
+1. Click a campaign card (anywhere except its **Pause** or **Resume** button).
+
+Result: the drill-down for that campaign opens, with its name, status and routing destination in the header, the refresh picker and the **Pause** or **Resume** button. The back arrow returns to the overview.
 
 | Section | Content |
 |---------|---------|
-| Campaign Progress | Overall completion with the completed, failed, voicemail and pending counts, and an estimated finish time once a calls-per-minute rate is known |
+| Campaign Progress | Overall completion with the completed, failed, voicemail and pending counts, and an **ETA** (pending numbers divided by the calls-per-minute rate; "Calculating..." until a rate is known) |
 | Active Calls | Calls in progress against the CAC limit |
-| CAC Utilization | Active calls as a share of CAC |
+| CAC Utilization | Active calls as a share of CAC, labelled Healthy (under 50 %), Moderate (under 80 %) or High |
 | Calls per Minute | Calls started per minute, measured between refreshes in your browser (empty until two refreshes have passed) |
 | Answer Rate | Completed calls divided by all attempts |
 | Avg Call Duration | Average length of connected calls |
 | Rate Limit | OK, or Throttled with the time the campaign resumes |
 | Voicemail Detected | Calls where voicemail detection heard a beep |
-| Active calls table | Phone number, status and duration of each call in progress |
-| Disposition Breakdown | A chart of how calls ended |
+| Active Calls (*n*) table | Phone number, status and duration of each call started in the last 5 minutes and still in progress ("No active calls at this time" when empty) |
+| Disposition Breakdown | A chart of how calls ended: Answered, Completed, Busy, No Answer, Failed, Cancelled, Congestion |
 
 ![Drill-down for Fall Webinar Follow-up with the progress card, the KPI cards, an empty active calls table and the disposition breakdown](../../img/screens/auto-dialer-monitor-drilldown.jpg)
 
 ## Pause and resume from the monitor
 
-Click **Pause** or **Resume** on a card or in the drill-down. The effect is the same as on the Campaign Manager: see [Start, pause, resume](/opbx/applications/auto-dialer/campaigns#start-pause-resume).
+Who can do this: Owner and PBX Admin. The buttons are shown to Reporters too, but the server refuses the change and the toast "Failed to pause campaign" (or "Failed to resume campaign") appears.
+
+1. Click **Pause** (on an Active campaign) or **Resume** (on a Paused one), on the campaign card or in the drill-down header. There is no confirmation dialog.
+
+Result: the toast "Campaign "*name*" paused" (or "… resumed") appears and the card's status and button change. The effect is the same as on the Campaign Manager: see [Start, pause, resume](/opbx/applications/auto-dialer/campaigns#start-pause-resume).
 
 ## Reading the monitor
 
