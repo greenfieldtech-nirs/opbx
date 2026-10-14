@@ -5,7 +5,7 @@
  */
 
 export { OrganizationStatusBadge } from './OrganizationStatusBadge';
-export { AuditLogEntry } from './AuditLogEntry';
+export { AuditLogEntry, actionLabels } from './AuditLogEntry';
 export { PlatformErrorPage } from './PlatformErrorPage';
 export { PlatformLayout } from './PlatformLayout';
 export { PlatformManagerRoute } from './PlatformManagerRoute';

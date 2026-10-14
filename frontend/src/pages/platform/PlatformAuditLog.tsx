@@ -26,22 +26,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PlatformLayout } from '@/components/platform';
-import { AuditLogEntry } from '@/components/platform';
+import { AuditLogEntry, actionLabels } from '@/components/platform';
 import { usePlatformAuditLogs } from '@/hooks/platform';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const actionTypes = [
   { value: 'all', label: 'All Actions' },
-  { value: 'user.create', label: 'User Created' },
-  { value: 'user.update', label: 'User Updated' },
-  { value: 'user.delete', label: 'User Deleted' },
-  { value: 'user.set_platform_manager', label: 'Platform Manager Set' },
-  { value: 'user.revoke_platform_manager', label: 'Platform Manager Revoked' },
-  { value: 'organization.create', label: 'Organization Created' },
-  { value: 'organization.update', label: 'Organization Updated' },
-  { value: 'organization.update_status', label: 'Status Changed' },
-  { value: 'organization.soft_delete', label: 'Organization Deleted' },
-  { value: 'organization.restore', label: 'Organization Restored' },
+  ...Object.entries(actionLabels).map(([value, label]) => ({ value, label })),
 ];
 
 export default function PlatformAuditLog() {

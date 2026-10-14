@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, User, Building2, Settings, Shield } from 'lucide-react';
+import { ChevronDown, ChevronUp, User, Building2, Settings, Shield, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { PlatformAuditLogEntry } from '@/types/platform';
@@ -14,32 +14,39 @@ interface AuditLogEntryProps {
   entry: PlatformAuditLogEntry;
 }
 
+// Exactly the action names the server writes (PlatformAuditService callers).
 const actionIcons: Record<string, React.ElementType> = {
-  'user.create': User,
-  'user.update': User,
-  'user.delete': User,
-  'user.set_platform_manager': Shield,
-  'user.revoke_platform_manager': Shield,
-  'organization.create': Building2,
-  'organization.update': Settings,
-  'organization.update_status': Building2,
-  'organization.soft_delete': Building2,
-  'organization.restore': Building2,
+  'user.created': User,
+  'user.updated': User,
+  'user.deleted': User,
+  'user.password.updated': User,
+  'user.platform_manager.granted': Shield,
+  'user.platform_manager.revoked': Shield,
+  'organization.settings.updated': Settings,
+  'organization.status.updated': Building2,
+  'organization.deleted': Building2,
+  'operate_as.started': LogIn,
+  'operate_as.stopped': LogOut,
   default: Settings,
 };
 
-const actionLabels: Record<string, string> = {
-  'user.create': 'User Created',
-  'user.update': 'User Updated',
-  'user.delete': 'User Deleted',
-  'user.set_platform_manager': 'Platform Manager Set',
-  'user.revoke_platform_manager': 'Platform Manager Revoked',
-  'organization.create': 'Organization Created',
-  'organization.update': 'Organization Updated',
-  'organization.update_status': 'Status Changed',
-  'organization.soft_delete': 'Organization Deleted',
-  'organization.restore': 'Organization Restored',
+export const actionLabels: Record<string, string> = {
+  'user.created': 'User Created',
+  'user.updated': 'User Updated',
+  'user.deleted': 'User Deleted',
+  'user.password.updated': 'User Password Changed',
+  'user.platform_manager.granted': 'Platform Manager Granted',
+  'user.platform_manager.revoked': 'Platform Manager Revoked',
+  'organization.settings.updated': 'Organization Settings Updated',
+  'organization.status.updated': 'Organization Status Changed',
+  'organization.deleted': 'Organization Deleted',
+  'operate_as.started': 'Operate As Started',
+  'operate_as.stopped': 'Operate As Stopped',
 };
+
+// Unknown (future) actions: "foo.bar_baz" -> "Foo Bar Baz" rather than the raw name.
+const humanizeAction = (action: string) =>
+  action.split(/[._]/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -130,7 +137,7 @@ export function AuditLogEntry({ entry }: AuditLogEntryProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const Icon = actionIcons[entry.action] || actionIcons.default;
-  const actionLabel = actionLabels[entry.action] || entry.action;
+  const actionLabel = actionLabels[entry.action] || humanizeAction(entry.action);
   const performedBy = entry.platform_manager;
   const organization = entry.target_organization;
 
