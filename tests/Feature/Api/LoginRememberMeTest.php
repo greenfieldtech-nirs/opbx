@@ -97,4 +97,15 @@ final class LoginRememberMeTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['remember']);
     }
+
+    public function test_login_always_returns_a_bearer_token_even_for_ajax_or_cookie_requests(): void
+    {
+        foreach ([['X-Requested-With' => 'XMLHttpRequest'], ['X-Auth-Mode' => 'cookie']] as $headers) {
+            $this->withHeaders($headers)
+                ->postJson('/api/v1/auth/login', ['email' => 'remember@example.com', 'password' => 'password123'])
+                ->assertOk()
+                ->assertJsonPath('token_type', 'Bearer')
+                ->assertJsonStructure(['access_token', 'expires_in', 'user']);
+        }
+    }
 }

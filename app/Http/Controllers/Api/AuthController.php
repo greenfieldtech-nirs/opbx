@@ -13,19 +13,15 @@ use App\Scopes\OrganizationScope;
 use App\Services\Cloudonix\CloudonixPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
- * Authentication API controller using Laravel Sanctum.
+ * Authentication API controller using Laravel Sanctum Bearer tokens.
  *
- * Supports dual authentication modes:
- * 1. Cookie-based (SPA): Uses httpOnly session cookies + CSRF protection
- * 2. Token-based (API): Returns bearer tokens for stateless authentication
- *
- * Mode is automatically detected based on request origin (stateful domains use cookies).
+ * Every login returns a Bearer token, for the web app and API clients alike;
+ * there is no cookie session mode.
  *
  * Implements security best practices including rate limiting, audit logging,
  * and proper error handling.
@@ -50,20 +46,14 @@ class AuthController extends Controller
     private const REMEMBER_ME_TOKEN_NAME = 'api-token-remember';
 
     /**
-     * Authenticate user and issue authentication credentials.
-     *
-     * Supports two authentication modes:
-     * - Cookie-based (SPA): Returns user data, sets httpOnly session cookie
-     * - Token-based (API): Returns API token for bearer authentication
+     * Authenticate user and issue a Bearer token.
      *
      * Security features:
      * - Rate limited to 5 attempts per minute per IP
      * - Generic error messages to prevent user enumeration
      * - Validates user and organization status
      * - Logs authentication attempts with context
-     * - Revokes old tokens on successful login (token mode only)
-     * - HttpOnly cookies prevent XSS attacks (cookie mode)
-     * - CSRF protection via Sanctum (cookie mode)
+     * - Revokes old tokens on successful login
      *
      * @param  LoginRequest  $request  Validated login credentials
      * @return JsonResponse Authentication response
@@ -141,9 +131,6 @@ class AuthController extends Controller
         // Warm the Cloudonix package tier after the response is sent; never fails the login.
         defer(fn () => rescue(fn () => app(CloudonixPackageService::class)->refresh((int) $user->organization_id)));
 
-        // Detect authentication mode based on request
-        $useCookieAuth = $this->shouldUseCookieAuth($request);
-
         Log::info('Login successful', [
             'request_id' => $requestId,
             'user_id' => $user->id,
@@ -151,21 +138,8 @@ class AuthController extends Controller
             'organization_id' => $user->organization_id,
             'role' => $user->role->value,
             'ip_address' => $ipAddress,
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based authentication (SPA)
-            // Login user via session - Laravel will set httpOnly cookie automatically
-            Auth::guard('web')->login($user, true);
-
-            return response()->json([
-                'message' => 'Login successful',
-                'user' => $this->formatUserResponse($user),
-            ]);
-        }
-
-        // Token-based authentication (API clients)
         // Revoke all existing tokens for security
         $user->tokens()->delete();
 
@@ -184,50 +158,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Determine if request should use cookie-based authentication.
-     *
-     * Cookie auth is used when:
-     * - Request explicitly asks for cookie auth via X-Auth-Mode header
-     * - OR request has X-Requested-With header (indicates AJAX/SPA request)
-     *
-     * Token auth is used when:
-     * - Request has Authorization Bearer header (for logout/refresh of existing token sessions)
-     * - OR request explicitly asks for token auth via X-Auth-Mode header
-     * - OR request doesn't meet cookie auth criteria (default)
-     */
-    private function shouldUseCookieAuth(Request $request): bool
-    {
-        // If Bearer token is already present in logout/refresh, use token auth
-        // This prevents conflicts when both auth modes are possible
-        if ($request->bearerToken()) {
-            return false;
-        }
-
-        // Check for explicit auth mode header
-        $authMode = $request->header('X-Auth-Mode');
-        if ($authMode === 'cookie') {
-            return true;
-        }
-        if ($authMode === 'token') {
-            return false;
-        }
-
-        // Check for AJAX/SPA indicators (X-Requested-With: XMLHttpRequest)
-        // SPAs typically send this header, while API clients don't
-        if ($request->hasHeader('X-Requested-With')) {
-            return true;
-        }
-
-        // Default to token-based for backward compatibility
-        return false;
-    }
-
-    /**
-     * Logout user (revoke authentication).
-     *
-     * Supports both authentication modes:
-     * - Cookie-based: Logs out of session, clears httpOnly cookie
-     * - Token-based: Deletes current access token
+     * Logout user: deletes the current access token.
      *
      * @param  Request  $request  Authenticated request
      * @return JsonResponse Success message
@@ -237,32 +168,17 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
-        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
-
         Log::info('Logout initiated', [
             'request_id' => $requestId,
             'user_id' => $user?->id,
             'email' => $user?->email,
             'ip_address' => $request->ip(),
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based logout
-            Auth::guard('web')->logout();
-
-            // Invalidate session using the helper (avoids "Session store not set on request" in tests)
-            session()->invalidate();
-
-            // Regenerate CSRF token
-            session()->regenerateToken();
-        } else {
-            // Token-based logout: only delete real persisted tokens
-            $token = $request->user()?->currentAccessToken();
-            if ($token instanceof PersonalAccessToken) {
-                $token->delete();
-            }
+        // Only delete real persisted tokens
+        $token = $request->user()?->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
         }
 
         Log::info('Logout successful', [
@@ -319,11 +235,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Refresh authentication credentials.
-     *
-     * Supports both authentication modes:
-     * - Cookie-based: Regenerates session, extends cookie expiration
-     * - Token-based: Revokes current token and issues a new one
+     * Refresh authentication: revokes the current token and issues a new one.
      *
      * @param  Request  $request  Authenticated request
      * @return JsonResponse Refresh response
@@ -333,33 +245,13 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
-        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
-
         Log::info('Authentication refresh initiated', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'email' => $user->email,
             'ip_address' => $request->ip(),
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based refresh - regenerate session using the helper
-            session()->regenerate();
-
-            Log::info('Session refresh successful', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-            ]);
-
-            return response()->json([
-                'message' => 'Session refreshed successfully',
-                'user' => $this->formatUserResponse($user),
-            ]);
-        }
-
-        // Token-based refresh
         // Revoke current real token (if any), then issue a new one with the same lifetime
         // (a "Remember me" token stays a 30-day token).
         $remember = false;

@@ -251,7 +251,7 @@ Route::prefix('v1')->group(function (): void {
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
-        // Supports both token-based (returns token in JSON) and cookie-based (for SPA) authentication
+        // Always returns a Bearer token (no cookie session mode)
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:auth')
             ->name('auth.login');
