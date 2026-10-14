@@ -112,7 +112,7 @@ On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers a
 Who can do this: Owner and PBX Admin.
 
 1. On a **Ready** list's row, click **Assign Campaign**.
-2. In the **Assign to Campaign** dialog, choose the campaign under **Select a campaign**. Only campaigns that are **Draft**, **Paused**, or **Active with a start date still in the future** are offered; with none, the dialog says "No available campaigns found." The server applies the same rule (the start date is checked in the campaign's timezone), also to a list uploaded straight into a campaign through the API.
+2. In the **Assign to Campaign** dialog, choose the campaign under **Select a campaign**. Only campaigns that are **Draft**, **Paused**, or **Active with a start date after today in the campaign's timezone** are offered; with none, the dialog says "No available campaigns found." The server applies the same rule, also to a list uploaded straight into a campaign through the API.
 3. Click **Assign**.
 
 Result: the toast "List assigned to campaign successfully" appears, the list becomes **In Use** and the row shows the campaign's name. The campaign's status does not change: a **Draft** campaign stays Draft until you [start it](/opbx/applications/auto-dialer/campaigns#start-a-campaign) (or auto-start does). An **Active** campaign whose start date has been reached is refused with "Assignment failed" and "Cannot assign list to "*name*" because it has already started. Pause the campaign first, then assign the list.", even outside its calling hours.
