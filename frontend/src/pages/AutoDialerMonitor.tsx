@@ -48,12 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { MonitorCampaign } from '@/services/autoDialerMonitorApi';
 
 // Constants
@@ -679,31 +674,13 @@ export default function AutoDialerMonitor() {
                       </div>
                     </div>
 
-                    {/* Progress Bar + Rate Limit */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 flex items-center gap-3">
-                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Progress</span>
-                        <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${campaign.progress_percentage}%` }} />
-                        </div>
-                        <span className="text-sm font-semibold w-12 text-right">{campaign.progress_percentage}%</span>
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Progress</span>
+                      <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${campaign.progress_percentage}%` }} />
                       </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs text-muted-foreground">Rate:</span>
-                            <div className={cn('h-2.5 w-2.5 rounded-full', campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
-                            <span className="text-xs font-medium">{campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {campaign.rate_limit_status.is_rate_limited
-                            ? campaign.rate_limit_status.resumes_at
-                              ? `Resumes at ${new Date(campaign.rate_limit_status.resumes_at).toLocaleTimeString()}`
-                              : 'Currently rate limited'
-                            : 'No rate limiting'}
-                        </TooltipContent>
-                      </Tooltip>
+                      <span className="text-sm font-semibold w-12 text-right">{campaign.progress_percentage}%</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -904,27 +881,6 @@ export default function AutoDialerMonitor() {
                     </div>
                     <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
                       <Clock className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Rate Limit</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={cn('h-3 w-3 rounded-full', detail.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
-                        <p className="text-2xl font-bold">{detail.rate_limit_status.is_rate_limited ? 'Throttled' : 'OK'}</p>
-                      </div>
-                      {detail.rate_limit_status.resumes_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Resumes at {new Date(detail.rate_limit_status.resumes_at).toLocaleTimeString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-                      <Activity className="h-6 w-6 text-red-600" />
                     </div>
                   </div>
                 </CardContent>

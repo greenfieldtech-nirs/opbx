@@ -51,8 +51,8 @@ paths:
         Get detailed monitoring view for a single campaign (any status). Owner, PBX Admin
         and Reporter only.
 
-        Returns campaign statistics, disposition breakdown,
-        rate limit status, and active call sessions. Statistics
+        Returns campaign statistics, disposition breakdown
+        and active call sessions. Statistics
         are cached for 10 seconds (cleared when the campaign is started, paused or resumed);
         active sessions are always fresh.
       operationId: getMonitorDetail

@@ -57,7 +57,7 @@ One card per campaign:
 
 - **Header**: name, status, routing destination, and, for the Owner and PBX Admins, a **Pause** (Active) or **Resume** (Paused) button.
 - **Counters**: Destinations, Active Calls (shown as *active*/*CAC limit*), Completed, Failed, Voicemail, Dialing, Pending.
-- **Footer**: a progress bar and a **Rate** indicator. "OK" is normal; "Limited" means the campaign was paused with the reason `cloudonix_rate_limit` (through the dialer-worker pause endpoint), with the time it resumes. The bundled dialer worker does not call that endpoint, so with the standard stack the indicator shows "OK".
+- **Footer**: a progress bar.
 
 A **Paused** campaign always shows 0 active calls.
 
@@ -81,7 +81,6 @@ Result: the drill-down for that campaign opens, with its name, status and routin
 | Calls per Minute | Calls started per minute, measured between refreshes in your browser (empty until two refreshes have passed) |
 | Answer Rate | Completed calls divided by all attempts |
 | Avg Call Duration | Average length of connected calls |
-| Rate Limit | OK, or Throttled with the time the campaign resumes |
 | Voicemail Detected | Calls where voicemail detection heard a beep |
 | Active Calls (*n*) table | Phone number, status and duration of each call started in the last 5 minutes and still in progress ("No active calls at this time" when empty) |
 | Disposition Breakdown | A chart of how calls ended: Answered, Completed, Busy, No Answer, Failed, Cancelled, Congestion |

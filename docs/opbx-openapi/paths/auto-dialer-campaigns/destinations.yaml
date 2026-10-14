@@ -201,8 +201,8 @@ paths:
       description: |
         Get real-time concurrency status for a campaign. Owner, PBX Admin and Reporter only.
 
-        Returns current CAC utilization, active sessions,
-        and rate limit status for real-time monitoring. Uses the same live sources as
+        Returns current CAC utilization and active sessions
+        for real-time monitoring. Uses the same live sources as
         the monitor detail: `active_calls` is the dialer worker's concurrent-call counter and
         `active_sessions` are the campaign's live call sessions. Never cached. A paused
         campaign always reports 0 active calls and no sessions.
@@ -284,28 +284,6 @@ paths:
                               type: integer
                               description: Seconds since initiated_at
                               example: 45
-                      rate_limit_status:
-                        type: object
-                        properties:
-                          is_rate_limited:
-                            type: boolean
-                            description: True when the campaign is paused with pause_reason `cloudonix_rate_limit`
-                            example: false
-                          pause_reason:
-                            type:
-                            - string
-                            - 'null'
-                            example: null
-                          resumes_at:
-                            type:
-                            - string
-                            - 'null'
-                            format: date-time
-                            example: null
-                          can_resume_now:
-                            type: boolean
-                            description: True when resumes_at is null or already passed
-                            example: true
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':

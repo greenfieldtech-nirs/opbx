@@ -70,7 +70,6 @@ class CampaignMonitorService
             'utilization_percentage' => $this->calculateUtilization($activeCount, $cac),
             'api_interval_seconds' => $campaign->getApiIntervalMilliseconds() / 1000,
             'active_sessions' => $this->getActiveSessions($campaign),
-            'rate_limit_status' => $this->getRateLimitStatus($campaign),
         ];
     }
 
@@ -174,7 +173,6 @@ class CampaignMonitorService
                     'avg_billsec_seconds' => $this->getAverageBillsec($campaign->id),
                 ],
                 'dispositions' => $this->getDispositions($campaign->id),
-                'rate_limit_status' => $this->getRateLimitStatus($campaign),
             ];
         });
 
@@ -262,12 +260,6 @@ class CampaignMonitorService
             'concurrent_active_calls' => $cac,
             'active_calls' => $activeCalls,
             'cac_utilization' => $this->calculateUtilization($activeCalls, $cac),
-            'rate_limit_status' => [
-                'is_rate_limited' => $campaign->status === CampaignStatus::PAUSED &&
-                    $campaign->pause_reason === 'cloudonix_rate_limit',
-                'pause_reason' => $campaign->pause_reason,
-                'resumes_at' => $campaign->resume_at?->toIso8601String(),
-            ],
             'caller_id' => $campaign->caller_id,
             'routing_destination_type' => $campaign->routing_destination_type->value,
             'routing_destination_label' => $campaign->getRoutingDestinationLabel(),
@@ -412,25 +404,6 @@ class CampaignMonitorService
     private function calculateUtilization(int $active, int $limit): float
     {
         return $limit > 0 ? round(($active / $limit) * 100, 1) : 0;
-    }
-
-    /**
-     * Get rate limit status for a campaign.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @return array<string, mixed>
-     */
-    private function getRateLimitStatus(AutoDialerCampaign $campaign): array
-    {
-        $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
-            $campaign->pause_reason === 'cloudonix_rate_limit';
-
-        return [
-            'is_rate_limited' => $isRateLimited,
-            'pause_reason' => $campaign->pause_reason,
-            'resumes_at' => $campaign->resume_at?->toIso8601String(),
-            'can_resume_now' => $campaign->resume_at ? now()->gte($campaign->resume_at) : true,
-        ];
     }
 
     /**

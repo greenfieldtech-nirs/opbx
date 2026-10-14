@@ -102,11 +102,6 @@ class AutoDialerMonitorTest extends TestCase
                             'concurrent_active_calls',
                             'active_calls',
                             'cac_utilization',
-                            'rate_limit_status' => [
-                                'is_rate_limited',
-                                'pause_reason',
-                                'resumes_at',
-                            ],
                             'caller_id',
                             'routing_destination_type',
                             'routing_destination_label',
@@ -356,12 +351,6 @@ class AutoDialerMonitorTest extends TestCase
                         'cancelled',
                         'congestion',
                     ],
-                    'rate_limit_status' => [
-                        'is_rate_limited',
-                        'pause_reason',
-                        'resumes_at',
-                        'can_resume_now',
-                    ],
                 ],
             ]);
     }
@@ -586,11 +575,11 @@ class AutoDialerMonitorTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.campaign.status', 'paused')
-            ->assertJsonPath('data.rate_limit_status.is_rate_limited', false)
-            ->assertJsonPath('data.rate_limit_status.pause_reason', 'Manual pause');
+            ->assertJsonMissingPath('data.rate_limit_status');
     }
 
-    public function test_monitor_detail_shows_rate_limited_status(): void
+    /** The Rate Limited indicator is gone (R47): no rate_limit_status on the summary, detail or concurrency endpoints. */
+    public function test_monitor_no_longer_reports_rate_limit_status(): void
     {
         $campaign = AutoDialerCampaign::factory()->create([
             'organization_id' => $this->organization->id,
@@ -599,13 +588,13 @@ class AutoDialerMonitorTest extends TestCase
             'resume_at' => now()->addMinutes(30),
         ]);
 
-        $response = $this->actingAs($this->adminUser)
-            ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail");
-
-        $response->assertOk()
-            ->assertJsonPath('data.rate_limit_status.is_rate_limited', true)
-            ->assertJsonPath('data.rate_limit_status.pause_reason', 'cloudonix_rate_limit')
-            ->assertJsonPath('data.rate_limit_status.can_resume_now', false);
+        $this->actingAs($this->adminUser)->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail")
+            ->assertOk()->assertJsonMissingPath('data.rate_limit_status');
+        $this->actingAs($this->adminUser)->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/concurrency")
+            ->assertOk()->assertJsonMissingPath('data.rate_limit_status');
+        $summary = $this->actingAs($this->adminUser)->getJson('/api/v1/auto-dialer-campaigns/monitor/summary')
+            ->assertOk()->json('data');
+        $this->assertStringNotContainsString('rate_limit_status', (string) json_encode($summary));
     }
 
     // ═══════════════════════════════════════════════════════════
