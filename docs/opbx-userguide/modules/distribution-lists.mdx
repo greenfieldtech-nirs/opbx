@@ -104,7 +104,7 @@ Click **Create List**, then **Upload Destinations** in the row menu, map the col
 
 ### Replace the numbers of a list
 
-**Who can do this:** Owner, PBX Admin. Not while the list is In Use.
+**Who can do this:** Owner, PBX Admin. The detail page shows **Upload** only for Draft, Pending, Failed, Ready and Used lists.
 
 Click **Upload** on the list's detail page. On a Ready or Used list this creates a new version; the numbers it replaces are kept as a previous version for 30 days. See [Replacing the numbers of a Ready or Used list](/opbx/applications/auto-dialer/distribution-lists#replacing-the-numbers-of-a-ready-or-used-list).
 
@@ -124,15 +124,13 @@ Click the unassign icon next to the campaign name, or **Unassign** next to the l
 
 **Who can do this:** Owner, PBX Admin, Reporter.
 
-Click the list's name to open its detail page, then search and filter the **Destinations** tab (All Statuses, Pending, Completed, Failed or Invalid). See [The list detail page](/opbx/applications/auto-dialer/distribution-lists#the-list-detail-page). For a Failed list, **View Errors** in the row menu shows the rejected rows. The detail page's **Validation Errors** tab does not list the rows yet, and its **Download Errors CSV** button does nothing; use **View Errors** instead.
+Click the list's name to open its detail page, then search and filter the **Destinations** tab (All Statuses, Pending, Completed, Failed or Invalid). See [The list detail page](/opbx/applications/auto-dialer/distribution-lists#the-list-detail-page). For a Failed list, **View Errors** in the row menu shows the rejected rows.
 
 ### Reset numbers so they are dialed again
 
-**Who can do this:** Owner, PBX Admin. Reporters see the buttons, but the server refuses the change and the page shows "Failed to reset dial attempts".
+**Who can do this:** Owner, PBX Admin. The reset buttons and the row check boxes are hidden from Reporters.
 
 On the detail page's **Destinations** tab, use **Reset Dial Attempts** on a row, select rows and click **Reset Dial Attempts (*n*)**, or click **Reset Pending Entries**. A toast reports the server's result. See [The list detail page](/opbx/applications/auto-dialer/distribution-lists#the-list-detail-page).
-
-The **Delete** button that appears when rows are selected does not delete anything yet: it only shows "Deleting *n* destinations..." and clears the selection.
 
 ### Browse or download a previous version
 
@@ -154,7 +152,7 @@ Choose **Copy List** in the row menu or **Copy** on the detail page. See [Copy a
 
 ### Download a list
 
-**Who can do this:** Owner, PBX Admin. Reporters see the **Download** button, but the server refuses and the page shows "Failed to download list".
+**Who can do this:** Owner, PBX Admin. The **Download** button is hidden from Reporters.
 
 Click **Download** on the detail page. The page confirms "List downloaded successfully". See [Download a list](/opbx/applications/auto-dialer/distribution-lists#download-a-list).
 

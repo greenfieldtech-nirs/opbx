@@ -105,7 +105,7 @@ Who can do this: Owner and PBX Admin.
 
 Result: the toast "Version *n+1* created. The previous entries are in Version History. Processing..." appears; when processing ends the dialog shows "Version *n+1* created and uploaded successfully!" and the page shows the toast "Upload completed successfully". The new file is processed into the same list with its version number increased by one. The numbers it replaces are kept, exactly as they were at that moment (status, dial attempts, last result), as a [previous version](#previous-versions) you can browse and download for 30 days.
 
-On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers like **Upload Destinations**. On a Processing or Archived list the server refuses the upload ("Cannot upload to list in status: …").
+On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers like **Upload Destinations**. On a Processing, In Use or Archived list the **Upload** button is not shown.
 
 ## Assign a list to a campaign
 
@@ -142,9 +142,9 @@ Click a list's row or name, or choose **View Details** in the row menu. The head
 |--------|-----------|------|
 | **Back** | Always | Returns to the list page |
 | **Refresh** | Always | Reloads the list and its numbers |
-| **Upload** | Owner and PBX Admin, list not In Use | Adds numbers, or [replaces them](#replacing-the-numbers-of-a-ready-or-used-list) on a Ready or Used list |
+| **Upload** | Owner and PBX Admin, list Draft, Pending, Failed, Ready or Used | Adds numbers, or [replaces them](#replacing-the-numbers-of-a-ready-or-used-list) on a Ready or Used list |
 | **Copy** | Owner and PBX Admin, status allows | [Copies the list](#copy-a-list) |
-| **Download** | Always (the server allows it for the Owner and PBX Admins only) | [Downloads the list](#download-a-list) |
+| **Download** | Owner and PBX Admin | [Downloads the list](#download-a-list) |
 | **Archive** | Owner and PBX Admin, Ready or Used and not assigned | [Archives the list](#archive-a-list). For an assigned list a disabled **Archive** explains "Unassign it first to archive or delete it." |
 | **Delete** | Not assigned, and the Owner (any status) or a PBX Admin (Failed only) | [Deletes the list](#delete-a-list) |
 
@@ -154,19 +154,18 @@ Tabs:
 
 | Tab | Shown when | Content |
 |-----|-----------|---------|
-| Destinations | Always | Phone number, name, batch, metadata (click **_n_ fields** to see them), status, dial attempts, last call (date and last result), duration. **Search phone numbers or descriptions...** searches the phone number; the filter offers All Statuses, Pending, Completed, Failed and Invalid |
+| Destinations | Always | Check boxes for selecting numbers (Owner and PBX Admin), phone number, name, batch, metadata (click **_n_ fields** to see them), status, dial attempts, last call (date and last result), duration and, for the Owner and PBX Admin, the reset icon. **Search phone numbers or descriptions...** searches the phone number; the filter offers All Statuses, Pending, Completed, Failed and Invalid |
 | Version History | A file was uploaded over the list's numbers at least once | The [previous versions](#previous-versions) of the list, with the date each is deleted |
 | Parts (*n*) | A large file was split into parts | The [parts](#see-a-lists-parts) the file was split into |
-| Validation Errors | The list is Failed | A **Download Errors CSV** button that does not download anything yet, and no rows. To read or download the rejected rows, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu |
 | Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
-![Detail page of Fall Webinar Leads: 20 pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
+{/* SCREENSHOT: auto-dialer-lists-detail — Detail page of Fall Webinar Leads as the Owner: Refresh, Upload, Copy, Download and Archive buttons, 20 pending destinations with names, the status filter and Reset Pending Entries */}
 
-Not available yet on the Destinations tab: clicking a phone number opens **Call History** with "CDR integration coming soon"; the bin icon on each row only shows "Delete destination functionality coming soon"; and the **Delete** button shown next to **Reset Dial Attempts (*n*)** when numbers are selected clears the selection without deleting anything. Numbers cannot be removed from a list in the app; upload a new version or copy the list instead.
+To read the rejected rows of a Failed list, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu. Numbers cannot be removed from a list in the app; upload a new version or copy the list instead.
 
 ### Reset dial attempts
 
-Who can do this: Owner and PBX Admin. The buttons are visible to Reporters too, but the server refuses them.
+Who can do this: Owner and PBX Admin. A Reporter does not see the reset buttons or the check boxes.
 
 Resetting sets a number back to **pending** with zero attempts and clears its last result, retry time and last call, so the dialer picks it up again (it is dialed only while its campaign is Active and inside its schedule).
 
@@ -294,7 +293,6 @@ If the server is asked to delete a list that a campaign still uses, or a list on
 | Name is required | The name field is empty | Enter a name |
 | Please upload a CSV file | The file does not end in `.csv` | Choose a CSV file |
 | CSV must contain a column mapped to phone_number | The phone column was not mapped | Map the phone column (use the header-row switch to match your file) |
-| Cannot upload to list in status: In Use | The list is assigned | Unassign it, or copy it and upload to the copy |
 | List is not ready for assignment | The list is not Ready | Wait for processing, or fix a Failed upload |
 | Cannot assign list … because it is currently running. Pause the campaign first | The campaign is dialing | Pause the campaign, assign, then resume |
 | Cannot unassign list: its campaign is active. Pause the campaign first. | The list's campaign is Active | Pause the campaign, unassign, then resume |
