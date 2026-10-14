@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -43,6 +45,14 @@ return [
             'root' => storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
+        // Copies of a distribution list's entries kept when the list is re-uploaded.
+        'list_backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups/lists'),
             'throw' => false,
             'report' => false,
         ],

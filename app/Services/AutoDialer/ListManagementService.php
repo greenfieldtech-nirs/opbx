@@ -414,13 +414,7 @@ class ListManagementService
      */
     private function backupDestinations(AutoDialerList $list): string
     {
-        $backupDir = storage_path('app/backups/lists');
-        if (! is_dir($backupDir)) {
-            mkdir($backupDir, 0755, true);
-        }
-
         $filename = "list_{$list->id}_v{$list->version_number}_".now()->format('Y-m-d_His').'.json';
-        $filepath = $backupDir.'/'.$filename;
 
         $destinations = $list->destinations()->get()->map(function ($dest) {
             return [
@@ -437,7 +431,8 @@ class ListManagementService
             ];
         });
 
-        file_put_contents($filepath, json_encode([
+        $disk = Storage::disk('list_backups');
+        $disk->put($filename, json_encode([
             'list_id' => $list->id,
             'list_name' => $list->name,
             'version_number' => $list->version_number,
@@ -445,7 +440,27 @@ class ListManagementService
             'destinations' => $destinations,
         ], JSON_PRETTY_PRINT));
 
-        return $filepath;
+        return $disk->path($filename);
+    }
+
+    /**
+     * Delete a list completely: its entries (and, by cascade, their dial sessions), the
+     * list row itself, and the backup files kept when it was re-uploaded.
+     */
+    public function deleteList(AutoDialerList $list): void
+    {
+        DB::transaction(function () use ($list): void {
+            $list->destinations()->delete();
+            $list->delete();
+        });
+
+        $disk = Storage::disk('list_backups');
+        $disk->delete(array_values(array_filter(
+            $disk->files(),
+            fn (string $file): bool => str_starts_with($file, "list_{$list->id}_v")
+        )));
+
+        Log::info('ListManagementService: Deleted list', ['list_id' => $list->id]);
     }
 
     /**

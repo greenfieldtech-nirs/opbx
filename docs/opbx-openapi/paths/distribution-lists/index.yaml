@@ -239,16 +239,15 @@ paths:
       tags:
       - Distribution Lists
       summary: Delete distribution list
-      description: 'Delete a distribution list and all its destinations.
+      description: |
+        Delete a distribution list completely: the list, all its destinations, their dial
+        sessions and the backup copies of its destinations kept when the list was
+        re-uploaded. Nothing of the list remains. Lists created by splitting a large upload
+        ("*name* (Part 2)" and so on) are separate lists and are not deleted with it.
 
-
-        Lists in ''failed'' status can be deleted by Owners and PBX Admins; lists in any
-
+        Lists in 'failed' status can be deleted by Owners and PBX Admins; lists in any
         other status only by Owners. A list that is assigned to a campaign returns 409
-
         (unassign it first).
-
-        '
       operationId: deleteDistributionList
       security:
       - bearerAuth: []

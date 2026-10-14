@@ -431,11 +431,7 @@ class DistributionListController extends Controller
         }
 
         try {
-            // Delete associated destinations first
-            $list->destinations()->delete();
-
-            // Delete the list
-            $list->delete();
+            $this->listService->deleteList($list);
 
             return response()->json([
                 'message' => 'List deleted successfully',
