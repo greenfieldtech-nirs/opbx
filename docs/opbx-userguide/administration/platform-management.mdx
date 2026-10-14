@@ -85,7 +85,7 @@ Who can do this: platform managers.
 3. Change **Organization Name** (up to 255 characters) or **Timezone** (type a valid IANA time zone, for example `America/New_York`).
 4. Click **Save Changes**.
 
-The toast "Organization updated" appears. An invalid time zone is refused: the toast "Failed to update organization" shows the server's validation message. The change is written to the audit log as `organization.settings.updated`.
+The toast "Organization updated" appears. An invalid time zone is refused: the toast "Failed to update organization" shows the server's validation message. The change is written to the audit log as `organization.settings.updated`. Cloudonix keys and secrets in the settings are masked (asterisks plus the last 4 characters) in the audit entry, as they are on the organization page.
 
 You can also edit the name and time zone on the organization detail page, **Settings** tab, with **Save Changes** ("Organization settings updated").
 
@@ -119,7 +119,7 @@ Who can do this: platform managers.
 2. Click the delete (trash) icon on the organization's row.
 3. In the **Delete Organization** dialog ("Are you sure you want to delete … ? This action cannot be undone."), click **Delete**.
 
-The toast "Organization deleted" appears, the dialog closes and the row disappears. OPBX revokes the users' API tokens and removes the organization's extensions, ring groups, business-hours schedules, phone numbers, call logs and users, then the organization itself. The deletion is written to the audit log as `organization.deleted`.
+The toast "Organization deleted" appears, the dialog closes and the row disappears. OPBX revokes the users' API tokens and removes the organization's extensions, ring groups, business-hours schedules, phone numbers, call logs and users, then the organization itself. The deletion is written to the audit log as `organization.deleted`, with the Cloudonix keys and secrets masked.
 
 The delete is refused when **any user in the organization is a platform manager** ("Cannot delete organization: one or more users in this organization are Platform Managers. …"). Revoke their platform-manager flag first. The page shows the toast "Failed to update status" with that message below it.
 

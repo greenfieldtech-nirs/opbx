@@ -170,7 +170,9 @@ paths:
         Updates the name, timezone and/or settings. Platform managers only. A field that
         is omitted or null is left unchanged. `settings` is merged into the existing
         settings at the top level (a key you send replaces that whole key). Writes an
-        `organization.settings.updated` audit log entry.
+        `organization.settings.updated` audit log entry. The response and the audit entry's
+        before/after snapshots mask sensitive `settings.cloudonix` values the same way
+        `GET` does (asterisks plus the last 4 characters); the real values are stored.
       operationId: updatePlatformOrganization
       security:
         - bearerAuth: []
@@ -213,7 +215,7 @@ paths:
                     allOf:
                       - $ref: '../../components/schemas/Organization.yaml'
                       - type: object
-                        description: Unmasked settings are returned here.
+                        description: Sensitive `settings.cloudonix` values are masked as in `GET`.
                         properties:
                           public_queues_token:
                             type:
