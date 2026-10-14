@@ -51,12 +51,14 @@ import {
 import {
   usePlatformUsers,
   useSetPlatformManager,
+  useUpdatePlatformUser,
   useDeletePlatformUser,
   useUpdateUserPassword,
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
 import { UserDeleteDialog } from '@/components/Users/UserDeleteDialog';
 import { platformApi } from '@/services/platformApi';
+import { getApiErrorMessage } from '@/services/api';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
@@ -113,6 +115,7 @@ export default function PlatformUsers() {
   const totalPages = Math.ceil(totalUsers / perPage);
 
   const setManagerMutation = useSetPlatformManager();
+  const updateUserMutation = useUpdatePlatformUser();
   const deleteMutation = useDeletePlatformUser();
   const updatePasswordMutation = useUpdateUserPassword();
 
@@ -121,7 +124,7 @@ export default function PlatformUsers() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
-  const [editFormData, setEditFormData] = useState({ name: '', email: '', role: 'pbx_user' });
+  const [editFormData, setEditFormData] = useState({ name: '', email: '', role: 'pbx_user', status: 'active' });
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
 
   const hasActiveFilters =
@@ -170,8 +173,19 @@ export default function PlatformUsers() {
 
   const openEditDialog = (user: PlatformUser) => {
     setSelectedUser(user);
-    setEditFormData({ name: user.name, email: user.email, role: user.role });
+    setEditFormData({ name: user.name, email: user.email, role: user.role, status: user.status });
     setShowEditDialog(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!selectedUser) return;
+    try {
+      await updateUserMutation.mutateAsync({ id: selectedUser.id, data: editFormData });
+      toast.success('User updated');
+      setShowEditDialog(false);
+    } catch (error) {
+      toast.error('Failed to update user', { description: getApiErrorMessage(error) });
+    }
   };
 
   const openPasswordDialog = (user: PlatformUser) => {
@@ -519,9 +533,21 @@ export default function PlatformUsers() {
                   />
                 </div>
 
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="text-sm text-muted-foreground">Status:</div>
-                  {getStatusBadge(selectedUser.status)}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select
+                    value={editFormData.status}
+                    onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="pt-4 border-t">
@@ -542,8 +568,8 @@ export default function PlatformUsers() {
               <Button variant="outline" onClick={() => setShowEditDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowEditDialog(false)}>
-                Save Changes
+              <Button onClick={handleEditSave} disabled={updateUserMutation.isPending}>
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </DialogContent>
