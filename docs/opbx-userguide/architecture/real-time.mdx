@@ -23,7 +23,7 @@ graph LR
     Laravel[Laravel API] -->|Broadcast events| Soketi
 ```
 
-When a call is initiated, answered, or ended, Laravel dispatches a broadcast event. Soketi forwards the event to all subscribed clients in the organization's presence channel. The React SPA updates the Live Calls view in real time.
+When the `call-initiated` webhook arrives, `ProcessInboundCallJob` broadcasts `call.initiated` on the organization's presence channel, and Soketi forwards it to every subscribed client. The Live Calls page merges these events into its list, but its main source is polling: it reloads the active calls from the session-updates API every 5 seconds by default (the refresh menu offers No Refresh, 1, 5, 15, 30 and 60 seconds).
 
 ---
 
@@ -33,7 +33,7 @@ Soketi runs as a Docker service (`opbx_websocket`) and listens on port 6001 inte
 
 ### Docker Configuration
 
-From `docker-compose.yml.example`:
+From `docker-compose.yml` (`docker-compose.yml.example` is the same file):
 
 ```yaml
 soketi:
@@ -45,7 +45,13 @@ soketi:
     SOKETI_DEFAULT_APP_ID: '${PUSHER_APP_ID:-app-id}'
     SOKETI_DEFAULT_APP_KEY: '${PUSHER_APP_KEY:-pbxappkey}'
     SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:?set PUSHER_APP_SECRET}'
+    SOKETI_METRICS_SERVER_PORT: '9601'
+    SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: 'false'
+    SOKETI_DEFAULT_APP_ENABLE_STATISTICS: 'true'
     SOKETI_DEFAULT_APP_MAX_CONNECTIONS: '10000'
+    SOKETI_DEFAULT_APP_MAX_BACKEND_EVENTS_PER_SECOND: '100'
+    SOKETI_DEFAULT_APP_MAX_CLIENT_EVENTS_PER_SECOND: '100'
+    SOKETI_DEFAULT_APP_MAX_READ_REQUEST_PER_SECOND: '100'
   healthcheck:
     test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9601/ready']
 ```
@@ -58,9 +64,10 @@ The frontend uses the environment variables:
 
 | Variable | Purpose |
 |----------|---------|
-| `VITE_PUSHER_APP_KEY` | Soketi app key |
+| `VITE_PUSHER_APP_KEY` | Soketi app key. Compose sets it from `PUSHER_APP_KEY` (default `pbxappkey`) |
 | `VITE_WS_HOST` | WebSocket host |
-| `VITE_WS_PORT` | WebSocket port (the compose file defaults to `80`, proxied through Nginx) |
+| `VITE_WS_PORT` | WebSocket port (the compose file defaults to `80`, proxied through Nginx; the code falls back to `6001`) |
+| `VITE_PUSHER_APP_CLUSTER` | Pusher cluster name (default `mt1`) |
 | `VITE_WS_SCHEME` | `http` or `https` |
 
 When Nginx proxies WebSockets, the browser connects to `ws://your-domain/app/` on port 80/443, not directly to port 6001.
@@ -73,7 +80,7 @@ Channel authorization is defined in `routes/channels.php`.
 
 | Channel | Type | Authorization |
 |---------|------|---------------|
-| `org.{organizationId}` | Presence | User belongs to the organization and is an Owner or PBX Admin. Supervisors are denied (their live view is filtered by assignment instead). Returns `{id, name, email, role}`. |
+| `org.{organizationId}` (`presence-org.{organizationId}` on the wire) | Presence | User belongs to the organization and is an Owner or PBX Admin. Supervisors are denied even though their role can view live calls (their live view is filtered by assignment instead). Returns `{id, name, email, role}`. |
 | `user.{userId}` | Private | User ID matches the channel ID. |
 | `extension.{extensionId}` | Private | User's organization matches the extension's organization. |
 
@@ -85,13 +92,13 @@ The organization presence channel is the primary channel for live call updates. 
 
 ## Broadcast Events
 
-| Event | Channel | Data |
-|-------|---------|------|
-| `CallInitiated` | `org.{organizationId}` | `call_id`, `from`, `to`, `did`, `status`, `timestamp` |
-| `CallAnswered` | `org.{organizationId}` | `call_id`, `extension`, `answered_at` |
-| `CallEnded` | `org.{organizationId}` | `call_id`, `duration` |
+| Event class | Broadcast name | Channel | Data |
+|-------------|----------------|---------|------|
+| `CallInitiated` | `call.initiated` | `org.{organizationId}` | `call_id`, `from_number`, `to_number`, `did_id`, `status`, `initiated_at` |
+| `CallAnswered` | `call.answered` | `org.{organizationId}` | `call_id`, `status`, `answered_at`, `extension_id` |
+| `CallEnded` | `call.ended` | `org.{organizationId}` | `call_id`, `status`, `ended_at`, `duration` |
 
-Events are dispatched from webhook handlers and jobs as call state changes occur.
+Only `CallInitiated` is dispatched today, by `ProcessInboundCallJob` after the `call-initiated` webhook. The `CallAnswered` and `CallEnded` classes exist and the frontend listens for them, but no backend code dispatches them. These are the only broadcast events in the backend; the `user.{userId}` and `extension.{extensionId}` channels have authorization rules but no events.
 
 ---
 
@@ -109,8 +116,8 @@ Events are dispatched from webhook handlers and jobs as call state changes occur
 
 ### Hooks
 
-- `useEchoConnection` — establishes the global Echo connection when the user is authenticated. It intentionally does **not** disconnect on component unmount so the connection persists across route changes.
-- `useCallPresence` — tracks `activeCalls` and `onlineMembers`, deduplicates entries, and recalculates call durations every second.
+- `useEchoConnection` — called from `AppLayout`; establishes the global Echo connection when the user is authenticated. It intentionally does **not** disconnect on component unmount so the connection persists across route changes.
+- `useCallPresence` — used by the Live Calls page; tracks `activeCalls` and `onlineMembers`, deduplicates entries, and recalculates call durations every second.
 
 ### Returned State
 
@@ -169,7 +176,7 @@ In production behind Nginx, set `VITE_WS_PORT=80` or `443` and `VITE_WS_SCHEME=h
 
 ## Scaling and Limits
 
-Default Soketi limits from `docker-compose.yml.example`:
+Default Soketi limits from `docker-compose.yml`:
 
 - Max connections: 10,000 per app
 - Max backend events per second: 100
@@ -191,7 +198,7 @@ For larger deployments, scale Soketi horizontally or tune these limits.
 
 ### No Live Call Updates
 
-1. Confirm the `CallInitiated` / `CallAnswered` / `CallEnded` events are dispatched from the webhook handlers.
+1. Confirm the `call-initiated` webhook reaches OPBX and the queue workers are running (`ProcessInboundCallJob` broadcasts `call.initiated`). Answered and ended states come from polling, not WebSocket events.
 2. Verify the user is subscribed to `org.{organizationId}`.
 3. Check that the organization channel authorization returns user data. It returns nothing for Reporters, PBX Users and Supervisors.
 
