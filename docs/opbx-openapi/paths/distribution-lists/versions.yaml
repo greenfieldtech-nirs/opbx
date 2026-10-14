@@ -1,0 +1,228 @@
+paths:
+  /v1/auto-dialer-campaigns/lists/{list}/versions:
+    parameters:
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Distribution Lists
+      summary: List previous versions
+      description: |
+        Previous versions of a distribution list, newest first. Each time a file is
+        uploaded over a `ready` or `used` list, the destinations it replaces are kept
+        as a version, exactly as they were at that moment. A version is deleted
+        `meta.retention_days` days after it was replaced (`expires_at`); `null` means
+        versions are kept until the list is deleted. Deleting the list deletes its
+        versions.
+
+        Roles: Owner, PBX Admin and Reporter.
+      operationId: listListVersions
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
+      responses:
+        '200':
+          description: Previous versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/ListVersion.yaml
+                  meta:
+                    type: object
+                    properties:
+                      retention_days:
+                        type:
+                        - integer
+                        - 'null'
+                        description: Days a version is kept after it is replaced
+                          (`RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS`)
+                        example: 30
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/destinations:
+    parameters:
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    - name: version
+      in: path
+      required: true
+      description: Previous version ID (`id` from the versions endpoint, not `version_number`)
+      schema:
+        type: integer
+        minimum: 1
+      example: 7
+    get:
+      tags:
+      - Distribution Lists
+      summary: List a previous version's destinations
+      description: |
+        The destinations of a previous version, in the order of the original list,
+        with their status, dial attempts and last result as they were when the
+        version was replaced. A version of another list returns 404.
+
+        Roles: Owner, PBX Admin and Reporter.
+      operationId: listListVersionDestinations
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
+      parameters:
+      - $ref: ../../components/parameters/query/Page.yaml
+      - name: per_page
+        in: query
+        required: false
+        description: Items per page (values outside 1-100 are clamped)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: search
+        in: query
+        required: false
+        description: Substring match on the phone number or the name
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A page of the version's destinations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/ListVersionDestination.yaml
+                  meta:
+                    $ref: ../../components/schemas/PaginationMeta.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/download:
+    parameters:
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    - name: version
+      in: path
+      required: true
+      description: Previous version ID (`id` from the versions endpoint, not `version_number`)
+      schema:
+        type: integer
+        minimum: 1
+      example: 7
+    get:
+      tags:
+      - Distribution Lists
+      summary: Download a previous version as CSV
+      description: |
+        Download a previous version as a CSV file named
+        `<list name> (version <n>).csv`. The file has a header row and one row per
+        destination with the columns `phone_number`, `name`, `batch_identifier`,
+        `metadata` (JSON), `status`, `dial_attempts`, `last_disposition` and
+        `last_dialed_at`.
+
+        Roles: Owner and PBX Admin.
+      operationId: downloadListVersion
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
+      responses:
+        '200':
+          description: CSV file download
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml
+  /v1/auto-dialer-campaigns/lists/{list}/parts:
+    parameters:
+    - name: list
+      in: path
+      required: true
+      description: Distribution List ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    get:
+      tags:
+      - Distribution Lists
+      summary: List a list's parts
+      description: |
+        The `<name> (Part N)` lists a large upload to this list was split into
+        (files of more than 100,000 rows), in creation order. Each is a list of its
+        own, with its own status and campaign; `campaign` is included.
+
+        Roles: Owner, PBX Admin and Reporter.
+      operationId: listDistributionListParts
+      security:
+      - bearerAuth: []
+      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
+      responses:
+        '200':
+          description: The list's parts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: ../../components/schemas/DistributionList.yaml
+        '401':
+          $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
+        '404':
+          $ref: ../../components/responses/NotFound.yaml

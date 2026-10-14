@@ -22,9 +22,10 @@ paths:
         - List in `draft`, `pending` or `failed` status (`action: upload`): the
           file is loaded into the current list.
         - List in `ready` or `used` status (`action: update`): the existing
-          destinations are backed up to a JSON file on the server and deleted,
-          the counters are reset, `version_number` is incremented and the file
-          is loaded into the same list.
+          destinations are kept as a previous version (see
+          `GET .../lists/{list}/versions`) and deleted, the counters are reset,
+          `version_number` is incremented and the file is loaded into the same
+          list.
         - Any other status (`processing`, `in_use`, `archived`): 422.
 
         The list moves to `processing` and ends in `ready` or `failed`. Phone
@@ -134,9 +135,6 @@ paths:
                         type: integer
                         description: Same as `version_number` (`update` only)
                         example: 2
-                      backup_path:
-                        type: string
-                        description: Server path of the JSON backup of the previous destinations (`update` only)
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':

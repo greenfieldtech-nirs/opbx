@@ -37,6 +37,7 @@ Use this module to:
 | Numbers per API batch add | 1000 |
 | Phone numbers | Validated with international numbering rules, stored as E.164. Numbers without `+` are read as US numbers. Duplicates in a file or list are skipped |
 | Copy name | Unique among your lists that are not archived |
+| Previous versions | Kept for 30 days after a new upload replaces them (`RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS`), then deleted automatically |
 
 ## Statuses
 
@@ -68,8 +69,8 @@ A campaign can hold several lists; assigning another list adds it to the ones al
 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See the page, list lists and their numbers | Yes | Yes | No | Yes (read-only) | No |
-| Create, upload, copy, download | Yes | Yes | No | No | No |
+| See the page, list lists and their numbers, previous versions and parts | Yes | Yes | No | Yes (read-only) | No |
+| Create, upload, copy, download (lists and previous versions) | Yes | Yes | No | No | No |
 | Download the example CSV | Yes | Yes | No | Yes | No |
 | Assign and unassign | Yes | Yes | No | No | No |
 | Reset dial attempts | Yes | Yes | No | No | No |
@@ -77,7 +78,7 @@ A campaign can hold several lists; assigning another list adds it to the ones al
 | Delete a Failed list | Yes | Yes | No | No | No |
 | Delete any other list | Yes | No | No | No | No |
 
-Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list completely (the list, all its numbers, their dialing records and the backup copies kept when it was re-uploaded; nothing can be restored) and asks for confirmation first. The lists split off it from a large file ("*name* (Part 2)" and so on) are deleted with it, and the confirmation says how many. A list that is assigned to a campaign, or whose parts include one that is, cannot be deleted: the delete is refused, nothing is deleted, and a dialog names the campaign (and the part). Unassign it first.
+Archiving an assigned list is refused (HTTP 422, the message names the campaign); unassign it first. The list index API takes `status=archived` for archived lists and `status=all` for every status including archived; without `status` it returns non-archived lists. Deleting removes the list completely (the list, all its numbers, their dialing records and its previous versions; nothing can be restored) and asks for confirmation first. The lists split off it from a large file ("*name* (Part 2)" and so on) are deleted with it, and the confirmation says how many. A list that is assigned to a campaign, or whose parts include one that is, cannot be deleted: the delete is refused, nothing is deleted, and a dialog names the campaign (and the part). Unassign it first.
 
 ## Workflows
 
@@ -105,7 +106,7 @@ Click **Create List**, then **Upload Destinations** in the row menu, map the col
 
 **Who can do this:** Owner, PBX Admin. Not while the list is In Use.
 
-Click **Upload** on the list's detail page. On a Ready or Used list this creates a new version. See [Replacing the numbers of a Ready or Used list](/opbx/applications/auto-dialer/distribution-lists#replacing-the-numbers-of-a-ready-or-used-list).
+Click **Upload** on the list's detail page. On a Ready or Used list this creates a new version; the numbers it replaces are kept as a previous version for 30 days. See [Replacing the numbers of a Ready or Used list](/opbx/applications/auto-dialer/distribution-lists#replacing-the-numbers-of-a-ready-or-used-list).
 
 ### Assign a list to a campaign
 
@@ -133,6 +134,18 @@ On the detail page's **Destinations** tab, use **Reset Dial Attempts** on a row,
 
 The **Delete** button that appears when rows are selected does not delete anything yet: it only shows "Deleting *n* destinations..." and clears the selection.
 
+### Browse or download a previous version
+
+**Who can do this:** browse: Owner, PBX Admin, Reporter. Download: Owner, PBX Admin (the download button is hidden from Reporters).
+
+Open the list's **Version History** tab. It says "Previous versions are kept for 30 days." and shows each version's upload date and uploader, file, entries, replacement date and **Deleted On** date. Click **View** to page through and search the version's numbers with their status, dial attempts, last result and last dialed time as they were when replaced; click the download icon or **Download CSV** to save "*list name* (version *n*).csv". See [Browse a previous version](/opbx/applications/auto-dialer/distribution-lists#browse-a-previous-version) and [Download a previous version](/opbx/applications/auto-dialer/distribution-lists#download-a-previous-version).
+
+### See a list's parts
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+On the detail page of a list whose large upload was split, open the **Parts (*n*)** tab. It lists each "(Part *n*)" list with its status, entries and assigned campaign; **Open** opens the part. See [See a list's parts](/opbx/applications/auto-dialer/distribution-lists#see-a-lists-parts).
+
 ### Copy a list
 
 **Who can do this:** Owner, PBX Admin.
@@ -159,7 +172,7 @@ Choose **Delete** and confirm with **Permanently Delete**. The page confirms "Li
 
 ### API-only tasks
 
-Adding single numbers or batches of up to 1000 numbers (`destinations`, `destinations/batch`), the CSV preview and the version and validation-error endpoints have no separate button beyond those above. Use the API endpoints below.
+Adding single numbers or batches of up to 1000 numbers (`destinations`, `destinations/batch`), the CSV preview and the validation-error endpoint have no separate button beyond those above. Use the API endpoints below.
 
 ## Key data fields
 
@@ -170,7 +183,10 @@ Adding single numbers or batches of up to 1000 numbers (`destinations`, `destina
 | `id`, `organization_id` | Key and tenant scope |
 | `campaign_id` | The campaign the list is assigned to, or empty. Several lists can share one campaign |
 | `name`, `description` | |
-| `version_number`, `parent_list_id`, `is_latest_version` | Versioning. Only latest versions appear on the page |
+| `version_number` | Increases by one each time a new file replaces the list's numbers |
+| `parent_list_id` | For a "(Part *n*)" list, the list it was split from |
+| `is_latest_version` | Only lists with it set appear on the page (archiving clears it) |
+| `uploaded_by`, `uploaded_at` | Who uploaded the current file, and when |
 | `status` | See [Statuses](#statuses) |
 | `used_by_campaign_id`, `used_at` | Last assignment |
 | `original_filename`, `total_rows`, `valid_rows`, `invalid_rows`, `validation_errors` | Upload results |
@@ -187,6 +203,10 @@ Adding single numbers or batches of up to 1000 numbers (`destinations`, `destina
 | `dial_attempts`, `consecutive_initiate_failures`, `next_retry_at` | Attempts and retry timing |
 | `last_dialed_at`, `last_disposition`, `last_error`, `duration`, `billsec` | Last result |
 | `last_session_token`, `last_call_id`, `last_cdr_id` | Links to the call |
+
+### `auto_dialer_list_versions` and `auto_dialer_list_version_destinations`
+
+A previous version (`list_id`, `version_number`, `original_filename`, `uploaded_by`, `uploaded_at`, `replaced_at`, `expires_at`, `entries_count`, `total_rows`, `valid_rows`, `invalid_rows`) and its numbers (`phone_number`, `name`, `batch_identifier`, `metadata`, `status`, `dial_attempts`, `last_dialed_at`, `last_disposition`, `duration`), copied when a re-upload replaced them. Deleting the list deletes them; `distribution-lists:prune-versions` deletes them daily once `expires_at` has passed. See [Auto Dialer Lists and Sessions](/opbx/data-models/models/auto-dialer-lists#autodialerlistversion).
 
 ## Related API endpoints
 
@@ -205,7 +225,10 @@ Adding single numbers or batches of up to 1000 numbers (`destinations`, `destina
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts` | Reset one number |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts` | Reset selected numbers |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations` | Reset every pending number |
-| GET | `/v1/auto-dialer-campaigns/lists/{list}/versions` | Version history |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/versions` | Previous versions, newest first, with `meta.retention_days` |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/versions/{version}/destinations` | A previous version's numbers (`page`, `per_page`, `search` by number or name) |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/versions/{version}/download` | A previous version as CSV (Owner, PBX Admin) |
+| GET | `/v1/auto-dialer-campaigns/lists/{list}/parts` | The "(Part *n*)" lists a large upload was split into |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/validation-errors` | Errors of a Failed list |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/copy` | Copy |
 | GET | `/v1/auto-dialer-campaigns/lists/{list}/download` | CSV export |

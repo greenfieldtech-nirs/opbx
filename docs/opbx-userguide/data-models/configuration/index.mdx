@@ -353,7 +353,7 @@ Only one provider may be enabled. Provider-specific variables:
 
 ## Data Retention
 
-Retention periods are set in days (or hours where noted) and enforced by the scheduler. Set a variable to an empty value to turn pruning off for that data. The pruning runs daily at 03:00 (`model:prune`); the CDR tiers and recording expiry run at 04:00 and 04:30 UTC.
+Retention periods are set in days (or hours where noted) and enforced by the scheduler. Set a variable to an empty value to turn pruning off for that data. The pruning runs daily at 03:00 (`model:prune`; previous list versions at 03:15); the CDR tiers and recording expiry run at 04:00 and 04:30 UTC.
 
 | Variable | Default | Data |
 |----------|---------|------|
@@ -363,6 +363,7 @@ Retention periods are set in days (or hours where noted) and enforced by the sch
 | `RETENTION_BLOCKED_CALL_LOGS_DAYS` | `90` | Blocked-call logs |
 | `RETENTION_QUEUE_CALLS_DAYS` | `183` | Call-queue call records (deleted, not archived) |
 | `RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS` | `183` | Auto-dialer call sessions (deleted) |
+| `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` | `30` | Previous versions of distribution lists, counted from the upload that replaced them (`distribution-lists:prune-versions`, daily at 03:15). Also removes list backup files left by older releases once they are this old. The value applies to versions replaced after it is set |
 | `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` | `365` | Platform audit log |
 | `PLATFORM_HEALTH_RETENTION_HOURS` | `24` | Platform Status history, in **hours** |
 

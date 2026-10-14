@@ -335,6 +335,9 @@ paths:
   /v1/auto-dialer-campaigns/lists/{list}/download:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1download'
 
+  /v1/auto-dialer-campaigns/lists/{list}/parts:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1parts'
+
   /v1/auto-dialer-campaigns/lists/{list}/preview-csv:
     $ref: './paths/distribution-lists/upload.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1preview-csv'
 
@@ -351,7 +354,13 @@ paths:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1validation-errors'
 
   /v1/auto-dialer-campaigns/lists/{list}/versions:
-    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions'
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions'
+
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/destinations:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions~1{version}~1destinations'
+
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/download:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions~1{version}~1download'
 
   /v1/auto-dialer-campaigns/monitor/summary:
     $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1monitor~1summary'

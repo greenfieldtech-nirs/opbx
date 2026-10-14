@@ -241,8 +241,7 @@ paths:
       summary: Delete distribution list
       description: |
         Delete a distribution list completely: the list, all its destinations, their dial
-        sessions and the backup copies of its destinations kept when the list was
-        re-uploaded. Nothing of the list remains. The lists created by splitting a large
+        sessions and its previous versions. Nothing of the list remains. The lists created by splitting a large
         upload into it ("*name* (Part 2)" and so on; counted in `parts_count`) are deleted
         the same way, in the same transaction.
 

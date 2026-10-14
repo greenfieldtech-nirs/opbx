@@ -11,7 +11,7 @@ Distribution lists, their destinations, and the call sessions the dialer creates
 
 ## AutoDialerList
 
-A distribution list of phone numbers. Lists are versioned: a new version is a new row that points to the first version through `parent_list_id`.
+A distribution list of phone numbers. Uploading a new file over a list's numbers keeps the list row and increases `version_number`; the replaced numbers are kept as an [AutoDialerListVersion](#autodialerlistversion). `parent_list_id` links a "(Part N)" list to the list a large upload was split from.
 
 **Table:** `auto_dialer_lists`  
 **Model:** `App\Models\AutoDialerList`  
@@ -25,12 +25,14 @@ A distribution list of phone numbers. Lists are versioned: a new version is a ne
 | `name` | varchar(255) | No | - | List name |
 | `description` | text | Yes | null | Description |
 | `version_number` | int unsigned | No | `1` | Version number, starting at 1 |
-| `parent_list_id` | bigint unsigned | Yes | null | Original list this row is a version of. Foreign key to `auto_dialer_lists`, on delete set null |
+| `parent_list_id` | bigint unsigned | Yes | null | List this "(Part N)" list was split from (rows of a retired versioning flow also use it). Foreign key to `auto_dialer_lists`, on delete set null |
 | `is_latest_version` | boolean | No | `true` | True on the newest version of a list |
 | `status` | enum | Yes | `draft` | List state. Values: `draft`, `pending`, `processing`, `ready`, `failed`, `in_use`, `used`, `archived` (cast to `ListStatus`) |
 | `used_by_campaign_id` | bigint unsigned | Yes | null | Campaign that used the list. Foreign key to `auto_dialer_campaigns`, on delete set null |
 | `used_at` | timestamp | Yes | null | When the list was marked used |
 | `original_filename` | varchar(255) | Yes | null | Uploaded CSV file name |
+| `uploaded_by` | bigint unsigned | Yes | null | User who uploaded the current file. Foreign key to `users`, on delete set null |
+| `uploaded_at` | timestamp | Yes | null | When the current file was uploaded |
 | `processed_at` | timestamp | Yes | null | When CSV processing finished |
 | `total_rows` | int unsigned | No | `0` | Rows in the uploaded CSV |
 | `valid_rows` | int unsigned | No | `0` | Rows imported as destinations |
@@ -48,7 +50,7 @@ A distribution list of phone numbers. Lists are versioned: a new version is a ne
 - `idx_org_status`: `organization_id`, `status`
 - `idx_version`: `parent_list_id`, `version_number`
 
-**Casts:** `validation_errors` (array)  
+**Casts:** `validation_errors` (array), `uploaded_at` (datetime)  
 
 **Relationships**
 
@@ -57,17 +59,91 @@ $autoDialerList->campaign() → AutoDialerCampaign (campaign_id) [BelongsTo]
 $autoDialerList->destinations() → AutoDialerDestination (list_id) [HasMany]
 $autoDialerList->organization() → Organization (organization_id) [BelongsTo]
 $autoDialerList->parentList() → AutoDialerList (parent_list_id) [BelongsTo]
-$autoDialerList->versions() → AutoDialerList (parent_list_id) [HasMany]
-$autoDialerList->latestVersion() → AutoDialerList (parent_list_id) [HasOne]
+$autoDialerList->versions() → AutoDialerListVersion (list_id) [HasMany]
+$autoDialerList->parts() → AutoDialerList (parent_list_id, name like '% (Part %)') [HasMany]
 $autoDialerList->usedByCampaign() → AutoDialerCampaign (used_by_campaign_id) [BelongsTo]
 ```
 
 **Scopes:** `ready()`, `processing()`, `archived()`, `latestVersion()`, `assignable()`  
-**Methods:** `canBeArchived()`, `isReady()`, `allDestinationsArePendingAndFresh()`, `canDelete()`, `isAssigned()`, `canUnassign()`, `isLocked()`, `getVersionHistory()`, `markAsInUse()`, `markAsUsed()`, `archive()`, `createNewVersion()`, `copy()`  
+**Methods:** `canBeArchived()`, `isReady()`, `allDestinationsArePendingAndFresh()`, `canDelete()`, `isAssigned()`, `canUnassign()`, `isLocked()`, `allParts()`, `markAsInUse()`, `markAsUsed()`, `archive()`, `copy()`  
 
 `canUnassign()` is true while the list is assigned and every destination is still `pending` with zero `dial_attempts` (`allDestinationsArePendingAndFresh()`); once the campaign has started processing the list's entries, the list can no longer be unassigned.
 
 `ready()`, `processing()` and `archived()` filter by status, `latestVersion()` by `is_latest_version`, and `assignable()` returns `ready` lists. The `ListStatus` rules (which states can be assigned, uploaded to, archived, copied or versioned) are listed in [Enumerations](/opbx/data-models/enums/index#liststatus).
+
+## AutoDialerListVersion
+
+A previous version of a distribution list: the numbers one re-upload replaced, kept until `expires_at`. Written by `ListManagementService::updateListWithBackup()` in the same transaction that deletes the replaced destinations.
+
+**Table:** `auto_dialer_list_versions`  
+**Model:** `App\Models\AutoDialerListVersion`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `list_id` | bigint unsigned | No | - | The list. Foreign key to `auto_dialer_lists`, on delete cascade |
+| `version_number` | int unsigned | No | - | The list's `version_number` while these numbers were current |
+| `original_filename` | varchar(255) | Yes | null | File the version came from, when known |
+| `uploaded_by` | bigint unsigned | Yes | null | User who uploaded that file, when known. Foreign key to `users`, on delete set null |
+| `uploaded_at` | timestamp | Yes | null | When that file was uploaded (for lists uploaded before uploads were recorded, when processing finished) |
+| `replaced_at` | timestamp | No | - | When a new upload replaced the version |
+| `expires_at` | timestamp | Yes | null | When the version is deleted: `replaced_at` plus `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` (default 30); null when that setting is empty (kept until the list is deleted) |
+| `entries_count` | int unsigned | No | `0` | Numbers kept |
+| `total_rows` | int unsigned | Yes | null | Rows in that version's CSV |
+| `valid_rows` | int unsigned | Yes | null | Rows imported from it |
+| `invalid_rows` | int unsigned | Yes | null | Rows rejected from it |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `auto_dialer_list_versions_list_id_version_number_unique`: `list_id`, `version_number` (unique)
+- `auto_dialer_list_versions_expires_at_index`: `expires_at`
+
+**Casts:** `uploaded_at`, `replaced_at`, `expires_at` (datetime)
+
+**Relationships**
+
+```php
+$autoDialerListVersion->list() → AutoDialerList (list_id) [BelongsTo]
+$autoDialerListVersion->uploader() → User (uploaded_by) [BelongsTo]
+$autoDialerListVersion->destinations() → AutoDialerListVersionDestination (version_id) [HasMany]
+```
+
+`distribution-lists:prune-versions` (daily at 03:15) deletes versions whose `expires_at` has passed; their entries go by cascade. It also deletes files on the `list_backups` disk (`storage/app/backups/lists`, JSON backups written by older releases) older than the retention period.
+
+## AutoDialerListVersionDestination
+
+One number of a previous list version, copied from `auto_dialer_destinations` when the version was replaced. Rows are only inserted (chunked `INSERT ... SELECT`), never updated.
+
+**Table:** `auto_dialer_list_version_destinations`  
+**Model:** `App\Models\AutoDialerListVersionDestination`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key; ascending in the order of the original list |
+| `version_id` | bigint unsigned | No | - | The version. Foreign key to `auto_dialer_list_versions`, on delete cascade |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `phone_number` | varchar(50) | No | - | Number |
+| `name` | varchar(255) | Yes | null | Contact name |
+| `batch_identifier` | varchar(255) | Yes | null | Batch label from the CSV |
+| `metadata` | json | Yes | null | Extra CSV columns |
+| `status` | varchar(20) | No | - | Dialing state at the time (cast to `DestinationStatus`) |
+| `dial_attempts` | int unsigned | No | `0` | Dial attempts made |
+| `last_dialed_at` | timestamp | Yes | null | When the last attempt started |
+| `last_disposition` | varchar(50) | Yes | null | Disposition of the last attempt |
+| `duration` | int unsigned | No | `0` | Duration of the last call, seconds |
+| `created_at` | timestamp | Yes | null | Copied from the destination |
+| `updated_at` | timestamp | Yes | null | Copied from the destination |
+
+**Indexes**
+
+- `adlvd_version_phone_idx`: `version_id`, `phone_number`
+
+**Casts:** `status` (`DestinationStatus`), `metadata` (array), `last_dialed_at` (datetime)
 
 ## AutoDialerDestination
 

@@ -91,13 +91,25 @@ properties:
     type:
     - integer
     - 'null'
-    description: ID of the parent list (for versioned lists)
+    description: For a "(Part N)" list, the ID of the list a large upload was split from
     example: null
   has_versions:
     type: boolean
-    description: Whether other lists point to this one as their parent (always `false` in the
-      versions endpoint response)
+    description: Whether previous versions of the list are kept (destinations replaced by a
+      re-upload; see the versions endpoint)
     example: false
+  parent_list:
+    type:
+    - object
+    - 'null'
+    description: The list this "(Part N)" list was split from. Present in the show response only.
+    properties:
+      id:
+        type: integer
+        example: 1
+      name:
+        type: string
+        example: Fall Webinar Leads
   parts_count:
     type: integer
     description: Number of "(Part N)" lists a large upload into this list was split into;
@@ -153,8 +165,8 @@ properties:
     type:
     - object
     - 'null'
-    description: Assigned campaign. Present in the list and show responses;
-      omitted in the create, copy and versions responses.
+    description: Assigned campaign. Present in the list, show and parts responses;
+      omitted in the create and copy responses.
     properties:
       id:
         type: integer
@@ -167,7 +179,7 @@ properties:
     - object
     - 'null'
     description: Campaign that used this list. Present in the list and show responses;
-      omitted in the create, copy and versions responses.
+      omitted in the create, copy and parts responses.
     properties:
       id:
         type: integer

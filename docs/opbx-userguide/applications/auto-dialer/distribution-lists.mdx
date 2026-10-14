@@ -80,7 +80,7 @@ phone_number,name,batch_identifier,company
 
 ### Large files
 
-A list holds at most **100,000** numbers. A file with more rows is split automatically: the first part goes into your list and each further part into a new list named "*name* (Part 2)", "(Part 3)" and so on. The parts belong to your list: deleting the list deletes them too.
+A list holds at most **100,000** numbers. A file with more rows is split automatically: the first part goes into your list and each further part into a new list named "*name* (Part 2)", "(Part 3)" and so on. The parts belong to your list: they are listed on its **Parts** tab (see [See a list's parts](#see-a-lists-parts)), and deleting the list deletes them too.
 
 ## List statuses
 
@@ -99,11 +99,11 @@ A list holds at most **100,000** numbers. A file with more rows is split automat
 
 Who can do this: Owner and PBX Admin.
 
-1. Open the list's detail page and click **Upload**. The dialog warns "Current version (v*n*) will be archived and version *n+1* will be created."
+1. Open the list's detail page and click **Upload**. The dialog warns "The current entries (v*n*) will be replaced by version *n+1*. You can still open and download them from the list's Version History tab."
 2. Choose the file, map the columns as for a [new upload](#create-a-list-and-upload-numbers).
 3. Click **Create Version & Upload**.
 
-Result: the toast "Version *n+1* created. Old data backed up. Processing..." appears; when processing ends the dialog shows "Version *n+1* created and uploaded successfully!" and the page shows the toast "Upload completed successfully". The existing numbers are backed up on the server, removed, and the new file is processed into the same list with its version number increased by one. Download the list first if you need its current numbers and statuses.
+Result: the toast "Version *n+1* created. The previous entries are in Version History. Processing..." appears; when processing ends the dialog shows "Version *n+1* created and uploaded successfully!" and the page shows the toast "Upload completed successfully". The new file is processed into the same list with its version number increased by one. The numbers it replaces are kept, exactly as they were at that moment (status, dial attempts, last result), as a [previous version](#previous-versions) you can browse and download for 30 days.
 
 On a Draft, Pending or Failed list, **Upload** on the detail page adds numbers like **Upload Destinations**. On a Processing or Archived list the server refuses the upload ("Cannot upload to list in status: …").
 
@@ -136,7 +136,7 @@ The same rules apply here and on the campaign's detail page:
 
 ## The list detail page
 
-Click a list's row or name, or choose **View Details** in the row menu. The header shows the name, status, version (and **Old Version** for an older version) and, for a copy, "Copied from Version *n*". The buttons are:
+Click a list's row or name, or choose **View Details** in the row menu. The header shows the name, status and version. For a part of a split list it also shows "Part of *list name*"; click the name to open the list it was split from. The buttons are:
 
 | Button | Shown when | Does |
 |--------|-----------|------|
@@ -155,7 +155,8 @@ Tabs:
 | Tab | Shown when | Content |
 |-----|-----------|---------|
 | Destinations | Always | Phone number, name, batch, metadata (click **_n_ fields** to see them), status, dial attempts, last call (date and last result), duration. **Search phone numbers or descriptions...** searches the phone number; the filter offers All Statuses, Pending, Completed, Failed and Invalid |
-| Version History | The list has versions | Every version with its status, valid numbers and date; **View** opens it |
+| Version History | A file was uploaded over the list's numbers at least once | The [previous versions](#previous-versions) of the list, with the date each is deleted |
+| Parts (*n*) | A large file was split into parts | The [parts](#see-a-lists-parts) the file was split into |
 | Validation Errors | The list is Failed | A **Download Errors CSV** button that does not download anything yet, and no rows. To read or download the rejected rows, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu |
 | Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
@@ -182,6 +183,58 @@ Who can do this: Owner, PBX Admin and Reporter.
 1. On a **Failed** list's row, open the row menu (⋮) and choose **View Errors**.
 
 Result: the **Validation Errors** dialog lists each rejected row with its row number, phone number and error, and the total. **Download CSV** saves them as *name*`_validation_errors.csv`; **Close** closes the dialog. Fix the file and upload it again with **Upload Destinations**, or delete the list.
+
+## Previous versions
+
+Each time you [upload a new file over a list's numbers](#replacing-the-numbers-of-a-ready-or-used-list), the numbers it replaces are kept as a previous version of the list, exactly as they were at that moment. The **Version History** tab lists them, newest first, under the note "Previous versions are kept for 30 days." Each row shows:
+
+| Column | Content |
+|--------|---------|
+| Version | The version number (v1, v2, ...) |
+| Uploaded | When that version's file was uploaded, and by whom when known |
+| File | The name of the file that version came from, when known |
+| Entries | How many numbers it held, and the valid and invalid rows of its file when known |
+| Replaced | When a new upload replaced it |
+| Deleted On | The day the version is deleted |
+
+A previous version is deleted automatically 30 days after it was replaced (the period is the `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` setting, see [Configuration](/opbx/data-models/configuration#data-retention)). Download it before then if you need to keep it. Deleting the list deletes its previous versions at once.
+
+{/* SCREENSHOT: auto-dialer-lists-version-history — Version History tab of a list re-uploaded twice: the 30-day note and two versions with their Deleted On dates */}
+
+### Browse a previous version
+
+Who can do this: Owner, PBX Admin and Reporter.
+
+1. Open the list's detail page and click the **Version History** tab.
+2. On the version's row, click **View**.
+3. To find a number, type part of the phone number or the name in **Search phone numbers or names...**.
+4. Use **Previous** and **Next** to page through the entries, 25 per page.
+5. Click the close icon to put the version away.
+
+Result: a card titled **Version *n*** opens under the list of versions. It shows each number with its name, status, dial attempts, last result and when it was last dialed, as they were when the version was replaced. A previous version is read-only: it cannot be assigned, dialed or edited. To call its numbers again, download it and upload the file to a list.
+
+{/* SCREENSHOT: auto-dialer-lists-version-browse — an open previous version: search box, entries with status, dial attempts, last result and last dialed, and the Download CSV button */}
+
+### Download a previous version
+
+Who can do this: Owner and PBX Admin.
+
+1. Open the list's detail page and click the **Version History** tab.
+2. Click the download icon on the version's row, or **View** and then **Download CSV**.
+
+Result: the browser saves "*list name* (version *n*).csv" with the columns `phone_number`, `name`, `batch_identifier`, `metadata` (JSON), `status`, `dial_attempts`, `last_disposition` and `last_dialed_at`. If the download fails, the toast "Failed to download version" appears.
+
+## See a list's parts
+
+Who can do this: Owner, PBX Admin and Reporter.
+
+1. Open the detail page of the list you uploaded the large file to.
+2. Click the **Parts (*n*)** tab.
+3. To work with a part, click **Open** on its row.
+
+Result: the tab lists every "*name* (Part *n*)" list the file was split into, with its status, number of valid entries and the campaign it is assigned to. **Open** opens the part's own detail page, where you assign, download or copy it like any list; its header says "Part of *list name*" with a link back.
+
+{/* SCREENSHOT: auto-dialer-lists-parts — Parts tab of a list split from a large file: two parts, one assigned to a campaign */}
 
 ## Copy a list
 
@@ -219,7 +272,7 @@ Who can do this: the Owner for any list that is not assigned to a campaign; a PB
 1. Choose **Delete** in the row menu or on the detail page.
 2. In the **Delete List** dialog, click **Permanently Delete**. For a list that is not Failed the dialog warns that only Owners can delete such lists. For a list split from a large file the dialog also says how many parts are deleted with it.
 
-Result: the toast "List deleted successfully" (row menu) or "List deleted" (detail page, which then returns to the list page) appears. The list is deleted completely: the list, all its numbers, their dialing records and the backup copies kept when the list was re-uploaded. It cannot be restored. The lists created by splitting a large file into it ("*name* (Part 2)" and so on) are deleted the same way, all together.
+Result: the toast "List deleted successfully" (row menu) or "List deleted" (detail page, which then returns to the list page) appears. The list is deleted completely: the list, all its numbers, their dialing records and its [previous versions](#previous-versions). It cannot be restored. The lists created by splitting a large file into it ("*name* (Part 2)" and so on) are deleted the same way, all together.
 
 If the server is asked to delete a list that a campaign still uses, or a list one of whose parts a campaign still uses, it refuses, deletes nothing, and the **Cannot delete: still in use** dialog names the campaign (and the part, for a part). Unassign the list or part first, then delete the list.
 
@@ -229,9 +282,9 @@ If the server is asked to delete a list that a campaign still uses, or a list on
 
 | Action | Owner | PBX Admin | Reporter | PBX User | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See lists, numbers and versions | Yes | Yes | Yes (read-only) | No | No |
+| See lists, numbers, previous versions and parts | Yes | Yes | Yes (read-only) | No | No |
 | Create, upload, assign, unassign, copy, archive | Yes | Yes | No | No | No |
-| Reset dial attempts, download | Yes | Yes | No | No | No |
+| Reset dial attempts, download (lists and previous versions) | Yes | Yes | No | No | No |
 | Delete | Any unassigned list | Failed lists only | No | No | No |
 
 ## Common errors

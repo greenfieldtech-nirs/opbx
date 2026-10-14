@@ -1,0 +1,66 @@
+type: object
+title: ListVersionDestination
+description: One destination of a previous list version, as it was when the version was replaced.
+properties:
+  id:
+    type: integer
+    description: Ascending in the order of the original list
+    example: 4411
+  phone_number:
+    type: string
+    example: '+14155551212'
+  name:
+    type:
+    - string
+    - 'null'
+    example: John Doe
+  batch_identifier:
+    type:
+    - string
+    - 'null'
+    example: batch-a
+  metadata:
+    type:
+    - object
+    - 'null'
+    additionalProperties:
+      type: string
+    example:
+      account: ACC-123
+  status:
+    type: string
+    enum:
+    - pending
+    - dialing
+    - connected
+    - failed
+    - completed
+    - invalid
+    example: completed
+  status_label:
+    type: string
+    example: Completed
+  dial_attempts:
+    type: integer
+    example: 2
+  last_disposition:
+    type:
+    - string
+    - 'null'
+    description: Result of the last attempt
+    example: ANSWER
+  last_dialed_at:
+    type:
+    - string
+    - 'null'
+    description: When the last attempt started (`Y-m-d H:i:s`)
+    example: '2026-10-10 14:02:11'
+  duration:
+    type: integer
+    description: Duration of the last call, seconds
+    example: 42
+required:
+- id
+- phone_number
+- status
+- dial_attempts
