@@ -4,11 +4,11 @@ paths:
       tags:
       - AI Load Balancers
       summary: List AI load balancers
-      description: 'Get paginated list of AI assistant load balancers with member details.
-
-        Supports filtering by strategy, status, and search.
-
-        '
+      description: |
+        Paginated list of AI assistant load balancers with members and fallback targets. Any
+        authenticated user can list. Filters: `strategy`, `status`, `search`, `unprovisioned`
+        (unknown `strategy`/`status` values are ignored). Default order is `created_at` descending.
+        List items also carry `members_count` and `active_members_count`.
       operationId: listAiLoadBalancers
       security:
       - bearerAuth: []
@@ -31,6 +31,7 @@ paths:
           - updated_at
           default: created_at
       - $ref: ../../components/parameters/query/SortOrder.yaml
+        description: Sort direction. Defaults to `desc` on this endpoint.
       - name: strategy
         in: query
         schema:
@@ -48,6 +49,7 @@ paths:
           - inactive
       - name: search
         in: query
+        description: Substring match on name or description
         schema:
           type: string
       responses:
@@ -70,11 +72,13 @@ paths:
       tags:
       - AI Load Balancers
       summary: Create AI load balancer
-      description: 'Create a new AI assistant load balancer with members.
-
-        Fallback action determines which fallback fields are used.
-
-        '
+      description: |
+        Create an AI assistant load balancer with members. Owner and PBX Admin only.
+        `strategy` defaults to `round_robin`, `status` to `active` and `fallback_action` to
+        `hangup`. Only the fallback_*_id matching `fallback_action` is stored; the others are
+        cleared. Every member must be an active AI assistant of the organization. A fallback
+        extension, ring group, IVR menu or AI assistant must be active, and the fallback AI
+        assistant cannot also be a member.
       operationId: createAiLoadBalancer
       security:
       - bearerAuth: []
@@ -90,9 +94,6 @@ paths:
                 - $ref: '../../components/schemas/AiAssistantLoadBalancerInput.yaml'
                 - required:
                     - name
-                    - strategy
-                    - fallback_action
-                    - status
                     - members
       responses:
         '201':
@@ -104,10 +105,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Aiassistantloadbalancer created successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
   /v1/ai-assistant-load-balancers/{ai_assistant_load_balancer}:
@@ -146,11 +150,13 @@ paths:
       tags:
       - AI Load Balancers
       summary: Update AI load balancer
-      description: 'Update load balancer configuration. Members are replaced if provided.
-
-        Uses distributed locking to prevent concurrent updates.
-
-        '
+      description: &updDesc |
+        Update a load balancer. Owner and PBX Admin only. All fields are optional. When
+        `members` is sent it replaces the whole member list (at least one). When
+        `fallback_action` is omitted the stored action and target are kept. The same member
+        and fallback checks as create apply; in addition the load balancer cannot fall back to
+        itself, and a chain of `ai_load_balancer` fallbacks must not lead back to it (422).
+        A concurrent update of the same load balancer returns 409 after waiting up to 5 seconds.
       operationId: updateAiLoadBalancer
       security:
       - bearerAuth: []
@@ -173,10 +179,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Aiassistantloadbalancer updated successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
@@ -194,11 +203,7 @@ paths:
       tags:
       - AI Load Balancers
       summary: Partially update AI load balancer
-      description: 'Update load balancer configuration. Members are replaced if provided.
-
-        Uses distributed locking to prevent concurrent updates.
-
-        '
+      description: *updDesc
       operationId: patchAiLoadBalancer
       security:
       - bearerAuth: []
@@ -221,10 +226,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Aiassistantloadbalancer updated successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistantLoadBalancer.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
@@ -242,7 +250,7 @@ paths:
       tags:
       - AI Load Balancers
       summary: Delete AI load balancer
-      description: Refused with 409 when the load balancer is still referenced (for example by extensions or routing). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the load balancer is still referenced (for example by extensions or routing). The 409 body lists the references.
       operationId: deleteAiLoadBalancer
       security:
       - bearerAuth: []
@@ -254,6 +262,8 @@ paths:
           description: Load balancer deleted
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':

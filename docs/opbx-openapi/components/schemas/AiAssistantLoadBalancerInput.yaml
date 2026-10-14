@@ -14,6 +14,7 @@ properties:
   strategy:
     type: string
     enum: [round_robin, priority, percentage]
+    description: Defaults to `round_robin` on create
   follow_through:
     type:
       - boolean
@@ -21,7 +22,7 @@ properties:
   fallback_action:
     type: string
     enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
-    description: '`unavailable` is rejected on create (422) and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, call_queue and ai_load_balancer (a load balancer cannot fall back to itself).'
+    description: 'Defaults to `hangup` on create. `unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, call_queue and ai_load_balancer (a load balancer cannot fall back to itself or through a chain back to itself).'
   fallback_extension_id:
     type:
       - integer
@@ -49,8 +50,10 @@ properties:
   status:
     type: string
     enum: [active, inactive]
+    description: Defaults to `active` on create
   members:
     type: array
+    description: Replaces the whole member list when sent. Each AI assistant must be active and appear once.
     minItems: 1
     maxItems: 50
     items:
@@ -64,20 +67,24 @@ properties:
             - integer
             - 'null'
           minimum: 0
+          description: 0 is the highest priority. Defaults to the member's index in the array.
         weight:
           type:
             - integer
             - 'null'
           minimum: 0
           maximum: 100
+          description: Defaults to 100
         position:
           type:
             - integer
             - 'null'
           minimum: 0
+          description: Defaults to the member's index in the array
         status:
           type:
             - string
             - 'null'
           enum: [active, inactive, null]
+          description: Defaults to `active`
       required: [ai_assistant_id]

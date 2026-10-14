@@ -29,6 +29,7 @@ properties:
     description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   fallback_action:
     type: string
+    description: Only the fallback_*_id matching this action is set; the others are null.
     enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
   fallback_extension_id:
     type:
@@ -56,7 +57,7 @@ properties:
       - 'null'
   members:
     type: array
-    description: Members ordered by position (present when loaded)
+    description: Members ordered by position
     items:
       type: object
       properties:
@@ -76,10 +77,13 @@ properties:
           type: integer
         status:
           type: string
+          enum: [active, inactive]
   members_count:
     type: integer
+    description: List endpoint only
   active_members_count:
     type: integer
+    description: List endpoint only. Members whose AI assistant is active.
   fallback_extension:
     $ref: '#/$defs/Ref'
   fallback_ring_group:
@@ -109,7 +113,7 @@ $defs:
     type:
       - object
       - 'null'
-    description: Fallback target summary (present when loaded); `name` or `extension_number`
+    description: Fallback target summary, null when that target is not set. `fallback_extension` carries `extension_number`; the others carry `name`.
     properties:
       id:
         type: integer
