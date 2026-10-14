@@ -27,10 +27,8 @@ paths:
         - `attempt`: Attempt number (starts at 1)
 
 
-        Middleware: voice.webhook.auth
-
-
-        Authentication: Bearer token (per-organization domain_requests_api_key)
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`). Unexpected exceptions
+        answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
 
         '
       operationId: conferencePinCallback
@@ -57,9 +55,10 @@ paths:
       requestBody:
         required: true
         content:
-          application/x-www-form-urlencoded:
+          application/json:
             schema:
               type: object
+              description: No FormRequest validates this body. It must be JSON because the authentication middleware reads `Domain` and `To` from it.
               properties:
                 CallSid:
                   type: string
@@ -69,14 +68,16 @@ paths:
                   type: string
                   description: Digits the caller entered (empty when the prompt timed out)
                   example: '4321'
-          application/json:
-            schema:
-              type: object
-              properties:
-                CallSid:
+                Domain:
                   type: string
-                Digits:
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                  example: acme.cloudonix.net
+                To:
                   type: string
+                  description: Called number (required by the authentication middleware)
+                From:
+                  type: string
+                  description: Caller number
       responses:
         '200':
           description: CXML that joins the conference, repeats the PIN prompt, or hangs up
@@ -84,5 +85,15 @@ paths:
             application/xml:
               schema:
                 $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
         '401':
-          description: Unauthorized - Invalid Bearer token
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml

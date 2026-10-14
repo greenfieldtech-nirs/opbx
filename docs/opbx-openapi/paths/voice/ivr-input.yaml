@@ -4,10 +4,31 @@ paths:
       tags:
         - Voice Routing
       summary: Handle IVR digit input
-      description: Process DTMF input from IVR menu
+      description: |
+        `<Gather>` action of an IVR menu: receives the DTMF digits the caller pressed and
+        returns CXML. The IVR menu comes from the `menu_id` query parameter that the IVR
+        routing strategy puts in the Gather `action` URL.
+
+        - A matching option routes to that option's destination.
+        - An unknown option replays the menu, until the menu's `max_turns` is exceeded; then
+          the call goes to the menu's failover destination.
+        - An unknown or other-organization `menu_id`, or no IVR state for `CallSid`, answers
+          200 CXML that says the error and hangs up.
+
+        Authentication, 400/401 CXML responses and the 422/302 validation behaviour are the
+        same as `POST /voice/route`. The body must be JSON: the authentication middleware
+        reads `Domain` and `To` from the JSON body. Unexpected exceptions answer 200 CXML.
+        Not rate-limited.
       operationId: handleIvrInput
       security:
         - voiceWebhookAuth: []
+      parameters:
+        - name: menu_id
+          in: query
+          required: true
+          description: IVR menu ID (set by the IVR routing strategy in the Gather action URL)
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
@@ -40,7 +61,8 @@ paths:
                   - string
                   - 'null'
                   maxLength: 255
-                  description: Cloudonix domain
+                  pattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                  description: Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it.
                 CallStatus:
                   type:
                   - string
@@ -53,11 +75,8 @@ paths:
                   - integer
                   - 'null'
                   minimum: 1
-                  description: Organization ID appended to callback URLs by the platform
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
               required: [CallSid, Digits, From, To]
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/paths/~1voice~1ivr-input/post/requestBody/content/application~1json/schema'
       responses:
         '200':
           description: CXML response
@@ -65,3 +84,17 @@ paths:
             application/xml:
               schema:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '401':
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

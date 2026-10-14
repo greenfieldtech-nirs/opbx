@@ -1,47 +1,56 @@
 type: object
-description: CXML (Cloudonix XML) response structure
+description: |
+  CXML (Cloudonix XML) document, built by `App\Services\CxmlBuilder\CxmlBuilder`
+  (DOMDocument, UTF-8). The root element is `<Response>`; the verbs below are the
+  ones the voice routing code emits. Call recording is an attribute of `<Dial>`
+  (`record`, `recordingStatusCallback`), not a separate `<Record>` verb.
+
+  When routing fails with an unexpected exception, `/voice/route`, `/voice/ivr-input`
+  and every `/callbacks/voice/*` route still answer 200 with
+  `<Say>We are sorry, an error occurred. Please try again later.</Say><Hangup/>`.
 properties:
   Response:
     type: object
     description: Root CXML response element
     properties:
-      Connect:
-        type: object
-        description: Connect verb for routing calls
-        properties:
-          Stream:
-            type: object
-            description: WebSocket stream configuration
-          Number:
-            type: object
-            description: Number to connect to
       Dial:
         type: object
-        description: Dial verb for outbound calls
-      Gather:
-        type: object
-        description: Gather DTMF input
-      Play:
-        type: object
-        description: Play audio file
+        description: |
+          Dial verb. Attributes used: `action`, `timeout`, `callerId`, `callerName`,
+          `trunks`, `record`, `recordingStatusCallback`. Children: `<Number>`, `<Sip>`,
+          `<Service provider="...">` (AI assistant, with optional `<Header name value>`)
+          or `<Conference>` (`startConferenceOnEnter`, `endConferenceOnExit`, `beep`,
+          `muted`, `maxParticipants`, `holdMusic`, `waitUrl`, ...).
       Say:
         type: object
-        description: Text-to-speech
-      Record:
+        description: Text-to-speech (`voice`, `language`, `loop`)
+      Play:
         type: object
-        description: Record call audio
-      Hangup:
+        description: Play an audio URL (`loop`)
+      Pause:
         type: object
-        description: Hangup the call
+        description: Silence (`length` seconds)
+      Gather:
+        type: object
+        description: Collect DTMF digits (`action`, `timeout`, `finishOnKey`, `minDigits`, `maxDigits`), with nested `<Say>`/`<Play>` prompts
+      Connect:
+        type: object
+        description: '`<Connect><Stream url name><Parameter name value/></Stream></Connect>` WebSocket stream (AI assistants), optionally with `action`'
+      Coach:
+        type: object
+        description: Supervisor call coaching on a session token (`policy` listen/whisper/barge, `finishOnKey`, `whisperDirection`, `spyDirection`; callee is spelled `calee`)
+      Voicemail:
+        type: object
+        description: Send the caller to voicemail (`transcribe`, `action`)
       Redirect:
         type: object
-        description: Redirect to another URL
+        description: Continue the call at another URL
+      Hangup:
+        type: object
+        description: Hang up the call
 example:
   Response:
-    Connect:
-      Stream:
-        url: wss://example.com/stream
-        name: ai-stream
-      Number:
-        _: '+1234567890'
-        sendDigits: ww1234
+    Dial:
+      action: https://opbx.example.com/api/callbacks/voice/ring-group-callback
+      timeout: 30
+      Number: "1001"

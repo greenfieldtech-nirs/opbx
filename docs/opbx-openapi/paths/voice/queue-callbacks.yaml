@@ -5,16 +5,30 @@ paths:
         - Voice Routing
       summary: Call queue poll
       description: |
-        Hold-loop callback for a call waiting in a call queue. Decides whether to keep the
-        caller waiting, dial an agent, or overflow. Returns CXML.
-        Authentication: voice webhook Bearer token (per organization).
+        Hold-loop callback for a call waiting in a call queue, called by Cloudonix after each
+        hold-music segment. Asks the ACD worker for a decision and returns the next CXML:
+        keep holding (hold music + `<Redirect>` back here), dial the offered agent(s), join
+        the conference room of the agent who claimed the call (conference-mediated ring-all),
+        or overflow to the queue's fallback action (with a short announcement unless the
+        fallback is hangup or unavailable). When the ACD worker is unreachable the caller
+        keeps holding. A call that is no longer waiting gets `<Hangup/>`.
+
+        Queue context comes from `SessionData` (when it has `call_queue_id`), else the
+        `session_data` JSON, else the top-level `call_queue_id`/`call_id`. Without it the
+        response is `<Say>Queue system error. Goodbye.</Say><Hangup/>`.
+
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+        be JSON because the middleware reads `Domain` and `To` from it. A validation failure
+        answers 200 CXML `<Say>Invalid queue callback request. Goodbye.</Say><Hangup/>` (never
+        a redirect). Unexpected exceptions answer 200 CXML (`We are sorry, an error
+        occurred...`). Not rate-limited.
       operationId: queuePollCallback
       security:
         - voiceWebhookAuth: []
       requestBody:
         required: true
         content:
-          application/x-www-form-urlencoded:
+          application/json:
             schema:
               type: object
               properties:
@@ -22,45 +36,65 @@ paths:
                   type: string
                   maxLength: 255
                   pattern: '^[a-zA-Z0-9_-]+$'
-                call_queue_id:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 1
-                call_id:
-                  type:
-                  - string
-                  - 'null'
-                  maxLength: 255
+                SessionData:
+                  type: object
+                  description: Queue context (`call_queue_id`, `call_id`, `moh_idx`) when Cloudonix sends it flattened; used only when it carries `call_queue_id`
+                  additionalProperties: true
                 session_data:
                   type:
                   - string
                   - 'null'
                   maxLength: 2000
+                  description: JSON queue context (`call_queue_id`, `call_id`, `moh_idx`), used when `SessionData` has no `call_queue_id`
+                call_queue_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Top-level queue context, used when neither `SessionData` nor `session_data` is present
+                call_id:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  description: Queue call ID (defaults to `CallSid`)
                 CallStatus:
                   type:
                   - string
                   - 'null'
                   maxLength: 20
+                Domain:
+                  type: string
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                To:
+                  type: string
+                  description: Called number (required by the authentication middleware)
                 _organization_id:
                   type:
                   - integer
                   - 'null'
                   minimum: 1
-                  description: Organization ID appended to callback URLs by the platform
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten. The tenant is never taken from the queue context.
               required: [CallSid]
-          application/json:
-            schema:
-              $ref: '#/paths/~1callbacks~1voice~1queue-poll/post/requestBody/content/application~1x-www-form-urlencoded/schema'
       responses:
         '200':
           description: CXML instructions for the call
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
 
   /callbacks/voice/queue-dial-callback:
     post:
@@ -68,61 +102,50 @@ paths:
         - Voice Routing
       summary: Call queue agent dial result
       description: |
-        Receives the result of an agent dial attempt for a queued call. Returns CXML.
-        Authentication: voice webhook Bearer token (per organization).
+        `<Dial>` action for an agent dial of a queued call. `CallStatus` (default `completed`)
+        is recorded as the dial result.
+
+        - `busy`, `no-answer` or `failed` (and the call was not already bridged): the agent is
+          released, the call is re-offered at once (dialing the next agent if the ACD worker
+          offers one), otherwise the caller goes back on hold.
+        - Any other status, an already bridged call, a missing context or an unknown queue:
+          `<Hangup/>` (call finalization is driven by the CDR webhook).
+
+        Queue context is resolved as for `POST /callbacks/voice/queue-poll`.
+
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+        be JSON because the middleware reads `Domain` and `To` from it. A validation failure
+        answers 200 CXML `<Say>Invalid queue callback request. Goodbye.</Say><Hangup/>` (never
+        a redirect). Unexpected exceptions answer 200 CXML (`We are sorry, an error
+        occurred...`). Not rate-limited.
       operationId: queueDialCallback
       security:
         - voiceWebhookAuth: []
       requestBody:
         required: true
         content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                CallSid:
-                  type: string
-                  maxLength: 255
-                  pattern: '^[a-zA-Z0-9_-]+$'
-                call_queue_id:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 1
-                call_id:
-                  type:
-                  - string
-                  - 'null'
-                  maxLength: 255
-                session_data:
-                  type:
-                  - string
-                  - 'null'
-                  maxLength: 2000
-                CallStatus:
-                  type:
-                  - string
-                  - 'null'
-                  maxLength: 20
-                _organization_id:
-                  type:
-                  - integer
-                  - 'null'
-                  minimum: 1
-                  description: Organization ID appended to callback URLs by the platform
-              required: [CallSid]
           application/json:
             schema:
-              $ref: '#/paths/~1callbacks~1voice~1queue-poll/post/requestBody/content/application~1x-www-form-urlencoded/schema'
+              $ref: '#/paths/~1callbacks~1voice~1queue-poll/post/requestBody/content/application~1json/schema'
       responses:
         '200':
           description: CXML instructions for the call
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
         '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
 
   /callbacks/voice/queue-dial:
     get:
@@ -130,32 +153,64 @@ paths:
         - Voice Routing
       summary: Queue proactive dial (immediate connect)
       description: |
-        Returns the CXML that dials an agent immediately for a queued call. The URL is
-        HMAC-signed, so no Bearer token is used (application-switched fetches may not carry one).
-        Accepts GET or POST.
+        Fetched by Cloudonix after OPBX switches the waiting caller's voice application
+        (immediate connect). Re-validates the offer with the ACD worker: when it still says
+        `dial`, returns the agent `<Dial>`; otherwise the caller keeps holding.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires 120 seconds
+        after it is issued (application-switched fetches may not carry a Bearer token). The
+        route is registered with `Route::any`, so every HTTP method is accepted; GET and POST
+        are documented. Not rate-limited.
       operationId: queueImmediateDialGet
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions (a hangup when the call is no longer valid)
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
     post:
       tags:
         - Voice Routing
       summary: Queue proactive dial (immediate connect)
-      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
       operationId: queueImmediateDialPost
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions (a hangup when the call is no longer valid)
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
 
   /callbacks/voice/queue-agent-connect:
     get:
@@ -163,32 +218,65 @@ paths:
         - Voice Routing
       summary: Conference ring-all agent leg
       description: |
-        Called when an originated agent leg answers in conference-mediated ring-all. The leg
-        claims the call, and the caller is joined to the winner's room. HMAC-signed URL, no
-        Bearer token. Accepts GET or POST.
+        Fetched by an originated agent leg when the agent answers (conference-mediated
+        ring-all). The first leg to arrive claims the call (agent from `agent_user_id` in
+        `sd`, session from the `Session` or `CallSid` request field) and is joined to the
+        call's conference room; every other leg gets `<Hangup/>`.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
+        agent ring timeout plus 60 seconds after it is issued. The route is registered with
+        `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+        rate-limited.
       operationId: queueAgentConnectGet
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
     post:
       tags:
         - Voice Routing
       summary: Conference ring-all agent leg
-      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
       operationId: queueAgentConnectPost
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
 
   /callbacks/voice/queue-conference-join:
     get:
@@ -196,28 +284,62 @@ paths:
         - Voice Routing
       summary: Conference ring-all caller join
       description: |
-        Joins the waiting caller to the room of the agent who claimed the call in
-        conference-mediated ring-all. HMAC-signed URL, no Bearer token. Accepts GET or POST.
+        Fetched by the caller's session after an agent claimed the call (application switch,
+        or the next poll). Joins the caller to the winner's conference room (recorded when
+        inbound recording applies); when no agent has claimed the call yet the caller keeps
+        holding.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
+        agent ring timeout plus 60 seconds after it is issued. The route is registered with
+        `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+        rate-limited.
       operationId: queueConferenceJoinGet
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
     post:
       tags:
         - Voice Routing
       summary: Conference ring-all caller join
-      description: Same as the GET form. HMAC-signed URL, no Bearer token.
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
       operationId: queueConferenceJoinPost
       security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
       responses:
         '200':
-          description: CXML instructions
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
           content:
             application/xml:
               schema:
-                type: string
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'

@@ -6,12 +6,19 @@ paths:
       summary: AMD action handler
       description: |
         Receives the Answering Machine Detection result from the AMD worker and runs the
-        auto-dialer campaign's configured action for the call (for example hang up or
-        route to a human agent). Only detection results of `voicemail`, `human` or
-        `unknown` are accepted. Fields `action`, `confidence`, `detectionTimeMs` and
-        `reason` are optional, sent by the worker, and are informational.
+        auto-dialer campaign's configured action for that result (`action_voicemail`,
+        `action_human` or `action_unknown`; empty means `CONTINUE`). The action is never
+        taken from the request.
 
-        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`.
+        - Stores `amd_result` and `amd_confidence` on the call session and writes an `amd`
+          object (result, confidence, detectionTimeMs, reason, timestamp) to the Cloudonix
+          session profile (best effort).
+        - `HANGUP`: disconnects the Cloudonix session; `status` is `error` when the
+          disconnect fails.
+        - `CONTINUE`: nothing else happens.
+
+        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`, checked in the
+        controller (no route middleware). Not rate-limited.
       operationId: amdAction
       security:
         - amdWorkerAuth: []
@@ -60,7 +67,7 @@ paths:
                   description: Free-text reason from the worker.
       responses:
         '200':
-          description: 'AMD result processed (or rejected with `status: error` in the body)'
+          description: AMD result processed
           content:
             application/json:
               schema:
@@ -69,7 +76,15 @@ paths:
                   status:
                     type: string
                     enum: [ok, error]
+                    description: '`error` only when a HANGUP disconnect failed'
                     example: ok
+                  action:
+                    type: string
+                    enum: [hangup, continue]
+                    example: hangup
+                  profile_updated:
+                    type: boolean
+                    description: Whether the Cloudonix session profile update succeeded
         '401':
           description: Missing or wrong AMD worker token
           content:
@@ -83,8 +98,33 @@ paths:
                   message:
                     type: string
                     example: Unauthorized
+        '404':
+          description: No call session for the token, or its campaign's organization has no Cloudonix settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: No Cloudonix settings found for this session
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
+        '500':
+          description: Exception while updating the session or calling Cloudonix (`message` is the exception message)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
         '503':
           description: AMD worker authentication is not configured on the server
           content:
@@ -109,7 +149,8 @@ paths:
         token belongs to a known, active (not terminated) auto-dialer call. Only then
         does the worker analyse the stream.
 
-        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`.
+        Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`, checked in the
+        controller (no route middleware). Not rate-limited.
       operationId: amdSessionCheck
       security:
         - amdWorkerAuth: []

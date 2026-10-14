@@ -4,22 +4,55 @@ paths:
       tags:
       - Voice Routing
       summary: Ring group callback
-      description: 'Handle ring group member callback from Cloudonix.
+      description: |
+        `<Dial>` action of a ring group. The ring group routing strategy puts this URL, with
+        the query parameters below, in the `action` of each `<Dial>` it returns; Cloudonix
+        calls it when that dial ends. The response is the next CXML step:
 
-        Called when a ring group member finishes ringing (answered, busy, no-answer, etc.)
+        - Sequential and round-robin groups: dial the next member (attempt
+          `attempt_number`), cycling through the members `ring_turns` times; after that the
+          ring group's fallback action runs (extension, ring group, IVR menu, AI assistant,
+          AI load balancer, call queue, hangup or unavailable).
+        - Simultaneous groups (`session_data.callback_type` = `ring_group_fallback`): run the
+          fallback action.
 
-        or to get the next member in sequence.
+        An unknown, inactive or other-organization ring group answers 200 CXML that says
+        `Ring group not found` and hangs up.
 
-
-        Middleware: voice.webhook.auth
-
-
-        Authentication: Bearer token (per-organization domain_requests_api_key)
-
-        '
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+        be JSON because the middleware reads `Domain` and `To` from it. Missing `Domain`/`To`
+        answers 400 CXML, a failed token check 401 CXML. A validation failure answers 422
+        JSON when the request accepts JSON, otherwise a 302 redirect. Unexpected exceptions
+        answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
       operationId: ringGroupCallback
       security:
       - voiceWebhookAuth: []
+      parameters:
+      - name: ring_group_id
+        in: query
+        required: true
+        description: Ring group ID (set by the routing strategy)
+        schema:
+          type: integer
+          minimum: 1
+      - name: attempt_number
+        in: query
+        required: false
+        description: Attempt to make now (0-based member attempt counter; set by the routing strategy)
+        schema:
+          type: integer
+      - name: rr_start
+        in: query
+        required: false
+        description: Round-robin starting member offset chosen on the first attempt
+        schema:
+          type: integer
+      - name: session_data
+        in: query
+        required: false
+        description: JSON with `ring_group_id`, `attempt_number` and, for simultaneous groups, `organization_id` and `callback_type` (`ring_group_fallback`). Read when `attempt_number` is 0 or missing.
+        schema:
+          type: string
       requestBody:
         required: true
         content:
@@ -29,12 +62,52 @@ paths:
               properties:
                 CallSid:
                   type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
                   description: Unique call identifier from Cloudonix
                   example: CA550e8400e29b41d4a716446655440000
-                ring_group_id:
-                  type: integer
-                  description: ID of the ring group being processed
-                  example: 11
+                From:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Caller number in E.164 format or extension
+                  example: '+12025550101'
+                To:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Called number in E.164 format or extension
+                  example: '+12025550102'
+                Domain:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                  description: Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it.
+                  example: acme.cloudonix.net
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                  enum:
+                  - ringing
+                  - answered
+                  - completed
+                  - failed
+                  - busy
+                  - no-answer
+                  - null
+                  description: Current call status (validated, not used for routing)
+                SessionData:
+                  type: object
+                  description: Optional; `attempt_number` and `callback_type` here take precedence over the query parameters
+                  properties:
+                    attempt_number:
+                      type: integer
+                    callback_type:
+                      type: string
                 action:
                   type:
                   - string
@@ -44,91 +117,48 @@ paths:
                   - timeout
                   - completed
                   - failed
-                  description: Action type for this callback
-                  example: next_member
+                  - null
+                  description: Validated but not used
                 current_index:
                   type:
                   - integer
                   - 'null'
                   minimum: 0
-                  description: Current member index in the ring sequence
-                  example: 0
+                  description: Validated but not used
                 attempt_count:
                   type:
                   - integer
                   - 'null'
                   minimum: 1
-                  description: Number of attempts made so far
-                  example: 1
-                From:
-                  type: string
-                  description: Caller number in E.164 format or extension
-                  example: '+1234567890'
-                To:
-                  type: string
-                  description: Called number in E.164 format or extension
-                  example: '+1987654321'
-                Domain:
-                  type:
-                  - string
-                  - 'null'
-                  description: Cloudonix domain
-                  example: example.cloudonix.io
-                CallStatus:
-                  type:
-                  - string
-                  - 'null'
-                  enum:
-                  - ringing
-                  - answered
-                  - completed
-                  - failed
-                  - busy
-                  - no-answer
-                  description: Current call status
-                  example: no-answer
+                  description: Validated but not used (the attempt comes from `attempt_number`)
                 _organization_id:
                   type:
                   - integer
                   - 'null'
-                  description: Organization ID (set by VerifyVoiceWebhookAuth middleware)
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
               required:
               - CallSid
-              - ring_group_id
               - From
               - To
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                CallSid:
-                  type: string
-                ring_group_id:
-                  type: integer
-                action:
-                  type: string
-                current_index:
-                  type: integer
-                attempt_count:
-                  type: integer
-                From:
-                  type: string
-                To:
-                  type: string
-                Domain:
-                  type: string
-                CallStatus:
-                  type: string
       responses:
         '200':
-          description: CXML routing response
+          description: CXML for the next step (next member, fallback, or a spoken error with hangup)
           content:
             application/xml:
               schema:
                 $ref: ../../components/schemas/cxml/CxmlResponse.yaml
-              example: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect>\n    <Stream url=\"wss://ai.example.com/stream\"\
-                \ name=\"ai-assistant\"/>\n  </Connect>\n</Response>\n"
-        '204':
-          description: Empty response to continue call normally
+              example: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Dial action=\"https://opbx.example.com/api/callbacks/voice/ring-group-callback?ring_group_id=11&amp;attempt_number=2\" timeout=\"20\">\n    <Number>1002</Number>\n  </Dial>\n</Response>\n"
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
         '401':
-          description: Unauthorized - Invalid Bearer token
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml

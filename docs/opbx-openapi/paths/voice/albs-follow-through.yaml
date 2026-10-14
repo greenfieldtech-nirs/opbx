@@ -4,26 +4,31 @@ paths:
       tags:
       - Voice Routing
       summary: ALB follow-through callback
-      description: 'Handle AI Load Balancer follow-through callback from Cloudonix.
+      description: |
+        `action` of the `<Connect>`/`<Dial>` that the AI load balancer strategy returns for an
+        AI assistant. Cloudonix calls it when that leg ends.
 
-        Called when a call to an AI Assistant fails (busy, no-answer, failed, canceled, unknown)
+        - The status comes from `DialCallStatus`, else `CallStatus`, else `status`. Only
+          `busy`, `no-answer`, `failed`, `canceled` and `unknown` trigger follow-through;
+          any other status (or none) answers `<Hangup/>`.
+        - Load balancer missing or not active: `<Say>Load balancer not available. Goodbye.</Say><Hangup/>`.
+        - Follow-through disabled on the load balancer: its fallback action runs at once.
+        - Otherwise the next active member that has not been tried on this call (tried
+          members are kept in Redis per call) is selected and the call is routed to it, with
+          this URL as the new `action`. When every member has been tried, the fallback action
+          runs (hangup, unavailable, extension, ring group, IVR menu, AI assistant, call
+          queue or AI load balancer).
+        - Missing call ID, `albs_id` or `current_assistant_id`:
+          `<Say>Missing required parameters. Goodbye.</Say><Hangup/>`.
 
-        and the load balancer needs to try the next available AI assistant.
+        There is no FormRequest. `albs_id` and `current_assistant_id` are read from the query
+        string first, then from the body. The call ID is `CallSid`, else the `X-Cx-Session`
+        header, else `SessionData.callSid`, `Session` or `session`.
 
-
-        Query Parameters:
-
-        - `albs_id`: Load balancer ID
-
-        - `current_assistant_id`: ID of the AI assistant that just failed
-
-
-        Middleware: voice.webhook.auth
-
-
-        Authentication: Bearer token (per-organization domain_requests_api_key)
-
-        '
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+        be JSON because the middleware reads `Domain` and `To` from it (400/401 CXML on
+        failure). Unexpected exceptions answer 200 CXML (`We are sorry, an error occurred...`).
+        Not rate-limited.
       operationId: albsFollowThrough
       security:
       - voiceWebhookAuth: []
@@ -51,75 +56,41 @@ paths:
               properties:
                 CallSid:
                   type: string
-                  description: Unique call identifier (also passed in X-Cx-Session header)
+                  description: Call identifier (falls back to the X-Cx-Session header, SessionData.callSid, Session or session)
                   example: CA550e8400e29b41d4a716446655440000
                 From:
                   type: string
                   description: Caller number
-                  example: '+1234567890'
+                  example: '+12025550101'
                 To:
                   type: string
-                  description: Called number
-                  example: '+1987654321'
+                  description: Called number (required by the authentication middleware)
+                  example: '+12025550102'
                 DialCallStatus:
                   type:
                   - string
                   - 'null'
-                  enum:
-                  - busy
-                  - no-answer
-                  - failed
-                  - canceled
-                  - unknown
-                  - completed
-                  description: Dial action status (preferred source)
+                  description: Dial result (first status source). `busy`, `no-answer`, `failed`, `canceled` and `unknown` trigger follow-through.
                   example: busy
                 CallStatus:
                   type:
                   - string
                   - 'null'
-                  enum:
-                  - busy
-                  - no-answer
-                  - failed
-                  - canceled
-                  - unknown
-                  - completed
-                  description: Alternative status field
-                  example: busy
-                Domain:
+                  description: Second status source
+                status:
                   type:
                   - string
                   - 'null'
-                  description: Cloudonix domain
-                  example: example.cloudonix.io
+                  description: Third status source
+                Domain:
+                  type: string
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                  example: acme.cloudonix.net
                 _organization_id:
                   type:
                   - integer
                   - 'null'
-                  description: Organization ID (set by VerifyVoiceWebhookAuth middleware)
-              required:
-              - CallSid
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                CallSid:
-                  type: string
-                From:
-                  type: string
-                To:
-                  type: string
-                DialCallStatus:
-                  type: string
-                CallStatus:
-                  type: string
-                Domain:
-                  type: string
-          application/xml:
-            schema:
-              type: object
-              description: Cloudonix may send XML data
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
       responses:
         '200':
           description: CXML routing response to next AI assistant or fallback
@@ -130,13 +101,19 @@ paths:
               examples:
                 routeToNextAssistant:
                   summary: Route to next AI assistant
-                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect>\n    <Stream url=\"wss://ai.example.com/stream/next\"\
-                    \ name=\"ai-assistant\"/>\n  </Connect>\n</Response>\n"
+                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect action=\"https://opbx.example.com/api/callbacks/voice/albs-follow-through?albs_id=5&amp;current_assistant_id=13\">\n    <Stream url=\"wss://ai.example.com/stream/next\"/>\n  </Connect>\n</Response>\n"
                 fallbackHangup:
                   summary: All assistants failed - hangup
-                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Say>All AI assistants are unavailable.\
-                    \ Goodbye.</Say>\n  <Hangup/>\n</Response>\n"
-        '204':
-          description: Empty response when follow-through is not needed
+                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Say>All AI assistants are unavailable. Goodbye. Goodbye.</Say>\n  <Hangup/>\n</Response>\n"
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
         '401':
-          description: Unauthorized - Invalid Bearer token
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
