@@ -57,44 +57,71 @@ The caller ID is compared exactly as the carrier delivers it, usually in E.164 f
 
 Every blocked call is logged and adds 1 to the rule's **Blocked Count**.
 
-## Create a rule
+## Workflows
+
+### Find a rule
+
+**Who can do this:** Owner and PBX Admin (the only roles with **Inbound Blacklist** in the sidebar).
 
 1. Open **Inbound Blacklist** (under **Apps and Security** › **Security**).
+2. Type in **Search by caller ID pattern...**.
+3. Click **Reset** to clear the search.
+
+The list shows each rule's pattern and match type, **Strategy**, **Scope**, **Blocked Count**, **Created** and **Status** (see [List columns](#list-columns)). The page loads up to 100 rules and pages through them 20 at a time.
+
+![Inbound Blacklist list with four rules: one Wildcard (Drop), one Prefix (Torment) and two Exact (Drop and Reject), each Global, with blocked counts 3, 31, 14 and 6](../img/screens/inbound-blacklist-list.jpg)
+
+### Block a caller
+
+**Who can do this:** Owner and PBX Admin (`InboundBlacklistPolicy::create`; the **Add Blacklist Entry** button is shown to these roles only).
+
+1. Open **Inbound Blacklist**.
 2. Click **Add Blacklist Entry**.
-3. Fill in the fields below.
-4. Click **Create Entry**.
+3. Enter the **Caller ID Pattern**, for example `+12025550190` or `+1202555018*`.
+4. Choose the **Match Type** (default **Exact Match**) and the **Rejection Strategy** (default **Drop (Silent)**). For **Torment (Music)** the dialog notes that callers are held with music for 10 minutes (600 seconds) and that the room prefix is generated.
+5. Leave **Global Blacklist** on to protect every phone number, or turn it off and tick the numbers under **Select Phone Numbers**. The counter shows how many are selected; **Refresh** reloads the number list.
+6. Click **Create Entry**.
+
+The dialog closes, the toast "Blacklist entry created successfully" appears and the rule is listed as **Active**. If the server refuses the entry, its message appears under the field or as a toast (see [Common errors](#common-errors)).
 
 | Field | Required | Limit | Meaning |
 |-------|----------|-------|---------|
 | Caller ID Pattern | Yes | Up to 50 characters: digits, `+`, `*` and `?` only | The number or pattern to block |
-| Match Type | Yes | Exact Match, Prefix Match or Wildcard Pattern | How the pattern is compared (table above) |
+| Match Type | Yes | Exact Match, Prefix Match or Wildcard Pattern | How the pattern is compared (see [Match types](#match-types)) |
 | Rejection Strategy | Yes | Drop (Silent), Reject (Message) or Torment (Music) | What the blocked caller experiences |
 | Global Blacklist | No | On or off. Default: on | On: the rule applies to every phone number. Off: pick the numbers under **Select Phone Numbers** |
-| Select Phone Numbers | When Global is off | At least one | The phone numbers the rule protects |
-
-A new rule is **Active**.
-
-![Inbound Blacklist list with four rules: one Wildcard (Drop), one Prefix (Torment) and two Exact (Drop and Reject), each Global, with blocked counts 3, 31, 14 and 6](../img/screens/inbound-blacklist-list.jpg)
+| Select Phone Numbers | When Global is off | At least one | The phone numbers the rule protects, shown by friendly name or number |
 
 ![Add Blacklist Entry dialog with pattern +1202555019, Prefix Match, Torment (Music) with the 600-second note, and Global Blacklist off with two phone numbers ticked](../img/screens/inbound-blacklist-create-dialog.jpg)
 
-## Edit a rule
+### Edit a rule
+
+**Who can do this:** Owner and PBX Admin (`InboundBlacklistPolicy::update`). For other roles the rows do not open.
 
 1. Click the rule's pattern or row.
-2. Change the fields and click **Update Entry**.
+2. Change the fields in **Edit Blacklist Entry**.
+3. Click **Update Entry**.
 
-Saving a rule with the Torment strategy generates a new room prefix and sets the timeout to 600 seconds again.
+The toast "Blacklist entry updated successfully" appears. Saving a rule with the Torment strategy generates a new room prefix and sets the timeout to 600 seconds again.
 
-## Turn a rule on or off
+{/* SCREENSHOT: inbound-blacklist-edit-dialog — Edit Blacklist Entry dialog for the +12025550191 rule, Exact Match, Reject (Message), Global Blacklist on */}
 
-Click the **Active** or **Disabled** pill in the Status column. The change applies to the next call.
+### Turn a rule on or off
 
-## Delete a rule
+**Who can do this:** Owner and PBX Admin (`InboundBlacklistPolicy::update`). For other roles the status pill is not clickable.
 
-1. Click the delete action on the row.
-2. Confirm in the **Delete Blacklist Entry** dialog.
+1. In the list, click the rule's **Active** or **Disabled** pill in the **Status** column.
 
-A rule is never referenced by other configuration, so the delete always goes through. The rule's blocked-call log entries are kept, without a link to the deleted rule.
+The toast "Status updated successfully" appears and the pill changes. The change applies to the next call.
+
+### Delete a rule
+
+**Who can do this:** Owner and PBX Admin (`InboundBlacklistPolicy::delete`; the **Delete** action is shown to these roles only).
+
+1. Click the **Delete** (trash) action on the row.
+2. In **Delete Blacklist Entry**, click **Delete**.
+
+The toast "Blacklist entry deleted successfully" appears. A rule is never referenced by other configuration, so the delete always goes through. The rule's blocked-call log entries are kept, without a link to the deleted rule.
 
 ![Delete Blacklist Entry confirmation for the +12025550191 rule](../img/screens/inbound-blacklist-delete-dialog.jpg)
 
@@ -113,7 +140,6 @@ A phone number selected in a rule cannot be deleted from the Phone Numbers page.
 | Created | Creation date |
 | Status | Active or Disabled; click to switch |
 
-The search box matches the caller ID pattern.
 
 ## Blocked-call logs and statistics
 
