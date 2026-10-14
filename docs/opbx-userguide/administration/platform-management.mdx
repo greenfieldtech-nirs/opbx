@@ -58,7 +58,7 @@ Open **Platform Management → Dashboard**. The page shows:
 - **Recent Organizations**: the newest organizations. Click one to open its detail page; **View All** opens the Organizations page.
 - **Recent Activity**: the latest audit entries; **View All** opens the Audit Log.
 
-{/* SCREENSHOT: platform-dashboard — Platform Dashboard with the Organizations, Users, Extensions and DIDs cards, Recent Organizations (Acme Corp (Demo) listed) and Recent Activity */}
+![Platform Dashboard with the Organizations, Users, Extensions and DIDs cards, Recent Organizations and Recent Activity](../img/screens/platform-dashboard.jpg)
 
 ## Organizations
 
@@ -139,7 +139,7 @@ After the delete you return to the Organizations page. Nothing is deleted until 
 Deleting an organization cannot be undone. Suspend first, take a database backup, and confirm with the customer.
 :::
 
-{/* SCREENSHOT: platform-org-delete-dialog — Delete Organization confirmation dialog for a demo organization, with the Cancel and Delete buttons */}
+![Delete Organization confirmation dialog for Acme Corp (Demo) with the Cancel and Delete buttons](../img/screens/platform-org-delete-dialog.jpg)
 
 ### Operate as an organization
 
@@ -166,7 +166,7 @@ How it works:
 While operating as an organization you can change anything its Owner can, including users, routing and Cloudonix settings. Exit as soon as you are done.
 :::
 
-{/* SCREENSHOT: platform-operate-as-banner — Dashboard of Acme Corp (Demo) with the yellow "Operating as Acme Corp (Demo)" banner and the Exit organization button */}
+![Dashboard of Acme Corp (Demo) with the yellow Operating as banner, the Exit organization button and the Now operating as toast](../img/screens/platform-operate-as-banner.jpg)
 
 ## Users
 
@@ -348,7 +348,7 @@ Who can do this: platform managers.
 
 Entries are listed newest first, 25, 50 or 100 per page.
 
-{/* SCREENSHOT: platform-audit-log — Audit Log page with one Organization Status Changed entry expanded, showing the before and after status */}
+![Audit Log with an Organization Status Changed entry expanded, showing the status change from suspended to active](../img/screens/platform-audit-log.jpg)
 
 Audit entries are kept for `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) and then pruned. See [Data retention](/opbx/data-models/configuration/index#data-retention).
 
