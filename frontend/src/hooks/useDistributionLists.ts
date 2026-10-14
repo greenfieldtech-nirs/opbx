@@ -39,6 +39,8 @@ export function useDistributionList(id: string | number) {
     queryKey: distributionListKeys.detail(id),
     queryFn: () => distributionListsApi.getById(id),
     enabled: !!id,
+    // Uploads are processed by a worker: keep the list fresh until it leaves 'processing'
+    refetchInterval: (query) => (query.state.data?.data?.status === 'processing' ? 2000 : false),
   });
 }
 

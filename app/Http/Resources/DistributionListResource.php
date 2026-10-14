@@ -25,6 +25,7 @@ class DistributionListResource extends JsonResource
             'campaign_id' => $this->campaign_id,
             'used_by_campaign_id' => $this->used_by_campaign_id,
             'used_at' => $this->used_at?->format('Y-m-d H:i:s'),
+            'original_filename' => $this->original_filename,
 
             // Statistics
             'statistics' => [

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -142,6 +142,15 @@ export default function DistributionListDetail() {
   const queryClient = useQueryClient();
 
   const list = listData?.data;
+
+  // When a worker finishes processing an upload, reload the entries (the dialog may be closed by then)
+  const previousStatus = useRef(list?.status);
+  useEffect(() => {
+    if (previousStatus.current === 'processing' && list?.status !== 'processing') {
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(id!) });
+    }
+    previousStatus.current = list?.status;
+  }, [list?.status, id, queryClient]);
   const destinations = destinationsData?.data || [];
   const meta = destinationsData?.meta;
 

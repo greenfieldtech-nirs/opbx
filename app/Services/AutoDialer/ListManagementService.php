@@ -100,6 +100,15 @@ class ListManagementService
             now()->addHours(2)
         );
 
+        // Mark the list before dispatching: a worker can finish the job before this request
+        // returns, and a later PROCESSING write would overwrite its READY/FAILED result.
+        $list->update([
+            'original_filename' => $file->getClientOriginalName(),
+            'uploaded_by' => Auth::id(),
+            'uploaded_at' => now(),
+            'status' => ListStatus::PROCESSING,
+        ]);
+
         if ($isLargeFile) {
             // Dispatch large file job
             ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping);
@@ -119,14 +128,6 @@ class ListManagementService
                 'row_count' => $rowCount,
             ]);
         }
-
-        // Update list status
-        $list->update([
-            'original_filename' => $file->getClientOriginalName(),
-            'uploaded_by' => Auth::id(),
-            'uploaded_at' => now(),
-            'status' => ListStatus::PROCESSING,
-        ]);
 
         return [
             'job_id' => $jobId,

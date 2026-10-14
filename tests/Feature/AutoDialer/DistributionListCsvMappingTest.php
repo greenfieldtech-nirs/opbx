@@ -105,6 +105,30 @@ class DistributionListCsvMappingTest extends TestCase
     }
 
     /** @test */
+    public function it_records_the_original_filename_and_exposes_it_on_the_list(): void
+    {
+        $file = UploadedFile::fake()->createWithContent('webinar-leads.csv', "phone\n+14155551212\n");
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/auto-dialer-campaigns/lists/{$this->list->id}/upload", [
+                'file' => $file,
+                'mapping' => ['phone' => 'phone'],
+            ])
+            ->assertOk();
+
+        // The job runs inline here, like a worker finishing before the request returns:
+        // the list must end READY, not be reset to PROCESSING afterwards.
+        $this->list->refresh();
+        $this->assertSame('webinar-leads.csv', $this->list->original_filename);
+        $this->assertSame('ready', $this->list->status->value);
+
+        $this->actingAs($this->user)
+            ->getJson("/api/v1/auto-dialer-campaigns/lists/{$this->list->id}")
+            ->assertOk()
+            ->assertJsonPath('data.original_filename', 'webinar-leads.csv');
+    }
+
+    /** @test */
     public function it_rejects_upload_without_phone_mapping(): void
     {
         $csv = "phone\n+14155551212\n";
