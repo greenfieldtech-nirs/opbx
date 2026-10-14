@@ -69,7 +69,7 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 | AI Assistant | One more assistant, tried without Follow Through. It must not be a member of the same load balancer |
 | Call Queue | Puts the caller in a call queue, so people answer |
 | AI Load Balancer | Hands the call to another load balancer. It cannot be this one, and a chain of fallbacks that leads back to this one is refused ("Fallback loop detected") |
-| Hangup | Ends the call (the default) |
+| Hang Up | Ends the call (the default) |
 
 On the edit dialog, **Disconnect** sets the fallback to "Destination unavailable". The load balancer is then marked **Unprovisioned** until you choose a real fallback. A new load balancer always needs a real fallback.
 
