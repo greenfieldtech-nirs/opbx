@@ -145,7 +145,7 @@ Only schedules with an action set to Destination unavailable are listed. Open ea
 1. Click the delete (trash) icon on the row.
 2. Confirm with **Delete** in the **Delete Schedule** dialog.
 
-The toast "Business hours schedule has been deleted." appears and the row disappears. The delete is refused while a phone number, an IVR menu option or failover, or a call-tracking campaign still routes to the schedule: the **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
+The toast "Business hours schedule has been deleted." appears and the row disappears. The delete is refused while a phone number or an IVR menu option or failover still routes to the schedule: the **Cannot delete: still in use** dialog lists each one. Change them, then delete again. Deleted schedules are soft-deleted, so the name can be reused.
 
 ![Cannot delete: still in use dialog for Main Office Hours listing the phone number +12025550100 as a routing target](../img/screens/business-hours-in-use-dialog.jpg)
 
@@ -190,8 +190,8 @@ There is no "Hangup" action. Use Disconnect on an existing schedule, or route to
 
 :::caution Things to check before relying on a schedule
 - **Time zone.** The hours are evaluated in the schedule's own time zone (the `timezone` field, `UTC` by default), including daylight-saving changes. The dialog has no time-zone field, so a schedule created in it is saved as **UTC**: enter the hours in UTC or set `timezone` through the API.
-- **Call Queue action.** The Call Queue action routes the caller into the queue, from a phone number, an IVR menu or a call-tracking number.
-- **Inactive schedules.** An Inactive schedule is always treated as closed: every call sent to it (from a phone number, an IVR menu or a call-tracking number) uses the **closed-hours action**, whatever the hours say.
+- **Call Queue action.** The Call Queue action routes the caller into the queue, from a phone number or an IVR menu.
+- **Inactive schedules.** An Inactive schedule is always treated as closed: every call sent to it (from a phone number or an IVR menu) uses the **closed-hours action**, whatever the hours say.
 :::
 
 ### Weekly schedule

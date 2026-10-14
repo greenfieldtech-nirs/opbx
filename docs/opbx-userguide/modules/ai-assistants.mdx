@@ -179,7 +179,7 @@ If anything still points at the assistant, the delete is refused and the **Canno
 - a business-hours action;
 - a call-queue fallback;
 - an AI load balancer, as a member or as its fallback;
-- an auto-dialer campaign or a call-tracking campaign.
+- an auto-dialer campaign.
 
 Change or remove those references, then delete again. Call history (call logs and CDRs) never blocks a delete.
 
@@ -197,7 +197,6 @@ Change or remove those references, then delete again. Call history (call logs an
 | [Extensions](/opbx/modules/extensions) | An extension of type **AI Assistant**, so it can be dialled internally |
 | [Ring Groups](/opbx/modules/ring-groups) | The **AI assistant** fallback of a ring group points at an AI Assistant extension, not at the assistant itself |
 | [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) | The routing destination for answered calls |
-| [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) | The campaign destination (API only) |
 
 ## Fields
 

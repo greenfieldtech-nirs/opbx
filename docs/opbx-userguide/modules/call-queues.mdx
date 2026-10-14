@@ -59,7 +59,7 @@ An available agent who is already on another call is skipped automatically. Pres
 
 ## Queue behaviour in practice
 
-1. A call reaches the queue (from a phone number, an IVR option, a ring group or AI load balancer fallback, business hours, a call-tracking campaign or a Call Queue extension).
+1. A call reaches the queue (from a phone number, an IVR option, a ring group or AI load balancer fallback, business hours or a Call Queue extension).
 2. The caller hears the hold music and, if enabled, their position.
 3. The strategy picks an agent, whose extension rings for the agent ring timeout.
 4. If the agent answers, the call connects and is recorded as answered.
@@ -135,7 +135,7 @@ Only queues whose fallback is Destination unavailable are listed. Click **Unprov
 1. On **Call Queues**, click the delete (trash) icon on the queue's row, or click **Delete** in the **Edit Call Queue** dialog.
 2. Confirm with **Delete** in the **Delete call queue** dialog.
 
-The toast "Call queue deleted" appears and the row disappears. If other configuration still points at the queue, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, ring-group and AI load-balancer fallbacks, business-hours actions, call-tracking campaigns and extensions of type **Call Queue**. Change those first, then delete again. Past call records never block a delete.
+The toast "Call queue deleted" appears and the row disappears. If other configuration still points at the queue, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, ring-group and AI load-balancer fallbacks, business-hours actions and extensions of type **Call Queue**. Change those first, then delete again. Past call records never block a delete.
 
 ![Cannot delete: still in use dialog for Billing Queue listing a Main Menu IVR option](../img/screens/call-queues-in-use-dialog.jpg)
 

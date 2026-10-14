@@ -29,7 +29,7 @@ The sidebar is grouped into sections. Items you cannot use for your role are hid
 |---------|---------------|
 | **Dashboards** | Your home dashboard |
 | **PBX Configuration** | Users, Supervisors, Extensions, Conference Rooms, Ring Groups, Call Queues, IVR Menus, Business Hours, Announcements, Phone Numbers, Trunks |
-| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers), Call Tracking (Dashboard, Campaigns, Sessions, DNI Snippet, Integrations), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
+| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
 | **Analytics** | Live Calls, Queues Dashboard, Queue Reports, Call Logs, Call Notifications, API Keys |
 | **Supervisor** | Shown to Supervisors instead of the sections above: Dashboard, Live Calls, Call Logs, Users, Ring Groups, Call Queues |
 | **Platform Management** | Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers, and hidden while they [operate as an organization](#operating-as-an-organization-platform-managers) |
@@ -44,8 +44,8 @@ Which roles see each item comes from the sidebar configuration. Examples:
 | IVR Menus, Business Hours, Announcements, Trunks | Yes | Yes | No | No | No |
 | Phone Numbers | Yes | Yes | No | Yes | No |
 | Auto Dialer, AI Load Balancers | Yes | Yes | No | Yes | No |
-| AI Assistants, Call Tracking Dashboard, Campaigns, Sessions | Yes | Yes | No (section hidden) | Yes | No |
-| DNI Snippet, Integrations, Inbound Blacklist, Outbound Whitelist | Yes | Yes | No | No | No |
+| AI Assistants | Yes | Yes | No (section hidden) | Yes | No |
+| Inbound Blacklist, Outbound Whitelist | Yes | Yes | No | No | No |
 | Live Calls, Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | Live Calls only |
 | Call Logs | Yes | Yes | Yes | Yes | Yes |
 | Call Notifications | Yes | Yes | No | No | No |
@@ -106,7 +106,7 @@ The server enforces the in-use check. The dialog is the display of that result, 
 An **Unprovisioned** badge marks a resource that has at least one route set to **Destination unavailable**. This is the "set up for future use" state. Callers who reach that route hear "Destination doesn't exist" and the call ends.
 
 - The badge appears on the list row and in the edit dialog title.
-- Seven resource types can be unprovisioned: IVR menus, phone numbers (DIDs), ring groups, call queues, AI load balancers, call-tracking campaigns and business hours schedules. Each list page has an **Unprovisioned** filter.
+- Six resource types can be unprovisioned: IVR menus, phone numbers (DIDs), ring groups, call queues, AI load balancers and business hours schedules. Each list page has an **Unprovisioned** filter.
 - A new resource must be fully connected when it is created. "Destination unavailable" is only offered on **edit** screens, under **Disconnect**.
 
 ![Ring Groups list with the Unprovisioned filter on and Executive Line showing the Unprovisioned badge](../img/screens/navigating-unprovisioned-filter.jpg)

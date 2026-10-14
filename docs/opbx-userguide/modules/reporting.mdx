@@ -27,7 +27,6 @@ Use this page to find:
 | Who called whom, when, for how long, with what result? | [Call Logs](/opbx/modules/call-logs) | Analytics |
 | How long are callers waiting in each queue, and which agents are free? | **Queues Dashboard** (see [Call Queues](/opbx/modules/call-queues#live-monitoring)) | Analytics |
 | How did each queued call end (answered, abandoned, overflow)? | **Queue Reports** (see [Call Queues](/opbx/modules/call-queues#reporting)) | Analytics |
-| Which marketing source brings calls and conversions? | Call Tracking **Dashboard** and **Sessions** (see [Call Tracking Analytics](/opbx/modules/call-tracking-analytics)) | Apps and Security |
 | How is an outbound campaign progressing? | Auto Dialer **Real Time Monitor** (see [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor)) | Apps and Security |
 | Were our call events delivered to our webhook? | **Call Notifications**, delivery log (see [Call Notifications](/opbx/modules/call-notifications)) | Analytics |
 | How often was a blocked caller turned away? | **Inbound Blacklist**, Blocked Count column (see [Inbound Blacklist](/opbx/modules/inbound-blacklist)) | Apps and Security |
@@ -41,7 +40,6 @@ Use this page to find:
 | Call Logs | Yes | Yes | Yes, read-only | Yes, read-only | Assigned scope, read-only |
 | Call Logs CSV export (button) | Yes | Yes | No | No | No |
 | Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | No |
-| Call Tracking Dashboard and Sessions | Yes | Yes | Yes | Yes | No |
 | Auto Dialer Real Time Monitor | Yes | Yes | No | Yes | No |
 | Call Notifications delivery log | Yes | Yes | No | No | No |
 | Inbound Blacklist counts | Yes | Yes | No | No | No |
@@ -79,7 +77,6 @@ The step-by-step workflows are on [Call Logs](/opbx/modules/call-logs#export-cal
 |------|---------------|--------|
 | Call records | Call Logs → apply filters → **Export** | CSV, produced in chunks of 1000 rows |
 | Queue calls | Queue Reports → apply filters → **Export CSV** | CSV |
-| Call tracking analytics | API only: `GET /v1/call-tracking-analytics/export`. The app has no button for it | CSV |
 
 Exports use the same filters as the list on screen. Call records older than 6 months are not in Call Logs; see [Call Logs → Retention and archive](/opbx/modules/call-logs#retention-and-archive).
 
@@ -104,7 +101,7 @@ Queue statistics (waiting and handling times, answered, abandoned and overflow c
 |------|------|
 | Call records (Call Logs) | 6 months in the main database, then 6 more months in an archive reachable by API key, then 7 years in compressed files for the platform owner |
 | Live-call events | 30 days |
-| Queue calls, call-tracking sessions, auto-dialer call sessions | 6 months |
+| Queue calls, auto-dialer call sessions | 6 months |
 | Call notification and blocked-call logs | 90 days |
 
 Every period can be changed by environment variables. See the [Configuration Reference](/opbx/data-models/configuration/index#data-retention).
@@ -131,5 +128,4 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 - [Call Logs](/opbx/modules/call-logs) — call history, filters, recordings and export
 - [Live Calls](/opbx/modules/live-calls) — calls in progress
 - [Call Queues](/opbx/modules/call-queues) — queue live views, statistics and reports
-- [Call Tracking Analytics](/opbx/modules/call-tracking-analytics) — campaign calls and conversions
 - [Supervisors](/opbx/modules/supervisors) — scoped reporting for team leads

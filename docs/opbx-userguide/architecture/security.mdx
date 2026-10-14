@@ -132,7 +132,7 @@ Additional env vars in `.env.example`:
 
 ### Laravel Throttle
 
-Standard Laravel `throttle` middleware is used for auth (`throttle:auth`, 5 per minute per IP), registration (10 per hour per IP), sensitive routes (`throttle:sensitive`), the call-tracking DNI endpoint (60 per minute), the embedded dialer API (60 per minute per token and IP), the dialer worker API (`DIALER_WORKER_RATE_LIMIT`, 1000 per minute), the public status page (60 per minute), the public queue wallboard (120 per minute) and a few other routes with inline limits. See [Configuration Reference](/opbx/data-models/configuration/index#webhooks--rate-limiting).
+Standard Laravel `throttle` middleware is used for auth (`throttle:auth`, 5 per minute per IP), registration (10 per hour per IP), sensitive routes (`throttle:sensitive`), the embedded dialer API (60 per minute per token and IP), the dialer worker API (`DIALER_WORKER_RATE_LIMIT`, 1000 per minute), the public status page (60 per minute), the public queue wallboard (120 per minute) and a few other routes with inline limits. See [Configuration Reference](/opbx/data-models/configuration/index#webhooks--rate-limiting).
 
 ---
 

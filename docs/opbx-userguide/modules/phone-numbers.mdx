@@ -174,12 +174,11 @@ Result: the toast "Phone number deleted successfully" appears and the number lea
 The delete is refused while the number is assigned as configuration somewhere else:
 
 - the default caller ID of an extension;
-- a call-tracking number;
 - the caller ID of an outbound whitelist rule;
 - a caller-ID pool of an auto-dialer campaign;
 - a scope of an inbound blacklist.
 
-The refusal opens the **Cannot delete: still in use** dialog, which lists each place. Remove those assignments, then delete the number. Call history (call logs, CDRs, call-tracking sessions, blocked-call logs) never blocks a delete.
+The refusal opens the **Cannot delete: still in use** dialog, which lists each place. Remove those assignments, then delete the number. Call history (call logs, CDRs, blocked-call logs) never blocks a delete.
 
 ![Cannot delete: still in use dialog for a phone number, listing extensions that use it as default caller ID and outbound whitelist entries](../img/screens/phone-numbers-in-use-dialog.jpg)
 

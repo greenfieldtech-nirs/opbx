@@ -123,7 +123,6 @@ The DID's `routing_type` selects the destination. The routing config holds the t
 | `business_hours` | `BusinessHoursSchedule` | `InboundRoutingService` resolves the schedule's current open or closed target, then that target's strategy runs |
 | `ai_assistant` | `AiAssistant` | `AiAgentRoutingStrategy` |
 | `ai_load_balancer` | `AiAssistantLoadBalancer` | `AiLoadBalancerRoutingStrategy` |
-| `call_tracking` | `CallTrackingCampaign` | `CallTrackingRoutingStrategy` (called directly, before the other types) |
 | `unavailable` | none | Plays the "destination unavailable" prompt and hangs up |
 
 A DID with no valid destination gets a spoken error prompt (`Destination not configured` or `Unsupported routing configuration`) and a hangup.
@@ -212,7 +211,6 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 
 - Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update.
 - Updates the legacy `CallLog` record if one exists.
-- Creates a [call-tracking session](/opbx/data-models/models/call-tracking-session) when the number is a tracking number.
 - Creates a final `SessionUpdate` with `action = 'cdr_final_status'`.
 - Triggers call notification webhooks for the final status.
 - For auto-dialer calls:

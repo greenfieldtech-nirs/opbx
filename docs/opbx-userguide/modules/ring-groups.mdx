@@ -123,7 +123,6 @@ The delete is refused while other configuration still routes calls to the group.
 - an IVR menu option or failover;
 - another ring group's, call queue's or AI load balancer's fallback;
 - a business-hours open or closed action;
-- a call-tracking campaign destination;
 - an extension of type Ring Group that points at it.
 
 Change those first, then delete again. A group that falls back to itself does not block its own delete. Call history never blocks a delete.
@@ -179,7 +178,6 @@ A ring group appears as a destination in:
 - **IVR menus**: as an option target or the failover.
 - **Business hours**: as the open-hours or closed-hours action.
 - **Other ring groups, call queues and AI load balancers**: as the fallback.
-- **Call-tracking campaigns**: as the destination.
 
 ## Common errors
 
