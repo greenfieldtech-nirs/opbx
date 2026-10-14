@@ -701,6 +701,7 @@ export interface CDRFilters {
   per_page?: number;
   from?: string; // partial match on 'from' number
   to?: string; // partial match on 'to' number
+  from_to_match?: 'any' | 'all'; // with both from and to: either matches (any) or both must (all, default)
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;

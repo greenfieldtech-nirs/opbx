@@ -31,12 +31,12 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Open Call Logs (sidebar) | Yes | Yes | Yes | Yes | Yes |
-| See the call records | All in the organization | All in the organization | All in the organization; the page starts filtered to their own extension | All in the organization | Only calls to or from their assigned users and ring groups |
+| See the call records | All in the organization | All in the organization | All in the organization; the page starts filtered to calls from or to their own extension | All in the organization | Only calls to or from their assigned users and ring groups |
 | Export CSV (button) | Yes | Yes | No | No | No |
 | Play a recording | Yes | Yes | No | Yes | Only calls in their scope |
 
 :::note
-The PBX User's own-extension filter is only a default on the page; **Clear Filters** removes it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but ignored.
+The PBX User's own-extension filter (From Number and To Number set to their extension, **Match** set to **Any**) is only a default on the page; **Clear Filters** removes it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but ignored.
 
 The **Export** button is hidden for PBX Users, Reporters and Supervisors, but the export endpoint itself accepts every role (a Supervisor's export is limited to their scope).
 :::
@@ -76,6 +76,7 @@ The list shows 50 calls per page, with **Previous** and **Next** below it.
    |--------|----------------|
    | From Number | Phone-number search (see below) |
    | To Number | Phone-number search (see below) |
+   | Match | Shown when both From Number and To Number are filled. **All (From and To)** (default) finds calls from the From number to the To number. **Any (From or To)** finds calls from the From number or to the To number, for example every call of one extension |
    | Disposition | Exact match: Answered, No Answer, Busy, Failed, Cancelled or Congestion |
    | User | Part of the name of the user who owns the extension |
    | Direction | Exact match: Incoming, Outgoing, Internal or Application |
@@ -85,6 +86,8 @@ The list shows 50 calls per page, with **Previous** and **Next** below it.
 5. To start over, click **Clear Filters**.
 
 When nothing matches, the list shows **No CDRs found** with "Try adjusting your filters".
+
+The API takes the same choice as `from_to_match=all` (default) or `from_to_match=any`; the CSV export honours it too.
 
 The API also filters on `session_token` (exact match on the Cloudonix session token). The page does not offer it.
 

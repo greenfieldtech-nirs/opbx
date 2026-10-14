@@ -28,6 +28,18 @@ paths:
           in: query
           schema:
             type: string
+        - name: from_to_match
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, any]
+            default: all
+          description: >-
+            How `from` and `to` combine when both are sent. `all` (default) returns calls whose caller
+            matches `from` AND whose called number matches `to`. `any` returns calls matching either one.
+            Ignored when only one of them is sent; the other filters always still apply. Other values
+            return 422.
         - name: from_date
           in: query
           schema:

@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -56,7 +57,7 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['from', 'to', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
+        return ['from', 'to', 'from_to_match', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
     }
 
     protected function getAllowedSortFields(): array
@@ -120,14 +121,23 @@ class CallDetailRecordController extends AbstractApiCrudController
             $this->applySupervisorFilter($query, $request->user());
         }
 
-        // Filter by caller number (from)
-        if ($request->filled('from')) {
-            $this->wherePhonePrefix($query, 'from', (string) $request->input('from'));
-        }
+        // From/To number filters: both must match (all, the default) or either (any).
+        $match = $request->validate(['from_to_match' => ['nullable', Rule::in(['any', 'all'])]])['from_to_match'] ?? 'all';
+        $from = $request->filled('from') ? (string) $request->input('from') : null;
+        $to = $request->filled('to') ? (string) $request->input('to') : null;
 
-        // Filter by called number (to)
-        if ($request->filled('to')) {
-            $this->wherePhonePrefix($query, 'to', (string) $request->input('to'));
+        if ($match === 'any' && $from !== null && $to !== null) {
+            $query->where(function (Builder $q) use ($from, $to): void {
+                $this->wherePhonePrefix($q, 'from', $from);
+                $q->orWhere(fn (Builder $q) => $this->wherePhonePrefix($q, 'to', $to));
+            });
+        } else {
+            if ($from !== null) {
+                $this->wherePhonePrefix($query, 'from', $from);
+            }
+            if ($to !== null) {
+                $this->wherePhonePrefix($query, 'to', $to);
+            }
         }
 
         // Filter by disposition

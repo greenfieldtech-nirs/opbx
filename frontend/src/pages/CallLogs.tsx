@@ -102,6 +102,7 @@ export default function CallLogs() {
   const [filterForm, setFilterForm] = useState({
     from: '',
     to: '',
+    from_to_match: 'all' as 'any' | 'all',
     from_date: '',
     to_date: '',
     disposition: '',
@@ -135,11 +136,14 @@ export default function CallLogs() {
   // Set default filter for PBX Users to show only their calls
   useEffect(() => {
     if (isPbxUser && userExtensionNumber) {
-      setCdrFilters({ 
+      // Calls from OR to their extension (any); the server ANDs from and to unless from_to_match=any.
+      setCdrFilters({
         per_page: 50,
-        from: userExtensionNumber,  // Show calls from their extension
-        to: userExtensionNumber,    // Or to their extension
+        from: userExtensionNumber,
+        to: userExtensionNumber,
+        from_to_match: 'any',
       });
+      setFilterForm((prev) => ({ ...prev, from: userExtensionNumber, to: userExtensionNumber, from_to_match: 'any' }));
     }
   }, [isPbxUser, userExtensionNumber]);
 
@@ -182,6 +186,7 @@ export default function CallLogs() {
     const newFilters: CDRFilters = { per_page: 50 };
     if (filterForm.from) newFilters.from = filterForm.from;
     if (filterForm.to) newFilters.to = filterForm.to;
+    if (filterForm.from && filterForm.to) newFilters.from_to_match = filterForm.from_to_match;
     if (filterForm.from_date) newFilters.from_date = filterForm.from_date;
     if (filterForm.to_date) newFilters.to_date = filterForm.to_date;
     if (filterForm.disposition) newFilters.disposition = filterForm.disposition;
@@ -196,6 +201,7 @@ export default function CallLogs() {
     setFilterForm({
       from: '',
       to: '',
+      from_to_match: 'all',
       from_date: '',
       to_date: '',
       disposition: '',
@@ -323,6 +329,23 @@ export default function CallLogs() {
                     onChange={(e) => setFilterForm({ ...filterForm, to: e.target.value })}
                   />
                 </div>
+                {filterForm.from && filterForm.to && (
+                  <div>
+                    <Label htmlFor="filter-from-to-match">Match</Label>
+                    <Select
+                      value={filterForm.from_to_match}
+                      onValueChange={(value) => setFilterForm({ ...filterForm, from_to_match: value as 'any' | 'all' })}
+                    >
+                      <SelectTrigger id="filter-from-to-match">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any (From or To)</SelectItem>
+                        <SelectItem value="all">All (From and To)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="filter-disposition">Disposition</Label>
                   <Select
