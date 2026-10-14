@@ -65,7 +65,11 @@ paths:
                   - 'null'
                   maxLength: 255
                   pattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-                  description: Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it.
+                  description: >-
+                    Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for
+                    validation, but the authentication middleware answers 400 without it. Must be
+                    the name, not the domain UUID: the authentication middleware would match a UUID,
+                    but this request's validation rejects it with 422, by design.
                 CallStatus:
                   type:
                   - string

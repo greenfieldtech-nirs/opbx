@@ -109,6 +109,8 @@ Voice routing webhooks are real-time CXML requests from Cloudonix that determine
 5. **Verify token** matches `domain_requests_api_key` using `hash_equals()`.
 6. **Attach `_organization_id`** to the request for downstream controllers.
 
+The middleware accepts either the domain name or the domain UUID in `Domain`, but `/api/voice/route`, `/api/voice/ivr-input` and `/api/callbacks/voice/ring-group-callback` then validate `Domain` as a domain **name** (`^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`) and reject a UUID with 422. This is by design: send the Cloudonix domain name in `Domain` for these requests.
+
 ### Protected Routes
 
 | Route | Method | Controller | Purpose |
