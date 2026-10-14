@@ -6,7 +6,7 @@ paths:
       summary: List campaigns
       description: |
         Get a paginated list of call tracking campaigns for the authenticated
-        user's organization. Available to every role. `search` matches name,
+        user's organization. Available to Owner, PBX Admin and Reporter only (other roles get 403). `search` matches name,
         source or medium (substring). Each item includes `tracking_numbers_count`.
         An unknown `sort_by` falls back to `created_at`; `per_page` is clamped
         to 1-100.

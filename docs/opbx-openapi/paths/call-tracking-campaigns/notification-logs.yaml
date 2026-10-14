@@ -16,7 +16,7 @@ paths:
       description: |
         Get a paginated list of webhook notification delivery logs for a
         call tracking campaign, newest first. `from` and `to` cover whole days
-        and `to` must not be before `from`. Available to every role.
+        and `to` must not be before `from`. Available to Owner, PBX Admin and Reporter only (other roles get 403).
       operationId: listCallTrackingNotificationLogs
       security:
       - bearerAuth: []

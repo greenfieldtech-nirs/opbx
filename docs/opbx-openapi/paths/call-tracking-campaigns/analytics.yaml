@@ -9,7 +9,7 @@ paths:
         by call start time). Supports filtering by campaign, source, medium and
         grouping by day, week or month (default `day`). Each `campaign_ids`
         value must be a campaign of the caller's organization (else 422). The
-        response is not wrapped in `data`. Available to every role.
+        response is not wrapped in `data`. Available to Owner, PBX Admin and Reporter only (other roles get 403).
       operationId: getCallTrackingAnalytics
       security:
       - bearerAuth: []
@@ -93,7 +93,7 @@ paths:
         medium, with the columns `date`, `campaign_name`, `source`, `medium`,
         `calls`, `answered`, `missed`, `conversions`, `avg_duration` (seconds).
         `date` uses the `group_by` format (`YYYY-MM-DD`, ISO `YYYY-WW`, or
-        `YYYY-MM`). Available to every role.
+        `YYYY-MM`). Available to Owner, PBX Admin and Reporter only (other roles get 403).
       operationId: exportCallTrackingAnalytics
       security:
       - bearerAuth: []

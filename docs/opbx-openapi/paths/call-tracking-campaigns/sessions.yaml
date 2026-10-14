@@ -8,8 +8,7 @@ paths:
         Get a paginated list of call tracking sessions, newest `started_at`
         first. Supports filtering by campaign, source, medium, date range,
         conversion status and search. Each `campaign_ids` value must be a
-        campaign of the caller's organization (else 422). Available to every
-        role.
+        campaign of the caller's organization (else 422). Available to Owner, PBX Admin and Reporter only (other roles get 403).
       operationId: listCallTrackingSessions
       security:
       - bearerAuth: []

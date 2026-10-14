@@ -33,11 +33,11 @@ Results are on the [Call Tracking Analytics](/opbx/modules/call-tracking-analyti
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | See **Call Tracking → Campaigns** in the sidebar | Yes | Yes | No | Yes (read-only) | No |
-| List and view campaigns (API) | Yes | Yes | Yes | Yes | Yes |
+| List and view campaigns and their tracking numbers (API) | Yes | Yes | No | Yes | No |
 | Create, edit, delete, activate or deactivate a campaign | Yes | Yes | No | No | No |
 | Add tracking numbers (page), change or remove them (API) | Yes | Yes | No | No | No |
 | View and change webhook notification settings, send a test | Yes | Yes | No | No | No |
-| Read the delivery log (API) | Yes | Yes | Yes | Yes | Yes |
+| Read the delivery log (API) | Yes | Yes | No | Yes | No |
 | Open **Integrations** in the sidebar | Yes | Yes | No | No | No |
 | Read or change ad-platform integrations (API) | Yes | Yes | No | No | No |
 
@@ -236,7 +236,7 @@ OPBX posts a sample `call.received` event at once, with made-up numbers (`+15550
 
 ### Check the delivery log
 
-**Who can do this:** Owner, PBX Admin (any role can read the log through the API).
+**Who can do this:** Owner, PBX Admin (Reporters can also read the log through the API).
 
 1. Open the campaign and select the **Logs** tab.
 2. Read the ten most recent deliveries: **Event**, **URL**, **Status** (the HTTP status code, or **Error** when no response came back) and **Time**.

@@ -20,9 +20,9 @@ Every finished call to an active tracking number becomes a **session**: the call
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | See **Call Tracking → Dashboard** and **Sessions** in the sidebar | Yes | Yes | No | Yes | No |
-| Read analytics, sessions and the CSV export (API) | Yes | Yes | Yes | Yes | Yes |
+| Read analytics, sessions and the CSV export (API) | Yes | Yes | No | Yes | No |
 
-Every signed-in user of the organization can read the analytics through the API; the pages are in the **Apps and Security** sidebar section, which only Owners, PBX Admins and Reporters see. Other roles who open a page's address directly are returned to the Dashboard with an **Access denied** toast. The pages are read-only for every role.
+Owners, PBX Admins and Reporters can read the analytics and sessions, in the app and through the API (other roles get 403). The pages are in the **Apps and Security** sidebar section, which only Owners, PBX Admins and Reporters see. Other roles who open a page's address directly are returned to the Dashboard with an **Access denied** toast. The pages are read-only for every role.
 
 ## Workflows
 

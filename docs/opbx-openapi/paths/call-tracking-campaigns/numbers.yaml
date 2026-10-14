@@ -16,7 +16,7 @@ paths:
       description: |
         Get all tracking numbers assigned to a campaign. The list is not
         paginated (no `meta`). Each item includes `phone_number`. Available to
-        every role.
+        Owner, PBX Admin and Reporter only (other roles get 403).
       operationId: listCallTrackingNumbers
       security:
       - bearerAuth: []
