@@ -120,13 +120,23 @@ Inviting the email of a user who is still Pending sends a new invitation. Inviti
 
 ### Edit a user
 
-Who can do this: Owner (any user); PBX Admin (any user except an Owner). A Supervisor can open their own and their assigned users' details read-only (**User Details**, with **Close**).
+Who can do this: Owner (any other user); PBX Admin (PBX Users, Reporters and Supervisors). A Supervisor can open their own and their assigned users' details read-only (**User Details**, with **Close**).
 
 1. Click the user's row or name. The **Edit User** dialog opens.
 2. Change **Name**, **Email**, **Role** or the **Contact Information** fields.
 3. Click **Save Changes**.
 
 A toast confirms "User updated successfully". The status is not part of this dialog; see [Activate or deactivate a user](#activate-or-deactivate-a-user).
+
+The dialog always sends the role along with the other fields, so the server refuses the save in three cases, even when you did not touch **Role**:
+
+| Case | Error |
+|------|-------|
+| Editing your own account | "You cannot change your own role." |
+| Editing an Owner account | "Owner role cannot be assigned. Each organization has a single owner." |
+| A PBX Admin editing another PBX Admin | "PBX Admins cannot modify users with Owner or PBX Admin roles." |
+
+A "Failed to update user" toast shows the reason and nothing is changed. Change your own name, email and password on [Profile](/opbx/administration/profile) instead.
 
 ### Change a user's role
 
