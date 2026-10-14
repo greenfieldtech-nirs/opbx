@@ -46,7 +46,7 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 - Strategy **Priority Based**, with the primary assistant at the top of the list.
 - **Follow Through** on, so a busy or failed primary moves the call to the next member.
 - Members from different providers, so one provider's outage does not stop every member.
-- A **Ring Group** or **Extension** fallback, so the last resort is a person.
+- A **Ring Group**, **Call Queue** or **Extension** fallback, so the last resort is a person.
 
 ### Gradual roll-out of a new assistant
 
@@ -67,6 +67,8 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 | Ring Group | Sends the call to a ring group |
 | IVR Menu | Plays a menu |
 | AI Assistant | One more assistant, tried without Follow Through. It must not be a member of the same load balancer |
+| Call Queue | Puts the caller in a call queue, so people answer |
+| AI Load Balancer | Hands the call to another load balancer. It cannot be this one, and a chain of fallbacks that leads back to this one is refused ("Fallback loop detected") |
 | Hangup | Ends the call (the default) |
 
 On the edit dialog, **Disconnect** sets the fallback to "Destination unavailable". The load balancer is then marked **Unprovisioned** until you choose a real fallback. A new load balancer always needs a real fallback.
@@ -79,7 +81,7 @@ The demo organization has a load balancer **Front Desk AI Pool**: Round Robin ov
 
 ## Where to use a load balancer
 
-A load balancer is a destination for phone numbers, IVR options and failovers, business-hours actions, ring-group and call-queue fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. While any of those point at it, it cannot be deleted; the delete dialog lists them.
+A load balancer is a destination for phone numbers, IVR options and failovers, business-hours actions, ring-group, call-queue and other load balancers' fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. While any of those point at it, it cannot be deleted; the delete dialog lists them.
 
 ## Monitoring
 
