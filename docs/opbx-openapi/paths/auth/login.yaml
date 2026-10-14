@@ -11,12 +11,16 @@ paths:
         - **Cookie-based (SPA)**: Returns user data, sets httpOnly session cookie
         - **Token-based (API)**: Returns API token for bearer authentication
         
-        Mode is automatically detected based on request headers:
-        - Uses cookie auth if `X-Requested-With: XMLHttpRequest` header is present
-        - Uses cookie auth if `X-Auth-Mode: cookie` header is set
-        - Otherwise uses token-based auth
-        
-        Rate limited to 5 attempts per minute per IP.
+        Mode is automatically detected based on request headers, in this order:
+        - Token auth if an `Authorization: Bearer` header is present
+        - Cookie auth if `X-Auth-Mode: cookie`; token auth if `X-Auth-Mode: token`
+        - Cookie auth if an `X-Requested-With` header is present (any value)
+        - Otherwise token-based auth
+
+        Token-based login revokes all of the user's existing tokens and issues a
+        new one with role-scoped abilities, valid for 24 hours.
+
+        Rate limited to 5 attempts per minute per IP (`RATE_LIMIT_AUTH`).
       operationId: login
       security: []
       requestBody:
@@ -55,7 +59,16 @@ paths:
                         type: string
                         example: Login successful
                       user:
-                        $ref: '../../components/schemas/User.yaml'
+                        description: >-
+                          Subset of the User object: `id`, `organization_id`, `name`, `email`,
+                          `role`, `status`, `is_platform_manager` and `social_identities`
+                          (`[{provider, provider_email}]`). `phone`, `extension` and
+                          timestamps are not returned.
+                        allOf:
+                          - $ref: '../../components/schemas/User.yaml'
+                    required:
+                      - message
+                      - user
                   - title: Token Auth Response
                     type: object
                     properties:
@@ -71,7 +84,14 @@ paths:
                         description: Token expiration in seconds
                         example: 86400
                       user:
-                        $ref: '../../components/schemas/User.yaml'
+                        description: Same user subset as the cookie response.
+                        allOf:
+                          - $ref: '../../components/schemas/User.yaml'
+                    required:
+                      - access_token
+                      - token_type
+                      - expires_in
+                      - user
               examples:
                 cookieAuth:
                   summary: Cookie-based authentication
@@ -85,6 +105,7 @@ paths:
                       role: owner
                       status: active
                       is_platform_manager: false
+                      social_identities: []
                 tokenAuth:
                   summary: Token-based authentication
                   value:
@@ -99,6 +120,7 @@ paths:
                       role: owner
                       status: active
                       is_platform_manager: false
+                      social_identities: []
           headers:
             Set-Cookie:
               schema:
@@ -111,9 +133,12 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
               example:
-                error: UNAUTHORIZED
-                message: Invalid credentials.
-                code: INVALID_CREDENTIALS
+                error:
+                  code: UNAUTHORIZED
+                  message: Invalid credentials.
+                  details:
+                    email: john@example.com
+                  request_id: 9b2f6c1e-3a4d-4e5f-8a9b-0c1d2e3f4a5b
         '403':
           description: Account or organization inactive
           content:
@@ -124,16 +149,30 @@ paths:
                 accountInactive:
                   summary: User account inactive
                   value:
-                    error: FORBIDDEN
-                    message: Your account is not active. Please contact support.
-                    code: ACCOUNT_INACTIVE
+                    error:
+                      code: ACCOUNT_INACTIVE
+                      message: Your account is not active. Please contact support.
+                      details:
+                        account_inactive: true
+                      request_id: 9b2f6c1e-3a4d-4e5f-8a9b-0c1d2e3f4a5b
                 orgInactive:
                   summary: Organization inactive
                   value:
-                    error: FORBIDDEN
-                    message: Your organization is not active. Please contact support.
-                    code: ORGANIZATION_INACTIVE
+                    error:
+                      code: ORGANIZATION_INACTIVE
+                      message: Your organization is not active. Please contact support.
+                      details:
+                        organization_id: 1
+                      request_id: 9b2f6c1e-3a4d-4e5f-8a9b-0c1d2e3f4a5b
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '429':
-          $ref: '../../components/responses/TooManyRequests.yaml'
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Too Many Requests
+                message: Too many login attempts. Please try again later.
+                retry_after: 60

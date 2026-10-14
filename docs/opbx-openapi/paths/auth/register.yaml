@@ -16,7 +16,14 @@ paths:
         3. API token for immediate access
 
 
-        Rate limited for registration attempts.
+        Rate limited to 10 registration attempts per hour per IP.
+
+
+        The admin email must be unique across all organizations and pass the
+
+        email-domain check (disposable, blocklisted, role-account, etc.). When
+
+        reCAPTCHA is enabled, a supplied `recaptcha_token` is verified with Google.
 
         '
       operationId: register
@@ -35,18 +42,20 @@ paths:
                       type: string
                       minLength: 2
                       maxLength: 100
-                      description: Organization name
+                      description: Organization name (must be unique)
                       example: Acme Corporation
                     timezone:
                       type: string
-                      description: Organization timezone (PHP timezone identifier)
+                      description: Organization timezone (any PHP timezone identifier)
                       example: America/New_York
                     slug:
-                      type: string
+                      type:
+                      - string
+                      - 'null'
                       minLength: 2
                       maxLength: 50
                       pattern: ^[a-z0-9\-]+$
-                      description: URL-friendly slug (auto-generated if not provided)
+                      description: URL-friendly slug, must be unique (generated from the name when empty or omitted)
                       example: acme-corporation
                   required:
                   - name
@@ -111,9 +120,41 @@ paths:
                     type: string
                     example: Organization registered successfully
                   user:
-                    $ref: ../../components/schemas/User.yaml
+                    type: object
+                    description: The new owner user
+                    properties:
+                      id:
+                        type: integer
+                      organization_id:
+                        type: integer
+                      name:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      role:
+                        type: string
+                        enum:
+                        - owner
+                      status:
+                        type: string
+                        enum:
+                        - active
                   organization:
-                    $ref: ../../components/schemas/Organization.yaml
+                    type: object
+                    description: The new organization
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      slug:
+                        type: string
+                      status:
+                        type: string
+                        example: active
+                      timezone:
+                        type: string
                   access_token:
                     type: string
                     description: Bearer token for immediate access
@@ -145,6 +186,17 @@ paths:
                 expires_in: 86400
         '422':
           $ref: ../../components/responses/ValidationError.yaml
+        '429':
+          description: Too many registration attempts
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error:
+                  code: RATE_LIMIT_EXCEEDED
+                  message: Too many registration attempts. Please try again in 1 hour.
+                  retry_after: 3600
         '500':
           description: Registration failed
           content:

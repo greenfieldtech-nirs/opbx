@@ -8,10 +8,12 @@ paths:
         Refresh authentication credentials.
         
         Supports both authentication modes:
-        - Cookie-based: Regenerates session, extends cookie expiration
-        - Token-based: Revokes current token and issues a new one
-        
-        Token expires in 24 hours (1440 minutes).
+        - Cookie-based (session authenticated and no bearer token): regenerates
+          the session and returns the user
+        - Token-based: revokes the current token and issues a new one with
+          role-scoped abilities (no `user` in the response)
+
+        Token expires in 24 hours (1440 minutes). Not rate limited.
       operationId: refreshAuth
       security:
         - bearerAuth: []
@@ -30,7 +32,9 @@ paths:
                         type: string
                         example: Session refreshed successfully
                       user:
-                        $ref: '../../components/schemas/User.yaml'
+                        description: Same user subset as `POST /v1/auth/login`.
+                        allOf:
+                          - $ref: '../../components/schemas/User.yaml'
                   - title: Token Auth Response
                     type: object
                     properties:

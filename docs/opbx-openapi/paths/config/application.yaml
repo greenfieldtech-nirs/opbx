@@ -7,9 +7,18 @@ paths:
       description: 'Get application-level configuration for the frontend.
 
 
-        Returns configuration details including SaaS mode, webhook URL
+        Returns configuration details including deployment mode, webhook URL
 
-        settings, reCAPTCHA configuration, and validation warnings.
+        settings, reCAPTCHA configuration, Auth0 (SaaS) social sign-in settings,
+
+        validation warnings, and the public API/MCP endpoint URLs.
+
+
+        Public: no authentication is required and the route is not rate-limited.
+
+        When a valid Sanctum bearer token is sent, `endpoints` is built from the
+
+        caller organization''s Cloudonix webhook base URL (if set).
 
         '
       operationId: getApplicationConfig
@@ -27,7 +36,7 @@ paths:
                     enum:
                     - development
                     - production
-                    description: Application deployment mode
+                    description: Application deployment mode (`OPBX_APPLICATION_MODE`; any other value falls back to `development`)
                     example: production
                   is_production:
                     type: boolean
@@ -65,23 +74,62 @@ paths:
                         - 'null'
                         description: reCAPTCHA site key (if enabled)
                         example: 6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+                  saas_enabled:
+                    type: boolean
+                    description: Whether Auth0 social sign-in is enabled (`OPBX_SAAS_ENABLED`)
+                    example: false
+                  auth0:
+                    type: object
+                    description: >-
+                      Auth0 settings for the login and register pages. When Auth0
+                      is disabled only `enabled: false` is returned.
+                    properties:
+                      enabled:
+                        type: boolean
+                        example: true
+                      domain:
+                        type:
+                        - string
+                        - 'null'
+                        description: Auth0 tenant domain (`AUTH0_DOMAIN`; only when enabled)
+                        example: example.us.auth0.com
+                      client_id:
+                        type:
+                        - string
+                        - 'null'
+                        description: Auth0 client ID (`AUTH0_CLIENT_ID`; only when enabled)
+                      providers:
+                        type: array
+                        description: >-
+                          Enabled social providers, from the comma-separated
+                          `AUTH0_PROVIDERS` (only when enabled). Supported values:
+                          google, facebook, microsoft, github, x.
+                        items:
+                          type: string
+                        example:
+                        - google
+                        - microsoft
+                    required:
+                    - enabled
                   endpoints:
                     type: object
                     description: >-
-                      Public API and MCP endpoint URLs, derived from the
-                      incoming request origin and the configured MCP port.
+                      Public API and MCP endpoint URLs. When the caller is
+                      authenticated and its organization has a Cloudonix webhook
+                      base URL, that URL is the base; otherwise the base is the
+                      public origin of the request (`X-Forwarded-Host` /
+                      `X-Forwarded-Proto` when present). MCP is proxied at `/mcp`
+                      on the same origin.
                     properties:
                       api_base_url:
                         type: string
-                        description: REST API base URL (request origin + /api/v1)
+                        description: REST API base URL (base + /api/v1)
                         example: https://pbx.example.com/api/v1
                       mcp_url:
                         type: string
-                        description: MCP server endpoint (request host + MCP port)
-                        example: https://pbx.example.com:8080/mcp
+                        description: MCP server endpoint (base + /mcp, no port)
+                        example: https://pbx.example.com/mcp
                       mcp_port:
                         type: integer
-                        description: Configured MCP host port (MCP_PORT)
+                        description: Configured MCP host port (`MCP_PORT`, default 8080)
                         example: 8080
-        '401':
-          $ref: ../../components/responses/Unauthorized.yaml
