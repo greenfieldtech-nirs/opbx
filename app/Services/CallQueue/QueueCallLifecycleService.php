@@ -12,6 +12,7 @@ use App\Models\Extension;
 use App\Models\QueueCall;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
+use App\Services\VoiceRouting\RingGroupConferenceService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -146,6 +147,8 @@ class QueueCallLifecycleService
 
         if ($sessionToken && ExtensionPresenceTracker::endsSession($status, $action)) {
             app(ConferenceOfferService::class)->releaseWinnerIfUnjoined($organizationId, $sessionToken);
+            // Simultaneous ring groups: a member session ending unanswered, or the caller hanging up.
+            app(RingGroupConferenceService::class)->sessionEnded($organizationId, $sessionToken);
         }
     }
 

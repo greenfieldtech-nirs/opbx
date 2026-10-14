@@ -147,7 +147,7 @@ The API also accepts a **description** (up to 1000 characters) and a **status**;
 
 | Strategy | What happens |
 |----------|--------------|
-| Simultaneous | All members ring at the same time for the ring timeout. The first to answer gets the call. If nobody answers, the fallback runs |
+| Simultaneous | All members ring at the same time for the ring timeout, each in a separate call. The first to answer gets the call, and the others stop ringing. If nobody answers, the fallback runs |
 | Sequential | Members ring one at a time, in the order shown in the dialog, each for the ring timeout. The list is tried **Ring Turns** times, then the fallback runs |
 | Round Robin | Rings members one at a time like Sequential, but each new call starts at the next member after the one the previous call started at. Retries for the same call continue from that member |
 
@@ -156,6 +156,12 @@ Once a member answers, the ring group is done with the call. When that conversat
 For Sequential, drag members by their handle to change the order; for Simultaneous and Round Robin the rows have up and down arrows instead. The top member rings first.
 
 Only **active** member extensions are rung. An inactive member is skipped without an error. A **Forward** member rings its forward-to number or SIP address.
+
+### What the caller hears with Simultaneous
+
+OPBX places a separate call to every member (a **Forward** member's call goes to its forward-to number or SIP address), each showing the caller's number. Meanwhile the caller is answered and hears hold music, not a ringing tone. The member who answers first is connected to the caller, the calls to the other members stop ringing, and the call is recorded as that member's (see [Call Logs](/opbx/modules/call-logs#which-extension-a-call-belongs-to)), so it shows up in that member's own call history. If no member answers within the ring timeout, or every member declines, is busy or cannot be reached, the calls to the members are ended and the caller goes to the fallback. If the caller hangs up first, the members stop ringing.
+
+Because the caller is answered as soon as the members start ringing, the call records an answered call even when nobody picks up and the fallback hangs up. Each member's ring is its own call on Cloudonix.
 
 ### Fallback actions
 

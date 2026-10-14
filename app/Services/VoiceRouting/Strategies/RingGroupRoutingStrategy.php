@@ -19,6 +19,7 @@ use App\Services\CallRecording\CallRecordingDecisionService;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\AlbsDistributionService;
+use App\Services\VoiceRouting\RingGroupConferenceService;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -122,73 +123,54 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         return $this->handleSequential($ringGroup, $request, $attempt);
     }
 
+    /**
+     * Every member rings in its own session (RingGroupConferenceService) while the caller waits in a
+     * conference room with hold music; the member who answers joins the room. Nothing could be rung:
+     * fallback right away.
+     */
     private function handleSimultaneous(RingGroup $ringGroup, Request $request): Response
     {
-        $members = $ringGroup->getMembers();
-        if ($members->isEmpty()) {
-            return $this->handleFallback($ringGroup, $request);
-        }
+        // Member extension number => what its session rings: the extension itself, or a Forward member's target.
+        $destinations = [];
+        foreach ($ringGroup->getMembers() as $member) {
+            $destination = $member->type === ExtensionType::FORWARD
+                ? ($member->configuration['forward_to'] ?? null)
+                : $member->extension_number;
 
-        $targets = [];
-        foreach ($members as $member) {
-            // Handle forward extensions by routing to their configured destination
-            if ($member->type === ExtensionType::FORWARD) {
-                $forwardTo = $member->configuration['forward_to'] ?? null;
-
-                if (! $forwardTo) {
-                    Log::warning('RingGroupRoutingStrategy: Forward extension has no destination configured', [
-                        'ring_group_id' => $ringGroup->id,
-                        'member_extension_number' => $member->extension_number,
-                    ]);
-
-                    continue;
-                }
-
-                // Route to the forward destination (phone number, SIP URI, or extension)
-                $targets[] = $forwardTo;
-
-                Log::info('RingGroupRoutingStrategy: Including forward extension destination in simultaneous ring group', [
+            if (! $destination) {
+                Log::warning('RingGroupRoutingStrategy: Forward extension has no destination configured', [
                     'ring_group_id' => $ringGroup->id,
                     'member_extension_number' => $member->extension_number,
-                    'forward_to' => $forwardTo,
                 ]);
 
                 continue;
             }
 
-            $targets[] = $member->extension_number;
+            $destinations[$member->extension_number] = (string) $destination;
         }
 
-        // If no valid targets found, fallback
-        if (empty($targets)) {
-            Log::warning('RingGroupRoutingStrategy: No valid targets found for simultaneous ring group', [
+        $callerToken = (string) ($request->input('Session') ?: $request->input('CallSid'));
+        $conference = app(RingGroupConferenceService::class);
+
+        if ($destinations === [] || $callerToken === ''
+            || ! $conference->offer($ringGroup, $callerToken, (string) $request->input('From', ''), $destinations)) {
+            Log::warning('RingGroupRoutingStrategy: No member of the simultaneous ring group could be rung', [
                 'ring_group_id' => $ringGroup->id,
-                'original_member_count' => $members->count(),
-                'forward_extensions_count' => $members->where('type', ExtensionType::FORWARD)->count(),
+                'member_count' => count($destinations),
             ]);
 
             return $this->handleFallback($ringGroup, $request);
         }
 
-        // Generate callback URL for fallback handling
-        // When all targets fail, Cloudonix will call this URL to trigger fallback
-        $callbackUrl = $this->getRingGroupCallbackUrl($ringGroup, $request, 0);
-
-        Log::info('RingGroupRoutingStrategy: Initiating simultaneous ring with fallback callback', [
-            'ring_group_id' => $ringGroup->id,
-            'ring_group_name' => $ringGroup->name,
-            'target_count' => count($targets),
-            'timeout' => $ringGroup->timeout ?? 30,
-            'callback_url' => $callbackUrl,
-        ]);
-
         $recording = $this->resolveRecording($request);
 
-        return response(
-            CxmlBuilder::dialRingGroup($targets, $ringGroup->timeout ?? 30, $callbackUrl, $recording->record, $recording->recordingStatusCallback),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        return (new CxmlBuilder)
+            ->dialQueueConference(
+                $conference->roomName($ringGroup->id, $callerToken),
+                record: $recording->record !== null,
+                recordingStatusCallback: $recording->recordingStatusCallback,
+            )
+            ->toResponse();
     }
 
     private function handleSequential(RingGroup $ringGroup, Request $request, int $attempt): Response
@@ -429,7 +411,7 @@ class RingGroupRoutingStrategy implements RoutingStrategy
         return $this->handleSequential($ringGroup, $request, $nextAttempt);
     }
 
-    private function handleFallback(RingGroup $ringGroup, Request $request): Response
+    public function handleFallback(RingGroup $ringGroup, Request $request): Response
     {
         $fallbackAction = $ringGroup->fallback_action;
 

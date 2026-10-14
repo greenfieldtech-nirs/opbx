@@ -57,6 +57,7 @@ use App\Http\Controllers\Voice\QueueConferenceController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
 use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
+use App\Http\Controllers\Voice\RingGroupConferenceController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
 Route::prefix('voice')->middleware(['log.callflow', 'log.voice'])->group(function (): void {
@@ -120,6 +121,13 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
         ->name('voice.queue-agent-connect');
     Route::any('/voice/queue-conference-join', [QueueConferenceController::class, 'callerJoin'])
         ->name('voice.queue-conference-join');
+
+    // Simultaneous ring groups (HMAC-signed URLs, no Bearer auth): a member's own session claims the
+    // call and joins the caller's room; the caller is switched to the fallback when nobody answers.
+    Route::any('/voice/ring-group-member-connect', [RingGroupConferenceController::class, 'memberConnect'])
+        ->name('voice.ring-group-member-connect');
+    Route::any('/voice/ring-group-fallback', [RingGroupConferenceController::class, 'fallback'])
+        ->name('voice.ring-group-fallback');
 });
 
 /*

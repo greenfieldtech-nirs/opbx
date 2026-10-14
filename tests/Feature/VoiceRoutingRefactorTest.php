@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Enums\ExtensionType;
@@ -15,6 +17,8 @@ use App\Services\RoutingSentryService;
 use App\Services\VoiceRouting\Strategies\AiAgentRoutingStrategy;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class VoiceRoutingRefactorTest extends TestCase
@@ -137,12 +141,15 @@ class VoiceRoutingRefactorTest extends TestCase
             $mock->shouldReceive('checkInbound')->andReturn(['allowed' => true]);
         });
 
+        // Simultaneous groups ring each member in its own session; the caller waits in a room.
+        Queue::fake();
+        Http::fake(['*' => Http::response(['token' => 'member-leg'], 200)]);
+
         $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
 
         $response->assertStatus(200);
-        $content = $response->getContent();
-        $this->assertStringContainsString('<Dial timeout="20"', $content);
-        $this->assertStringContainsString($this->extension->extension_number, $content);
+        $this->assertStringContainsString('<Conference', $response->getContent());
+        Http::assertSent(fn ($request) => $request['destination'] === $this->extension->extension_number && $request['timeout'] === 20);
     }
 
     /** @test */

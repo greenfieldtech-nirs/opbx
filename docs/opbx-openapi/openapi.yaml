@@ -95,6 +95,7 @@ info:
       | `GET /voice/health` | Voice routing health |
       | `POST /voice/amd-session`, `POST /voice/amd-action` | AMD worker session check and detection result |
       | `POST /callbacks/voice/ring-group-callback` | Ring group routing |
+      | `/callbacks/voice/ring-group-member-connect`, `/callbacks/voice/ring-group-fallback` | Simultaneous ring group member answer and fallback (signed URLs) |
       | `POST /callbacks/voice/conference-pin` | Conference room PIN entry |
       | `POST /callbacks/voice/albs-follow-through` | AI load balancer failover routing |
       | `/callbacks/voice/queue-*` | Call queue polling, dialing and conference callbacks |
@@ -208,6 +209,12 @@ paths:
 
   /callbacks/voice/ring-group-callback:
     $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
+
+  /callbacks/voice/ring-group-member-connect:
+    $ref: './paths/voice/ring-group-conference.yaml#/paths/~1callbacks~1voice~1ring-group-member-connect'
+
+  /callbacks/voice/ring-group-fallback:
+    $ref: './paths/voice/ring-group-conference.yaml#/paths/~1callbacks~1voice~1ring-group-fallback'
 
   /callbacks/voice/conference-pin:
     $ref: './paths/voice/conference-pin.yaml#/paths/~1callbacks~1voice~1conference-pin'

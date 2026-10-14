@@ -19,7 +19,9 @@ paths:
           ring group's fallback action runs (extension, ring group, IVR menu, AI assistant,
           AI load balancer, call queue, hangup or unavailable).
         - Simultaneous groups (`session_data.callback_type` = `ring_group_fallback`): run the
-          fallback action.
+          fallback action. Simultaneous groups no longer use a multi-number `<Dial>` (members
+          ring in separate sessions, see `/callbacks/voice/ring-group-member-connect`); this
+          case only serves calls that were already ringing when OPBX was upgraded.
 
         An unknown, inactive or other-organization ring group answers 200 CXML that says
         `Ring group not found` and hangs up.
