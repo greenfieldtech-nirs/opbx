@@ -342,7 +342,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'call-tracking/dni-snippet',
-        element: <CallTrackingDniSnippet />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingDniSnippet />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/integrations',
