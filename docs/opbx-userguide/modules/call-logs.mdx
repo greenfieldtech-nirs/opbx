@@ -14,13 +14,12 @@ Call Logs shows the call detail records (CDRs) that Cloudonix sends to OPBX when
 
 Use this module to:
 
-- find a call by number, date, disposition or direction;
+- find a call by number, date, disposition, direction or user;
 - open one call to see its full record and AMD result;
-- play or download the call's recording, if one was made;
-- export the results to CSV;
-- see totals and averages for a filtered set.
+- play the call's recording, if one was made;
+- export the results to CSV.
 
-Call logs are read-only. They are created by the Cloudonix call-end webhook and cannot be edited or deleted in the interface.
+Call logs are read-only. They are created by the Cloudonix call-end webhook and cannot be edited or deleted.
 
 ## Prerequisites
 
@@ -34,45 +33,64 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 | Open Call Logs (sidebar) | Yes | Yes | Yes | Yes | Yes |
 | See the call records | All in the organization | All in the organization | All in the organization; the page starts filtered to their own extension | All in the organization | Only calls to or from their assigned users and ring groups |
 | Export CSV (button) | Yes | Yes | No | No | No |
-| Play or download a recording | Yes | Yes | Yes | Yes | Only calls in their scope (single-call view) |
+| Play a recording | Yes | Yes | No | Yes | Only calls in their scope |
 
 :::note
-The PBX User's own-extension filter is only a default on the page; they can clear it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but no longer needed.
+The PBX User's own-extension filter is only a default on the page; **Clear Filters** removes it. A supervisor's list, single call, statistics and CSV export are always limited to their scope (their assigned users and ring groups plus their own calls), decided by role on the server; the old `supervisor=true` request flag is accepted but ignored.
+
+The **Export** button is hidden for PBX Users, Reporters and Supervisors, but the export endpoint itself accepts every role (a Supervisor's export is limited to their scope).
 :::
 
-:::caution Recording playback for PBX Users
-The decision for recordings is that PBX Users may not list or play recordings from the Recordings page. **Call Logs do not apply that rule today**: any PBX User can play the recording of any call in the organization from this page. Treat this as a known gap until it is fixed.
+:::note Recording playback for PBX Users
+PBX Users see the play button on recorded calls, but the server refuses the recording (403), so nothing plays. Recordings are played by Owners, PBX Admins, Reporters and Supervisors (in their scope).
 :::
 
 ## Table columns
 
 | Column | Meaning |
 |--------|---------|
-| From | Calling number |
-| To | Called number |
-| Session time | When the call started |
-| Disposition | How the call ended, for example ANSWER, BUSY or FAILED |
-| Direction | Inbound or outbound |
-| User | The OPBX user who owns the extension involved, when there is one |
-| Duration | Total call length in seconds |
-| Billable (billsec) | Billable seconds |
-| AMD | Answering machine detection result (see below) |
+| Session Time | When the call started. The default sort, newest first |
+| Extension Number | The calling number (`from`) |
+| User | The OPBX user who owns the extension involved, or *Unassigned User* |
+| Destination | The called number (`to`) |
+| Direction | `incoming`, `outgoing`, `internal` or `application` |
+| Disposition | How the call ended, for example ANSWERED, NO ANSWER, BUSY or FAILED |
+| AMD Status | Answering machine detection result (see [AMD results](#amd-results)) |
+| Duration | Total call length |
+| Connected Time | Billable (connected) time |
+| Recording | A play button when a recording is available, otherwise `-` |
 
-Click a column header to sort. Sorting by the user name is available on the live tier only (see [Retention and archive](#retention-and-archive)).
+The list shows 50 calls per page, with **Previous** and **Next** below it.
 
-## Searching and filtering
+## Workflows
 
-| Filter | How it matches |
-|--------|----------------|
-| From number | Phone-number search (see below) |
-| To number | Phone-number search (see below) |
-| Disposition | Exact match |
-| Direction | Exact match (inbound or outbound) |
-| Date range | From the start of the first day to the end of the last day, by session time |
-| Session token | Exact match on the Cloudonix session token |
-| User | Matches the OPBX user who owns the extension |
+### Find a call
 
-### Searching numbers
+**Who can do this:** everyone who can open Call Logs.
+
+1. Open **Call Logs** in the sidebar.
+2. Click **Show Filters**.
+3. Fill in any of the filters:
+
+   | Filter | How it matches |
+   |--------|----------------|
+   | From Number | Phone-number search (see below) |
+   | To Number | Phone-number search (see below) |
+   | Disposition | Exact match: Answered, No Answer, Busy, Failed, Cancelled or Congestion |
+   | User | Part of the name of the user who owns the extension |
+   | Direction | Exact match: Incoming, Outgoing, Internal or Application |
+   | From Date / To Date | From the start of the first day to the end of the last day, by session time |
+
+4. Click **Apply Filters**. The list returns to page 1 and the card header shows the number of matching records.
+5. To start over, click **Clear Filters**.
+
+When nothing matches, the list shows **No CDRs found** with "Try adjusting your filters".
+
+The API also filters on `session_token` (exact match on the Cloudonix session token). The page does not offer it.
+
+![Call Logs list with a To Number filter applied and the matching demo calls, with the AMD Status column](../img/screens/call-logs-list.jpg)
+
+#### Searching numbers
 
 - A number matches from its **start**. Typing `+1415` finds numbers that begin with `+1415`.
 - The leading `+` is optional: `+1415` and `1415` both match numbers stored with or without the plus sign.
@@ -81,17 +99,34 @@ Click a column header to sort. Sorting by the user name is available on the live
 
 A search with a leading wildcard works, but is slower on large data sets. Use a prefix when you can.
 
-The same number search applies to the list, the CSV export and the statistics.
+The same number search applies to the list and the CSV export.
 
-## Call details
+### Sort the list
 
-Open a row to see:
+**Who can do this:** everyone who can open Call Logs.
 
-- all the call fields, including the Cloudonix session token and call ID;
-- the **AMD** result: the result label, confidence percentage, detection time in milliseconds, timestamp and reason;
-- the recording player when the recording is available.
+1. Click the **Session Time**, **Extension Number**, **User**, **Direction** or **Disposition** column header. The first click sorts ascending.
+2. Click the same header again to reverse the order.
 
-### AMD results
+### Refresh the list
+
+**Who can do this:** everyone who can open Call Logs.
+
+1. Click **Refresh** above the list to load new calls now.
+2. To change the automatic refresh, choose a value in **Refresh:** at the top of the page: **Manual**, **5 Seconds**, **10 Seconds**, **30 Seconds** (the default) or **60 Seconds**.
+
+### Open a call's details
+
+**Who can do this:** everyone who can open Call Logs (a Supervisor only calls in their scope).
+
+1. Click the call's row. The **Call Detail Record** dialog opens.
+2. Read the summary: **From**, **To**, **Disposition**, **Session Time**, **Total Duration**, **Connected Time**, **Domain** and, when the call was rated, **Cost**.
+3. When AMD ran on the call, the **AMD Result** box shows **Result**, **Confidence**, **Detection Time**, **Timestamp** and, when there is one, **Reason**.
+4. Open the **Application Executions** tab to see each webhook request (**URL:**) and the **CXML Response:** OPBX returned, or the **Raw Data** tab for the full Cloudonix CDR, including the session token and call ID.
+
+![Call Detail Record dialog for a demo call showing From, To, disposition, durations and the Application Executions and Raw Data tabs (the demo calls carry no AMD result or recording)](../img/screens/call-logs-detail.jpg)
+
+#### AMD results
 
 | Result | Meaning |
 |--------|---------|
@@ -100,27 +135,33 @@ Open a row to see:
 | `Enabled::unknown` | Detection timed out or was not conclusive |
 | `Disabled` | AMD was not used on this call |
 
-![Call Logs list with a To Number filter applied and the matching demo calls, with the AMD Status column](../img/screens/call-logs-list.jpg)
+### Play a call recording
 
-![Call Detail Record dialog for a demo call showing From, To, disposition, durations and the Application Executions and Raw Data tabs (the demo calls carry no AMD result or recording)](../img/screens/call-logs-detail.jpg)
+**Who can do this:** Owner, PBX Admin, Reporter, and a Supervisor for calls in their scope.
 
-## Recordings
+1. Find the call. Recorded calls show a play button in the **Recording** column.
+2. Click the play button. It shows a spinner while the recording loads, then plays it in the browser.
+3. Click the pause button to stop.
 
-If a call was recorded, its row has a recording and the detail dialog shows a player. The recording is streamed; it is not fully loaded into memory on the server. Downloads are limited to 200 MB per file.
+The recording is streamed from storage. Recordings larger than 200 MB are not fetched from Cloudonix (`RECORDINGS_MAX_DOWNLOAD_BYTES`), so such calls have no recording.
 
-A recording is removed when its retention period ends. After that the row stays, with the recording marked as not available.
+A recording is removed when its retention period ends. After that the row stays, without the play button.
 
-## Exporting
+{/* SCREENSHOT: call-logs-recording-play — Call Logs list with a recorded demo call whose Recording column shows the pause button while it plays */}
 
-1. Apply the filters you need.
-2. Click **Export** (shown to the Owner and PBX Admins only).
-3. The CSV is produced in chunks of 1000 records, so large exports do not run out of memory.
+### Export call logs to CSV
 
-The export uses the same filters as the list, including the number-search rules.
+**Who can do this:** Owner, PBX Admin.
 
-## Statistics
+1. Apply the filters you need with **Show Filters** and **Apply Filters**.
+2. Click **Export**.
+3. The browser downloads `cdr-<date and time>.csv`.
 
-Click **Statistics** to see totals, averages and a breakdown by disposition for the current filters.
+The export uses the applied filters (not the sort order; it is always newest first) and is produced in chunks of 1000 records, so large exports do not run out of memory. Its columns are Timestamp, From, To, Call Start Time, Call Answer Time, Call End Time, Domain, Session Token, Duration (sec), Billable (sec) and Status.
+
+## Statistics (API)
+
+`GET /v1/call-detail-records/statistics` returns the total calls, total and billable duration, average duration, total cost and a count per disposition. It filters only by `from_date` and `to_date` (default: the last 30 days) and, for a Supervisor, by their scope. The page has no statistics view.
 
 ## Retention and archive
 
