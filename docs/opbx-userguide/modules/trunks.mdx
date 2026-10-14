@@ -60,7 +60,7 @@ The **Your SIP Trunk Configuration Cheatsheet** panel on the Trunks page lists t
 | Inbound Call Routing: IP Based | The fixed Cloudonix signalling IP with a **Copy** button and the same ports. Your provider must send calls from a call origin (source IP) that Cloudonix accepts |
 | Outbound Call Routing | The Cloudonix source IP for outbound calls. Configure your provider to accept and authenticate SIP signalling from it |
 
-{/* SCREENSHOT: trunks-cheatsheet — Trunks page with Your SIP Trunk Configuration Cheatsheet expanded on the Inbound Call Routing: DNS Based tab, showing the hostname, the Copy button and the SIP URIs */}
+![Trunks page with Your SIP Trunk Configuration Cheatsheet expanded on the Inbound Call Routing: IP Based tab, showing the Cloudonix ingress IP, the Copy button and the SIP URIs](../img/screens/trunks-cheatsheet.jpg)
 
 ## Workflows
 
@@ -75,7 +75,7 @@ Who can do this: Owner and PBX Admin.
 5. If the provider needs authentication, click **Authentication** and enter the **Username** and **Password**. Turn on **Overwrite From header** if the provider expects the username in the From header.
 6. Click **Create Trunk**.
 
-{/* SCREENSHOT: trunks-create-dialog — Add Trunk dialog with direction Outbound, a hostname address, transport TLS and the Authentication section expanded */}
+![Add Trunk dialog with direction Outbound, the address sip.carrier.example.com, port 5061, transport TLS and the Authentication section expanded with a username](../img/screens/trunks-create-dialog.jpg)
 
 Result: the toast "Trunk created successfully" appears and the trunk is listed. A field error is shown under the field, for example "Port must be between 1 and 65535".
 
