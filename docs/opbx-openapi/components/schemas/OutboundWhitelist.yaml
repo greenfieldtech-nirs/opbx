@@ -10,7 +10,7 @@ properties:
     example: US Long Distance
   destination_country:
     type: string
-    description: Destination country. Unique within the organization.
+    description: Destination country (max 100 characters). Unique within the organization.
     example: US
   destination_prefix:
     type:
@@ -27,14 +27,14 @@ properties:
     - integer
     - 'null'
     description: >-
-      ID of an active DID owned by the organization to present as the caller ID on
-      outbound calls matching this rule. Overridden by the calling extension's own
-      default caller ID when set. See the Outbound Calling Overview in the user guide.
+      ID of a DID owned by the organization to present as the caller ID on
+      outbound calls matching this rule (used only while that DID is active). Overridden
+      by the calling extension's own default caller ID when set. See the Outbound Calling Overview in the user guide.
   default_caller_id:
     type:
     - object
     - 'null'
-    description: Nested DID summary, present only when the relationship is loaded.
+    description: Nested DID summary. Present only in list responses (null when no caller ID is set).
     properties:
       id:
         type: integer

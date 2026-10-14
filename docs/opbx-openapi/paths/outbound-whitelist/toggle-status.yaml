@@ -5,6 +5,7 @@ paths:
         - Outbound Whitelist
       summary: Toggle whitelist entry status
       operationId: toggleWhitelistStatus
+      description: Owner and PBX Admin only. Flips `status` between `active` and `inactive`.
       security:
         - bearerAuth: []
         - cookieAuth: []
