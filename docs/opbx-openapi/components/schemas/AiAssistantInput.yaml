@@ -15,12 +15,14 @@ properties:
       - string
       - 'null'
     enum: [active, inactive, null]
-    description: Defaults to active on create (null allowed on create only)
+    description: Defaults to `active` when omitted on create. Cannot be null on update.
   provider:
     type: string
     maxLength: 100
     description: Provider key (see `GET /v1/ai-assistant/providers`)
   configuration:
     type: object
-    description: Provider-specific configuration. Required (may be empty) on create.
+    description: |
+      Provider-specific configuration, keyed by the provider's `config_fields` names. Must be
+      present on create (may be `{}` for providers without required fields).
     additionalProperties: true

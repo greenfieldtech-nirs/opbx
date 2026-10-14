@@ -33,10 +33,10 @@ properties:
     additionalProperties: true
   usage_count:
     type: integer
-    description: Number of extensions using the assistant (present when extensions are loaded or counted)
+    description: Show endpoint only. Number of extensions in `used_by_extensions` (the show endpoint loads at most 10).
   used_by_extensions:
     type: array
-    description: Extensions using the assistant (show endpoint, when non-empty)
+    description: Show endpoint only, omitted when no extension uses the assistant. At most 10 extensions.
     items:
       type: object
       properties:
@@ -50,6 +50,7 @@ properties:
           type: string
         user:
           type: object
+          description: Omitted when the extension has no user
           properties:
             id:
               type: integer
@@ -59,7 +60,7 @@ properties:
               type: string
   created_by:
     type: object
-    description: Present when the creator is loaded
+    description: Create and update responses only (when the creator is known)
     properties:
       id:
         type: integer
@@ -67,7 +68,7 @@ properties:
         type: string
   updated_by:
     type: object
-    description: Present when the updater is loaded
+    description: Create and update responses only (when the updater is known)
     properties:
       id:
         type: integer

@@ -26,32 +26,71 @@ paths:
                     properties:
                       providers:
                         type: array
-                        items:
+                        items: &provider
                           type: object
                           properties:
                             key:
                               type: string
+                              example: dograh-cloud
                             name:
                               type: string
                             protocol:
                               type: string
                               enum: [sip, websocket, dummy]
+                            url_template:
+                              type: [string, 'null']
+                              description: Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers.
+                            description:
+                              type: [string, 'null']
                             config_fields:
                               type: array
+                              description: Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`.
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                    description: Key in the assistant `configuration` object
+                                  label:
+                                    type: string
+                                  type:
+                                    type: string
+                                    description: Input type (for example `text`, `url`, `tel`, `email`, `number`)
+                                  required:
+                                    type: boolean
+                                  placeholder:
+                                    type: [string, 'null']
+                                  description:
+                                    type: [string, 'null']
+                                  validation_rules:
+                                    type: array
+                                    items:
+                                      type: string
+                                  read_only:
+                                    type: boolean
+                                    description: Fixed value; the server overwrites what the client sends
+                                  default_value:
+                                    type: [string, 'null']
                       grouped:
                         type: object
+                        description: The same provider objects, grouped by protocol
                         properties:
                           sip:
                             type: array
+                            items: *provider
                           websocket:
                             type: array
+                            items: *provider
                           dummy:
                             type: array
+                            items: *provider
                       protocols:
                         type: array
                         items:
                           type: string
                         example: [sip, websocket, dummy]
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
 
   /v1/ai-assistant/providers/{provider}:
     get:
@@ -80,14 +119,17 @@ paths:
               schema:
                 type: object
                 properties:
-                  data:
-                    type: object
+                  data: *provider
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
         '404':
           description: Provider not found
           content:
             application/json:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Provider not found
 
   /v1/ai-assistant/providers/protocol/{protocol}:
     get:
@@ -105,6 +147,7 @@ paths:
         - name: protocol
           in: path
           required: true
+          description: Any other value returns 400.
           schema:
             type: string
             enum: [sip, websocket, dummy]
@@ -119,8 +162,9 @@ paths:
                 properties:
                   data:
                     type: array
-                    items:
-                      type: object
+                    items: *provider
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
         '400':
           description: Invalid protocol
           content:

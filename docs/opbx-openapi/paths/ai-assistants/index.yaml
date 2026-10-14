@@ -4,11 +4,11 @@ paths:
       tags:
       - AI Assistants
       summary: List AI assistants
-      description: 'Get paginated list of AI assistants in the organization.
-
-        Supports filtering by status, protocol, provider, and search.
-
-        '
+      description: |
+        Paginated list of AI assistants in the organization. Any authenticated user can list.
+        Filters: `status`, `protocol`, `provider` (exact match) and `search`. An unknown
+        `sort_by` value falls back to `name`; an unknown `status` value is ignored.
+        List items do not include `usage_count`, `used_by_extensions`, `created_by` or `updated_by`.
       operationId: listAiAssistants
       security:
       - bearerAuth: []
@@ -52,6 +52,7 @@ paths:
           type: string
       - name: search
         in: query
+        description: Case-insensitive substring match on name, description or provider
         schema:
           type: string
       responses:
@@ -74,11 +75,13 @@ paths:
       tags:
       - AI Assistants
       summary: Create AI assistant
-      description: 'Create a new AI assistant. Protocol is auto-detected from provider
-
-        if not specified.
-
-        '
+      description: |
+        Create an AI assistant. Owner and PBX Admin only. `protocol` is set from the provider.
+        `provider` must be a key from the provider registry, and `configuration` is checked
+        against the provider's `config_fields` (required fields, and `email`/`url`/`tel`/`number`
+        formats). For `dograh-cloud` the server sets `configuration.websocket_endpoint` to the
+        fixed Dograh Cloud endpoint. `status` defaults to `active`.
+        The response includes `created_by` and `updated_by`.
       operationId: createAiAssistant
       security:
       - bearerAuth: []
@@ -106,11 +109,13 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: AI Assistant created successfully.
+                    example: Aiassistant created successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistant.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
   /v1/ai-assistants/{ai_assistant}:
@@ -124,7 +129,9 @@ paths:
       tags:
       - AI Assistants
       summary: Get AI assistant
-      description: Get AI assistant details including usage information
+      description: |
+        AI assistant details. Includes `used_by_extensions` (up to 10 extensions that use the
+        assistant, omitted when none) and `usage_count`.
       operationId: getAiAssistant
       security:
       - bearerAuth: []
@@ -149,7 +156,12 @@ paths:
       tags:
       - AI Assistants
       summary: Update AI assistant
-      description: Update AI assistant configuration
+      description: &updDesc |
+        Update an AI assistant. Owner and PBX Admin only. All fields are optional; `status`,
+        `name` and `provider` cannot be null. Changing `provider` resets `protocol` from the
+        new provider. `configuration` is checked against the provider's `config_fields` only
+        when `provider` is sent in the same request. The response includes `created_by` and
+        `updated_by`.
       operationId: updateAiAssistant
       security:
       - bearerAuth: []
@@ -172,10 +184,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Aiassistant updated successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistant.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
@@ -184,7 +199,7 @@ paths:
       tags:
       - AI Assistants
       summary: Partially update AI assistant
-      description: Update AI assistant configuration
+      description: *updDesc
       operationId: patchAiAssistant
       security:
       - bearerAuth: []
@@ -207,10 +222,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Aiassistant updated successfully.
                   data:
                     $ref: ../../components/schemas/AiAssistant.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
@@ -219,9 +237,11 @@ paths:
       tags:
       - AI Assistants
       summary: Delete AI assistant
-      description: 'Delete an AI assistant. Cannot delete if in use by extensions.
-
-        '
+      description: |
+        Delete an AI assistant. Owner and PBX Admin only. Refused with 409 while anything still
+        points at it: an AI assistant extension, a call queue or AI load balancer fallback, AI
+        load balancer membership, or other routing (DID routing, IVR options, business hours,
+        call tracking). The 409 body lists the references.
       operationId: deleteAiAssistant
       security:
       - bearerAuth: []
@@ -233,6 +253,8 @@ paths:
           description: AI assistant deleted
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
