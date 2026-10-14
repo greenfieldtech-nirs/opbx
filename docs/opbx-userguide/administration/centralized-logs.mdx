@@ -29,7 +29,7 @@ Call-related entries are shown with the session token as a prefix:
 
 ## Enable the stack
 
-1. Set the Grafana password in `.env`. It is required; there is no default.
+1. Make sure `.env` has a Grafana password. It is required, even when the `logs` profile is off, and there is no default; `docker/scripts/generate-secrets.sh` sets one. Also set `LOG_STACK_ENABLED=true`.
 
    ```bash
    LOG_STACK_ENABLED=true
@@ -52,9 +52,9 @@ Two dashboards are provisioned: **OPBX Call Flow Logs** (with the session-token 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_STACK_ENABLED` | `false` | Documents intent only. The `logs` profile is what starts the stack |
+| `LOG_STACK_ENABLED` | `false` | Does not start anything; the `logs` profile starts the stack. When `true`, the app container's start-up check also refuses an empty or placeholder `GRAFANA_ADMIN_PASSWORD` |
 | `GRAFANA_ADMIN_USER` | `admin` | Grafana admin user name |
-| `GRAFANA_ADMIN_PASSWORD` | none | Grafana admin password. Required |
+| `GRAFANA_ADMIN_PASSWORD` | none | Grafana admin password. Required: Compose refuses to start any service while it is unset |
 | `GRAFANA_ROOT_URL` | `http://localhost/logs/` | Must match the URL your browser uses. A mismatch makes Grafana refuse dashboard queries with "origin not allowed" |
 | `GRAFANA_CSRF_TRUSTED_ORIGINS` | empty | Extra hostnames that reach the UI (for example an ngrok or second domain). Space-separated, no scheme |
 | `LOKI_RETENTION_HOURS` | `168` | How long logs are kept (7 days) |
@@ -88,7 +88,7 @@ In Grafana, open **Explore** and choose the **Loki** data source:
   ./scripts/export-logs.sh --session sess-abc123 call-audit.txt
   ```
 
-  Run `./scripts/export-logs.sh --help` for all filters (type, text, time window, sessions only).
+  Options: `--type call_flow|platform` (default `call_flow`), `--session <token>`, `--text <string>`, `--all` (include lines without a session token) and `--since <duration>` (default `24h`). Run `./scripts/export-logs.sh --help` for the full list.
 
 ## How it works
 
