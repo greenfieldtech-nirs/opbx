@@ -100,7 +100,7 @@ Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue c
 
 - Image: `eclipse-temurin:21-jre`, runs as a non-root user (uid 10001).
 - No published ports; Laravel reaches it on the internal network.
-- Docker healthcheck: `GET http://localhost:8085/health` every 30 seconds. Because health fails when Redis is unreachable, Docker restarts a worker that lost Redis.
+- Docker healthcheck: `GET http://localhost:8085/health` every 30 seconds. Because health fails when Redis is unreachable, a worker that lost Redis is marked **unhealthy**. Plain Docker Compose does not restart an unhealthy container by itself (`restart: unless-stopped` acts only when the process exits); restart it with `docker compose restart acd-worker` or use an orchestrator that acts on health.
 - The [Platform Status](/opbx/administration/platform-management#platform-status) page probes the same address every minute (`PLATFORM_STATUS_ACD_URL`, default `http://acd-worker:8085/health`).
 
 ## Common Commands
