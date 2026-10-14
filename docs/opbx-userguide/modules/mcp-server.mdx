@@ -23,9 +23,7 @@ OPBX ships an optional **MCP (Model Context Protocol) server**, `opbx-mcp`. It g
 
 ## Where to find the URL
 
-Open **API Keys** (Owner). The **MCP Server** card at the top of the page shows the URL to give to MCP clients, with a copy button. It is the OPBX address followed by `/mcp`, for example `https://pbx.example.com/mcp`. nginx forwards `/mcp` to the MCP container, so no extra port is needed.
-
-![The REST API and MCP Server endpoint cards on the API Keys page, with the MCP URL ending in /mcp and its copy button](../img/screens/api-keys-list.jpg)
+The **MCP Server** card at the top of the **API Keys** page (Owner) shows the URL to give to MCP clients, next to the **REST API** card. It is the organization's **Webhook Base URL** from [Settings](/opbx/modules/settings) followed by `/mcp`, or, when that is empty, the address you opened OPBX on followed by `/mcp`, for example `https://pbx.example.com/mcp`. nginx forwards `/mcp` to the MCP container, so no extra port is needed.
 
 For local development only, the container's port can be published on the loopback interface by starting the stack with `-f docker-compose.ports.yml` (`http://127.0.0.1:8080/mcp`, port from `MCP_PORT`).
 
@@ -35,14 +33,38 @@ For local development only, the container's port can be published on the loopbac
 | `/health` | Liveness (container-internal or on the dev port) |
 | `/ready` | Readiness, including a check that OPBX answers |
 
-## Connect an MCP client
+## Workflows
+
+### Copy the MCP server URL
+
+Who can do this: Owner (the **API Keys** page is Owner-only).
+
+1. In the sidebar, click **API Keys**.
+2. On the **MCP Server** card, click the copy button next to the URL.
+
+A toast confirms "MCP Server URL copied to clipboard".
+
+![The REST API and MCP Server endpoint cards on the API Keys page, with the MCP URL ending in /mcp and its copy button](../img/screens/api-keys-list.jpg)
+
+### Connect an MCP client
+
+Who can do this: Owner, to create the API key. Anyone can then use the key in an MCP client.
+
+1. On the **API Keys** page, [create a key](/opbx/modules/api-keys#create-a-key) with the resource grants the agent needs, and copy the `opbxk_…` value (it is shown once).
+2. [Copy the MCP server URL](#copy-the-mcp-server-url).
+3. In your MCP client (for example Claude or MCP Inspector), add a server with that URL and the header `Authorization: Bearer <key>`. See the example configuration below.
+4. Ask the agent to run `validate_configuration` to check the connection.
+
+The agent lists the OPBX tools and answers with the configuration report. A wrong or revoked key makes every tool call fail with an authentication error.
+
+## Credentials
 
 The client sends **its own OPBX credential** as a bearer token. The MCP server stores nothing.
 
 | Credential | Format | Best for | Notes |
 |------------|--------|----------|-------|
 | API key | `opbxk_…` | Long-running agents | Never expires; can be revoked. Access is exactly the key's resource grants |
-| Personal access token | `id\|token` | Interactive use | Acts with the user's role. Expires after 24 hours and stops working when the user signs in again or changes the password |
+| Personal access token | `id\|token` | Interactive use | Acts with the user's role. Expires after 24 hours by default (`SANCTUM_EXPIRATION`) and stops working when the user signs in again or changes the password |
 
 Example client configuration:
 
@@ -57,7 +79,7 @@ Example client configuration:
 }
 ```
 
-The organization always comes from the credential. Tools do not accept an organization id, and the platform-manager "operate as" header is never sent. A request without a valid credential is refused with `401` before any tool runs.
+The organization always comes from the credential. Tools do not accept an organization id, and the platform-manager "operate as" header is never sent. A request without an `Authorization: Bearer` header, or with a personal access token OPBX rejects, is refused with `401` before any tool runs. An `opbxk_` API key is not checked up front: OPBX checks it on each tool call, and a wrong or revoked key fails there with an authentication error.
 
 ## Permissions
 
@@ -67,8 +89,8 @@ The MCP server checks the caller's role on every tool call, using the same rules
 |--------|-----------------------|
 | Owner | Everything the tools offer |
 | PBX Admin | Configuration tools. Owner-only actions stay Owner-only (for example deleting or archiving a campaign, disconnecting a call) |
-| PBX User | Read tools, and updating their own extension |
-| Reporter | Read tools only (configuration, call records, analytics) |
+| PBX User | Read tools only, except the user and supervisor tools |
+| Reporter | Read tools only (configuration, call records, analytics), except the user and supervisor tools |
 | Supervisor | Read tools, scoped views and `start_call_coaching`, limited to the people and groups assigned to them |
 | API key | Whatever the key's grants allow, enforced by OPBX |
 
@@ -83,13 +105,13 @@ A delete that OPBX refuses because the item is still in use comes back as a **co
 
 ## Rate limits
 
-Per caller, per minute (defaults, configurable by the administrator):
+Per caller, per minute (defaults, configurable by the administrator with `RATE_LIMIT_READ_PER_MIN`, `RATE_LIMIT_WRITE_PER_MIN`, `RATE_LIMIT_SENSITIVE_PER_MIN` and `RATE_LIMIT_IP_PER_MIN`):
 
 | Class | Limit |
 |-------|-------|
 | Read tools | 120 |
 | Write tools | 30 |
-| Sensitive tools | 10 |
+| Sensitive tools (campaign control, live calls, bulk operations such as `validate_configuration`) | 10 |
 | Per IP address | 600 |
 
 OPBX's own per-organization API limits also apply.
@@ -125,7 +147,11 @@ Every tool call is logged with a request id, trace id, tool name, permission, or
 
 | Symptom | Cause | What to do |
 |---------|-------|-----------|
-| `401` on every call | Missing, wrong, expired or revoked credential | Check the bearer token; create a new API key if needed |
+| `401` on every call | Missing header, or a wrong or expired personal access token | Check the bearer token |
+| Every tool fails with an authentication error | Wrong or revoked API key | Create a new API key |
+| `502` "OPBX API is unreachable; credential could not be validated" (JSON-RPC error from the MCP server) | The MCP server cannot reach OPBX | Check that the OPBX stack is up |
+| `429` | Too many requests from one address | Wait a minute |
+| A tool answers `rate_limited` ("Rate limit for … operations exceeded") | The caller passed the per-minute limit for that class of tools | Wait a minute |
 | A tool answers "forbidden" | The role or API key does not allow it | Use a credential with the right role or grant |
 | A delete answers with a conflict | The item is still used elsewhere | Change the listed references, then delete |
 | `/mcp` returns 502 | The `mcp-server` container is not running | `docker compose up -d mcp-server` |
