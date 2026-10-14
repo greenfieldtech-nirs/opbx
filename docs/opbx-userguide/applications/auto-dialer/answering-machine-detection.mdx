@@ -45,7 +45,7 @@ Result: the toast "Campaign updated successfully" (or "Campaign created successf
 | If Detection Unclear | Hang up, Continue to destination | **Continue to destination** | No beep within the detection window |
 | Retry on Voicemail | On or off | Off | A beep is heard and the number has attempts left |
 
-An action left empty is treated as **Continue**.
+An action left empty (possible through the API) is treated as **Hang up**, as the form shows it. Only an explicit **Continue to destination** keeps the call going.
 
 ## What happens on a call
 
@@ -92,7 +92,7 @@ Result: the toast "Campaign updated successfully" appears. The saved actions and
 
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
-| Live calls end after about 30 seconds | **If Detection Unclear** is Hang up (older campaigns or set by hand) | Set it to Continue to destination |
+| Live calls end after about 30 seconds | **If Detection Unclear** is Hang up or empty (older campaigns, set by hand, or `action_unknown` left out in the API) | Set it to Continue to destination |
 | Voicemail is never detected | The AMD worker is down, or the webhook base URL (or `APP_URL`) does not reach Nginx from the internet | Check the worker's health and the Cloudonix settings |
 | A real beep is missed | The beep came within the first 2 seconds, or the greeting was longer than the window | Raise `AMD_DEFAULT_TIMEOUT_SECONDS` (add it to the `amd-worker` environment in the compose file); lower `AMD_MIN_BEEP_START_MS` with care |
 | Calls are hung up on a ringback or tone at answer | A steady tone after the 2-second gate | Raise `AMD_MIN_BEEP_START_MS` |

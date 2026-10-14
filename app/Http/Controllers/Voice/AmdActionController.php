@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  * - session(): the worker asks, on stream start, whether the stream's session
  *   token is a known active auto-dialer call session; unknown streams are closed.
  * - handle(): receives a detection result and executes the action configured on
- *   the session's campaign (HANGUP or CONTINUE). The action is never taken from
+ *   the session's campaign (HANGUP or CONTINUE; empty means HANGUP). The action is never taken from
  *   the request: anyone who could open a stream would otherwise control the call.
  */
 class AmdActionController extends Controller
@@ -106,7 +106,8 @@ class AmdActionController extends Controller
             ], 404);
         }
 
-        $action = $campaign->{'action_'.$result} ?: 'CONTINUE';
+        // An empty action is HANGUP (what the campaign form shows for it); only an explicit CONTINUE keeps the call.
+        $action = $campaign->{'action_'.$result} ?: 'HANGUP';
 
         Log::info('AMD action received', [
             'call_sid' => $callSid,

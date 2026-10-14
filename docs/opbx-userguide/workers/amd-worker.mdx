@@ -179,10 +179,10 @@ The worker echoes the action in its callback, but Laravel ignores it and uses th
 
 | Action Value | Behavior |
 |--------------|----------|
-| `HANGUP` | Disconnect the session |
-| `CONTINUE` (or empty) | Take no further action |
+| `HANGUP` (or empty) | Disconnect the session |
+| `CONTINUE` | Take no further action |
 
-Default: voicemail → `HANGUP`; human or unknown → `CONTINUE`.
+Laravel treats an empty campaign action as `HANGUP`. The worker's own echoed default (voicemail → `HANGUP`; human or unknown → `CONTINUE`) is only logged and has no effect.
 
 ## Health Endpoint
 

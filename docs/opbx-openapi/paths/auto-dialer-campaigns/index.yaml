@@ -437,19 +437,19 @@ paths:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when the AMD worker detects a voicemail
+                  description: What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_human:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when a human answers
+                  description: What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_unknown:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when detection is inconclusive
+                  description: What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                 retry_on_voicemail:
                   type: boolean
                   default: false
@@ -893,19 +893,19 @@ paths:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when the AMD worker detects a voicemail
+                  description: What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_human:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when a human answers
+                  description: What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_unknown:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when detection is inconclusive
+                  description: What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                 retry_on_voicemail:
                   type: boolean
                   description: Retry the destination when a voicemail was detected
@@ -1307,19 +1307,19 @@ paths:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when the AMD worker detects a voicemail
+                  description: What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_human:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when a human answers
+                  description: What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                 action_unknown:
                   type:
                   - string
                   - 'null'
                   enum: [HANGUP, CONTINUE, null]
-                  description: What to do when detection is inconclusive
+                  description: What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                 retry_on_voicemail:
                   type: boolean
                   description: Retry the destination when a voicemail was detected

@@ -93,6 +93,17 @@ class AmdActionControllerTest extends TestCase
             ->assertOk()->assertJson(['action' => 'hangup']);
     }
 
+    public function test_an_empty_action_hangs_up(): void
+    {
+        // The campaign sets no Unclear action: an empty action at call time means HANGUP (what the form shows).
+        $this->postAction(['result' => 'unknown', 'action' => 'CONTINUE'])
+            ->assertOk()->assertJson(['action' => 'hangup']);
+
+        OrganizationScope::bypass(fn () => AutoDialerCampaign::whereKey($this->session->campaign_id)->update(['action_human' => '']));
+        $this->postAction(['result' => 'human'])
+            ->assertOk()->assertJson(['action' => 'hangup']);
+    }
+
     public function test_unknown_session_is_rejected(): void
     {
         $this->postAction(['session' => 'sess-unknown'])->assertNotFound();

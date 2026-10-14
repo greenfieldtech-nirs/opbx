@@ -7,7 +7,7 @@ paths:
       description: |
         Receives the Answering Machine Detection result from the AMD worker and runs the
         auto-dialer campaign's configured action for that result (`action_voicemail`,
-        `action_human` or `action_unknown`; empty means `CONTINUE`). The action is never
+        `action_human` or `action_unknown`; empty means `HANGUP`). The action is never
         taken from the request.
 
         - Stores `amd_result` and `amd_confidence` on the call session and writes an `amd`
