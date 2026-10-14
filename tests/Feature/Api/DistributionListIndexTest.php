@@ -39,12 +39,12 @@ final class DistributionListIndexTest extends TestCase
         $this->assertSame($small, $this->indexQueryCount($user));
     }
 
-    public function test_has_versions_reflects_child_versions(): void
+    public function test_has_versions_reflects_previous_versions(): void
     {
         $org = Organization::factory()->create();
         $user = User::factory()->create(['organization_id' => $org->id, 'role' => 'owner']);
         $parent = AutoDialerList::factory()->create(['organization_id' => $org->id, 'name' => 'Parent']);
-        AutoDialerList::factory()->create(['organization_id' => $org->id, 'parent_list_id' => $parent->id, 'is_latest_version' => false]);
+        $parent->versions()->create(['organization_id' => $org->id, 'version_number' => 1, 'replaced_at' => now()]);
         $lonely = AutoDialerList::factory()->create(['organization_id' => $org->id, 'name' => 'Lonely']);
 
         $byId = collect($this->actingAs($user)->getJson('/api/v1/auto-dialer-campaigns/lists')->assertOk()->json('data'))->keyBy('id');

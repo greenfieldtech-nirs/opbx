@@ -22,6 +22,9 @@ return [
     'queue_calls_days' => $days('RETENTION_QUEUE_CALLS_DAYS', 183),
     'call_tracking_sessions_days' => $days('RETENTION_CALL_TRACKING_SESSIONS_DAYS', 183),
     'auto_dialer_call_sessions_days' => $days('RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS', 183),
+    // Previous versions of a distribution list, counted from the re-upload that replaced them
+    // (distribution-lists:prune-versions, which also removes legacy JSON backups this old).
+    'auto_dialer_list_versions_days' => $days('RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS', 30),
     'platform_audit_logs_days' => $days('RETENTION_PLATFORM_AUDIT_LOGS_DAYS', 365),
     // Platform Status history, in HOURS (model:prune runs daily, so rows may live up to a day longer).
     'platform_health_checks_hours' => $days('PLATFORM_HEALTH_RETENTION_HOURS', 24),

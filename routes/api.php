@@ -605,6 +605,14 @@ Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scop
         ->name('distribution-lists.destinations');
     Route::get('auto-dialer-campaigns/lists/{list}/versions', [DistributionListController::class, 'getVersions'])
         ->name('distribution-lists.versions');
+    Route::get('auto-dialer-campaigns/lists/{list}/versions/{version}/destinations', [DistributionListController::class, 'getVersionDestinations'])
+        ->scopeBindings()
+        ->name('distribution-lists.versions.destinations');
+    Route::get('auto-dialer-campaigns/lists/{list}/versions/{version}/download', [DistributionListController::class, 'downloadVersion'])
+        ->scopeBindings()
+        ->name('distribution-lists.versions.download');
+    Route::get('auto-dialer-campaigns/lists/{list}/parts', [DistributionListController::class, 'getParts'])
+        ->name('distribution-lists.parts');
     Route::post('auto-dialer-campaigns/lists/{list}/copy', [DistributionListController::class, 'copy'])
         ->name('distribution-lists.copy');
     Route::patch('auto-dialer-campaigns/lists/{list}/archive', [DistributionListController::class, 'archive'])

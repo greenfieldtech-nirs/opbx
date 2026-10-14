@@ -9,12 +9,11 @@ use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerList extends Model
@@ -47,6 +46,8 @@ class AutoDialerList extends Model
         'used_by_campaign_id',
         'used_at',
         'original_filename',
+        'uploaded_by',
+        'uploaded_at',
         'processed_at',
         'total_rows',
         'valid_rows',
@@ -65,6 +66,7 @@ class AutoDialerList extends Model
         'is_latest_version' => 'boolean',
         'validation_errors' => 'array',
         'processed_at' => 'datetime',
+        'uploaded_at' => 'datetime',
         'used_at' => 'datetime',
         'archived_at' => 'datetime',
     ];
@@ -102,16 +104,16 @@ class AutoDialerList extends Model
     }
 
     /**
-     * Get all versions of this list.
+     * Previous versions of this list: the entries each re-upload replaced.
      */
     public function versions(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_list_id');
+        return $this->hasMany(AutoDialerListVersion::class, 'list_id');
     }
 
     /**
      * The "(Part N)" lists ProcessLargeListJob split off this list. The name filter keeps out
-     * version rows of the retired create-new-version flow, which share parent_list_id.
+     * list rows left by the retired create-new-version flow, which share parent_list_id.
      */
     public function parts(): HasMany
     {
@@ -121,21 +123,11 @@ class AutoDialerList extends Model
     /**
      * Every part of this list, and their parts in turn.
      *
-     * @return \Illuminate\Support\Collection<int, self>
+     * @return Collection<int, self>
      */
-    public function allParts(): \Illuminate\Support\Collection
+    public function allParts(): Collection
     {
         return $this->parts->flatMap(fn (self $part) => [$part, ...$part->allParts()]);
-    }
-
-    /**
-     * Get the latest version of this list lineage.
-     */
-    public function latestVersion(): HasOne
-    {
-        return $this->hasOne(self::class, 'parent_list_id')
-            ->where('is_latest_version', true)
-            ->orderByDesc('version_number');
     }
 
     /**
@@ -279,33 +271,6 @@ class AutoDialerList extends Model
     }
 
     /**
-     * Get the version history for this list.
-     *
-     * @return Collection<int, self>
-     */
-    public function getVersionHistory(): Collection
-    {
-        // If this is the root list (no parent), get all children
-        if ($this->parent_list_id === null) {
-            return self::where('parent_list_id', $this->id)
-                ->orWhere('id', $this->id)
-                ->orderBy('version_number')
-                ->get();
-        }
-
-        // If this is a child, find the root first
-        $root = $this->parentList;
-        while ($root->parent_list_id !== null) {
-            $root = $root->parentList;
-        }
-
-        return self::where('parent_list_id', $root->id)
-            ->orWhere('id', $root->id)
-            ->orderBy('version_number')
-            ->get();
-    }
-
-    /**
      * Mark the list as in use by a campaign.
      */
     public function markAsInUse(int $campaignId): void
@@ -337,31 +302,6 @@ class AutoDialerList extends Model
             'status' => ListStatus::ARCHIVED,
             'archived_at' => now(),
             'is_latest_version' => false,
-        ]);
-    }
-
-    /**
-     * Create a new version of this list.
-     */
-    public function createNewVersion(string $name): self
-    {
-        // Archive current version if it's the latest
-        if ($this->is_latest_version) {
-            $this->update(['is_latest_version' => false]);
-        }
-
-        // Determine version number
-        $maxVersion = self::where('parent_list_id', $this->id)
-            ->orWhere('id', $this->id)
-            ->max('version_number') ?? 0;
-
-        return self::create([
-            'organization_id' => $this->organization_id,
-            'name' => $name,
-            'version_number' => $maxVersion + 1,
-            'parent_list_id' => $this->parent_list_id ?? $this->id,
-            'is_latest_version' => true,
-            'status' => ListStatus::DRAFT,
         ]);
     }
 

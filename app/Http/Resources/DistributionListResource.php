@@ -35,11 +35,8 @@ class DistributionListResource extends JsonResource
 
             // Versioning
             'parent_list_id' => $this->parent_list_id,
-            'has_versions' => $this->when(
-                $request->routeIs('*versions*'),
-                false,
-                fn () => (bool) ($this->has_versions ?? $this->versions()->exists())
-            ),
+            // Whether previous versions (entries replaced by a re-upload) are kept
+            'has_versions' => (bool) ($this->has_versions ?? $this->versions()->exists()),
 
             'parts_count' => $this->whenCounted('parts'),
 

@@ -12,6 +12,7 @@ use App\Jobs\ProcessListUploadJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\AutoDialerListVersion;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -122,6 +123,8 @@ class ListManagementService
         // Update list status
         $list->update([
             'original_filename' => $file->getClientOriginalName(),
+            'uploaded_by' => Auth::id(),
+            'uploaded_at' => now(),
             'status' => ListStatus::PROCESSING,
         ]);
 
@@ -343,31 +346,11 @@ class ListManagementService
     }
 
     /**
-     * Create a new version of a list.
-     */
-    public function createNewVersion(
-        int $listId,
-        UploadedFile $file,
-    ): array {
-        $list = AutoDialerList::findOrFail($listId);
-
-        // Check if version can be created
-        if (! $list->status->canCreateVersion()) {
-            throw new \InvalidArgumentException('Cannot create version from list in status: '.$list->status->label());
-        }
-
-        // Create new version
-        $newVersion = $list->createNewVersion($list->name);
-
-        // Upload file to new version
-        return $this->uploadCsv($newVersion->id, $file);
-    }
-
-    /**
-     * Update list with new CSV - backup old destinations first.
+     * Replace a list's entries with a new CSV. The entries being replaced are kept as a
+     * previous version (see snapshotVersion()) before they are deleted.
      *
      * @param  array<string, mixed>  $mapping
-     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int, backup_path: string}
+     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int}
      */
     public function updateListWithBackup(int $listId, UploadedFile $file, array $mapping = []): array
     {
@@ -378,25 +361,25 @@ class ListManagementService
             throw new \InvalidArgumentException('Cannot update list in status: '.$list->status->label());
         }
 
-        // Backup old destinations to JSON file
-        $backupPath = $this->backupDestinations($list);
+        $version = DB::transaction(function () use ($list): AutoDialerListVersion {
+            $version = $this->snapshotVersion($list);
 
-        // Delete old destinations
-        $deletedCount = $list->destinations()->delete();
+            $list->destinations()->delete();
+            $list->update([
+                'total_rows' => 0,
+                'valid_rows' => 0,
+                'invalid_rows' => 0,
+                'status' => ListStatus::PENDING,
+                'version_number' => $list->version_number + 1,
+            ]);
 
-        // Reset list statistics
-        $list->update([
-            'total_rows' => 0,
-            'valid_rows' => 0,
-            'invalid_rows' => 0,
-            'status' => ListStatus::PENDING,
-            'version_number' => $list->version_number + 1,
-        ]);
+            return $version;
+        });
 
-        Log::info('ListManagementService: Backed up and cleared old destinations', [
+        Log::info('ListManagementService: Kept previous version and cleared old destinations', [
             'list_id' => $listId,
-            'backup_path' => $backupPath,
-            'deleted_count' => $deletedCount,
+            'version_id' => $version->id,
+            'entries' => $version->entries_count,
             'new_version' => $list->version_number,
         ]);
 
@@ -406,47 +389,77 @@ class ListManagementService
         return [
             ...$result,
             'version_number' => $list->version_number,
-            'backup_path' => $backupPath,
         ];
     }
 
     /**
-     * Backup destinations to a JSON file.
+     * Copy the list's current entries, as they are now, into a new previous-version record.
      */
-    private function backupDestinations(AutoDialerList $list): string
+    private function snapshotVersion(AutoDialerList $list): AutoDialerListVersion
     {
-        $filename = "list_{$list->id}_v{$list->version_number}_".now()->format('Y-m-d_His').'.json';
+        $days = config('retention.auto_dialer_list_versions_days');
+        $source = fn () => DB::table('auto_dialer_destinations')->where('list_id', $list->id);
+        $bounds = $source()->selectRaw('COUNT(*) AS total, MIN(id) AS lo, MAX(id) AS hi')->first();
 
-        $destinations = $list->destinations()->get()->map(function ($dest) {
-            return [
-                'phone_number' => $dest->phone_number,
-                'name' => $dest->name,
-                'batch_identifier' => $dest->batch_identifier,
-                'metadata' => $dest->metadata,
-                'status' => $dest->status->value,
-                'dial_attempts' => $dest->dial_attempts,
-                'duration' => $dest->duration,
-                'last_dialed_at' => $dest->last_dialed_at?->toIso8601String(),
-                'last_disposition' => $dest->last_disposition,
-                'created_at' => $dest->created_at->toIso8601String(),
-            ];
-        });
-
-        $disk = Storage::disk('list_backups');
-        $disk->put($filename, json_encode([
-            'list_id' => $list->id,
-            'list_name' => $list->name,
+        $version = $list->versions()->create([
+            'organization_id' => $list->organization_id,
             'version_number' => $list->version_number,
-            'backed_up_at' => now()->toIso8601String(),
-            'destinations' => $destinations,
-        ], JSON_PRETTY_PRINT));
+            'original_filename' => $list->original_filename,
+            'uploaded_by' => $list->uploaded_by,
+            // Lists uploaded before uploads were recorded: processing finished shortly after the upload.
+            'uploaded_at' => $list->uploaded_at ?? $list->processed_at,
+            'replaced_at' => now(),
+            'expires_at' => $days === null ? null : now()->addDays((int) $days),
+            'entries_count' => (int) $bounds->total,
+            'total_rows' => $list->total_rows,
+            'valid_rows' => $list->valid_rows,
+            'invalid_rows' => $list->invalid_rows,
+        ]);
 
-        return $disk->path($filename);
+        $columns = ['phone_number', 'name', 'batch_identifier', 'metadata', 'status', 'dial_attempts',
+            'last_dialed_at', 'last_disposition', 'duration', 'created_at', 'updated_at'];
+        $chunk = 10000;
+        for ($from = (int) $bounds->lo; $bounds->lo !== null && $from <= (int) $bounds->hi; $from += $chunk) {
+            DB::table('auto_dialer_list_version_destinations')->insertUsing(
+                ['version_id', 'organization_id', ...$columns],
+                $source()->whereBetween('id', [$from, $from + $chunk - 1])->orderBy('id')
+                    ->select([DB::raw((int) $version->id), 'organization_id', ...$columns]),
+            );
+        }
+
+        return $version;
     }
 
     /**
-     * Delete a list completely: its entries (and, by cascade, their dial sessions), the
-     * list row itself, and the backup files kept when it was re-uploaded.
+     * Write a previous version's entries as CSV to the output stream.
+     */
+    public function writeVersionCsv(AutoDialerListVersion $version): void
+    {
+        $handle = fopen('php://output', 'w');
+        fputcsv($handle, ['phone_number', 'name', 'batch_identifier', 'metadata', 'status', 'dial_attempts', 'last_disposition', 'last_dialed_at']);
+
+        $version->destinations()->chunkById(1000, function ($destinations) use ($handle): void {
+            foreach ($destinations as $destination) {
+                fputcsv($handle, [
+                    $destination->phone_number,
+                    $destination->name,
+                    $destination->batch_identifier,
+                    $destination->metadata ? json_encode($destination->metadata) : null,
+                    $destination->status->value,
+                    $destination->dial_attempts,
+                    $destination->last_disposition,
+                    $destination->last_dialed_at?->format('Y-m-d H:i:s'),
+                ]);
+            }
+        });
+
+        fclose($handle);
+    }
+
+    /**
+     * Delete a list completely: its entries (and, by cascade, their dial sessions and its
+     * previous versions), the list row itself, and any JSON backup files left from re-uploads
+     * made before previous versions were kept in the database.
      */
     public function deleteList(AutoDialerList $list): void
     {

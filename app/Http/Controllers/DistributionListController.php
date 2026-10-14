@@ -8,9 +8,12 @@ use App\Enums\ListStatus;
 use App\Exceptions\ResourceInUseException;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
+use App\Http\Resources\ListVersionDestinationResource;
+use App\Http\Resources\ListVersionResource;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\AutoDialerListVersion;
 use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\ListManagementService;
 use App\Services\ResourceReferenceChecker;
@@ -19,6 +22,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DistributionListController extends Controller
 {
@@ -94,7 +98,7 @@ class DistributionListController extends Controller
     {
         $this->authorize('view', $list);
 
-        $list->load(['campaign', 'usedByCampaign', 'parentList', 'versions'])->loadCount('parts');
+        $list->load(['campaign', 'usedByCampaign', 'parentList'])->loadCount('parts');
 
         return response()->json([
             'data' => new DistributionListResource($list),
@@ -150,14 +154,13 @@ class DistributionListController extends Controller
                     ],
                 ]);
             } else {
-                // Update existing list - backup old destinations first
+                // Replace the entries; the old ones are kept as a previous version
                 $this->authorize('createVersion', $list);
 
-                // Backup old destinations and update same list
                 $result = $this->listService->updateListWithBackup($list->id, $file, $mapping);
 
                 return response()->json([
-                    'message' => 'List updated with new data. Old destinations backed up. Processing started.',
+                    'message' => 'List updated with new data. Previous entries kept as a previous version. Processing started.',
                     'data' => [
                         ...$result,
                         'action' => 'update',
@@ -315,16 +318,58 @@ class DistributionListController extends Controller
     }
 
     /**
-     * Get version history.
+     * Previous versions of the list (the entries each re-upload replaced), newest first.
      */
     public function getVersions(AutoDialerList $list): JsonResponse
     {
         $this->authorize('view', $list);
 
-        $versions = $list->getVersionHistory();
+        return response()->json([
+            'data' => ListVersionResource::collection($list->versions()->with('uploader')->orderByDesc('version_number')->get()),
+            'meta' => ['retention_days' => config('retention.auto_dialer_list_versions_days')],
+        ]);
+    }
+
+    /**
+     * Entries of a previous version, in file order, optionally searched by number or name.
+     */
+    public function getVersionDestinations(Request $request, AutoDialerList $list, AutoDialerListVersion $version): JsonResponse
+    {
+        $this->authorize('view', $list);
+
+        $destinations = $version->destinations()
+            ->when($request->string('search')->trim()->value(), fn ($q, string $search) => $q->where(
+                fn ($q) => $q->where('phone_number', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%")
+            ))
+            ->orderBy('id')
+            ->paginate($this->perPage($request, 50));
+
+        return $this->paginatedResponse($destinations, ListVersionDestinationResource::collection($destinations));
+    }
+
+    /**
+     * Download a previous version as CSV.
+     */
+    public function downloadVersion(AutoDialerList $list, AutoDialerListVersion $version): StreamedResponse
+    {
+        $this->authorize('download', $list);
+
+        return response()->streamDownload(
+            fn () => $this->listService->writeVersionCsv($version),
+            "{$list->name} (version {$version->version_number}).csv",
+            ['Content-Type' => 'text/csv'],
+        );
+    }
+
+    /**
+     * The "(Part N)" lists a large upload to this list was split into.
+     */
+    public function getParts(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('view', $list);
 
         return response()->json([
-            'data' => DistributionListResource::collection($versions),
+            'data' => DistributionListResource::collection($list->parts()->with('campaign')->orderBy('id')->get()),
         ]);
     }
 
