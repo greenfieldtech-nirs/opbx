@@ -233,6 +233,26 @@ class QueueStatsAndAgentTest extends TestCase
             ->assertJsonPath('meta.total', 4);
     }
 
+    public function test_queue_calls_to_date_includes_the_whole_day(): void
+    {
+        foreach (['2026-03-09 23:00:00', '2026-03-10 18:30:00', '2026-03-11 00:00:01'] as $at) {
+            QueueCall::factory()->create([
+                'organization_id' => $this->organization->id,
+                'call_queue_id' => $this->queue->id,
+                'entered_at' => $at,
+            ]);
+        }
+
+        Sanctum::actingAs($this->owner);
+
+        $this->getJson('/api/v1/queue-calls?from=2026-03-10&to=2026-03-10')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1);
+
+        $csv = $this->get('/api/v1/queue-calls/export?from=2026-03-10&to=2026-03-10')->streamedContent();
+        $this->assertSame(2, substr_count(trim($csv), "\n") + 1); // header + the 18:30 call
+    }
+
     public function test_queue_calls_csv_export(): void
     {
         QueueCall::factory()->answered($this->agent, waitSeconds: 15, handleSeconds: 60)->create([

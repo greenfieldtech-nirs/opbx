@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,13 +37,7 @@ class QueueCallController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = QueueCall::withoutGlobalScope(OrganizationScope::class)
-            ->where('organization_id', $user->organization_id)
-            ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
-            ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
-            ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
-            ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to))
-            ->orderByDesc('entered_at');
+        $query = $this->filtered($request, $user->organization_id);
 
         $rows = $query->paginate((int) $request->input('per_page', 20));
 
@@ -72,13 +67,7 @@ class QueueCallController extends Controller
             fputcsv($out, ['Queue Call ID', 'Queue ID', 'Call ID', 'From', 'To', 'Entered At', 'Answered At',
                 'Abandoned At', 'Ended At', 'Agent User ID', 'Waiting Seconds', 'Handling Seconds', 'Disposition']);
 
-            QueueCall::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $user->organization_id)
-                ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
-                ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
-                ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
-                ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to))
-                ->orderByDesc('entered_at')
+            $this->filtered($request, $user->organization_id)
                 ->chunk(1000, function ($rows) use ($out) {
                     foreach ($rows as $call) {
                         fputcsv($out, [
@@ -101,6 +90,22 @@ class QueueCallController extends Controller
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    /**
+     * Report rows for the organization, newest first. The `to` day is inclusive (up to its end).
+     *
+     * @return Builder<QueueCall>
+     */
+    private function filtered(Request $request, int $organizationId): Builder
+    {
+        return QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
+            ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
+            ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
+            ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to->endOfDay()))
+            ->orderByDesc('entered_at');
     }
 
     /**

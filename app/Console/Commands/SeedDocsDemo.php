@@ -699,6 +699,9 @@ class SeedDocsDemo extends Command
             $this->id['q_support'] => ['henry', 'isabel', 'jack'],
             $this->id['q_billing'] => ['emma', 'grace'],
         ];
+        $agentExtensions = Extension::withoutGlobalScopes()
+            ->whereIn('id', array_map(fn (string $key): int => $this->x[$key], ['henry', 'isabel', 'jack', 'emma', 'grace']))
+            ->get()->keyBy('id');
         for ($i = 0; $i < 70; $i++) {
             $queueId = $i % 3 === 0 ? $this->id['q_billing'] : $this->id['q_support'];
             $entered = now()->subDays(random_int(0, 13))->setTime(random_int(8, 18), random_int(0, 59), random_int(0, 59));
@@ -709,20 +712,33 @@ class SeedDocsDemo extends Command
             $disposition = $roll < 72 ? QueueCallDisposition::ANSWERED : ($roll < 92 ? QueueCallDisposition::ABANDONED : QueueCallDisposition::OVERFLOW);
             $wait = random_int(4, 150);
             $handle = $disposition === QueueCallDisposition::ANSWERED ? random_int(45, 620) : null;
+            // CallSid is the session token: the report opens the call's CDR by it
+            $token = (string) Str::uuid();
+            $agentExtension = null;
             $row = [
-                'organization_id' => $this->org, 'call_queue_id' => $queueId, 'call_id' => 'demo-call-'.$i,
-                'session_token' => (string) Str::uuid(), 'from_number' => '+12025550'.random_int(120, 199),
+                'organization_id' => $this->org, 'call_queue_id' => $queueId, 'call_id' => $token,
+                'session_token' => $token, 'from_number' => '+12025550'.random_int(120, 199),
                 'to_number' => '+12025550102', 'entered_at' => $entered, 'waiting_seconds' => $wait,
                 'disposition' => $disposition, 'handling_seconds' => $handle,
                 'ended_at' => $entered->copy()->addSeconds($wait + ($handle ?? 0)),
             ];
             if ($disposition === QueueCallDisposition::ANSWERED) {
                 $row['answered_at'] = $entered->copy()->addSeconds($wait);
-                $row['agent_user_id'] = $this->u[$agents[$queueId][array_rand($agents[$queueId])]];
+                $agent = $agents[$queueId][array_rand($agents[$queueId])];
+                $row['agent_user_id'] = $this->u[$agent];
+                $agentExtension = $agentExtensions[$this->x[$agent]];
             } elseif ($disposition === QueueCallDisposition::ABANDONED) {
                 $row['abandoned_at'] = $entered->copy()->addSeconds($wait);
             }
             QueueCall::create($row);
+            CallDetailRecord::create([
+                'organization_id' => $this->org, 'session_timestamp' => $entered, 'session_token' => $token,
+                'from' => $row['from_number'], 'to' => $row['to_number'], 'direction' => 'incoming',
+                'disposition' => $agentExtension ? 'CONNECTED' : 'NO_ANSWER',
+                'duration' => $wait + ($handle ?? 0), 'billsec' => $handle ?? 0, 'call_id' => (string) Str::uuid(),
+                'domain' => self::DOMAIN, 'subscriber' => $agentExtension?->cloudonix_uuid,
+                'extension_number' => $agentExtension?->extension_number, 'session_id' => 760000 + $i, 'raw_cdr' => [],
+            ]);
         }
     }
 }

@@ -57,7 +57,11 @@ class SeedDocsDemoTest extends TestCase
         foreach (['ring_group_members', 'ivr_menu_options', 'api_key_permissions', 'ai_assistant_load_balancer_members', 'business_hours_exceptions'] as $child) {
             $this->assertGreaterThan(0, DB::table($child)->count(), "{$child} is empty");
         }
-        $this->assertSame(150, DB::table('call_detail_records')->where('organization_id', $id)->count());
+        // 150 call log rows plus one CDR per queue call (70), so queue report rows open their call details
+        $this->assertSame(220, DB::table('call_detail_records')->where('organization_id', $id)->count());
+        $this->assertSame(0, DB::table('queue_calls')->where('organization_id', $id)
+            ->whereNotIn('call_id', DB::table('call_detail_records')->where('organization_id', $id)->select('session_token'))
+            ->count());
         $this->assertSame(0, DB::table('cloudonix_settings')->where('organization_id', $id)->count());
         $this->assertSame(
             ['owner', 'pbx_admin', 'pbx_user', 'reporter', 'supervisor'],
