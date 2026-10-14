@@ -25,12 +25,12 @@ Use this module to:
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|:-----:|:---------:|:--------:|:--------:|
-| See API Keys in the sidebar (Analytics section) | Yes | No | No | No |
-| List, create, update and revoke keys | Yes | No | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See API Keys in the sidebar (Analytics section) | Yes | No | No | No | No |
+| List, create, update and revoke keys | Yes | No | No | No | No |
 
-Other roles get "Access denied" in the app and `403` from the API. An API key can never manage API keys, whatever its permissions: the API key endpoints are not grantable and answer `403`.
+Other roles who open the page get the toast **Access denied** ("You do not have permission to access this page.") and `403` from the API. An API key can never manage API keys, whatever its permissions: the API key endpoints are not grantable and answer `403`.
 
 ## How a key's access works
 
@@ -60,16 +60,21 @@ The live list comes from `GET /v1/api-keys/grantable-resources`. In the dialog t
 
 Only an API key can read the archive tier of call detail records (records 6 to 12 months old). Add `archive=1` to the list, single-record, export or statistics request of `call-detail-records`. The flag is ignored for signed-in users, including the Owner. See [Call Logs](/opbx/modules/call-logs).
 
-## Create a key
+## Workflows
 
-1. Open **API Keys** (in the **Analytics** section of the sidebar).
-2. Click **Create API Key**.
-3. Enter a **Name** (required, up to 255 characters), for example "CRM Integration".
+### Create a key
+
+**Who can do this:** Owner.
+
+1. Open **Analytics → API Keys** in the sidebar.
+2. Click **Create API Key** (top right of the **API Keys** card, or in the middle of the page when there are no keys yet).
+3. Enter a **Name** (required, up to 255 characters), for example `CRM Integration`.
 4. Under **Permissions**, choose **No Access**, **Read** or **Write** for each resource. The buttons **Disable All**, **Grant Read-Only All** and **Grant Write All** set every resource at once.
 5. Click **Create**. The button stays disabled until there is a name and at least one permission.
-6. The **API Key Created** dialog shows the key once. Copy it and store it in a secret manager, then click **I've copied it**. The dialog cannot be closed by clicking outside it or pressing Escape.
+6. The toast **API key created** appears and the **API Key Created** dialog shows the key once. Click the copy button next to the key (toast **Copied**) and store it in a secret manager.
+7. Click **I've copied it**. The dialog cannot be closed by clicking outside it or pressing Escape.
 
-The key starts with `opbxk_` followed by 40 random characters. Only a SHA-256 hash is stored, so the key can never be shown again. If it is lost, revoke it and create a new one.
+The new key is listed as **Active**, with **Never** under **Last used**. The key starts with `opbxk_` followed by 40 random characters. Only a SHA-256 hash is stored, so the key can never be shown again. If it is lost, revoke it and create a new one.
 
 ![API Keys page with the REST API and MCP Server endpoint cards on top and two keys: Reporting Dashboard (call-detail-records:read, dashboard:read) and CRM Integration (extensions:write, phone-numbers:read, users:read), both Active with a last-used date](../img/screens/api-keys-list.jpg)
 
@@ -77,19 +82,37 @@ The key starts with `opbxk_` followed by 40 random characters. Only a SHA-256 ha
 
 {/* SCREENSHOT: api-keys-reveal-dialog — API Key Created dialog with a placeholder key (opbxk_ followed by Xs) and the Copy button */}
 
-## Use a key
+### Use a key
 
-Send the key as a bearer token:
+**Who can do this:** anyone holding the key; the endpoint cards are on the Owner's API Keys page.
+
+1. On the **API Keys** page, click the copy button on the **REST API** card (toast **REST API URL copied to clipboard**) or the **MCP Server** card (toast **MCP Server URL copied to clipboard**).
+2. Send the key as a bearer token to that base URL:
 
 ```bash
 curl -H "Authorization: Bearer opbxk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
      https://pbx.example.com/api/v1/phone-numbers
 ```
 
-The top of the API Keys page shows two endpoint cards with copy buttons:
-
 - **REST API**: the base URL for REST calls.
 - **MCP Server**: the URL to give MCP clients, with the same bearer key. See [MCP Server](/opbx/modules/mcp-server).
+
+### Change a key
+
+**Who can do this:** Owner, through the API with a signed-in session (an API key cannot manage keys).
+
+The page has no edit dialog. To rename a key or replace its permissions, use `PUT /v1/api-keys/{id}` with `name` and/or `permissions`. The new permission list **replaces** the old one completely and must contain at least one entry. Name and permissions change together or not at all.
+
+### Revoke a key
+
+**Who can do this:** Owner.
+
+1. Click **Revoke** on the key's row.
+2. The **Revoke API key?** dialog says that revoking the key immediately disables it and cannot be undone. Click **Revoke**.
+
+The toast **API key revoked** appears. The key stops working immediately: requests with it answer `401` "Unauthenticated." Revoked keys stay in the list, dimmed, with the **Revoked** badge and no **Revoke** button. Revoking cannot be undone and a revoked key cannot be deleted.
+
+![Revoke API key? confirmation for Reporting Dashboard](../img/screens/api-keys-revoke-dialog.jpg)
 
 ## List columns
 
@@ -100,19 +123,6 @@ The top of the API Keys page shows two endpoint cards with copy buttons:
 | Last used | Date of the last request, or **Never**. Updated at most every 5 seconds per key (every request for `users` and `extensions`) |
 | Status | **Active** or **Revoked** |
 | Actions | **Revoke** for active keys |
-
-## Change a key
-
-The page has no edit dialog. To rename a key or replace its permissions, use `PUT /v1/api-keys/{id}` with `name` and/or `permissions`. The new permission list **replaces** the old one completely and must contain at least one entry. Name and permissions change together or not at all.
-
-## Revoke a key
-
-1. Click **Revoke** on the key's row.
-2. Confirm in the **Revoke API key?** dialog.
-
-The key stops working immediately: requests with it answer `401` "Unauthenticated." Revoked keys stay in the list, dimmed, with the **Revoked** badge. Revoking cannot be undone and a revoked key cannot be deleted.
-
-![Revoke API key? confirmation for Reporting Dashboard](../img/screens/api-keys-revoke-dialog.jpg)
 
 ## Common errors
 
