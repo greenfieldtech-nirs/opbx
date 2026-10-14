@@ -18,6 +18,18 @@ Use these limits to match the campaign to what its destination can take: an AI a
 
 - A campaign in **Draft** or **Paused** status. The limits are on the **Advanced** tab of the campaign form. See [Managing Campaigns](/opbx/applications/auto-dialer/campaigns).
 
+## Set the rate limits
+
+Who can do this: Owner and PBX Admin.
+
+1. Open **Auto Dialer → Campaign Manager**. Pause the campaign if it is Running.
+2. Click **Edit** on the campaign (or **Create Campaign** for a new one) and select the **Advanced** tab.
+3. Enter **Concurrent Active Calls (CAC)**, pick **Calls Per Second (CPS)** and enter **Max Dial Attempts**.
+4. Optionally switch on **Retry on busy / no-answer** and set **First retry delay (minutes)**.
+5. Click **Update Campaign** (or **Create Campaign**).
+
+Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears. The dialer worker uses the new limits from its next poll.
+
 ## Fields
 
 | Field | Limits and default | Meaning |
@@ -25,6 +37,8 @@ Use these limits to match the campaign to what its destination can take: an AI a
 | Concurrent Active Calls (CAC) | 1 to 50. Default: 1 | Most calls of this campaign in progress at the same time |
 | Calls Per Second (CPS) | 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25 or 30 (the API accepts 1 to 30). Default: 1 | Fastest rate at which new calls start. 2 CPS means at least 500 ms between call starts |
 | Max Dial Attempts | 1 to 5. Default: 1 | Most attempts per number, retries included |
+| Retry on busy / no-answer | Off by default | Redial busy and unanswered numbers while attempts remain |
+| First retry delay (minutes) | 1 to 1440. Default: 15 | Wait before the first redial; each further one waits twice as long, up to 24 hours |
 
 ![Advanced tab showing Concurrent Active Calls, the Calls Per Second picker open, and Max Dial Attempts](../../img/screens/auto-dialer-rate-limits.jpg)
 
@@ -57,7 +71,7 @@ OPBX keeps the count of calls in progress for each campaign:
 
 The dialer worker runs as a **single replica**; the CPS pacing is kept inside that one process. Do not scale it out. See [Dialer Worker](/opbx/workers/dialer-worker).
 
-One worker processes at most 10 campaigns at the same time. If OPBX asks the worker to slow down (HTTP 429), it waits the time OPBX gives and skips the rest of that batch.
+One worker processes at most 10 campaigns at the same time. OPBX accepts at most `DIALER_WORKER_RATE_LIMIT` worker requests per minute (default 1000). If OPBX answers HTTP 429, the worker waits the `Retry-After` time (5 minutes when none is given) and skips the rest of that campaign's batch.
 
 ## Attempts and retries
 
@@ -65,13 +79,13 @@ Each call to a number counts as one attempt. A number is dialed again only while
 
 | Situation | What happens |
 |-----------|--------------|
-| Cloudonix refuses to place the call | The number goes back to pending and is retried after 1 minute, then 2 minutes. After **3 consecutive** refusals it is marked **Failed** |
-| Voicemail detected and **Retry on Voicemail** is on | The number goes back to pending with a delay of 5, 10, 20, 40, then 60 minutes (doubling, capped at 60), while attempts remain. See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
+| Cloudonix refuses to place the call | The number goes back to pending and is retried after 1 minute, then 2 minutes. After **3 consecutive** refusals it is marked **Failed**. Each refusal also uses an attempt, so the number fails earlier when Max Dial Attempts is reached |
+| Voicemail detected and **Retry on Voicemail** is on | The number goes back to pending with a delay of 5, 10, 20, then 40 minutes (doubling with each attempt), while attempts remain. See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
 | The call was answered | The number is **Completed** |
 | Busy or no answer | With **Retry on busy / no-answer** on and attempts left, the number goes back to pending after the campaign's **First retry delay** (default 15 minutes), and each further retry waits twice as long as the one before (15, 30, 60, 120 ... minutes), up to 24 hours. Otherwise it is **Failed** |
 | Failed, cancelled, congestion or a result OPBX does not recognise | The number is **Failed**. These are never retried |
 
-To call failed numbers again, select them on the list's detail page and use **Reset Dial Attempts**, or copy the list.
+To call failed numbers again, select them on the list's detail page and use **Reset Dial Attempts** (see [Reset dial attempts](/opbx/applications/auto-dialer/distribution-lists#reset-dial-attempts)), or copy the list.
 
 On a retry, the dialer prefers a caller ID from the pool that has not been tried for that number yet.
 
