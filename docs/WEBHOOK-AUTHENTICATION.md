@@ -30,7 +30,9 @@ There are four distinct authentication contexts:
 | Voice Routing | `VerifyVoiceWebhookAuth` (`voice.webhook.auth`) | Bearer token (required) | CXML | `/api/voice/*`, `/api/callbacks/voice/*` |
 | Status/CDR | `VerifyCloudonixSignature` (`webhook.signature`) | Bearer token (conditional) | JSON | `/api/webhooks/cloudonix/*` |
 | Auto-Dialer | `VerifyCloudonixSignature` + `EnsureWebhookIdempotency` | Bearer token (conditional) | JSON | `/api/webhooks/auto-dialer/*`, `/api/webhooks/cloudonix/dialer` |
-| AMD Action | Inline in `AmdActionController` | Bearer token (required) | JSON | `/api/voice/amd-action` |
+| AMD Action | Inline in `AmdActionController` | Bearer token (required) | JSON | `/api/voice/amd-action`, `/api/voice/amd-session` |
+
+`POST /api/webhooks/cloudonix/recording-status` uses `webhook.idempotency` only and has no authentication middleware.
 
 ---
 
@@ -43,6 +45,9 @@ flowchart TD
         V2[POST /api/voice/ivr-input] --> VM
         V3[POST /api/callbacks/voice/ring-group-callback] --> VM
         V4[POST /api/callbacks/voice/albs-follow-through] --> VM
+        V5[POST /api/callbacks/voice/conference-pin] --> VM
+        V6[POST /api/callbacks/voice/queue-poll] --> VM
+        V7[POST /api/callbacks/voice/queue-dial-callback] --> VM
     end
 
     subgraph Status["Status/CDR Webhooks (JSON)"]
@@ -77,7 +82,9 @@ flowchart TD
     SA -->|Yes| ST{Bearer token<br/>matches?}
     ST -->|Yes| SO[Attach _organization_id<br/>Proceed to controller]
     ST -->|No| SJ2[401 JSON:<br/>Invalid Bearer token]
-    SA -->|No| SB[Proceed<br/>(backward compatible)]
+    SA -->|No| SR{CLOUDONIX_WEBHOOK_<br/>REQUIRE_AUTH?}
+    SR -->|false| SB[Proceed<br/>(warn: webhook.unauthenticated)]
+    SR -->|true| SJ3[401 JSON:<br/>Webhook key not configured]
 
     AC --> AT{Bearer matches<br/>AMD_WORKER_API_TOKEN?}
     AT -->|Yes| AO[Proceed to controller]
@@ -110,6 +117,9 @@ Voice routing webhooks are real-time CXML requests from Cloudonix that determine
 | `/api/voice/ivr-input` | POST | `VoiceRoutingController@handleIvrInput` | IVR digit input callback |
 | `/api/callbacks/voice/ring-group-callback` | POST | `VoiceRoutingController@handleRingGroupCallback` | Ring group sequential routing |
 | `/api/callbacks/voice/albs-follow-through` | POST | `AlbsFollowThroughController@handle` | ALB failover routing |
+| `/api/callbacks/voice/conference-pin` | POST | `VoiceRoutingController@handleConferencePin` | Conference PIN entry |
+| `/api/callbacks/voice/queue-poll` | POST | `QueuePollController@handle` | Call queue hold loop |
+| `/api/callbacks/voice/queue-dial-callback` | POST | `QueueDialCallbackController@handle` | Call queue agent dial result |
 
 ### Error Responses
 
@@ -141,7 +151,7 @@ Status and CDR webhooks are asynchronous events from Cloudonix. The authenticati
 2. **Match domain to organization** via `CloudonixSettings` (`domain_name` or `domain_uuid`).
 3. **Check organization's auth configuration:**
    - If `domain_requests_api_key` is set → Bearer token **REQUIRED** and **MUST match**.
-   - If `domain_requests_api_key` is `null`/`empty` → Bearer token **OPTIONAL** (backward compatible).
+   - If `domain_requests_api_key` is `null`/`empty` → rejected with 401 when `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`; otherwise accepted without a token (backward compatible) and logged as `webhook.unauthenticated`.
 4. **Attach `_organization_id`** to the request.
 
 ### Token Comparison
@@ -240,6 +250,8 @@ When a webhook is first processed, its response is cached:
 
 - **Small responses** (≤ 100 KB): Full content cached and returned on duplicate.
 - **Large responses** (> 100 KB): Only metadata cached; duplicate returns empty 200.
+- **Failed responses** are not cached, so a redelivery is processed again.
+- **Concurrent duplicates**: while the first delivery is still running, a second one with the same key gets `409` `{"error": "Webhook is being processed"}`.
 
 ### Routes with Idempotency
 
@@ -284,13 +296,21 @@ The AMD (Answering Machine Detection) action callback is a special endpoint that
 ### Authentication
 
 ```php
-$authHeader = $request->header('Authorization', '');
-$expectedToken = config('services.amd_worker.api_token', env('AMD_WORKER_API_TOKEN', ''));
+$authHeader = (string) $request->header('Authorization', '');
+$expectedToken = (string) config('services.amd_worker.api_token', '');
 
-if (!str_starts_with($authHeader, 'Bearer ') || !hash_equals('Bearer '.$expectedToken, $authHeader)) {
-    return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+if ($expectedToken === '') {
+    return response()->json(['status' => 'error', 'message' => 'AMD worker authentication is not configured'], 503);
 }
+
+if (hash_equals('Bearer '.$expectedToken, $authHeader)) {
+    return null; // authorized
+}
+
+return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
 ```
+
+The same check protects `POST /api/voice/amd-session`, which the AMD worker calls to ask whether a session token belongs to an active auto-dialer call.
 
 ### Key Differences
 
@@ -347,6 +367,7 @@ See `routes/api.php` for the full `/api/v1/dialer/worker/*` route group.
 | `WEBHOOK_IDEMPOTENCY_TTL` | No | `86400` | Idempotency key TTL in seconds (24h) |
 | `WEBHOOK_MAX_CACHE_SIZE` | No | `102400` | Max response cache size in bytes (100 KB) |
 | `WEBHOOK_REPLAY_MAX_AGE` | No | `300` | Max webhook age in seconds (5 min) |
+| `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` | No | `false` | Reject status, CDR and dialer webhooks from organizations that have no webhook key |
 
 ### Per-Organization Settings
 
@@ -402,6 +423,7 @@ $middleware->alias([
 | Unknown domain | 401 | `{"error": "Unauthorized - Unknown domain"}` |
 | Bearer token required | 401 | `{"error": "Unauthorized - Bearer token required"}` |
 | Invalid Bearer token | 401 | `{"error": "Unauthorized - Invalid Bearer token"}` |
+| No key configured and `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true` | 401 | `{"error": "Unauthorized - Webhook key not configured"}` |
 
 ### Idempotency (JSON)
 
@@ -410,12 +432,14 @@ $middleware->alias([
 | Replay attack (too old) | 400 | `{"error": "Webhook Expired", "message": "Webhook timestamp is too old..."}` |
 | Future timestamp | 400 | `{"error": "Invalid Timestamp", "message": "Webhook timestamp is in the future."}` |
 | Duplicate webhook | 200 | Cached response or empty body |
+| Duplicate while the first is still processing | 409 | `{"error": "Webhook is being processed"}` |
 
 ### AMD Action (JSON)
 
 | Scenario | HTTP Status | Response |
 |----------|-------------|----------|
 | Missing/invalid auth | 401 | `{"status": "error", "message": "Unauthorized"}` |
+| `AMD_WORKER_API_TOKEN` not set | 503 | `{"status": "error", "message": "AMD worker authentication is not configured"}` |
 
 ---
 
@@ -440,7 +464,7 @@ This applies to:
 
 The `domain_requests_api_key` is:
 - **Encrypted at rest** via Laravel's `encrypted` cast.
-- **Masked in API responses** (only last 4 characters shown).
+- **Masked in API responses** (first 4 and last 4 characters with `***` between; keys of 8 characters or less are fully masked).
 - **Excluded from logs** via exception context filtering.
 
 ### Log Sanitization
