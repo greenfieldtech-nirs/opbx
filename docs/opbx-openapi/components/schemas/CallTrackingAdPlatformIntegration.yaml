@@ -15,7 +15,7 @@ properties:
         example: true
       is_configured:
         type: boolean
-        description: Whether all required Google Ads credentials are present
+        description: Whether customer ID, developer token, refresh token and conversion action resource name are all stored
         example: true
   meta:
     type: object
@@ -27,12 +27,14 @@ properties:
         example: false
       is_configured:
         type: boolean
-        description: Whether all required Meta credentials are present
+        description: Whether the pixel ID and access token are both stored
         example: false
   updated_at:
-    type: string
+    type:
+    - string
+    - 'null'
     format: date-time
-    description: Last update timestamp
+    description: Last update timestamp (null when no settings were saved yet)
     example: '2024-01-15T12:00:00Z'
 required:
 - organization_id

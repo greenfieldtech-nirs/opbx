@@ -7,7 +7,8 @@ paths:
       description: |
         Returns the organization's Google Ads and Meta conversion-upload integration
         settings (singleton). When no integration exists a default disabled/unconfigured
-        shape is returned. Secret credentials are never echoed back.
+        shape is returned (`updated_at` null). Credentials are stored encrypted
+        and never echoed back. Owner and PBX Admin only.
       operationId: getAdPlatformIntegration
       security:
         - bearerAuth: []
@@ -34,8 +35,12 @@ paths:
       summary: Update ad-platform integration settings
       description: |
         Creates or updates the organization's Google Ads and Meta conversion-upload
-        integration settings. Only supplied secret credential fields are written;
-        omitting a credential leaves the stored value untouched.
+        integration settings. Only credential fields sent with a non-null value
+        are written; omitting a credential (or sending null) leaves the stored
+        value untouched, so a credential cannot be cleared here. When
+        `google_ads_enabled` is true, each Google Ads credential is required
+        unless one is already stored; the same applies to the Meta credentials
+        when `meta_enabled` is true. Owner and PBX Admin only.
       operationId: updateAdPlatformIntegration
       security:
         - bearerAuth: []
@@ -60,26 +65,38 @@ paths:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 1024
                 google_ads_refresh_token:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 8192
                 google_ads_customer_id:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 255
                 google_ads_conversion_action_resource_name:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 1024
                 meta_pixel_id:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 255
                 meta_access_token:
                   type:
                     - string
                     - 'null'
+                  minLength: 1
+                  maxLength: 8192
       responses:
         '200':
           description: Updated integration settings
@@ -90,6 +107,7 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Integration settings updated successfully.
                   data:
                     $ref: '../../openapi.yaml#/components/schemas/CallTrackingAdPlatformIntegration'
         '401':
