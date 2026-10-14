@@ -8,7 +8,9 @@ paths:
         Returns dashboard statistics for assigned users and ring groups. Accessible
         to `owner`, `pbx_admin`, and `supervisor` roles
         (`UserRole::canViewAssignedDashboard`). Supervisors receive data scoped to
-        their own assignments; Owner and PBX Admin receive an unscoped, org-wide view.
+        their own assignments; Owner and PBX Admin (and API keys) receive an org-wide
+        view in which `assigned_users` are all users except supervisors and
+        `assigned_ring_groups` are all ring groups.
       operationId: getSupervisorDashboard
       security:
         - bearerAuth: []
@@ -34,9 +36,12 @@ paths:
                     description: Number of active calls in scope.
                   recent_calls:
                     type: array
-                    description: Recent calls in scope.
+                    description: >-
+                      The 5 most recent CDRs in scope (for a supervisor, the caller or callee is the
+                      supervisor's own extension, an assigned user's extension, or an assigned ring
+                      group's extension).
                     items:
-                      type: object
+                      $ref: '../../components/schemas/CallDetailRecord.yaml'
                   assigned_users:
                     type: array
                     description: Users in scope.
@@ -48,7 +53,9 @@ paths:
                         name:
                           type: string
                         extension_number:
-                          type: string
+                          type:
+                            - string
+                            - 'null'
                   assigned_ring_groups:
                     type: array
                     description: Ring groups in scope.

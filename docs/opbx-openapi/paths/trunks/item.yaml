@@ -38,7 +38,9 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
         '404':
-          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          description: >-
+            Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no
+            Cloudonix settings (standard 404 body).
           content:
             application/json:
               schema:
@@ -130,7 +132,9 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
         '404':
-          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          description: >-
+            Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no
+            Cloudonix settings (standard 404 body).
           content:
             application/json:
               schema:
@@ -223,7 +227,9 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
         '404':
-          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          description: >-
+            Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no
+            Cloudonix settings (standard 404 body).
           content:
             application/json:
               schema:
@@ -263,7 +269,9 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
         '404':
-          description: Trunk not found in Cloudonix (`{"error": "not_found", "message": "Trunk not found."}`), or the organization has no Cloudonix settings (`Resource not found.`)
+          description: >-
+            Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no
+            Cloudonix settings (standard 404 body).
           content:
             application/json:
               schema:
