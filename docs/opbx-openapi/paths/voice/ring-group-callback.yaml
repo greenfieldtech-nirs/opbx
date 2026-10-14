@@ -47,6 +47,12 @@ paths:
         description: Round-robin starting member offset chosen on the first attempt
         schema:
           type: integer
+      - name: dialed_extension
+        in: query
+        required: false
+        description: Extension number of the member this `<Dial>` rang (sequential and round-robin groups; set by the routing strategy). When `DialCallStatus` (or `CallStatus`) is `answered` or `completed` and this is a member of the ring group, it is recorded as the extension that answered the call (the call record's `extension_number`).
+        schema:
+          type: string
       - name: session_data
         in: query
         required: false
@@ -99,7 +105,10 @@ paths:
                   - busy
                   - no-answer
                   - null
-                  description: Current call status (validated, not used for routing)
+                  description: Dial outcome when `DialCallStatus` is absent (validated; not used for routing). `answered` or `completed` records `dialed_extension` as the answering extension
+                DialCallStatus:
+                  type: string
+                  description: Outcome of the `<Dial>`, sent by Cloudonix on the action callback. `answered` or `completed` records `dialed_extension` as the answering extension
                 SessionData:
                   type: object
                   description: Optional; `attempt_number` and `callback_type` here take precedence over the query parameters

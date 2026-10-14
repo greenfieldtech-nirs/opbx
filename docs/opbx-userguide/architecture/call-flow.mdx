@@ -167,7 +167,7 @@ If the route returns an IVR `Gather`, Cloudonix POSTs the caller's digits to `/a
 
 ## Step 6: Ring Group Callback
 
-For ring groups with sequential strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` determines the next action (try next member, failover, or hangup).
+For ring groups with sequential strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` determines the next action (try next member, failover, or hangup). When the dial was answered (`DialCallStatus` or `CallStatus` `answered`/`completed`), the member named by the callback URL's `dialed_extension` is recorded as the call's answering extension (see [CDR](#cdr)).
 
 ---
 
@@ -209,7 +209,7 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 
 `POST /api/webhooks/cloudonix/cdr`
 
-- Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update.
+- Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update. `extension_number` comes from the calling subscriber, an extension caller ID, a DID routed directly to an extension, or else the answering extension recorded during routing (single-extension dial, answered ring group member, answering queue agent). An answer recorded after the CDR (queue finalization runs after the CDR is stored) updates the CDR if its `extension_number` is still null.
 - Updates the legacy `CallLog` record if one exists.
 - Creates a final `SessionUpdate` with `action = 'cdr_final_status'`.
 - Triggers call notification webhooks for the final status.
@@ -223,6 +223,7 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 ## Call State in Redis
 
 - `cdr:create:{organization_id}:{call_id}` — lock that keeps a CDR from being created twice
+- `cdr:answerer:{organization_id}:{session_token}` — the extension that answered the call (first one wins, 24-hour TTL), read when the CDR is stored
 - IVR state — turn count and digit history (`ivr:call:{call_sid}`), with `ivr:idempotency:{event_id}`
 - Dialer CAC counters — `dialer:cac:{campaign_id}:active`
 - Call queue state — `acd:*` keys owned by the ACD worker, and extension presence `acd:presence:{organization_id}:{extension}`

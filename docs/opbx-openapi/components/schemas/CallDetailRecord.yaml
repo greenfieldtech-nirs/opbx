@@ -24,8 +24,10 @@ properties:
     - 'null'
     description: >-
       The organization's extension the call belongs to: the extension that placed it, an extension
-      number used as the caller ID (API-initiated calls), or the extension its DID routes to directly
-      (inbound). Null when none applies, for example an inbound call to a DID routed to a ring group.
+      number used as the caller ID (API-initiated calls), the extension its DID routes to directly
+      (inbound), or else the extension that took the call while OPBX routed it (an IVR or business
+      hours target, the answering member of a Sequential or Round Robin ring group, the answering
+      queue agent). Null when none applies, for example an unanswered call or a Simultaneous ring group.
   from:
     type:
     - string
