@@ -264,14 +264,21 @@ export type paths = {
          * Ring group callback
          * @description `<Dial>` action of a ring group. The ring group routing strategy puts this URL, with
          *     the query parameters below, in the `action` of each `<Dial>` it returns; Cloudonix
-         *     calls it when that dial ends. The response is the next CXML step:
+         *     calls it when that dial ends. The response is the next CXML step.
+         *
+         *     When the dial was answered (`DialCallStatus`, else `CallStatus`, is `answered`,
+         *     `completed` or `in-progress`), the call is over whatever the strategy: the response
+         *     is `<Hangup/>` (no next member, no fallback). Otherwise (`no-answer`, `busy`,
+         *     `failed`, `canceled`, `unknown`, or no status):
          *
          *     - Sequential and round-robin groups: dial the next member (attempt
          *       `attempt_number`), cycling through the members `ring_turns` times; after that the
          *       ring group's fallback action runs (extension, ring group, IVR menu, AI assistant,
          *       AI load balancer, call queue, hangup or unavailable).
          *     - Simultaneous groups (`session_data.callback_type` = `ring_group_fallback`): run the
-         *       fallback action.
+         *       fallback action. Simultaneous groups no longer use a multi-number `<Dial>` (members
+         *       ring in separate sessions, see `/callbacks/voice/ring-group-member-connect`); this
+         *       case only serves calls that were already ringing when OPBX was upgraded.
          *
          *     An unknown, inactive or other-organization ring group answers 200 CXML that says
          *     `Ring group not found` and hangs up.
@@ -283,6 +290,80 @@ export type paths = {
          *     answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
          */
         post: operations["ringGroupCallback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/ring-group-fallback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Simultaneous ring group fallback
+         * @description Fetched by the caller's session when nobody answered a Simultaneous ring group call:
+         *     every member session ended unanswered (no answer, busy, rejected), or the ring
+         *     timeout plus 10 seconds passed (the members still ringing are then ended). OPBX
+         *     switches the caller's session to this URL (`POST
+         *     /calls/{domain}/sessions/{token}/application`); the response is the ring group's
+         *     fallback action (extension, ring group, IVR menu, AI assistant, AI load balancer,
+         *     call queue, hangup or unavailable), exactly as for the other strategies.
+         *
+         *     Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires 120 seconds
+         *     after it is issued. The route is registered with `Route::any`, so every HTTP method
+         *     is accepted; GET and POST are documented. Not rate-limited.
+         */
+        get: operations["ringGroupFallbackGet"];
+        put?: never;
+        /**
+         * Simultaneous ring group fallback
+         * @description Same as the GET form (the route accepts every HTTP method).
+         */
+        post: operations["ringGroupFallbackPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/ring-group-member-connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Simultaneous ring group member answered
+         * @description Fetched by a member's own session when that member answers a Simultaneous ring
+         *     group call. Every member of a Simultaneous group is rung in a separate Cloudonix
+         *     session (`POST /calls/{domain}/application`, destination = the member's extension
+         *     number, or a Forward member's forward-to target; caller ID = the caller's number;
+         *     timeout = the group's ring timeout) while the caller waits alone in a conference
+         *     room with hold music. The first member session to arrive claims the call (member
+         *     from `extension` in `sd`, session from the `Session` or `CallSid` request field):
+         *     it gets `<Dial><Conference>` into the caller's room, the other members' sessions are
+         *     ended, and the member is recorded as the extension that answered the call (the call
+         *     record's `extension_number`). Every other request gets `<Hangup/>`: a later member,
+         *     a session that is not part of the current offer, or a call that already went to the
+         *     fallback or whose caller hung up.
+         *
+         *     Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the ring
+         *     group's ring timeout plus 60 seconds after it is issued. The route is registered with
+         *     `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+         *     rate-limited.
+         */
+        get: operations["ringGroupMemberConnectGet"];
+        put?: never;
+        /**
+         * Simultaneous ring group member answered
+         * @description Same as the GET form (the route accepts every HTTP method).
+         */
+        post: operations["ringGroupMemberConnectPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -319,10 +400,9 @@ export type paths = {
         };
         /**
          * Get CSRF cookie
-         * @description Returns a CSRF cookie for SPA authentication.
-         *     Must be called before login when using cookie-based auth.
-         *     Uses web middleware to enable sessions and set CSRF cookie.
-         *     Rate limited to 60 requests per minute per IP.
+         * @description Framework route (Laravel Sanctum) that sets the `XSRF-TOKEN` cookie; the API
+         *     authenticates with Bearer tokens and does not need it. Rate limited to 60
+         *     requests per minute per IP.
          */
         get: operations["getCsrfCookie"];
         put?: never;
@@ -744,6 +824,10 @@ export type paths = {
          *     Returns the Auth0 authorize URL and a state token the client should
          *     use when handling the callback.
          *
+         *     Only `google` and `github` are supported; any other `provider` (for example
+         *     `facebook`, `microsoft` or `x`) fails validation with 422. A supported provider
+         *     that is not in `AUTH0_PROVIDERS` returns 400 `AUTH0_INVALID_PROVIDER`.
+         *
          *     Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
          */
         post: operations["auth0Redirect"];
@@ -784,20 +868,13 @@ export type paths = {
         put?: never;
         /**
          * User login
-         * @description Authenticate user and issue authentication credentials.
+         * @description Authenticate a user and issue a Sanctum Bearer token. The web app and API
+         *     clients both authenticate with `Authorization: Bearer <token>`; the API
+         *     does not use session cookies.
          *
-         *     Supports two authentication modes:
-         *     - **Cookie-based (SPA)**: Returns user data, sets httpOnly session cookie
-         *     - **Token-based (API)**: Returns API token for bearer authentication
-         *
-         *     Mode is automatically detected based on request headers, in this order:
-         *     - Token auth if an `Authorization: Bearer` header is present
-         *     - Cookie auth if `X-Auth-Mode: cookie`; token auth if `X-Auth-Mode: token`
-         *     - Cookie auth if an `X-Requested-With` header is present (any value)
-         *     - Otherwise token-based auth
-         *
-         *     Token-based login revokes all of the user's existing tokens and issues a
-         *     new one with role-scoped abilities, valid for 24 hours.
+         *     Login revokes all of the user's existing tokens and issues a
+         *     new one with role-scoped abilities, valid for 24 hours, or 30 days when
+         *     `remember` is `true` ("Remember me").
          *
          *     Rate limited to 5 attempts per minute per IP (`RATE_LIMIT_AUTH`).
          */
@@ -819,12 +896,8 @@ export type paths = {
         put?: never;
         /**
          * User logout
-         * @description Logout user and revoke authentication.
-         *
-         *     Supports both authentication modes:
-         *     - Cookie-based (session authenticated and no bearer token): logs out of
-         *       the session, invalidates it and regenerates the CSRF token
-         *     - Token-based: deletes the current access token only (other tokens stay valid)
+         * @description Logout user: deletes the current Bearer access token only (the user's other
+         *     tokens stay valid).
          */
         post: operations["logout"];
         delete?: never;
@@ -872,15 +945,11 @@ export type paths = {
         put?: never;
         /**
          * Refresh authentication
-         * @description Refresh authentication credentials.
+         * @description Refresh the Bearer token: revokes the current token and issues a new one
+         *     with role-scoped abilities (no `user` in the response).
          *
-         *     Supports both authentication modes:
-         *     - Cookie-based (session authenticated and no bearer token): regenerates
-         *       the session and returns the user
-         *     - Token-based: revokes the current token and issues a new one with
-         *       role-scoped abilities (no `user` in the response)
-         *
-         *     Token expires in 24 hours (1440 minutes). Not rate limited.
+         *     The new token keeps the lifetime of the current one: 24 hours, or 30 days for a
+         *     token issued by a "Remember me" login. Not rate limited.
          */
         post: operations["refreshAuth"];
         delete?: never;
@@ -1070,6 +1139,13 @@ export type paths = {
          * @description Get per-Caller-ID usage statistics for a campaign's Caller ID pool (one row per DID
          *     in the pool; removing a DID from the pool deletes its row). Owner, PBX Admin and
          *     Reporter only. The response is not wrapped in `data`.
+         *
+         *     A call is counted once, when its session first reaches a final status, against the pool
+         *     DID it was placed from: `completed` adds to `completed_calls`, `failed` (busy, no answer,
+         *     failed, or an attempt that will be retried) adds to `failed_calls`, and both add to
+         *     `total_calls` and set `last_used_at`. Retried webhooks do not count a call twice. Calls
+         *     still in progress, and sessions failed in bulk when the campaign is paused or stopped,
+         *     are not counted.
          */
         get: operations["getCampaignCallerIdStats"];
         put?: never;
@@ -1097,8 +1173,8 @@ export type paths = {
          * Get concurrency information
          * @description Get real-time concurrency status for a campaign. Owner, PBX Admin and Reporter only.
          *
-         *     Returns current CAC utilization, active sessions,
-         *     and rate limit status for real-time monitoring. Uses the same live sources as
+         *     Returns current CAC utilization and active sessions
+         *     for real-time monitoring. Uses the same live sources as
          *     the monitor detail: `active_calls` is the dialer worker's concurrent-call counter and
          *     `active_sessions` are the campaign's live call sessions. Never cached. A paused
          *     campaign always reports 0 active calls and no sessions.
@@ -1166,8 +1242,9 @@ export type paths = {
         /**
          * Upload campaign list
          * @description Upload a CSV as another distribution list of a campaign; the campaign's existing lists
-         *     are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active but
-         *     outside its schedule window right now (otherwise 422).
+         *     are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active with a
+         *     start date still in the future in the campaign's timezone (otherwise 422; an Active
+         *     campaign that has started must be paused first).
          *
          *     The file must be a CSV or TXT file up to 10 MB. The first row is a header and is skipped.
          *     Only the first column is read: it must be an E.164 number (`+` then 2-15 digits);
@@ -1240,8 +1317,8 @@ export type paths = {
          * @description Get detailed monitoring view for a single campaign (any status). Owner, PBX Admin
          *     and Reporter only.
          *
-         *     Returns campaign statistics, disposition breakdown,
-         *     rate limit status, and active call sessions. Statistics
+         *     Returns campaign statistics, disposition breakdown
+         *     and active call sessions. Statistics
          *     are cached for 10 seconds (cleared when the campaign is started, paused or resumed);
          *     active sessions are always fresh.
          */
@@ -1560,8 +1637,8 @@ export type paths = {
          * @description Assign a distribution list to an auto-dialer campaign.
          *
          *     The list must be in 'ready' status (otherwise 403). The campaign must be
-         *     Draft, Paused, or Active but outside its schedule window right now (otherwise
-         *     422). On success the list moves to 'in_use' and `campaign_id`,
+         *     Draft, Paused, or Active with a start date still in the future in the campaign's
+         *     timezone (otherwise 422; an Active campaign that has started must be paused first). On success the list moves to 'in_use' and `campaign_id`,
          *     `used_by_campaign_id` and `used_at` are set. A campaign can hold several
          *     lists: assigning another list adds it next to the lists already assigned.
          *
@@ -2324,8 +2401,11 @@ export type paths = {
          * List Call Detail Records
          * @description Paginated, filterable list of the organization's Call Detail Records, newest
          *     `session_timestamp` first by default. Any role can list; a Supervisor always sees only
-         *     CDRs whose `from` or `to` matches a resource they supervise (none when nothing is
-         *     assigned). An unknown `sort_by` falls back to `session_timestamp`.
+         *     CDRs whose `extension_number`, `from` or `to` matches a resource they supervise (none when
+         *     nothing is assigned), and a PBX User only CDRs whose `extension_number` or `to` is one of
+         *     their own extension numbers (bare or `+`-prefixed; none without an extension). The Caller ID
+         *     (`from`) is display-only and not a filter. The server enforces both
+         *     scopes by role; filters only narrow them. An unknown `sort_by` falls back to `session_timestamp`.
          */
         get: operations["listCallDetailRecords"];
         put?: never;
@@ -2347,7 +2427,7 @@ export type paths = {
         };
         /**
          * Get Call Detail Record
-         * @description Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they supervise. With an organisation API key, `archive=1` looks the CDR up in the warm archive instead of the live table.
+         * @description Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they supervise, and a PBX User gets 403 for a CDR that is neither of nor to one of their own extensions. A CDR of another organization, or an unknown ID, is 404. With an organisation API key, `archive=1` looks the CDR up in the warm archive instead of the live table.
          */
         get: operations["getCallDetailRecord"];
         put?: never;
@@ -2394,7 +2474,7 @@ export type paths = {
         };
         /**
          * Export CDR records
-         * @description Streams all matching CDRs as CSV, newest first, as `call-detail-records-YYYY-MM-DD-HHMMSS.csv`. Accepts the same filters as the list endpoint (from, to, disposition, direction, user, session_token, from_date, to_date); `sort_by`, `sort_order` and pagination are ignored. Any role can export; Supervisors are always limited to the resources they supervise. Columns: Timestamp, From, To, Call Start Time, Call Answer Time, Call End Time, Domain, Session Token, Duration (sec), Billable (sec), Status. Times are `Y-m-d H:i:s`; the call times, session token and status come from the raw CDR session.
+         * @description Streams all matching CDRs as CSV, newest first, as `call-detail-records-YYYY-MM-DD-HHMMSS.csv`. Accepts the same filters as the list endpoint (extension, to, extension_destination_match, disposition, direction, user, session_token, from_date, to_date); `sort_by`, `sort_order` and pagination are ignored. Any role can export; Supervisors are always limited to the resources they supervise and PBX Users to calls of or to their own extensions. Columns: Timestamp, Extension (`extension_number`), From (the Caller ID), To, Call Start Time, Call Answer Time, Call End Time, Domain, Session Token, Duration (sec), Billable (sec), Status. Times are `Y-m-d H:i:s`; the call times, session token and status come from the raw CDR session.
          */
         get: operations["exportCdr"];
         put?: never;
@@ -2415,7 +2495,9 @@ export type paths = {
         /**
          * Get CDR statistics
          * @description Totals over the CDRs whose `session_timestamp` date is between `from_date` and `to_date`
-         *     (inclusive). Any role; a Supervisor's totals cover only the resources they supervise.
+         *     (inclusive). Any role; a Supervisor's totals cover only the resources they supervise and a
+         *     PBX User's only calls of or to their own extensions. The `extension`, `to` and
+         *     `extension_destination_match` filters apply as on the list endpoint.
          *     The response is not wrapped in `data`. No other list filters apply.
          */
         get: operations["getCdrStatistics"];
@@ -3593,7 +3675,8 @@ export type paths = {
          *     The request must be approved by an Owner or PBX Admin of the organization before
          *     the user is created. Public; rate limited to 5 requests per minute per IP. An
          *     unknown `organization_slug` fails validation (422); an organization that exists but
-         *     is not active returns 404.
+         *     is not active returns 404. When the onboarding email already belongs to a user of any
+         *     organization, the request is refused with 422 on `email` ("The email has already been taken.").
          */
         post: operations["createOrganizationJoinRequest"];
         delete?: never;
@@ -3999,7 +4082,9 @@ export type paths = {
          * @description Updates the name, timezone and/or settings. Platform managers only. A field that
          *     is omitted or null is left unchanged. `settings` is merged into the existing
          *     settings at the top level (a key you send replaces that whole key). Writes an
-         *     `organization.settings.updated` audit log entry.
+         *     `organization.settings.updated` audit log entry. The response and the audit entry's
+         *     before/after snapshots mask sensitive `settings.cloudonix` values the same way
+         *     `GET` does (asterisks plus the last 4 characters); the real values are stored.
          */
         put: operations["updatePlatformOrganization"];
         post?: never;
@@ -4562,7 +4647,7 @@ export type paths = {
         get: operations["getRecording"];
         /**
          * Update recording
-         * @description Owner and PBX Admin only. Every field is optional.
+         * @description Owner and PBX Admin only. Every field is optional. Requires a user token; API keys get 403 ("Updating recordings requires a user token; API keys cannot update recordings."), because `updated_by` records the user.
          */
         put: operations["updateRecording"];
         post?: never;
@@ -4729,7 +4814,7 @@ export type paths = {
          *     whisper to, or barge into a live call via the in-browser Web Phone.
          *
          *     This is the UI-facing authorization layer. It enforces:
-         *     - `owner`/`supervisor` role (403 otherwise; API keys always get 403);
+         *     - `owner`/`supervisor` role (403 otherwise);
          *     - for Supervisors, the session must be within their assigned scope (403 otherwise);
          *     - tenant isolation via an explicit `organization_id` filter (cross-org lookups return 404);
          *     - the latest stored update of the session must be `processing`/`ringing`/`connected`
@@ -4740,6 +4825,11 @@ export type paths = {
          *     `CoachRoutingService` re-authorizes the request and emits `<Coach>` CXML — the
          *     real telephony-side gate. The token is only ever handed out per-request here;
          *     it is never included in the bulk active-calls list.
+         *
+         *     **API keys always get 403 here, by design**, even with `session-updates:write`:
+         *     coaching is done by a signed-in Owner or Supervisor dialing from their own
+         *     Web Phone extension, which an API key does not have. The same permission does
+         *     allow an API key to disconnect a call (`DELETE /v1/session-updates/{sessionId}/disconnect`).
          */
         post: operations["resolveCoachTarget"];
         delete?: never;
@@ -4763,7 +4853,8 @@ export type paths = {
          * @description Disconnects a call through the Cloudonix API, using the session token received from
          *     the session-update webhooks. Owner only (`SessionUpdatePolicy::disconnect`);
          *     Supervisors and PBX Admins cannot disconnect calls. An API key with
-         *     `session-updates:write` can. The session must belong to the organization; its
+         *     `session-updates:write` can disconnect calls, by design (unlike coaching,
+         *     which always answers API keys with 403). The session must belong to the organization; its
          *     status is not checked.
          */
         delete: operations["disconnectSession"];
@@ -5386,7 +5477,7 @@ export type paths = {
          * AMD action handler
          * @description Receives the Answering Machine Detection result from the AMD worker and runs the
          *     auto-dialer campaign's configured action for that result (`action_voicemail`,
-         *     `action_human` or `action_unknown`; empty means `CONTINUE`). The action is never
+         *     `action_human` or `action_unknown`; empty means `HANGUP`). The action is never
          *     taken from the request.
          *
          *     - Stores `amd_result` and `amd_confidence` on the call session and writes an `amd`
@@ -5467,8 +5558,11 @@ export type paths = {
          *     routing strategy puts in the Gather `action` URL.
          *
          *     - A matching option routes to that option's destination.
-         *     - An unknown option replays the menu, until the menu's `max_turns` is exceeded; then
-         *       the call goes to the menu's failover destination.
+         *     - An unknown option, or no input at all (`Digits` missing or empty: the caller pressed
+         *       nothing before the Gather `maxTimeout`), counts as one turn and replays the menu. The
+         *       IVR Gather sets `actionOnEmptyResult="true"`, so Cloudonix posts here on no input too.
+         *       Unknown and missing input share the same count; when it reaches the menu's
+         *       `max_turns`, the call goes to the menu's failover destination.
          *     - An unknown or other-organization `menu_id`, or no IVR state for `CallSid`, answers
          *       200 CXML that says the error and hangs up.
          *
@@ -5899,7 +5993,7 @@ export type components = {
         } | null;
         "$defs-TimeRange": {
             /**
-             * @description H:i, after start_time
+             * @description H:i, after start_time. 24:00 means end of day, so 00:00-24:00 is open the whole day
              * @example 17:00
              */
             end_time: string;
@@ -5920,10 +6014,15 @@ export type components = {
         };
         /** @description AI Assistant */
         AiAssistant: {
-            /** @description Provider-specific configuration */
-            configuration?: {
+            /** @description Provider-specific configuration. For a SIP assistant it also carries `enable_non_e164`, derived from the stored `phone_number`. */
+            configuration?: ({
+                /** @description SIP providers. `false` when `phone_number` is valid E.164 (`^\+[1-9]\d{1,14}$`), `true` for any other (non-E.164) number. */
+                enable_non_e164?: boolean;
+                /** @description SIP providers. The number dialled at the provider, exactly as stored. */
+                phone_number?: string;
+            } & {
                 [key: string]: unknown;
-            } | null;
+            }) | null;
             /** Format: date-time */
             created_at?: string;
             /** @description Create and update responses only (when the creator is known) */
@@ -5975,9 +6074,27 @@ export type components = {
         AiAssistantInput: {
             /**
              * @description Provider-specific configuration, keyed by the provider's `config_fields` names. Must be
-             *     present on create (may be `{}` for providers without required fields).
+             *     present on create (may be `{}` for providers without required fields). Each field's
+             *     `validation_rules` (from `GET /v1/ai-assistant/providers`) are enforced and a breach is a 422
+             *     on `configuration.<field>`: for example DeepDub `bot_id` up to 255 and `auth_token` up to
+             *     512 characters, `agent_uuid` up to 255. A SIP `phone_number` must be E.164
+             *     (`^\+[1-9]\d{1,14}$`) unless `enable_non_e164` is true, in which case it is a non-E.164 number:
+             *     digits, `+` and `#`, up to 20 characters (the phone-number non-E.164 rule). A number that is
+             *     not E.164 without the flag is a 422 asking to mark it as non-E.164. `enable_non_e164` is not
+             *     stored; the response derives it from the number.
              */
             configuration?: {
+                /**
+                 * @description SIP providers. Marks `phone_number` as a non-E.164 number (digits, `+` and `#`, up to 20).
+                 * @default false
+                 */
+                enable_non_e164: boolean;
+                /**
+                 * @description SIP providers. E.164, or a non-E.164 number when `enable_non_e164` is true.
+                 * @example +12025550170
+                 */
+                phone_number?: string;
+            } & {
                 [key: string]: unknown;
             };
             description?: string | null;
@@ -6216,7 +6333,7 @@ export type components = {
                      * @example google
                      * @enum {string}
                      */
-                    provider?: "google" | "facebook" | "microsoft" | "github" | "x";
+                    provider?: "google" | "github";
                     /**
                      * Format: email
                      * @example john.doe@example.com
@@ -6244,22 +6361,22 @@ export type components = {
              * @example google
              * @enum {string}
              */
-            provider: "google" | "facebook" | "microsoft" | "github" | "x";
+            provider: "google" | "github";
         };
         /** @description Auto Dialer Campaign for outbound calling with rate limiting and scheduling */
         AutoDialerCampaign: {
             /**
-             * @description What to do when a human answers
+             * @description What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
              * @enum {string|null}
              */
             action_human?: "HANGUP" | "CONTINUE" | null;
             /**
-             * @description What to do when detection is inconclusive
+             * @description What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
              * @enum {string|null}
              */
             action_unknown?: "HANGUP" | "CONTINUE" | null;
             /**
-             * @description What to do when the AMD worker detects a voicemail
+             * @description What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
              * @enum {string|null}
              */
             action_voicemail?: "HANGUP" | "CONTINUE" | null;
@@ -6640,7 +6757,7 @@ export type components = {
             $defs: {
                 TimeRange: {
                     /**
-                     * @description HH:mm
+                     * @description HH:mm, later than start_time. 24:00 means end of day (00:00-24:00 is open all day).
                      * @example 17:00
                      */
                     end_time?: string;
@@ -6710,7 +6827,7 @@ export type components = {
             $defs: {
                 TimeRange: {
                     /**
-                     * @description H:i, after start_time
+                     * @description H:i, after start_time. 24:00 means end of day, so 00:00-24:00 is open the whole day
                      * @example 17:00
                      */
                     end_time: string;
@@ -6764,7 +6881,9 @@ export type components = {
             /** @description Duration in seconds */
             duration?: number | null;
             duration_formatted?: string | null;
-            /** @description Caller number */
+            /** @description The organization's extension the call belongs to: the extension that placed it, an extension number used as the caller ID (API-initiated calls), the extension its DID routes to directly (inbound), or else the extension that took the call while OPBX routed it (an IVR or business hours target, the answering member of a Sequential or Round Robin ring group, the answering queue agent). Null when none applies, for example an unanswered call or a Simultaneous ring group. */
+            extension_number?: string | null;
+            /** @description Caller ID the call presented (for an outbound call this can be a DID). Display only, not a filter */
             from?: string | null;
             /** @description True when `recording_status` is `available` and the caller may play it (`GET .../recording`) */
             has_recording?: boolean;
@@ -6786,7 +6905,7 @@ export type components = {
             session_token?: string | null;
             status?: string | null;
             subscriber?: string | null;
-            /** @description Called number */
+            /** @description Called number (destination) */
             to?: string | null;
             /** Format: date-time */
             updated_at?: string | null;
@@ -7042,8 +7161,11 @@ export type components = {
              * @default 60
              */
             announce_position_timeout: number | null;
-            /** @description No default; the stored value is kept when omitted on update */
-            conference_ring_all?: boolean;
+            /**
+             * @description Ring Agents in Separate Calls (used with the `ring_all` strategy). On create, defaults to `true` when the strategy is `ring_all` (also when `strategy` is omitted, which means `ring_all`) and to `false` otherwise. On update, the stored value is kept when omitted. When `false`, a Ring All queue rings all agents in one call and the answering agent is not recorded on the call log or CDR.
+             * @default true
+             */
+            conference_ring_all: boolean;
             description?: string | null;
             /**
              * @description `unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer and call_queue, and the target must belong to the organization and be active. A call_queue target must not be the queue itself, and the chain of call queue fallbacks must not lead back to it (422 "Fallback loop detected: ...").
@@ -7819,7 +7941,7 @@ export type components = {
                  * @enum {string}
                  */
                 destination_type: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "business_hours" | "call_queue" | "unavailable";
-                /** @description Digits the caller presses */
+                /** @description Digits the caller presses. Must differ between the options of a menu; a repeated value is a 422 on `options.N.input_digits` ("Each menu option must use a different key.") */
                 input_digits: string;
                 priority: number;
             }[];
@@ -8097,30 +8219,6 @@ export type components = {
                  */
                 no_answer?: number;
             };
-            /** @description Rate limiting status */
-            rate_limit_status: {
-                /**
-                 * @description True when resumes_at is null or already passed
-                 * @example true
-                 */
-                can_resume_now?: boolean;
-                /**
-                 * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
-                 * @example false
-                 */
-                is_rate_limited?: boolean;
-                /**
-                 * @description Reason for pause
-                 * @example null
-                 */
-                pause_reason?: string | null;
-                /**
-                 * Format: date-time
-                 * @description When the campaign can resume
-                 * @example null
-                 */
-                resumes_at?: string | null;
-            };
             /** @description Campaign statistics */
             statistics: {
                 /**
@@ -8236,24 +8334,6 @@ export type components = {
                  * @example 76
                  */
                 progress_percentage?: number;
-                rate_limit_status?: {
-                    /**
-                     * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
-                     * @example false
-                     */
-                    is_rate_limited?: boolean;
-                    /**
-                     * @description Reason for pause
-                     * @example null
-                     */
-                    pause_reason?: string | null;
-                    /**
-                     * Format: date-time
-                     * @description When the campaign can resume
-                     * @example null
-                     */
-                    resumes_at?: string | null;
-                };
                 /**
                  * @description Label of the routing destination type (AI Assistant, AI Load Balancer or Hangup)
                  * @example AI Assistant
@@ -8431,7 +8511,7 @@ export type components = {
              * @example google
              * @enum {string}
              */
-            provider: "google" | "facebook" | "microsoft" | "github" | "x";
+            provider: "google" | "github";
             /**
              * @description Provider-specific subject identifier
              * @example 112233445566778899001
@@ -8907,7 +8987,7 @@ export type components = {
              * @enum {string}
              */
             fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
-            /** @description AI assistant ID for fallback */
+            /** @description AI assistant ID for the `ai_assistant` fallback (references ai_assistants; set to null when the assistant is deleted) */
             fallback_ai_assistant_id?: number | null;
             /** @description AI load balancer ID for fallback */
             fallback_ai_load_balancer_id?: number | null;
@@ -8982,7 +9062,7 @@ export type components = {
              * @enum {string}
              */
             fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
-            /** @description Required when fallback_action is `ai_assistant` (an extension ID) */
+            /** @description Required when fallback_action is `ai_assistant`. ID of an active AI assistant of the organization (not an AI Assistant extension) */
             fallback_ai_assistant_id?: number | null;
             /** @description Required when fallback_action is `ai_load_balancer` */
             fallback_ai_load_balancer_id?: number | null;
@@ -9154,7 +9234,7 @@ export type components = {
         };
         TimeRange: {
             /**
-             * @description HH:mm
+             * @description HH:mm, later than start_time. 24:00 means end of day (00:00-24:00 is open all day).
              * @example 17:00
              */
             end_time?: string;
@@ -9244,7 +9324,7 @@ export type components = {
                  * @example google
                  * @enum {string}
                  */
-                provider?: "google" | "facebook" | "microsoft" | "github" | "x";
+                provider?: "google" | "github";
                 /** Format: email */
                 provider_email?: string | null;
             }[];
@@ -9330,7 +9410,7 @@ export type components = {
              * @example google
              * @enum {string}
              */
-            provider: "google" | "facebook" | "microsoft" | "github" | "x";
+            provider: "google" | "github";
             /**
              * @description Raw provider metadata
              * @example {
@@ -10126,6 +10206,8 @@ export interface operations {
             query: {
                 /** @description Attempt to make now (0-based member attempt counter; set by the routing strategy) */
                 attempt_number?: number;
+                /** @description Extension number of the member this `<Dial>` rang (sequential and round-robin groups; set by the routing strategy). When `DialCallStatus` (or `CallStatus`) is `answered`, `completed` or `in-progress` and this is a member of the ring group, it is recorded as the extension that answered the call (the call record's `extension_number`). */
+                dialed_extension?: string;
                 /** @description Ring group ID (set by the routing strategy) */
                 ring_group_id: number;
                 /** @description Round-robin starting member offset chosen on the first attempt */
@@ -10155,14 +10237,16 @@ export interface operations {
                      */
                     CallSid: string;
                     /**
-                     * @description Current call status (validated, not used for routing)
+                     * @description Dial outcome when `DialCallStatus` is absent. `answered`, `completed` or `in-progress` ends the call (`<Hangup/>`) and records `dialed_extension` as the answering extension
                      * @enum {string|null}
                      */
-                    CallStatus?: "ringing" | "answered" | "completed" | "failed" | "busy" | "no-answer" | null;
+                    CallStatus?: "queued" | "ringing" | "in-progress" | "answered" | "completed" | "busy" | "canceled" | "failed" | "no-answer" | "unknown" | null;
                     /** @description Validated but not used */
                     current_index?: number | null;
+                    /** @description Outcome of the `<Dial>`, sent by Cloudonix on the action callback. `answered`, `completed` or `in-progress` ends the call (`<Hangup/>`) and records `dialed_extension` as the answering extension; any other value moves on to the next member or the fallback */
+                    DialCallStatus?: string;
                     /**
-                     * @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it.
+                     * @description Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for validation, but the authentication middleware answers 400 without it. Must be the name, not the domain UUID: the authentication middleware would match a UUID, but this request's validation rejects it with 422, by design.
                      * @example acme.cloudonix.net
                      */
                     Domain?: string | null;
@@ -10185,7 +10269,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description CXML for the next step (next member, fallback, or a spoken error with hangup) */
+            /** @description CXML for the next step (hangup after an answered dial, next member, fallback, or a spoken error with hangup) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10221,6 +10305,106 @@ export interface operations {
                 };
             };
             422: components["responses"]["ValidationError"];
+        };
+    };
+    ringGroupFallbackGet: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML of the ring group's fallback action; `<Hangup/>` when the signature is invalid or expired, or the ring group is no longer active */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    ringGroupFallbackPost: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML of the ring group's fallback action; `<Hangup/>` when the signature is invalid or expired, or the ring group is no longer active */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    ringGroupMemberConnectGet: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token` = the caller's session token, `extension` = the member's extension number, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML: `<Dial><Conference>` into the caller's room for the member that claims the call; `<Hangup/>` otherwise, or when the signature is invalid or expired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    ringGroupMemberConnectPost: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token` = the caller's session token, `extension` = the member's extension number, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML: `<Dial><Conference>` into the caller's room for the member that claims the call; `<Hangup/>` otherwise, or when the signature is invalid or expired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
         };
     };
     publicHealthCheck: {
@@ -11482,7 +11666,7 @@ export interface operations {
                      * @example google
                      * @enum {string}
                      */
-                    provider: "google" | "facebook" | "microsoft" | "github" | "x";
+                    provider: "google" | "github";
                 };
             };
         };
@@ -11563,7 +11747,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid provider */
+            /** @description Provider is supported but not enabled in `AUTH0_PROVIDERS` */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -11573,7 +11757,7 @@ export interface operations {
                      * @example {
                      *       "error": {
                      *         "code": "AUTH0_INVALID_PROVIDER",
-                     *         "message": "Invalid provider selected."
+                     *         "message": "Unsupported or disabled provider: github"
                      *       }
                      *     }
                      */
@@ -11616,7 +11800,7 @@ export interface operations {
                      * @example google
                      * @enum {string}
                      */
-                    provider: "google" | "facebook" | "microsoft" | "github" | "x";
+                    provider: "google" | "github";
                 };
             };
         };
@@ -11661,6 +11845,12 @@ export interface operations {
                      * @example SecurePass123!
                      */
                     password: string;
+                    /**
+                     * @description "Remember me": issue a 30-day token (expires_in 2592000) instead of the default 24-hour token (expires_in 86400)
+                     * @default false
+                     * @example false
+                     */
+                    remember?: boolean;
                 };
             };
         };
@@ -11668,30 +11858,23 @@ export interface operations {
             /** @description Login successful */
             200: {
                 headers: {
-                    /** @description Session cookie (only in cookie auth mode) */
-                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Login successful */
-                        message: string;
-                        /** @description Subset of the User object: `id`, `organization_id`, `name`, `email`, `role`, `status`, `is_platform_manager` and `social_identities` (`[{provider, provider_email}]`). `phone`, `extension` and timestamps are not returned. */
-                        user: components["schemas"]["User"];
-                    } | {
                         /**
                          * @description Bearer token for API authentication
                          * @example 1|laravel_sanctum_token_xyz123
                          */
                         access_token: string;
                         /**
-                         * @description Token expiration in seconds
+                         * @description Token lifetime in seconds (86400, or 2592000 with `remember`)
                          * @example 86400
                          */
                         expires_in: number;
                         /** @example Bearer */
                         token_type: string;
-                        /** @description Same user subset as the cookie response. */
+                        /** @description Subset of the User object: `id`, `organization_id`, `name`, `email`, `role`, `status`, `is_platform_manager` and `social_identities` (`[{provider, provider_email}]`). `phone`, `extension` and timestamps are not returned. */
                         user: components["schemas"]["User"];
                     };
                 };
@@ -11862,18 +12045,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @example Session refreshed successfully */
-                        message?: string;
-                        /** @description Same user subset as `POST /v1/auth/login`. */
-                        user?: components["schemas"]["User"];
-                    } | {
                         /**
                          * @description New bearer token
                          * @example 1|new_laravel_sanctum_token_abc456
                          */
                         access_token?: string;
                         /**
-                         * @description Token expiration in seconds
+                         * @description Token lifetime in seconds (86400, or 2592000 for a "Remember me" token)
                          * @example 86400
                          */
                         expires_in?: number;
@@ -12148,17 +12326,17 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description What to do when a human answers
+                     * @description What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_human?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when detection is inconclusive
+                     * @description What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_unknown?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when the AMD worker detects a voicemail
+                     * @description What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_voicemail?: "HANGUP" | "CONTINUE" | null;
@@ -12462,17 +12640,17 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description What to do when a human answers
+                     * @description What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_human?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when detection is inconclusive
+                     * @description What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_unknown?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when the AMD worker detects a voicemail
+                     * @description What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_voicemail?: "HANGUP" | "CONTINUE" | null;
@@ -12779,17 +12957,17 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description What to do when a human answers
+                     * @description What to do when a human answers. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_human?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when detection is inconclusive
+                     * @description What to do when detection is inconclusive. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_unknown?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description What to do when the AMD worker detects a voicemail
+                     * @description What to do when the AMD worker detects a voicemail. With AMD on (any action set), an empty or null action means HANGUP at call time
                      * @enum {string|null}
                      */
                     action_voicemail?: "HANGUP" | "CONTINUE" | null;
@@ -13228,25 +13406,6 @@ export interface operations {
                              * @example 10
                              */
                             cac_limit?: number;
-                            rate_limit_status?: {
-                                /**
-                                 * @description True when resumes_at is null or already passed
-                                 * @example true
-                                 */
-                                can_resume_now?: boolean;
-                                /**
-                                 * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
-                                 * @example false
-                                 */
-                                is_rate_limited?: boolean;
-                                /** @example null */
-                                pause_reason?: string | null;
-                                /**
-                                 * Format: date-time
-                                 * @example null
-                                 */
-                                resumes_at?: string | null;
-                            };
                             /**
                              * @description active_calls / cac_limit x 100, one decimal
                              * @example 50
@@ -13498,7 +13657,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Request validation failed, or the campaign cannot take a list now (`{"error": "Cannot assign list to \"…\" because it is currently running. Pause the campaign first, then assign the list."}`). */
+            /** @description Request validation failed, or the campaign cannot take a list now (`{"error": "Cannot assign list to \"…\" because it has already started. Pause the campaign first, then assign the list."}`). */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -14162,7 +14321,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "Cannot assign list to \"Q1 Sales Campaign\" because it is currently running. Pause the campaign first, then assign the list."
+                     *       "error": "Cannot assign list to \"Q1 Sales Campaign\" because it has already started. Pause the campaign first, then assign the list."
                      *     }
                      */
                     "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
@@ -15518,8 +15677,10 @@ export interface operations {
                 direction?: "incoming" | "outgoing" | "internal" | "application";
                 /** @description Exact disposition (for example ANSWER, BUSY, NOANSWER) */
                 disposition?: string;
-                /** @description Caller number filter. A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
-                from?: string;
+                /** @description Extension filter, on the extension the call belongs to (`extension_number`). A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
+                extension?: string;
+                /** @description How `extension` and `to` combine when both are sent. `all` (default) returns calls of the extension AND to the destination. `any` returns calls matching either one. Ignored when only one of them is sent; the other filters always still apply. Other values return 422. */
+                extension_destination_match?: "all" | "any";
                 /** @description First day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored. */
                 from_date?: string;
                 /** @description Include the complete raw CDR in each row */
@@ -15537,7 +15698,7 @@ export interface operations {
                 /** @description Exact session token (locates the CDR of a queue call) */
                 session_token?: string;
                 /** @description `user_full_name` is not available with `archive` */
-                sort_by?: "session_timestamp" | "from" | "to" | "duration" | "billsec" | "disposition" | "user_full_name" | "direction";
+                sort_by?: "session_timestamp" | "extension_number" | "from" | "to" | "duration" | "billsec" | "disposition" | "user_full_name" | "direction";
                 /**
                  * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
                  * @example desc
@@ -15548,7 +15709,7 @@ export interface operations {
                  * @description Ignored. Supervisors are always restricted to the resources they supervise.
                  */
                 supervisor?: boolean;
-                /** @description Called number filter. A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
+                /** @description Destination (called number) filter. A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
                 to?: string;
                 /** @description Last day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored. */
                 to_date?: string;
@@ -15655,7 +15816,9 @@ export interface operations {
                 direction?: "incoming" | "outgoing" | "internal" | "application";
                 /** @description Exact disposition (for example ANSWER, BUSY, NOANSWER) */
                 disposition?: string;
-                from?: string;
+                extension?: string;
+                /** @description How `extension` and `to` combine when both are sent. `all` (default) returns calls of the extension AND to the destination. `any` returns calls matching either one. Ignored when only one of them is sent; the other filters always still apply. Other values return 422. */
+                extension_destination_match?: "all" | "any";
                 from_date?: string;
                 /** @description Exact session token (locates the CDR of a queue call) */
                 session_token?: string;
@@ -15687,8 +15850,14 @@ export interface operations {
             query?: {
                 /** @description Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users, including organisation owners. Archived rows have no extension user. CDRs older than the warm period are stored as files and are not available through the API. */
                 archive?: components["parameters"]["CdrArchive"];
+                /** @description Extension filter, as on the list endpoint */
+                extension?: string;
+                /** @description How `extension` and `to` combine, as on the list endpoint */
+                extension_destination_match?: "all" | "any";
                 /** @description Defaults to 30 days ago */
                 from_date?: string;
+                /** @description Destination filter, as on the list endpoint */
+                to?: string;
                 /** @description Defaults to today */
                 to_date?: string;
             };
@@ -16616,10 +16785,10 @@ export interface operations {
                             /** @example true */
                             enabled: boolean;
                             /**
-                             * @description Enabled social providers, from the comma-separated `AUTH0_PROVIDERS` (only when enabled). Supported values: google, facebook, microsoft, github, x.
+                             * @description Enabled social providers, from the comma-separated `AUTH0_PROVIDERS` (only when enabled). Supported values: google, github (other values are ignored).
                              * @example [
                              *       "google",
-                             *       "microsoft"
+                             *       "github"
                              *     ]
                              */
                             providers?: string[];
@@ -18115,7 +18284,11 @@ export interface operations {
                     /** @description Digits, `+`, and the wildcards `*` and `?` */
                     caller_id_pattern: string;
                     /**
-                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     * @description DIDs the entry applies to. At least one is required whenever the resulting
+                     *     entry is not global: on create when `is_global` is `false` or omitted; on update
+                     *     when the entry stays or becomes non-global (the stored DIDs count when the field
+                     *     is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                     *     number when not using global scope."
                      *     Each ID must be a DID of the organization. On update, sending the field
                      *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                      */
@@ -18196,7 +18369,11 @@ export interface operations {
                     /** @description Digits, `+`, and the wildcards `*` and `?` */
                     caller_id_pattern?: string;
                     /**
-                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     * @description DIDs the entry applies to. At least one is required whenever the resulting
+                     *     entry is not global: on create when `is_global` is `false` or omitted; on update
+                     *     when the entry stays or becomes non-global (the stored DIDs count when the field
+                     *     is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                     *     number when not using global scope."
                      *     Each ID must be a DID of the organization. On update, sending the field
                      *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                      */
@@ -18278,7 +18455,11 @@ export interface operations {
                     /** @description Digits, `+`, and the wildcards `*` and `?` */
                     caller_id_pattern?: string;
                     /**
-                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     * @description DIDs the entry applies to. At least one is required whenever the resulting
+                     *     entry is not global: on create when `is_global` is `false` or omitted; on update
+                     *     when the entry stays or becomes non-global (the stored DIDs count when the field
+                     *     is omitted). Otherwise 422 on `did_number_ids`: "Please select at least one phone
+                     *     number when not using global scope."
                      *     Each ID must be a DID of the organization. On update, sending the field
                      *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
                      */
@@ -18851,7 +19032,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Request is not pending */
+            /** @description Request is not pending (`JOIN_REQUEST_NOT_PENDING`), or its email meanwhile belongs to a user of any organization (validation error on `email`, "The email has already been taken."; the request stays pending) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -18865,7 +19046,7 @@ export interface operations {
                      *       }
                      *     }
                      */
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ValidationError"];
                 };
             };
         };
@@ -20105,7 +20286,10 @@ export interface operations {
                 "application/json": {
                     city?: string | null;
                     country?: string | null;
-                    /** Format: email */
+                    /**
+                     * Format: email
+                     * @description Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."
+                     */
                     email: string;
                     name: string;
                     /** Format: password */
@@ -20372,7 +20556,10 @@ export interface operations {
                 "application/json": {
                     city?: string | null;
                     country?: string | null;
-                    /** Format: email */
+                    /**
+                     * Format: email
+                     * @description Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."
+                     */
                     email?: string;
                     name?: string;
                     /** Format: password */
@@ -23062,8 +23249,14 @@ export interface operations {
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Only users with this role (an unknown value is ignored) */
+                role?: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                /** @description Substring match on name or email */
+                search?: string;
                 sort_by?: "name" | "email" | "role" | "status" | "created_at" | "updated_at";
                 sort_order?: "asc" | "desc";
+                /** @description Only users with this status (an unknown value is ignored) */
+                status?: "active" | "inactive" | "pending";
             };
             header?: never;
             path?: never;
@@ -23101,7 +23294,7 @@ export interface operations {
                     country?: string | null;
                     /**
                      * Format: email
-                     * @description Email address (unique within organization)
+                     * @description Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."
                      * @example jane.smith@example.com
                      */
                     email: string;
@@ -23210,6 +23403,7 @@ export interface operations {
                     country?: string | null;
                     /**
                      * Format: email
+                     * @description Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."
                      * @example jane.smith.new@example.com
                      */
                     email?: string;
@@ -23328,6 +23522,7 @@ export interface operations {
                     country?: string | null;
                     /**
                      * Format: email
+                     * @description Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."
                      * @example jane.smith.new@example.com
                      */
                     email?: string;
@@ -23661,7 +23856,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            /** @description Validation error, or a non-pending user with this email already exists in the organization (or in another organization) */
+            /** @description Validation error, or a non-pending user with this email already exists in the organization (`USER_ALREADY_EXISTS`). An email that belongs to a user of another organization is a validation error on `email` ("The email has already been taken.") */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -24389,9 +24584,9 @@ export interface operations {
                      * @enum {string|null}
                      */
                     CallStatus?: "ringing" | "answered" | "completed" | "failed" | "busy" | "no-answer" | "in-progress" | null;
-                    /** @description Collected DTMF digits */
-                    Digits: string;
-                    /** @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it. */
+                    /** @description Collected DTMF digits. Missing, empty or null means the caller pressed nothing. */
+                    Digits?: string | null;
+                    /** @description Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for validation, but the authentication middleware answers 400 without it. Must be the name, not the domain UUID: the authentication middleware would match a UUID, but this request's validation rejects it with 422, by design. */
                     Domain?: string | null;
                     /** @description Caller number */
                     From: string;
@@ -24452,7 +24647,7 @@ export interface operations {
                     CallStatus?: "ringing" | "in-progress" | "answered" | "completed" | "failed" | "busy" | "no-answer" | "new" | null;
                     /** @enum {string|null} */
                     Direction?: "subscriber" | "inbound" | "outbound" | "application" | null;
-                    /** @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it. */
+                    /** @description Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for validation, but the authentication middleware answers 400 without it. Must be the name, not the domain UUID: the authentication middleware would match a UUID, but this request's validation rejects it with 422, by design. */
                     Domain?: string | null;
                     /** @description Caller number */
                     From: string;
