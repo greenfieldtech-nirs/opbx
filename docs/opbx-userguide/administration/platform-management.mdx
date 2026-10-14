@@ -9,7 +9,7 @@ description: Managing organizations, users, audit logs and platform health as a 
 # Platform Management
 
 :::danger Platform Owners/Operators Only
-This section applies only to people who operate the OPBX deployment. Organization users (Owner, PBX Admin, PBX User, Reporter, Supervisor) cannot open Platform Management. If you administer one organization, see [Organization Settings](/administration) instead.
+This section applies only to people who operate the OPBX deployment. Organization users (Owner, PBX Admin, PBX User, Reporter, Supervisor) cannot open Platform Management. If you administer one organization, see [Organization Settings](/opbx/administration) instead.
 :::
 
 Platform Management is a cross-tenant console for the team that hosts OPBX for one or more customer organizations. It appears in the sidebar as **Platform Management** for platform managers only.
@@ -97,7 +97,7 @@ The Users page lists users across all organizations. Platform managers can:
 
 ### Deleting a user
 
-Before the delete is sent, a **Delete User** dialog shows what it will change. The same impact preview is used by organization admins (see [User Management](/modules/user-management)): the user's extensions are kept but unassigned, memberships are removed, and routes that pointed at those extensions become "Destination unavailable". Confirm only after reading the list.
+Before the delete is sent, a **Delete User** dialog shows what it will change. The same impact preview is used by organization admins (see [User Management](/opbx/modules/user-management)): the user's extensions are kept but unassigned, memberships are removed, and routes that pointed at those extensions become "Destination unavailable". Confirm only after reading the list.
 
 Platform-level guards:
 
@@ -190,14 +190,14 @@ Every platform action is recorded with:
 | Action | For example `operate_as.started` or `operate_as.stopped` |
 | Target | The organization or user affected |
 
-Audit entries are kept for `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) and then pruned. See [Data retention](/data-models/configuration/index#data-retention).
+Audit entries are kept for `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` (default 365) and then pruned. See [Data retention](/opbx/data-models/configuration/index#data-retention).
 
 ## Cross-tenant call data
 
-The Platform API has a read-only **CDR archive** endpoint that lists warm-tier call records (6 to 12 months old) for all organizations. The web console does not show it. See [Call Logs](/modules/call-logs#retention-and-archive).
+The Platform API has a read-only **CDR archive** endpoint that lists warm-tier call records (6 to 12 months old) for all organizations. The web console does not show it. See [Call Logs](/opbx/modules/call-logs#retention-and-archive).
 
 ## Related
 
-- [Navigating the Admin Interface](/administration/navigating-the-interface)
-- [Centralized Logs](/administration/centralized-logs)
-- [Configuration Reference](/data-models/configuration/index)
+- [Navigating the Admin Interface](/opbx/administration/navigating-the-interface)
+- [Centralized Logs](/opbx/administration/centralized-logs)
+- [Configuration Reference](/opbx/data-models/configuration/index)

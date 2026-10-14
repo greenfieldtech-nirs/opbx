@@ -39,7 +39,7 @@ Which roles see each item comes from the sidebar configuration. Examples:
 | Live Calls, Call Logs | Yes | Yes | Call Logs only | Yes | Yes |
 
 :::info Supervisors
-A user with the Supervisor role sees the **Supervisor** section, not the configuration sections. Their Users, Ring Groups and Call Queues views are limited to the users and groups assigned to them. See [Supervisors](/modules/supervisors).
+A user with the Supervisor role sees the **Supervisor** section, not the configuration sections. Their Users, Ring Groups and Call Queues views are limited to the users and groups assigned to them. See [Supervisors](/opbx/modules/supervisors).
 :::
 
 ## Roles at a Glance
@@ -52,7 +52,7 @@ A user with the Supervisor role sees the **Supervisor** section, not the configu
 | **Reporter** | Read-only access to reports, call logs and most configuration |
 | **Supervisor** | Monitors and coaches the users and groups assigned to them |
 
-Full permissions per module are on each module page. The role rules that affect user management are in [User Management](/modules/user-management).
+Full permissions per module are on each module page. The role rules that affect user management are in [User Management](/opbx/modules/user-management).
 
 ## Repeated Patterns
 
@@ -60,7 +60,7 @@ Full permissions per module are on each module page. The role rules that affect 
 
 Every delete in the interface asks for confirmation first. Some deletes show more than a yes/no question:
 
-- **User delete** shows an impact preview: which extensions are kept, which groups or queues lose the user, and which routes will change. The delete goes ahead only when you confirm. See [User Management](/modules/user-management).
+- **User delete** shows an impact preview: which extensions are kept, which groups or queues lose the user, and which routes will change. The delete goes ahead only when you confirm. See [User Management](/opbx/modules/user-management).
 - **Routing resources** (extensions used as a target, ring groups, IVR menus, DIDs and similar) are refused while other configuration still points at them. The refusal opens a **"Cannot delete: still in use"** dialog that lists every place the resource is used. Remove or change those references first, then delete again. History records (call logs, CDRs, session logs) never block a delete.
 
 :::note
@@ -95,10 +95,10 @@ A platform manager can act as the Owner of an active organization. While that se
 - Every request carries the organization being operated on. Changes you make are real changes to that organization.
 - The session ends when you exit, log out, or your token expires.
 
-Start and stop are both recorded in the platform audit log. Read [Platform Management](/administration/platform-management) before using it.
+Start and stop are both recorded in the platform audit log. Read [Platform Management](/opbx/administration/platform-management) before using it.
 
 ## Where to Go Next
 
-- [Organization Settings](/administration) — profile, Cloudonix integration and organization users
-- [Module guides](/modules) — one page per feature, in the order listed in the modules index
-- [Platform Management](/administration/platform-management) — for platform owners and operators only
+- [Organization Settings](/opbx/administration) — profile, Cloudonix integration and organization users
+- [Module guides](/opbx/modules) — one page per feature, in the order listed in the modules index
+- [Platform Management](/opbx/administration/platform-management) — for platform owners and operators only

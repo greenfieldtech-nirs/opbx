@@ -10,7 +10,7 @@ description: How OPBX hands calls to AI voice agents over SIP or WebSocket, and 
 
 An AI assistant connects callers to an AI voice agent run by a provider. OPBX does not run the agent itself: it routes the call, then hands the audio to the provider. Once an assistant exists, any routing in OPBX can send callers to it.
 
-This page explains how the connection works and the common designs. For the screens, fields, limits and error messages, see the module walk-through: [AI Assistants](/modules/ai-assistants).
+This page explains how the connection works and the common designs. For the screens, fields, limits and error messages, see the module walk-through: [AI Assistants](/opbx/modules/ai-assistants).
 
 ## How the call reaches the agent
 
@@ -46,14 +46,14 @@ The call audio is streamed to an address built from the provider's settings:
 
 | Place | Typical design |
 |-------|----------------|
-| [Phone number](/modules/phone-numbers) | A dedicated AI line, for example a 24-hour receptionist |
-| [IVR option](/modules/ivr-menus) | "Press 2 to talk to our assistant" |
-| [Business hours](/modules/business-hours) | The assistant answers when the office is closed |
-| [Call queue](/modules/call-queues) fallback | Callers who wait too long are offered the assistant |
-| [AI load balancer](/applications/ai-load-balancers) | Several assistants behind one destination, with failover |
-| [Extension](/modules/extensions) of type AI Assistant | Staff can dial or transfer to the assistant |
-| [Ring group](/modules/ring-groups) fallback | Through an AI Assistant extension |
-| [Auto dialer campaign](/applications/auto-dialer) | Answered outbound calls go to the assistant |
+| [Phone number](/opbx/modules/phone-numbers) | A dedicated AI line, for example a 24-hour receptionist |
+| [IVR option](/opbx/modules/ivr-menus) | "Press 2 to talk to our assistant" |
+| [Business hours](/opbx/modules/business-hours) | The assistant answers when the office is closed |
+| [Call queue](/opbx/modules/call-queues) fallback | Callers who wait too long are offered the assistant |
+| [AI load balancer](/opbx/applications/ai-load-balancers) | Several assistants behind one destination, with failover |
+| [Extension](/opbx/modules/extensions) of type AI Assistant | Staff can dial or transfer to the assistant |
+| [Ring group](/opbx/modules/ring-groups) fallback | Through an AI Assistant extension |
+| [Auto dialer campaign](/opbx/applications/auto-dialer) | Answered outbound calls go to the assistant |
 
 ## Example: Acme Corp
 
@@ -83,6 +83,6 @@ An assistant that any routing still points at cannot be deleted. The delete is r
 
 ## Related pages
 
-- [AI Assistants (module walk-through)](/modules/ai-assistants)
-- [AI Load Balancers](/applications/ai-load-balancers)
-- [Extensions](/modules/extensions)
+- [AI Assistants (module walk-through)](/opbx/modules/ai-assistants)
+- [AI Load Balancers](/opbx/applications/ai-load-balancers)
+- [Extensions](/opbx/modules/extensions)

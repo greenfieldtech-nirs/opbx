@@ -10,7 +10,7 @@ description: "Ring several extensions for one call, choose the ring strategy, an
 
 A ring group rings a set of extensions for one incoming call. The first member who answers takes the call. If nobody answers, the call goes to the group's **fallback** destination.
 
-A ring group is **stateless**: members do not log in, and there are no waiting callers or statistics. For callers that should wait on hold until someone is free, use a [call queue](/modules/call-queues).
+A ring group is **stateless**: members do not log in, and there are no waiting callers or statistics. For callers that should wait on hold until someone is free, use a [call queue](/opbx/modules/call-queues).
 
 ## Purpose
 
@@ -23,7 +23,7 @@ Use this module to:
 
 ## Prerequisites
 
-1. **Member extensions.** Members are extensions of type **User** or **Forward**, and they must be **active**. See [Extensions](/modules/extensions).
+1. **Member extensions.** Members are extensions of type **User** or **Forward**, and they must be **active**. See [Extensions](/opbx/modules/extensions).
 2. **A fallback destination (optional).** If you want unanswered calls to go somewhere other than a hangup, the target (extension, ring group, IVR menu, AI assistant, AI load balancer or call queue) must exist and be active.
 
 ## Permissions
@@ -35,7 +35,7 @@ Use this module to:
 | Create, edit, delete | Yes | Yes | No | No | No |
 | Toggle status from the list | Yes | Yes | No | No | No |
 
-Reporters and supervisors see the page with a **Read-Only** badge. Supervisor assignments are made on [Supervisors](/modules/supervisors).
+Reporters and supervisors see the page with a **Read-Only** badge. Supervisor assignments are made on [Supervisors](/opbx/modules/supervisors).
 
 ## Create a ring group
 
@@ -110,7 +110,7 @@ On the edit dialog only, the fallback action list has a **Disconnect** choice. I
 
 The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination." A new group must have a real fallback.
 
-Groups can also become unprovisioned when a user is deleted and the group's fallback pointed at that user's extension (see [User Management](/modules/user-management#delete-a-user)).
+Groups can also become unprovisioned when a user is deleted and the group's fallback pointed at that user's extension (see [User Management](/opbx/modules/user-management#delete-a-user)).
 
 To find these groups, click the **Unprovisioned** filter in the toolbar. To fix one, open it and choose a new fallback.
 
@@ -193,15 +193,15 @@ A ring group appears as a destination in:
 | PUT | `/v1/ring-groups/{ringGroup}` | Update. Sending `members` replaces the list; omitting it keeps the list |
 | DELETE | `/v1/ring-groups/{ringGroup}` | Delete. Returns 409 with `references` when in use |
 
-Scoped API keys use the `ring-groups` resource. The MCP server has `list_ring_groups`, `get_ring_group`, `create_ring_group`, `update_ring_group` and `delete_ring_group`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
+Scoped API keys use the `ring-groups` resource. The MCP server has `list_ring_groups`, `get_ring_group`, `create_ring_group`, `update_ring_group` and `delete_ring_group`. See [API Keys](/opbx/modules/api-keys) and [MCP Server](/opbx/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related modules
 
-- [Extensions](/modules/extensions) — members are extensions
-- [Call Queues](/modules/call-queues) — a stateful alternative, and a possible fallback
-- [Phone Numbers](/modules/phone-numbers) — route a number to a group
-- [IVR Menus](/modules/ivr-menus) — route a menu option to a group
-- [Business Hours](/modules/business-hours) — route open or closed hours to a group
-- [Supervisors](/modules/supervisors) — assign groups to a supervisor
+- [Extensions](/opbx/modules/extensions) — members are extensions
+- [Call Queues](/opbx/modules/call-queues) — a stateful alternative, and a possible fallback
+- [Phone Numbers](/opbx/modules/phone-numbers) — route a number to a group
+- [IVR Menus](/opbx/modules/ivr-menus) — route a menu option to a group
+- [Business Hours](/opbx/modules/business-hours) — route open or closed hours to a group
+- [Supervisors](/opbx/modules/supervisors) — assign groups to a supervisor

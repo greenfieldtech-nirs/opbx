@@ -8,7 +8,7 @@ description: "Lists of numbers for auto-dialer campaigns: statuses, limits, perm
 
 # Distribution Lists
 
-A distribution list holds the phone numbers an [auto-dialer campaign](/modules/auto-dialer-campaigns) dials, with an optional name, batch identifier and metadata per number. This page is the reference. The step-by-step walk-through is [Distribution Lists](/applications/auto-dialer/distribution-lists) in the Auto Dialer guide.
+A distribution list holds the phone numbers an [auto-dialer campaign](/opbx/modules/auto-dialer-campaigns) dials, with an optional name, batch identifier and metadata per number. This page is the reference. The step-by-step walk-through is [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) in the Auto Dialer guide.
 
 ## Purpose
 
@@ -51,7 +51,7 @@ Use this module to:
 | `used` | A campaign has finished with it |
 | `archived` | Kept for history |
 
-Assigning a list to a **Draft** campaign also makes that campaign **Active**. See [Assign a list](/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
+Assigning a list to a **Draft** campaign also makes that campaign **Active**. See [Assign a list](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign).
 
 ## Number statuses
 
@@ -131,11 +131,11 @@ Archiving an assigned list is refused (HTTP 422, the message names the campaign)
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/assign` | Assign to a campaign (`campaign_id`) |
 | POST | `/v1/auto-dialer-campaigns/lists/{list}/unassign` | Take back from the campaign |
 
-**Scoped API keys** use the `distribution-lists` resource. The **MCP server** offers tools such as `list_distribution_lists`, `create_distribution_list`, `add_distribution_list_destinations`, `assign_distribution_list` and `unassign_distribution_list`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
+**Scoped API keys** use the `distribution-lists` resource. The **MCP server** offers tools such as `list_distribution_lists`, `create_distribution_list`, `add_distribution_list_destinations`, `assign_distribution_list` and `unassign_distribution_list`. See [API Keys](/opbx/modules/api-keys) and [MCP Server](/opbx/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related modules
 
-- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) — lists are assigned to campaigns
-- [Campaign Routing](/applications/auto-dialer/routing-destinations) — how list metadata reaches the assistant
+- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) — lists are assigned to campaigns
+- [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) — how list metadata reaches the assistant

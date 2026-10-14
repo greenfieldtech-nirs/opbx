@@ -10,7 +10,7 @@ description: "Connect calls to an AI voice agent over SIP or WebSocket, and rout
 
 An AI assistant is a connection to an AI voice agent hosted by a provider (Retell, VAPI, ElevenLabs, Dograh and others). When a call reaches the assistant, OPBX hands the call to the provider, either by dialling the provider's SIP service or by streaming the audio over a WebSocket. Once it exists, the assistant is a destination like any other: phone numbers, IVR options, business hours, queue fallbacks and campaigns can all send callers to it.
 
-This page is the walk-through. For the concepts and typical designs, see [AI Assistants (applications)](/applications/ai-assistants).
+This page is the walk-through. For the concepts and typical designs, see [AI Assistants (applications)](/opbx/applications/ai-assistants).
 
 ## Purpose
 
@@ -115,15 +115,15 @@ Calls already connected are not affected.
 
 | Place | How |
 |-------|-----|
-| [Phone Numbers](/modules/phone-numbers) | Routing type **AI assistant** |
-| [IVR Menus](/modules/ivr-menus) | An option target or the failover |
-| [Business Hours](/modules/business-hours) | The open-hours or closed-hours action |
-| [Call Queues](/modules/call-queues) | The overflow fallback |
-| [AI Load Balancers](/modules/ai-load-balancers) | As a member, or as the fallback |
-| [Extensions](/modules/extensions) | An extension of type **AI Assistant**, so it can be dialled internally |
-| [Ring Groups](/modules/ring-groups) | The **AI assistant** fallback of a ring group points at an AI Assistant extension, not at the assistant itself |
-| [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) | The routing destination for answered calls |
-| [Call Tracking Campaigns](/modules/call-tracking-campaigns) | The campaign destination (API only) |
+| [Phone Numbers](/opbx/modules/phone-numbers) | Routing type **AI assistant** |
+| [IVR Menus](/opbx/modules/ivr-menus) | An option target or the failover |
+| [Business Hours](/opbx/modules/business-hours) | The open-hours or closed-hours action |
+| [Call Queues](/opbx/modules/call-queues) | The overflow fallback |
+| [AI Load Balancers](/opbx/modules/ai-load-balancers) | As a member, or as the fallback |
+| [Extensions](/opbx/modules/extensions) | An extension of type **AI Assistant**, so it can be dialled internally |
+| [Ring Groups](/opbx/modules/ring-groups) | The **AI assistant** fallback of a ring group points at an AI Assistant extension, not at the assistant itself |
+| [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) | The routing destination for answered calls |
+| [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) | The campaign destination (API only) |
 
 ## Delete an assistant
 
@@ -184,13 +184,13 @@ Change or remove those references, then delete again. Call history (call logs an
 | GET | `/v1/ai-assistant/providers/{provider}` | One provider |
 | GET | `/v1/ai-assistant/providers/protocol/{protocol}` | Providers for `sip` or `websocket` |
 
-Scoped API keys use the `ai-assistants` and `ai-assistant-providers` resources (see [API Keys](/modules/api-keys)). The [MCP server](/modules/mcp-server) has `list_ai_providers`, `get_ai_provider`, `list_ai_assistants`, `get_ai_assistant`, `create_ai_assistant`, `update_ai_assistant` and `delete_ai_assistant`.
+Scoped API keys use the `ai-assistants` and `ai-assistant-providers` resources (see [API Keys](/opbx/modules/api-keys)). The [MCP server](/opbx/modules/mcp-server) has `list_ai_providers`, `get_ai_provider`, `list_ai_assistants`, `get_ai_assistant`, `create_ai_assistant`, `update_ai_assistant` and `delete_ai_assistant`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related modules
 
-- [AI Load Balancers](/modules/ai-load-balancers) — spread calls over several assistants, with failover
-- [Extensions](/modules/extensions) — AI Assistant extensions for internal dialling
-- [Phone Numbers](/modules/phone-numbers) — route a number straight to an assistant
-- [AI Assistants (applications)](/applications/ai-assistants) — concepts and designs
+- [AI Load Balancers](/opbx/modules/ai-load-balancers) — spread calls over several assistants, with failover
+- [Extensions](/opbx/modules/extensions) — AI Assistant extensions for internal dialling
+- [Phone Numbers](/opbx/modules/phone-numbers) — route a number straight to an assistant
+- [AI Assistants (applications)](/opbx/applications/ai-assistants) — concepts and designs

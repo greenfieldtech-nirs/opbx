@@ -10,7 +10,7 @@ description: Designs for spreading calls across AI assistants, failing over betw
 
 An AI load balancer puts several AI assistants behind one destination. It chooses one assistant per call, can move on to the next assistant when one fails, and runs a fallback when none can take the call.
 
-This page explains the designs. The step-by-step screens, every field and the error messages are in the module walk-through: [AI Load Balancers](/modules/ai-load-balancers).
+This page explains the designs. The step-by-step screens, every field and the error messages are in the module walk-through: [AI Load Balancers](/opbx/modules/ai-load-balancers).
 
 ## How a call moves through a load balancer
 
@@ -83,11 +83,11 @@ A load balancer is a destination for phone numbers, IVR options and failovers, b
 
 ## Monitoring
 
-- [Call Logs](/modules/call-logs) show each call to the number that routes to the load balancer.
-- With the [centralized logging stack](/administration/centralized-logs), the routing log names the member chosen for each call and every failover step.
+- [Call Logs](/opbx/modules/call-logs) show each call to the number that routes to the load balancer.
+- With the [centralized logging stack](/opbx/administration/centralized-logs), the routing log names the member chosen for each call and every failover step.
 
 ## Related pages
 
-- [AI Load Balancers (module walk-through)](/modules/ai-load-balancers)
-- [AI Assistants](/applications/ai-assistants)
-- [Auto Dialer](/applications/auto-dialer) — campaigns can connect answered calls to a load balancer
+- [AI Load Balancers (module walk-through)](/opbx/modules/ai-load-balancers)
+- [AI Assistants](/opbx/applications/ai-assistants)
+- [Auto Dialer](/opbx/applications/auto-dialer) — campaigns can connect answered calls to a load balancer

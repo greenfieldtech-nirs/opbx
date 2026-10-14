@@ -25,7 +25,7 @@ Log in at `http://localhost/ui/login` and **change the password immediately** (o
 
 ## Platform Managers
 
-A platform manager administers all organizations (see [Platform Management](/administration/platform-management)). Neither the seeded account nor a registered owner is one. Create one from the command line:
+A platform manager administers all organizations (see [Platform Management](/opbx/administration/platform-management)). Neither the seeded account nor a registered owner is one. Create one from the command line:
 
 ```bash
 docker compose exec app php artisan opbx:create-platform-manager      # interactive: new user and organization
@@ -107,7 +107,7 @@ Complete these tasks in order to get your PBX operational:
 
 Navigate to **Settings** in the sidebar (Owner-only access). Enter your Cloudonix credentials to enable telephony features.
 
-See the [Cloudonix Integration](./cloudonix-setup) guide for detailed instructions.
+See the [Cloudonix Integration](/opbx/installation/cloudonix-setup) guide for detailed instructions.
 
 ### 2. Create Extensions
 
@@ -171,10 +171,10 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 With your initial setup complete, you are ready to:
 
-1. [Configure Cloudonix integration](./cloudonix-setup)
-2. [Learn core PBX concepts](./concepts)
-3. [Create extensions](../modules/extensions)
-4. [Configure phone numbers](../modules/phone-numbers)
+1. [Configure Cloudonix integration](/opbx/installation/cloudonix-setup)
+2. [Learn core PBX concepts](/opbx/installation/concepts)
+3. [Create extensions](/opbx/modules/extensions)
+4. [Configure phone numbers](/opbx/modules/phone-numbers)
 
 :::info Need Help?
 If you encounter issues during setup, check the logs with `docker compose logs -f app` and verify all services are running with `docker compose ps`.

@@ -8,7 +8,7 @@ description: Create, edit, start, pause, resume, archive and delete auto-dialer 
 
 # Managing Campaigns
 
-A campaign holds everything about one outbound calling run: where answered calls go, which caller IDs to show, when to dial, how fast, how often to retry and what to do when a voicemail answers. The numbers themselves live in a [distribution list](/applications/auto-dialer/distribution-lists) that you assign to the campaign.
+A campaign holds everything about one outbound calling run: where answered calls go, which caller IDs to show, when to dial, how fast, how often to retry and what to do when a voicemail answers. The numbers themselves live in a [distribution list](/opbx/applications/auto-dialer/distribution-lists) that you assign to the campaign.
 
 ## Purpose
 
@@ -22,8 +22,8 @@ Use **Campaign Manager** to:
 ## Prerequisites
 
 - You are the **Owner** or a **PBX Admin**. Some actions are **Owner only** (see [Permissions](#permissions)).
-- An [AI assistant](/modules/ai-assistants) or [AI load balancer](/modules/ai-load-balancers) to receive answered calls, unless you only want to test with **Hangup**.
-- At least one **active** [phone number](/modules/phone-numbers) of your organization to use as the caller ID.
+- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers) to receive answered calls, unless you only want to test with **Hangup**.
+- At least one **active** [phone number](/opbx/modules/phone-numbers) of your organization to use as the caller ID.
 
 ## The Campaign Manager page
 
@@ -59,7 +59,7 @@ On save the campaign is stored in **Draft** status and you land on its detail pa
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Campaign Name | Required, up to 255 characters | Shown in lists and the monitor |
-| Routing Destination | AI Assistant, AI Load Balancer or Hangup. Required | Where answered calls go. See [Campaign Routing](/applications/auto-dialer/routing-destinations) |
+| Routing Destination | AI Assistant, AI Load Balancer or Hangup. Required | Where answered calls go. See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
 | Select Destination | Required unless the type is Hangup | The assistant or load balancer |
 | Caller ID Strategy | Round Robin (default), Random, Least Recently Used | How the next caller ID is chosen from the pool |
 | Caller ID Pool | 1 to 100 numbers. Only **active** numbers of your organization are offered | The numbers callees see. The first number is also stored as the campaign's main caller ID |
@@ -77,7 +77,7 @@ The pool can only be changed while the campaign is **Draft** or **Paused**. On a
 When a number is **retried**, the dialer prefers a caller ID that has not yet been tried for that number.
 
 :::note Caller-ID numbers are protected
-A phone number in a campaign's caller-ID pool cannot be deleted. The delete is refused and the dialog lists the campaign as a "caller ID pool" use. Remove the number from the pool first. See [Phone Numbers](/modules/phone-numbers#delete).
+A phone number in a campaign's caller-ID pool cannot be deleted. The delete is refused and the dialog lists the campaign as a "caller ID pool" use. Remove the number from the pool first. See [Phone Numbers](/opbx/modules/phone-numbers#delete).
 :::
 
 ### Schedule tab
@@ -89,7 +89,7 @@ A phone number in a campaign's caller-ID pool cannot be deleted. The delete is r
 | End Date | Required. On or after the start date | Last day the campaign may dial |
 | Active Hours | A weekly grid. New campaigns start with Monday to Friday, 09:00 to 17:00 | The hours each weekday when dialing is allowed. Click time slots to toggle them |
 
-See [Campaign Scheduling](/applications/auto-dialer/scheduling) for how the window is evaluated.
+See [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) for how the window is evaluated.
 
 ### Answering Machine Detection tab
 
@@ -102,7 +102,7 @@ See [Campaign Scheduling](/applications/auto-dialer/scheduling) for how the wind
 | Retry on Voicemail | Off by default | Schedules another attempt when a voicemail was detected |
 
 :::warning Read the AMD page before you enable detection
-With the defaults, a call where no beep is heard is **hung up** when the detection window ends, which includes calls answered by a person. Read [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) and set **If Detection Unclear** to **Continue to destination** unless you really want that.
+With the defaults, a call where no beep is heard is **hung up** when the detection window ends, which includes calls answered by a person. Read [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) and set **If Detection Unclear** to **Continue to destination** unless you really want that.
 :::
 
 Each action offers **Hang up** or **Continue to destination**. When you turn detection off on the edit form, the saved actions are cleared.
@@ -111,7 +111,7 @@ Each action offers **Hang up** or **Continue to destination**. When you turn det
 
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
-| Auto-start | Disabled by default | Lets the scheduler start a Draft campaign on schedule (see [Auto-start](/applications/auto-dialer/scheduling#auto-start)) |
+| Auto-start | Disabled by default | Lets the scheduler start a Draft campaign on schedule (see [Auto-start](/opbx/applications/auto-dialer/scheduling#auto-start)) |
 | Time Limit (sec) | 30 to 14400. Default: 3600 | Maximum length of one call |
 | Dial Timeout (sec) | 1 to 300. Default: 60 | How long the callee's phone rings before the attempt is given up |
 | Connect When | Call Connected (default) or Immediately | Sent to Cloudonix as `execute`. **Call Connected** starts the call flow (routing, AMD) when the callee answers; **Immediately** starts it while the callee's phone is still ringing |
@@ -122,10 +122,10 @@ Each action offers **Hang up** or **Continue to destination**. When you turn det
 | First retry delay (minutes) | 1 to 1440. Default: 15. Shown when the retry switch is on | Wait before the first redial; each further retry waits twice as long, up to 24 hours |
 | Record Calls | Off by default | Asks Cloudonix to record each call |
 
-See [Rate Limiting](/applications/auto-dialer/rate-limiting) for CAC, CPS and attempts.
+See [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) for CAC, CPS and attempts.
 
 :::note Connect When and detection
-Cloudonix turns its own machine detection off when a call is not started with **Call Connected**. If you use [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection), keep **Call Connected**.
+Cloudonix turns its own machine detection off when a call is not started with **Call Connected**. If you use [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection), keep **Call Connected**.
 :::
 
 ![Advanced tab with CAC 3, CPS 1 call/sec, Max Dial Attempts 3 and Record Calls off](../../img/screens/auto-dialer-campaign-create-advanced.jpg)
@@ -136,7 +136,7 @@ For each number, OPBX:
 
 1. claims the number so it is dialed once, even if two requests race;
 2. picks the caller ID from the pool;
-3. chooses the outbound trunk from the first matching [outbound whitelist](/modules/outbound-whitelist) rule. When no rule matches, Cloudonix chooses the trunk;
+3. chooses the outbound trunk from the first matching [outbound whitelist](/opbx/modules/outbound-whitelist) rule. When no rule matches, Cloudonix chooses the trunk;
 4. asks Cloudonix to dial, with the dial timeout, time limit, recording flag and a 5-minute start deadline;
 5. counts the call against the CAC limit until Cloudonix reports it ended.
 
@@ -226,10 +226,10 @@ Below the cards: the full configuration (routing, caller ID strategy and pool, d
 
 ## Related pages
 
-- [Distribution Lists](/applications/auto-dialer/distribution-lists) — the numbers to dial
-- [Campaign Scheduling](/applications/auto-dialer/scheduling)
-- [Rate Limiting](/applications/auto-dialer/rate-limiting)
-- [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection)
-- [Campaign Routing](/applications/auto-dialer/routing-destinations)
-- [Real-Time Monitor](/applications/auto-dialer/real-time-monitor)
-- [Auto Dialer Campaigns module](/modules/auto-dialer-campaigns) — fields, data and API reference
+- [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) — the numbers to dial
+- [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling)
+- [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting)
+- [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection)
+- [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations)
+- [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor)
+- [Auto Dialer Campaigns module](/opbx/modules/auto-dialer-campaigns) — fields, data and API reference

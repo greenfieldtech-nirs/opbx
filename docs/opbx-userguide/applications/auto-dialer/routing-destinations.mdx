@@ -16,8 +16,8 @@ Choose the routing destination to decide who talks to the people your campaign c
 
 ## Prerequisites
 
-- The destination exists in your organization: an [AI assistant](/modules/ai-assistants) or an [AI load balancer](/modules/ai-load-balancers) with active members.
-- A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/applications/auto-dialer/campaigns).
+- The destination exists in your organization: an [AI assistant](/opbx/modules/ai-assistants) or an [AI load balancer](/opbx/modules/ai-load-balancers) with active members.
+- A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/opbx/applications/auto-dialer/campaigns).
 
 ## Set the destination
 
@@ -52,7 +52,7 @@ OPBX asks the load balancer for an assistant according to its strategy, consider
 
 ## Passing list data to the assistant
 
-The **Full Name**, **Batch Identifier** and **metadata columns** you mapped when uploading the [distribution list](/applications/auto-dialer/distribution-lists) are stored with each number. The metadata is handed to the assistant with each call:
+The **Full Name**, **Batch Identifier** and **metadata columns** you mapped when uploading the [distribution list](/opbx/applications/auto-dialer/distribution-lists) are stored with each number. The metadata is handed to the assistant with each call:
 
 | Assistant type | How metadata is sent |
 |----------------|---------------------|
@@ -74,18 +74,18 @@ An AI assistant or AI load balancer that a campaign routes to cannot be deleted.
 
 ## Call recording
 
-With **Record Calls** on (Advanced tab), Cloudonix records each call of the campaign. See [Recordings](/modules/recordings) for who can play recordings.
+With **Record Calls** on (Advanced tab), Cloudonix records each call of the campaign. See [Recordings](/opbx/modules/recordings) for who can play recordings.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
 | Callees answer and the line drops at once | Routing is Hangup, or the destination is missing or has no available member | Check the campaign's routing and the assistant's or load balancer's status |
-| Callees answer and the line drops after about 30 seconds | Voicemail detection with "If Detection Unclear = Hang up" | See [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
+| Callees answer and the line drops after about 30 seconds | Voicemail detection with "If Detection Unclear = Hang up" | See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
 | The assistant does not receive the lead's details | The columns were not mapped as metadata, or the assistant ignores them | Re-upload with the columns ticked as metadata; check the assistant's header or parameter handling |
 
 ## Related pages
 
-- [AI Assistants](/modules/ai-assistants) and [AI Load Balancers](/modules/ai-load-balancers)
-- [Distribution Lists](/applications/auto-dialer/distribution-lists)
-- [Managing Campaigns](/applications/auto-dialer/campaigns)
+- [AI Assistants](/opbx/modules/ai-assistants) and [AI Load Balancers](/opbx/modules/ai-load-balancers)
+- [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists)
+- [Managing Campaigns](/opbx/applications/auto-dialer/campaigns)

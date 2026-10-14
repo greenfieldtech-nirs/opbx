@@ -17,14 +17,14 @@ Use the Web Phone to:
 - place calls from any page of OPBX;
 - answer calls to your extension in the browser, whether or not the panel is open;
 - redial your recent outbound calls;
-- spy, whisper or barge from [Live Calls](/modules/live-calls) (Owners and Supervisors).
+- spy, whisper or barge from [Live Calls](/opbx/modules/live-calls) (Owners and Supervisors).
 
-The same Web Phone can be placed on another website, such as a CRM. See [Embedded Dialer](/modules/embedded-dialer).
+The same Web Phone can be placed on another website, such as a CRM. See [Embedded Dialer](/opbx/modules/embedded-dialer).
 
 ## Prerequisites
 
-- A **user extension** assigned to you (extension type User). Other extension types, such as forward or ring group extensions, do not count. See [Extensions](/modules/extensions).
-- The organization's Cloudonix settings, with a domain name. See [Settings](/modules/settings).
+- A **user extension** assigned to you (extension type User). Other extension types, such as forward or ring group extensions, do not count. See [Extensions](/opbx/modules/extensions).
+- The organization's Cloudonix settings, with a domain name. See [Settings](/opbx/modules/settings).
 - A browser with microphone access. The browser asks for permission the first time you place or answer a call.
 - Network access to `wss://webrtc.cloudonix.io` on port 443.
 
@@ -101,7 +101,7 @@ When there are none, the tab reads "No recent calls yet."
 
 ## Coaching from Live Calls
 
-When an Owner or Supervisor clicks **Spy**, **Whisper** or **Barge** on [Live Calls](/modules/live-calls), the Web Phone opens by itself and dials the coaching target. Once connected, the header reads "On call - Coaching: Spy" (or Whisper, Barge). When the coaching call ends, the Web Phone closes.
+When an Owner or Supervisor clicks **Spy**, **Whisper** or **Barge** on [Live Calls](/opbx/modules/live-calls), the Web Phone opens by itself and dials the coaching target. Once connected, the header reads "On call - Coaching: Spy" (or Whisper, Barge). When the coaching call ends, the Web Phone closes.
 
 ## Call-progress tones
 
@@ -112,9 +112,9 @@ Ringing, busy, congestion and dial tones follow the conventions of the organizat
 | Message | What it means | What to do |
 |---------|---------------|-----------|
 | Web Phone Unavailable — No extension is assigned to your account | No user extension | Assign a user extension |
-| Web Phone Unavailable — Cloudonix isn't configured for your organization | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/modules/settings) |
+| Web Phone Unavailable — Cloudonix isn't configured for your organization | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/opbx/modules/settings) |
 | Connection Failed — Could not open a connection to the voice server | The browser cannot reach `wss://webrtc.cloudonix.io` | Check the network and firewall, then **Retry** |
-| Authentication Rejected | Cloudonix refused the extension's password | Reset the extension password on [Extensions](/modules/extensions) |
+| Authentication Rejected | Cloudonix refused the extension's password | Reset the extension password on [Extensions](/opbx/modules/extensions) |
 | Extension Not Found | The subscriber does not exist in Cloudonix | Check that the extension is synced to Cloudonix |
 | Web Phone Error — no reply came back in time | Registration timed out | **Retry** in a moment |
 
@@ -156,8 +156,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Embedded Dialer](/modules/embedded-dialer) — the same Web Phone on another website
-- [Live Calls](/modules/live-calls) — start a coaching call
-- [Supervisors](/modules/supervisors) — who a Supervisor may coach
-- [Extensions](/modules/extensions) — the extension the Web Phone registers as
-- [Settings](/modules/settings) — Cloudonix domain
+- [Embedded Dialer](/opbx/modules/embedded-dialer) — the same Web Phone on another website
+- [Live Calls](/opbx/modules/live-calls) — start a coaching call
+- [Supervisors](/opbx/modules/supervisors) — who a Supervisor may coach
+- [Extensions](/opbx/modules/extensions) — the extension the Web Phone registers as
+- [Settings](/opbx/modules/settings) — Cloudonix domain

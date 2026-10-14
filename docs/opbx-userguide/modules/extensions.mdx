@@ -10,7 +10,7 @@ description: "Create extensions, choose what each one reaches, set the outbound 
 
 An extension is a short internal number, for example `1005`. Dialing it reaches whatever the extension is linked to: a person's phone, a ring group, a queue, a conference room, an IVR menu, an AI assistant, an AI load balancer, or an outside number.
 
-Extensions of type **PBX User** are SIP accounts. OPBX creates a matching subscriber in Cloudonix so a desk phone, softphone or the [web phone](/modules/web-phone) can register with it.
+Extensions of type **PBX User** are SIP accounts. OPBX creates a matching subscriber in Cloudonix so a desk phone, softphone or the [web phone](/opbx/modules/web-phone) can register with it.
 
 ## Purpose
 
@@ -24,9 +24,9 @@ Use this module to:
 
 ## Prerequisites
 
-- **Cloudonix settings** for the organization (domain and API key). Without them, PBX User extensions are saved but no SIP subscriber is created. See [Settings](/modules/settings).
+- **Cloudonix settings** for the organization (domain and API key). Without them, PBX User extensions are saved but no SIP subscriber is created. See [Settings](/opbx/modules/settings).
 - **The target exists.** For any type other than PBX User and Forward, create the ring group, queue, room, menu, assistant or load balancer first.
-- **A phone number (optional)** for the default caller ID. See [Phone Numbers](/modules/phone-numbers).
+- **A phone number (optional)** for the default caller ID. See [Phone Numbers](/opbx/modules/phone-numbers).
 
 ## Permissions
 
@@ -56,7 +56,7 @@ A PBX User may change their own extension through the API but cannot change its 
 
 The API also has a `custom_logic` type (a Cloudonix container application and block name, up to 255 characters each). The page does not offer it.
 
-A **Call Queue** extension lets agents transfer callers into a queue by number. See [Call Queues](/modules/call-queues).
+A **Call Queue** extension lets agents transfer callers into a queue by number. See [Call Queues](/opbx/modules/call-queues).
 
 ## Create an extension
 
@@ -95,7 +95,7 @@ The number is fixed after creation. To use another number, create a new extensio
 
 ### Default caller ID
 
-The default caller ID is the number presented when someone calls out from this extension. It takes precedence over the caller ID of an [outbound whitelist](/modules/outbound-whitelist) rule. When the chosen number is not active, the call falls through to the next caller ID in the order described in the [Outbound Calling Overview](/installation/outbound-calling-overview).
+The default caller ID is the number presented when someone calls out from this extension. It takes precedence over the caller ID of an [outbound whitelist](/opbx/modules/outbound-whitelist) rule. When the chosen number is not active, the call falls through to the next caller ID in the order described in the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 
 A phone number used as a default caller ID cannot be deleted until you clear it here.
 
@@ -148,7 +148,7 @@ Change those first, then delete again. Call history never blocks a delete. A PBX
 
 ### When a user is deleted
 
-Deleting a user does **not** delete their extension. It is kept, unassigned, and can be given to someone else. Routes that pointed at it are changed to "Destination unavailable". See [User Management](/modules/user-management#delete-a-user).
+Deleting a user does **not** delete their extension. It is kept, unassigned, and can be given to someone else. Routes that pointed at it are changed to "Destination unavailable". See [User Management](/opbx/modules/user-management#delete-a-user).
 
 ## Common errors
 
@@ -208,8 +208,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [User Management](/modules/user-management) — the people PBX User extensions belong to
-- [Ring Groups](/modules/ring-groups) — extensions are ring-group members
-- [Phone Numbers](/modules/phone-numbers) — route a number to an extension, and use a number as caller ID
-- [Web Phone](/modules/web-phone) — a browser phone that registers with a PBX User extension
-- [Outbound Calling Overview](/installation/outbound-calling-overview) — how the caller ID is chosen
+- [User Management](/opbx/modules/user-management) — the people PBX User extensions belong to
+- [Ring Groups](/opbx/modules/ring-groups) — extensions are ring-group members
+- [Phone Numbers](/opbx/modules/phone-numbers) — route a number to an extension, and use a number as caller ID
+- [Web Phone](/opbx/modules/web-phone) — a browser phone that registers with a PBX User extension
+- [Outbound Calling Overview](/opbx/installation/outbound-calling-overview) — how the caller ID is chosen

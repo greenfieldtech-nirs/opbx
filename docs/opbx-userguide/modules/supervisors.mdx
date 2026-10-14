@@ -15,16 +15,16 @@ A **Supervisor** is a team lead who watches and coaches calls but does not confi
 Use the Supervisor role to:
 
 - give a team lead a view of their team's live and recent calls;
-- let them coach those calls (spy, whisper, barge) from the [Web Phone](/modules/web-phone);
+- let them coach those calls (spy, whisper, barge) from the [Web Phone](/opbx/modules/web-phone);
 - keep the rest of the organization's calls, configuration, exports and user management out of reach.
 
-A [Reporter](/modules/user-management#roles) is the other read-only role. The difference: a Reporter sees all of the organization's data and cannot coach; a Supervisor sees only their assignment and can coach it.
+A [Reporter](/opbx/modules/user-management#roles) is the other read-only role. The difference: a Reporter sees all of the organization's data and cannot coach; a Supervisor sees only their assignment and can coach it.
 
 ## Prerequisites
 
 - You are the **Owner** or a **PBX Admin**. Only they can open the Supervisors page and change assignments.
 - The users to supervise have the **PBX User** role. Owners, PBX Admins, Reporters and other Supervisors cannot be assigned.
-- To coach calls, the Supervisor needs a **user extension** of their own. Assign it on [Extensions](/modules/extensions); the user editor sets no extension for this role.
+- To coach calls, the Supervisor needs a **user extension** of their own. Assign it on [Extensions](/opbx/modules/extensions); the user editor sets no extension for this role.
 
 ## What a Supervisor can do
 
@@ -78,7 +78,7 @@ The Supervisors page has no create button. Create the account on the Users page:
 2. Enter name, email and password, and choose the role **Supervisor**.
 3. Save. The **Supervisor Assignments** dialog opens straight away (next section).
 
-To turn an existing user into a Supervisor, the **Owner** edits the user and changes the role to Supervisor. The assignment dialog opens after saving. Only the Owner can change roles; see [User Management](/modules/user-management).
+To turn an existing user into a Supervisor, the **Owner** edits the user and changes the role to Supervisor. The assignment dialog opens after saving. Only the Owner can change roles; see [User Management](/opbx/modules/user-management).
 
 ## Assign users and ring groups
 
@@ -136,7 +136,7 @@ It refreshes every 30 seconds while the tab is visible.
 
 ## Coaching calls
 
-A Supervisor coaches calls from **Live Calls** with **Spy**, **Whisper** or **Barge**. The server refuses a call outside the scope with "This call is outside your supervised scope". See [Live Calls](/modules/live-calls#coach-a-call-spy-whisper-barge).
+A Supervisor coaches calls from **Live Calls** with **Spy**, **Whisper** or **Barge**. The server refuses a call outside the scope with "This call is outside your supervised scope". See [Live Calls](/opbx/modules/live-calls#coach-a-call-spy-whisper-barge).
 
 ## Real-time updates
 
@@ -183,8 +183,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [User Management](/modules/user-management) — create the Supervisor account and set roles
-- [Live Calls](/modules/live-calls) — watch and coach calls
-- [Call Logs](/modules/call-logs) — finished calls
-- [Ring Groups](/modules/ring-groups) — the groups a Supervisor can be assigned
-- [Web Phone](/modules/web-phone) — the softphone used for coaching
+- [User Management](/opbx/modules/user-management) — create the Supervisor account and set roles
+- [Live Calls](/opbx/modules/live-calls) — watch and coach calls
+- [Call Logs](/opbx/modules/call-logs) — finished calls
+- [Ring Groups](/opbx/modules/ring-groups) — the groups a Supervisor can be assigned
+- [Web Phone](/opbx/modules/web-phone) — the softphone used for coaching

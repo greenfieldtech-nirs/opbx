@@ -172,7 +172,7 @@ For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failov
 
 ## Step 8: Call Queues
 
-A call routed to a call queue is enqueued in the [ACD worker](/workers/acd-worker) and hears hold music. After each hold segment Cloudonix POSTs to `/api/callbacks/voice/queue-poll`. Laravel asks the ACD worker for a decision: **wait**, **dial** (the selected agents' extensions) or **overflow** (to the queue's fallback). The dial result comes back on `/api/callbacks/voice/queue-dial-callback`. Agents who are already on a call are skipped, using the extension presence kept in Redis from session updates.
+A call routed to a call queue is enqueued in the [ACD worker](/opbx/workers/acd-worker) and hears hold music. After each hold segment Cloudonix POSTs to `/api/callbacks/voice/queue-poll`. Laravel asks the ACD worker for a decision: **wait**, **dial** (the selected agents' extensions) or **overflow** (to the queue's fallback). The dial result comes back on `/api/callbacks/voice/queue-dial-callback`. Agents who are already on a call are skipped, using the extension presence kept in Redis from session updates.
 
 ---
 
@@ -224,9 +224,9 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 
 ## Related Documentation
 
-- [Architecture Overview](./index)
-- [Webhooks](./webhooks)
-- [Multi-Tenancy](./multi-tenancy)
-- [Security](./security)
-- [Real-Time](./real-time)
-- [Call Queues](/modules/call-queues)
+- [Architecture Overview](/opbx/architecture)
+- [Webhooks](/opbx/architecture/webhooks)
+- [Multi-Tenancy](/opbx/architecture/multi-tenancy)
+- [Security](/opbx/architecture/security)
+- [Real-Time](/opbx/architecture/real-time)
+- [Call Queues](/opbx/modules/call-queues)

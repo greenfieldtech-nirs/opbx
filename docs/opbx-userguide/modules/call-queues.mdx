@@ -8,7 +8,7 @@ description: "Hold callers in a FIFO line until an agent is free, with agent log
 
 # Call Queues
 
-A call queue holds incoming callers in first-in, first-out order with music on hold, and offers each caller to an agent when one is free. Unlike a [ring group](/modules/ring-groups), a queue is **stateful**: agents log in and out, finished calls leave a wrap-up pause, callers that wait too long overflow to a fallback, and every call is measured.
+A call queue holds incoming callers in first-in, first-out order with music on hold, and offers each caller to an agent when one is free. Unlike a [ring group](/opbx/modules/ring-groups), a queue is **stateful**: agents log in and out, finished calls leave a wrap-up pause, callers that wait too long overflow to a fallback, and every call is measured.
 
 ## When to use a queue instead of a ring group
 
@@ -27,8 +27,8 @@ Use a queue for a support or sales line where you need to know how long callers 
 
 Before you create a queue, prepare these:
 
-1. **Agents.** Each agent is an **active** user with an **extension assigned**. A user without an extension cannot be added. See [User Management](/modules/user-management) and [Extensions](/modules/extensions).
-2. **Hold music (optional).** An audio recording with the **Hold music** tag. Only tagged recordings are offered. See [Recordings](/modules/recordings).
+1. **Agents.** Each agent is an **active** user with an **extension assigned**. A user without an extension cannot be added. See [User Management](/opbx/modules/user-management) and [Extensions](/opbx/modules/extensions).
+2. **Hold music (optional).** An audio recording with the **Hold music** tag. Only tagged recordings are offered. See [Recordings](/opbx/modules/recordings).
 3. **A fallback destination.** Where overflow calls go (see below). It must exist and be active.
 
 ## Create a queue
@@ -170,8 +170,8 @@ PBX Users can read the queue through the API, but the sidebar does not show the 
 ## API and automation
 
 - **REST API**: create, read, update and delete queues and agent membership. Statistics, live state and per-call reports are read-only endpoints.
-- **Scoped API keys**: the `call-queues` and `queue-calls` resources, with read access meaning GET only. See [API Keys](/modules/api-keys).
-- **MCP server**: read-only tools `list_call_queues`, `get_call_queue`, `get_call_queue_stats`, `get_call_queue_live` and `list_queue_calls`. See [MCP Server](/modules/mcp-server).
+- **Scoped API keys**: the `call-queues` and `queue-calls` resources, with read access meaning GET only. See [API Keys](/opbx/modules/api-keys).
+- **MCP server**: read-only tools `list_call_queues`, `get_call_queue`, `get_call_queue_stats`, `get_call_queue_live` and `list_queue_calls`. See [MCP Server](/opbx/modules/mcp-server).
 
 ## Common errors
 
@@ -186,18 +186,18 @@ PBX Users can read the queue through the API, but the sidebar does not show the 
 
 ## Troubleshooting
 
-With the [centralized logging stack](/administration/centralized-logs) enabled, every queue event (enqueue, offer, answer, overflow) is searchable by the call's Cloudonix session token. That is the quickest way to follow one caller through a queue.
+With the [centralized logging stack](/opbx/administration/centralized-logs) enabled, every queue event (enqueue, offer, answer, overflow) is searchable by the call's Cloudonix session token. That is the quickest way to follow one caller through a queue.
 
 Common causes of "nobody gets the call":
 
 - No agent is logged in (state Logged out). The Live tab shows the states.
 - The agent is already on a call, so presence skips them.
-- The agent's extension is not active. Check its status on [Extensions](/modules/extensions).
+- The agent's extension is not active. Check its status on [Extensions](/opbx/modules/extensions).
 
 ## Related modules
 
-- [Ring Groups](/modules/ring-groups) — a simpler alternative, and a common queue fallback
-- [IVR Menus](/modules/ivr-menus) — route callers into a queue from a menu option
-- [Phone Numbers](/modules/phone-numbers) — route a number directly to a queue
-- [Recordings](/modules/recordings) — hold music
-- [Supervisors](/modules/supervisors) — supervisors can read the queues where their assigned users are agents
+- [Ring Groups](/opbx/modules/ring-groups) — a simpler alternative, and a common queue fallback
+- [IVR Menus](/opbx/modules/ivr-menus) — route callers into a queue from a menu option
+- [Phone Numbers](/opbx/modules/phone-numbers) — route a number directly to a queue
+- [Recordings](/opbx/modules/recordings) — hold music
+- [Supervisors](/opbx/modules/supervisors) — supervisors can read the queues where their assigned users are agents

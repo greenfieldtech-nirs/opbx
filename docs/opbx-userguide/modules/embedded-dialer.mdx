@@ -8,7 +8,7 @@ description: "Put one user's Web Phone on another website, such as a CRM, with a
 
 # Embedded Dialer
 
-The Embedded Dialer puts one user's [Web Phone](/modules/web-phone) on a website you control, most often a CRM. You paste a short script into the page. It loads an OPBX iframe that registers the user's extension and offers click-to-dial. The host page can drive the dialer and listen to call events through `window.OpbxDialer`.
+The Embedded Dialer puts one user's [Web Phone](/opbx/modules/web-phone) on a website you control, most often a CRM. You paste a short script into the page. It loads an OPBX iframe that registers the user's extension and offers click-to-dial. The host page can drive the dialer and listen to call events through `window.OpbxDialer`.
 
 ## Purpose
 
@@ -152,7 +152,7 @@ The embedded phone registers with the extension's SIP user name and password, ex
 
 - allow only domains you control;
 - use a dedicated extension for embedding where possible;
-- if you suspect a leak, **Regenerate** the token at once and reset the extension password on [Extensions](/modules/extensions).
+- if you suspect a leak, **Regenerate** the token at once and reset the extension password on [Extensions](/opbx/modules/extensions).
 :::
 
 ### Host-page Content Security Policy
@@ -197,7 +197,7 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Web Phone](/modules/web-phone) — the softphone that is embedded
-- [User Management](/modules/user-management) — the Embed column and Get Code button
-- [Extensions](/modules/extensions) — the extension the dialer registers as
-- [Settings](/modules/settings) — allowed domains and Cloudonix settings
+- [Web Phone](/opbx/modules/web-phone) — the softphone that is embedded
+- [User Management](/opbx/modules/user-management) — the Embed column and Get Code button
+- [Extensions](/opbx/modules/extensions) — the extension the dialer registers as
+- [Settings](/opbx/modules/settings) — allowed domains and Cloudonix settings

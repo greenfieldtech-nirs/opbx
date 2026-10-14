@@ -8,7 +8,7 @@ description: "Outbound calling campaigns: fields, statuses, permissions, data an
 
 # Auto Dialer Campaigns
 
-An auto-dialer campaign dials every number on its [distribution list](/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference. The step-by-step walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/applications/auto-dialer).
+An auto-dialer campaign dials every number on its [distribution list](/opbx/modules/distribution-lists) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference. The step-by-step walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
 
 ## Purpose
 
@@ -18,26 +18,26 @@ Use this module to:
 - choose the routing destination and the caller-ID pool;
 - set the schedule, rate limits, attempts and voicemail detection;
 - start, pause, resume, archive or delete campaigns;
-- follow progress on the [Real-Time Monitor](/applications/auto-dialer/real-time-monitor).
+- follow progress on the [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor).
 
 ## Prerequisites
 
 - **Owner** or **PBX Admin** role to change anything; **Reporter** may view.
-- An [AI assistant](/modules/ai-assistants) or [AI load balancer](/modules/ai-load-balancers), unless you route to Hangup for testing.
-- At least one **active** [phone number](/modules/phone-numbers) for the caller ID.
-- The [dialer worker](/workers/dialer-worker) running (single replica), and the [AMD worker](/workers/amd-worker) for voicemail detection.
+- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers), unless you route to Hangup for testing.
+- At least one **active** [phone number](/opbx/modules/phone-numbers) for the caller ID.
+- The [dialer worker](/opbx/workers/dialer-worker) running (single replica), and the [AMD worker](/opbx/workers/amd-worker) for voicemail detection.
 
 ## Walk-through
 
 | Task | Guide |
 |------|-------|
-| Create, edit, start, pause, resume, archive, delete | [Managing Campaigns](/applications/auto-dialer/campaigns) |
-| Upload and assign the numbers | [Distribution Lists](/applications/auto-dialer/distribution-lists) |
-| Dates, weekly hours, timezone, auto-start | [Campaign Scheduling](/applications/auto-dialer/scheduling) |
-| CAC, CPS, attempts, retries | [Rate Limiting](/applications/auto-dialer/rate-limiting) |
-| Voicemail detection | [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
-| Where answered calls go | [Campaign Routing](/applications/auto-dialer/routing-destinations) |
-| Live view | [Real-Time Monitor](/applications/auto-dialer/real-time-monitor) |
+| Create, edit, start, pause, resume, archive, delete | [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) |
+| Upload and assign the numbers | [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) |
+| Dates, weekly hours, timezone, auto-start | [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) |
+| CAC, CPS, attempts, retries | [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) |
+| Voicemail detection | [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
+| Where answered calls go | [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
+| Live view | [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) |
 
 ![Campaign Manager with Fall Webinar Follow-up (Paused, AI Assistant routing)](../img/screens/auto-dialer-campaign-list.jpg)
 
@@ -94,7 +94,7 @@ A Draft campaign becomes **Active** when a Ready list is assigned to it.
 - A **phone number** in a campaign's caller-ID pool cannot be deleted ("caller ID pool" in the in-use dialog).
 - An **AI assistant** or **AI load balancer** that a campaign routes to cannot be deleted ("routing" in the in-use dialog), whatever the campaign's status.
 
-Remove the reference from the campaign first. See [Phone Numbers](/modules/phone-numbers#delete) and [Campaign Routing](/applications/auto-dialer/routing-destinations#deleting-a-destination-that-a-campaign-uses).
+Remove the reference from the campaign first. See [Phone Numbers](/opbx/modules/phone-numbers#delete) and [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations#deleting-a-destination-that-a-campaign-uses).
 
 ## Key data fields
 
@@ -146,14 +146,14 @@ One row per call attempt: campaign, destination, session token, status, disposit
 | GET | `/v1/auto-dialer-campaigns/{campaign}/caller-id-stats` | Per-number usage |
 | POST | `/v1/auto-dialer-campaigns/{campaign}/reset-caller-id-cycle` | Restart round robin (Paused only) |
 
-**Scoped API keys** use the `auto-dialer-campaigns` resource. The **MCP server** offers tools such as `list_campaigns`, `get_campaign`, `create_campaign`, `update_campaign` and `get_campaigns_monitor_summary`. See [API Keys](/modules/api-keys) and [MCP Server](/modules/mcp-server).
+**Scoped API keys** use the `auto-dialer-campaigns` resource. The **MCP server** offers tools such as `list_campaigns`, `get_campaign`, `create_campaign`, `update_campaign` and `get_campaigns_monitor_summary`. See [API Keys](/opbx/modules/api-keys) and [MCP Server](/opbx/modules/mcp-server).
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related modules
 
-- [Distribution Lists](/modules/distribution-lists) — the numbers a campaign dials
-- [AI Assistants](/modules/ai-assistants) and [AI Load Balancers](/modules/ai-load-balancers) — routing destinations
-- [Phone Numbers](/modules/phone-numbers) — caller IDs
-- [Outbound Whitelist](/modules/outbound-whitelist) — trunk selection for campaign calls
-- [Dialer Worker](/workers/dialer-worker) and [AMD Worker](/workers/amd-worker)
+- [Distribution Lists](/opbx/modules/distribution-lists) — the numbers a campaign dials
+- [AI Assistants](/opbx/modules/ai-assistants) and [AI Load Balancers](/opbx/modules/ai-load-balancers) — routing destinations
+- [Phone Numbers](/opbx/modules/phone-numbers) — caller IDs
+- [Outbound Whitelist](/opbx/modules/outbound-whitelist) — trunk selection for campaign calls
+- [Dialer Worker](/opbx/workers/dialer-worker) and [AMD Worker](/opbx/workers/amd-worker)

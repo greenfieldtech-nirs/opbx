@@ -21,7 +21,7 @@ Use this module to:
 
 ## Prerequisites
 
-- The number is provisioned in Cloudonix and points at your OPBX instance. See [Cloudonix Setup](/installation/cloudonix-setup).
+- The number is provisioned in Cloudonix and points at your OPBX instance. See [Cloudonix Setup](/opbx/installation/cloudonix-setup).
 - The destination exists and is **active**. Creating a DID is refused if its destination is inactive, missing, or belongs to another organization.
 
 ## Permissions
@@ -120,9 +120,9 @@ The refusal opens a dialog that lists each place. Remove those assignments, then
 
 ## Using a number as an outbound caller ID
 
-Besides receiving calls, an **active** number can be shown as the caller ID on outbound calls. Assign it as the default caller ID on an [extension](/modules/extensions) or on an [outbound whitelist](/modules/outbound-whitelist) rule.
+Besides receiving calls, an **active** number can be shown as the caller ID on outbound calls. Assign it as the default caller ID on an [extension](/opbx/modules/extensions) or on an [outbound whitelist](/opbx/modules/outbound-whitelist) rule.
 
-Only active numbers owned by your organization can be used this way. When the chosen number is not usable, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/installation/outbound-calling-overview).
+Only active numbers owned by your organization can be used this way. When the chosen number is not usable, outbound calls fall through to the next caller ID in the precedence order. See the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 
 :::note
 The organization-wide default caller ID (`GET` and `PUT /v1/phone-numbers/default-caller-id`) is deprecated. Call routing no longer reads it. Use the per-extension and per-whitelist default instead.
@@ -162,9 +162,9 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Extensions](/modules/extensions) — extension routing target and per-extension caller ID
-- [Ring Groups](/modules/ring-groups) — ring group routing target
-- [Call Queues](/modules/call-queues) — queue routing target
-- [IVR Menus](/modules/ivr-menus) — menu routing target
-- [Business Hours](/modules/business-hours) — time-based routing target
-- [Outbound Calling Overview](/installation/outbound-calling-overview) — using a number as an outbound caller ID
+- [Extensions](/opbx/modules/extensions) — extension routing target and per-extension caller ID
+- [Ring Groups](/opbx/modules/ring-groups) — ring group routing target
+- [Call Queues](/opbx/modules/call-queues) — queue routing target
+- [IVR Menus](/opbx/modules/ivr-menus) — menu routing target
+- [Business Hours](/opbx/modules/business-hours) — time-based routing target
+- [Outbound Calling Overview](/opbx/installation/outbound-calling-overview) — using a number as an outbound caller ID

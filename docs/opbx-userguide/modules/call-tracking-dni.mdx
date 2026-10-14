@@ -14,7 +14,7 @@ DNI has two parts: a public OPBX endpoint that picks the number, and a small scr
 
 ## Prerequisites
 
-- A [call-tracking campaign](/modules/call-tracking-campaigns) whose **Source** and **Medium** match your UTM values, with at least one **active** tracking number.
+- A [call-tracking campaign](/opbx/modules/call-tracking-campaigns) whose **Source** and **Medium** match your UTM values, with at least one **active** tracking number.
 - Your organization's numeric ID. The API returns it as `organization_id`, for example in `GET /v1/call-tracking-campaigns`.
 - Your website's origin must be allowed to call the OPBX API from the browser. The deployment's CORS configuration (`config/cors.php`) allows only the OPBX front-end and a few fixed origins by default; ask the platform operator to add your site, otherwise the browser blocks the request and the page keeps its default number.
 - To open **Call Tracking → DNI Snippet**, you are the **Owner** or a **PBX Admin**.
@@ -117,6 +117,6 @@ https://opbx.example.com/api/v1/call-tracking-dni/swap?organization_id=1&utm_sou
 
 ## Related modules
 
-- [Call Tracking Campaigns](/modules/call-tracking-campaigns) — source, medium and tracking numbers
-- [Call Tracking Analytics](/modules/call-tracking-analytics) — the calls that DNI brings in
-- [Phone Numbers](/modules/phone-numbers) — the numbers behind the tracking numbers
+- [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) — source, medium and tracking numbers
+- [Call Tracking Analytics](/opbx/modules/call-tracking-analytics) — the calls that DNI brings in
+- [Phone Numbers](/opbx/modules/phone-numbers) — the numbers behind the tracking numbers

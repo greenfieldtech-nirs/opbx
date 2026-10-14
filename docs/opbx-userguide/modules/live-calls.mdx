@@ -8,7 +8,7 @@ description: "Watch active calls as they happen, coach them (spy, whisper, barge
 
 # Live Calls
 
-The Live Calls page lists the calls that are in progress right now: who is calling whom, which user's extension is on the call, its state and how long it has been running. Owners and Supervisors can also listen in on a call, whisper to one side or join it, using the [Web Phone](/modules/web-phone).
+The Live Calls page lists the calls that are in progress right now: who is calling whom, which user's extension is on the call, its state and how long it has been running. Owners and Supervisors can also listen in on a call, whisper to one side or join it, using the [Web Phone](/opbx/modules/web-phone).
 
 ## Purpose
 
@@ -19,12 +19,12 @@ Use this page to:
 - coach a call: **Spy** (listen only), **Whisper** (talk to one side) or **Barge** (join the call);
 - disconnect a single call, or every active call at once (Owner only, see [Permissions](#permissions)).
 
-For finished calls, use [Call Logs](/modules/call-logs).
+For finished calls, use [Call Logs](/opbx/modules/call-logs).
 
 ## Prerequisites
 
-- Cloudonix sends session-update webhooks to OPBX. Live Calls is built from those events. If the page stays empty during a test call, check the webhook settings on [Settings](/modules/settings) and [Cloudonix Setup](/installation/cloudonix-setup).
-- To coach a call you need a **user extension** assigned to you, because coaching dials out from your Web Phone. See [Extensions](/modules/extensions).
+- Cloudonix sends session-update webhooks to OPBX. Live Calls is built from those events. If the page stays empty during a test call, check the webhook settings on [Settings](/opbx/modules/settings) and [Cloudonix Setup](/opbx/installation/cloudonix-setup).
+- To coach a call you need a **user extension** assigned to you, because coaching dials out from your Web Phone. See [Extensions](/opbx/modules/extensions).
 - To disconnect calls, the organization's Cloudonix settings must be configured. Without them the server answers "Cloudonix settings not configured for this organization".
 
 ## Permissions
@@ -43,7 +43,7 @@ The server allows only the **Owner** to disconnect a call. PBX Admins and Superv
 The Supervisor scope is applied by the server on role alone: a Supervisor always gets only the calls of their assigned users and ring groups plus their own, whether or not the request carries `supervisor=true` (still accepted, no longer needed). The same holds for the active-call statistics and the call detail view. Owners, PBX Admins and Reporters see all of the organization's calls.
 
 :::note Supervisor scope
-A Supervisor's list contains only calls whose caller or destination is one of their assigned users, one of those users' extension numbers, their own user or extension, or the extension number of an assigned ring group. See [Supervisors](/modules/supervisors).
+A Supervisor's list contains only calls whose caller or destination is one of their assigned users, one of those users' extension numbers, their own user or extension, or the extension number of an assigned ring group. See [Supervisors](/opbx/modules/supervisors).
 :::
 
 ## Open the page
@@ -71,7 +71,7 @@ A Supervisor's list contains only calls whose caller or destination is one of th
 
 A call is listed when its latest session update is **processing**, **ringing** or **connected** and arrived in the **last 30 minutes**. A call that Cloudonix has reported as finished (final CDR or deleted session) in the last 24 hours never comes back, even if a late "active" update arrives. At most 100 calls are returned.
 
-A call that gets no update for 30 minutes drops off the list even if it is still up. Very long calls with no state change can therefore disappear from the page; they still appear in [Call Logs](/modules/call-logs) when they end.
+A call that gets no update for 30 minutes drops off the list even if it is still up. Very long calls with no state change can therefore disappear from the page; they still appear in [Call Logs](/opbx/modules/call-logs) when they end.
 
 ## Refresh and real-time updates
 
@@ -142,7 +142,7 @@ For ten seconds after Disconnect All, the disconnected calls are kept off the li
 | You do not have permission to monitor calls | Only Owners and Supervisors can coach | Use an Owner or Supervisor account |
 | This call is not active or has no session token | The call ended, or Cloudonix has not sent its session token yet | Wait a moment and try again |
 | Unable to disconnect: session token not yet received from Cloudonix | The call is too new | Try again in a moment |
-| Cloudonix settings not configured for this organization | No Cloudonix settings | Configure them on [Settings](/modules/settings) |
+| Cloudonix settings not configured for this organization | No Cloudonix settings | Configure them on [Settings](/opbx/modules/settings) |
 | Web Phone shows "Web Phone Unavailable" when you click Spy | You have no user extension, or the organization has no Cloudonix domain | Assign an extension to yourself |
 
 ## Key data fields
@@ -177,14 +177,14 @@ Session updates are kept for 30 days.
 | DELETE | `/v1/session-updates/{sessionId}/disconnect` | Disconnect a call (Owner only) |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Get the dial target for `spy`, `whisper` (with `whisper_party` `caller`, `callee` or `both`) or `barge` |
 
-Scoped API keys use the `session-updates` resource. The [MCP server](/modules/mcp-server) offers `list_active_calls`, `get_active_call`, `get_active_call_statistics`, `disconnect_call` and `start_call_coaching`.
+Scoped API keys use the `session-updates` resource. The [MCP server](/opbx/modules/mcp-server) offers `list_active_calls`, `get_active_call`, `get_active_call_statistics`, `disconnect_call` and `start_call_coaching`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Related modules
 
-- [Supervisors](/modules/supervisors) — which calls a Supervisor sees and may coach
-- [Web Phone](/modules/web-phone) — the softphone used for coaching
-- [Call Logs](/modules/call-logs) — finished calls
-- [Call Queues](/modules/call-queues) — the queue Live tab and Queues Dashboard for waiting callers
-- [Call Notifications](/modules/call-notifications) — send call events to your own system
+- [Supervisors](/opbx/modules/supervisors) — which calls a Supervisor sees and may coach
+- [Web Phone](/opbx/modules/web-phone) — the softphone used for coaching
+- [Call Logs](/opbx/modules/call-logs) — finished calls
+- [Call Queues](/opbx/modules/call-queues) — the queue Live tab and Queues Dashboard for waiting callers
+- [Call Notifications](/opbx/modules/call-notifications) — send call events to your own system

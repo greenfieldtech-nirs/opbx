@@ -53,7 +53,7 @@ The `CallDetailRecord` model stores the final record of every call, created from
 | Warm | `archived_call_detail_records` on the `cdr_archive` connection. That is the main schema unless `DB_CDR_ARCHIVE_DATABASE` (and the optional `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`) points elsewhere | Up to `CDR_WARM_MONTHS` (12) |
 | Cold | Compressed CSV files in the `CDR_ARCHIVE_BUCKET` bucket (default `cdr-archive`) | Kept `CDR_COLD_RETENTION_YEARS` (7) |
 
-`cdr:tier` moves rows between tiers daily at 04:00 UTC, and `recordings:expire` deletes expired recordings at 04:30 UTC (`RECORDING_RETENTION_MONTHS`, at most the cold retention). Call records are never pruned by `model:prune`. `ArchivedCallDetailRecord` is read-only and is written only by `cdr:tier`. See [Call Logs](/modules/call-logs#retention-and-archive).
+`cdr:tier` moves rows between tiers daily at 04:00 UTC, and `recordings:expire` deletes expired recordings at 04:30 UTC (`RECORDING_RETENTION_MONTHS`, at most the cold retention). Call records are never pruned by `model:prune`. `ArchivedCallDetailRecord` is read-only and is written only by `cdr:tier`. See [Call Logs](/opbx/modules/call-logs#retention-and-archive).
 
 ## Relationships
 
@@ -78,6 +78,6 @@ $cdr->formatted_duration / $cdr->formatted_billsec / $cdr->amd_status
 
 ## Related Documentation
 
-- [Call Logs Module](../../modules/call-logs)
-- [SessionUpdate](./session-updates)
-- [Configuration Reference](../configuration/index#call-detail-records-tiered)
+- [Call Logs Module](/opbx/modules/call-logs)
+- [SessionUpdate](/opbx/data-models/models/session-updates)
+- [Configuration Reference](/opbx/data-models/configuration/index#call-detail-records-tiered)

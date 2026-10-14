@@ -16,7 +16,7 @@ Use these limits to match the campaign to what its destination can take: an AI a
 
 ## Prerequisites
 
-- A campaign in **Draft** or **Paused** status. The limits are on the **Advanced** tab of the campaign form. See [Managing Campaigns](/applications/auto-dialer/campaigns).
+- A campaign in **Draft** or **Paused** status. The limits are on the **Advanced** tab of the campaign form. See [Managing Campaigns](/opbx/applications/auto-dialer/campaigns).
 
 ## Fields
 
@@ -55,7 +55,7 @@ OPBX keeps the count of calls in progress for each campaign:
 - It goes down when Cloudonix reports that a call ended.
 - Every minute a reconciliation job corrects it against the calls OPBX knows to be in progress, so a missed or duplicate report cannot block a campaign for long.
 
-The dialer worker runs as a **single replica**; the CPS pacing is kept inside that one process. Do not scale it out. See [Dialer Worker](/workers/dialer-worker).
+The dialer worker runs as a **single replica**; the CPS pacing is kept inside that one process. Do not scale it out. See [Dialer Worker](/opbx/workers/dialer-worker).
 
 One worker processes at most 10 campaigns at the same time. If OPBX asks the worker to slow down (HTTP 429), it waits the time OPBX gives and skips the rest of that batch.
 
@@ -66,7 +66,7 @@ Each call to a number counts as one attempt. A number is dialed again only while
 | Situation | What happens |
 |-----------|--------------|
 | Cloudonix refuses to place the call | The number goes back to pending and is retried after 1 minute, then 2 minutes. After **3 consecutive** refusals it is marked **Failed** |
-| Voicemail detected and **Retry on Voicemail** is on | The number goes back to pending with a delay of 5, 10, 20, 40, then 60 minutes (doubling, capped at 60), while attempts remain. See [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) |
+| Voicemail detected and **Retry on Voicemail** is on | The number goes back to pending with a delay of 5, 10, 20, 40, then 60 minutes (doubling, capped at 60), while attempts remain. See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
 | The call was answered | The number is **Completed** |
 | Busy or no answer | With **Retry on busy / no-answer** on and attempts left, the number goes back to pending after the campaign's **First retry delay** (default 15 minutes), and each further retry waits twice as long as the one before (15, 30, 60, 120 ... minutes), up to 24 hours. Otherwise it is **Failed** |
 | Failed, cancelled, congestion or a result OPBX does not recognise | The number is **Failed**. These are never retried |
@@ -92,7 +92,7 @@ On a retry, the dialer prefers a caller ID from the pool that has not been tried
 
 ## Related pages
 
-- [Managing Campaigns](/applications/auto-dialer/campaigns)
-- [Campaign Scheduling](/applications/auto-dialer/scheduling)
-- [Real-Time Monitor](/applications/auto-dialer/real-time-monitor)
-- [Dialer Worker](/workers/dialer-worker)
+- [Managing Campaigns](/opbx/applications/auto-dialer/campaigns)
+- [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling)
+- [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor)
+- [Dialer Worker](/opbx/workers/dialer-worker)

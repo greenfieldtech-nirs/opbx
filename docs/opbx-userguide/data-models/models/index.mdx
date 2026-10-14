@@ -13,30 +13,30 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 
 ### Auto Dialer
 
-- [AutoDialerCampaign](./auto-dialer-campaign) — Campaign configuration
-- [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id) — Caller ID pool pivot
-- [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat) — Per-Caller ID statistics
+- [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign) — Campaign configuration
+- [AutoDialerCampaignCallerId](/opbx/data-models/models/auto-dialer-campaign-caller-id) — Caller ID pool pivot
+- [AutoDialerCallerIdStat](/opbx/data-models/models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
 - `App\Models\AutoDialerList` — Distribution lists (`auto_dialer_lists`)
 - `App\Models\AutoDialerDestination` — List destinations (`auto_dialer_destinations`)
 - `App\Models\AutoDialerCallSession` — Campaign call sessions (`auto_dialer_call_sessions`)
 
 ### Call & Logging
 
-- [CallDetailRecord](./call-detail-record) — CDR from Cloudonix (`call_detail_records`), with the warm-tier `ArchivedCallDetailRecord` (`archived_call_detail_records`)
+- [CallDetailRecord](/opbx/data-models/models/call-detail-record) — CDR from Cloudonix (`call_detail_records`), with the warm-tier `ArchivedCallDetailRecord` (`archived_call_detail_records`)
 - `App\Models\CallLog` — Legacy call log, backfilled from CDRs (`call_logs`)
-- [SessionUpdate](./session-updates) — Real-time session events (`session_updates`)
-- [CallNotificationsSettings](./call-notifications-settings) — Webhook notification config (`call_notifications_settings`)
+- [SessionUpdate](/opbx/data-models/models/session-updates) — Real-time session events (`session_updates`)
+- [CallNotificationsSettings](/opbx/data-models/models/call-notifications-settings) — Webhook notification config (`call_notifications_settings`)
 - `App\Models\CallNotificationLog` — Notification delivery log (`call_notification_logs`)
-- [EmailLog](./email-logs) — Transactional email log (`email_logs`)
-- [PlatformAuditLog](./platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
-- [PlatformHealthCheck](./platform-health-check) — Platform Status history (`platform_health_checks`)
+- [EmailLog](/opbx/data-models/models/email-logs) — Transactional email log (`email_logs`)
+- [PlatformAuditLog](/opbx/data-models/models/platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
+- [PlatformHealthCheck](/opbx/data-models/models/platform-health-check) — Platform Status history (`platform_health_checks`)
 
 ### Call Tracking
 
-- [CallTrackingCampaign](./call-tracking-campaign) — Marketing campaign attribution (`call_tracking_campaigns`)
-- [CallTrackingNumber](./call-tracking-number) — DID-to-campaign assignment (`call_tracking_numbers`)
-- [CallTrackingSession](./call-tracking-session) — Attributed call session (`call_tracking_sessions`)
-- [CallTrackingNotificationSettings](./call-tracking-notification-settings) — Per-campaign webhook settings (`call_tracking_notification_settings`)
+- [CallTrackingCampaign](/opbx/data-models/models/call-tracking-campaign) — Marketing campaign attribution (`call_tracking_campaigns`)
+- [CallTrackingNumber](/opbx/data-models/models/call-tracking-number) — DID-to-campaign assignment (`call_tracking_numbers`)
+- [CallTrackingSession](/opbx/data-models/models/call-tracking-session) — Attributed call session (`call_tracking_sessions`)
+- [CallTrackingNotificationSettings](/opbx/data-models/models/call-tracking-notification-settings) — Per-campaign webhook settings (`call_tracking_notification_settings`)
 - `App\Models\CallTrackingNotificationLog` — Notification delivery log (`call_tracking_notification_logs`)
 - `App\Models\CallTrackingAdPlatformIntegration` — Google Ads / Meta settings (`call_tracking_ad_platform_integrations`)
 
@@ -61,7 +61,7 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 - `App\Models\CallQueueAgent` — Queue agent membership (`call_queue_agents`)
 - `App\Models\QueueCall` — One row per queued call, for reports (`queue_calls`)
 
-Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/workers/acd-worker) keeps it in Redis.
+Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/opbx/workers/acd-worker) keeps it in Redis.
 
 ### AI Integration
 
@@ -83,7 +83,7 @@ Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/wo
 
 - `App\Models\User` — User accounts (`users`)
 - `App\Models\Organization` — Multi-tenant organizations (`organizations`)
-- [CloudonixSettings](./cloudonix-settings) — Cloudonix credentials per org (`cloudonix_settings`)
+- [CloudonixSettings](/opbx/data-models/models/cloudonix-settings) — Cloudonix credentials per org (`cloudonix_settings`)
 - `App\Models\OrganizationJoinRequest` — Requests to join an organization (`organization_join_requests`)
 - `App\Models\UserSocialIdentity` — Linked Auth0 social identities (`user_social_identities`)
 - `App\Models\UserEmbedToken` — Embeddable dialer tokens (`user_embed_tokens`)
@@ -99,10 +99,10 @@ Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/wo
 - Models with `#[ScopedBy([OrganizationScope::class])]` are automatically filtered by the authenticated user's organization.
 - Webhook handlers and platform admin operations must use `OrganizationScope::bypass()` when querying tenant-scoped models.
 - `PlatformAuditLog`, `PlatformHealthCheck` and `EmailLog` are not tenant-scoped.
-- Rows of several tables are pruned daily by retention settings; call records are tiered instead. See [Data Retention](../configuration/index#data-retention).
+- Rows of several tables are pruned daily by retention settings; call records are tiered instead. See [Data Retention](/opbx/data-models/configuration/index#data-retention).
 
 ## Related Documentation
 
-- [Enumerations](../enums/index)
-- [Configuration Reference](../configuration/index)
-- [Data Models Overview](../../data-models)
+- [Enumerations](/opbx/data-models/enums/index)
+- [Configuration Reference](/opbx/data-models/configuration/index)
+- [Data Models Overview](/opbx/data-models)

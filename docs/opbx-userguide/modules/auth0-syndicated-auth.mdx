@@ -14,7 +14,7 @@ Auth0 sign-in works **alongside** password sign-in. A password user can keep the
 
 ## Prerequisites
 
-- The deployment runs with `OPBX_SAAS_ENABLED=true` and the Auth0 variables (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_REDIRECT_URI`, `AUTH0_PROVIDERS`). See [Auth0 Setup](/installation/auth0-setup).
+- The deployment runs with `OPBX_SAAS_ENABLED=true` and the Auth0 variables (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_REDIRECT_URI`, `AUTH0_PROVIDERS`). See [Auth0 Setup](/opbx/installation/auth0-setup).
 - Without this configuration, no social buttons are shown, the **Linked Accounts** section of the profile is hidden, and every Auth0 endpoint, including **Invite User**, answers `503` with `AUTH0_NOT_CONFIGURED` "Auth0 is not enabled."
 
 ## Permissions
@@ -174,6 +174,6 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [User Management](/modules/user-management) — the Invite User button and roles
-- [Profile](/administration/profile) — Linked Accounts
-- [Auth0 Setup](/installation/auth0-setup) — tenant and environment configuration
+- [User Management](/opbx/modules/user-management) — the Invite User button and roles
+- [Profile](/opbx/administration/profile) — Linked Accounts
+- [Auth0 Setup](/opbx/installation/auth0-setup) — tenant and environment configuration

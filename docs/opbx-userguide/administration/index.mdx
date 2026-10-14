@@ -7,7 +7,7 @@ description: "Your profile, the organization's Cloudonix integration, and where 
 
 # Organization Settings
 
-This page covers the settings that apply to your own account and to your organization. The admin interface itself is explained in [Navigating the Admin Interface](/administration/navigating-the-interface).
+This page covers the settings that apply to your own account and to your organization. The admin interface itself is explained in [Navigating the Admin Interface](/opbx/administration/navigating-the-interface).
 
 ## Where the settings are
 
@@ -16,10 +16,10 @@ This page covers the settings that apply to your own account and to your organiz
 | Profile (`/ui/profile`) | User menu, top right: **Profile** | Every signed-in user, for their own account |
 | Settings (`/ui/settings`) | User menu, top right: **Settings** | Owner only |
 | Users (`/ui/users`) | Sidebar, PBX Configuration: **Users** | Owner and PBX Admin |
-| Platform Management | Sidebar, Platform Management section | Platform managers only. See [Platform Management](/administration/platform-management) |
+| Platform Management | Sidebar, Platform Management section | Platform managers only. See [Platform Management](/opbx/administration/platform-management) |
 
 :::tip
-For the full Cloudonix setup workflow, see [Cloudonix Setup](/installation/cloudonix-setup). For local webhook development with ngrok, see the [Installation guide](/installation).
+For the full Cloudonix setup workflow, see [Cloudonix Setup](/opbx/installation/cloudonix-setup). For local webhook development with ngrok, see the [Installation guide](/opbx/installation).
 :::
 
 ## Profile
@@ -56,15 +56,15 @@ Use **Validate** to check the credentials against Cloudonix before you save.
 
 {/* SCREENSHOT: settings-cloudonix — Settings page, Cloudonix Integration section with the domain fields filled in (values masked) and the Validate button */}
 
-Saving the settings updates the domain profile in Cloudonix and creates or updates the OPBX voice application that Cloudonix calls. Check the result on the Settings page and in [Call Logs](/modules/call-logs) after a test call.
+Saving the settings updates the domain profile in Cloudonix and creates or updates the OPBX voice application that Cloudonix calls. Check the result on the Settings page and in [Call Logs](/opbx/modules/call-logs) after a test call.
 
 ## Organization users
 
-The Users page is covered in [User Management](/modules/user-management): roles, creating and deactivating users, passwords, and what a delete changes.
+The Users page is covered in [User Management](/opbx/modules/user-management): roles, creating and deactivating users, passwords, and what a delete changes.
 
 ## Related
 
-- [Navigating the Admin Interface](/administration/navigating-the-interface)
-- [Cloudonix Setup](/installation/cloudonix-setup)
-- [Trunks](/modules/trunks) — SIP trunks stored in Cloudonix
-- [Centralized Logs](/administration/centralized-logs) — optional log stack for operators
+- [Navigating the Admin Interface](/opbx/administration/navigating-the-interface)
+- [Cloudonix Setup](/opbx/installation/cloudonix-setup)
+- [Trunks](/opbx/modules/trunks) — SIP trunks stored in Cloudonix
+- [Centralized Logs](/opbx/administration/centralized-logs) — optional log stack for operators

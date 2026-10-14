@@ -11,7 +11,7 @@ description: "Decide which external destinations extensions may call, through wh
 The Outbound Whitelist decides which external numbers your extensions may dial. Each rule names a destination country (and optionally a prefix inside it), the voice trunk the call leaves through, and an optional caller ID. A call to a destination that no active rule matches is refused.
 
 :::tip
-For the full picture of how OPBX authorizes outbound calls and picks the caller ID, see the [Outbound Calling Overview](/installation/outbound-calling-overview).
+For the full picture of how OPBX authorizes outbound calls and picks the caller ID, see the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Purpose
@@ -25,8 +25,8 @@ Use this module to:
 
 ## Prerequisites
 
-- **Voice trunks.** The trunk list comes from your Cloudonix domain. If the Cloudonix integration is not configured, the dialog shows "No outbound trunks available" and the save button stays disabled. See [Organization Settings](/modules/settings) and [Trunks](/modules/trunks).
-- **A caller ID number (optional).** An **active** phone number of your organization. See [Phone Numbers](/modules/phone-numbers).
+- **Voice trunks.** The trunk list comes from your Cloudonix domain. If the Cloudonix integration is not configured, the dialog shows "No outbound trunks available" and the save button stays disabled. See [Organization Settings](/opbx/modules/settings) and [Trunks](/opbx/modules/trunks).
+- **A caller ID number (optional).** An **active** phone number of your organization. See [Phone Numbers](/opbx/modules/phone-numbers).
 
 ## Permissions
 
@@ -159,8 +159,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Outbound Calling Overview](/installation/outbound-calling-overview) — authorization and caller ID precedence
-- [Phone Numbers](/modules/phone-numbers) — numbers used as caller ID
-- [Extensions](/modules/extensions) — per-extension caller ID, which wins over the rule's
-- [Trunks](/modules/trunks) — the voice trunks a rule can use
-- [Inbound Blacklist](/modules/inbound-blacklist) — the inbound counterpart
+- [Outbound Calling Overview](/opbx/installation/outbound-calling-overview) — authorization and caller ID precedence
+- [Phone Numbers](/opbx/modules/phone-numbers) — numbers used as caller ID
+- [Extensions](/opbx/modules/extensions) — per-extension caller ID, which wins over the rule's
+- [Trunks](/opbx/modules/trunks) — the voice trunks a rule can use
+- [Inbound Blacklist](/opbx/modules/inbound-blacklist) — the inbound counterpart

@@ -20,11 +20,11 @@ Use this module to:
 - define what counts as a converted call;
 - notify your own systems by webhook, and upload conversions to Google Ads and Meta.
 
-Results are on the [Call Tracking Analytics](/modules/call-tracking-analytics) pages. To show the right number on your website, see [Call Tracking DNI](/modules/call-tracking-dni).
+Results are on the [Call Tracking Analytics](/opbx/modules/call-tracking-analytics) pages. To show the right number on your website, see [Call Tracking DNI](/opbx/modules/call-tracking-dni).
 
 ## Prerequisites
 
-- One **active** phone number per tracking number, not yet used by another campaign. See [Phone Numbers](/modules/phone-numbers).
+- One **active** phone number per tracking number, not yet used by another campaign. See [Phone Numbers](/opbx/modules/phone-numbers).
 - The destination: an external number in E.164 form, or the ID of an active extension or ring group.
 - You are the **Owner** or a **PBX Admin** to create, edit or delete.
 
@@ -131,7 +131,7 @@ POST /v1/call-tracking-campaigns/{campaign}/call-tracking-numbers
 
 When a number is added, OPBX changes the phone number's routing type to **Call tracking**, pointing at the campaign. Its previous routing is replaced.
 
-When a tracking number is removed (`DELETE …/call-tracking-numbers/{number}`), the phone number keeps the **Call tracking** routing type. Calls to it then hear a short message and end. Give the phone number a new destination on the [Phone Numbers](/modules/phone-numbers) page.
+When a tracking number is removed (`DELETE …/call-tracking-numbers/{number}`), the phone number keeps the **Call tracking** routing type. Calls to it then hear a short message and end. Give the phone number a new destination on the [Phone Numbers](/opbx/modules/phone-numbers) page.
 
 ![Campaign page for Fall Promo - Search Ads with the status and destination badges, and the Tracking Numbers tab listing +12025550115](../img/screens/call-tracking-campaigns-detail.jpg)
 
@@ -149,7 +149,7 @@ Editing keeps the campaign's current description and status. The form only knows
 
 On the edit page only, the **Destination Type** list offers **Disconnect**. It saves the campaign with "Destination unavailable": callers to its tracking numbers hear "Destination doesn't exist" and the call ends. The campaign then shows the **Unprovisioned** badge in the list and on its page, and the **Unprovisioned** filter finds it. To reconnect it, choose a destination type again and save. The create page never offers Disconnect.
 
-The same state appears after a [user is deleted](/modules/user-management#delete-a-user) whose extension was the campaign's destination.
+The same state appears after a [user is deleted](/opbx/modules/user-management#delete-a-user) whose extension was the campaign's destination.
 
 ## Activate or deactivate
 
@@ -293,7 +293,7 @@ A campaign that still has tracking numbers cannot be deleted: the delete is refu
 | GET | `/v1/call-tracking-campaigns/{campaign}/notification-logs` | Delivery log |
 | GET, PUT | `/v1/call-tracking-ad-platform-integrations` | Google Ads and Meta settings |
 
-Scoped API keys use the `call-tracking-campaigns`, `call-tracking-sessions`, `call-tracking-analytics` and `call-tracking-ad-platform-integrations` resources (see [API Keys](/modules/api-keys)). The [MCP server](/modules/mcp-server) has the read-only tools `list_call_tracking_campaigns`, `get_call_tracking_campaign` and `list_call_tracking_numbers`.
+Scoped API keys use the `call-tracking-campaigns`, `call-tracking-sessions`, `call-tracking-analytics` and `call-tracking-ad-platform-integrations` resources (see [API Keys](/opbx/modules/api-keys)). The [MCP server](/opbx/modules/mcp-server) has the read-only tools `list_call_tracking_campaigns`, `get_call_tracking_campaign` and `list_call_tracking_numbers`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
@@ -306,7 +306,7 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Call Tracking Analytics](/modules/call-tracking-analytics) — dashboard and sessions
-- [Call Tracking DNI](/modules/call-tracking-dni) — show the campaign's number on your website
-- [Phone Numbers](/modules/phone-numbers) — the numbers used as tracking numbers
-- [Ring Groups](/modules/ring-groups) and [Extensions](/modules/extensions) — campaign destinations
+- [Call Tracking Analytics](/opbx/modules/call-tracking-analytics) — dashboard and sessions
+- [Call Tracking DNI](/opbx/modules/call-tracking-dni) — show the campaign's number on your website
+- [Phone Numbers](/opbx/modules/phone-numbers) — the numbers used as tracking numbers
+- [Ring Groups](/opbx/modules/ring-groups) and [Extensions](/opbx/modules/extensions) — campaign destinations

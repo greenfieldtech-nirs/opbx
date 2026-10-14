@@ -106,7 +106,7 @@ IVR menus support text-to-speech for dynamic content. Enter plain text and OPBX 
 
 ## Call Queues
 
-Call queues hold callers in first-in, first-out order with music on hold and offer each caller to an available agent. Agents log in and out, and get a wrap-up pause after each call. Queue state is kept by the Java [ACD worker](/workers/acd-worker).
+Call queues hold callers in first-in, first-out order with music on hold and offer each caller to an available agent. Agents log in and out, and get a wrap-up pause after each call. Queue state is kept by the Java [ACD worker](/opbx/workers/acd-worker).
 
 | Strategy | Behavior |
 |----------|----------|
@@ -115,7 +115,7 @@ Call queues hold callers in first-in, first-out order with music on hold and off
 | Least talk time | Offers to the agent with the least total talk time |
 | Fewest calls | Offers to the agent who handled the fewest calls |
 
-A caller who waits longer than the queue's maximum wait overflows to its fallback. See [Call Queues](/modules/call-queues).
+A caller who waits longer than the queue's maximum wait overflows to its fallback. See [Call Queues](/opbx/modules/call-queues).
 
 ## Business Hours
 
@@ -222,8 +222,8 @@ The call enters through a DID, which determines the initial destination. From th
 
 Now that you understand these core concepts, you are ready to:
 
-1. [Create extensions](../modules/extensions) for your users
-2. [Configure DIDs](../modules/phone-numbers) for inbound calls
-3. [Set up ring groups](../modules/ring-groups) for departments
-4. [Build IVR menus](../modules/ivr-menus) for self-service
-5. [Define business hours](../modules/business-hours) for time-based routing
+1. [Create extensions](/opbx/modules/extensions) for your users
+2. [Configure DIDs](/opbx/modules/phone-numbers) for inbound calls
+3. [Set up ring groups](/opbx/modules/ring-groups) for departments
+4. [Build IVR menus](/opbx/modules/ivr-menus) for self-service
+5. [Define business hours](/opbx/modules/business-hours) for time-based routing

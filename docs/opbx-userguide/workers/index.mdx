@@ -12,9 +12,9 @@ OPBX uses standalone worker services for specialized runtime tasks:
 
 | Worker | Technology | Purpose |
 |--------|------------|---------|
-| [Dialer Worker](/workers/dialer-worker) | Go | Executes outbound auto-dialer campaigns |
-| [AMD Worker](/workers/amd-worker) | Java/Vert.x 5 | Detects voicemail beeps in live audio streams |
-| [ACD Worker](/workers/acd-worker) | Java/Vert.x 5 | Runs call queue state (FIFO, agent states, selection strategies) |
+| [Dialer Worker](/opbx/workers/dialer-worker) | Go | Executes outbound auto-dialer campaigns |
+| [AMD Worker](/opbx/workers/amd-worker) | Java/Vert.x 5 | Detects voicemail beeps in live audio streams |
+| [ACD Worker](/opbx/workers/acd-worker) | Java/Vert.x 5 | Runs call queue state (FIFO, agent states, selection strategies) |
 
 All workers run as Docker services in the standard Docker Compose stack and start with a plain `docker compose up -d`. They communicate with the Laravel backend through REST APIs and Redis.
 
@@ -47,7 +47,7 @@ docker compose logs -f amd-worker
 docker compose logs -f acd-worker
 ```
 
-Or enable the [centralized logging stack](/administration/centralized-logs) to search all worker logs (and Laravel's) in one place, including per-call audit trails by Cloudonix session token.
+Or enable the [centralized logging stack](/opbx/administration/centralized-logs) to search all worker logs (and Laravel's) in one place, including per-call audit trails by Cloudonix session token.
 
 ### Dialer Worker Replicas
 

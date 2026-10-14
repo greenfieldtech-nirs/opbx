@@ -16,9 +16,9 @@ Use AMD to avoid spending an AI conversation on voicemail boxes, to count how ma
 
 ## Prerequisites
 
-- The AMD worker is running and reachable by Cloudonix through your public address (path `/ws/amd/`). See [AMD Worker](/workers/amd-worker).
+- The AMD worker is running and reachable by Cloudonix through your public address (path `/ws/amd/`). See [AMD Worker](/opbx/workers/amd-worker).
 - The Cloudonix integration has its webhook base URL set; the stream address is built from it. Without it, calls are placed **without** detection.
-- A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/applications/auto-dialer/campaigns).
+- A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/opbx/applications/auto-dialer/campaigns).
 
 ## Turn detection on
 
@@ -43,7 +43,7 @@ An action left empty is treated as **Continue**.
 
 ## What happens on a call
 
-1. The callee answers. Cloudonix connects the call to the campaign's [routing destination](/applications/auto-dialer/routing-destinations) **and at the same time** starts streaming the callee's audio to the AMD worker. Detection does not delay the conversation.
+1. The callee answers. Cloudonix connects the call to the campaign's [routing destination](/opbx/applications/auto-dialer/routing-destinations) **and at the same time** starts streaming the callee's audio to the AMD worker. Detection does not delay the conversation.
 2. The AMD worker accepts the stream only if it belongs to a known, active auto-dialer call. Any other stream is closed.
 3. The worker listens for a beep: a steady tone between about 300 and 1000 Hz. Two detectors run side by side, a trained model (`beep_ml`) and an energy-based tone detector. A tone that starts in the first **2 seconds** of the stream is ignored, because voicemail beeps come after a greeting and a tone at answer time is usually line noise.
 4. The first verdict wins, and there is exactly one per call:
@@ -53,7 +53,7 @@ An action left empty is treated as **Continue**.
    - **Hang up**: ends the call through Cloudonix.
    - **Continue**: does nothing; the conversation goes on.
 
-Timings are set on the AMD worker: `AMD_DEFAULT_TIMEOUT_SECONDS` (default 30) and `AMD_MIN_BEEP_START_MS` (default 2000). See [AMD Worker](/workers/amd-worker).
+Timings are set on the AMD worker: `AMD_DEFAULT_TIMEOUT_SECONDS` (default 30) and `AMD_MIN_BEEP_START_MS` (default 2000). See [AMD Worker](/opbx/workers/amd-worker).
 
 :::warning The detector does not recognise a human voice
 The current detector only listens for a beep. It never reports **Human**, so **If Human Detected** has no effect. A call answered by a person ends with **Unknown** when the detection window closes. The form now defaults **If Detection Unclear** to **Continue to destination**, so live conversations carry on. If you set it to **Hang up**, every call that does not reach a voicemail is **hung up after about 30 seconds**, including live conversations. Campaigns saved earlier keep the value they were saved with.
@@ -69,7 +69,7 @@ When a beep is heard, **Retry on Voicemail** is on and the number still has atte
 |-------|--------------|
 | Campaign detail page | The **Voicemail** card counts calls where a beep was heard |
 | Real-Time Monitor | **Voicemail** on each campaign card and **Voicemail Detected** in the drill-down |
-| [Call Logs](/modules/call-logs) | The **AMD Status** column on each call |
+| [Call Logs](/opbx/modules/call-logs) | The **AMD Status** column on each call |
 | List detail page | The number's last result |
 
 ## Turning detection off
@@ -87,7 +87,7 @@ Switching **Enable Detection** off in the edit form does **not** clear the actio
 
 ## Related pages
 
-- [Managing Campaigns](/applications/auto-dialer/campaigns)
-- [Rate Limiting](/applications/auto-dialer/rate-limiting) — attempts and retries
-- [AMD Worker](/workers/amd-worker) — configuration and operation
-- [Call Logs](/modules/call-logs) — the AMD Status column
+- [Managing Campaigns](/opbx/applications/auto-dialer/campaigns)
+- [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) — attempts and retries
+- [AMD Worker](/opbx/workers/amd-worker) — configuration and operation
+- [Call Logs](/opbx/modules/call-logs) — the AMD Status column

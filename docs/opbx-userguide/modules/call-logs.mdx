@@ -24,8 +24,8 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 
 ## Prerequisites
 
-- Calls are flowing through Cloudonix to your OPBX instance. If the Call Logs page is empty after a test call, check the webhook settings on [Settings](/administration) and [Cloudonix Setup](/installation/cloudonix-setup).
-- Only recorded calls have a recording to play. Recordings of IVR prompts and announcements are a different thing; see [Recordings](/modules/recordings).
+- Calls are flowing through Cloudonix to your OPBX instance. If the Call Logs page is empty after a test call, check the webhook settings on [Settings](/opbx/administration) and [Cloudonix Setup](/opbx/installation/cloudonix-setup).
+- Only recorded calls have a recording to play. Recordings of IVR prompts and announcements are a different thing; see [Recordings](/opbx/modules/recordings).
 
 ## Who can see what
 
@@ -134,7 +134,7 @@ Call records are kept in three tiers, by the call's session time (UTC):
 
 Recordings have their own retention. They are not moved between tiers. They are deleted after `RECORDING_RETENTION_MONTHS`, which can never be longer than the cold-tier period (7 years by default). A CDR whose recording has been deleted stays, with its recording status set to none.
 
-Retention is set by environment variables. See the [Configuration Reference](/data-models/configuration/index#data-retention).
+Retention is set by environment variables. See the [Configuration Reference](/opbx/data-models/configuration/index#data-retention).
 
 :::note
 The move from hot to warm and from warm to cold runs once a day, at 04:00 UTC. Records do not disappear at the exact moment they cross a boundary.
@@ -157,15 +157,15 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 | Symptom | Likely cause |
 |---------|--------------|
-| A call is missing | The call-end webhook did not reach OPBX. Check [Settings](/administration) and the Cloudonix webhook configuration |
+| A call is missing | The call-end webhook did not reach OPBX. Check [Settings](/opbx/administration) and the Cloudonix webhook configuration |
 | Recording button is missing | The call was not recorded, or the recording was deleted by retention |
 | A search finds nothing for a number | Number search matches the start of the number. Add a wildcard (`*`) in front of the part you want |
 | A call older than 6 months is missing from this page | It moved to the warm tier. Use the API with an API key and `archive=1` |
 
 ## Related modules
 
-- [Live Calls](/modules/live-calls) — real-time view of calls in progress
-- [Recordings](/modules/recordings) — recordings for IVR prompts and announcements (different from call recordings)
-- [AMD Worker](/workers/amd-worker) — voicemail detection service
-- [Call Notifications](/modules/call-notifications) — webhook notifications for call events
-- [API Keys](/modules/api-keys) — scoped keys, including archive access
+- [Live Calls](/opbx/modules/live-calls) — real-time view of calls in progress
+- [Recordings](/opbx/modules/recordings) — recordings for IVR prompts and announcements (different from call recordings)
+- [AMD Worker](/opbx/workers/amd-worker) — voicemail detection service
+- [Call Notifications](/opbx/modules/call-notifications) — webhook notifications for call events
+- [API Keys](/opbx/modules/api-keys) — scoped keys, including archive access

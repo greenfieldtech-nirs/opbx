@@ -10,7 +10,7 @@ description: "Upload or link the audio files used for IVR greetings and queue ho
 
 Recordings are the audio files OPBX plays to callers: IVR menu greetings, closed messages and call-queue hold music. In the application they are managed on the **Announcements** page. The old `/ui/recordings` address redirects there.
 
-This page is about announcement audio. Recordings of **calls** are played from [Call Logs](/modules/call-logs).
+This page is about announcement audio. Recordings of **calls** are played from [Call Logs](/opbx/modules/call-logs).
 
 ## Purpose
 
@@ -81,8 +81,8 @@ Filter by type (All Types, Uploaded, Remote) and status, or search by name. Clic
 
 | Where | How it is used |
 |-------|----------------|
-| [IVR Menus](/modules/ivr-menus) | The menu greeting, instead of text-to-speech |
-| [Call Queues](/modules/call-queues) | Hold music. Only recordings with the **Hold Music** tag are offered |
+| [IVR Menus](/opbx/modules/ivr-menus) | The menu greeting, instead of text-to-speech |
+| [Call Queues](/opbx/modules/call-queues) | Hold music. Only recordings with the **Hold Music** tag are offered |
 
 Turn on the **Hold Music** switch in the list to tag a recording. A queue refuses a recording that is not tagged or belongs to another organization.
 
@@ -151,6 +151,6 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [IVR Menus](/modules/ivr-menus) — menu greetings
-- [Call Queues](/modules/call-queues) — hold music
-- [Call Logs](/modules/call-logs) — recordings of calls
+- [IVR Menus](/opbx/modules/ivr-menus) — menu greetings
+- [Call Queues](/opbx/modules/call-queues) — hold music
+- [Call Logs](/opbx/modules/call-logs) — recordings of calls

@@ -94,7 +94,7 @@ MySQL stores all durable application data. Examples include:
 
 MySQL data is preserved in a host bind mount (`./volumes/mysql`). Server settings come from `docker/mysql/my.cnf`, and the container is limited to 1 GB of memory. Back it up regularly with `./scripts/backup-database.sh`.
 
-Old call detail records move out of the main tables in tiers: a warm archive table (`archived_call_detail_records`, in the main schema unless `DB_CDR_ARCHIVE_DATABASE` names another one) and then a cold compressed CSV archive in object storage. See [Configuration Reference](/data-models/configuration/index#call-detail-records-tiered).
+Old call detail records move out of the main tables in tiers: a warm archive table (`archived_call_detail_records`, in the main schema unless `DB_CDR_ARCHIVE_DATABASE` names another one) and then a cold compressed CSV archive in object storage. See [Configuration Reference](/opbx/data-models/configuration/index#call-detail-records-tiered).
 
 ### Redis (Ephemeral Runtime State)
 
@@ -144,9 +144,9 @@ Data is stored in host bind mounts (`./volumes/seaweedfs`). External access to r
 
 The execution plane includes three worker services. All three start with the standard stack:
 
-- **[Dialer Worker](/workers/dialer-worker)** (Go) — Polls Laravel for active auto-dialer campaigns and asks Laravel to initiate outbound calls. It has no webhook endpoints; Laravel receives the call results from Cloudonix. Run exactly one replica.
-- **[AMD Worker](/workers/amd-worker)** (Java) — Receives live audio streams from Cloudonix, checks each stream's session with `/api/voice/amd-session`, detects voicemail beeps, and posts results to `/api/voice/amd-action`.
-- **[ACD Worker](/workers/acd-worker)** (Java) — Holds call queue state in Redis. Laravel calls it over the internal network on every queue decision.
+- **[Dialer Worker](/opbx/workers/dialer-worker)** (Go) — Polls Laravel for active auto-dialer campaigns and asks Laravel to initiate outbound calls. It has no webhook endpoints; Laravel receives the call results from Cloudonix. Run exactly one replica.
+- **[AMD Worker](/opbx/workers/amd-worker)** (Java) — Receives live audio streams from Cloudonix, checks each stream's session with `/api/voice/amd-session`, detects voicemail beeps, and posts results to `/api/voice/amd-action`.
+- **[ACD Worker](/opbx/workers/acd-worker)** (Java) — Holds call queue state in Redis. Laravel calls it over the internal network on every queue decision.
 
 The workers authenticate with shared tokens (`DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`). The worker images run as a non-root user (uid 10001), and each has a Docker healthcheck.
 
@@ -154,8 +154,8 @@ The workers authenticate with shared tokens (`DIALER_WORKER_API_TOKEN`, `AMD_WOR
 
 ## Next Steps
 
-- Learn how tenant isolation works: [Multi-Tenancy](./multi-tenancy)
-- Understand webhook security: [Webhooks](./webhooks)
-- Follow an inbound call through the system: [Call Flow](./call-flow)
-- Review security controls: [Security](./security)
-- See real-time infrastructure: [Real-Time](./real-time)
+- Learn how tenant isolation works: [Multi-Tenancy](/opbx/architecture/multi-tenancy)
+- Understand webhook security: [Webhooks](/opbx/architecture/webhooks)
+- Follow an inbound call through the system: [Call Flow](/opbx/architecture/call-flow)
+- Review security controls: [Security](/opbx/architecture/security)
+- See real-time infrastructure: [Real-Time](/opbx/architecture/real-time)

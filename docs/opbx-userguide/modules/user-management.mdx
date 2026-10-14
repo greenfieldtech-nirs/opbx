@@ -23,7 +23,7 @@ Use this module to:
 ## Prerequisites
 
 - You are the **Owner** or a **PBX Admin**. Other roles cannot open the Users page.
-- For a PBX User to take queue calls or be called, give them an **extension**. See [Extensions](/modules/extensions).
+- For a PBX User to take queue calls or be called, give them an **extension**. See [Extensions](/opbx/modules/extensions).
 
 ## Roles
 
@@ -33,7 +33,7 @@ Use this module to:
 | **PBX Admin** | Day-to-day administration of routing, numbers and users |
 | **PBX User** | An employee with an extension. Manages their own profile and queue login |
 | **Reporter** | Read-only access to reports, call logs and most configuration |
-| **Supervisor** | Watches and coaches only the users and groups assigned to them. See [Supervisors](/modules/supervisors) |
+| **Supervisor** | Watches and coaches only the users and groups assigned to them. See [Supervisors](/opbx/modules/supervisors) |
 
 :::info The Owner role
 The **Owner** role cannot be assigned through the API or the Users page: the server refuses it with "Owner role cannot be assigned. Each organization has a single owner." An organization's Owner is set up when the organization is created. Only an Owner can change another user's role, and an Owner cannot change their own role.
@@ -99,7 +99,7 @@ Two changes need care:
 
 ## Set a password
 
-Open the user and choose **Set password**, then enter and confirm the new password. The same password rules as on create apply. You cannot change your own password here; use your profile instead (see [Organization Settings](/administration)).
+Open the user and choose **Set password**, then enter and confirm the new password. The same password rules as on create apply. You cannot change your own password here; use your profile instead (see [Organization Settings](/opbx/administration)).
 
 ## Delete a user
 
@@ -118,7 +118,7 @@ Confirm only after reading the list. The Owner cannot be deleted while they are 
 
 ![Delete User dialog listing the kept extension, a removed ring group membership and the IVR and DID routes that will become Destination unavailable](../img/screens/platform-user-delete-preview.jpg)
 
-After the delete, the routes that were changed show **Unprovisioned** in their own lists. Fix them by choosing a new destination on the edit screen. See [IVR Menus](/modules/ivr-menus) and [Phone Numbers](/modules/phone-numbers).
+After the delete, the routes that were changed show **Unprovisioned** in their own lists. Fix them by choosing a new destination on the edit screen. See [IVR Menus](/opbx/modules/ivr-menus) and [Phone Numbers](/opbx/modules/phone-numbers).
 
 ## Deactivate a user
 
@@ -159,7 +159,7 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Extensions](/modules/extensions) — assign extensions to users
-- [Supervisors](/modules/supervisors) — assign the users a supervisor can watch
-- [Call Queues](/modules/call-queues) — queue agents
-- [Organization Settings](/administration) — profile and Cloudonix integration
+- [Extensions](/opbx/modules/extensions) — assign extensions to users
+- [Supervisors](/opbx/modules/supervisors) — assign the users a supervisor can watch
+- [Call Queues](/opbx/modules/call-queues) — queue agents
+- [Organization Settings](/opbx/administration) — profile and Cloudonix integration

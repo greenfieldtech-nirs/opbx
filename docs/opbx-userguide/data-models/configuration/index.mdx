@@ -132,7 +132,7 @@ Per-organization credentials, including the webhook key, are stored in `cloudoni
 
 Cloudonix webhook and voice routing routes are intentionally **not rate-limited**: with many organisations Cloudonix sends hundreds of events per second, and throttling them would drop calls and CDRs. They are protected by authentication and idempotency instead. All rate limits live in `config/rate_limiting.php`.
 
-See [Webhooks](/architecture/webhooks) for the authentication flow.
+See [Webhooks](/opbx/architecture/webhooks) for the authentication flow.
 
 ### Voice Routing
 
@@ -182,7 +182,7 @@ The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`
 | `ACD_WORKER_URL` | `http://acd-worker:8084` | Worker URL used by Laravel |
 | `ACD_LOG_LEVEL` | `info` | Log level |
 
-The worker reads Redis from `ACD_REDIS_HOST`, `ACD_REDIS_PORT` and `ACD_REDIS_PASSWORD`, which the compose file sets from the Redis service and `REDIS_PASSWORD`. See [ACD Worker](../../workers/acd-worker).
+The worker reads Redis from `ACD_REDIS_HOST`, `ACD_REDIS_PORT` and `ACD_REDIS_PASSWORD`, which the compose file sets from the Redis service and `REDIS_PASSWORD`. See [ACD Worker](/opbx/workers/acd-worker).
 
 ### ngrok
 
@@ -267,7 +267,7 @@ Call records are not pruned. They move through three tiers, by session time in U
 | `CDR_COLD_RETENTION_YEARS` | `7` | Years a cold (compressed CSV) archive file is kept |
 | `RECORDING_RETENTION_MONTHS` | empty | Months a call recording is kept. Empty means the cold retention period. A larger value is reduced to the cold retention period |
 
-The warm tier is the `archived_call_detail_records` table on the `cdr_archive` connection. Without `DB_CDR_ARCHIVE_DATABASE` it lives in the main schema. To use a separate schema, create it, grant the app user, and set `DB_CDR_ARCHIVE_DATABASE` (and optionally `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`; each falls back to the main database setting). The cold tier is written to the bucket named by `CDR_ARCHIVE_BUCKET` (default `cdr-archive`). See [Call Logs](/modules/call-logs#retention-and-archive).
+The warm tier is the `archived_call_detail_records` table on the `cdr_archive` connection. Without `DB_CDR_ARCHIVE_DATABASE` it lives in the main schema. To use a separate schema, create it, grant the app user, and set `DB_CDR_ARCHIVE_DATABASE` (and optionally `DB_CDR_ARCHIVE_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`; each falls back to the main database setting). The cold tier is written to the bucket named by `CDR_ARCHIVE_BUCKET` (default `cdr-archive`). See [Call Logs](/opbx/modules/call-logs#retention-and-archive).
 
 ## Platform Status
 
@@ -281,7 +281,7 @@ The warm tier is the `archived_call_detail_records` table on the `cdr_archive` c
 | `PLATFORM_STATUS_CLOUDONIX_TIMEOUT` | `5` | Seconds before a Cloudonix check counts as no answer |
 | `PLATFORM_STATUS_CLOUDONIX_CONSECUTIVE` | `3` | Consecutive bad checks before the status changes |
 
-Each probe URL can be overridden with `PLATFORM_STATUS_*_URL`. See [Platform Management](/administration/platform-management#platform-status).
+Each probe URL can be overridden with `PLATFORM_STATUS_*_URL`. See [Platform Management](/opbx/administration/platform-management#platform-status).
 
 ## Health Check Endpoints
 
@@ -327,13 +327,13 @@ Services are started with `docker compose up -d`. Optional services need a profi
 | Profile | Starts |
 |---------|--------|
 | `dev` | ngrok tunnel for local webhook testing |
-| `logs` | Loki, Alloy, Grafana and the docker-socket-proxy. See [Centralized Logs](/administration/centralized-logs) |
+| `logs` | Loki, Alloy, Grafana and the docker-socket-proxy. See [Centralized Logs](/opbx/administration/centralized-logs) |
 
 Host ports for the database, Redis and SeaweedFS are not published by default. `docker-compose.ports.yml` adds loopback ports for development.
 
 ## Related Documentation
 
-- [Installation Guide](../../installation)
-- [Data Models Overview](../../data-models)
-- [Dialer Worker](../../workers/dialer-worker)
-- [AMD Worker](../../workers/amd-worker)
+- [Installation Guide](/opbx/installation)
+- [Data Models Overview](/opbx/data-models)
+- [Dialer Worker](/opbx/workers/dialer-worker)
+- [AMD Worker](/opbx/workers/amd-worker)

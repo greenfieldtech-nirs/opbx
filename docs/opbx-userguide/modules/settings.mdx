@@ -22,7 +22,7 @@ Use this page to:
 
 ## Prerequisites
 
-- A Cloudonix domain and its **domain API key**. See [Cloudonix Setup](/installation/cloudonix-setup).
+- A Cloudonix domain and its **domain API key**. See [Cloudonix Setup](/opbx/installation/cloudonix-setup).
 - You are the **Owner**.
 
 ## Permissions
@@ -34,7 +34,7 @@ Use this page to:
 | Generate a webhook key | Yes | No | No | No |
 | List voice trunks (`/settings/cloudonix/outbound-trunks`) | Yes | No | No | No |
 
-Other roles do not see the **Settings** item in the user menu, get "Access denied" if they open the address, and get `403` from the API. Settings endpoints are never available to [API keys](/modules/api-keys).
+Other roles do not see the **Settings** item in the user menu, get "Access denied" if they open the address, and get `403` from the API. Settings endpoints are never available to [API keys](/opbx/modules/api-keys).
 
 ## Configure Cloudonix
 
@@ -67,7 +67,7 @@ If saving locally works but the push to Cloudonix fails, the API answers with a 
 | Cloudonix Domain API Key | Yes | Up to 255 characters | Authenticates OPBX to Cloudonix. Shown masked after saving; a masked value is never saved over the real key |
 | Cloudonix Domain Requests API Key | No | Up to 255 characters. Generated automatically on the first save if empty | The key Cloudonix sends with every webhook so OPBX can check it. See [Webhook key](#webhook-key) |
 | Webhook Base URL | No | A URL, up to 255 characters | Base for the URLs Cloudonix calls. Hidden when the installation sets the URL (see below) |
-| Embedded Dialer — Allowed Domains | No | Hostnames, `localhost` or an IPv4 address, each with an optional port | Sites allowed to host the [embedded dialer](/modules/embedded-dialer). Empty list: the dialer cannot be embedded |
+| Embedded Dialer — Allowed Domains | No | Hostnames, `localhost` or an IPv4 address, each with an optional port | Sites allowed to host the [embedded dialer](/opbx/modules/embedded-dialer). Empty list: the dialer cannot be embedded |
 | No Answer Timeout (seconds) | Yes | 5 to 120. Default: 60 | How long a call rings before it counts as unanswered |
 | Call Recording | Yes | See the next table. Default: Do not record calls | Which calls are recorded |
 | Recording Media File Format | Yes | WAV or MP3. Default: MP3 | File format of call recordings |
@@ -81,7 +81,7 @@ If saving locally works but the push to Cloudonix fails, the API answers with a 
 | Record all inbound/outbound calls | Inbound and outbound, not internal |
 | Record all calls (inbound/outbound/internal) | Everything |
 
-Recordings appear in [Call Logs](/modules/call-logs) and are visible to the Owner, PBX Admins and Reporters.
+Recordings appear in [Call Logs](/opbx/modules/call-logs) and are visible to the Owner, PBX Admins and Reporters.
 
 ## Webhook key
 
@@ -119,7 +119,7 @@ Voice calls are sent to `{base}/api/voice/route` through the voice application c
 3. Remove a domain with the × on its badge.
 4. Click **Validate and Save Settings** to store the list.
 
-See [Embedded Dialer](/modules/embedded-dialer).
+See [Embedded Dialer](/opbx/modules/embedded-dialer).
 
 ## Common errors
 
@@ -166,8 +166,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [Cloudonix Setup](/installation/cloudonix-setup) — creating the domain and key
-- [Trunks](/modules/trunks) and [Outbound Whitelist](/modules/outbound-whitelist) — use the domain's voice trunks
-- [Extensions](/modules/extensions) — synced to Cloudonix subscribers
-- [Embedded Dialer](/modules/embedded-dialer) — uses the allowed domains
-- [Call Logs](/modules/call-logs) — recordings and call records
+- [Cloudonix Setup](/opbx/installation/cloudonix-setup) — creating the domain and key
+- [Trunks](/opbx/modules/trunks) and [Outbound Whitelist](/opbx/modules/outbound-whitelist) — use the domain's voice trunks
+- [Extensions](/opbx/modules/extensions) — synced to Cloudonix subscribers
+- [Embedded Dialer](/opbx/modules/embedded-dialer) — uses the allowed domains
+- [Call Logs](/opbx/modules/call-logs) — recordings and call records

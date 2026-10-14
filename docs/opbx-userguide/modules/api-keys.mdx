@@ -16,7 +16,7 @@ Use this module to:
 
 - give an integration (a CRM, a reporting tool, a provisioning script) access to the API;
 - grant read-only or read-write access per resource;
-- connect an MCP client to the [MCP Server](/modules/mcp-server);
+- connect an MCP client to the [MCP Server](/opbx/modules/mcp-server);
 - revoke access at once without touching any user account.
 
 ## Prerequisites
@@ -58,7 +58,7 @@ The live list comes from `GET /v1/api-keys/grantable-resources`. In the dialog t
 
 ### Archived call records
 
-Only an API key can read the archive tier of call detail records (records 6 to 12 months old). Add `archive=1` to the list, single-record, export or statistics request of `call-detail-records`. The flag is ignored for signed-in users, including the Owner. See [Call Logs](/modules/call-logs).
+Only an API key can read the archive tier of call detail records (records 6 to 12 months old). Add `archive=1` to the list, single-record, export or statistics request of `call-detail-records`. The flag is ignored for signed-in users, including the Owner. See [Call Logs](/opbx/modules/call-logs).
 
 ## Create a key
 
@@ -89,7 +89,7 @@ curl -H "Authorization: Bearer opbxk_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
 The top of the API Keys page shows two endpoint cards with copy buttons:
 
 - **REST API**: the base URL for REST calls.
-- **MCP Server**: the URL to give MCP clients, with the same bearer key. See [MCP Server](/modules/mcp-server).
+- **MCP Server**: the URL to give MCP clients, with the same bearer key. See [MCP Server](/opbx/modules/mcp-server).
 
 ## List columns
 
@@ -161,6 +161,6 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 ## Related modules
 
-- [MCP Server](/modules/mcp-server) — uses API keys for authentication
-- [User Management](/modules/user-management) — roles for signed-in users
-- [Call Logs](/modules/call-logs) — the archive tier readable with a key
+- [MCP Server](/opbx/modules/mcp-server) — uses API keys for authentication
+- [User Management](/opbx/modules/user-management) — roles for signed-in users
+- [Call Logs](/opbx/modules/call-logs) — the archive tier readable with a key

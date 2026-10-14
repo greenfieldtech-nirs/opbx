@@ -17,10 +17,10 @@ Use the Auto Dialer for outbound work such as webinar follow-ups, appointment re
 ## Prerequisites
 
 1. **Role.** You are the **Owner** or a **PBX Admin**. The three Auto Dialer pages are hidden from every other role.
-2. **A routing destination.** An [AI assistant](/modules/ai-assistants) or an [AI load balancer](/modules/ai-load-balancers). See [Campaign Routing](/applications/auto-dialer/routing-destinations).
-3. **At least one caller ID.** An **active** phone number of your organization, used as the caller ID. See [Phone Numbers](/modules/phone-numbers).
-4. **The dialer worker is running.** The Go dialer worker places the calls. It runs as a single replica. See [Dialer Worker](/workers/dialer-worker).
-5. **For voicemail detection:** the AMD worker is running. See [AMD Worker](/workers/amd-worker).
+2. **A routing destination.** An [AI assistant](/opbx/modules/ai-assistants) or an [AI load balancer](/opbx/modules/ai-load-balancers). See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations).
+3. **At least one caller ID.** An **active** phone number of your organization, used as the caller ID. See [Phone Numbers](/opbx/modules/phone-numbers).
+4. **The dialer worker is running.** The Go dialer worker places the calls. It runs as a single replica. See [Dialer Worker](/opbx/workers/dialer-worker).
+5. **For voicemail detection:** the AMD worker is running. See [AMD Worker](/opbx/workers/amd-worker).
 
 ## The three pages
 
@@ -28,9 +28,9 @@ The sidebar section **Auto Dialer** has three entries:
 
 | Page | What you do there | Guide |
 |------|-------------------|-------|
-| **Campaign Manager** | Create, edit, start, pause, resume, archive and delete campaigns | [Managing Campaigns](/applications/auto-dialer/campaigns) |
-| **Distribution Lists** | Create lists, upload CSV files, assign a list to a campaign | [Distribution Lists](/applications/auto-dialer/distribution-lists) |
-| **Real Time Monitor** | Watch active and paused campaigns, live calls and dispositions | [Real-Time Monitor](/applications/auto-dialer/real-time-monitor) |
+| **Campaign Manager** | Create, edit, start, pause, resume, archive and delete campaigns | [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) |
+| **Distribution Lists** | Create lists, upload CSV files, assign a list to a campaign | [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) |
+| **Real Time Monitor** | Watch active and paused campaigns, live calls and dispositions | [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) |
 
 ![Sidebar with the Auto Dialer section: Campaign Manager, Distribution Lists, Real Time Monitor](../../img/screens/auto-dialer-campaign-list.jpg)
 
@@ -76,7 +76,7 @@ stateDiagram-v2
 | Draft | Draft | New campaign. Can be deleted | Yes |
 | Active | Running | Dials whenever the schedule allows | No. Pause first |
 | Paused | Paused | No new calls | Yes |
-| Completed | Completed | Every number reached a final state (set automatically within a minute of the last number finishing; see [Managing Campaigns](/applications/auto-dialer/campaigns#start-pause-resume)) | No |
+| Completed | Completed | Every number reached a final state (set automatically within a minute of the last number finishing; see [Managing Campaigns](/opbx/applications/auto-dialer/campaigns#start-pause-resume)) | No |
 | Archived | Archived | Kept for history, hidden by the default filter | No |
 
 :::note Assigning a list does not start the campaign
@@ -94,11 +94,11 @@ Assigning a distribution list leaves a **Draft** campaign in Draft. Start it whe
 
 ## Related pages
 
-- [Managing Campaigns](/applications/auto-dialer/campaigns) — full campaign walk-through
-- [Distribution Lists](/applications/auto-dialer/distribution-lists) — CSV format, statuses and assignment
-- [Campaign Scheduling](/applications/auto-dialer/scheduling) — timezone, dates and weekly hours
-- [Rate Limiting](/applications/auto-dialer/rate-limiting) — CAC, CPS, attempts and retries
-- [Answering Machine Detection](/applications/auto-dialer/answering-machine-detection) — voicemail handling
-- [Campaign Routing](/applications/auto-dialer/routing-destinations) — where answered calls go
-- [Real-Time Monitor](/applications/auto-dialer/real-time-monitor) — live view
-- [Auto Dialer Campaigns module](/modules/auto-dialer-campaigns) and [Distribution Lists module](/modules/distribution-lists) — field and API reference
+- [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) — full campaign walk-through
+- [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) — CSV format, statuses and assignment
+- [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) — timezone, dates and weekly hours
+- [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) — CAC, CPS, attempts and retries
+- [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) — voicemail handling
+- [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) — where answered calls go
+- [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) — live view
+- [Auto Dialer Campaigns module](/opbx/modules/auto-dialer-campaigns) and [Distribution Lists module](/opbx/modules/distribution-lists) — field and API reference

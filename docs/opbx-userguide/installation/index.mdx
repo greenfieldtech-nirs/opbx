@@ -98,7 +98,7 @@ Optional but commonly configured variables:
 | `USERCHECK_API_TOKEN` | UserCheck email validation token | *(empty)* |
 | `DB_CDR_ARCHIVE_DATABASE` | Separate schema for the warm call-record archive. Create it and grant the app user first | *(main schema)* |
 
-All variables are listed in the [Configuration Reference](/data-models/configuration/index).
+All variables are listed in the [Configuration Reference](/opbx/data-models/configuration/index).
 
 :::note Cloudonix Configuration
 Cloudonix credentials are per organization and are entered in the web UI after your first login. Do not add them to `.env`.
@@ -141,14 +141,14 @@ This builds the local images and starts these services:
 | `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker (one replica) | — |
 | `amd-worker` | `opbx_amd_worker` | Java/Vert.x answering-machine detection | — |
 | `acd-worker` | `opbx_acd_worker` | Java/Vert.x call queue engine | — |
-| `mcp-server` | `opbx_mcp` | MCP server for AI agents (see [MCP Server](/modules/mcp-server)) | — |
+| `mcp-server` | `opbx_mcp` | MCP server for AI agents (see [MCP Server](/opbx/modules/mcp-server)) | — |
 
 Two groups of services start only with a profile:
 
 | Profile | Services | Start with |
 |---------|----------|------------|
 | `dev` | `ngrok` (webhook tunnel) | `docker compose --profile dev up -d ngrok` |
-| `logs` | `loki`, `alloy`, `grafana`, `docker-socket-proxy` | `docker compose --profile logs up -d` (see [Centralized Logs](/administration/centralized-logs)) |
+| `logs` | `loki`, `alloy`, `grafana`, `docker-socket-proxy` | `docker compose --profile logs up -d` (see [Centralized Logs](/opbx/administration/centralized-logs)) |
 
 :::tip First Boot
 On start, the `app` container validates the environment, waits for MySQL, runs migrations, seeds a fresh database, checks object storage and validates the configuration. Wait **120 seconds** after starting the containers before testing.
@@ -195,7 +195,7 @@ curl http://localhost/api/health
 | `http://localhost/logs/` | Grafana log viewer (`logs` profile) |
 
 :::tip Next Steps
-Proceed to [First Login](./first-login). A fresh database is seeded with a default organization and an owner account whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](./auth0-setup). To understand how calls are handled, see the [Call Routing Overview](./call-routing-overview) and [Outbound Calling Overview](./outbound-calling-overview).
+Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Troubleshooting
@@ -325,7 +325,7 @@ Also:
 4. Set `OPBX_APPLICATION_MODE=production` and `OPBX_APPLICATION_WEBHOOK_BASEURL` to your public URL.
 5. Restrict `SANCTUM_STATEFUL_DOMAINS` to your domains.
 6. Rotate the worker tokens regularly.
-7. Optionally enable the [log stack](/administration/centralized-logs).
+7. Optionally enable the [log stack](/opbx/administration/centralized-logs).
 
 :::danger Security Notice
 Never expose the MySQL, Redis or SeaweedFS ports to the internet, and never use `docker-compose.ports.yml` on a production host.

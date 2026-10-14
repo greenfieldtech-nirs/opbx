@@ -8,9 +8,9 @@ description: "Spread calls across several AI assistants, try the next one when a
 
 # AI Load Balancers
 
-An AI load balancer groups several [AI assistants](/modules/ai-assistants) behind one destination. Each call goes to one member chosen by the strategy (round robin, priority or percentage). With **Follow Through** on, a member that fails is skipped and the next one is tried. When no member can take the call, the **fallback** runs: an extension, ring group, IVR menu, another AI assistant, a call queue, another AI load balancer, or hang up.
+An AI load balancer groups several [AI assistants](/opbx/modules/ai-assistants) behind one destination. Each call goes to one member chosen by the strategy (round robin, priority or percentage). With **Follow Through** on, a member that fails is skipped and the next one is tried. When no member can take the call, the **fallback** runs: an extension, ring group, IVR menu, another AI assistant, a call queue, another AI load balancer, or hang up.
 
-This page is the walk-through. For designs such as primary and backup, or A/B tests, see [AI Load Balancers (applications)](/applications/ai-load-balancers).
+This page is the walk-through. For designs such as primary and backup, or A/B tests, see [AI Load Balancers (applications)](/opbx/applications/ai-load-balancers).
 
 ## Purpose
 
@@ -23,7 +23,7 @@ Use a load balancer to:
 
 ## Prerequisites
 
-- At least one **active** AI assistant. Inactive assistants cannot be added. See [AI Assistants](/modules/ai-assistants).
+- At least one **active** AI assistant. Inactive assistants cannot be added. See [AI Assistants](/opbx/modules/ai-assistants).
 - A fallback destination, if you do not want callers to be hung up on. It must exist and be **active**.
 - You are the **Owner** or a **PBX Admin** to create, edit or delete. Reporters can open the page read-only.
 
@@ -113,7 +113,7 @@ Saving replaces the member list with the one in the dialog. If another person is
 
 On the edit dialog only, the fallback picker offers **Disconnect**. It stores "Destination unavailable": callers who reach the fallback hear "Destination doesn't exist" and the call ends. The load balancer then shows the **Unprovisioned** badge in the list and in the dialog title, and the **Unprovisioned** filter on the list finds it. Pick a real fallback to clear the badge.
 
-The same state appears after a [user is deleted](/modules/user-management#delete-a-user) whose extension was the fallback.
+The same state appears after a [user is deleted](/opbx/modules/user-management#delete-a-user) whose extension was the fallback.
 
 ## Activate or deactivate
 
@@ -130,12 +130,12 @@ If anything still points at the load balancer, the delete is refused and the **C
 
 ## Where a load balancer can be used
 
-- [Phone Numbers](/modules/phone-numbers): routing type **AI load balancer**.
-- [IVR Menus](/modules/ivr-menus): an option target or the failover.
-- [Business Hours](/modules/business-hours): the open-hours or closed-hours action.
-- [Ring Groups](/modules/ring-groups) and [Call Queues](/modules/call-queues): the fallback.
-- [Extensions](/modules/extensions): an extension of type **AI Load Balancer**.
-- [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) and [Call Tracking Campaigns](/modules/call-tracking-campaigns) (API).
+- [Phone Numbers](/opbx/modules/phone-numbers): routing type **AI load balancer**.
+- [IVR Menus](/opbx/modules/ivr-menus): an option target or the failover.
+- [Business Hours](/opbx/modules/business-hours): the open-hours or closed-hours action.
+- [Ring Groups](/opbx/modules/ring-groups) and [Call Queues](/opbx/modules/call-queues): the fallback.
+- [Extensions](/opbx/modules/extensions): an extension of type **AI Load Balancer**.
+- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) and [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) (API).
 
 ## Common errors
 
@@ -188,13 +188,13 @@ If anything still points at the load balancer, the delete is refused and the **C
 | PUT | `/v1/ai-assistant-load-balancers/{id}` | Update. Sending `members` replaces them all |
 | DELETE | `/v1/ai-assistant-load-balancers/{id}` | Delete. Returns 409 with the list of uses when in use |
 
-Scoped API keys use the `ai-assistant-load-balancers` resource (see [API Keys](/modules/api-keys)). The [MCP server](/modules/mcp-server) has `list_ai_load_balancers` and `get_ai_load_balancer`.
+Scoped API keys use the `ai-assistant-load-balancers` resource (see [API Keys](/opbx/modules/api-keys)). The [MCP server](/opbx/modules/mcp-server) has `list_ai_load_balancers` and `get_ai_load_balancer`.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
 ## Troubleshooting
 
-With the [centralized logging stack](/administration/centralized-logs) enabled, search for `AiLoadBalancerRoutingStrategy` to see which member was chosen for a call, and for `ALBS Follow Through` to follow a failover.
+With the [centralized logging stack](/opbx/administration/centralized-logs) enabled, search for `AiLoadBalancerRoutingStrategy` to see which member was chosen for a call, and for `ALBS Follow Through` to follow a failover.
 
 Common causes of "callers always get the fallback":
 
@@ -204,7 +204,7 @@ Common causes of "callers always get the fallback":
 
 ## Related modules
 
-- [AI Assistants](/modules/ai-assistants) — the members
-- [Extensions](/modules/extensions) — AI Load Balancer extensions
-- [Phone Numbers](/modules/phone-numbers) — route a number to a load balancer
-- [AI Load Balancers (applications)](/applications/ai-load-balancers) — designs and use cases
+- [AI Assistants](/opbx/modules/ai-assistants) — the members
+- [Extensions](/opbx/modules/extensions) — AI Load Balancer extensions
+- [Phone Numbers](/opbx/modules/phone-numbers) — route a number to a load balancer
+- [AI Load Balancers (applications)](/opbx/applications/ai-load-balancers) — designs and use cases

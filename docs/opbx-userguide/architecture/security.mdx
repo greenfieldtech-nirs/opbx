@@ -135,7 +135,7 @@ Standard Laravel `throttle` middleware is used for auth, registration, email val
 
 ## Webhook Security
 
-See [Webhooks](./webhooks) for endpoint details. Highlights:
+See [Webhooks](/opbx/architecture/webhooks) for endpoint details. Highlights:
 
 - Voice routing webhooks require a Bearer token (`VerifyVoiceWebhookAuth`) and return CXML on errors.
 - Status/CDR webhooks conditionally require a Bearer token (`VerifyCloudonixSignature`) and return JSON on errors. `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true` makes the token mandatory.
@@ -279,7 +279,7 @@ For production deployments:
 ## Related Documentation
 
 - [`docs/WEBHOOK-AUTHENTICATION.md`](https://github.com/greenfieldtech-nirs/opbx/blob/main/docs/WEBHOOK-AUTHENTICATION.md)
-- [Multi-Tenancy](./multi-tenancy)
-- [Webhooks](./webhooks)
-- [Call Flow](./call-flow)
-- [Architecture Overview](./index)
+- [Multi-Tenancy](/opbx/architecture/multi-tenancy)
+- [Webhooks](/opbx/architecture/webhooks)
+- [Call Flow](/opbx/architecture/call-flow)
+- [Architecture Overview](/opbx/architecture)

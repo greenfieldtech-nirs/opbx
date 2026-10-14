@@ -14,53 +14,53 @@ OPBX provides a comprehensive set of modules for managing your business phone sy
 
 | Module | Description |
 |--------|-------------|
-| [User Management](/modules/user-management) | Create and manage user accounts with role-based access control |
-| [Supervisors](/modules/supervisors) | Let a supervisor watch and coach live calls of the users and ring groups assigned to them |
-| [Extensions](/modules/extensions) | Configure phone extensions with SIP credentials and Cloudonix sync |
-| [Phone Numbers](/modules/phone-numbers) | Manage DID numbers and configure inbound call routing |
-| [Trunks](/modules/trunks) | Manage the inbound and outbound SIP trunks held in Cloudonix |
-| [Ring Groups](/modules/ring-groups) | Distribute incoming calls across groups of extensions |
-| [Call Queues](/modules/call-queues) | Stateful call distribution with waiting callers, agent states, and queue statistics |
-| [IVR Menus](/modules/ivr-menus) | Build interactive voice response menus with digit-based navigation |
-| [Business Hours](/modules/business-hours) | Route calls based on time of day with weekly schedules and holidays |
-| [Conference Rooms](/modules/conference-rooms) | Set up multi-party conference bridges with PIN protection |
-| [AI Assistants](/modules/ai-assistants) | Configure AI-powered voice agents |
-| [AI Load Balancers](/modules/ai-load-balancers) | Distribute calls across multiple AI providers |
-| [Call Logs](/modules/call-logs) | View and export call detail records |
-| [Live Calls](/modules/live-calls) | Monitor, disconnect, and coach active calls in real time |
-| [Reporting](/modules/reporting) | Dashboard, call logs and live monitoring at a glance |
-| [Web Phone](/modules/web-phone) | In-browser softphone for placing, receiving, and coaching calls |
-| [Embedded Dialer](/modules/embedded-dialer) | Embed a user's Web Phone in a third-party website with one script snippet |
-| [Call Tracking Campaigns](/modules/call-tracking-campaigns) | Attribute inbound calls to marketing campaigns and sources |
-| [Call Tracking DNI](/modules/call-tracking-dni) | Dynamic number insertion for websites |
-| [Call Tracking Analytics](/modules/call-tracking-analytics) | Campaign performance, conversions, and exports |
-| [Call Notifications](/modules/call-notifications) | Configure webhook notifications for call events |
-| [Recordings](/modules/recordings) | Upload and manage audio files for IVR prompts and announcements |
-| [Inbound Blacklist](/modules/inbound-blacklist) | Block unwanted inbound callers |
-| [Outbound Whitelist](/modules/outbound-whitelist) | Choose which destination prefixes may be dialled, through which trunk and with which caller ID |
-| [Auto Dialer Campaigns](/modules/auto-dialer-campaigns) | Run outbound calling campaigns |
-| [Distribution Lists](/modules/distribution-lists) | Manage contact lists for auto-dialer campaigns |
-| [Settings](/modules/settings) | Configure Cloudonix integration and organization settings |
-| [API Keys](/modules/api-keys) | Owner-managed scoped API keys with per-resource read/write permissions |
-| [MCP Server](/modules/mcp-server) | Let AI agents safely operate your PBX via the Model Context Protocol |
-| [Auth0 Syndicated Auth](/modules/auth0-syndicated-auth) | Social sign-in, invitations and organization join requests (when Auth0 is enabled) |
+| [User Management](/opbx/modules/user-management) | Create and manage user accounts with role-based access control |
+| [Supervisors](/opbx/modules/supervisors) | Let a supervisor watch and coach live calls of the users and ring groups assigned to them |
+| [Extensions](/opbx/modules/extensions) | Configure phone extensions with SIP credentials and Cloudonix sync |
+| [Phone Numbers](/opbx/modules/phone-numbers) | Manage DID numbers and configure inbound call routing |
+| [Trunks](/opbx/modules/trunks) | Manage the inbound and outbound SIP trunks held in Cloudonix |
+| [Ring Groups](/opbx/modules/ring-groups) | Distribute incoming calls across groups of extensions |
+| [Call Queues](/opbx/modules/call-queues) | Stateful call distribution with waiting callers, agent states, and queue statistics |
+| [IVR Menus](/opbx/modules/ivr-menus) | Build interactive voice response menus with digit-based navigation |
+| [Business Hours](/opbx/modules/business-hours) | Route calls based on time of day with weekly schedules and holidays |
+| [Conference Rooms](/opbx/modules/conference-rooms) | Set up multi-party conference bridges with PIN protection |
+| [AI Assistants](/opbx/modules/ai-assistants) | Configure AI-powered voice agents |
+| [AI Load Balancers](/opbx/modules/ai-load-balancers) | Distribute calls across multiple AI providers |
+| [Call Logs](/opbx/modules/call-logs) | View and export call detail records |
+| [Live Calls](/opbx/modules/live-calls) | Monitor, disconnect, and coach active calls in real time |
+| [Reporting](/opbx/modules/reporting) | Dashboard, call logs and live monitoring at a glance |
+| [Web Phone](/opbx/modules/web-phone) | In-browser softphone for placing, receiving, and coaching calls |
+| [Embedded Dialer](/opbx/modules/embedded-dialer) | Embed a user's Web Phone in a third-party website with one script snippet |
+| [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) | Attribute inbound calls to marketing campaigns and sources |
+| [Call Tracking DNI](/opbx/modules/call-tracking-dni) | Dynamic number insertion for websites |
+| [Call Tracking Analytics](/opbx/modules/call-tracking-analytics) | Campaign performance, conversions, and exports |
+| [Call Notifications](/opbx/modules/call-notifications) | Configure webhook notifications for call events |
+| [Recordings](/opbx/modules/recordings) | Upload and manage audio files for IVR prompts and announcements |
+| [Inbound Blacklist](/opbx/modules/inbound-blacklist) | Block unwanted inbound callers |
+| [Outbound Whitelist](/opbx/modules/outbound-whitelist) | Choose which destination prefixes may be dialled, through which trunk and with which caller ID |
+| [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) | Run outbound calling campaigns |
+| [Distribution Lists](/opbx/modules/distribution-lists) | Manage contact lists for auto-dialer campaigns |
+| [Settings](/opbx/modules/settings) | Configure Cloudonix integration and organization settings |
+| [API Keys](/opbx/modules/api-keys) | Owner-managed scoped API keys with per-resource read/write permissions |
+| [MCP Server](/opbx/modules/mcp-server) | Let AI agents safely operate your PBX via the Model Context Protocol |
+| [Auth0 Syndicated Auth](/opbx/modules/auth0-syndicated-auth) | Social sign-in, invitations and organization join requests (when Auth0 is enabled) |
 
 ## Getting Started
 
-Read [Navigating the Admin Interface](/administration/navigating-the-interface) first; it explains the sidebar, roles and the delete and Unprovisioned patterns that every module uses.
+Read [Navigating the Admin Interface](/opbx/administration/navigating-the-interface) first; it explains the sidebar, roles and the delete and Unprovisioned patterns that every module uses.
 
 If you are setting up OPBX for the first time, we recommend configuring the modules in this order:
 
-1. **Users** — [User Management](/modules/user-management): create accounts for your team members
-2. **Extensions** — [Extensions](/modules/extensions): assign phone extensions to each user
-3. **Trunks** — [Trunks](/modules/trunks): add the SIP trunks used for inbound and outbound calls, if your provider needs them
-4. **Phone Numbers** — [Phone Numbers](/modules/phone-numbers): add your DID numbers and configure routing
-5. **Ring Groups** — [Ring Groups](/modules/ring-groups): set up call distribution for departments
-6. **Call Queues** — [Call Queues](/modules/call-queues): add queues if you need waiting callers and statistics
-7. **Business Hours** — [Business Hours](/modules/business-hours): configure time-based routing rules
-8. **IVR Menus** — [IVR Menus](/modules/ivr-menus): build automated phone menus for callers
+1. **Users** — [User Management](/opbx/modules/user-management): create accounts for your team members
+2. **Extensions** — [Extensions](/opbx/modules/extensions): assign phone extensions to each user
+3. **Trunks** — [Trunks](/opbx/modules/trunks): add the SIP trunks used for inbound and outbound calls, if your provider needs them
+4. **Phone Numbers** — [Phone Numbers](/opbx/modules/phone-numbers): add your DID numbers and configure routing
+5. **Ring Groups** — [Ring Groups](/opbx/modules/ring-groups): set up call distribution for departments
+6. **Call Queues** — [Call Queues](/opbx/modules/call-queues): add queues if you need waiting callers and statistics
+7. **Business Hours** — [Business Hours](/opbx/modules/business-hours): configure time-based routing rules
+8. **IVR Menus** — [IVR Menus](/opbx/modules/ivr-menus): build automated phone menus for callers
 
-Then add [Recordings](/modules/recordings) for prompts and hold music, and [Inbound Blacklist](/modules/inbound-blacklist) or [Outbound Whitelist](/modules/outbound-whitelist) for call control.
+Then add [Recordings](/opbx/modules/recordings) for prompts and hold music, and [Inbound Blacklist](/opbx/modules/inbound-blacklist) or [Outbound Whitelist](/opbx/modules/outbound-whitelist) for call control.
 
 ## Module Documentation Format
 

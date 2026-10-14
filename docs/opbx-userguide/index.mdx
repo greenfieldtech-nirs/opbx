@@ -75,13 +75,13 @@ OPBX implements a hierarchical permission system. Each user belongs to exactly o
 | Role | Description | Key Capabilities |
 |------|-------------|------------------|
 | Owner | Organization creator | Full access to all features, can manage all users including other owners, configure system-wide settings |
-| PBX Admin | System administrator | Manage extensions, routing rules, phone numbers, trunks and users (within the limits in [User Management](/modules/user-management)) |
+| PBX Admin | System administrator | Manage extensions, routing rules, phone numbers, trunks and users (within the limits in [User Management](/opbx/modules/user-management)) |
 | Supervisor | Scoped monitor | Read-only view of assigned users/ring groups; coach live calls (spy/whisper/barge); use the Web Phone; no configuration or exports |
 | PBX User | Regular user | View assigned resources, update own extension settings, view personal call history |
 | Reporter | Read-only access | View call logs, generate reports, access dashboards without modification rights |
 
 :::info Role Assignment
-The Owner role cannot be assigned through the API or the Users page. Only an Owner can change another user's role. PBX Admins cannot give the PBX Admin role or change an Owner's or PBX Admin's role. See [User Management](/modules/user-management).
+The Owner role cannot be assigned through the API or the Users page. Only an Owner can change another user's role. PBX Admins cannot give the PBX Admin role or change an Owner's or PBX Admin's role. See [User Management](/opbx/modules/user-management).
 :::
 
 ## API Documentation
@@ -92,14 +92,14 @@ The OPBX REST API is documented with OpenAPI 3.1.0. You can explore the endpoint
 
 Ready to get started? Follow these steps:
 
-1. [Install OPBX](./installation) using Docker Compose
-2. Complete your [first login and organization setup](./installation/first-login)
-3. Configure [Cloudonix integration](./installation/cloudonix-setup) for telephony
-4. Learn the [core concepts](./installation/concepts) before configuring your PBX
-5. Learn the [admin interface](./administration/navigating-the-interface), then configure each module in the order given in the [modules index](./modules)
+1. [Install OPBX](/opbx/installation) using Docker Compose
+2. Complete your [first login and organization setup](/opbx/installation/first-login)
+3. Configure [Cloudonix integration](/opbx/installation/cloudonix-setup) for telephony
+4. Learn the [core concepts](/opbx/installation/concepts) before configuring your PBX
+5. Learn the [admin interface](/opbx/administration/navigating-the-interface), then configure each module in the order given in the [modules index](/opbx/modules)
 
-Operators who run the platform for several organizations also read [Platform Management](./administration/platform-management) and [Centralized Logs](./administration/centralized-logs).
+Operators who run the platform for several organizations also read [Platform Management](/opbx/administration/platform-management) and [Centralized Logs](/opbx/administration/centralized-logs).
 
 :::tip New to PBX Systems?
-If you are unfamiliar with PBX terminology, start with the [Core Concepts](./installation/concepts) guide. It explains extensions, DIDs, ring groups, and other essential concepts you will need to configure your phone system.
+If you are unfamiliar with PBX terminology, start with the [Core Concepts](/opbx/installation/concepts) guide. It explains extensions, DIDs, ring groups, and other essential concepts you will need to configure your phone system.
 :::
