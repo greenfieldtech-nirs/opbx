@@ -85,9 +85,8 @@ Missing and wrong input count toward the same total. For example, with **Maximum
 
 ## Failover
 
-The failover is used after the last turn with no valid input. If the menu has no other failover set, the default is **Hang Up**. Its choices are the same destination types as the options, plus:
+The failover is used after the last turn with no valid input. If the menu has no other failover set, the default is **Hang Up**: the **Failover Action** list shows no type and **Failover Destination** reads "Call will end". The list offers the same destination types as the options (it has no Hang Up entry; once you pick a type, a destination is required), plus:
 
-- **Hang Up**: the call ends. This is the default for a new menu.
 - **Disconnect**: only offered when editing (see [Edit an IVR menu](#edit-an-ivr-menu)).
 
 ## Workflows
@@ -103,7 +102,7 @@ The failover is used after the last turn with no valid input. If the menu has no
 
 The list shows each menu's name and option count, **Options**, **Max Turns**, **Created** and **Status**. Click the **Name** or **Status** column header to sort.
 
-{/* SCREENSHOT: ivr-menus-list — IVR Menus list with Main Menu, Support Menu and After Hours Menu rows showing option counts, Max Turns and Active/Inactive status badges */}
+![IVR Menus list with Main Menu (4 options) and After Hours Menu (2 options), their Max Turns and Active status badges, and the search, status and Unprovisioned filters](../img/screens/ivr-menus-list.jpg)
 
 ### Create an IVR menu
 
@@ -114,13 +113,13 @@ The list shows each menu's name and option count, **Options**, **Max Turns**, **
 3. Enter a **Name**.
 4. On the **Audio** tab, choose the prompt source (see [Audio source](#audio-source)) and fill in its field.
 
-{/* SCREENSHOT: ivr-menus-create-audio — Create IVR Menu dialog, Audio tab, Audio Resource set to Text-to-Speech, a voice selected and "Thank you for calling Acme Corp. For sales press 1, for support press 2." in Text to Speak */}
+![Create IVR Menu dialog, Audio tab, with Audio Resource Text-to-Speech, an English US voice and the Acme Corp greeting in Text to Speak](../img/screens/ivr-menus-create-audio.jpg)
 
 5. Open the **Menu Options** tab and click **Add Option** for each choice. Set the digits, the destination type and the destination of each row. Remove a row with its trash icon.
 
 ![Create IVR Menu dialog, Menu Options tab, with digit 1 to extension 1005 and digit 2 to the Sales Team ring group](../img/screens/ivr-menus-create-options.jpg)
 
-6. Click **Menu Settings** to open the panel. Set **Max Timeout (seconds)**, **Inter-digit Timeout (seconds)** and **Maximum Turns**, then pick the **Failover Action** and, unless it is **Hang Up**, the **Failover Destination**.
+6. Click **Menu Settings** to open the panel. Set **Max Timeout (seconds)**, **Inter-digit Timeout (seconds)** and **Maximum Turns**, then pick the **Failover Action** and the **Failover Destination**, or leave the action empty to hang up ("Call will end").
 7. Click **Create Menu**.
 
 The dialog closes, the toast "IVR menu created successfully" appears and the menu is listed. Any phone number, option or queue that points at the menu now sends callers to it.
@@ -129,7 +128,7 @@ The dialog closes, the toast "IVR menu created successfully" appears and the men
 
 Each problem is shown next to the field it belongs to, and a tab that holds an error is marked **(!)**. On save the dialog switches to the first tab with an error. If the problem is in the timeouts, the maximum turns or the failover, the **Menu Settings** panel opens by itself so you can see it. An error returned by the server is shown as a toast.
 
-{/* SCREENSHOT: ivr-menus-field-errors — Edit IVR Menu dialog with the Menu Settings panel auto-opened and an inline error under Max turns */}
+![Edit IVR Menu dialog with the Menu Options tab marked (!) and the inline error Option 2 needs a destination under the option row](../img/screens/ivr-menus-field-errors.jpg)
 
 ### Edit an IVR menu
 
@@ -143,7 +142,7 @@ The toast "IVR menu updated successfully" appears. Saving replaces the whole opt
 
 **Disconnect** (edit only): the destination type list of an option or of the failover also offers **Disconnect**. It sets that route to **Destination unavailable**: the form shows "No destination (unprovisioned). Callers hear "Destination doesn't exist". Choose a type to provision this route." Once saved, the menu is unprovisioned: its row in the list and the **Edit IVR Menu** dialog title carry the **Unprovisioned** badge, and the **Unprovisioned** list filter finds it. A caller who reaches that route hears "Destination doesn't exist" and the call ends. A new menu must have a destination for every option and for the failover; to provision the route again, choose a destination type.
 
-{/* SCREENSHOT: ivr-menus-unprovisioned — IVR Menus list filtered to Unprovisioned, one row with the badge and an option set to Destination unavailable */}
+![Edit IVR Menu dialog for After Hours Menu with the Unprovisioned badge in the title and option 2 set to Destination unavailable](../img/screens/ivr-menus-unprovisioned.jpg)
 
 ### Activate or deactivate an IVR menu
 
