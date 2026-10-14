@@ -80,7 +80,8 @@ class IvrRoutingStrategy implements RoutingStrategy
             $gatherFinishOnKey,
             1, // min digits
             10, // max digits
-            $maxTimeout
+            $maxTimeout,
+            true // no input posts back too, so it counts as a turn and the menu replays
         );
 
         Log::info('IVR Routing: Presenting menu to caller', [

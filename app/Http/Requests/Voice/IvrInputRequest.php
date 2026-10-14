@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Voice;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -28,7 +29,7 @@ class IvrInputRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -36,8 +37,8 @@ class IvrInputRequest extends FormRequest
             // Call identifier - required, alphanumeric with hyphens/underscores
             'CallSid' => ['required', 'string', 'regex:/^[a-zA-Z0-9_-]+$/', 'max:255'],
 
-            // Digits pressed - required, single digit or sequence
-            'Digits' => ['required', 'string', 'regex:/^[0-9*#]+$/', 'max:10'],
+            // Digits pressed - missing/empty means the caller pressed nothing (Gather timed out)
+            'Digits' => ['nullable', 'string', 'regex:/^[0-9*#]+$/', 'max:10'],
 
             // Caller number - required
             'From' => ['required', 'string', 'regex:/^(\+?[1-9]\d{1,14}|\d{1,10})$/', 'max:16'],
@@ -66,7 +67,6 @@ class IvrInputRequest extends FormRequest
         return [
             'CallSid.required' => 'Call SID is required for IVR input.',
             'CallSid.regex' => 'Call SID format is invalid.',
-            'Digits.required' => 'Digits input is required.',
             'Digits.regex' => 'Digits must contain only numbers, #, or *.',
             'From.required' => 'Caller number (From) is required.',
             'From.regex' => 'Caller number must be in E.164 format or valid extension.',

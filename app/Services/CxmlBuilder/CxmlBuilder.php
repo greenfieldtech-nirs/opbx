@@ -715,7 +715,8 @@ class CxmlBuilder
         string $finishOnKey = '#',
         int $minDigits = 1,
         int $maxDigits = 1,
-        ?int $maxTimeout = null
+        ?int $maxTimeout = null,
+        bool $actionOnEmptyResult = false
     ): self {
         $gather = $this->document->createElement('Gather');
 
@@ -727,6 +728,10 @@ class CxmlBuilder
 
         if ($maxTimeout !== null) {
             $gather->setAttribute('maxTimeout', (string) $maxTimeout);
+        }
+
+        if ($actionOnEmptyResult) {
+            $gather->setAttribute('actionOnEmptyResult', 'true');
         }
 
         // Parse and append nested verbs
@@ -756,6 +761,7 @@ class CxmlBuilder
      * @param  string  $finishOnKey  Key that ends input collection
      * @param  int  $minDigits  Minimum number of digits to collect
      * @param  int  $maxDigits  Maximum number of digits to collect
+     * @param  bool  $actionOnEmptyResult  Call the action URL even when the caller pressed nothing
      */
     public static function gather(
         string $nestedVerbs,
@@ -764,11 +770,12 @@ class CxmlBuilder
         string $finishOnKey = '#',
         int $minDigits = 1,
         int $maxDigits = 1,
-        ?int $maxTimeout = null
+        ?int $maxTimeout = null,
+        bool $actionOnEmptyResult = false
     ): string {
         $builder = new self;
 
-        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout)->build();
+        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout, $actionOnEmptyResult)->build();
     }
 
     /**

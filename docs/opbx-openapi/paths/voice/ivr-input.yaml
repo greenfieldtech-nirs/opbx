@@ -10,8 +10,11 @@ paths:
         routing strategy puts in the Gather `action` URL.
 
         - A matching option routes to that option's destination.
-        - An unknown option replays the menu, until the menu's `max_turns` is exceeded; then
-          the call goes to the menu's failover destination.
+        - An unknown option, or no input at all (`Digits` missing or empty: the caller pressed
+          nothing before the Gather `maxTimeout`), counts as one turn and replays the menu. The
+          IVR Gather sets `actionOnEmptyResult="true"`, so Cloudonix posts here on no input too.
+          Unknown and missing input share the same count; when it reaches the menu's
+          `max_turns`, the call goes to the menu's failover destination.
         - An unknown or other-organization `menu_id`, or no IVR state for `CallSid`, answers
           200 CXML that says the error and hangs up.
 
@@ -42,10 +45,12 @@ paths:
                   pattern: '^[a-zA-Z0-9_-]+$'
                   description: Call SID
                 Digits:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   maxLength: 10
                   pattern: '^[0-9*#]+$'
-                  description: Collected DTMF digits
+                  description: Collected DTMF digits. Missing, empty or null means the caller pressed nothing.
                 From:
                   type: string
                   maxLength: 16
@@ -80,7 +85,7 @@ paths:
                   - 'null'
                   minimum: 1
                   description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
-              required: [CallSid, Digits, From, To]
+              required: [CallSid, From, To]
       responses:
         '200':
           description: CXML response
