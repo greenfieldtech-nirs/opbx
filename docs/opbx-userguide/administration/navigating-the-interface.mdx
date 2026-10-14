@@ -12,35 +12,67 @@ This page explains how the OPBX web interface is organised, which menu items you
 
 Read this page first. The module guides assume you know where things are.
 
+## Page Layout
+
+Every signed-in page has the same frame:
+
+- **Activity bar** (far left): one icon per sidebar section. Hover an icon to see the section name; click it to show that section's items in the sidebar. The **Dashboards** icon also opens your dashboard.
+- **Sidebar**: the items of the selected section. Drag its right edge to make it wider or narrower (200 to 400 pixels); the width and the selected section are remembered in your browser.
+- **Header** (top): your name, the queue agent widget when you are a call-queue agent, and the **user menu**.
+- **Web Phone**: a floating softphone, shown when an extension is assigned to you. See [Web Phone](/opbx/modules/web-phone).
+
 ## Sidebar Areas
 
-The sidebar is grouped into sections. Items you cannot use for your role are hidden.
+The sidebar is grouped into sections. Items you cannot use for your role are hidden, and a section with no visible item is hidden too.
 
 | Section | What is in it |
 |---------|---------------|
 | **Dashboards** | Your home dashboard |
 | **PBX Configuration** | Users, Supervisors, Extensions, Conference Rooms, Ring Groups, Call Queues, IVR Menus, Business Hours, Announcements, Phone Numbers, Trunks |
-| **Apps and Security** | Campaign Manager, Distribution Lists, Real Time Monitor (auto dialer), AI Assistants, AI Load Balancers, Call Tracking (Dashboard, Campaigns, Sessions, DNI Snippet, Integrations), Inbound Blacklist, Outbound Whitelist |
+| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers), Call Tracking (Dashboard, Campaigns, Sessions, DNI Snippet, Integrations), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
 | **Analytics** | Live Calls, Queues Dashboard, Queue Reports, Call Logs, Call Notifications, API Keys |
-| **Supervisor** | Shown to Supervisors instead of the sections above (see below) |
-| **Platform Management** | Platform Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers |
+| **Supervisor** | Shown to Supervisors instead of the sections above: Dashboard, Live Calls, Call Logs, Users, Ring Groups, Call Queues |
+| **Platform Management** | Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers, and hidden while they [operate as an organization](#operating-as-an-organization-platform-managers) |
 
 Which roles see each item comes from the sidebar configuration. Examples:
 
 | Item | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Users | Yes | Yes | No | No | Yes (own scope) |
-| Extensions | Yes | Yes | Yes | Yes | No |
+| Extensions, Conference Rooms | Yes | Yes | Yes | Yes | No |
 | Ring Groups, Call Queues | Yes | Yes | No | Yes | Yes (own scope) |
-| IVR Menus, Business Hours, Trunks | Yes | Yes | No | No | No |
+| IVR Menus, Business Hours, Announcements, Trunks | Yes | Yes | No | No | No |
 | Phone Numbers | Yes | Yes | No | Yes | No |
+| Auto Dialer, AI Load Balancers | Yes | Yes | No | Yes | No |
+| AI Assistants, Call Tracking Dashboard, Campaigns, Sessions | Yes | Yes | No (section hidden) | Yes | No |
+| DNI Snippet, Integrations, Inbound Blacklist, Outbound Whitelist | Yes | Yes | No | No | No |
+| Live Calls, Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | Live Calls only |
+| Call Logs | Yes | Yes | Yes | Yes | Yes |
+| Call Notifications | Yes | Yes | No | No | No |
 | API Keys | Yes | No | No | No | No |
-| Outbound Whitelist, Call Tracking Integrations | Yes | Yes | No | No | No |
-| Live Calls, Call Logs | Yes | Yes | Call Logs only | Yes | Yes |
 
 :::info Supervisors
 A user with the Supervisor role sees the **Supervisor** section, not the configuration sections. Their Users, Ring Groups and Call Queues views are limited to the users and groups assigned to them. See [Supervisors](/opbx/modules/supervisors).
 :::
+
+## The User Menu
+
+Click your name at the top right to open the user menu. It shows your name and email and these items:
+
+| Item | Who sees it | Opens |
+|------|-------------|-------|
+| **Profile** | Everyone | Your [profile](/opbx/administration/profile): contact details, password, linked accounts and (Owner) organization details |
+| **Settings** | Owner | The organization's [Cloudonix settings](/opbx/modules/settings) |
+| **Logout** | Everyone | Signs you out |
+
+### Log out
+
+Who can do this: every signed-in user.
+
+1. Click your name at the top right.
+2. Choose **Logout**.
+
+The toast "Logged out successfully" appears and the login page opens. Your current token is revoked.
 
 ## Roles at a Glance
 
