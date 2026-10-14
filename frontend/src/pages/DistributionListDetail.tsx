@@ -308,7 +308,8 @@ export default function DistributionListDetail() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          {canManage && list.status !== 'in_use' && (
+          {/* Server accepts uploads for ListStatus::canUpload() or canCreateVersion(); others get 422 */}
+          {canManage && ['draft', 'pending', 'failed', 'ready', 'used'].includes(list.status) && (
             <Button variant="outline" onClick={() => setIsUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Upload
