@@ -18,4 +18,9 @@ paths:
               schema:
                 $ref: '../../components/schemas/PublicStatus.yaml'
         '429':
-          description: Too many requests
+          description: Too many requests (Laravel `throttle:60,1`, per IP)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying

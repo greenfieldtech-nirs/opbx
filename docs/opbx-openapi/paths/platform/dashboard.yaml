@@ -4,7 +4,7 @@ paths:
       tags:
         - Platform
       summary: Platform dashboard
-      description: Get cross-tenant statistics and dashboard data
+      description: Cross-tenant statistics and dashboard data. Platform managers only.
       operationId: getPlatformDashboard
       security:
         - bearerAuth: []
@@ -44,14 +44,17 @@ paths:
                             type: integer
                       extensions:
                         type: object
-                        additionalProperties:
-                          type: integer
+                        properties:
+                          total:
+                            type: integer
                       dids:
                         type: object
-                        additionalProperties:
-                          type: integer
+                        properties:
+                          total:
+                            type: integer
                       recent_organizations:
                         type: array
+                        description: The 10 most recently created organizations
                         items:
                           type: object
                           properties:
@@ -63,6 +66,10 @@ paths:
                               type: string
                             status:
                               type: string
+                              enum:
+                                - active
+                                - suspended
+                                - deleted
                             timezone:
                               type: string
                             users_count:
@@ -79,11 +86,73 @@ paths:
                               format: date-time
                       recent_audit_logs:
                         type: array
+                        description: The 10 most recent audit log entries
                         items:
                           type: object
-                          additionalProperties: true
-                          description: Same shape as the audit-log entries
+                          description: Audit-log entry without `ip_address`, `user_agent` and `updated_at`
+                          properties:
+                            id:
+                              type: integer
+                            platform_manager_user_id:
+                              type: integer
+                            platform_manager:
+                              type:
+                                - object
+                                - 'null'
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                email:
+                                  type: string
+                            target_organization_id:
+                              type:
+                                - integer
+                                - 'null'
+                            target_organization:
+                              type:
+                                - object
+                                - 'null'
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                slug:
+                                  type: string
+                            action:
+                              type: string
+                            target_entity_type:
+                              type:
+                                - string
+                                - 'null'
+                            target_entity_id:
+                              type:
+                                - integer
+                                - 'null'
+                            before_state:
+                              type:
+                                - object
+                                - 'null'
+                            after_state:
+                              type:
+                                - object
+                                - 'null'
+                            reason:
+                              type:
+                                - string
+                                - 'null'
+                            created_at:
+                              type: string
+                              format: date-time
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.

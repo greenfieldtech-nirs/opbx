@@ -35,6 +35,12 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
         '404':
           $ref: '../../components/responses/NotFound.yaml'

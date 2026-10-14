@@ -19,14 +19,24 @@ paths:
             application/json:
               schema:
                 $ref: '../../components/schemas/PlatformStatus.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          description: Platform manager access required
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
   /v1/platform/status/check:
     post:
       tags:
         - Platform
       summary: Run all health checks now
-      description: Runs and stores every check, then returns the same payload as GET. Throttled to 6 requests per minute.
+      description: >-
+        Runs and stores every check, then returns the same payload as GET. Platform managers
+        only. Throttled to 6 requests per minute per user.
       operationId: runPlatformStatusCheck
       security:
         - bearerAuth: []
@@ -38,7 +48,26 @@ paths:
             application/json:
               schema:
                 $ref: '../../components/schemas/PlatformStatus.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          description: Platform manager access required
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
         '429':
-          description: Too many requests
+          description: Too many requests (Laravel `throttle:6,1`)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer

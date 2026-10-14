@@ -5,14 +5,17 @@ paths:
         - Platform
       summary: Search archived CDRs
       description: >-
-        Warm-tier CDRs (older than 6 months, up to 12 months) across all organisations.
-        Platform managers only. Older CDRs are gzip CSV files in the private cdr-archive
-        private S3 bucket and are not served by the API.
+        Warm-tier CDRs (older than 6 months, up to 12 months) across all organisations,
+        newest first (`session_timestamp` descending). Platform managers only. `per_page`
+        defaults to 25 (max 100). Older CDRs are gzip CSV files in the private cdr-archive
+        S3 bucket and are not served by the API.
       operationId: listPlatformCdrArchive
       security:
         - bearerAuth: []
         - cookieAuth: []
       parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
         - name: organization_id
           in: query
           schema:
@@ -22,27 +25,63 @@ paths:
           schema:
             type: string
             format: date
+          description: CDRs with a session timestamp on or after the start of this day
         - name: to_date
           in: query
           schema:
             type: string
             format: date
+          description: CDRs with a session timestamp on or before the end of this day
         - name: from
           in: query
           schema:
             type: string
-          description: Number filter. Starts-with by default; `*` or `%` are wildcards for any characters (anywhere); `_` is literal.
+            maxLength: 100
+          description: Caller number filter, starts-with match. A leading `+` is ignored; `%` and `_` match literally (no wildcards).
         - name: to
           in: query
           schema:
             type: string
-          description: Number filter. Starts-with by default; `*` or `%` are wildcards for any characters (anywhere); `_` is literal.
+            maxLength: 100
+          description: Called number filter, starts-with match. A leading `+` is ignored; `%` and `_` match literally (no wildcards).
         - name: disposition
           in: query
           schema:
             type: string
+            maxLength: 50
+          description: Exact disposition
       responses:
         '200':
           description: Page of archived CDRs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '../../components/schemas/CallDetailRecord.yaml'
+                  meta:
+                    type: object
+                    properties:
+                      current_page:
+                        type: integer
+                      per_page:
+                        type: integer
+                      total:
+                        type: integer
+                      last_page:
+                        type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          description: Platform manager access required
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

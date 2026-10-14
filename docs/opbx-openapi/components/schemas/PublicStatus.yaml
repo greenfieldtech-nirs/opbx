@@ -4,20 +4,39 @@ properties:
     type: object
     properties:
       status: {type: string, enum: [ok, degraded, down, unknown], description: Worst group status}
-      updated_at: {type: [string, 'null'], format: date-time}
+      updated_at:
+        type: [string, 'null']
+        format: date-time
+        description: Time of the most recent check in the last 6 hours (null if none)
       groups:
         type: array
         items:
           type: object
           properties:
-            key: {type: string, example: call_routing}
-            name: {type: string, example: Call routing}
-            status: {type: string, enum: [ok, degraded, down, unknown]}
+            key:
+              type: string
+              enum: [web_portal_api, call_routing, call_queues, dialer_voicemail, recordings_storage, realtime_updates]
+              example: call_routing
+            name:
+              type: string
+              enum: [Web portal & API, Call routing, Call queues, Auto dialer & voicemail detection, Recordings & storage, Real-time updates]
+              example: Call routing
+            status:
+              type: string
+              enum: [ok, degraded, down, unknown]
+              description: Worst latest status of the group's members (`unknown` for a member with no check in the last 6 hours)
             history:
               type: array
               description: Last 6 hours in 5-minute buckets, worst member status per bucket
               items:
                 type: object
                 properties:
-                  at: {type: string, format: date-time}
+                  at:
+                    type: string
+                    format: date-time
+                    description: Start of the 5-minute bucket
                   status: {type: string, enum: [ok, degraded, down, unknown]}
+                  check_at:
+                    type: string
+                    format: date-time
+                    description: Time of the latest check in the bucket that had this status

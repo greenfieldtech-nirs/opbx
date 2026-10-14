@@ -4,7 +4,9 @@ paths:
       tags:
         - Platform
       summary: View audit logs
-      description: Platform-wide audit trail
+      description: |
+        Platform-wide audit trail of platform-manager actions, newest first.
+        Platform managers only. `per_page` defaults to 25 (max 100).
       operationId: getAuditLogs
       security:
         - bearerAuth: []
@@ -30,11 +32,13 @@ paths:
           schema:
             type: string
             format: date
+          description: Entries created on or after the start of this day
         - name: date_to
           in: query
           schema:
             type: string
             format: date
+          description: Entries created on or before the end of this day
       responses:
         '200':
           description: Audit log entries, newest first (per_page defaults to 25)
@@ -78,7 +82,18 @@ paths:
                           type:
                             - string
                             - 'null'
+                        ip_address:
+                          type:
+                            - string
+                            - 'null'
+                        user_agent:
+                          type:
+                            - string
+                            - 'null'
                         created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
                           type: string
                           format: date-time
                         platform_manager:
@@ -113,6 +128,12 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
         '422':
           $ref: '../../components/responses/ValidationError.yaml'

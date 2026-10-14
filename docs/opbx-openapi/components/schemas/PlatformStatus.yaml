@@ -3,7 +3,10 @@ properties:
   data:
     type: object
     properties:
-      checked_at: {type: [string, 'null'], format: date-time}
+      checked_at:
+        type: [string, 'null']
+        format: date-time
+        description: Time of the most recent stored check across all components
       summary:
         type: object
         description: Component counts per status
@@ -14,20 +17,41 @@ properties:
           unknown: {type: integer}
       components:
         type: array
+        description: One entry per component, in a fixed order
         items:
           type: object
           properties:
-            component: {type: string, example: redis}
-            label: {type: string}
-            optional: {type: boolean}
-            status: {type: string, enum: [ok, degraded, down, unknown]}
+            component:
+              type: string
+              enum: [app, mysql, mysql_archive, redis, queue, scheduler, seaweedfs, soketi, acd_worker, amd_worker, dialer_worker, mcp_server, cloudonix, loki, grafana]
+              example: redis
+            label: {type: string, example: Redis}
+            optional:
+              type: boolean
+              description: True for `loki` and `grafana` (the optional logs profile)
+            status:
+              type: string
+              enum: [ok, degraded, down, unknown]
+              description: >-
+                Latest stored status (`unknown` when no check is recorded). The `scheduler`
+                status is evaluated when the request is served, from the scheduler heartbeat.
             latency_ms: {type: [integer, 'null']}
-            detail: {type: string}
+            detail:
+              type: string
+              description: Latest check message (`No check recorded yet` when there is none)
             checked_at: {type: [string, 'null'], format: date-time}
             history:
               type: array
+              description: Last 24 hours in 5-minute buckets, worst status per bucket
               items:
                 type: object
                 properties:
-                  checked_at: {type: string, format: date-time}
+                  checked_at:
+                    type: string
+                    format: date-time
+                    description: Start of the 5-minute bucket
                   status: {type: string, enum: [ok, degraded, down, unknown]}
+                  check_at:
+                    type: string
+                    format: date-time
+                    description: Time of the latest check in the bucket that had this status

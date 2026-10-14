@@ -4,6 +4,10 @@ paths:
       tags:
         - Platform
       summary: List all users (cross-tenant)
+      description: |
+        Users of every organization, each with its `organization` (`id`, `name`, `slug`).
+        Platform managers only. `per_page` defaults to 25 (max 100). An unknown `sort_by`
+        leaves the result unsorted; any `sort_direction` other than `asc` sorts descending.
       operationId: listAllUsers
       security:
         - bearerAuth: []
@@ -23,7 +27,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Name or email
+          description: Substring match on name or email
         - name: role
           in: query
           schema:
@@ -58,7 +62,7 @@ paths:
                     type: array
                     items:
                       type: object
-                      description: User (id, organization_id, name, email, role, status, is_platform_manager, created_at)
+                      description: User (id, organization_id, name, email, role, status, is_platform_manager, created_at, organization)
                       properties:
                         id:
                           type: integer
@@ -77,6 +81,17 @@ paths:
                         created_at:
                           type: string
                           format: date-time
+                        organization:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            slug:
+                              type: string
                   meta:
                     allOf:
                       - $ref: '../../components/schemas/PaginationMeta.yaml'
@@ -87,7 +102,13 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
   
   /v1/platform/users/{user}:
     parameters:
@@ -101,25 +122,56 @@ paths:
       tags:
         - Platform
       summary: Get user details
+      description: Any user in any organization, with its `organization` (`id`, `name`, `slug`). Platform managers only.
       operationId: getPlatformUser
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         '200':
-          description: User (serialized model)
+          description: User (serialized model, without `password` and `remember_token`)
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    $ref: '../../components/schemas/User.yaml'
+                    allOf:
+                      - $ref: '../../components/schemas/User.yaml'
+                      - type: object
+                        properties:
+                          organization:
+                            type:
+                              - object
+                              - 'null'
+                            properties:
+                              id:
+                                type: integer
+                              name:
+                                type: string
+                              slug:
+                                type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
     
     put:
       tags:
         - Platform
       summary: Update user
+      description: |
+        Updates any user in any organization. Platform managers only. Every field is
+        optional; omitted fields are unchanged. A `password` is hashed before it is stored.
+        Writes a `user.updated` audit log entry.
       operationId: updatePlatformUser
       security:
         - bearerAuth: []
@@ -146,11 +198,8 @@ paths:
                   type: string
                   enum: [owner, pbx_admin, pbx_user, reporter, supervisor]
                 status:
-                  type:
-                    - string
-                    - 'null'
-                  enum: [active, inactive, pending, null]
-                  description: Defaults to active
+                  type: string
+                  enum: [active, inactive, pending]
                 phone:
                   type:
                     - string
@@ -193,6 +242,18 @@ paths:
                     type: string
                   data:
                     $ref: '../../components/schemas/User.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
     
@@ -200,6 +261,11 @@ paths:
       tags:
         - Platform
       summary: Delete user
+      description: |
+        Deletes any user in any organization. Platform managers only. Inside one
+        transaction it first applies the deletion impact (see
+        `GET /v1/platform/users/{user}/delete-impact`), then deletes the user. Writes a
+        `user.deleted` audit log entry.
       operationId: deletePlatformUser
       security:
         - bearerAuth: []
@@ -214,8 +280,27 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: User deleted successfully.
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
         '422':
-          description: Cannot delete yourself or the last owner of an organization
+          description: Cannot delete yourself, or the user is the last owner of the organization
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Cannot delete the last owner of an organization.
 
   /v1/platform/users/{user}/password:
     parameters:
@@ -233,10 +318,8 @@ paths:
         - Platform
       summary: Update user password
       description: |
-        Update a user's password (platform manager only).
-        
-        Allows platform managers to reset passwords for any user
-        across all organizations.
+        Sets the password of any user in any organization (platform managers only).
+        Writes a `user.password.updated` audit log entry.
       operationId: updatePlatformUserPassword
       security:
         - bearerAuth: []
@@ -252,11 +335,7 @@ paths:
                   type: string
                   format: password
                   minLength: 8
-                  description: |
-                    New password requirements:
-                    - At least 8 characters
-                    - Upper and lowercase letters
-                    - At least one number
+                  description: New password, at least 8 characters
                   example: "NewSecurePass123"
                 password_confirmation:
                   type: string
@@ -286,7 +365,13 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':

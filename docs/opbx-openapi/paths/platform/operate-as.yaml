@@ -25,7 +25,7 @@ paths:
         switch is driven by the client sending the `X-Operate-As-Organization`
         request header (set to the target organization ID) on every
         subsequent request; see
-        [`ApplyOperateAsOrganization`](/architecture/security) middleware.
+        the `ApplyOperateAsOrganization` middleware ([Security](/opbx/architecture/security)).
 
         Only a real, authenticated platform-manager `User` may call this —
         API key principals and non-platform-manager users are rejected.
@@ -71,6 +71,8 @@ paths:
                             example: acme-corporation
                           status:
                             type: string
+                            enum:
+                              - active
                             example: active
                           timezone:
                             type: string
@@ -79,41 +81,26 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
           description: |
-            Caller is not a platform manager, or the target organization is
-            suspended/deleted.
+            The caller is not a platform manager (`{"message": "Forbidden. Platform manager access required."}`),
+            or the target organization has status `suspended` or `deleted` (`OPERATE_AS_ORG_INACTIVE`).
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: object
-                    properties:
-                      code:
-                        type: string
-                        enum:
-                          - OPERATE_AS_FORBIDDEN
-                          - OPERATE_AS_ORG_INACTIVE
-                        example: OPERATE_AS_ORG_INACTIVE
-                      message:
-                        type: string
-                        example: The target organization is not active.
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: OPERATE_AS_ORG_INACTIVE
+                  message: The target organization is not active.
         '404':
-          description: Target organization not found
+          description: |
+            No organization with this ID (soft-deleted organizations included). Standard
+            route-model-binding 404. The `OPERATE_AS_FORBIDDEN` and `OPERATE_AS_ORG_NOT_FOUND`
+            codes come from the `X-Operate-As-Organization` header handling on tenant routes,
+            not from this endpoint.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: object
-                    properties:
-                      code:
-                        type: string
-                        example: OPERATE_AS_ORG_NOT_FOUND
-                      message:
-                        type: string
-                        example: The target organization could not be found.
+                $ref: '../../components/schemas/Error.yaml'
 
   /v1/platform/operate-as:
     delete:
@@ -146,8 +133,23 @@ paths:
                     Target organization ID to attribute the exit to in the
                     audit log. Optional — accepted via query string or body.
                   example: 42
+      parameters:
+        - name: organization_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Same as the body field `organization_id`.
       responses:
         '204':
           description: Impersonation session stopped
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.

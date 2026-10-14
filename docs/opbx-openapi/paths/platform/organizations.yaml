@@ -4,6 +4,10 @@ paths:
       tags:
         - Platform
       summary: List all organizations
+      description: |
+        All organizations with user, extension and DID counts. Platform managers only.
+        `per_page` defaults to 25 (max 100). An unknown `sort_by` value leaves the
+        result unsorted; any `sort_direction` other than `asc` sorts descending.
       operationId: listOrganizations
       security:
         - bearerAuth: []
@@ -15,7 +19,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Name or slug
+          description: Substring match on name or slug
         - name: status
           in: query
           schema:
@@ -54,6 +58,19 @@ paths:
                               type: integer
                             dids_count:
                               type: integer
+                        - type: object
+                          properties:
+                            public_queues_token:
+                              type:
+                                - string
+                                - 'null'
+                              format: uuid
+                              description: Token of the public queues dashboard link (null until the link is first requested)
+                            deleted_at:
+                              type:
+                                - string
+                                - 'null'
+                              format: date-time
                   meta:
                     allOf:
                       - $ref: '../../components/schemas/PaginationMeta.yaml'
@@ -78,6 +95,11 @@ paths:
       tags:
         - Platform
       summary: Get organization details
+      description: |
+        The organization with its users and counts. Platform managers only. Sensitive
+        values under `settings.cloudonix` (`domain_api_key`, `domain_requests_api_key`,
+        `domain_cdr_auth_key`, `api_key`, `api_secret`, `password`, `secret`, `token`)
+        longer than 4 characters are masked to asterisks plus their last 4 characters.
       operationId: getOrganization
       security:
         - bearerAuth: []
@@ -105,6 +127,16 @@ paths:
                             type: integer
                           business_hours_count:
                             type: integer
+                          public_queues_token:
+                            type:
+                              - string
+                              - 'null'
+                            format: uuid
+                          deleted_at:
+                            type:
+                              - string
+                              - 'null'
+                            format: date-time
                           users:
                             type: array
                             items:
@@ -136,6 +168,11 @@ paths:
       tags:
         - Platform
       summary: Update organization
+      description: |
+        Updates the name, timezone and/or settings. Platform managers only. A field that
+        is omitted or null is left unchanged. `settings` is merged into the existing
+        settings at the top level (a key you send replaces that whole key). Writes an
+        `organization.settings.updated` audit log entry.
       operationId: updatePlatformOrganization
       security:
         - bearerAuth: []
@@ -156,11 +193,13 @@ paths:
                   type:
                     - string
                     - 'null'
+                  description: A valid PHP timezone identifier
+                  example: America/New_York
                 settings:
                   type:
                     - object
                     - 'null'
-                  description: Merged into the existing settings
+                  description: Merged into the existing settings (top-level keys replace)
                   additionalProperties: true
       responses:
         '200':
@@ -172,8 +211,23 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Organization updated successfully.
                   data:
-                    $ref: '../../components/schemas/Organization.yaml'
+                    allOf:
+                      - $ref: '../../components/schemas/Organization.yaml'
+                      - type: object
+                        description: Unmasked settings are returned here.
+                        properties:
+                          public_queues_token:
+                            type:
+                              - string
+                              - 'null'
+                            format: uuid
+                          deleted_at:
+                            type:
+                              - string
+                              - 'null'
+                            format: date-time
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':

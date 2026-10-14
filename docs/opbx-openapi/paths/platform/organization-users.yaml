@@ -4,6 +4,10 @@ paths:
       tags:
         - Platform
       summary: List users by organization
+      description: |
+        Users of one organization. Platform managers only. `per_page` defaults to 25
+        (max 100). An unknown `sort_by` leaves the result unsorted; any `sort_direction`
+        other than `asc` sorts descending.
       operationId: listOrganizationUsers
       security:
         - bearerAuth: []
@@ -20,7 +24,7 @@ paths:
           in: query
           schema:
             type: string
-          description: Name or email
+          description: Substring match on name or email
         - name: role
           in: query
           schema:
@@ -84,12 +88,23 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
     
     post:
       tags:
         - Platform
       summary: Create user in organization
+      description: |
+        Creates a user directly in the organization (no invitation). Platform managers
+        only. `status` defaults to `active`. Writes a `user.created` audit log entry.
       operationId: createOrganizationUser
       security:
         - bearerAuth: []
@@ -126,7 +141,7 @@ paths:
                     - string
                     - 'null'
                   enum: [active, inactive, pending, null]
-                  description: Defaults to active
+                  description: Defaults to `active`
                 phone:
                   type:
                     - string
@@ -168,11 +183,20 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: User created successfully.
                   data:
                     $ref: '../../components/schemas/User.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
