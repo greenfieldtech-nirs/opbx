@@ -37,9 +37,10 @@ Voice routing webhooks are synchronous: Cloudonix POSTs JSON and OPBX returns CX
 - Method: Bearer token from the `Authorization` header
 - Token location: `cloudonix_settings.domain_requests_api_key`
 - Token comparison: `hash_equals()` for timing-safe comparison
-- Error format: CXML with `<Say>Unauthorized. Authentication failed.</Say><Hangup/>`
+- Organization lookup: the `Domain` (or `domain`) field of the JSON body, matched against `cloudonix_settings.domain_name`, then `domain_uuid`
+- Error format: CXML. A missing, malformed or wrong token, an unknown domain, or an organization with no key returns 401 with `<Say>Unauthorized. Authentication failed.</Say><Hangup/>`. A body without `Domain` or without a `to`/`To` number returns 400 with `<Say>Bad request. ...</Say><Hangup/>`
 
-The voice webhook middleware requires a Bearer token. There is no unauthenticated fallback.
+The voice webhook middleware requires a Bearer token. There is no unauthenticated fallback, and `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` does not apply to it. On success it adds `_organization_id` to the request.
 
 ### Voice Routing Endpoints
 
@@ -48,6 +49,7 @@ The voice webhook middleware requires a Bearer token. There is no unauthenticate
 | POST | `/api/voice/route` | `VoiceRoutingController@handleInbound` | Main inbound call routing. |
 | POST | `/api/voice/ivr-input` | `VoiceRoutingController@handleIvrInput` | IVR digit input callback. |
 | POST | `/api/callbacks/voice/ring-group-callback` | `VoiceRoutingController@handleRingGroupCallback` | Ring group sequential/round-robin callback. |
+| POST | `/api/callbacks/voice/conference-pin` | `VoiceRoutingController@handleConferencePin` | Conference room PIN entry. |
 | POST | `/api/callbacks/voice/albs-follow-through` | `AlbsFollowThroughController@handle` | AI load balancer failover routing. |
 | POST | `/api/callbacks/voice/queue-poll` | `QueuePollController@handle` | Call queue hold loop: wait, dial or overflow. |
 | POST | `/api/callbacks/voice/queue-dial-callback` | `QueueDialCallbackController@handle` | Result of a queue offer to an agent. |
@@ -83,7 +85,7 @@ The middleware extracts the domain from:
 2. `payload.owner.domain.name`
 3. `payload.owner.domain.uuid`
 
-It then looks up the organization via `CloudonixSettings` by `domain_name` or `domain_uuid`.
+It then looks up the organization via `CloudonixSettings` by `domain_name`, then by `domain_uuid` (when the value looks like a UUID), then by `owner.domain.uuid`. A payload with no domain returns 400 `Bad Request - Missing domain parameter`; an unknown domain returns 401 `Unauthorized - Unknown domain`. A key that is configured but missing or wrong in the request returns 401 `Unauthorized - Bearer token required` or `Unauthorized - Invalid Bearer token`.
 
 ### Status / CDR Endpoints
 
@@ -101,7 +103,7 @@ The recording-status payload has no `domain` field, so `webhook.signature` canno
 
 `session-update` is high-velocity and therefore skips the idempotency middleware. The controller still deduplicates by `eventId` against the `session_updates` table.
 
-It filters statuses into notification events:
+It lowercases the status and keeps only these statuses, mapped to notification events. Updates with any other status are not stored (the controller only ends extension presence for terminal statuses):
 
 - `new`, `initiated`, `created` → `new`
 - `ringing`, `ring`, `progress` → `ringing`
@@ -168,20 +170,30 @@ The action is never taken from the request body, so a stream sender cannot choos
 ### Key Generation Priority
 
 1. `X-Idempotency-Key` header
-2. SHA-256 of `call_id` + `event_type`
+2. SHA-256 of the call ID (`CallSid` or `call_id`) and the event type (`CallStatus` or `event_type`, or the route name when the payload has no status)
 3. SHA-256 of the full JSON payload
+
+A request that yields no key (empty payload) is processed without idempotency, with a warning in the log.
 
 Redis key format: `idem:webhook:{key}`.
 
 ### Replay Protection
 
-- Timestamps older than 5 minutes are rejected with 400 (except CDR webhooks, which are accepted with a warning log).
-- Timestamps more than 1 minute in the future are rejected with 400.
+Checked only when the payload has a `timestamp` field (Unix seconds):
+
+- Timestamps older than `WEBHOOK_REPLAY_MAX_AGE` (5 minutes) are rejected with 400 `Webhook Expired` (except CDR webhooks, which are accepted with a warning log).
+- Timestamps more than 1 minute in the future are rejected with 400 `Invalid Timestamp`.
+
+### Concurrent Duplicates
+
+Before running the handler, the middleware claims `idem:webhook:{key}:lock` for 60 seconds. A second delivery that arrives while the first is still running gets 409 `Webhook is being processed`. The claim is released when the handler finishes.
 
 ### Response Caching
 
-- Small responses (≤ 100 KB): full content is cached and returned on duplicate requests.
-- Large responses (> 100 KB): only metadata is cached; duplicates receive an empty 200.
+Only successful (2xx) responses are cached, so a failed delivery can be retried.
+
+- Small responses (≤ 100 KB): status, content and content type are cached and returned on duplicate requests.
+- Large responses (> 100 KB): only metadata is cached; duplicates receive an empty body with the original status.
 
 ### Endpoints Using Idempotency
 
