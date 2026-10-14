@@ -7,7 +7,8 @@ paths:
       description: >
         Owner and PBX Admin only. Copies the weekly schedule, the exceptions (with
         their type and special-hours time ranges) and the open/closed actions into a
-        new schedule named "<name> (Copy)" with status `inactive`.
+        new schedule named "<name> (Copy)" with status `inactive` and the same
+        `timezone` as the original.
       operationId: duplicateBusinessHours
       security:
         - bearerAuth: []

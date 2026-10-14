@@ -159,7 +159,7 @@ An action can also become Destination unavailable when a user is deleted and the
 
 ## Duplicate a schedule
 
-The API and the MCP server (`duplicate_business_hours`) can copy a schedule with its days and exceptions (each exception keeps its type, Closed All Day or Special Hours, and its time ranges). The copy is named "*original* (Copy)" and starts **Inactive**. The page has no Duplicate button.
+The API and the MCP server (`duplicate_business_hours`) can copy a schedule with its days and exceptions (each exception keeps its type, Closed All Day or Special Hours, and its time ranges). The copy is named "*original* (Copy)", keeps the original's time zone and starts **Inactive**. The page has no Duplicate button.
 
 ## Fields
 
@@ -260,7 +260,7 @@ Target prefixes checked by the API: `ext-` (extension), `rg-` (ring group), `que
 | GET | `/v1/business-hours/{businessHour}` | One schedule with days and exceptions |
 | PUT | `/v1/business-hours/{businessHour}` | Update |
 | DELETE | `/v1/business-hours/{businessHour}` | Delete. Returns 409 with `references` when in use |
-| POST | `/v1/business-hours/{businessHour}/duplicate` | Copy, saved as Inactive |
+| POST | `/v1/business-hours/{businessHour}/duplicate` | Copy with the same time zone, saved as Inactive |
 | PATCH | `/v1/business-hours/{businessHour}/toggle-status` | Switch Active and Inactive |
 
 Scoped API keys use the `business-hours` resource. The MCP server has `list_business_hours`, `get_business_hours`, `create_business_hours`, `update_business_hours`, `duplicate_business_hours`, `set_business_hours_status` and `delete_business_hours`.

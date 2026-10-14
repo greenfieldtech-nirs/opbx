@@ -249,6 +249,7 @@ class BusinessHoursController extends AbstractApiCrudController
                     'name' => $businessHour->name.' (Copy)',
                     'description' => $businessHour->description,
                     'status' => 'inactive',
+                    'timezone' => $businessHour->timezone,
                     'organization_id' => $user->organization_id,
                     'open_hours_action' => $businessHour->open_hours_action,
                     'open_hours_action_type' => $businessHour->open_hours_action_type,

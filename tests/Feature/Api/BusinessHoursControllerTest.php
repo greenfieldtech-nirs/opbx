@@ -524,4 +524,20 @@ class BusinessHoursControllerTest extends TestCase
 
         $this->assertExceptionTypes(BusinessHoursSchedule::findOrFail($copyId));
     }
+
+    public function test_duplicate_keeps_timezone(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'timezone' => 'Asia/Jerusalem',
+        ]);
+
+        $copyId = $this->postJson("/api/v1/business-hours/{$schedule->id}/duplicate")
+            ->assertCreated()
+            ->assertJsonPath('data.timezone', 'Asia/Jerusalem')
+            ->json('data.id');
+
+        $this->assertSame('Asia/Jerusalem', BusinessHoursSchedule::findOrFail($copyId)->timezone);
+    }
 }
