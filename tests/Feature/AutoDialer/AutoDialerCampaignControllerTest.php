@@ -360,6 +360,46 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertEquals('New Name', $campaign->name);
     }
 
+    public function test_update_refuses_an_active_campaign_and_changes_nothing(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'name' => 'Old Name',
+            'status' => CampaignStatus::ACTIVE,
+            'dial_timeout' => 30,
+        ]);
+
+        foreach (['putJson', 'patchJson'] as $method) {
+            $this->actingAs($this->user)
+                ->{$method}('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['dial_timeout' => 45])
+                ->assertStatus(409)
+                ->assertJsonPath('message', 'Pause the campaign before editing it.');
+        }
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['name' => 'New Name'])
+            ->assertStatus(409);
+
+        $campaign->refresh();
+        $this->assertSame('Old Name', $campaign->name);
+        $this->assertSame(30, $campaign->dial_timeout);
+    }
+
+    public function test_update_allows_a_paused_campaign(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::PAUSED,
+            'dial_timeout' => 30,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['dial_timeout' => 45])
+            ->assertOk();
+
+        $this->assertSame(45, $campaign->refresh()->dial_timeout);
+    }
+
     public function test_update_sets_retry_settings_and_validates_delay(): void
     {
         $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);

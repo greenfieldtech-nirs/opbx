@@ -609,7 +609,7 @@ export default function AutoDialerCampaigns() {
                     
                     // Active/paused campaigns: show Edit (disabled when active)
                     const canEdit = campaign.status !== 'active';
-                    return (
+                    const editButton = (
                       <Button
                         variant="outline"
                         size="sm"
@@ -621,11 +621,20 @@ export default function AutoDialerCampaigns() {
                             navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
                           }
                         }}
-                        title={!canEdit ? 'Pause the campaign to edit' : undefined}
                       >
                         <Edit className="h-3.5 w-3.5 mr-1" />
                         Edit
                       </Button>
+                    );
+                    if (canEdit) return editButton;
+                    // A disabled button gets no pointer events, so the span carries the tooltip
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0} onClick={(e) => e.stopPropagation()}>{editButton}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Pause the campaign to edit it</TooltipContent>
+                      </Tooltip>
                     );
                   }
                 },

@@ -233,6 +233,9 @@ export default function AutoDialerCampaignForm() {
   const callerIdPool = watch('caller_id_pool');
   const callerIdStrategy = watch('caller_id_strategy');
 
+  // An active campaign is never edited: the server answers 409 until it is paused
+  const isActiveCampaign = isEditing && existingCampaign?.status === 'active';
+
   // Determine if pool can be modified (only in DRAFT or PAUSED status)
   const canModifyPool = !isEditing || 
     existingCampaign?.status === 'draft' || 
@@ -437,6 +440,16 @@ export default function AutoDialerCampaignForm() {
           </p>
         </div>
       </div>
+
+      {isActiveCampaign && (
+        <Alert className="bg-yellow-50 border-yellow-200">
+          <Info className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Campaign is running</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            Pause the campaign to edit it.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -881,6 +894,7 @@ export default function AutoDialerCampaignForm() {
           <Button
             type="submit"
             disabled={
+              isActiveCampaign ||
               createMutation.isPending ||
               updateMutation.isPending
             }

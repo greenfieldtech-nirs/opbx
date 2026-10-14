@@ -30,6 +30,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -235,15 +236,27 @@ export default function AutoDialerCampaignDetail() {
 
         {canManageCampaigns && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={campaign.status === 'active'}
-              onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}
-              title={campaign.status === 'active' ? 'Pause the campaign to edit' : undefined}
-            >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
+            {campaign.status === 'active' ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* A disabled button gets no pointer events, so the span carries the tooltip */}
+                    <span tabIndex={0}>
+                      <Button variant="outline" disabled>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Pause the campaign to edit it</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Button variant="outline" onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
             {campaign.status === 'draft' && (
               <Button onClick={() => handleAction('start')}>
                 <Play className="h-4 w-4 mr-2" />

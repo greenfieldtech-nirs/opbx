@@ -30,11 +30,9 @@ class UpdateCampaignRequest extends FormRequest
     {
         $campaign = $this->route('campaign');
 
-        // Cannot update if campaign is active
+        // An active campaign is never edited: the controller answers 409 before anything is validated
         if ($campaign && $campaign->status === CampaignStatus::ACTIVE) {
-            return [
-                'name' => ['prohibited'],
-            ];
+            return [];
         }
 
         return [

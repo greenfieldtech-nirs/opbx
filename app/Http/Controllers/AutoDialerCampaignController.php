@@ -138,17 +138,13 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
-        $data = $request->validated();
-
-        // Check if trying to modify caller_id_pool on active campaign
-        if (isset($data['caller_id_pool']) && $campaign->status === CampaignStatus::ACTIVE) {
+        if ($campaign->status === CampaignStatus::ACTIVE) {
             return response()->json([
-                'message' => 'Cannot modify Caller ID pool on an active campaign',
-                'errors' => [
-                    'caller_id_pool' => ['Please pause the campaign before modifying the Caller ID pool.'],
-                ],
+                'message' => 'Pause the campaign before editing it.',
             ], 409);
         }
+
+        $data = $request->validated();
 
         // Same pool validation as create: a bad pool is a 422, not a 500 from the sync.
         if (isset($data['caller_id_pool'])
