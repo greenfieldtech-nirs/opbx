@@ -154,7 +154,7 @@ Who can do this: Owner and PBX Admin on the page (a PBX Admin not an Owner's ext
 2. Read the **Reset Extension Password?** dialog. It shows the extension number and the user it is assigned to.
 3. Click **Reset Password**.
 
-{/* SCREENSHOT: extensions-reset-password-dialog — Reset Extension Password? dialog for PBX User extension 1005, showing the warning box, the extension number and "Assigned to" with the demo user name */}
+![Reset Extension Password? dialog for extension 1005 with the warning box, the extension number and Assigned to: Emma Wilson](../img/screens/extensions-reset-password-dialog.jpg)
 
 Result: OPBX generates a new password (a 16 to 32 character passphrase of words, digits and a symbol) and pushes it to Cloudonix. The toast "Password reset successfully! New password: …" shows it for 10 seconds with a **Copy** button. Every phone registered with this extension must be configured with the new password.
 
@@ -199,7 +199,7 @@ Who can do this: Owner and PBX Admin (a PBX Admin not an Owner's extension).
 2. In the **Delete Extension?** dialog, check the number. It warns "This extension is currently assigned to a user." when it has a user.
 3. Click **Delete Extension**.
 
-{/* SCREENSHOT: extensions-delete-dialog — Delete Extension? dialog for extension 1011 showing the "This extension is currently assigned to a user." warning */}
+![Delete Extension? dialog for extension 1011 with the warning This extension is currently assigned to a user.](../img/screens/extensions-delete-dialog.jpg)
 
 Result: the toast "Extension deleted successfully" appears and the extension leaves the list. A PBX User extension's Cloudonix subscriber is removed with it. Call history never blocks a delete.
 
