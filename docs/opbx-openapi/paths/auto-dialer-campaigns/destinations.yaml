@@ -206,7 +206,10 @@ paths:
         Get real-time concurrency status for a campaign. Owner, PBX Admin and Reporter only.
 
         Returns current CAC utilization, active sessions,
-        and rate limit status for real-time monitoring.
+        and rate limit status for real-time monitoring. Uses the same live sources as
+        the monitor detail: `active_calls` is the dialer worker's concurrent-call counter and
+        `active_sessions` are the campaign's live call sessions. Never cached. A paused
+        campaign always reports 0 active calls and no sessions.
       operationId: getCampaignConcurrency
       security:
       - bearerAuth: []
@@ -230,7 +233,7 @@ paths:
                         example: 10
                       active_calls:
                         type: integer
-                        description: Currently active calls
+                        description: Currently active calls (the dialer worker's counter; 0 while paused)
                         example: 5
                       available_slots:
                         type: integer
@@ -246,31 +249,44 @@ paths:
                         example: 1.0
                       active_sessions:
                         type: array
-                        description: Active call sessions
+                        description: |
+                          Call sessions in `initiated`, `ringing` or `answered` status that started in the
+                          last 5 minutes, newest first. Always empty for a paused campaign.
                         items:
                           type: object
                           properties:
-                            session_id:
+                            id:
                               type: integer
+                              description: Session ID
                               example: 123
-                            session_token:
-                              type: string
-                              example: sess-abc123
-                            destination_id:
-                              type: integer
-                              example: 456
                             phone_number:
-                              type: string
-                              description: Destination number, or `unknown`
-                              example: '+14155551212'
-                            started_at:
                               type:
                               - string
                               - 'null'
+                              description: Destination phone number
+                              example: '+14155551212'
+                            status:
+                              type: string
+                              enum:
+                              - initiated
+                              - ringing
+                              - answered
+                              description: Current call status
+                              example: answered
+                            call_id:
+                              type:
+                              - string
+                              - 'null'
+                              description: Cloudonix call ID (null until the call is placed)
+                              example: call-abc123
+                            initiated_at:
+                              type: string
                               format: date-time
+                              description: When the call was initiated
                               example: '2024-01-15T14:30:00Z'
                             duration_seconds:
                               type: integer
+                              description: Seconds since initiated_at
                               example: 45
                       rate_limit_status:
                         type: object
