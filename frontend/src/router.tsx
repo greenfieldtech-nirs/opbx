@@ -318,27 +318,51 @@ export const router = createBrowserRouter([
       },
       {
         path: 'call-tracking/dashboard',
-        element: <CallTrackingDashboard />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingDashboard />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns',
-        element: <CallTrackingCampaigns />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingCampaigns />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/new',
-        element: <CallTrackingCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/:id',
-        element: <CallTrackingCampaignDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingCampaignDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/:id/edit',
-        element: <CallTrackingCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/sessions',
-        element: <CallTrackingSessions />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingSessions />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/dni-snippet',
