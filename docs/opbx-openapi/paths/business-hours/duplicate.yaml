@@ -5,9 +5,9 @@ paths:
         - Business Hours
       summary: Duplicate business hours schedule
       description: >
-        Owner and PBX Admin only. Copies the weekly schedule, exceptions and
-        open/closed actions into a new schedule named "<name> (Copy)" with
-        status `inactive`.
+        Owner and PBX Admin only. Copies the weekly schedule, the exceptions (with
+        their type and special-hours time ranges) and the open/closed actions into a
+        new schedule named "<name> (Copy)" with status `inactive`.
       operationId: duplicateBusinessHours
       security:
         - bearerAuth: []

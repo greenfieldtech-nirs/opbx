@@ -63,6 +63,9 @@ properties:
         type:
           type: string
           enum: [closed, special_hours]
+          description: >-
+            Stored as sent. A `special_hours` exception is open only during its time
+            ranges on that date; a `closed` exception is closed all day.
         time_ranges:
           type:
             - array

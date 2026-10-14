@@ -276,6 +276,7 @@ class BusinessHoursController extends AbstractApiCrudController
                     $newException = $newSchedule->exceptions()->create([
                         'name' => $exception->name,
                         'date' => $exception->date,
+                        'type' => $exception->type,
                         'start_time' => $exception->start_time,
                         'end_time' => $exception->end_time,
                         'action' => $exception->action,
@@ -399,6 +400,7 @@ class BusinessHoursController extends AbstractApiCrudController
             $exception = $schedule->exceptions()->create([
                 'name' => $exceptionData['name'],
                 'date' => $exceptionData['date'],
+                'type' => $exceptionData['type'],
                 'start_time' => $exceptionData['start_time'] ?? null,
                 'end_time' => $exceptionData['end_time'] ?? null,
                 'action' => $exceptionData['action'] ?? null,

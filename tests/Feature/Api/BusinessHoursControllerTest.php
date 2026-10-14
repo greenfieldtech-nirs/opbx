@@ -438,4 +438,90 @@ class BusinessHoursControllerTest extends TestCase
             'schedule' => array_fill_keys(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], $day),
         ])->assertStatus(422)->assertJsonValidationErrors(['open_hours_action.target_id']);
     }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $exceptions
+     * @return array<string, mixed>
+     */
+    private function schedulePayload(string $name, array $exceptions): array
+    {
+        $open = ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]];
+        $closed = ['enabled' => false, 'time_ranges' => []];
+
+        return [
+            'name' => $name,
+            'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'America/New_York',
+            'open_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extA->id}"],
+            'closed_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extB->id}"],
+            'schedule' => [
+                'monday' => $open, 'tuesday' => $open, 'wednesday' => $open, 'thursday' => $open,
+                'friday' => $open, 'saturday' => $closed, 'sunday' => $closed,
+            ],
+            'exceptions' => $exceptions,
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function mixedExceptions(): array
+    {
+        return [
+            ['date' => '2026-12-25', 'name' => 'Christmas', 'type' => 'closed'],
+            [
+                'date' => '2026-12-24',
+                'name' => 'Christmas Eve',
+                'type' => 'special_hours',
+                'time_ranges' => [['start_time' => '09:00', 'end_time' => '12:00']],
+            ],
+        ];
+    }
+
+    private function assertExceptionTypes(BusinessHoursSchedule $schedule): void
+    {
+        $exceptions = $schedule->exceptions()->with('timeRanges')->get()->keyBy('name');
+
+        $this->assertSame('closed', $exceptions['Christmas']->type->value);
+        $this->assertSame('special_hours', $exceptions['Christmas Eve']->type->value);
+        $this->assertCount(1, $exceptions['Christmas Eve']->timeRanges);
+        $this->assertSame('09:00', substr((string) $exceptions['Christmas Eve']->timeRanges->first()->start_time, 0, 5));
+    }
+
+    public function test_store_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $id = $this->postJson('/api/v1/business-hours', $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertExceptionTypes(BusinessHoursSchedule::findOrFail($id));
+    }
+
+    public function test_update_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create(['organization_id' => $this->organization->id]);
+
+        $this->putJson("/api/v1/business-hours/{$schedule->id}", $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertOk();
+
+        $this->assertExceptionTypes($schedule->fresh());
+    }
+
+    public function test_duplicate_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $id = $this->postJson('/api/v1/business-hours', $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertCreated()
+            ->json('data.id');
+
+        $copyId = $this->postJson("/api/v1/business-hours/{$id}/duplicate")
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertExceptionTypes(BusinessHoursSchedule::findOrFail($copyId));
+    }
 }
