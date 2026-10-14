@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\CallTracking;
 
+use App\Models\CallTrackingCampaign;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 /**
@@ -17,7 +19,8 @@ class AnalyticsRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        // Same readers as the campaigns: Owner, PBX Admin, Reporter (API keys pass via Gate::before).
+        return Gate::allows('viewAny', CallTrackingCampaign::class);
     }
 
     /**
