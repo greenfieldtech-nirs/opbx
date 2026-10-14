@@ -31,43 +31,80 @@ Use the Embedded Dialer to:
 | Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
 | Set the organization's allowed domains (Settings) | Yes | No | No | No | No |
-| Open a user's Embedded Dialer dialog, set icon position and colour | Yes | Yes | No | No | No |
-| Regenerate a user's token and get the snippet | Yes | Yes | No | No | No |
+| Open a user's Embedded Dialer dialog, set icon position and colour | Yes | Yes, except for an Owner's account | No | No | No |
+| Regenerate a user's token and get the snippet | Yes | Yes, except for an Owner's account | No | No | No |
 
-Token management is only for signed-in users. Scoped API keys cannot call the embed-token endpoints.
+The **Embed** column on **Users** is shown to Owners and PBX Admins only, and a PBX Admin sees no **Get Code** badge on an Owner's row. The server applies the same rule (403 otherwise). Token management is only for signed-in users. Scoped API keys cannot call the embed-token endpoints.
 
-## Step 1: Allow the host website
+## Workflows
+
+### Allow a website to embed the dialer
+
+**Who can do this:** Owner.
 
 The list of websites that may embed the dialer is set once for the whole organization and applies to every embedded user.
 
-1. Open **Settings** (Owner only).
+1. Open **Settings**.
 2. Find **Embedded Dialer — Allowed Domains**.
-3. Add each host name without a scheme, for example `crm.example.com`. For local testing, `localhost` or an IP address with an optional port is accepted, for example `localhost:3000` or `127.0.0.1:3000`.
-4. Save the settings.
+3. Type a host name in the field, for example `crm.example.com`, and click the **+** button (or press Enter). A scheme and any path are stripped, so `https://crm.example.com/leads` is added as `crm.example.com`. For local testing, `localhost` or an IP address with an optional port is accepted, for example `localhost:3000` or `127.0.0.1:3000`.
+4. Repeat for each website. Each entry appears as a badge.
+5. Click **Validate and Save Settings**. The list is saved together with the rest of the Cloudonix settings, so the **Domain UUID** and **API Key** must be filled in. A toast confirms "Settings validated and saved successfully".
 
-Each entry must be a host name, `localhost` or an IPv4 address, optionally followed by `:port`. Anything else is refused with "Each embed allowed domain must be a valid hostname, localhost, or IP address, optionally with a port".
+Each entry must be a host name, `localhost` or an IPv4 address, optionally followed by `:port`. The page refuses anything else with "Enter a valid hostname, localhost, or IP address (a port is allowed)." and a repeated entry with "Domain already added". The server applies the same rule: "Each embed allowed domain must be a valid hostname, localhost, or IP address, optionally with a port".
 
 While the list is empty, Settings shows "No domains yet — the embedded dialer cannot be used until you add one."
 
 ![Settings page, Embedded Dialer - Allowed Domains section with crm.example.com typed into the domain field before it is added](../img/screens/embedded-dialer-allowed-domains.jpg)
 
-## Step 2: Get the snippet for a user
+### Remove a website from the allowed list
+
+**Who can do this:** Owner.
+
+1. Open **Settings** and find **Embedded Dialer — Allowed Domains**.
+2. Click the **×** on the domain's badge.
+3. Click **Validate and Save Settings**.
+
+From then on the dialer no longer loads on that website, for every user.
+
+### Set the dialer icon for a user
+
+**Who can do this:** Owner; PBX Admin for any user except an Owner.
 
 1. Open **Users**.
-2. On the user's row, in the **Embed** column, click **Get Code** (tooltip "Embedded dialer settings").
-3. In the **Embedded Dialer** dialog, choose:
-   - **Icon Position**: Bottom Right (default), Bottom Left, Top Right or Top Left;
-   - **Icon Color**: a colour in `#RRGGBB` form (default `#007acc`).
-4. Click **Save Settings**. A toast confirms "Embedded dialer settings saved".
-5. Click **Regenerate Token**. The **Installation Snippet (shown once)** appears with a **Copy** button. Copy it now.
+2. On the user's row, in the **Embed** column, click **Get Code** (tooltip "Embedded dialer settings"). The **Embedded Dialer** dialog opens. The first time, OPBX creates the user's token record.
+3. Choose the **Icon Position**: Bottom Right (default), Bottom Left, Top Right or Top Left.
+4. Choose the **Icon Color** with the colour picker, or type it in `#RRGGBB` form (default `#007acc`).
+5. Click **Save Settings**. A toast confirms "Embedded dialer settings saved".
+
+The icon inside the dialer follows the saved settings the next time the host page loads. The corner where the dialer frame sits on the host page comes from the `iconPosition` in the installed snippet, so after changing the position, also change `iconPosition` in the installed snippet (or install a new one).
 
 ![Embedded Dialer dialog for Emma Wilson with Icon Position Bottom Right, Icon Color #007acc and the Regenerate Token and Save Settings buttons (the one-time snippet appears only after Regenerate Token)](../img/screens/embedded-dialer-dialog.jpg)
 
+### Get the installation snippet for a user
+
+**Who can do this:** Owner; PBX Admin for any user except an Owner.
+
+1. Open **Users** and click **Get Code** on the user's row.
+2. If you changed the icon settings, click **Save Settings** first. The snippet is built from the saved settings, not from unsaved changes in the dialog.
+3. Click **Regenerate Token**.
+4. Confirm in the **Regenerate embed token** dialog by clicking **Regenerate**. A toast confirms "New embed token generated. Old token is now revoked."
+5. The **Installation Snippet (shown once)** appears. Click **Copy** ("Snippet copied to clipboard") and keep it for the next workflow.
+
+{/* SCREENSHOT: embedded-dialer-snippet — Embedded Dialer dialog for Emma Wilson after Regenerate Token, with the amber Installation Snippet (shown once) box, its Copy button and the snippet pointing at https://pbx.example.com/embed/loader.js */}
+
 :::warning The token is shown once, and regenerating revokes the old one
-The token is stored only as a hash and cannot be shown again. If you lose the snippet, click **Regenerate Token** for a new one. Regenerating **immediately revokes** the previous token: every site that still uses the old snippet stops working. OPBX asks you to confirm before it happens.
+The token is stored only as a hash and cannot be shown again. If you lose the snippet, regenerate for a new one. Regenerating **immediately revokes** the previous token: every site that still uses the old snippet stops working until you install the new snippet.
 :::
 
-## Step 3: Install the snippet
+### Revoke a user's embedded dialer
+
+**Who can do this:** Owner; PBX Admin for any user except an Owner.
+
+There is no separate revoke button. To cut off every site that uses a user's snippet, follow [Get the installation snippet for a user](#get-the-installation-snippet-for-a-user) and do not install the new snippet anywhere. Deactivating the user also stops the dialer ("Embed token is not active.").
+
+### Install the snippet on a website
+
+**Who can do this:** whoever maintains the host website. No OPBX role is needed.
 
 Paste the snippet anywhere in the host page's HTML:
 
@@ -91,7 +128,7 @@ Paste the snippet anywhere in the host page's HTML:
 | `iconPosition` | `bottom-right`, `bottom-left`, `top-right` or `top-left` |
 | `iconBackgroundColor` | The launcher colour |
 
-The loader adds a 360 × 600 pixel iframe (`/embed/dialer`) in the chosen corner, with microphone access allowed. Inside it the Web Phone opens and registers straight away. The icon position and colour shown inside the iframe come from the settings saved in the dialog.
+The loader adds a 360 × 600 pixel iframe (`/embed/dialer`) in the corner given by the snippet's `iconPosition`, with microphone access allowed. Inside it the Web Phone opens and registers straight away. The icon position and colour shown inside the iframe come from the settings saved in the dialog.
 
 ## Drive the dialer from the host page
 
