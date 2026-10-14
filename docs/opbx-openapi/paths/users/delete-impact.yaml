@@ -16,8 +16,8 @@ paths:
       description: |
         Returns what deleting this user would change, without changing anything: the
         extensions it holds, the ring group and call queue memberships that would be
-        removed, and the routing entries that would be cleared. Use it to confirm a
-        delete. Authorization is the same as `DELETE /v1/users/{user}`.
+        removed, and the routing entries that would be switched to `unavailable`. Use it to
+        confirm a delete. Authorization is the same as `DELETE /v1/users/{user}`.
       operationId: getUserDeleteImpact
       security:
         - bearerAuth: []

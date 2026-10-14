@@ -4,9 +4,10 @@ paths:
       tags:
       - Users
       summary: List users
-      description: 'Get a paginated list of users in the organization, sorted by `sort_by`.
-        Supervisors see only themselves and their assigned users. Each user includes
-        its assigned `extension`.
+      description: 'Get a paginated list of users in the organization, sorted by `sort_by`
+        (newest first by default). Owner and PBX Admin see every user; a Supervisor sees
+        only themselves and their assigned users; PBX User and Reporter get 403. Each user
+        includes its assigned `extension`.
 
         '
       operationId: listUsers
@@ -31,7 +32,15 @@ paths:
           - created_at
           - updated_at
           default: created_at
-      - $ref: ../../components/parameters/query/SortOrder.yaml
+      - name: sort_order
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+          default: desc
       responses:
         '200':
           description: List of users
@@ -54,17 +63,18 @@ paths:
       tags:
       - Users
       summary: Create user
-      description: 'Create a new user in the organization.
+      description: 'Create a new user in the organization. Owner and PBX Admin only.
 
 
         **Role Restrictions:**
 
-        - Owner role cannot be assigned (single owner per organization)
+        - Owner role cannot be assigned (422)
 
-        - PBX Admins can only create PBX Users or Reporters
+        - A PBX Admin cannot create a PBX Admin (422)
 
 
-        Default status is `active` if not specified.
+        Default status is `active` if not specified. An Embedded Dialer token is created for
+        the new user.
 
         '
       operationId: createUser
@@ -186,7 +196,9 @@ paths:
       tags:
       - Users
       summary: Get user
-      description: Get a specific user by ID
+      description: >-
+        Get a specific user by ID. Owner and PBX Admin can read any user; a Supervisor
+        themselves and their assigned users; PBX User and Reporter only themselves.
       operationId: getUser
       security:
       - bearerAuth: []
@@ -215,16 +227,22 @@ paths:
       tags:
       - Users
       summary: Update user
-      description: 'Update an existing user.
+      description: 'Update an existing user. All fields are optional.
 
 
         **Restrictions:**
 
-        - Users cannot change their own role
+        - Owner and PBX Admin can update any user, except that only an Owner can update an Owner;
+        a PBX User can update only themselves; Supervisor and Reporter get 403
 
-        - Owner role cannot be assigned
+        - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when
+        updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for
+        an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
 
-        - PBX Admins cannot modify Owner or PBX Admin users
+        - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an
+        Owner (403)
+
+        - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
 
         '
       operationId: updateUser
@@ -331,16 +349,22 @@ paths:
       tags:
       - Users
       summary: Partially update user
-      description: 'Update an existing user.
+      description: 'Update an existing user. All fields are optional.
 
 
         **Restrictions:**
 
-        - Users cannot change their own role
+        - Owner and PBX Admin can update any user, except that only an Owner can update an Owner;
+        a PBX User can update only themselves; Supervisor and Reporter get 403
 
-        - Owner role cannot be assigned
+        - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when
+        updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for
+        an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
 
-        - PBX Admins cannot modify Owner or PBX Admin users
+        - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an
+        Owner (403)
+
+        - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
 
         '
       operationId: patchUser
@@ -447,10 +471,14 @@ paths:
       tags:
       - Users
       summary: Delete user
-      description: 'Delete a user from the organization.
+      description: 'Delete a user from the organization. Owner and PBX Admin only; you cannot
+        delete yourself, and only an Owner can delete an Owner. The last Owner of the
+        organization cannot be deleted (409).
 
 
-        **Restriction:** Cannot delete the last owner in the organization.
+        The user''s extensions are kept but unassigned, their ring group and call queue
+        memberships are removed, and routing entries that pointed at their extensions are
+        switched to `unavailable`. Preview this with `GET /v1/users/{user}/delete-impact`.
 
         '
       operationId: deleteUser
@@ -471,11 +499,24 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
-          description: Cannot delete last owner
+          description: >-
+            The user is the organization's last Owner (`LAST_OWNER_DELETE_BLOCKED`), or the
+            owner-deletion lock could not be acquired (`LOCK_ACQUISITION_FAILED`, retry)
           content:
             application/json:
               schema:
-                $ref: ../../components/schemas/Error.yaml
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                  error_code:
+                    type: string
+                    enum:
+                    - LAST_OWNER_DELETE_BLOCKED
+                    - LOCK_ACQUISITION_FAILED
               example:
                 success: false
                 message: Cannot delete the last owner in the organization.

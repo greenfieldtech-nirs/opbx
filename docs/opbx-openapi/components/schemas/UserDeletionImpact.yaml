@@ -25,7 +25,9 @@ properties:
           example: '1001'
   memberships:
     type: array
-    description: Ring group and call queue memberships of the user's extensions that the delete removes.
+    description: >-
+      Ring group memberships of the user's extensions and call queue agent memberships of the
+      user that the delete removes.
     items:
       type: object
       required: [type, id, name, becomes_empty]
@@ -42,7 +44,10 @@ properties:
           description: True when removing these members leaves the group or queue with no members.
   routes:
     type: array
-    description: Routing entries (fallbacks, IVR options, JSON destinations, business-hours actions) that point at the user's extensions and are cleared by the delete.
+    description: >-
+      Routing entries (fallbacks, IVR options, JSON destinations, business-hours actions) that
+      point at the user's extensions; the delete switches them to the `unavailable`
+      destination.
     items:
       type: object
       required: [type, id, name, detail]
