@@ -20,11 +20,13 @@ The `CallTrackingNumber` model links a DID number to a call tracking campaign. W
 | `id` | bigint unsigned | No | auto | Primary key |
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
 | `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
-| `did_number_id` | bigint unsigned | No | - | Linked DID |
+| `did_number_id` | bigint unsigned | No | - | Linked DID. Unique: a DID can belong to only one tracking number |
 | `friendly_name` | varchar(255) | Yes | null | Display label |
-| `status` | enum | No | active | `active` or `inactive` |
+| `status` | enum | No | active | `active` or `inactive` (cast to `CallTrackingCampaignStatus`) |
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+Indexes: unique `ct_numbers_did_unique` (`did_number_id`), `ct_numbers_org_campaign_idx` (`organization_id`, `call_tracking_campaign_id`). All three foreign keys cascade on delete.
 
 ## Relationships
 
@@ -35,6 +37,8 @@ $number->organization() → Organization
 $number->campaign() → CallTrackingCampaign
 $number->did() → DidNumber
 ```
+
+Scopes: `forOrganization($orgId)`, `active()`. Method: `isActive()`.
 
 ## Status
 

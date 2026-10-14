@@ -19,18 +19,20 @@ The `CallTrackingCampaign` model represents a marketing campaign that attributes
 |--------|------|----------|---------|-------------|
 | `id` | bigint unsigned | No | auto | Primary key |
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
-| `name` | varchar(255) | No | - | Campaign name (unique per organization) |
+| `name` | varchar(255) | No | - | Campaign name. Unique per organization (request validation; there is no unique index) |
 | `source` | varchar(100) | Yes | null | Marketing source (e.g. utm_source) |
 | `medium` | varchar(100) | Yes | null | Marketing medium (e.g. utm_medium) |
 | `description` | text | Yes | null | Campaign description |
 | `status` | enum | No | active | `active` or `inactive` |
-| `destination_type` | enum | No | forward | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `unavailable` |
+| `destination_type` | enum | No | forward | `forward`, `extension`, `ring_group`, `business_hours`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `unavailable`. `unavailable` is rejected when creating a campaign |
 | `destination_config` | json | No | - | Destination-specific configuration |
-| `conversion_rule` | json | Yes | null | Conversion rule configuration |
+| `conversion_rule` | json | No | - | Conversion rule configuration. When the create request omits it, the API stores `{"min_answered_duration_seconds": 0, "requires_answered_disposition": false}` |
 | `google_ads_upload_enabled` | boolean | No | false | Enable Google Ads conversion upload |
 | `meta_upload_enabled` | boolean | No | false | Enable Meta conversion upload |
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+Indexes: (`organization_id`, `status`) and (`organization_id`, `source`, `medium`). `organization_id` references `organizations` with `ON DELETE CASCADE`.
 
 ## Destination Configuration
 
@@ -106,6 +108,7 @@ CallTrackingCampaign::forOrganization($orgId)
 CallTrackingCampaign::active()
 CallTrackingCampaign::withStatus(CallTrackingCampaignStatus $status)
 CallTrackingCampaign::search($term)
+CallTrackingCampaign::unprovisioned($on = true) // destination_type = 'unavailable' (HasUnprovisionedState)
 ```
 
 ### Business Logic
@@ -114,6 +117,7 @@ CallTrackingCampaign::search($term)
 $campaign->isActive(): bool
 $campaign->getForwardTo(): ?string
 $campaign->getDestinationId(string $key): ?int
+$campaign->is_unprovisioned // true when destination_type is 'unavailable'
 ```
 
 ## Related Documentation

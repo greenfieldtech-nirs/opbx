@@ -7,7 +7,7 @@ title: CallTrackingSession Model
 
 # CallTrackingSession Model
 
-The `CallTrackingSession` model represents a single attributed call to a tracking number. Sessions are created from Cloudonix CDRs by `ProcessCDRJob` and are used for analytics, conversion tracking, and ad-platform uploads.
+The `CallTrackingSession` model represents a single attributed call to a tracking number. Sessions are created by `CallTrackingSessionService::createFromCDR()` when the Cloudonix CDR webhook stores a CDR whose number is a tracking number, and are used for analytics, conversion tracking, and ad-platform uploads.
 
 **Table:** `call_tracking_sessions`  
 **Model:** `App\Models\CallTrackingSession`  
@@ -43,6 +43,8 @@ The `CallTrackingSession` model represents a single attributed call to a trackin
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
 
+Indexes: `call_id`, `session_id`, (`called_number`, `started_at`), (`organization_id`, `started_at`), (`organization_id`, `call_tracking_campaign_id`, `started_at`), plus the foreign-key indexes. All four foreign keys cascade on delete.
+
 ## Relationships
 
 ### Belongs To
@@ -58,13 +60,15 @@ $session->did() → DidNumber
 
 Conversion is evaluated by `ConversionRuleEvaluator` using the campaign's `conversion_rule`:
 
-- `min_answered_duration_seconds` must be met if configured.
-- `requires_answered_disposition` must be met if enabled.
-- `conversion_value` is copied from the rule if set.
+- If `requires_answered_disposition` is true (or missing from the rule), the disposition must be `CONNECTED` or `ANSWERED`.
+- `billsec` must be at least `min_answered_duration_seconds` (0 when missing).
+- On a converted session, `conversion_value` is copied from the rule if set.
+
+After the session is created, its events are dispatched to the campaign's notification webhook, and a converted session is also sent to the enabled ad platforms.
 
 ## Retention
 
-Rows older than `RETENTION_CALL_TRACKING_SESSIONS_DAYS` (default 183) are deleted daily. They are not archived.
+Rows whose `created_at` is older than `RETENTION_CALL_TRACKING_SESSIONS_DAYS` (default 183) are deleted daily by `model:prune` (`PrunesByRetention`). They are not archived.
 
 ## Related Documentation
 

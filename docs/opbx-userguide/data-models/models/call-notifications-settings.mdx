@@ -17,19 +17,19 @@ The `CallNotificationsSettings` model stores per-organization webhook notificati
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | `id` | bigint unsigned | No | auto | Primary key |
-| `organization_id` | bigint unsigned | No | - | Singleton per org |
+| `organization_id` | bigint unsigned | No | - | Unique: one row per organization. Foreign key to `organizations`, `ON DELETE CASCADE` |
 | `webhook_url` | varchar(2048) | No | - | Target URL |
 | `auth_method` | enum | No | none | `none`, `bearer_token`, `basic_auth`. The column enum still lists `hmac_sha256` (not accepted by the API); the DB default is `none` and migration `2026_10_14_100000` converted old `hmac_sha256` rows to `none` |
-| `auth_secret` | text | Yes | null | Encrypted secret |
-| `auth_username` | string | Yes | null | For basic auth |
-| `retry_attempts` | int | No | 3 | Max retries |
-| `retry_backoff_seconds` | int | No | 60 | Base backoff |
-| `request_timeout_seconds` | int | No | 30 | HTTP timeout |
-| `enabled_events` | JSON | No | `["new","ringing","connected","answered","busy","cancel","failed","congestion"]` | Event types |
-| `rate_limit_per_minute` | int | No | 500 | Redis-based rate limit |
+| `auth_secret` | text | Yes | null | Bearer token or basic-auth password. `encrypted` cast, hidden from serialization |
+| `auth_username` | varchar(255) | Yes | null | For basic auth |
+| `retry_attempts` | tinyint unsigned | No | 3 | Max retries (API: 1-10) |
+| `retry_backoff_seconds` | smallint unsigned | No | 60 | Base backoff (API: 10-3600) |
+| `request_timeout_seconds` | smallint unsigned | No | 30 | HTTP timeout (API: 5-120) |
+| `enabled_events` | json | No | all eight events (model default) | Subset of `new`, `ringing`, `connected`, `answered`, `busy`, `cancel`, `failed`, `congestion`. The column has no database default; the model's `$attributes` sets all eight |
+| `rate_limit_per_minute` | smallint unsigned | No | 500 | Redis-based rate limit (API: 100-5000) |
 | `is_active` | boolean | No | true | Master switch |
-| `created_at` | datetime | Yes | - | |
-| `updated_at` | datetime | Yes | - | |
+| `created_at` | timestamp | Yes | null | |
+| `updated_at` | timestamp | Yes | null | |
 
 ## Relationships
 
@@ -52,9 +52,11 @@ $settings->isConfigured(): bool
 $settings->getAuthHeaders(array $payload): array
 ```
 
+`isConfigured()` is true when `webhook_url` is set and `is_active` is true. `getAuthHeaders()` returns `Authorization: Bearer <auth_secret>` for `bearer_token`, `Authorization: Basic base64(auth_username:auth_secret)` for `basic_auth`, and no header for `none`.
+
 ## Usage Notes
 
-- Webhook URLs are validated against SSRF rules before storage.
+- Webhook URLs are validated by the `ValidWebhookUrl` rule (SSRF protection) before storage.
 - The model is scoped by `OrganizationScope`; webhook handlers use `OrganizationScope::bypass()` to read it.
 - Authentication secrets are encrypted at rest.
 

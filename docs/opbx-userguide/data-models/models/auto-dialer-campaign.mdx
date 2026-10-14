@@ -47,12 +47,12 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `action_unknown` | varchar(255) | Yes | null | AMD action for unknown |
 | `retry_on_voicemail` | boolean | No | false | Retry a destination that reached voicemail |
 | `retry_on_busy_no_answer` | boolean | No | false | Redial busy / no-answer destinations within `max_dial_attempts` |
-| `retry_delay_minutes` | integer | No | 15 | Minutes before the first busy / no-answer retry (1 to 1440); doubles for each further retry, capped at 24 hours |
-| `total_destinations` | int | No | 0 | Total destinations count |
-| `completed_calls` | int | No | 0 | Completed calls count |
-| `failed_calls` | int | No | 0 | Failed calls count |
-| `voicemail_calls` | int | No | 0 | Voicemail calls count |
-| `pending_calls` | int | No | 0 | Pending calls count |
+| `retry_delay_minutes` | smallint unsigned | No | 15 | Minutes before the first busy / no-answer retry (1 to 1440); doubles for each further retry, capped at 24 hours |
+| `total_destinations` | int unsigned | No | 0 | Total destinations count |
+| `completed_calls` | int unsigned | No | 0 | Completed calls count |
+| `failed_calls` | int unsigned | No | 0 | Failed calls count |
+| `voicemail_calls` | int unsigned | No | 0 | Voicemail calls count |
+| `pending_calls` | int unsigned | No | 0 | Pending calls count |
 | `pause_reason` | varchar(255) | Yes | null | Reason for pause |
 | `resume_at` | timestamp | Yes | null | Scheduled resume time |
 | `started_at` | timestamp | Yes | null | When campaign started |
@@ -60,12 +60,25 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
 
+## Indexes
+
+| Index | Columns |
+|-------|---------|
+| `adc_org_status_idx` | `organization_id`, `status` |
+| `adc_org_auto_start_idx` | `organization_id`, `auto_start`, `status` |
+| `adc_dates_idx` | `start_date`, `end_date` |
+| `auto_dialer_campaigns_routing_destination_id_foreign` | `routing_destination_id` |
+
+`organization_id` references `organizations` with `ON DELETE CASCADE`. `routing_destination_id` has no foreign key constraint: it points to an AI assistant or an AI load balancer depending on `routing_destination_type`.
+
 ## Relationships
 
 ### Belongs To
 
 ```php
 campaign.organization() → Organization
+campaign.aiAssistant() → AiAssistant (routing_destination_id, when routing to an AI assistant)
+campaign.aiLoadBalancer() → AiAssistantLoadBalancer (routing_destination_id, when routing to a load balancer)
 ```
 
 ### Has Many
@@ -77,12 +90,18 @@ campaign.callSessions() → AutoDialerCallSession[]
 campaign.callerIdStats() → AutoDialerCallerIdStat[]
 ```
 
+### Has One
+
+```php
+campaign.list() → AutoDialerList (deprecated: the first list; use lists())
+```
+
 ### Belongs To Many
 
 ```php
 campaign.callerIds() → DidNumber[]
   - Pivot: auto_dialer_campaign_caller_ids
-  - With pivot: weight
+  - With pivot: weight, with timestamps
 ```
 
 ## Enums
@@ -150,7 +169,7 @@ AutoDialerCampaign::forOrganization($orgId)
 AutoDialerCampaign::active()
 AutoDialerCampaign::paused()
 AutoDialerCampaign::draft()
-AutoDialerCampaign::runnable() // Active and within schedule
+AutoDialerCampaign::runnable() // Active, with start_date/end_date within one day of today (coarse pre-filter; isRunnable() does the exact, timezone-aware check)
 ```
 
 ### Business Logic
@@ -165,7 +184,12 @@ $campaign->hasList(): bool
 $campaign->canStart(): bool
 $campaign->canPause(): bool
 $campaign->canAcceptList(): bool
+$campaign->getPendingCount(): int          // destinations with status pending
+$campaign->getRoutingDestinationLabel(): string
+$campaign->clearRedisKeys(): void          // deletes dialer:cac:{id}:active and campaign:{id}:caller_id_index on the dialer Redis
 ```
+
+`isRunnable()` evaluates the current time in the campaign's `timezone` and checks the date range and the `schedule` time ranges for today. `getApiIntervalMilliseconds()` returns `1000 / calls_per_second`. `hasValidCac()` and `hasValidCps()` check the `MIN_CAC`/`MAX_CAC` (1-50) and `MIN_CPS`/`MAX_CPS` (1-30) constants.
 
 ## Related Documentation
 

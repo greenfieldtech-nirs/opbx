@@ -32,7 +32,7 @@ Tracks usage statistics for each Caller ID (DID) within a campaign's pool. Provi
 
 - **Primary:** `id`
 - **Unique:** `campaign_id` + `did_number_id` (one stats record per DID per campaign)
-- **Foreign Keys:** Indexed automatically
+- **Foreign keys:** `campaign_id` → `auto_dialer_campaigns`, `did_number_id` → `did_numbers`, both `ON DELETE CASCADE`
 
 ## Relationships
 
@@ -119,33 +119,14 @@ $mostUsed = $campaign->callerIdStats->sortByDesc('total_calls')->first();
 
 ## Recording Statistics
 
-Statistics are recorded automatically when call sessions are updated via webhooks:
+`CallerIdPoolService` creates one row per pool DID, with all counters at 0, when a campaign's Caller ID pool is created or synced, and deletes the rows of DIDs removed from the pool. The service's `getCallerIdStats()` builds the API response shown above.
 
-```php
-// In CDR webhook handler
-$stat = AutoDialerCallerIdStat::firstOrCreate([
-    'campaign_id' => $session->campaign_id,
-    'did_number_id' => $session->caller_did_id,
-]);
-
-if ($disposition === 'completed') {
-    $stat->recordCompleted();
-} else {
-    $stat->recordFailed();
-}
-```
+`recordCompleted()` and `recordFailed()` are defined on the model, but no webhook handler, job or the dialer worker calls them in the current code, so `total_calls`, `completed_calls`, `failed_calls` and `last_used_at` are not updated after the rows are created.
 
 ## Analytics Queries
 
 ```php
-// Top performing Caller IDs
-$topPerformers = AutoDialerCallerIdStat::with('didNumber')
-    ->where('campaign_id', $campaignId)
-    ->orderByDesc('success_rate')
-    ->limit(5)
-    ->get();
-
-// Caller IDs needing attention (high failure rate)
+// Caller IDs with more failed than completed calls
 $problematic = AutoDialerCallerIdStat::with('didNumber')
     ->where('campaign_id', $campaignId)
     ->whereColumn('failed_calls', '>', 'completed_calls')
@@ -156,6 +137,8 @@ $distribution = AutoDialerCallerIdStat::where('campaign_id', $campaignId)
     ->select('did_number_id', 'total_calls')
     ->get();
 ```
+
+`success_rate` is an accessor (`completed_calls / total_calls * 100`, rounded to 2 decimals, 0 when there are no calls), not a column, so you cannot sort or filter on it in SQL.
 
 ## Related Models
 

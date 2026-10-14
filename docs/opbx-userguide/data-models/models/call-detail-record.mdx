@@ -28,7 +28,8 @@ The `CallDetailRecord` model stores the final record of every call, created from
 | `domain` | varchar(255) | Yes | Cloudonix domain |
 | `subscriber` | varchar(100) | Yes | Subscriber (extension) UUID |
 | `cx_trunk_id` | int | Yes | Trunk |
-| `application`, `route`, `vapp_server` | varchar | Yes | Cloudonix routing details |
+| `application`, `route` | varchar(255) | Yes | Cloudonix routing details |
+| `vapp_server` | varchar(50) | Yes | Cloudonix voice application server |
 | `rated_cost`, `approx_cost`, `sell_cost` | decimal(10,4) | Yes | Costs |
 | `session_id` | bigint | Yes | Cloudonix session ID |
 | `call_start_time`, `call_answer_time`, `call_end_time` | timestamp | Yes | Call times |
@@ -40,10 +41,25 @@ The `CallDetailRecord` model stores the final record of every call, created from
 | `amd_confidence` | decimal(5,2) | Yes | AMD confidence |
 | `raw_cdr` | json | No | The CDR payload as received |
 | `is_auto_dialer` | boolean | No | Auto-dialer call. Default false |
-| `auto_dialer_campaign_id` | bigint unsigned | Yes | Campaign |
+| `auto_dialer_campaign_id` | bigint unsigned | Yes | Campaign. Foreign key to `auto_dialer_campaigns`, `ON DELETE SET NULL` |
 | `created_at` / `updated_at` | timestamp | Yes | |
 
 `archived_call_detail_records` has the same columns and keeps the original IDs.
+
+`organization_id` references `organizations` with `ON DELETE CASCADE`. `amd_result`, `amd_confidence`, `is_auto_dialer` and `auto_dialer_campaign_id` are not mass assignable; they are set separately for auto-dialer calls.
+
+### Indexes
+
+Single-column indexes on `call_id`, `disposition`, `domain`, `from`, `to`, `session_timestamp`, `session_token` and `auto_dialer_campaign_id`, plus these composite indexes:
+
+| Index | Columns |
+|-------|---------|
+| `cdr_org_ts_idx` | `organization_id`, `session_timestamp` |
+| `cdr_org_disp_idx` | `organization_id`, `disposition` |
+| `cdr_org_from_idx` | `organization_id`, `from` |
+| `cdr_org_to_idx` | `organization_id`, `to` |
+| `cdr_org_session_idx` | `organization_id`, `session_id` |
+| `cdr_auto_dialer_org_idx` | `is_auto_dialer`, `organization_id` |
 
 ## Storage Tiers
 
@@ -74,7 +90,7 @@ CallDetailRecord::betweenDates($start, $end)
 $cdr->formatted_duration / $cdr->formatted_billsec / $cdr->amd_status
 ```
 
-`createFromWebhook()` takes a lock on `cdr:create:{organization_id}:{call_id}`, so a redelivered CDR does not create a second row.
+`createFromWebhook()` takes a cache lock on `cdr:create:{organization_id}:{call_id}` (held up to 10 seconds, waits up to 5) and returns the existing row for that `call_id` if there is one, so a redelivered CDR does not create a second row. `extension()` matches `subscriber` against `extensions.cloudonix_uuid`; `sessionUpdate()` is the latest `session_updates` row with the same `session_id`.
 
 ## Related Documentation
 

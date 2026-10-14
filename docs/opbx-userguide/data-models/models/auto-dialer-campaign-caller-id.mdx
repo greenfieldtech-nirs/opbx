@@ -30,7 +30,7 @@ Pivot model for the many-to-many relationship between campaigns and Caller IDs (
 
 - **Primary:** `id`
 - **Unique:** `campaign_id` + `did_number_id` (prevents duplicate assignments)
-- **Foreign Keys:** Indexed automatically
+- **Foreign keys:** `campaign_id` → `auto_dialer_campaigns`, `did_number_id` → `did_numbers`, both `ON DELETE CASCADE`
 
 ## Relationships
 
@@ -84,7 +84,7 @@ $campaign->callerIds()->updateExistingPivot($didId, [
 
 ## Weight System
 
-The `weight` field controls distribution frequency in weighted strategies:
+The `weight` field controls distribution frequency in the `round_robin` (weighted round robin) and `random` (weighted random) strategies. `least_recently_used` ignores it. A weight below 1 is treated as 1.
 
 | Weight | Meaning | Example (3 DIDs with weights 1,1,2) |
 |--------|---------|-------------------------------------|
@@ -96,16 +96,17 @@ The `weight` field controls distribution frequency in weighted strategies:
 
 ## Constraints
 
-- Maximum 100 Caller IDs per campaign (enforced at application level)
+- Maximum 100 Caller IDs per campaign (enforced by request validation)
 - Only DIDs with `status = 'active'` can be assigned
 - DIDs must belong to the same organization as the campaign
+- The pool cannot be changed while the campaign is `active` (`CallerIdPoolService` returns 409)
 
 ## Validation
 
 ```php
 // In CreateCampaignRequest/UpdateCampaignRequest
-'caller_id_pool' => ['required', 'array', 'min:1', 'max:100'],
-'caller_id_pool.*.did_id' => ['required', 'exists:did_numbers,id'],
+'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
+'caller_id_pool.*.did_id' => ['required', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
 'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
 ```
 

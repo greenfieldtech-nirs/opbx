@@ -17,34 +17,48 @@ The `SessionUpdate` model stores real-time session update events from Cloudonix 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | `id` | bigint unsigned | No | Primary key |
-| `organization_id` | bigint unsigned | No | Tenant scope |
+| `organization_id` | bigint unsigned | No | Tenant scope. Foreign key, `ON DELETE CASCADE` |
 | `session_id` | bigint | No | Cloudonix session ID |
-| `session_token` | string | Yes | Token for Cloudonix API disconnect |
+| `session_token` | varchar(64) | Yes | Token for Cloudonix API disconnect |
 | `event_id` | varchar(36) | No | Idempotency key |
 | `domain_id` | int | No | Cloudonix domain ID |
-| `domain` | string | No | Domain name |
+| `domain` | varchar(255) | No | Domain name |
 | `subscriber_id` | int | Yes | Subscriber ID |
 | `outgoing_subscriber_id` | int | Yes | Outgoing subscriber ID |
-| `caller_id` | string | No | Caller number |
-| `destination` | string | No | Callee number |
+| `caller_id` | varchar(50) | No | Caller number |
+| `destination` | varchar(50) | No | Callee number |
 | `direction` | enum | No | `incoming`, `outgoing`, `internal`, `application`. Copied to the CDR at ingest |
-| `status` | string | No | Current status |
-| `session_created_at` | datetime | No | Session creation time |
-| `session_modified_at` | datetime | No | Last modification time |
+| `status` | varchar(50) | No | Current status |
+| `session_created_at` | timestamp | No | Session creation time |
+| `session_modified_at` | timestamp | No | Last modification time |
 | `call_start_time` | bigint | Yes | Start timestamp (ms) |
-| `start_time` | datetime | Yes | Parsed start time |
+| `start_time` | timestamp | Yes | Parsed start time |
 | `call_answer_time` | bigint | Yes | Answer timestamp (ms) |
-| `answer_time` | datetime | Yes | Parsed answer time |
+| `answer_time` | timestamp | Yes | Parsed answer time |
 | `time_limit` | int | Yes | Call time limit |
-| `vapp_server` | string | Yes | Voice app server |
-| `action` | string | No | |
-| `reason` | string | No | |
-| `last_error` | text | Yes | |
-| `call_ids` | JSON | No | Associated call IDs |
-| `profile` | JSON | No | Session profile (QoS, AMD) |
-| `processed_at` | datetime | No | When OPBX processed the event |
+| `vapp_server` | varchar(45) | Yes | Voice app server |
+| `action` | varchar(50) | No | Cloudonix session action |
+| `reason` | varchar(100) | No | Cloudonix status reason |
+| `last_error` | text | Yes | Last error reported by Cloudonix |
+| `call_ids` | json | No | Associated call IDs |
+| `profile` | json | No | Session profile (QoS, AMD) |
+| `processed_at` | timestamp | No | When OPBX processed the event. Default `CURRENT_TIMESTAMP` |
 | `created_at` | timestamp | Yes | |
 | `updated_at` | timestamp | Yes | |
+
+### Indexes
+
+| Index | Columns |
+|-------|---------|
+| `unique_session_event` (unique) | `organization_id`, `session_id`, `event_id` |
+| `su_org_session_status_idx` | `organization_id`, `session_id`, `status` |
+| `su_org_status_updated_idx` | `organization_id`, `status`, `updated_at` |
+| `session_updates_organization_id_created_at_index` | `organization_id`, `created_at` |
+| `idx_caller_destination` | `caller_id`, `destination` |
+| `idx_created_at` | `session_created_at` |
+| `idx_event_id` | `event_id` |
+| `session_updates_session_id_index` | `session_id` |
+| `session_updates_session_token_index` | `session_token` |
 
 ## Relationships
 
@@ -66,9 +80,9 @@ SessionUpdate::search($term) // caller_id or destination
 
 - The Live Calls module queries this table to display active sessions.
 - The `profile` field is the Cloudonix session profile. For auto-dialer calls it can include the AMD result, which Laravel writes to the Cloudonix profile when the AMD worker reports.
-- Session updates are processed idempotently using `event_id`.
+- Session updates are processed idempotently using `event_id`; the unique index on (`organization_id`, `session_id`, `event_id`) rejects a duplicate row.
 - Every 15 minutes, `session-updates:cleanup` marks sessions stuck in an active state (no CDR or delete event arrived) as deleted.
-- Rows older than `RETENTION_SESSION_UPDATES_DAYS` (default 30) are pruned daily at 03:00.
+- Rows whose `updated_at` is older than `RETENTION_SESSION_UPDATES_DAYS` (default 30) are pruned daily at 03:00 UTC by `model:prune`.
 
 ## Related Documentation
 

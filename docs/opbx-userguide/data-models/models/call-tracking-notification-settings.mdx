@@ -19,15 +19,17 @@ The `CallTrackingNotificationSettings` model stores per-campaign webhook notific
 |--------|------|----------|---------|-------------|
 | `id` | bigint unsigned | No | auto | Primary key |
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
-| `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign |
+| `call_tracking_campaign_id` | bigint unsigned | No | - | Parent campaign. Unique: one settings row per campaign |
 | `webhook_url` | varchar(2048) | No | - | Destination URL |
 | `auth_method` | enum | No | none | `none`, `bearer_token`, `basic_auth` |
-| `auth_secret` | text | Yes | null | Encrypted token/password |
+| `auth_secret` | text | Yes | null | Token or password (`encrypted` cast) |
 | `auth_username` | varchar(255) | Yes | null | Basic auth username |
 | `enabled_events` | json | No | - | Array of event types |
 | `is_active` | boolean | No | true | Whether notifications are enabled |
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+Indexes: unique `ct_notif_settings_campaign_unique` (`call_tracking_campaign_id`) and `ct_notif_settings_org_active_idx` (`organization_id`, `is_active`). Both foreign keys cascade on delete.
 
 ## Events
 
@@ -42,7 +44,7 @@ The `CallTrackingNotificationSettings` model stores per-campaign webhook notific
 ## Security
 
 - Outbound URLs are validated with `SsrfUrlValidator` to prevent SSRF.
-- `Authorization` headers are redacted before being persisted in delivery logs.
+- The `Authorization` header is stored as `***REDACTED***` in delivery logs.
 
 ## Relationships
 
@@ -51,6 +53,14 @@ The `CallTrackingNotificationSettings` model stores per-campaign webhook notific
 ```php
 $settings->organization() → Organization
 $settings->campaign() → CallTrackingCampaign
+```
+
+## Methods
+
+```php
+CallTrackingNotificationSettings::forCampaign($campaignId)
+$settings->isEventEnabled(string $event): bool
+$settings->isConfigured(): bool // webhook_url set and is_active
 ```
 
 ## Related Documentation
