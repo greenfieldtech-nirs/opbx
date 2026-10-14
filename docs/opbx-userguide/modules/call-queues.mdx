@@ -88,7 +88,7 @@ If the agent hangs up after the caller has joined, the call ends.
 
 The toast "Call queue created" appears and the queue is listed as **Active**. It becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Join a queue as an agent](#join-a-queue-as-an-agent)).
 
-![Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the Unprovisioned filter button](../img/screens/call-queues-list.jpg)
+{/* SCREENSHOT: call-queues-list — Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the filter bar: Search call queues..., refresh, All Strategies, All Status, Unprovisioned */}
 
 ![New Call Queue dialog showing the strategy, timeouts, hold music, the option switches, agents and the overflow fallback selector](../img/screens/call-queues-create-dialog.jpg)
 
@@ -120,11 +120,22 @@ The badge switches at once. An inactive queue keeps its settings but does not ac
 
 The fallback now stores **Destination unavailable**, and the queue shows the **Unprovisioned** badge in the list and the dialog title. Create screens never offer Disconnect. A fallback also becomes Destination unavailable when a user is deleted and the fallback pointed at that user's extension.
 
+### Find a call queue
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+1. Open **Call Queues** in the sidebar.
+2. Type in **Search call queues...** to filter by name or description.
+3. Narrow the list with the strategy filter (**All Strategies**, **Ring All**, **Round Robin**, **Least Talk Time**, **Fewest Calls**), the status filter (**All Status**, **Active**, **Inactive**) and the **Unprovisioned** button.
+4. Click the refresh button to reload the list.
+
+When no queue matches, the list reads "No call queues found" and "Try adjusting your filters".
+
 ### Find unprovisioned queues
 
 **Who can do this:** Owner, PBX Admin, Reporter.
 
-1. On **Call Queues**, click the **Unprovisioned** button above the list.
+1. On **Call Queues**, click the **Unprovisioned** button in the filter bar.
 
 Only queues whose fallback is Destination unavailable are listed. Click **Unprovisioned** again to show all queues.
 
