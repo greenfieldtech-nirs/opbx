@@ -185,7 +185,7 @@ A call counts as failed when the provider leg ends **busy**, **no answer**, **fa
 | Fallback Action | Result |
 |-----------------|--------|
 | PBX User Extension | Rings the chosen extension. The dialog lists active PBX User extensions |
-| Ring Group | Sends the call to the ring group |
+| Ring Group | Sends the call to the ring group, which rings its members with its own strategy and uses its own fallback. If the group is missing or inactive, the call ends |
 | IVR Menu | Plays the menu |
 | AI Assistant | Connects one more assistant, without Follow Through. It cannot be a member of the same load balancer ("Circular reference detected") |
 | Call Queue | Puts the caller in the call queue |

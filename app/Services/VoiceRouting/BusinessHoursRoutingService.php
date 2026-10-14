@@ -240,24 +240,9 @@ class BusinessHoursRoutingService
             );
         }
 
-        $members = $ringGroup->getMembers()->filter(fn ($ext) => $ext->isActive());
-        $sipUris = $members->map(fn ($ext) => $ext->getSipUri())->filter()->values()->toArray();
-
-        if (empty($sipUris)) {
-            return response(
-                CxmlBuilder::unavailable('No active members in ring group'),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
-        }
-
-        $recording = $this->recordingDecision->resolve($organizationId, $request->input('_call_category', 'inbound'));
-
-        return response(
-            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout, null, $recording->record, $recording->recordingStatusCallback),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        // The group's own strategy and fallback, as on every other path to a ring group.
+        return app(VoiceRoutingManager::class)
+            ->executeStrategy(ExtensionType::RING_GROUP, $request, new DidNumber, ['ring_group' => $ringGroup]);
     }
 
     /**

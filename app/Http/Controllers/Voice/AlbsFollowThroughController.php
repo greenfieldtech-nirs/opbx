@@ -14,7 +14,6 @@ use App\Models\AutoDialerCallSession;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
-use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
@@ -459,7 +458,7 @@ class AlbsFollowThroughController extends Controller
             RingGroupFallbackAction::HANGUP => $this->hangupResponse(),
             RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             RingGroupFallbackAction::EXTENSION => $this->routeToExtension($albs, $request),
-            RingGroupFallbackAction::RING_GROUP => $this->routeToRingGroup($albs, $request),
+            RingGroupFallbackAction::RING_GROUP => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackRingGroup($albs, $request),
             RingGroupFallbackAction::IVR_MENU => $this->routeToIvrMenu($albs, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->routeToAiAssistant($albs, $request, $metadata),
             RingGroupFallbackAction::CALL_QUEUE => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackCallQueue($albs, $request),
@@ -529,61 +528,6 @@ class AlbsFollowThroughController extends Controller
 
         return response(
             CxmlBuilder::simpleDial($sipUri),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
-    }
-
-    /**
-     * Route to fallback ring group.
-     */
-    private function routeToRingGroup(AiAssistantLoadBalancer $albs, Request $request): Response
-    {
-        $ringGroupId = $albs->fallback_ring_group_id;
-
-        if (! $ringGroupId) {
-            Log::warning('ALBS Follow Through: No fallback ring group configured', [
-                'albs_id' => $albs->id,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $ringGroupId)
-            ->where('organization_id', $albs->organization_id)
-            ->where('status', 'active')
-            ->first();
-
-        if (! $ringGroup) {
-            Log::warning('ALBS Follow Through: Fallback ring group not found or inactive', [
-                'albs_id' => $albs->id,
-                'ring_group_id' => $ringGroupId,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        $members = $ringGroup->getMembers()->filter(fn (Extension $ext) => $ext->isActive());
-        $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
-
-        if (empty($sipUris)) {
-            Log::warning('ALBS Follow Through: Fallback ring group has no active members', [
-                'albs_id' => $albs->id,
-                'ring_group_id' => $ringGroupId,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        Log::info('ALBS Follow Through: Routing to fallback ring group', [
-            'albs_id' => $albs->id,
-            'ring_group_id' => $ringGroupId,
-            'member_count' => count($sipUris),
-        ]);
-
-        return response(
-            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
             200,
             ['Content-Type' => 'application/xml']
         );

@@ -399,7 +399,8 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         );
     }
 
-    private function handleFallbackRingGroup(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    /** Public: the follow-through controller reuses it. */
+    public function handleFallbackRingGroup(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackRingGroupId = $aiLoadBalancer->fallback_ring_group_id;
 

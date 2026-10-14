@@ -183,7 +183,9 @@ A Simultaneous ring group does not use a multi-number `<Dial>` (Cloudonix's acti
 
 ## Step 7: AI Load Balancer Follow-Through
 
-For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failover when the primary AI provider is busy or unavailable. It tries the next assistant in the balancer distribution.
+For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failover when the primary AI provider is busy or unavailable. It tries the next assistant in the balancer distribution. When none is left, the balancer's fallback runs; a ring-group or call-queue fallback is handed to `AiLoadBalancerRoutingStrategy` (`handleFallbackRingGroup`, `handleFallbackCallQueue`), which runs the target's normal strategy.
+
+A ring group is always routed through `RingGroupRoutingStrategy` (`VoiceRoutingManager::executeStrategy(RING_GROUP, ...)`), whatever reaches it: a DID, an extension, an IVR option or failover, a business-hours action (`BusinessHoursRoutingService` and the IVR business-hours path), or a ring group, call queue or AI load balancer fallback. So its strategy, fallback and answering-member attribution are the same on every path.
 
 ---
 

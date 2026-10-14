@@ -187,6 +187,8 @@ A ring group appears as a destination in:
 - **Business hours**: as the open-hours or closed-hours action.
 - **Other ring groups, call queues and AI load balancers**: as the fallback.
 
+However the call reaches the group, it rings the members with the group's own strategy (Sequential, Round Robin or Simultaneous), and the group's fallback runs when no member answers.
+
 ## Common errors
 
 | Message | What it means | What to do |
