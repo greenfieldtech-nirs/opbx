@@ -82,6 +82,14 @@ required:
   - name
   - timezone
   - status
+  - is_unprovisioned
+  - schedule
+  - exceptions
+  - open_hours_action
+  - closed_hours_action
+  - current_status
+  - created_at
+  - updated_at
 $defs:
   TimeRange:
     type: object
@@ -111,6 +119,7 @@ $defs:
       type:
         type: string
         enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, call_queue, unavailable]
+        description: Falls back to `extension` when no type is stored
       target_id:
         type: string
-        description: Target resource ID as a string (empty string when none)
+        description: Prefixed target ID as stored (for example `ext-12`, `rg-3`); empty string when none

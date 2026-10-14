@@ -4,6 +4,7 @@ paths:
       tags:
         - Business Hours
       summary: Toggle business hours status
+      description: Sets the schedule status to the value sent.
       operationId: toggleBusinessHoursStatus
       security:
         - bearerAuth: []
@@ -37,6 +38,7 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Business hours schedule status updated successfully.
                   data:
                     type: object
                     properties:

@@ -4,7 +4,9 @@ paths:
       tags:
         - Business Hours
       summary: List Business Hours Schedules
-      description: Get paginated list of Business Hours Schedules
+      description: >
+        Paginated list of the organization's schedules. Available to all roles.
+        An unknown `sort_by` falls back to `name`; default order is ascending.
       operationId: listBusinessHoursSchedules
       security:
         - bearerAuth: []
@@ -48,6 +50,7 @@ paths:
       tags:
         - Business Hours
       summary: Create Business Hours Schedule
+      description: Owner and PBX Admin only.
       operationId: createBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -70,10 +73,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Businesshoursschedule created successfully.
                   data:
                     $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -114,6 +120,9 @@ paths:
       tags:
         - Business Hours
       summary: Update Business Hours Schedule
+      description: >
+        Owner and PBX Admin only. Full replacement: send the whole schedule,
+        including `status`.
       operationId: updateBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -136,10 +145,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Businesshoursschedule updated successfully.
                   data:
                     $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -148,6 +160,9 @@ paths:
       tags:
         - Business Hours
       summary: Partially update Business Hours Schedule
+      description: >
+        Same as PUT. Despite the method, the body is validated as a full
+        replacement (all required fields, including `status`).
       operationId: patchBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -170,10 +185,13 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Businesshoursschedule updated successfully.
                   data:
                     $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -183,7 +201,7 @@ paths:
       tags:
         - Business Hours
       summary: Delete Business Hours Schedule
-      description: Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
       operationId: deleteBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -195,6 +213,8 @@ paths:
           description: Business Hours Schedule deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '409':

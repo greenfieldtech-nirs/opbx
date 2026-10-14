@@ -1,5 +1,9 @@
 type: object
-description: Business hours schedule create/update request. All top-level fields are required on both create and update (full replacement).
+description: >-
+  Business hours schedule create/update request. Create and update (PUT or PATCH)
+  both replace the whole schedule: the weekly days and the exceptions are deleted
+  and recreated from the request. `status` is required on update and defaults to
+  `active` on create.
 properties:
   name:
     type: string
@@ -9,6 +13,7 @@ properties:
   status:
     type: string
     enum: [active, inactive]
+    description: Required on update; defaults to `active` on create when omitted or empty
   timezone:
     type: string
     description: Any valid timezone identifier
@@ -19,7 +24,7 @@ properties:
     $ref: '#/$defs/Action'
   schedule:
     type: object
-    description: All seven days are required
+    description: Days that are not sent are stored as disabled with no time ranges
     properties:
       monday:
         $ref: '#/$defs/Day'
@@ -35,12 +40,15 @@ properties:
         $ref: '#/$defs/Day'
       sunday:
         $ref: '#/$defs/Day'
-    required: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]
   exceptions:
     type:
       - array
       - 'null'
     maxItems: 100
+    description: >-
+      Date exceptions. When two exceptions share a date only the first is kept.
+      `closed` exceptions must not have time ranges; `special_hours` exceptions
+      need at least one.
     items:
       type: object
       properties:
@@ -64,7 +72,6 @@ properties:
       required: [date, name, type]
 required:
   - name
-  - status
   - timezone
   - open_hours_action
   - closed_hours_action
@@ -96,6 +103,7 @@ $defs:
         items:
           $ref: '#/$defs/TimeRange'
     required: [enabled]
+    description: An enabled day needs at least one time range
   Action:
     type: object
     properties:
@@ -106,4 +114,11 @@ $defs:
       target_id:
         type: string
         maxLength: 255
+        description: >-
+          Prefixed target ID: `ext-{id}` (extension), `rg-{id}` (ring group),
+          `queue-{id}` (call queue) and `ivr-{id}` (IVR menu) are format-checked;
+          `conf-{id}` (conference room) and `alb-{id}` (AI load balancer) are the
+          formats the UI sends; an AI assistant uses its plain ID. Prefixed
+          extension, ring group, call queue, IVR menu and conference room
+          targets must exist in the organization.
     required: [type, target_id]

@@ -4,6 +4,10 @@ paths:
       tags:
         - Business Hours
       summary: Duplicate business hours schedule
+      description: >
+        Owner and PBX Admin only. Copies the weekly schedule, exceptions and
+        open/closed actions into a new schedule named "<name> (Copy)" with
+        status `inactive`.
       operationId: duplicateBusinessHours
       security:
         - bearerAuth: []
@@ -26,6 +30,7 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Business hours schedule duplicated successfully.
                   data:
                     $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
