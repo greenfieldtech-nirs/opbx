@@ -76,6 +76,7 @@ properties:
       - hangup
       - unavailable
     example: extension
+    description: Only the fallback_*_id matching this action is set; the others are null.
   fallback_extension_id:
     type:
       - integer
@@ -104,11 +105,13 @@ properties:
     example: active
   agents:
     type: array
+    description: Agent users. Not included in the toggle-status response.
     items:
       type: object
       properties:
         id:
           type: integer
+          description: User ID
         name:
           type: string
         extension_id:
@@ -121,9 +124,11 @@ properties:
             - 'null'
   agents_count:
     type: integer
+    description: List endpoint only
     example: 5
   moh_recording:
     $ref: '#/$defs/Ref'
+    description: Hold music recording summary (`id`, `name`); null when none. Not included in the toggle-status response.
   fallback_extension:
     $ref: '#/$defs/Ref'
   fallback_ring_group:
@@ -132,6 +137,10 @@ properties:
     $ref: '#/$defs/Ref'
   fallback_ai_assistant:
     $ref: '#/$defs/Ref'
+    description: |
+      List endpoint only (as are `fallback_extension`, `fallback_ring_group` and
+      `fallback_ivr_menu`). Null when that target is not set. There is no
+      `fallback_ai_load_balancer` summary; use `fallback_ai_load_balancer_id`.
   created_at:
     type: string
     format: date-time
@@ -140,8 +149,10 @@ properties:
     format: date-time
 $defs:
   Ref:
-    type: object
-    description: Related resource summary (present when loaded); `name` or `extension_number`
+    type:
+      - object
+      - 'null'
+    description: Related resource summary; `fallback_extension` carries `extension_number`, the others `name`
     properties:
       id:
         type: integer

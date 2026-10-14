@@ -11,7 +11,7 @@ paths:
       tags:
         - Call Queues
       summary: Toggle call queue status
-      description: Flips the queue between `active` and `inactive`. Requires update permission on the queue.
+      description: Flips the queue between `active` and `inactive`. Owner and PBX Admin only. The returned queue does not include `agents`, `moh_recording` or the fallback summaries.
       operationId: toggleCallQueueStatus
       security:
         - bearerAuth: []
