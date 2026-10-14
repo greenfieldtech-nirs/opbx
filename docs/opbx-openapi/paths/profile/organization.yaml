@@ -5,11 +5,12 @@ paths:
         - Profile
       summary: Update organization
       description: |
-        Update organization details.
-        
-        **Authorization:** Only users with Owner role can update organization.
-        
-        Rate limited with `throttle:sensitive` middleware.
+        Update organization details. Only fields provided are updated.
+
+        **Authorization:** Only users with Owner role can update organization. Not
+        available to API keys.
+
+        Rate limited with `throttle:sensitive`: 10 requests per minute per user.
       operationId: updateOrganization
       security:
         - bearerAuth: []
@@ -23,12 +24,13 @@ paths:
               properties:
                 name:
                   type: string
+                  minLength: 1
                   maxLength: 255
-                  description: Organization name
+                  description: Organization name (cannot be empty when sent)
                   example: Acme Corporation Inc.
                 timezone:
                   type: string
-                  description: PHP timezone identifier
+                  description: PHP timezone identifier (any identifier PHP accepts; cannot be empty when sent)
                   example: America/Los_Angeles
       responses:
         '200':
@@ -42,7 +44,25 @@ paths:
                     type: string
                     example: Organization updated successfully.
                   organization:
-                    $ref: '../../components/schemas/Organization.yaml'
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      slug:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - suspended
+                        - deleted
+                      timezone:
+                        type: string
+                      updated_at:
+                        type: string
+                        format: date-time
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
@@ -50,6 +70,14 @@ paths:
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '429':
-          $ref: '../../components/responses/TooManyRequests.yaml'
+          description: Too many attempts (10 requests per minute per user), or the per-organization API limit
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Too Many Requests
+                message: Too many attempts. Please try again later.
+                retry_after: 60
         '500':
           $ref: '../../components/responses/ServerError.yaml'
