@@ -34,19 +34,86 @@ Use this module to:
 
 The API leaves `pin` and `host_pin` out of the response for anyone who cannot edit the room. The **Security** column still shows whether a PIN is set.
 
-## Create a conference room
+## Workflows
 
-1. Open **Conference Rooms** in the sidebar.
-2. Click **Create Conference Room**.
-3. Enter the **Conference Room Name** and **Max Participants**.
-4. Open **Security & Access** and **Audio Settings** to set the options below.
-5. Click **Create Conference Room**.
+### Create a conference room
 
-The room is saved as **Active** and becomes available as a destination.
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Conference Rooms** in the sidebar (under **PBX Configuration**).
+2. Click **Add Conference Room**. The **Create Conference Room** dialog opens.
+3. Enter the **Conference Room Name** and **Max Participants** (default 25).
+4. Optionally expand **Security & Access** to protect the room (see [Protect a room with a PIN](#protect-a-room-with-a-pin) and [Set up a host](#set-up-a-host)).
+5. Optionally expand **Audio Settings** and switch on **Mute on Entry**, **Announce Join/Leave**, **Music on Hold**, **Enable Recording** or **Enable Talk Detection**.
+6. Click **Create Conference Room**.
+
+The toast "Conference room created successfully" appears and the room is listed as **Active**. It becomes available as a destination.
 
 ![Conference Rooms list with Support Escalation Bridge (capacity 15, Standard audio, Open) and Weekly All-Hands (capacity 50, Recording and Mute on Entry, PIN and Wait for Host)](../img/screens/conference-rooms-list.jpg)
 
 ![Create Conference Room dialog with Security & Access and Audio Settings expanded, PIN Protection on and a participant PIN entered](../img/screens/conference-rooms-create-dialog.jpg)
+
+### Protect a room with a PIN
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the room (click its row) or start a new one.
+2. Expand **Security & Access** and switch on **PIN Protection**.
+3. Enter the **Participant PIN** (digits only).
+4. Click **Save Changes** (or **Create Conference Room**).
+
+Callers are now asked "Please enter the conference PIN followed by the pound key." The list shows **PIN** in the **Security** column.
+
+### Set up a host
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the room and expand **Security & Access**.
+2. Enter the **Host PIN** (digits only). The label reads **Host PIN (Optional)**, or **Host PIN (Required)** once Wait for Host is on.
+3. To hold participants until the host joins, switch on **Wait for Host**. The switch stays disabled until a Host PIN is entered.
+4. Click **Save Changes**.
+
+A caller who enters the host PIN joins as the host: never muted on entry, and the room ends for everyone when the host leaves. With Wait for Host on, the list shows **Wait for Host** in the **Security** column.
+
+### Edit a conference room
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the room's row or name in the list. The **Edit Conference Room** dialog opens with both sections collapsed.
+2. Change the settings.
+3. Click **Save Changes**.
+
+The toast "Conference room updated successfully" appears.
+
+![Edit Conference Room dialog for Weekly All-Hands showing PIN 4821, host PIN 9034, Wait for Host, Mute on Entry and Announce Join/Leave on](../img/screens/conference-rooms-edit-dialog.jpg)
+
+### Activate or deactivate a room
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the **Active** or **Inactive** badge in the **Status** column.
+
+The toast "Conference room updated successfully" appears and the badge switches. Callers who reach an inactive room hear "Conference room is closed" and the call ends. The status filter calls inactive rooms **Disabled**.
+
+### Find a room
+
+**Who can do this:** Owner, PBX Admin, PBX User, Reporter.
+
+1. Type in **Search conference rooms...**, or pick **All Statuses**, **Active** or **Disabled** in the status filter.
+2. Click a column header such as **Capacity** to sort, and **Refresh** to reload.
+
+PBX Users and Reporters see the page with a **Read-Only** badge: they cannot open, toggle or delete rooms.
+
+### Delete a conference room
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the delete (trash) icon on the row.
+2. Confirm with **Delete** in the **Delete Conference Room** dialog.
+
+The toast "Conference room deleted successfully" appears and the row disappears. The delete is refused while something still routes to the room: a phone number, an IVR menu option or failover, a business-hours action, an extension of type Conference, or a call-tracking campaign. The **Cannot delete: still in use** dialog lists each one. Change those first, then delete again.
+
+![Cannot delete: still in use dialog for Weekly All-Hands listing the phone number +12025550103 as a routing target](../img/screens/conference-rooms-in-use-dialog.jpg)
 
 ## Fields
 
@@ -59,11 +126,11 @@ The room is saved as **Active** and becomes available as a destination.
 | Host PIN | Digits only, up to 20. Optional, but required when Wait for Host is on | |
 | Wait for Host | Off by default. Needs a Host PIN: saving without one is refused | |
 | Mute on Entry | Off by default | Participants join muted |
-| Announce Join/Leave | Off by default | Plays a tone or announcement when someone joins or leaves |
+| Announce Join/Leave | Off by default | Plays voice prompts when someone joins or leaves |
 | Music on Hold | Off by default | |
 | Enable Recording | Off by default. With an optional **Recording Webhook URL** | The room is recorded from its start |
 | Enable Talk Detection | Off by default. Needs a **Webhook URL** | |
-| Status | Active or Disabled. Default: Active | Changed from the list |
+| Status | Active or Inactive (the status filter says **Disabled**). Default: Active | Changed from the list |
 
 The API also accepts a **description** (up to 1000 characters). The dialog does not show it.
 
@@ -71,9 +138,9 @@ Webhook URLs must be valid URLs up to 500 characters that are publicly reachable
 
 ### How the settings apply to a call
 
-- **PIN Protection.** The caller is asked for the participant PIN followed by `#`. Three wrong entries end the call. No PIN entered ends the call.
+- **PIN Protection.** The caller is asked for the participant PIN followed by `#` and has 8 seconds to start. Three wrong entries end the call ("Too many incorrect attempts. Goodbye."). No PIN entered ends the call. A room with PIN Protection on but no PIN stored is not joinable: callers hear a short "not available" message.
 - **Host PIN.** A caller who enters the host PIN joins as the host. The host is never muted on entry, and **the room ends for everyone when the host leaves**.
-- **Wait for Host.** Participants wait (with hold music if enabled) until the host joins. Saving the room with Wait for Host on and no Host PIN is refused (HTTP 422, error on `host_pin`). Rooms saved earlier with Wait for Host on and no Host PIN keep working: the setting is ignored for them so the room cannot get stuck, and the next save that touches Wait for Host or the Host PIN asks you to set a PIN. If PIN Protection is off, callers are offered a short chance to enter the host PIN and are otherwise let in as waiting participants.
+- **Wait for Host.** Participants wait (with hold music if enabled) until the host joins. Saving the room with Wait for Host on and no Host PIN is refused (HTTP 422, error on `host_pin`). Rooms saved earlier with Wait for Host on and no Host PIN keep working: the setting is ignored for them so the room cannot get stuck, and the next save that touches Wait for Host or the Host PIN asks you to set a PIN. If PIN Protection is off, callers hear "If you are the host, enter your PIN followed by the pound key. Otherwise, please hold." and, without the host PIN, join as waiting participants.
 - **Music on Hold.** Hold music plays while a caller is alone or waiting. When off, they wait in silence.
 - **Mute on Entry.** Participants join muted. **Announce Join/Leave** plays voice prompts when people join or leave. **Max Participants** is capped at 250.
 - **Recording.** The room is recorded from its start whenever **Enable Recording** is on (the old Auto-Start Recording setting is no longer needed or shown). The recording is delivered to OPBX's recording handler, not to the Recording Webhook URL.
@@ -81,24 +148,6 @@ Webhook URLs must be valid URLs up to 500 characters that are publicly reachable
 :::caution Settings that are still stored but not applied
 **Talk detection** and the **Recording Webhook URL** are saved with the room but not used when a call joins.
 :::
-
-## Edit a conference room
-
-1. Click the room in the list.
-2. Change the settings and click **Save Changes**.
-
-**Status:** click the **Active** or **Disabled** badge in the list. Callers who reach a disabled room hear "Conference room is closed" and the call ends.
-
-![Edit Conference Room dialog for Weekly All-Hands showing PIN 4821, host PIN 9034, Wait for Host, Mute on Entry and Announce Join/Leave on](../img/screens/conference-rooms-edit-dialog.jpg)
-
-## Delete a conference room
-
-1. Click the delete icon on the row.
-2. Confirm in the **Delete Conference Room** dialog.
-
-The delete is refused while something still routes to the room: a phone number, an IVR menu option or failover, a business-hours action, an extension of type Conference, or a call-tracking campaign. The **Cannot delete: still in use** dialog lists each one. Change those first, then delete again.
-
-![Cannot delete: still in use dialog for Weekly All-Hands listing the phone number +12025550103 as a routing target](../img/screens/conference-rooms-in-use-dialog.jpg)
 
 ## Common errors
 
@@ -108,6 +157,8 @@ The delete is refused while something still routes to the room: a phone number, 
 | Maximum participants must be at least 2. / cannot exceed 1000. | Capacity out of range | Use 2 to 1000 |
 | PIN is required when PIN protection is enabled. | PIN Protection on, no PIN | Enter a PIN or turn the protection off |
 | PIN must contain only numbers. | Letters or symbols in the PIN | Use digits only |
+| A host PIN is required when waiting for the host is enabled. | Wait for Host on, no Host PIN (the dialog shows "A host PIN is required when Wait for Host is enabled") | Enter a Host PIN or turn Wait for Host off |
+| Host PIN must contain only numbers. | Letters or symbols in the Host PIN | Use digits only |
 | Webhook URL is required when talk detection is enabled. | Talk detection on, no URL | Enter the URL |
 | This conference room is still used by: … | The delete was refused | Change the listed references, then delete |
 
