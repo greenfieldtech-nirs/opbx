@@ -271,14 +271,14 @@ const BusinessHours: React.FC = () => {
                       "text-xs transition-all",
                       toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(schedule.id)
                         ? 'opacity-50 cursor-wait'
-                        : 'cursor-pointer hover:scale-105',
+                        : canManage && 'cursor-pointer hover:scale-105',
                       schedule.status === 'active'
                         ? "bg-green-100 text-green-800 hover:bg-green-200"
                         : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!toggleStatusMutation.isPending) {
+                      if (canManage && !toggleStatusMutation.isPending) {
                         handleToggleStatus(schedule);
                       }
                     }}

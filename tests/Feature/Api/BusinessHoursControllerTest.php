@@ -10,6 +10,7 @@ use App\Models\BusinessHoursSchedule;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\VoiceRoutingCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -379,6 +380,47 @@ class BusinessHoursControllerTest extends TestCase
         $response = $this->postJson("/api/v1/business-hours/{$schedule->id}/duplicate");
 
         $response->assertStatus(403);
+    }
+
+    public function test_only_owner_and_pbx_admin_can_toggle_business_hours_status(): void
+    {
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => BusinessHoursStatus::ACTIVE,
+        ]);
+
+        foreach ([UserRole::PBX_USER, UserRole::REPORTER, UserRole::SUPERVISOR] as $role) {
+            Sanctum::actingAs(User::factory()->create([
+                'organization_id' => $this->organization->id,
+                'role' => $role,
+            ]));
+
+            $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+                ->assertStatus(403);
+        }
+        $this->assertSame(BusinessHoursStatus::ACTIVE, $schedule->fresh()->status);
+
+        foreach ([$this->owner, $this->admin] as $user) {
+            Sanctum::actingAs($user);
+            $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+                ->assertOk();
+        }
+        $this->assertSame(BusinessHoursStatus::INACTIVE, $schedule->fresh()->status);
+    }
+
+    public function test_toggle_business_hours_status_clears_the_routing_cache(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => BusinessHoursStatus::ACTIVE,
+        ]);
+
+        $cache = $this->mock(VoiceRoutingCacheService::class);
+        $cache->shouldReceive('invalidateBusinessHoursSchedule')->atLeast()->once()->with($this->organization->id);
+
+        $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+            ->assertOk();
     }
 
     public function test_store_rejects_target_from_another_organization(): void

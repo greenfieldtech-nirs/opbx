@@ -488,6 +488,8 @@ class BusinessHoursController extends AbstractApiCrudController
             ], 404);
         }
 
+        $this->authorize('update', $businessHour);
+
         $newStatus = $request->input('status');
         $oldStatus = $businessHour->status;
 
