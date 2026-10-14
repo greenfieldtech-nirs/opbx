@@ -6,7 +6,10 @@ paths:
       summary: Get queues dashboard link
       description: |
         Returns the public wallboard URL for the organization's queues dashboard.
-        The token is created lazily on first call. Owner and PBX Admin only.
+        The token (a UUID) is created on the first call. The URL base is the organization's
+        effective webhook base URL (falling back to the app URL), so wallboard browsers can
+        reach it. Owner and PBX Admin only (also when operating as the organization); API keys
+        are refused because this route has no API-key grant.
         Anyone holding the URL can read the queue dashboard endpoints under
         `/v1/public/queues-dashboard/{token}`, so treat it as a secret.
       operationId: getQueuesDashboardLink
