@@ -15,42 +15,54 @@ A campaign holds everything about one outbound calling run: where answered calls
 Use **Campaign Manager** to:
 
 - create a campaign and edit it while it is Draft or Paused;
-- start, pause, resume and archive it;
-- delete a Draft campaign (Owner only; archiving is Owner only too);
-- see its progress, settings, assigned lists and caller-ID usage.
+- start, pause and resume it;
+- archive it and delete a Draft campaign (Owner only);
+- see its progress, settings and assigned lists.
 
 ## Prerequisites
 
-- You are the **Owner** or a **PBX Admin**. Some actions are **Owner only** (see [Permissions](#permissions)).
-- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers) to receive answered calls, unless you only want to test with **Hangup**.
+- You are the **Owner** or a **PBX Admin**. A **Reporter** can look at the campaigns but cannot change them (see [Permissions](#permissions)).
+- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers) to receive answered calls, unless you only want to test with **Hang Up**.
 - At least one **active** [phone number](/opbx/modules/phone-numbers) of your organization to use as the caller ID.
 
 ## The Campaign Manager page
 
-Open **Auto Dialer → Campaign Manager**. Each row shows the campaign name, status badge, caller ID (or the number of caller IDs in the pool and the strategy), assigned lists, the CAC limit, the routing destination and the creation date.
+Open **Auto Dialer → Campaign Manager**. Each row shows the campaign name (with the caller ID, or the number of caller IDs in the pool and the strategy, underneath), the status badge, the **Caller ID**, the number of assigned **Lists**, the **CAC** limit, the **Routing** destination and the **Created** date.
 
-- **Search** filters by name.
-- **Status filter**: All (except Archived) is the default. You can also pick All Statuses, Draft, Running, Paused, Completed or Archived.
-- **The status badge is a button** for managers: on a Draft it starts the campaign, on Running it pauses, on Paused it resumes. Completed and Archived badges do nothing.
+- **Search campaigns...** filters by name. The refresh button reloads the list.
+- **Status filter**: **All (except Archived)** is the default. You can also pick **All Statuses**, **Draft**, **Running**, **Paused**, **Completed** or **Archived**. **Clear Filters** resets both.
+- **The status badge is a button** for the Owner and PBX Admins: on **Draft** it reads "Draft (Start)" and starts the campaign, on **Running** "Running (Pause)" pauses it, on **Paused** "Paused (Resume)" resumes it. Completed and Archived badges do nothing.
+- Clicking a row or the name opens the [campaign detail page](#the-campaign-detail-page).
 - **Row actions** depend on the status:
 
 | Status | Actions on the row |
 |--------|--------------------|
-| Draft | **Edit**, **Delete** (Delete is for the Owner only) |
-| Running | **Edit** (disabled, with the hint "Pause the campaign to edit") |
+| Draft | Edit (pencil) and, for the Owner, Delete (bin) |
+| Running | **Edit**, disabled, with the hint "Pause the campaign to edit" |
 | Paused | **Edit** |
-| Completed | **Archive** (Owner only) |
+| Completed | **Archive** (Owner only; other roles see "-") |
 | Archived | None |
+
+A Reporter sees the page with a **Read-Only** badge, no **Create Campaign** button and no actions. Clicking a row does nothing for a Reporter.
 
 ![Campaign Manager list with Fall Webinar Follow-up in Paused status, routing AI Assistant, and the status filter open](../../img/screens/auto-dialer-campaigns-list.jpg)
 
 ## Create a campaign
 
-1. Click **Create Campaign**.
-2. Fill in the four tabs described below: **Basic Info**, **Schedule**, **Answering Machine Detection** and **Advanced**.
-3. Click **Create Campaign** at the bottom.
+Who can do this: Owner and PBX Admin. Other roles do not see **Create Campaign**.
 
-On save the campaign is stored in **Draft** status and you land on its detail page. Nothing is dialed yet. To dial, assign a Ready distribution list (the campaign stays **Draft**), then press **Start**, or turn on **Auto-start**.
+1. Open **Auto Dialer → Campaign Manager** and click **Create Campaign**. The **Create Campaign** form opens on the **Basic Info** tab.
+2. Enter the **Campaign Name**.
+3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer** or **Hang Up**, then pick the assistant or load balancer under **Select Destination** (not needed for Hang Up).
+4. Under **Caller ID Configuration**, choose a **Strategy**, then click **Add Caller IDs** (or **Add** once the pool has numbers) and pick one or more numbers from the search list. Remove a number with its **X**.
+5. Open the **Schedule** tab and set the **Timezone**, **Start Date**, **End Date** and the **Active Hours** (see [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling#set-the-schedule)).
+6. Optionally open the **Answering Machine Detection** tab and switch on **Enable Detection** (see [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection#turn-detection-on)).
+7. Open the **Advanced** tab and check the rate limits, attempts, retries, timeouts and recording.
+8. Click **Create Campaign** at the bottom.
+
+Result: the toast "Campaign created successfully" appears and the campaign's detail page opens. The campaign is stored as **Draft**; nothing is dialed yet. To dial, [assign a Ready distribution list](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign) (the campaign stays **Draft**), then [start it](#start-a-campaign), or turn on **Auto-start**.
+
+When a field is wrong, the form shows "Please fix the errors above before submitting." next to the buttons, or an error toast with the server's message (see [Common errors](#common-errors)). **Cancel** goes back without saving.
 
 ![Create Campaign form, Basic Info tab, with routing destination AI Assistant Aria - Front Desk Receptionist and one caller ID selected in the pool](../../img/screens/auto-dialer-campaign-create-basic.jpg)
 
@@ -59,22 +71,24 @@ On save the campaign is stored in **Draft** status and you land on its detail pa
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Campaign Name | Required, up to 255 characters | Shown in lists and the monitor |
-| Routing Destination | AI Assistant, AI Load Balancer or Hangup. Required | Where answered calls go. See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
-| Select Destination | Required unless the type is Hangup | The assistant or load balancer |
-| Caller ID Strategy | Round Robin (default), Random, Least Recently Used | How the next caller ID is chosen from the pool |
-| Caller ID Pool | 1 to 100 numbers. Only **active** numbers of your organization are offered | The numbers callees see. The first number is also stored as the campaign's main caller ID |
+| Routing Destination | **AI Assistant** (default), **AI Load Balancer** or **Hang Up** | Where answered calls go. See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
+| Select Destination | Required unless the type is Hang Up | The assistant or load balancer |
+| Strategy | Round Robin (default), Random, Least Recently Used | How the next caller ID is chosen from the pool |
+| Caller ID Pool | 1 to 100 numbers (the counter shows *n*/100). Only **active** numbers of your organization are offered | The numbers callees see. The first number is also stored as the campaign's main caller ID |
 
-The pool can only be changed while the campaign is **Draft** or **Paused**. On an active campaign the pool section shows **Pool Locked**.
+The pool can only be changed while the campaign is **Draft** or **Paused**. On an active campaign the pool section shows **Pool Locked** and the strategy and pool are disabled.
 
 ### Caller ID strategies
 
 | Strategy | How the next caller ID is chosen |
 |----------|----------------------------------|
-| Round Robin | Each number in turn. Numbers with a higher weight are used more often (weights can be set through the API only; the default is 1) |
+| Round Robin | Each number in turn |
 | Random | A random number from the pool |
 | Least Recently Used | The number that was used longest ago |
 
-When a number is **retried**, the dialer prefers a caller ID that has not yet been tried for that number.
+Round Robin and Random take each number's **weight** into account: a number with weight 2 is used twice as often as one with weight 1. Weights can be set through the API only (1 to 100); the form gives every number weight 1.
+
+When a number is **retried**, the dialer prefers a caller ID that has not yet been tried for that number in the last hour.
 
 :::note Caller-ID numbers are protected
 A phone number in a campaign's caller-ID pool cannot be deleted. The delete is refused and the dialog lists the campaign as a "caller ID pool" use. Remove the number from the pool first. See [Phone Numbers](/opbx/modules/phone-numbers#delete).
@@ -84,9 +98,9 @@ A phone number in a campaign's caller-ID pool cannot be deleted. The delete is r
 
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
-| Timezone | Required, any IANA timezone. Default: UTC | The clock the schedule and dates are read in |
-| Start Date | Required. Today or later when you create | First day the campaign may dial |
-| End Date | Required. On or after the start date | Last day the campaign may dial |
+| Timezone | Required. Default: UTC | The clock the schedule and dates are read in |
+| Start Date | Required. Default: today. Today or later when you create | First day the campaign may dial |
+| End Date | Required. Default: 30 days from today. On or after the start date | Last day the campaign may dial |
 | Active Hours | A weekly grid. New campaigns start with Monday to Friday, 09:00 to 17:00 | The hours each weekday when dialing is allowed. Click time slots to toggle them |
 
 See [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) for how the window is evaluated.
@@ -97,15 +111,15 @@ See [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) for how the
 |-------|--------------------|---------|
 | Enable Detection | Off by default | Streams the call audio to the AMD worker, which listens for a voicemail beep |
 | If Voicemail Detected | Hang up (default when enabled) or Continue to destination | Applied when a beep is heard |
-| If Human Detected | Continue to destination (default when enabled) or Hang up | See the note on the AMD page: the detector does not report "human" today |
-| If Detection Unclear | Hang up (default when enabled) or Continue to destination | Applied when no beep is heard within the detection window |
+| If Human Detected | Continue to destination (default when enabled) or Hang up | The detector does not report "human" today, so this has no effect |
+| If Detection Unclear | Continue to destination (default when enabled) or Hang up | Applied when no beep is heard within the detection window |
 | Retry on Voicemail | Off by default | Schedules another attempt when a voicemail was detected |
 
-:::warning Read the AMD page before you enable detection
-With the defaults, a call where no beep is heard is **hung up** when the detection window ends, which includes calls answered by a person. Read [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) and set **If Detection Unclear** to **Continue to destination** unless you really want that.
+:::warning Read the AMD page before you set "If Detection Unclear" to Hang up
+A call answered by a person ends as "unclear" when the detection window closes (about 30 seconds). With **If Detection Unclear** set to **Hang up**, those live conversations are hung up. Read [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) first.
 :::
 
-Each action offers **Hang up** or **Continue to destination**. When you turn detection off on the edit form, the saved actions are cleared.
+Switching **Enable Detection** off clears the actions and **Retry on Voicemail**; on save, detection is turned off for the campaign.
 
 ### Advanced tab
 
@@ -116,7 +130,7 @@ Each action offers **Hang up** or **Continue to destination**. When you turn det
 | Dial Timeout (sec) | 1 to 300. Default: 60 | How long the callee's phone rings before the attempt is given up |
 | Connect When | Call Connected (default) or Immediately | Sent to Cloudonix as `execute`. **Call Connected** starts the call flow (routing, AMD) when the callee answers; **Immediately** starts it while the callee's phone is still ringing |
 | Concurrent Active Calls (CAC) | 1 to 50. Default: 1 | Most calls in progress at once |
-| Calls Per Second (CPS) | 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25 or 30. Default: 1 | How fast new calls are started |
+| Calls Per Second (CPS) | 1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 25 or 30 calls/sec. Default: 1 | How fast new calls are started |
 | Max Dial Attempts | 1 to 5. Default: 1 | Most attempts per number, including retries |
 | Retry on busy / no-answer | Off by default | Redials a number whose call ended busy or unanswered, within Max Dial Attempts. Cancelled, failed and congested calls are never retried |
 | First retry delay (minutes) | 1 to 1440. Default: 15. Shown when the retry switch is on | Wait before the first redial; each further retry waits twice as long, up to 24 hours |
@@ -134,59 +148,95 @@ Cloudonix turns its own machine detection off when a call is not started with **
 
 For each number, OPBX:
 
-1. claims the number so it is dialed once, even if two requests race;
-2. picks the caller ID from the pool;
+1. claims the number so it is dialed once, even if two requests race, and counts one attempt;
+2. uses the caller ID the dialer worker picked from the pool;
 3. chooses the outbound trunk from the first matching [outbound whitelist](/opbx/modules/outbound-whitelist) rule. When no rule matches, Cloudonix chooses the trunk;
 4. asks Cloudonix to dial, with the dial timeout, time limit, recording flag and a 5-minute start deadline;
 5. counts the call against the CAC limit until Cloudonix reports it ended.
 
-If Cloudonix refuses the call, the number goes back to pending and is tried again after 1 minute, then 2 minutes; after **3 consecutive** refusals it is marked **Failed**.
+If Cloudonix refuses the call, the number goes back to pending and is tried again after 1 minute, then 2 minutes; after **3 consecutive** refusals it is marked **Failed**. Each refusal uses one of the number's attempts, so with **Max Dial Attempts** 1 the number is marked **Failed** after the first refusal (within a minute).
 
 ## Start, pause, resume
 
 | Action | Where | Allowed from | What happens |
 |--------|-------|--------------|--------------|
-| **Start** | Status badge on a Draft row, or **Start** on the detail page | Draft or Paused | Needs a list assigned (Ready or In Use). Status becomes Active (Running). The concurrent-call counter is reset |
+| **Start** | Draft badge on the row, or **Start** on the detail page | Draft (the server also accepts Paused) | Needs an assigned list that is Ready or In Use. Status becomes Active (Running). The concurrent-call counter is reset |
 | **Pause** | Running badge, **Pause** on the detail page, or the monitor | Active | No new calls. Calls still recorded as in progress are closed as cancelled and the concurrent-call counter is reset. OPBX does not hang up calls that are already connected |
 | **Resume** | Paused badge, **Resume** on the detail page, or the monitor | Paused | Status becomes Active. The counter is reset |
-
-On the detail page each action asks for confirmation first.
 
 An Active campaign only dials inside its schedule. Outside the window it stays **Running** but places no calls.
 
 A campaign becomes **Completed** by itself, within a minute, once nothing is left to dial: every number is completed, failed or invalid, or pending with no attempts left, and no call is in progress. This applies however the campaign was started. A completed campaign can be archived.
 
+### Start a campaign
+
+Who can do this: Owner and PBX Admin.
+
+1. Make sure a Ready list is assigned (see [Assign a list to a campaign](/opbx/applications/auto-dialer/distribution-lists#assign-a-list-to-a-campaign)).
+2. Either click the **Draft (Start)** badge on the campaign's row, or open the campaign and click **Start**, then **Confirm** in the **Start Campaign** dialog ("Are you sure you want to start this campaign?").
+
+Result: from the row, the toast "Campaign status updated" appears and the badge reads **Running**; from the detail page, the toast reads "Campaign started successfully" and the badge reads **Active**. Without a usable list the toast shows "Cannot start campaign without a destination list" and the campaign stays Draft.
+
+{/* SCREENSHOT: auto-dialer-campaign-start-dialog — campaign detail page of a Draft campaign in Acme Corp (Demo) with the Start Campaign confirmation dialog open */}
+
+### Pause a campaign
+
+Who can do this: Owner and PBX Admin.
+
+1. Click the **Running (Pause)** badge on the row, or open the campaign and click **Pause**, then **Confirm** in the **Pause Campaign** dialog. You can also click **Pause** on the [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor#pause-and-resume-from-the-monitor).
+
+Result: the toast "Campaign status updated" (row) or "Campaign paused successfully" (detail page) appears and the badge reads **Paused**.
+
+### Resume a campaign
+
+Who can do this: Owner and PBX Admin.
+
+1. Click the **Paused (Resume)** badge on the row, or open the campaign and click **Resume**, then **Confirm** in the **Resume Campaign** dialog. You can also click **Resume** on the Real-Time Monitor.
+
+Result: the toast "Campaign status updated" (row) or "Campaign resumed successfully" (detail page) appears and the badge reads **Running** (**Active** on the detail page).
+
 ## Edit a campaign
 
-1. Pause the campaign if it is Running. **Edit** is disabled on Running campaigns and the server refuses the change with "Cannot modify an active campaign. Please pause it first."
-2. Click **Edit** on the row or on the detail page.
-3. Change the fields and click **Update Campaign**.
+Who can do this: Owner and PBX Admin.
+
+1. Pause the campaign if it is Running. **Edit** is disabled on Running campaigns ("Pause the campaign to edit") and the server refuses the change with "Cannot modify an active campaign. Please pause it first."
+2. Click **Edit** on the row or on the detail page. The **Edit Campaign** form opens with the campaign's values.
+3. Change the fields on any tab.
+4. Click **Update Campaign**.
+
+Result: the toast "Campaign updated successfully" appears and you return to the page you came from.
 
 The start date may be in the past when you edit. The caller-ID pool can be changed only while the campaign is Draft or Paused; on an Active campaign the server answers 409 "Cannot modify Caller ID pool on an active campaign".
 
-:::note Turning detection off
-Switching **Enable Detection** off in the edit form does not clear the saved actions on the server, so detection stays on after you save. To really turn it off, set every action to **Continue to destination**, or clear the actions through the API.
-:::
-
 ## Archive a campaign
 
-1. Click **Archive** on a Completed row, or **Archive** on any campaign's detail page.
-2. Confirm. The dialog warns that this cannot be undone.
+Who can do this: the Owner only. Other roles do not see **Archive**.
 
-Archiving an Active campaign pauses it first. Archived campaigns cannot be restored from the app. Only the **Owner** can archive; a PBX Admin sees the button but the server refuses.
+1. Click **Archive** on a **Completed** row, or **Archive** on any campaign's detail page.
+2. Confirm:
+   - from the row, the **Archive Campaign** dialog asks "Are you sure you want to archive "*name*"? This action cannot be undone." Click **Archive**;
+   - from the detail page, the **Archive Campaign** dialog asks "Are you sure you want to archive this campaign?" Click **Confirm**.
+
+Result: the toast "Campaign archived successfully" appears. From the detail page you return to Campaign Manager, where the campaign is hidden by the default filter (choose **Archived** or **All Statuses** to see it).
+
+Archiving an Active campaign pauses it first. Archived campaigns cannot be restored from the app.
+
+{/* SCREENSHOT: auto-dialer-campaign-archive-dialog — Campaign Manager in Acme Corp (Demo) with the Archive Campaign confirmation dialog open for a Completed campaign */}
 
 ## Delete a campaign
 
-1. Click **Delete** on a **Draft** row.
-2. Confirm in the **Delete Campaign** dialog. It says the campaign's lists stay in the system.
+Who can do this: the Owner only, and only for **Draft** campaigns. Other roles do not see the delete button.
 
-Only **Draft** campaigns can be deleted, and only by the **Owner**. A PBX Admin sees the button but the server refuses. Use **Archive** for campaigns that have dialed.
+1. Click the delete (bin) button on a **Draft** row.
+2. In the **Delete Campaign** dialog ("Are you sure you want to delete "*name*"? This action cannot be undone. Associated lists will remain in the system."), click **Delete**.
+
+Result: the toast "Campaign deleted successfully" appears and the row disappears. Use **Archive** for campaigns that have dialed.
 
 {/* SCREENSHOT: auto-dialer-campaign-delete-dialog — Delete Campaign confirmation dialog for a Draft campaign */}
 
 ## The campaign detail page
 
-Click a campaign name. The header shows the status badge, an **Auto-start** badge when enabled, and the **Edit**, **Start**/**Pause**/**Resume** and **Archive** buttons. The page refreshes every 10 seconds.
+Click a campaign's row or name (Owner and PBX Admin). The header has **Back to Campaigns**, the name, the status badge (Draft, Active, Paused, Completed or Archived), an **Auto-start** badge when enabled, and, for the Owner and PBX Admins, **Edit**, **Start**, **Pause** or **Resume** (whichever fits the status) and, for the Owner, **Archive**. The page refreshes every 10 seconds.
 
 | Card | Meaning |
 |------|---------|
@@ -197,16 +247,16 @@ Click a campaign name. The header shows the status badge, an **Auto-start** badg
 | Pending | Numbers not yet dialed or waiting for a retry |
 | Progress | Completed and failed as a share of the total |
 
-Below the cards: the full configuration (routing, caller ID strategy and pool, dial timeout, connect mode, attempts, CAC), the assigned distribution lists (name, version, records, invalid), the schedule (timezone, date range, active days), time limit, recording and the voicemail detection actions, or "Not configured".
+Below the cards: the full configuration (routing, caller ID strategy and pool, dial timeout, connect mode, attempts, retry on busy / no-answer, CAC), the assigned distribution lists (name, version, records, invalid; five per page), the schedule (timezone, date range, active days), time limit, recording and the voicemail detection actions, or "Not configured".
 
 ![Detail page of Fall Webinar Follow-up: Paused badge, Resume button, the list Fall Webinar Leads with 20 records, routing AI Assistant and the Monday to Friday America/New_York schedule](../../img/screens/auto-dialer-campaign-detail.jpg)
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+| Action | Owner | PBX Admin | Reporter | PBX User | Supervisor |
 |--------|:-----:|:---------:|:--------:|:--------:|:----------:|
-| See the Auto Dialer pages | Yes | Yes | No | No | No |
-| List campaigns, monitor summary | Yes | Yes | No | No | No |
+| See the Auto Dialer pages and campaigns | Yes | Yes | Yes (read-only) | No | No |
+| Open the campaign detail page from the list | Yes | Yes | No | No | No |
 | Create, edit, start, pause, resume | Yes | Yes | No | No | No |
 | Archive | Yes | No | No | No | No |
 | Delete (Draft only) | Yes | No | No | No | No |
@@ -215,14 +265,15 @@ Below the cards: the full configuration (routing, caller ID strategy and pool, d
 
 | Message (summary) | What it means | What to do |
 |-------------------|---------------|-----------|
-| Caller ID must be in E.164 format | No caller ID was chosen, or the number is not E.164 | Add at least one number to the pool |
+| The caller ID field is required | No number is in the caller-ID pool | Add at least one number to the pool |
+| Caller ID must be in E.164 format | The main caller ID sent through the API is not E.164 | Use `+` and the country code |
 | Invalid Caller ID pool: some DIDs do not exist, do not belong to your organization, or are not active | A pool number is inactive or not yours | Activate the number or remove it |
 | A destination ID is required when routing to AI Assistant or AI Load Balancer | No destination picked | Pick the assistant or load balancer |
 | The start date must be a date after or equal to today | Start date in the past on create | Pick today or later |
 | Cannot modify an active campaign. Please pause it first | Edit sent while Running | Pause, then edit |
 | Cannot modify Caller ID pool on an active campaign | Pool change while Running | Pause first |
-| Cannot start campaign without a destination list | No list assigned, or the list is archived, used or failed | Assign a Ready list |
-| This action is unauthorized | A PBX Admin tried to archive or delete, or the campaign is not Draft | Ask the Owner, or archive instead of delete |
+| Cannot start campaign without a destination list | No list assigned, or the assigned list is not Ready or In Use | Assign a Ready list |
+| This action is unauthorized | The action is not allowed for your role or for the campaign's status (for example deleting a campaign that is not Draft through the API) | Ask the Owner, or archive instead of delete |
 
 ## Related pages
 
