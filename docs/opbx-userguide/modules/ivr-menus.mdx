@@ -81,7 +81,9 @@ The failover is used after the last turn with no valid input. Its choices are th
 - **Hang Up**: the call ends. This is the default for a new menu.
 - **Disconnect**: only offered when editing (see [Edit an IVR menu](#edit-an-ivr-menu)).
 
-## Find an IVR menu
+## Workflows
+
+### Find an IVR menu
 
 **Who can do this:** Owner and PBX Admin (the only roles with **IVR Menus** in the sidebar).
 
@@ -94,7 +96,7 @@ The list shows each menu's name and option count, **Options**, **Max Turns**, **
 
 {/* SCREENSHOT: ivr-menus-list — IVR Menus list with Main Menu, Support Menu and After Hours Menu rows showing option counts, Max Turns and Active/Inactive status badges */}
 
-## Create an IVR menu
+### Create an IVR menu
 
 **Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::create`; the **Create IVR Menu** button is shown to these roles only).
 
@@ -114,13 +116,13 @@ The list shows each menu's name and option count, **Options**, **Max Turns**, **
 
 The dialog closes, the toast "IVR menu created successfully" appears and the menu is listed. Any phone number, option or queue that points at the menu now sends callers to it.
 
-### Error display
+#### Error display
 
 Each problem is shown next to the field it belongs to, and a tab that holds an error is marked **(!)**. On save the dialog switches to the first tab with an error. If the problem is in the timeouts, the maximum turns or the failover, the **Menu Settings** panel opens by itself so you can see it. An error returned by the server is shown as a toast.
 
 {/* SCREENSHOT: ivr-menus-field-errors — Edit IVR Menu dialog with the Menu Settings panel auto-opened and an inline error under Max turns */}
 
-## Edit an IVR menu
+### Edit an IVR menu
 
 **Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::update`).
 
@@ -134,7 +136,7 @@ The toast "IVR menu updated successfully" appears. Saving replaces the whole opt
 
 {/* SCREENSHOT: ivr-menus-unprovisioned — IVR Menus list filtered to Unprovisioned, one row with the badge and an option set to Destination unavailable */}
 
-## Activate or deactivate an IVR menu
+### Activate or deactivate an IVR menu
 
 **Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::update`).
 
@@ -142,7 +144,7 @@ The toast "IVR menu updated successfully" appears. Saving replaces the whole opt
 
 The status flips, the toast "IVR menu status updated" appears and the badge changes colour. An inactive menu is not used for routing.
 
-## Delete an IVR menu
+### Delete an IVR menu
 
 **Who can do this:** Owner and PBX Admin (`IvrMenuPolicy::delete`).
 
