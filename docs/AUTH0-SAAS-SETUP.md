@@ -31,11 +31,11 @@ Replace `your-opbx-domain` with your actual domain.
 ## 3. Enable Social Connections
 
 1. Go to **Authentication > Social**.
-2. Enable the providers you want to support: Google, Facebook, Microsoft, GitHub, X.
+2. Enable the providers you want to support: Google and/or GitHub (the only providers OPBX supports).
 3. Configure each provider's API keys/secrets as required by Auth0.
 4. For each enabled connection, set `email_verified` behavior:
-   - **Google / Microsoft**: typically verified by default.
-   - **Facebook / GitHub / X**: verify that the connection returns `email_verified: true` for verified email addresses.
+   - **Google**: typically verified by default.
+   - **GitHub**: verify that the connection returns `email_verified: true` for verified email addresses.
 
 ## 4. Configure OPBX Environment
 
@@ -48,10 +48,10 @@ AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_ID=your-client-id
 AUTH0_CLIENT_SECRET=your-client-secret
 AUTH0_REDIRECT_URI=https://your-opbx-domain/ui/auth/callback
-AUTH0_PROVIDERS=google,facebook,microsoft,github,x
+AUTH0_PROVIDERS=google,github
 ```
 
-`AUTH0_PROVIDERS` lists the providers the backend accepts. The web pages only have buttons for **Google** and **GitHub** (`frontend/src/components/Auth/SocialAuthButtons.tsx`), shown when they are in the list; the profile's Linked Accounts card never shows Microsoft, Facebook or X. Those three work only through the API (`POST /api/v1/auth/auth0/redirect`).
+`AUTH0_PROVIDERS` lists the enabled providers: `google` and/or `github`. Each one gets a button on the login and register pages (`frontend/src/components/Auth/SocialAuthButtons.tsx`) and on the profile's Linked Accounts card. Other values (`facebook`, `microsoft`, `x`, ...) are ignored, and the API refuses them with 422.
 
 ## 5. Reload the Configuration
 
@@ -72,7 +72,7 @@ Open the browser dev tools and check the `/api/v1/config/application` response. 
     "enabled": true,
     "domain": "your-tenant.us.auth0.com",
     "client_id": "your-client-id",
-    "providers": ["google", "facebook", "microsoft", "github", "x"]
+    "providers": ["google", "github"]
   }
 }
 ```

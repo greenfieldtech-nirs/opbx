@@ -57,10 +57,7 @@ properties:
           type: string
           enum:
             - google
-            - facebook
-            - microsoft
             - github
-            - x
           example: google
         provider_email:
           type:

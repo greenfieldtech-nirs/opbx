@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Services\Auth0\Auth0Config;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
@@ -38,5 +39,25 @@ class Auth0ControllerRedirectTest extends TestCase
 
         $response->assertStatus(503);
         $response->assertJsonPath('error.code', 'AUTH0_NOT_CONFIGURED');
+    }
+
+    public function test_redirect_refuses_unsupported_providers(): void
+    {
+        Config::set('services.auth0.enabled', true);
+        Config::set('services.auth0.domain', 'tenant.us.auth0.com');
+        Config::set('services.auth0.client_id', 'id');
+        Config::set('services.auth0.client_secret', 'secret');
+        Config::set('services.auth0.redirect_uri', 'https://app.opbx.com/ui/auth/callback');
+        // Even when configured, only Google and GitHub are supported.
+        Config::set('services.auth0.providers', ['google', 'github', 'facebook', 'microsoft', 'x']);
+
+        foreach (['facebook', 'microsoft', 'x'] as $provider) {
+            $this->postJson('/api/v1/auth/auth0/redirect', ['provider' => $provider, 'intent' => 'login'])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['provider']);
+        }
+
+        $this->postJson('/api/v1/auth/auth0/redirect', ['provider' => 'github', 'intent' => 'login'])->assertOk();
+        $this->assertSame(['google', 'github'], array_map(fn ($p) => $p->value, Auth0Config::fromConfig()->providers));
     }
 }

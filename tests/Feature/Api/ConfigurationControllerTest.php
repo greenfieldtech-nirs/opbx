@@ -146,7 +146,7 @@ class ConfigurationControllerTest extends TestCase
         Config::set('services.auth0.enabled', true);
         Config::set('services.auth0.domain', 'tenant.us.auth0.com');
         Config::set('services.auth0.client_id', 'client-id');
-        Config::set('services.auth0.providers', ['google', 'github']);
+        Config::set('services.auth0.providers', ['google', 'facebook', 'microsoft', 'github', 'x']);
 
         $response = $this->getJson('/api/v1/config/application');
 

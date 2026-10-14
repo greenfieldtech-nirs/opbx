@@ -17,10 +17,7 @@ properties:
     type: string
     enum:
       - google
-      - facebook
-      - microsoft
       - github
-      - x
     description: Social identity provider
     example: google
   provider_subject:

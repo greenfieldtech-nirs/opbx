@@ -16,7 +16,7 @@ class OrganizationJoinRequestFactory extends Factory
 
     public function definition(): array
     {
-        $provider = $this->faker->randomElement(SocialIdentityProvider::cases());
+        $provider = $this->faker->randomElement(SocialIdentityProvider::SUPPORTED);
 
         return [
             'organization_id' => Organization::factory(),

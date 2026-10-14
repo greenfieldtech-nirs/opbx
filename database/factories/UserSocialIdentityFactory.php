@@ -15,7 +15,7 @@ class UserSocialIdentityFactory extends Factory
 
     public function definition(): array
     {
-        $provider = $this->faker->randomElement(SocialIdentityProvider::cases());
+        $provider = $this->faker->randomElement(SocialIdentityProvider::SUPPORTED);
 
         return [
             'user_id' => User::factory(),

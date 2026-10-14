@@ -103,12 +103,12 @@ paths:
                         description: >-
                           Enabled social providers, from the comma-separated
                           `AUTH0_PROVIDERS` (only when enabled). Supported values:
-                          google, facebook, microsoft, github, x.
+                          google, github (other values are ignored).
                         items:
                           type: string
                         example:
                         - google
-                        - microsoft
+                        - github
                     required:
                     - enabled
                   endpoints:

@@ -899,9 +899,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {auth0Config.providers
-                  ?.filter((provider) => !['x', 'microsoft', 'facebook'].includes(provider))
-                  .map((provider) => {
+                {auth0Config.providers?.map((provider) => {
                   const isLinked = linkedProviders.includes(provider);
                   const label = provider.charAt(0).toUpperCase() + provider.slice(1);
 

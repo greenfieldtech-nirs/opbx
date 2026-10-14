@@ -21,25 +21,14 @@ Before you start:
 
 ## Supported Providers
 
-OPBX can syndicate authentication through the following social connections:
+OPBX supports two social connections:
 
 | OPBX Provider | Auth0 Connection | Typical Email Verification |
 |---------------|------------------|----------------------------|
 | Google        | `google-oauth2`  | Verified by default        |
-| Facebook      | `facebook`       | Depends on Auth0 setup     |
-| Microsoft     | `windowslive`    | Verified by default        |
 | GitHub        | `github`         | Depends on Auth0 setup     |
-| X             | `twitter`        | Depends on Auth0 setup     |
 
-`AUTH0_PROVIDERS` lists the providers the backend accepts. The web pages show buttons for only some of them:
-
-| Provider | Button on the login and register pages | Listed under **Linked Accounts** on the profile |
-|----------|:--------------------------------------:|:-----------------------------------------------:|
-| Google | Yes | Yes |
-| GitHub | Yes | Yes |
-| Microsoft, Facebook, X | No | No |
-
-A provider gets a button only when it is also in `AUTH0_PROVIDERS`. Microsoft, Facebook and X can be used only through the API (`POST /v1/auth/auth0/redirect` with that `provider`).
+Each provider in `AUTH0_PROVIDERS` gets a button on the login and register pages and is listed under **Linked Accounts** on the profile. Other values (for example `facebook`, `microsoft` or `x`) are ignored, and the API refuses them with 422 "The selected provider is invalid."
 
 ## Auth0 Application Setup
 
@@ -57,7 +46,7 @@ A provider gets a button only when it is also in `AUTH0_PROVIDERS`. Microsoft, F
 | Allowed Origins (CORS) | `https://your-opbx-domain` |
 
 6. Go to **Authentication > Social** and enable each provider you want to support. Configure the provider's own API keys or secrets where Auth0 asks for them.
-7. For each social connection, ensure it returns `email_verified: true` for verified email addresses. Google and Microsoft usually do this by default; Facebook, GitHub, and X may need additional configuration.
+7. For each social connection, ensure it returns `email_verified: true` for verified email addresses. Google usually does this by default; GitHub may need additional configuration.
 
 :::info Redirect URI
 The callback must point to the frontend route `/ui/auth/callback`. This page exchanges the OAuth code with the backend. The value you enter in Auth0 must exactly match the `AUTH0_REDIRECT_URI` environment variable.
@@ -74,7 +63,7 @@ AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_ID=your-client-id
 AUTH0_CLIENT_SECRET=your-client-secret
 AUTH0_REDIRECT_URI=https://your-opbx-domain/ui/auth/callback
-AUTH0_PROVIDERS=google,facebook,microsoft,github,x
+AUTH0_PROVIDERS=google,github
 
 # Optional invitation tuning
 OPBX_INVITE_TOKEN_TTL_HOURS=24
@@ -98,7 +87,7 @@ The frontend reads SaaS and Auth0 state from `/api/v1/config/application`. Open 
     "enabled": true,
     "domain": "your-tenant.us.auth0.com",
     "client_id": "your-client-id",
-    "providers": ["google", "facebook", "microsoft", "github", "x"]
+    "providers": ["google", "github"]
   }
 }
 ```
@@ -161,7 +150,7 @@ An Owner or PBX Admin of the target organization approves or rejects the request
 | `AUTH0_CLIENT_ID` | Yes (if SaaS enabled) | — | Client ID of the Auth0 Regular Web Application. |
 | `AUTH0_CLIENT_SECRET` | Yes (if SaaS enabled) | — | Client secret of the Auth0 application. |
 | `AUTH0_REDIRECT_URI` | Yes (if SaaS enabled) | — | Must match the **Allowed Callback URL** in Auth0. Use the frontend route `/ui/auth/callback`. |
-| `AUTH0_PROVIDERS` | Yes (if SaaS enabled) | *(empty)* | Comma-separated list of accepted providers: `google`, `github`, `microsoft`, `facebook`, `x`. The web pages show buttons for `google` and `github` only. `.env.example` lists all five. |
+| `AUTH0_PROVIDERS` | Yes (if SaaS enabled) | *(empty)* | Comma-separated list of enabled providers: `google` and/or `github`. Other values are ignored. `.env.example` lists both. |
 | `OPBX_INVITE_TOKEN_TTL_HOURS` | No | `24` | Lifetime of invitation magic links, in hours. |
 | `OPBX_INVITE_RATE_LIMIT_PER_HOUR` | No | `10` | Maximum invitations per organization per hour. |
 

@@ -38,11 +38,13 @@ final readonly class Auth0Config
             throw new InvalidArgumentException('Auth0 is enabled but missing required configuration.');
         }
 
+        // Unsupported values in AUTH0_PROVIDERS (e.g. facebook, microsoft, x) are ignored.
         $providers = array_filter(
             array_map(
                 fn (string $value) => SocialIdentityProvider::tryFrom($value),
                 config('services.auth0.providers', [])
-            )
+            ),
+            fn (?SocialIdentityProvider $provider) => $provider?->isSupported() ?? false
         );
 
         return new self($domain, $clientId, $clientSecret, $redirectUri, array_values($providers), true);

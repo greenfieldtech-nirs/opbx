@@ -9,6 +9,10 @@ paths:
         Returns the Auth0 authorize URL and a state token the client should
         use when handling the callback.
 
+        Only `google` and `github` are supported; any other `provider` (for example
+        `facebook`, `microsoft` or `x`) fails validation with 422. A supported provider
+        that is not in `AUTH0_PROVIDERS` returns 400 `AUTH0_INVALID_PROVIDER`.
+
         Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
       operationId: auth0Redirect
       security: []
@@ -39,7 +43,7 @@ paths:
                   - redirect_url
                   - state
         '400':
-          description: Invalid provider
+          description: Provider is supported but not enabled in `AUTH0_PROVIDERS`
           content:
             application/json:
               schema:
@@ -47,7 +51,7 @@ paths:
               example:
                 error:
                   code: AUTH0_INVALID_PROVIDER
-                  message: Invalid provider selected.
+                  message: 'Unsupported or disabled provider: github'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '429':
@@ -293,10 +297,7 @@ paths:
                   type: string
                   enum:
                     - google
-                    - facebook
-                    - microsoft
                     - github
-                    - x
                   description: Social identity provider to link
                   example: google
               required:
@@ -355,10 +356,7 @@ paths:
                   type: string
                   enum:
                     - google
-                    - facebook
-                    - microsoft
                     - github
-                    - x
                   description: Social identity provider to unlink
                   example: google
               required:

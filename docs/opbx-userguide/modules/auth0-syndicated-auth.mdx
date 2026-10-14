@@ -10,7 +10,7 @@ description: "Social sign-in through Auth0, linked accounts, email invitations a
 
 When the deployment has Auth0 configured, people can sign up and sign in with a social account instead of, or in addition to, an email and password.
 
-The server accepts five providers in `AUTH0_PROVIDERS`: `google`, `facebook`, `microsoft`, `github` and `x`. The sign-in, registration and profile pages show buttons only for **Google** and **GitHub** (when they are in `AUTH0_PROVIDERS`); the other three can be used only by a client that calls the API itself. The same feature powers **email invitations** and **requests to join** an existing organization.
+Two providers are supported: **Google** and **GitHub**. The sign-in, registration and profile pages show a button for each one listed in `AUTH0_PROVIDERS`. Any other provider is refused with 422 "The selected provider is invalid." The same feature powers **email invitations** and **requests to join** an existing organization.
 
 Auth0 sign-in works **alongside** password sign-in. A password user can keep their password and also link one or more social accounts.
 
@@ -166,7 +166,7 @@ Rules:
 | Column | Notes |
 |--------|-------|
 | `user_id` | The OPBX user |
-| `provider` | `google`, `facebook`, `microsoft`, `github` or `x` |
+| `provider` | `google` or `github` |
 | `provider_subject` | The provider's user id |
 | `provider_email` | Email returned by the provider when linked |
 | `provider_data` | Extra provider details |

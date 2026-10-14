@@ -187,14 +187,8 @@ return [
         'client_id' => env('AUTH0_CLIENT_ID'),
         'client_secret' => env('AUTH0_CLIENT_SECRET'),
         'redirect_uri' => env('AUTH0_REDIRECT_URI'),
+        // Supported: google, github (other values are ignored).
         'providers' => array_filter(explode(',', env('AUTH0_PROVIDERS', ''))),
-        'connection_map' => [
-            'google' => 'google-oauth2',
-            'facebook' => 'facebook',
-            'microsoft' => 'windowslive',
-            'github' => 'github',
-            'x' => 'twitter',
-        ],
     ],
 
     /*
