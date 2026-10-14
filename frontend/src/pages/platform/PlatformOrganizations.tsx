@@ -372,6 +372,7 @@ export default function PlatformOrganizations() {
               canView={false}
               canEdit={false}
               canDelete={true}
+              canDeleteItem={(org) => org.status !== 'deleted'}
               onDelete={(org) => {
                 setSelectedOrg(org);
                 setShowDeleteDialog(true);

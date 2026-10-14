@@ -121,6 +121,8 @@ Who can do this: platform managers.
 
 The toast "Organization deleted" appears, the dialog closes and the row disappears. OPBX revokes the users' API tokens and removes the organization's extensions, ring groups, business-hours schedules, phone numbers, call logs and users, then the organization itself. The deletion is written to the audit log as `organization.deleted`, with the Cloudonix keys and secrets masked.
 
+A row whose status is already **Deleted** (such a row can still be listed, for example with the **Deleted** filter) has no delete icon, because a deleted organization cannot change again.
+
 The delete is refused when **any user in the organization is a platform manager** ("Cannot delete organization: one or more users in this organization are Platform Managers. …"). Revoke their platform-manager flag first. The page shows the toast "Failed to update status" with that message below it.
 
 #### Delete from the organization detail page
@@ -168,7 +170,7 @@ While operating as an organization you can change anything its Owner can, includ
 
 ## Users
 
-The Users page lists the **Owner** accounts of every organization (other roles are not listed) with **ID**, **Name**, **Email**, **Organization**, **Status**, **Platform Manager** and **Created**. Search by name or email, filter by status (**All Statuses**, **Active**, **Inactive**, **Suspended**) and by **All Users**, **Platform Managers** or **Regular Users**.
+The Users page lists the **Owner** accounts of every organization (other roles are not listed) with **ID**, **Name**, **Email**, **Organization**, **Status**, **Platform Manager** and **Created**. Search by name or email, filter by status (**All Statuses**, **Active**, **Inactive**, **Pending**; users have no Suspended status, an organization does) and by **All Users**, **Platform Managers** or **Regular Users**.
 
 The platform console has no action to create a user. Users of an organization are managed by its Owner and PBX Admins on the [Users](/opbx/modules/user-management) page (or by you, after [operating as the organization](#operate-as-an-organization)).
 

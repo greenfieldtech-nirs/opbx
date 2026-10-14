@@ -227,7 +227,7 @@ export default function PlatformUsers() {
     const configs: Record<string, { label: string; color: string }> = {
       active: { label: 'Active', color: 'bg-green-100 text-green-800 border-green-200' },
       inactive: { label: 'Inactive', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-      suspended: { label: 'Suspended', color: 'bg-red-100 text-red-800 border-red-200' },
+      pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
     };
     const config = configs[status] || configs.inactive;
     return (
@@ -367,7 +367,7 @@ export default function PlatformUsers() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
 
