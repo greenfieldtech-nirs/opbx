@@ -321,10 +321,12 @@ export default function DistributionListDetail() {
               Copy
             </Button>
           )}
-          <Button variant="outline" onClick={handleDownload} disabled={downloadMutation.isPending}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
+          {canManage && (
+            <Button variant="outline" onClick={handleDownload} disabled={downloadMutation.isPending}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          )}
           {list.can_archive && canManage && list.status !== 'failed' && (
             <Button variant="outline" className="text-red-600" onClick={() => setIsArchiveOpen(true)}>
               <Archive className="h-4 w-4 mr-2" />
@@ -444,16 +446,18 @@ export default function DistributionListDetail() {
                     <SelectItem value="invalid">Invalid</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={handleResetPendingDestinations}
-                  disabled={resetPendingDestinationsMutation.isPending}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset Pending Entries
-                </Button>
-                {selectedDestinations.length > 0 && (
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    className="h-10"
+                    onClick={handleResetPendingDestinations}
+                    disabled={resetPendingDestinationsMutation.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Pending Entries
+                  </Button>
+                )}
+                {canManage && selectedDestinations.length > 0 && (
                   <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Reset Dial Attempts ({selectedDestinations.length})
@@ -469,12 +473,14 @@ export default function DistributionListDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40px]">
-                      <Checkbox
-                        checked={selectedDestinations.length === destinations.length && destinations.length > 0}
-                        onCheckedChange={toggleAllDestinations}
-                      />
-                    </TableHead>
+                    {canManage && (
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={selectedDestinations.length === destinations.length && destinations.length > 0}
+                          onCheckedChange={toggleAllDestinations}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Phone Number</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Batch</TableHead>
@@ -483,31 +489,33 @@ export default function DistributionListDetail() {
                     <TableHead>Dial Attempts</TableHead>
                     <TableHead>Last Call</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    {canManage && <TableHead className="w-[80px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isDestinationsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8">
+                      <TableCell colSpan={canManage ? 10 : 8} className="text-center py-8">
                         Loading destinations...
                       </TableCell>
                     </TableRow>
                   ) : destinations.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={canManage ? 10 : 8} className="text-center py-8 text-muted-foreground">
                         No destinations found
                       </TableCell>
                     </TableRow>
                   ) : (
                     destinations.map((destination) => (
                       <TableRow key={destination.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedDestinations.includes(destination.id)}
-                            onCheckedChange={() => toggleDestinationSelection(destination.id)}
-                          />
-                        </TableCell>
+                        {canManage && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedDestinations.includes(destination.id)}
+                              onCheckedChange={() => toggleDestinationSelection(destination.id)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell>
                           <span className="font-mono text-sm">{destination.phone_number}</span>
                         </TableCell>
@@ -566,26 +574,28 @@ export default function DistributionListDetail() {
                             '-'
                           )}
                         </TableCell>
-                        <TableCell>
-                          {destination.dial_attempts > 0 && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleResetDialAttempts(destination.id)}
-                                  >
-                                    <RotateCcw className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Reset Dial Attempts</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </TableCell>
+                        {canManage && (
+                          <TableCell>
+                            {destination.dial_attempts > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleResetDialAttempts(destination.id)}
+                                    >
+                                      <RotateCcw className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Reset Dial Attempts</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}

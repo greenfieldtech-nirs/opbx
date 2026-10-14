@@ -36,6 +36,8 @@ import {
   useResumeCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
+import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -304,6 +306,8 @@ function CampaignActionButton({
       </Button>
     );
   }
+  // The server resumes only paused campaigns
+  if (campaign.status !== 'paused') return null;
   return (
     <Button
       size="default"
@@ -324,6 +328,9 @@ function CampaignActionButton({
 export default function AutoDialerMonitor() {
   const navigate = useNavigate();
   const refreshMonitor = useRefreshMonitor();
+  const { user } = useAuth();
+  // Pause/Resume need AutoDialerCampaignPolicy pause/resume (Owner, PBX Admin)
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   // State
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
@@ -624,14 +631,16 @@ export default function AutoDialerMonitor() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">{campaign.routing_destination_label}</span>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <CampaignActionButton
-                          campaign={campaign}
-                          onPause={handlePause}
-                          onResume={handleResume}
-                          isLoading={isActionLoading}
-                        />
-                      </div>
+                      {canManage && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <CampaignActionButton
+                            campaign={campaign}
+                            onPause={handlePause}
+                            onResume={handleResume}
+                            isLoading={isActionLoading}
+                          />
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
 
@@ -738,7 +747,7 @@ export default function AutoDialerMonitor() {
               onManualRefresh={handleManualRefresh}
               isRefreshing={isManualRefreshing}
             />
-            {selectedCampaign && (
+            {canManage && selectedCampaign && (
               <CampaignActionButton
                 campaign={selectedCampaign}
                 onPause={handlePause}
