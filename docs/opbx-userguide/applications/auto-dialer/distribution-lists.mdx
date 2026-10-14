@@ -151,10 +151,12 @@ Tabs:
 |-----|-----------|---------|
 | Destinations | Always | Phone number, name, batch, metadata (click **_n_ fields** to see them), status, dial attempts, last call (date and last result), duration. **Search phone numbers or descriptions...** searches the phone number; the filter offers All Statuses, Pending, Completed, Failed and Invalid |
 | Version History | The list has versions | Every version with its status, valid numbers and date; **View** opens it |
-| Validation Errors | The list is Failed | A **Download Errors CSV** button. To read the rejected rows, use **View Errors** in the list page's row menu |
+| Validation Errors | The list is Failed | A **Download Errors CSV** button that does not download anything yet, and no rows. To read or download the rejected rows, use [View Errors](#view-the-errors-of-a-failed-list) in the list page's row menu |
 | Upload Info | A file was uploaded | The original file name, when it was processed, and the total, valid and invalid rows |
 
 ![Detail page of Fall Webinar Leads: 20 pending destinations with names, the status filter and Reset Pending Entries](../../img/screens/auto-dialer-lists-detail.jpg)
+
+Not available yet on the Destinations tab: clicking a phone number opens **Call History** with "CDR integration coming soon"; the bin icon on each row only shows "Delete destination functionality coming soon"; and the **Delete** button shown next to **Reset Dial Attempts (*n*)** when numbers are selected clears the selection without deleting anything. Numbers cannot be removed from a list in the app; upload a new version or copy the list instead.
 
 ### Reset dial attempts
 
@@ -167,6 +169,14 @@ Resetting sets a number back to **pending** with zero attempts and clears its la
 - **Every pending number:** click **Reset Pending Entries**. This sets every number that is still pending back to zero attempts and clears its retry time; completed and failed numbers are not touched.
 
 Result: a toast with the server's message, for example "Dial attempts reset for 3 destinations" or "Reset 20 pending destinations".
+
+## View the errors of a failed list
+
+Who can do this: Owner, PBX Admin and Reporter.
+
+1. On a **Failed** list's row, open the row menu (⋮) and choose **View Errors**.
+
+Result: the **Validation Errors** dialog lists each rejected row with its row number, phone number and error, and the total. **Download CSV** saves them as *name*`_validation_errors.csv`; **Close** closes the dialog. Fix the file and upload it again with **Upload Destinations**, or delete the list.
 
 ## Copy a list
 
