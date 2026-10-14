@@ -5,13 +5,14 @@
 
 import { queryKeys } from '@/lib/queryKeys';
 import { invalidateRoutingResources } from '@/lib/invalidation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Users, ListMusic } from 'lucide-react';
+import { Plus, Users, ListMusic, Search, Filter, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import {
   callQueuesService,
@@ -129,11 +130,31 @@ export default function CallQueues() {
   const [editing, setEditing] = useState<CallQueue | null>(null);
   const [form, setForm] = useState<QueueFormState>(emptyForm);
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [strategyFilter, setStrategyFilter] = useState<CallQueueStrategy | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('all');
   const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
 
-  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading } = useQuery({
-    queryKey: queryKeys.callQueues.list({ unprovisioned: unprovisionedOnly }),
-    queryFn: () => callQueuesService.getAll(unprovisionedOnly ? { unprovisioned: 1 } : undefined),
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const listParams = {
+    search: debouncedSearch || undefined,
+    strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    unprovisioned: unprovisionedOnly ? 1 : undefined,
+  };
+  const hasActiveFilters = !!searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: queryKeys.callQueues.list(listParams),
+    queryFn: () => callQueuesService.getAll(listParams),
   });
 
   const { data: recordingsData } = useQuery({
@@ -402,9 +423,58 @@ export default function CallQueues() {
         )}
       </div>
 
-      <div className="flex justify-end">
-        <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
-      </div>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search call queues..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
+            <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Strategies</SelectItem>
+                <SelectItem value="ring_all">Ring All</SelectItem>
+                <SelectItem value="round_robin">Round Robin</SelectItem>
+                <SelectItem value="least_talk_time">Least Talk Time</SelectItem>
+                <SelectItem value="fewest_calls">Fewest Calls</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="pt-6">
@@ -428,8 +498,8 @@ export default function CallQueues() {
             emptyState={
               <EmptyState
                 icon={Users}
-                title="No call queues"
-                description="Create a call queue to distribute calls to logged-in agents."
+                title={hasActiveFilters ? 'No call queues found' : 'No call queues'}
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Create a call queue to distribute calls to logged-in agents.'}
               />
             }
           />
