@@ -9,6 +9,7 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import './index.css';
 import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Loading fallback
@@ -29,11 +30,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <OperateAsProvider>
           <ConfigProvider>
-            <ErrorBoundary>
-              <React.Suspense fallback={<LoadingFallback />}>
-                <RouterProvider router={router} />
-              </React.Suspense>
-            </ErrorBoundary>
+            {/* App-level provider so any page can use <Tooltip> without wrapping its own */}
+            <TooltipProvider>
+              <ErrorBoundary>
+                <React.Suspense fallback={<LoadingFallback />}>
+                  <RouterProvider router={router} />
+                </React.Suspense>
+              </ErrorBoundary>
+            </TooltipProvider>
             <Toaster />
           </ConfigProvider>
         </OperateAsProvider>
