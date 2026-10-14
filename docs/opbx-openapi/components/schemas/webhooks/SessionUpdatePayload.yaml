@@ -21,6 +21,7 @@ properties:
     type:
     - string
     - 'null'
+    description: Cloudonix domain name (required by the authentication middleware unless `owner.domain` is sent; also used to identify the organization)
   subscriberId:
     type:
     - integer
@@ -44,6 +45,7 @@ properties:
     type:
     - string
     - 'null'
+    description: Session status, lower-cased before filtering
     example: connected
   createdAt:
     type: string

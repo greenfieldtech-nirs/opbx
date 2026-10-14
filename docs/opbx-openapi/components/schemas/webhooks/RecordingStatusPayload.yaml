@@ -15,16 +15,18 @@ properties:
     description: Fallback for `CallSid`.
   Session:
     type: string
-    maxLength: 255
-    description: Session token of the call.
+    description: Session token of the call (read, not validated).
   session_token:
     type: string
     maxLength: 255
     description: Fallback for `Session`.
-  session.token:
-    type: string
-    maxLength: 255
-    description: Fallback for `Session`.
+  session:
+    type: object
+    properties:
+      token:
+        type: string
+        maxLength: 255
+        description: Fallback for `Session` and `session_token`.
   RecordingUrl:
     type: string
     format: uri

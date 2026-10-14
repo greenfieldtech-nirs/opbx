@@ -6,10 +6,28 @@ paths:
       summary: Recording status webhook
       description: |
         Receives Cloudonix recording status callbacks and queues the recording for download.
-        The payload has no `domain`, so the organization is found from the matching call
-        detail record (by `CallSid`, then by session token). The organization's webhook
-        authentication (Bearer or HMAC-SHA256) is checked before any write.
-        Idempotent via `webhook.idempotency`. Not gated by the `webhook.signature` middleware.
+
+        The payload has no `domain`, so the route has no `webhook.signature` middleware. The
+        controller finds the call detail record by call ID (`CallSid`, else `call_id`), then by
+        session token (`Session`, else `session_token`, else `session.token`), and only then
+        authenticates the request against that organization: when it has a
+        `domain_requests_api_key`, `Authorization: Bearer <key>` must match it; without a key
+        the request is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. An organization
+        without Cloudonix settings is always refused (401). No HMAC. Not rate-limited.
+
+        - No matching call detail record: 200 `No matching call detail record found` (nothing
+          is checked or written).
+        - `RecordingStatus` `absent`, or no recording URL: 200 `No recording to download`.
+        - Otherwise the CDR's recording is marked `pending` (source URL and duration stored)
+          and a download job is queued: 200 `Recording status processed`.
+
+        Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+        else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+        else the route name), else a hash of the whole payload. A repeat within
+        `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+        repeat while the first is still running answers 409. A body `timestamp` older than
+        `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+        60 s in the future 400 `Invalid Timestamp`.
       operationId: cloudonixRecordingStatusWebhook
       security:
         - webhookBearer: []
@@ -24,7 +42,7 @@ paths:
               $ref: '../../components/schemas/webhooks/RecordingStatusPayload.yaml'
       responses:
         '200':
-          description: Accepted. Also returned when no matching call detail record exists.
+          description: Processed, nothing to download, or no matching call detail record
           content:
             application/json:
               schema:
@@ -32,9 +50,22 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: No recording to download
+                    enum: [Recording status processed, No recording to download, No matching call detail record found]
+                    example: Recording status processed
+        '400':
+          description: Expired or future `timestamp` (`EnsureWebhookIdempotency`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook Expired
+                  message:
+                    type: string
         '401':
-          description: Webhook authentication failed for the matched organization
+          description: Webhook authentication failed for the matched organization (or it has no Cloudonix settings)
           content:
             application/json:
               schema:
@@ -43,5 +74,19 @@ paths:
                   error:
                     type: string
                     example: Unauthorized
+        '409':
+          description: The same webhook is still being processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook is being processed
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          description: Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'

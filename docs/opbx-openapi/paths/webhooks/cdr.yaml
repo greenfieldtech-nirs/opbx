@@ -5,14 +5,26 @@ paths:
         - Webhooks
       summary: CDR webhook
       description: |
-        Call Detail Record webhook sent after call completion.
-        
-        Contains complete call information including:
-        - Call duration and billable seconds
-        - Cost information
-        - Recording URL (if available)
-        
-        Middleware: webhook.signature, webhook.idempotency
+        Call Detail Record webhook sent by Cloudonix after a call ends. Validated by
+        `CdrRequest` and processed synchronously: stores the call detail record (a replay of
+        an already stored CDR answers `CDR already recorded`), updates the call log
+        (recording URL, duration), records a final session status, finalizes auto-dialer and
+        call queue calls, and creates call tracking sessions when the number is a tracking
+        number. The AMD result in `session.profile.amd` is read for auto-dialer calls.
+
+        Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+        `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+        and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+        `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+        is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+
+        Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+        else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+        else the route name), else a hash of the whole payload. A repeat within
+        `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+        repeat while the first is still running answers 409. A body `timestamp` older than
+        `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) is still accepted on this route; one more than
+        60 s in the future answers 400 `Invalid Timestamp`.
       operationId: cdrWebhook
       security:
         - webhookBearer: []
@@ -24,14 +36,63 @@ paths:
               $ref: '../../components/schemas/webhooks/CdrPayload.yaml'
       responses:
         '200':
-          description: CDR processed
+          description: CDR stored (or already stored)
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                  message:
                     type: string
-                    example: processed
+                    enum: [CDR Inserted successfully, CDR already recorded]
+                    example: CDR Inserted successfully
         '400':
-          $ref: '../../components/responses/BadRequest.yaml'
+          description: Missing `domain` (`VerifyCloudonixSignature`), or an expired/future `timestamp` (`EnsureWebhookIdempotency`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Bad Request - Missing domain parameter
+                  message:
+                    type: string
+        '401':
+          description: Unknown domain, or missing/invalid Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized - Invalid Bearer token
+        '409':
+          description: The same webhook is still being processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook is being processed
+        '422':
+          description: Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'
+        '500':
+          description: CDR processing failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Call Detail Record processing failed
+                  message:
+                    type: string

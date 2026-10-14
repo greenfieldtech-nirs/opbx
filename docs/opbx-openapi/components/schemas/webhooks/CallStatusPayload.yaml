@@ -1,28 +1,36 @@
 type: object
-description: Cloudonix call-status webhook payload
+description: |
+  Cloudonix call-status webhook payload. Not validated; these are the fields the controller
+  reads. The authentication middleware also needs `domain` (or `owner.domain.name` /
+  `owner.domain.uuid`).
 properties:
+  domain:
+    type: string
+    description: Cloudonix domain name or UUID (required by the authentication middleware)
+    example: acme.cloudonix.net
   CallSid:
     type: string
-    description: Call SID
+    description: Call ID used to find the call log
     example: CA550e8400e29b41d4a716446655440000
   call_id:
     type: string
-    description: Alternative call ID field
+    description: Fallback for `CallSid`
   CallStatus:
     type: string
-    description: Current call status
+    description: Current call status, stored on the call log
     example: completed
   status:
     type: string
-    description: Alternative status field
+    description: Fallback for `CallStatus`
   Duration:
     type: integer
-    description: Call duration
+    description: Call duration in seconds, stored on the call log
   duration:
     type: integer
-  From:
+    description: Fallback for `Duration`
+  token:
     type: string
-    description: Caller number
-  To:
-    type: string
-    description: Called number
+    description: Session token; when present the matching auto-dialer call session is updated
+  timestamp:
+    type: integer
+    description: Optional Unix timestamp, checked for replay by the idempotency middleware

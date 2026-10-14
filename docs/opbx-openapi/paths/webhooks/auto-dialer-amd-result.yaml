@@ -4,12 +4,24 @@ paths:
       tags:
       - Auto Dialer Webhooks
       summary: Auto-dialer AMD result
-      description: 'Receives Answering Machine Detection (AMD) results for auto-dialer calls.
+      description: |
+        Receives an Answering Machine Detection result for an auto-dialer call and stores
+        `result` and `confidence` on the call session found by `session_token`. No payload
+        validation; an unknown session token still answers `ok`.
 
+        Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+        `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+        and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+        `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+        is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
 
-        The result is stored on the matching call session.
-
-        '
+        Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+        else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+        else the route name), else a hash of the whole payload. A repeat within
+        `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+        repeat while the first is still running answers 409. A body `timestamp` older than
+        `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+        60 s in the future 400 `Invalid Timestamp`.
       operationId: autoDialerAmdResult
       security:
       - webhookBearer: []
@@ -20,17 +32,17 @@ paths:
             schema:
               type: object
               properties:
+                domain:
+                  type: string
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                  example: acme.cloudonix.net
                 session_token:
                   type: string
-                  description: Auto-dialer session token
+                  description: Auto-dialer session token (400 when missing)
                   example: sess-abc123
                 result:
                   type: string
-                  enum:
-                  - human
-                  - machine
-                  - unknown
-                  description: AMD detection result
+                  description: AMD detection result (stored as sent, for example `human`, `machine` or `unknown`)
                   example: human
                 confidence:
                   type:
@@ -51,7 +63,7 @@ paths:
                     type: string
                     example: ok
         '400':
-          description: Bad request (missing session token)
+          description: Missing `session_token` (`{"status":"error"}`), missing `domain`, or an expired/future `timestamp`
           content:
             application/json:
               schema:
@@ -60,3 +72,25 @@ paths:
                   status:
                     type: string
                     example: error
+                  error:
+                    type: string
+        '401':
+          description: Unknown domain, or missing/invalid Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized - Invalid Bearer token
+        '409':
+          description: The same webhook is still being processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook is being processed
