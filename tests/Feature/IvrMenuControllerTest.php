@@ -374,4 +374,42 @@ class IvrMenuControllerTest extends TestCase
         $this->actingAs($admin)->patchJson("/api/v1/ivr-menus/{$id}/toggle-status", ['status' => 'inactive'])->assertOk();
         $this->assertDatabaseHas('ivr_menus', ['id' => $id, 'status' => 'inactive']);
     }
+
+    /** @return array<string, mixed> */
+    private function menuWithDigits(string ...$digits): array
+    {
+        return [
+            'name' => 'Dup Menu',
+            'tts_text' => 'Hello',
+            'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
+            'failover_destination_type' => 'hangup',
+            'status' => 'active',
+            'options' => array_map(fn (string $d, int $i) => [
+                'input_digits' => $d,
+                'destination_type' => 'extension',
+                'destination_id' => $this->extension->id,
+                'priority' => $i + 1,
+            ], $digits, array_keys($digits)),
+        ];
+    }
+
+    public function test_duplicate_option_digits_are_a_validation_error_on_create(): void
+    {
+        $response = $this->actingAs($this->owner)->postJson('/api/v1/ivr-menus', $this->menuWithDigits('1', '2', '1'));
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['options.2.input_digits']);
+        $this->assertSame('Each menu option must use a different key.', $response->json('errors')['options.2.input_digits'][0]);
+        $this->assertDatabaseMissing('ivr_menus', ['name' => 'Dup Menu']);
+    }
+
+    public function test_duplicate_option_digits_are_a_validation_error_on_update(): void
+    {
+        $menu = $this->actingAs($this->owner)->postJson('/api/v1/ivr-menus', $this->menuWithDigits('1', '2'))->assertCreated()->json('data.id');
+
+        $this->actingAs($this->owner)->putJson("/api/v1/ivr-menus/{$menu}", $this->menuWithDigits('3', '3'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['options.1.input_digits']);
+    }
 }

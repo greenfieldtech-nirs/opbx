@@ -84,7 +84,8 @@ class StoreIvrMenuRequest extends FormRequest
             ],
             'status' => 'required|string|in:active,inactive',
             'options' => 'required|array|min:1|max:20',
-            'options.*.input_digits' => 'required|string|max:10',
+            // distinct: the (ivr_menu_id, input_digits) unique index would otherwise fail with a 500
+            'options.*.input_digits' => 'required|string|max:10|distinct',
             'options.*.description' => 'nullable|string|max:255',
             'options.*.destination_type' => ['required', 'string', 'in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,unavailable', new RejectUnavailableOnCreate],
             'options.*.destination_id' => [
@@ -219,6 +220,7 @@ class StoreIvrMenuRequest extends FormRequest
             'options.min' => 'At least one menu option is required.',
             'options.max' => 'Maximum 20 menu options are allowed.',
             'options.*.input_digits.required' => 'Input digits are required for each option.',
+            'options.*.input_digits.distinct' => 'Each menu option must use a different key.',
             'options.*.destination_type.required' => 'Destination type is required for each option.',
             'options.*.destination_id.required' => 'Destination is required for each option.',
             'options.*.priority.required' => 'Priority is required for each option.',

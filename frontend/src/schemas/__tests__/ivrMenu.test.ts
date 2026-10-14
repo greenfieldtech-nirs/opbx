@@ -30,8 +30,13 @@ describe('ivrMenuSchema', () => {
   it('requires an audio source and 1-20 options', () => {
     expect(firstIvrMenuError({ ...valid(), tts_text: undefined })).toMatch(/audio source/);
     expect(firstIvrMenuError({ ...valid(), options: [] })).toMatch(/At least one/);
-    const many = Array.from({ length: 21 }, (_, i) => ({ ...valid().options[0], priority: i + 1 }));
+    const many = Array.from({ length: 21 }, (_, i) => ({ ...valid().options[0], input_digits: String(i), priority: i + 1 }));
     expect(firstIvrMenuError({ ...valid(), options: many })).toMatch(/Maximum 20/);
+  });
+
+  it('refuses two options with the same key', () => {
+    const o = valid().options[0];
+    expect(firstIvrMenuError({ ...valid(), options: [o, { ...o, priority: 2 }] })).toMatch(/different key/);
   });
 
   it('lets unavailable options omit a destination', () => {

@@ -63,7 +63,17 @@ export const ivrMenuSchema = z
     options: z
       .array(optionSchema)
       .min(IVR_LIMITS.options.min, 'At least one menu option is required')
-      .max(IVR_LIMITS.options.max, `Maximum ${IVR_LIMITS.options.max} menu options allowed`),
+      .max(IVR_LIMITS.options.max, `Maximum ${IVR_LIMITS.options.max} menu options allowed`)
+      .superRefine((opts, ctx) => {
+        // Mirrors the server's `distinct` rule (one option per key)
+        const seen = new Set<string>();
+        opts.forEach((o, i) => {
+          if (seen.has(o.input_digits)) {
+            ctx.addIssue({ code: 'custom', path: [i, 'input_digits'], message: 'Each menu option must use a different key' });
+          }
+          seen.add(o.input_digits);
+        });
+      }),
   })
   .superRefine((m, ctx) => {
     if (!m.recording_id && !m.audio_file_path && !m.tts_text) {

@@ -71,7 +71,9 @@ properties:
         input_digits:
           type: string
           maxLength: 10
-          description: Digits the caller presses
+          description: >-
+            Digits the caller presses. Must differ between the options of a menu; a repeated
+            value is a 422 on `options.N.input_digits` ("Each menu option must use a different key.")
         description:
           type:
             - string

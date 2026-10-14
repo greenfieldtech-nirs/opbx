@@ -65,7 +65,7 @@ Each option maps digits to one destination. A menu has **1 to 20 options**.
 
 | Field | Limit | Meaning |
 |-------|-------|---------|
-| Digits | 1 to 10 characters. The form accepts only `0`-`9`, `*` and `#` | The digits the caller presses |
+| Digits | 1 to 10 characters. The form accepts only `0`-`9`, `*` and `#`. Each option needs different digits: a repeated key is marked "Each menu option must use a different key" and the menu is not saved | The digits the caller presses |
 | Destination type and destination | Pick one existing item | Where the caller goes |
 
 **Add Option** fills in the next digit for you (the highest numeric digit so far plus one); you can change it. The order of the rows is the option priority. Each option can also carry a description of up to 255 characters, which is set through the API only.
@@ -180,7 +180,7 @@ Recording and call-log history never blocks a delete.
 | Column | Notes |
 |--------|-------|
 | `ivr_menu_id` | Parent menu |
-| `input_digits` | 1 to 10 characters |
+| `input_digits` | 1 to 10 characters, unique within the menu |
 | `description` | Up to 255 characters |
 | `destination_type`, `destination_id` | The target. An option set to Destination unavailable has `destination_id` 0 |
 | `priority` | 1 to 20 |
