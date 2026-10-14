@@ -34,11 +34,15 @@ For finished calls, use [Call Logs](/opbx/modules/call-logs).
 | See Live Calls in the sidebar | Yes | Yes | No | Yes | Yes |
 | See the calls | All in the organization | All in the organization | Not in the sidebar (see the caution below) | All, read-only | Only calls to or from their assigned users and ring groups |
 | Spy, Whisper, Barge | Yes | No | No | No | Yes, calls in their scope |
-| Disconnect one call | Yes | No | No | No | No (the button is shown, the server refuses it) |
+| Disconnect one call | Yes | No (the button is hidden) | No | No | No (the button is hidden) |
 | Disconnect All Calls | Yes | No (the button is hidden) | No | No | No |
 | Clear Stale (display only) | Yes | Yes | No | No | No |
 
-The server allows only the **Owner** to disconnect a call. PBX Admins and Supervisors see a disconnect control on the page, but the request is refused with "This action is unauthorized." Reporters and Supervisors see a **Read-Only** badge next to the page title.
+The server allows only the **Owner** to disconnect a call. The **Disconnect** icon and **Disconnect All Calls** are shown to the Owner only; any other role that calls the API directly is refused with "This action is unauthorized." The **Actions** column (Spy, Whisper, Barge) is shown to Owners and Supervisors only, so PBX Admins and Reporters see no actions on the rows. Reporters, PBX Users and Supervisors see a **Read-Only** badge next to the page title.
+
+:::caution PBX Users
+Live Calls is not in a PBX User's sidebar, but the page (`/ui/live-calls`) and the API are not blocked for that role. A PBX User who opens the page directly sees every active call of the organization, read-only.
+:::
 
 The Supervisor scope is applied by the server on role alone: a Supervisor always gets only the calls of their assigned users and ring groups plus their own, whether or not the request carries `supervisor=true` (still accepted, no longer needed). The same holds for the active-call statistics and the call detail view. Owners, PBX Admins and Reporters see all of the organization's calls.
 
@@ -46,15 +50,19 @@ The Supervisor scope is applied by the server on role alone: a Supervisor always
 A Supervisor's list contains only calls whose caller or destination is one of their assigned users, one of those users' extension numbers, their own user or extension, or the extension number of an assigned ring group. See [Supervisors](/opbx/modules/supervisors).
 :::
 
-## Open the page
+## Workflows
+
+### View the active calls
+
+Who can do this: Owner, PBX Admin, Reporter and Supervisor (Supervisors see only the calls in their scope).
 
 1. Open **Live Calls** in the sidebar (section **Analytics**; for Supervisors, section **Supervisor**).
 2. Read the four counters at the top: **Total Active**, **Processing**, **Ringing** and **Connected**.
-3. The table below lists one row per active call.
+3. The table below lists one row per active call. When there are none, the page shows "No active calls at the moment" and the current refresh interval.
 
 ![Live Calls with three active calls (two Connected, one Ringing), the counters and the Spy, Whisper, Barge and Disconnect actions](../img/screens/live-calls-list.jpg)
 
-### Table columns
+#### Table columns
 
 | Column | What it shows |
 |--------|---------------|
@@ -64,27 +72,33 @@ A Supervisor's list contains only calls whose caller or destination is one of th
 | Status | Processing, Ringing or Connected |
 | Duration | Time since the session started, for example `4m 12s` |
 | Started | Local time the session started |
-| Session ID | The Cloudonix session ID |
-| Actions | Spy, Whisper and Barge are shown to Owners and Supervisors; Disconnect only to the Owner |
+| Session ID | The Cloudonix session ID, or N/A for a row that arrived over the WebSocket without one |
+| Actions | Spy, Whisper and Barge are shown to Owners and Supervisors; Disconnect only to the Owner. Rows without a session ID show "-" |
 
-### Which calls count as active
+#### Which calls count as active
 
 A call is listed when its latest session update is **processing**, **ringing** or **connected** and arrived in the **last 30 minutes**. A call that Cloudonix has reported as finished (final CDR or deleted session) in the last 24 hours never comes back, even if a late "active" update arrives. At most 100 calls are returned.
 
 A call that gets no update for 30 minutes drops off the list even if it is still up. Very long calls with no state change can therefore disappear from the page; they still appear in [Call Logs](/opbx/modules/call-logs) when they end.
 
-## Refresh and real-time updates
+### Change the refresh interval
+
+Who can do this: everyone who can open the page.
 
 The page combines two sources:
 
-- **Polling**: the list is reloaded at the interval chosen in **Refresh**: No Refresh, 1 Second, 5 Seconds (default), 15 Seconds, 30 Seconds or 60 Seconds. Polling **stops while the browser tab is hidden** and resumes when you return to it.
+- **Polling**: the list is reloaded at the interval chosen in **Refresh**. Polling **stops while the browser tab is hidden** and resumes when you return to it.
 - **WebSocket**: Owners and PBX Admins also receive live updates over the organization's WebSocket channel. The badge next to the Refresh selector reads **Live** when that connection is up, otherwise it shows the connection state.
 
 Reporters and Supervisors are not admitted to the organization channel, so their page relies on polling only. For Supervisors this is deliberate: the channel carries every call in the organization.
 
-**Clear Stale (*n*)** appears when the WebSocket has delivered calls that have no session ID yet. It removes them from your screen only; nothing is sent to the server.
+1. Open the **Refresh** selector at the top right.
+2. Choose **No Refresh**, **1 Second**, **5 Seconds** (default), **15 Seconds**, **30 Seconds** or **60 Seconds**.
+3. The list now reloads at that interval. With **No Refresh**, the empty page reads "Auto-refresh disabled". The choice is not saved: the page starts at 5 Seconds again next time.
 
-## Coach a call (Spy, Whisper, Barge)
+### Listen to a call (Spy)
+
+Who can do this: Owner, and Supervisor for calls in their scope. You need a user extension and a registered [Web Phone](/opbx/modules/web-phone).
 
 | Action | Icon | What happens |
 |--------|------|--------------|
@@ -92,15 +106,33 @@ Reporters and Supervisors are not admitted to the organization channel, so their
 | **Whisper** | Microphone, with a menu | Choose **Whisper to caller** or **Whisper to callee**. Only that side hears you; you hear both |
 | **Barge** | Phone | You join the call. Everyone hears you |
 
-1. Make sure your Web Phone is registered (you need a user extension).
-2. On the call's row, click **Spy** or **Barge**, or open **Whisper** and choose a side.
-3. OPBX checks that you may coach this call and returns a dial target. The Web Phone opens by itself, dials it and shows a short label: **Spy**, **Whisper** or **Barge**.
-4. While connected, the Web Phone header reads "On call - Coaching: Spy" (or Whisper, Barge).
-5. To stop, hang up in the Web Phone. When the coaching call ends, the Web Phone closes.
+1. On the call's row, click the **Spy** icon (headphones).
+2. OPBX checks that you may coach this call and returns a dial target. The Web Phone opens by itself, dials it and shows the label **Spy**.
+3. While connected, the Web Phone header reads "On call - Coaching: Spy".
+4. To stop, hang up in the Web Phone. When the coaching call ends, the Web Phone closes.
+
+If OPBX refuses, a toast shows the reason (see [Common errors](#common-errors)), or "Unable to start monitoring this call." when there is none.
+
+{/* SCREENSHOT: live-calls-coaching-webphone — Web Phone opened by a Spy action, showing the Spy label and the call timer */}
+
+### Whisper to one side of a call
+
+Who can do this: Owner, and Supervisor for calls in their scope. You need a user extension and a registered Web Phone.
+
+1. On the call's row, click the **Whisper** icon (microphone).
+2. Choose **Whisper to caller** or **Whisper to callee**.
+3. The Web Phone opens, dials and shows the label **Whisper**. Only the side you chose hears you; you hear both.
+4. Hang up in the Web Phone to stop.
 
 ![Whisper menu open on a call row with Whisper to caller and Whisper to callee](../img/screens/live-calls-whisper-menu.jpg)
 
-{/* SCREENSHOT: live-calls-coaching-webphone — Web Phone opened by a Spy action, showing the Spy label and the call timer */}
+### Join a call (Barge)
+
+Who can do this: Owner, and Supervisor for calls in their scope. You need a user extension and a registered Web Phone.
+
+1. On the call's row, click the **Barge** icon (phone).
+2. The Web Phone opens, dials and shows the label **Barge**. Both sides hear you.
+3. Hang up in the Web Phone to leave.
 
 ### How coaching is protected
 
@@ -109,29 +141,41 @@ Coaching is checked twice:
 1. **When you click the action.** The server checks that you are an Owner or a Supervisor, that the call belongs to your organization, that it is in a Supervisor's scope, and that it is still active. The secret session token used to build the dial target is handed out only here, one call at a time; it is never part of the call list.
 2. **When the Web Phone dials.** Before Cloudonix connects the coaching leg, OPBX checks again that the dialing extension is a user extension of an Owner or Supervisor in the same organization. A guessed or replayed dial target from any other extension is refused.
 
-## Disconnect calls
+### Disconnect a call
+
+Who can do this: Owner only (the icon is hidden for every other role).
 
 :::warning
 A disconnect ends the call for everyone on it at once. It cannot be undone.
 :::
 
-### Disconnect one call (Owner)
-
 1. Click the **Disconnect** icon on the call's row.
 2. Confirm "Are you sure you want to disconnect this call?".
-3. The row disappears at once. OPBX asks Cloudonix to end the session; a toast confirms "Session disconnected successfully".
+3. The row disappears at once. OPBX asks Cloudonix to end the session; a toast confirms "Session disconnected successfully". If the request is refused, the error is shown in a toast and the row comes back.
 
-### Disconnect All Calls (Owner)
+### Disconnect all calls
+
+Who can do this: Owner only.
 
 1. Click **Disconnect All Calls** (shown when there is at least one call).
 2. Read the **Dangerous Operation** dialog. It gives the number of calls, and how many rows have no session ID and are only cleared from the display.
 3. Click **Yes, Disconnect All**.
-4. A progress overlay shows "*n* of *total*". Calls are disconnected one after the other with a short pause between them.
-5. A toast reports the result, for example "All 3 calls disconnected successfully" or "Disconnected 2 calls, 1 failed".
+4. A progress overlay shows "*n* of *total*". Calls are disconnected one after the other with a short pause between them. Do not close or refresh the page.
+5. A toast reports the result: "All 3 calls disconnected successfully", "Disconnected 2 calls. 1 stale records cleared." when rows without a session ID were only cleared, or "Disconnected 2 calls, 1 failed". Calls whose disconnect failed stay on the list.
 
 For ten seconds after Disconnect All, the disconnected calls are kept off the list even if Cloudonix still reports them, so they do not flash back while the hang-up is processed.
 
 ![Dangerous Operation dialog asking to disconnect all 3 active calls](../img/screens/live-calls-disconnect-all-dialog.jpg)
+
+### Clear stale rows
+
+Who can do this: Owner and PBX Admin.
+
+**Clear Stale (*n*)** appears when the WebSocket has delivered calls that have no session ID yet. Clearing them affects your screen only; nothing is sent to the server.
+
+1. Click **Clear Stale (*n*)**.
+2. Confirm "Clear *n* stale record(s) without session ID from display?".
+3. The rows disappear and a toast reads "Cleared *n* stale record(s)".
 
 ## Common errors
 
