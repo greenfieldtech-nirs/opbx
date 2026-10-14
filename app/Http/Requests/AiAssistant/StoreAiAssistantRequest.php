@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AiAssistant;
 
-use App\Enums\UserStatus;
+use App\Enums\AiAssistantStatus;
 use App\Services\AiAssistant\ProviderRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -42,7 +42,7 @@ class StoreAiAssistantRequest extends FormRequest
             ],
             'status' => [
                 'nullable',
-                new Enum(UserStatus::class),
+                new Enum(AiAssistantStatus::class),
             ],
             'provider' => [
                 'required',
@@ -79,10 +79,10 @@ class StoreAiAssistantRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Set default status if not provided
-        if (! $this->has('status')) {
+        // Default status when omitted or null (the column is NOT NULL)
+        if ($this->input('status') === null) {
             $this->merge([
-                'status' => UserStatus::ACTIVE->value,
+                'status' => AiAssistantStatus::ACTIVE->value,
             ]);
         }
     }

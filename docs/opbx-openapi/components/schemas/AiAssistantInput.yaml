@@ -15,7 +15,9 @@ properties:
       - string
       - 'null'
     enum: [active, inactive, null]
-    description: Defaults to `active` when omitted on create. Cannot be null on update.
+    description: >-
+      Defaults to `active` when omitted or null on create. Cannot be null on update. AI
+      assistants have no `pending` status; any value other than `active` or `inactive` is a 422.
   provider:
     type: string
     maxLength: 100

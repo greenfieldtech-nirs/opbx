@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AiAssistant;
 
-use App\Enums\UserStatus;
+use App\Enums\AiAssistantStatus;
 use App\Services\AiAssistant\ProviderRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -47,7 +47,7 @@ class UpdateAiAssistantRequest extends FormRequest
             'status' => [
                 'sometimes',
                 'required',
-                new Enum(UserStatus::class),
+                new Enum(AiAssistantStatus::class),
             ],
             'provider' => [
                 'sometimes',

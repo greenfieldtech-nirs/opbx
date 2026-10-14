@@ -236,7 +236,7 @@ The phone number of a SIP provider must be E.164. A value such as `2025550170` w
 | `provider` | Provider key, for example `vapi` or `dograh-cloud` |
 | `protocol` | `sip`, `websocket` or `dummy`. Set from the provider |
 | `configuration` | JSON with the provider's fields, for example `{"phone_number": "+12025550170"}` |
-| `status` | `active` or `inactive` |
+| `status` | `active` or `inactive` (there is no `pending`; other values are refused with 422) |
 | `deleted_at` | Deletes are soft deletes |
 
 ## Related API endpoints
