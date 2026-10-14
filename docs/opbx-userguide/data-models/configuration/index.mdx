@@ -7,7 +7,7 @@ title: "Configuration Reference"
 
 # Configuration Reference
 
-This page documents the environment variables and configuration values used by OPBX.
+This page documents the environment variables and configuration values used by OPBX. The **Default** column shows the value in `.env.example` (or in `docker-compose.yml` for variables that only the compose file reads). Where the code falls back to a different value when the variable is unset, the description says so.
 
 ## Environment Variables
 
@@ -21,14 +21,17 @@ This page documents the environment variables and configuration values used by O
 | `APP_DEBUG` | `false` | Enable debug mode |
 | `APP_URL` | `https://your-domain.com` | Base URL |
 | `APP_PORT` | `80` | Host port for Nginx |
+| `OPCACHE_VALIDATE_TIMESTAMPS` | `1` | Compose only. `1` makes PHP OPcache revalidate file timestamps in the PHP containers, so code changes are picked up without a restart; any other value keeps the image defaults |
 | `APP_LOCALE` | `en` | Default locale |
+| `APP_FALLBACK_LOCALE` | `en` | Fallback locale |
+| `APP_FAKER_LOCALE` | `en_US` | Locale for factories and seeders |
 
 ### Application Mode
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPBX_APPLICATION_MODE` | `development` | `development` or `production` (SaaS) |
-| `OPBX_APPLICATION_WEBHOOK_BASEURL` | — | Application-level webhook base URL |
+| `OPBX_APPLICATION_WEBHOOK_BASEURL` | — | Application-level webhook base URL. When set, it overrides every organization's `cloudonix_settings.webhook_base_url` |
 
 ### Database
 
@@ -41,7 +44,8 @@ This page documents the environment variables and configuration values used by O
 | `DB_USERNAME` | `opbx` | Database user |
 | `DB_PASSWORD` | — | Database password |
 | `DB_ROOT_PASSWORD` | — | MySQL root password |
-| `DB_EXPOSE_PORT` | — | Expose MySQL port to host (dev only) |
+| `DB_EXPOSE_PORT` | `3306` | Loopback host port for MySQL (dev only, needs `docker-compose.ports.yml`) |
+| `DB_CDR_ARCHIVE_DATABASE` | empty | Schema for the warm call-record tier. See [Call detail records](#call-detail-records-tiered) |
 
 ### Redis
 
@@ -52,7 +56,7 @@ This page documents the environment variables and configuration values used by O
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_PASSWORD` | — | Redis password |
 | `REDIS_DB` | `0` | Default database |
-| `REDIS_EXPOSE_PORT` | — | Expose Redis port to host (dev only) |
+| `REDIS_EXPOSE_PORT` | `6379` | Loopback host port for Redis (dev only, needs `docker-compose.ports.yml`) |
 
 ### Session / Sanctum
 
@@ -60,6 +64,9 @@ This page documents the environment variables and configuration values used by O
 |----------|---------|-------------|
 | `SESSION_DRIVER` | `redis` | Session storage |
 | `SESSION_LIFETIME` | `120` | Session lifetime (minutes) |
+| `SESSION_ENCRYPT` | `false` | Encrypt session data |
+| `SESSION_PATH` | `/` | Session cookie path |
+| `SESSION_DOMAIN` | `null` | Session cookie domain |
 | `SANCTUM_STATEFUL_DOMAINS` | `localhost:3000,127.0.0.1:3000` | Cookie auth domains |
 | `SANCTUM_EXPIRATION` | `1440` | Token expiration (minutes) |
 
@@ -67,15 +74,20 @@ This page documents the environment variables and configuration values used by O
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BROADCAST_DRIVER` | `pusher` | Broadcasting driver |
+| `BROADCAST_DRIVER` | `pusher` | Broadcasting driver (`config/broadcasting.php` falls back to `redis` when unset) |
+| `BROADCAST_CONNECTION` | `pusher` | Redis connection name used only by the `redis` broadcaster (code default `default`) |
 | `PUSHER_APP_ID` | `app-id` | Soketi app ID |
 | `PUSHER_APP_KEY` | `pbxappkey` | Soketi app key |
-| `PUSHER_APP_SECRET` | — | Soketi app secret |
+| `PUSHER_APP_SECRET` | — | Soketi app secret. Required: compose refuses to start Soketi without it |
 | `PUSHER_HOST` | `soketi` | Soketi host |
 | `PUSHER_PORT` | `6001` | Soketi port |
 | `PUSHER_SCHEME` | `http` | |
+| `PUSHER_APP_CLUSTER` | `mt1` | Pusher cluster name (required by the client library; Soketi ignores it) |
 | `SOKETI_PORT` | `6001` | Host port for Soketi |
 | `SOKETI_METRICS_PORT` | `9601` | Host port for Soketi metrics |
+| `SOKETI_DEBUG` | `0` | Soketi debug logging (compose only) |
+
+`config/websockets.php` (`LARAVEL_WEBSOCKETS_*`, `WEBSOCKETS_REPLICATION_MODE`) belongs to the beyondcode Laravel WebSockets package, which is not installed; nothing reads it. Soketi is the WebSocket server.
 
 ### Frontend (Vite)
 
@@ -87,6 +99,7 @@ This page documents the environment variables and configuration values used by O
 | `VITE_WS_HOST` | `localhost` | WebSocket host |
 | `VITE_WS_PORT` | `6001` | WebSocket port |
 | `VITE_WS_SCHEME` | `http` | WebSocket scheme |
+| `VITE_ALLOWED_HOSTS` | `localhost,.localhost` | Host names the Vite dev server accepts |
 
 ### S3 Storage (SeaweedFS)
 
@@ -94,8 +107,8 @@ The `MINIO_*` variable names are kept for the S3 client. The S3 store is Seaweed
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MINIO_ACCESS_KEY` | empty (generated) | S3 access key (SeaweedFS identity). Must not be a weak value; the container entrypoint rejects them. |
-| `MINIO_SECRET_KEY` | empty (generated) | S3 secret key. Same rule as the access key. |
+| `MINIO_ACCESS_KEY` | empty | S3 access key (SeaweedFS identity). `docker/scripts/generate-secrets.sh` generates it. Required: compose refuses to start SeaweedFS without it, and the app entrypoint rejects weak values such as `minioadmin` |
+| `MINIO_SECRET_KEY` | empty | S3 secret key. Same rules as the access key |
 | `MINIO_REGION` | `us-east-1` | |
 | `MINIO_BUCKET` | `recordings` | Default bucket |
 | `MINIO_ENDPOINT` | `http://seaweedfs:8333` | S3 API endpoint |
@@ -115,6 +128,8 @@ The `MINIO_*` names are kept for compatibility. Existing installations that used
 | `CLOUDONIX_SIP_SERVER` | `sip.cloudonix.io` | SIP server |
 | `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` | `false` | `false`: status, CDR and dialer webhooks from an organization with no webhook key are accepted and logged as `webhook.unauthenticated`. `true`: they are rejected with 401. Turn on after `php artisan cloudonix:provision-webhook-keys` |
 | `CXML_DEFAULT_TIMEOUT` | `30` | Default `<Dial>` timeout (seconds) for extension and ring group dials |
+| `CLOUDONIX_API_TOKEN` | — | Read into `services.cloudonix.api_token`, but no code uses it; API calls use each organization's `domain_api_key` |
+| `VOICE_WEBHOOK_TOKEN` | — | Read into `services.cloudonix.voice_webhook_token`, but no code uses it |
 
 Per-organization credentials, including the webhook key, are stored in `cloudonix_settings`.
 
@@ -122,15 +137,20 @@ Per-organization credentials, including the webhook key, are stored in `cloudoni
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RATE_LIMIT_API` | `60` | API requests per minute per organization |
-| `RATE_LIMIT_SENSITIVE` | `10` | Sensitive operations per minute |
-| `RATE_LIMIT_SENSITIVE_ADMIN` | `60` | Admin sensitive operations |
-| `RATE_LIMIT_AUTH` | `5` | Auth attempts per minute |
+| `RATE_LIMIT_API` | `60` | API requests per organization per window (`rate_limit_org:api` on the `/api/v1` resource routes). Also the `api` named limiter, which no route applies |
+| `RATE_LIMIT_API_MINUTES` | `1` | Window, in minutes, for `RATE_LIMIT_API` |
+| `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | `60` / `1` | Fallback per-organization limit for any other `rate_limit_org:<type>` (none is applied today) |
+| `RATE_LIMIT_SENSITIVE` | `10` | Sensitive operations per minute (`throttle:sensitive`, and the `sensitive-operations` middleware for users who are not Owner or PBX Admin) |
+| `RATE_LIMIT_SENSITIVE_ADMIN` | `60` | `sensitive-operations` limit for Owners and PBX Admins |
+| `RATE_LIMIT_SENSITIVE_DECAY` | `60` | Seconds a `sensitive-operations` hit counts |
+| `RATE_LIMIT_AUTH` | `5` | Auth attempts per minute per IP (`throttle:auth`) |
 | `WEBHOOK_IDEMPOTENCY_TTL` | `86400` | Seconds a webhook idempotency key (`idem:webhook:{key}`) is kept |
 | `WEBHOOK_MAX_CACHE_SIZE` | `102400` | Largest response (bytes) cached for a duplicate webhook |
 | `WEBHOOK_REPLAY_MAX_AGE` | `300` | Webhooks with an older `timestamp` are rejected (CDRs are accepted with a log line) |
 
-Cloudonix webhook and voice routing routes are intentionally **not rate-limited**: with many organisations Cloudonix sends hundreds of events per second, and throttling them would drop calls and CDRs. They are protected by authentication and idempotency instead. All rate limits live in `config/rate_limiting.php`.
+Cloudonix webhook and voice routing routes are intentionally **not rate-limited**: with many organisations Cloudonix sends hundreds of events per second, and throttling them would drop calls and CDRs. They are protected by authentication and idempotency instead.
+
+The values above are in `config/rate_limiting.php`. Other limits are fixed in code: `registration` (10 per hour per IP; `config('rate_limiting.registration')` has no key, so the fallback applies), `call-tracking-dni` (60 per minute per organization and IP), `embed` (60 per minute per token and IP), `dialer-worker` (`DIALER_WORKER_RATE_LIMIT`, default 1000 per minute per IP), the public status page (`throttle:60,1`), and a few routes with inline `throttle:<n>,1` values.
 
 See [Webhooks](/opbx/architecture/webhooks) for the authentication flow.
 
@@ -150,6 +170,7 @@ The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`
 | `CIRCUIT_BREAKER_CLOUDONIX_THRESHOLD` | `5` | Failure threshold |
 | `CIRCUIT_BREAKER_CLOUDONIX_TIMEOUT` | `30` | Timeout (seconds) |
 | `CIRCUIT_BREAKER_CLOUDONIX_RETRY_AFTER` | `60` | Retry after (seconds) |
+| `CIRCUIT_BREAKER_DEFAULT_THRESHOLD` / `_TIMEOUT` / `_RETRY_AFTER` | `5` / `30` / `60` | Same settings for any other service (not in `.env.example`) |
 
 ### Dialer Worker
 
@@ -157,17 +178,22 @@ The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`
 |----------|---------|-------------|
 | `DIALER_WORKER_ID` | `worker-1` | Worker identifier |
 | `DIALER_LARAVEL_API_URL` | `http://nginx` | Laravel API URL |
-| `DIALER_WORKER_API_TOKEN` | — | Worker auth token |
+| `DIALER_WORKER_API_TOKEN` | — | Worker auth token. Required: compose refuses to start without it |
 | `DIALER_WEBHOOK_PORT` | `8081` | Worker webhook port (container) |
 | `DIALER_WEBHOOK_HOST_PORT` | `8181` | Host port publishing the worker webhook endpoint |
 | `DIALER_POLL_INTERVAL` | `10s` | Campaign poll interval |
 | `DIALER_WORKER_API_TOKEN_SECONDARY` | — | Optional second token Laravel accepts, for rotation |
+| `DIALER_WORKER_RATE_LIMIT` | `1000` | Requests per minute per IP on the worker API (`throttle:dialer-worker`) |
+| `DIALER_WORKER_HEALTH_URL` | `http://dialer-worker:8081/webhooks/health` | Worker health URL used by the campaign monitor |
+| `DIALER_WORKER_MAX_RETRIES` / `DIALER_WORKER_RETRY_DELAY` | `3` / `60` | Read into `services.dialer_worker`, but no code uses them |
+
+Auto-dialer jobs use the `auto-dialer` queue connection: `AUTO_DIALER_QUEUE_DRIVER` (default `redis`, or `sync` when `QUEUE_CONNECTION=sync`), `AUTO_DIALER_QUEUE_CONNECTION` (`default`), `AUTO_DIALER_QUEUE` (`auto-dialer`) and `AUTO_DIALER_QUEUE_RETRY_AFTER` (`7500` seconds). `queue-worker` works the `auto-dialer` and `default` queues; `queue-worker-long` works `auto-dialer-long` with a 7200-second job timeout.
 
 ### AMD Worker
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AMD_WORKER_API_TOKEN` | — | Callback auth token. Required |
+| `AMD_WORKER_API_TOKEN` | — | Callback auth token. Required: compose refuses to start without it |
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | Max streams |
 | `AMD_MIN_BEEP_START_MS` | `2000` | Earliest point (ms after stream start) a beep may be accepted |
 | `AMD_LOG_LEVEL` | `info` | Log level |
@@ -178,11 +204,18 @@ The per-organization no-answer timeout is `cloudonix_settings.no_answer_timeout`
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required |
+| `ACD_WORKER_API_TOKEN` | — | Bearer token for Laravel → worker requests. Required: compose refuses to start without it |
 | `ACD_WORKER_URL` | `http://acd-worker:8084` | Worker URL used by Laravel |
 | `ACD_LOG_LEVEL` | `info` | Log level |
 
 The worker reads Redis from `ACD_REDIS_HOST`, `ACD_REDIS_PORT` and `ACD_REDIS_PASSWORD`, which the compose file sets from the Redis service and `REDIS_PASSWORD`. See [ACD Worker](/opbx/workers/acd-worker).
+
+### MCP Server
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_PORT` | `8080` | Host port publishing the MCP server (container port 8080). The UI shows the MCP endpoint URL with this port |
+| `MCP_LOG_LEVEL` | `info` | MCP server log level (compose only) |
 
 ### ngrok
 
@@ -208,6 +241,58 @@ The `ngrok` service is in the `dev` profile: `docker compose --profile dev up -d
 | `USERCHECK_BLOCK_RELAY_DOMAINS` | `false` | Reject email relay domains |
 | `USERCHECK_BLOCK_PUBLIC_DOMAINS` | `false` | Reject public mail providers |
 
+### SaaS Sign-in (Auth0) and Invitations
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPBX_SAAS_ENABLED` | `false` | Enable Auth0 social sign-in |
+| `AUTH0_DOMAIN` | — | Auth0 tenant domain |
+| `AUTH0_CLIENT_ID` | — | |
+| `AUTH0_CLIENT_SECRET` | — | |
+| `AUTH0_REDIRECT_URI` | `https://app.opbx.com/ui/auth/callback` | OAuth callback URL |
+| `AUTH0_PROVIDERS` | `google,facebook,microsoft,github,x` | Enabled social providers. They map to the Auth0 connections `google-oauth2`, `facebook`, `windowslive`, `github` and `twitter` |
+| `OPBX_INVITE_TOKEN_TTL_HOURS` | `24` | Hours an invitation link is valid |
+| `OPBX_INVITE_RATE_LIMIT_PER_HOUR` | `10` | Invitations a user can send per hour |
+
+Invitation links use `FRONTEND_URL` (falling back to `APP_URL`).
+
+### Embeddable Dialer
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EMBED_ALLOW_INSECURE_FRAMING` | `false` | Allow embedding the dialer on `http://` sites |
+| `EMBED_WIDGET_URL` | `/embed/assets/embed-widget.js` | Widget script URL served by the loader |
+| `EMBED_WIDGET_CSS_URL` | `/embed/assets/embed-widget.css` | Widget stylesheet URL |
+
+### Security Headers
+
+Set in `config/security.php` and applied by the `SecurityHeaders` middleware. See [Security](/opbx/architecture/security#security-headers).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HSTS_MAX_AGE` | `31536000` | `Strict-Transport-Security` max-age, sent on HTTPS requests |
+| `HSTS_INCLUDE_SUBDOMAINS` | `true` | Add `includeSubDomains` |
+| `HSTS_PRELOAD` | `false` | Add `preload` |
+| `CSP_REPORT_URI` | — | CSP `report-uri` |
+| `CSP_CONNECT_DOMAINS` | empty | Comma-separated extra origins for the CSP `connect-src` |
+
+### Recordings
+
+Set in `config/recordings.php`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RECORDINGS_MAX_SIZE_KB` | `5120` | Largest audio file you can upload (MP3 or WAV) |
+| `RECORDINGS_MAX_DOWNLOAD_BYTES` | `209715200` | Largest call recording `DownloadCallRecordingJob` fetches (200 MB) |
+| `RECORDINGS_STORAGE_DISK` | `recordings` | Filesystem disk for recordings |
+| `RECORDINGS_URL_TIMEOUT` | `10` | Seconds to wait when fetching a remote audio URL |
+| `RECORDINGS_ALLOWED_DOMAINS` | empty (all) | Comma-separated domains allowed for remote audio URLs |
+| `RECORDINGS_ACCESS_TOKEN_EXPIRY` | `30` | Minutes a recording download token is valid |
+| `RECORDINGS_SECURE_DELETE` | `true` | Secure deletion of recording files |
+| `RECORDINGS_QUEUE_PROCESSING` | `true` | Process uploads on the queue |
+
+`RECORDINGS_LOCAL_PATH`, `RECORDINGS_ALLOW_HTTP`, `RECORDINGS_QUEUE_CONNECTION`, `RECORDINGS_AUDIT_LOGGING`, `RECORDINGS_RETENTION_DAYS`, `RECORDINGS_CACHE_ENABLED` and `RECORDINGS_CACHE_TTL` are read by the config file but not used by any code. Recording expiry is `RECORDING_RETENTION_MONTHS` (see [Data Retention](#data-retention)).
+
 ### reCAPTCHA
 
 | Variable | Default | Description |
@@ -231,14 +316,40 @@ The `ngrok` service is in the `dev` profile: `docker compose --profile dev up -d
 | `MAIL_FROM_ADDRESS` | `noreply@your-domain.com` | |
 | `MAIL_FROM_NAME` | `${APP_NAME}` | |
 
-Provider-specific variables are in `.env.example` for Mailgun, Mailjet, MailerLite, and SendInBlue/Brevo.
+Only one provider may be enabled. Provider-specific variables:
+
+| Provider | Variables |
+|----------|-----------|
+| Mailgun | `MAILGUN_ENABLED` (`false`), `MAILGUN_DOMAIN`, `MAILGUN_SECRET`, `MAILGUN_ENDPOINT` (`api.mailgun.net`), `MAILGUN_REGION` (`us` or `eu`) |
+| Mailjet | `MAILJET_ENABLED` (`false`), `MAILJET_APIKEY`, `MAILJET_APISECRET` |
+| MailerLite | `MAILERLITE_ENABLED` (`false`), `MAILERLITE_API_KEY` |
+| SendInBlue/Brevo | `SENDINBLUE_ENABLED` (`false`), `SENDINBLUE_API_KEY` |
+
+`MAIL_USERNAME` and `MAIL_PASSWORD` (`null`) are the SMTP credentials.
 
 ### Logging
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_CHANNEL` | `stack` | |
+| `LOG_STACK` | `single,json` | Channels in the `stack` channel. In the app, queue and scheduler containers compose sets it from `OPBX_LOG_STACK` (default `single,json`) |
 | `LOG_LEVEL` | `info` | |
+| `LOG_DEPRECATIONS_CHANNEL` | `null` | |
+
+### Log Stack (profile `logs`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_STACK_ENABLED` | `false` | Tells `docker/scripts/validate-env.sh` that the log stack is used, so it checks `GRAFANA_ADMIN_PASSWORD` |
+| `GRAFANA_ROOT_URL` | `http://localhost/logs/` | Set to `<APP_URL>/logs/` |
+| `GRAFANA_CSRF_TRUSTED_ORIGINS` | empty | |
+| `GRAFANA_ADMIN_USER` | `admin` | |
+| `GRAFANA_ADMIN_PASSWORD` | — | Required by compose even when the `logs` profile is not started |
+| `LOKI_RETENTION_HOURS` | `168` | Log retention in Loki |
+
+### Laravel Framework Settings
+
+`.env.example` also sets `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis` and `FILESYSTEM_DISK=local`. The other variables read by the stock Laravel config files (`config/app.php`, `auth.php`, `cache.php`, `database.php`, `filesystems.php`, `logging.php`, `mail.php`, `queue.php`, `session.php`, `services.php`: for example `CACHE_PREFIX`, `REDIS_PREFIX`, `SESSION_SECURE_COOKIE`, `SESSION_SAME_SITE`, `AWS_*`, `POSTMARK_*`, `RESEND_*`, `SLACK_*`, `MEMCACHED_*`, `SQS_*`) keep their Laravel defaults and are described in the [Laravel documentation](https://laravel.com/docs/12.x/configuration).
 
 ## Data Retention
 
