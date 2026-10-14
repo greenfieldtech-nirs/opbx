@@ -8,14 +8,16 @@ description: "Social sign-in through Auth0, linked accounts, email invitations a
 
 # Auth0 Syndicated Authentication
 
-When the deployment has Auth0 configured, people can sign up and sign in with a social account (Google, Facebook, Microsoft, GitHub or X) instead of, or in addition to, an email and password. The same feature powers **email invitations** and **requests to join** an existing organization.
+When the deployment has Auth0 configured, people can sign up and sign in with a social account instead of, or in addition to, an email and password.
+
+The server accepts five providers in `AUTH0_PROVIDERS`: `google`, `facebook`, `microsoft`, `github` and `x`. The sign-in, registration and profile pages show buttons only for **Google** and **GitHub** (when they are in `AUTH0_PROVIDERS`); the other three can be used only by a client that calls the API itself. The same feature powers **email invitations** and **requests to join** an existing organization.
 
 Auth0 sign-in works **alongside** password sign-in. A password user can keep their password and also link one or more social accounts.
 
 ## Prerequisites
 
 - The deployment runs with `OPBX_SAAS_ENABLED=true` and the Auth0 variables (`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_REDIRECT_URI`, `AUTH0_PROVIDERS`). See [Auth0 Setup](/opbx/installation/auth0-setup).
-- Without this configuration, no social buttons are shown, the **Linked Accounts** section of the profile is hidden, and every Auth0 endpoint, including **Invite User**, answers `503` with `AUTH0_NOT_CONFIGURED` "Auth0 is not enabled."
+- Without this configuration, no social buttons are shown, the **Linked Accounts** section of the profile is hidden, the **Invite User** button on the Users page is disabled (its tooltip says "Invitations need Auth0, which is not configured on this server."), and every Auth0 endpoint answers `503` with `AUTH0_NOT_CONFIGURED` "Auth0 is not enabled."
 
 ## Permissions
 
@@ -26,46 +28,56 @@ Auth0 sign-in works **alongside** password sign-in. A password user can keep the
 | Invite a user by email | Yes | Yes | No | No | No |
 | List, approve or reject join requests (API) | Yes | Yes | No | No | No |
 
-## Sign up: create a new organization
+## Workflows
+
+### Sign up: create a new organization
+
+**Who can do this:** anyone with a social account whose email has no OPBX account yet.
 
 1. Open the registration page (`/ui/register`).
-2. Click a social provider button.
+2. Under **Or continue with**, click **Google** or **GitHub**.
 3. Sign in at the provider. The provider must report the email address as **verified**.
-4. OPBX creates a new organization and makes you its **Owner**, then opens the Dashboard.
+4. OPBX creates a new organization named "*your email* Organization", makes you its **Owner**, shows the toast **Login successful!** and opens the Dashboard. Rename the organization in your [Profile](/opbx/administration/profile).
 
-## Sign in with a social account
+If an OPBX account with that email already exists, nothing is created: the toast says to sign in with your password and link the account in your profile. If the social account is already linked, you are simply signed in.
+
+### Sign in with a social account
+
+**Who can do this:** any active user (every role) who linked the provider before.
 
 1. Open the sign-in page (`/ui/login`).
-2. Click the provider you linked before.
-3. After the provider sign-in, OPBX finds the linked account and opens the Dashboard.
+2. Under **Or continue with**, click the provider you linked before.
+3. After the provider sign-in, OPBX finds the linked account, shows **Login successful!** and opens the Dashboard.
 
 The session lasts 24 hours. What happens when the social account is not linked yet:
 
 | Situation | Result |
 |-----------|--------|
-| The provider's email is not verified | `AUTH0_EMAIL_UNVERIFIED`: verify the email with the provider first |
+| The provider's email is not verified | `AUTH0_EMAIL_UNVERIFIED`: the toast **Email not verified** and you are back on the sign-in page. Verify the email with the provider first |
 | An OPBX account with that email already exists | `AUTH0_ACCOUNT_EXISTS`: sign in with your password, then link the provider in your profile |
 | No OPBX account with that email | The **Complete your account** page opens (below) |
 | The OPBX account is inactive or pending | `ACCOUNT_INACTIVE` "Account is not active." |
 
-{/* SCREENSHOT: auth0-login-buttons — sign-in page with email and password fields and the social provider buttons below */}
+{/* SCREENSHOT: auth0-login-buttons — sign-in page with email and password fields and the Google and GitHub buttons under "Or continue with" */}
 
-## Complete your account (new social users)
+### Complete your account (new social users)
 
-When someone signs in with a social account that matches no OPBX user, the **Complete your account** page offers two choices:
+**Who can do this:** a person who signed in with a social account that matches no OPBX user.
 
-- **Create a new organization**: signs in at the provider again and creates the organization with the person as Owner.
-- **Request to join organization**: enter the **Organization slug** (for example `acme-corp`) and submit. The toast says "Join request submitted. Please wait for approval."
+The **Complete your account** page opens by itself and offers two choices:
 
-The onboarding session is valid for 60 minutes and can be used once ("Onboarding session is invalid or expired." otherwise). The slug must belong to an existing organization.
+- **Create a new organization**: click it to sign in at the provider again; OPBX then creates the organization with you as Owner (as in [Sign up](#sign-up-create-a-new-organization)).
+- **Request to join organization**: enter the **Organization slug** (for example `acme-corp`; ask an Owner of that organization for it) and click **Request to join organization**. The toast says "Join request submitted. Please wait for approval." and the sign-in page opens.
+
+The onboarding session is valid for 60 minutes and can be used for one request. When it has expired the toast says "Your sign-in session expired. Please sign in again." The slug must belong to an existing, active organization; otherwise the toast says "Failed to submit join request."
 
 {/* SCREENSHOT: auth0-onboarding — Complete your account page with the Create a new organization button and the Organization slug field with Request to join organization */}
 
-## Join requests
+### Approve or reject a join request
+
+**Who can do this:** Owner, PBX Admin (API only; there is no page for join requests).
 
 A join request records the target organization, the person's email and name, and the social account they used.
-
-There is no page for join requests; an Owner or PBX Admin handles them through the API:
 
 | Action | Endpoint | Result |
 |--------|----------|--------|
@@ -75,37 +87,43 @@ There is no page for join requests; an Owner or PBX Admin handles them through t
 
 A request that is no longer pending cannot be approved again (`JOIN_REQUEST_NOT_PENDING`). OPBX does not email the requester about the decision.
 
-## Link a social account to your profile
+### Link a social account to your profile
+
+**Who can do this:** every signed-in user, for their own account.
 
 1. Sign in (with your password or an already linked provider).
 2. Open **Profile** from the user menu.
-3. In **Linked Accounts**, click **Connect** next to a provider.
+3. In **Linked Accounts**, click **Connect** next to a provider (the card lists **Google** and **Github** when they are configured).
 4. Sign in at the provider with the **same email address** as your OPBX account (upper and lower case do not matter).
-5. You return to your profile with the provider shown as linked.
+5. You return to your profile with the toast **Account linked successfully!** and the provider now shows **Disconnect**.
 
 | Error | Meaning |
 |-------|---------|
-| `AUTH0_LINK_EMAIL_MISMATCH` "Auth0 email does not match your account email." | The provider account has another email |
+| `AUTH0_LINK_EMAIL_MISMATCH` "Auth0 email does not match your account email." | The provider account has another email. The toast **Could not link account** appears on your profile |
 | `AUTH0_LINK_ALREADY_LINKED` | That provider account is already linked to a user |
 
-## Unlink a social account
+### Unlink a social account
 
-In **Profile** › **Linked Accounts**, click **Disconnect** next to the provider. The toast says "Account unlinked." Your OPBX account and password stay as they are.
+**Who can do this:** every signed-in user, for their own account.
 
-{/* SCREENSHOT: auth0-linked-accounts — Profile page Linked Accounts card with Google linked (Disconnect button) and Microsoft not linked (Connect button) */}
+1. Open **Profile** › **Linked Accounts**.
+2. Click **Disconnect** next to the provider.
 
-## Invite a user by email
+The toast says "Account unlinked." and the provider shows **Connect** again. Your OPBX account and password stay as they are.
 
-1. Open **Users** and click **Invite User** (Owner and PBX Admin).
-2. Enter the email address and send.
-3. OPBX creates a **pending** user with the **PBX User** role and emails a link to `/ui/invite?token=…`.
-4. The invitee opens the link. The page says "You're invited" with the organization name.
-5. The invitee clicks **Accept & Continue** and signs in at the first configured provider, with the invited email filled in.
-6. If the provider's email is verified and matches the invitation, the user becomes **active** and is signed in.
+{/* SCREENSHOT: auth0-linked-accounts — Profile page Linked Accounts card with Google linked (Disconnect button) and Github not linked (Connect button) */}
+
+### Invite a user by email
+
+**Who can do this:** Owner, PBX Admin (needs Auth0).
+
+1. Open **Users** and click **Invite User**.
+2. In the **Invite User** dialog, enter the **Email**, for example `colleague@example.com`, and click **Send Invitation**.
+3. The toast **Invitation sent successfully.** appears. OPBX creates a **pending** user with the **PBX User** role and emails a link to `/ui/invite?token=…`. If the server refuses, the reason is shown in the dialog.
 
 Rules:
 
-- The **Invite User** button is shown on the Users page even when Auth0 is not configured; the invitation is then refused with "Auth0 is not enabled."
+- When Auth0 is not configured, the **Invite User** button is disabled.
 - The link is valid for 24 hours (`OPBX_INVITE_TOKEN_TTL_HOURS`) and can be used once.
 - Inviting an email that is still pending sends a new link; the old one stops working.
 - Inviting an email that already belongs to a user is refused: "A user with this email already exists in the organization."
@@ -114,13 +132,21 @@ Rules:
 
 {/* SCREENSHOT: auth0-invite-dialog — Invite User dialog on the Users page with an email address entered */}
 
+### Accept an invitation
+
+**Who can do this:** the invited person.
+
+1. Open the link from the invitation email. The page says "You're invited" and "Join *organization* on OPBX."
+2. Click **Accept & Continue** and sign in at the first configured provider, with the invited email filled in.
+3. If the provider's email is verified and matches the invitation, the user becomes **active**, the toast **Login successful!** appears and the Dashboard opens.
+
 {/* SCREENSHOT: auth0-accept-invitation — "You're invited" page for Acme Corp (Demo) with the Accept & Continue button */}
 
 | Invitation error | Meaning |
 |------------------|---------|
-| `INVITE_EXPIRED_OR_INVALID` "Invitation is invalid or has expired." | The link is wrong, expired or already used |
+| `INVITE_EXPIRED_OR_INVALID` "Invitation is invalid or has expired." | The link is wrong, expired or already used. The page shows **Invitation Error** with **Go to Login** |
 | `INVITE_INVALID_USER` | The invited user was already activated |
-| `INVITE_EMAIL_MISMATCH` | The provider account's email is not the invited email |
+| `INVITE_EMAIL_MISMATCH` | The provider account's email is not the invited email (toast **Invitation email mismatch**) |
 | `AUTH0_EMAIL_UNVERIFIED` | The provider did not confirm the email |
 
 ## Other errors
