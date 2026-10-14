@@ -32,11 +32,11 @@ Use this module to:
 
 | Action | Owner | PBX Admin | PBX User | Reporter |
 |--------|:-----:|:---------:|:--------:|:--------:|
-| See Outbound Whitelist in the sidebar and open the page | Yes | No | No | No |
+| See Outbound Whitelist in the sidebar and open the page | Yes | Yes | No | No |
 | Read rules through the API | Yes | Yes | Yes | Yes |
-| Create, edit, toggle or delete a rule (API) | Yes | Yes | No | No |
+| Create, edit, toggle or delete a rule | Yes | Yes | No | No |
 
-The page is available to the Owner and the PBX Admin, who can both manage rules.
+The page is available to the Owner and the PBX Admin only; other roles who open `/ui/outbound-whitelist` are sent to the Dashboard. Supervisors do not see it either.
 
 ## How a call is matched
 
@@ -70,44 +70,75 @@ The caller ID presented on the call is chosen in this order:
 
 A number that has been set to Inactive is skipped and the next step is used.
 
-## Create a rule
+## Workflows
+
+### Find a rule
+
+**Who can do this:** Owner and PBX Admin.
 
 1. Open **Outbound Whitelist** (under **Apps and Security** › **Security**).
+2. Type in **Search by name or pattern...**. The search matches the rule name, country, prefix and trunk name.
+3. Click **Reset** to clear the search.
+
+The list shows each rule's name with its voice trunk under it, **Country** (flag and name), **Additional Prefix**, **Created** and **Status**. The page loads up to 50 rules and pages through them 20 at a time.
+
+![Outbound Whitelist list with four rules (Germany, United Kingdom, Israel, US and Canada), each showing country, trunk, created date and an Active status pill](../img/screens/outbound-whitelist-list.jpg)
+
+### Allow an outbound destination
+
+**Who can do this:** Owner and PBX Admin (`OutboundWhitelistPolicy::create`; `can(role, 'outboundWhitelist.manage')` shows the **Add Whitelist Entry** button).
+
+1. Open **Outbound Whitelist**.
 2. Click **Add Whitelist Entry**.
-3. Fill in the fields below.
-4. Click **Create Entry**.
+3. Enter a **Name**, for example "Local Calls".
+4. Pick the **Country**.
+5. Optionally enter an **Additional Prefix**: the area code without the country code, for example `202`.
+6. Pick the **Voice Trunk**. Click the refresh button next to the label to reload the trunk list from Cloudonix.
+7. Optionally pick a **Default Caller ID**, or leave **None**.
+8. Click **Create Entry**.
+
+The dialog closes, the toast "Outbound whitelist entry created successfully" appears and the rule is listed as **Active**. If the server refuses the rule, the page shows "Failed to create outbound whitelist entry"; the reasons are listed under [Common errors](#common-errors).
 
 | Field | Required | Limit | Meaning |
 |-------|----------|-------|---------|
 | Name | Yes | Up to 255 characters | A label, for example "Local Calls" |
 | Country | Yes | One country per rule; unique within the organization | The destination country. The list shows the flag, calling code and name |
 | Additional Prefix | No | Up to 12 characters: digits, spaces, `+` and `-` | Area code or prefix **without** the country code, for example `202`. Extra spaces are removed |
-| Voice Trunk | Yes | One of the trunks fetched from Cloudonix | The trunk the call leaves through. Use the refresh button next to the label to reload the list |
-| Default Caller ID | No | An active phone number of your organization, or None | Presented on matching calls when the extension has no caller ID of its own |
+| Voice Trunk | Yes | One of the trunks fetched from Cloudonix | The trunk the call leaves through. With no trunks the dialog shows "No outbound trunks available" and **Create Entry** stays disabled |
+| Default Caller ID | No | **None**, or one of your **active** phone numbers (shown as friendly name and number) | Presented on matching calls when the extension has no caller ID of its own |
 
 Because the country is unique, you cannot have two rules for the same country. To allow only some area codes, use one rule with the narrowest prefix you need.
 
-![Outbound Whitelist list with four rules (Germany, United Kingdom, Israel, US and Canada), each showing country, trunk, created date and an Active status pill](../img/screens/outbound-whitelist-list.jpg)
-
 ![Add Whitelist Entry dialog with Name, Country picker, Additional Prefix, Voice Trunk selector (no trunks in the demo) and Default Caller ID set to Main Line (+12025550100)](../img/screens/outbound-whitelist-create-dialog.jpg)
 
-## Edit a rule
+### Edit a rule
+
+**Who can do this:** Owner and PBX Admin (`OutboundWhitelistPolicy::update`).
 
 1. Click the rule's name or row.
-2. Change the fields and click **Update Entry**.
+2. Change the fields in **Edit Whitelist Entry**. The prefix is shown without the country code.
+3. Click **Update Entry**.
 
-The prefix is shown without the country code while you edit.
+The toast "Outbound whitelist entry updated successfully" appears. If the server refuses the change, the page shows "Failed to update outbound whitelist entry".
 
-## Turn a rule on or off
+{/* SCREENSHOT: outbound-whitelist-edit-dialog — Edit Whitelist Entry dialog for the "US and Canada" rule, Country United States, Additional Prefix 202, a voice trunk selected and Default Caller ID Main Line (+12025550100) */}
 
-Click the **Active** or **Disabled** pill in the Status column. The change is saved at once. Disabled rules are ignored when calls are matched, so calls that only that rule allowed are refused.
+### Turn a rule on or off
 
-## Delete a rule
+**Who can do this:** Owner and PBX Admin (`OutboundWhitelistPolicy::update`). For other roles the status pill is not clickable.
 
-1. Click the delete action on the row.
-2. Confirm in the **Delete Whitelist Entry** dialog.
+1. In the list, click the rule's **Active** or **Disabled** pill in the **Status** column.
 
-Nothing else in OPBX points at a whitelist rule, so the delete is never refused. Calls that only this rule allowed are refused from then on.
+The toast "Status updated successfully" appears and the change is saved at once. Disabled rules are ignored when calls are matched, so calls that only that rule allowed are refused.
+
+### Delete a rule
+
+**Who can do this:** Owner and PBX Admin (`OutboundWhitelistPolicy::delete`; the **Delete** action is shown to these roles only).
+
+1. Click the **Delete** (trash) action on the row.
+2. In **Delete Whitelist Entry**, click **Delete**.
+
+The toast "Outbound whitelist entry deleted successfully" appears. Nothing else in OPBX points at a whitelist rule, so the delete is never refused. Calls that only this rule allowed are refused from then on.
 
 ![Delete Whitelist Entry confirmation for the Germany rule](../img/screens/outbound-whitelist-delete-dialog.jpg)
 
@@ -115,11 +146,9 @@ Nothing else in OPBX points at a whitelist rule, so the delete is never refused.
 A phone number that is the Default Caller ID of a whitelist rule cannot be deleted. The delete on the Phone Numbers page is refused and the dialog lists this rule. Change the rule's caller ID first.
 :::
 
-## Search
-
-The search box matches the rule name, country, prefix and trunk name.
-
 ## Common errors
+
+These messages come from the API. The page itself shows only "Failed to create outbound whitelist entry" or "Failed to update outbound whitelist entry".
 
 | Message | What it means | What to do |
 |---------|---------------|-----------|
