@@ -18,6 +18,35 @@ paths:
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: role
+        in: query
+        required: false
+        description: Only users with this role (an unknown value is ignored)
+        schema:
+          type: string
+          enum:
+          - owner
+          - pbx_admin
+          - pbx_user
+          - reporter
+          - supervisor
+      - name: status
+        in: query
+        required: false
+        description: Only users with this status (an unknown value is ignored)
+        schema:
+          type: string
+          enum:
+          - active
+          - inactive
+          - pending
+      - name: search
+        in: query
+        required: false
+        description: Substring match on name or email
+        schema:
+          type: string
+          example: jane
       - name: sort_by
         in: query
         required: false

@@ -556,7 +556,7 @@ function UsersComplete() {
             <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search users by name, email, or extension..."
+                placeholder="Search users by name or email..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);

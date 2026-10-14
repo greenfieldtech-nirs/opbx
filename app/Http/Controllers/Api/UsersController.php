@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\User\CreateUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
@@ -91,6 +92,18 @@ class UsersController extends AbstractApiCrudController
     protected function getAllowedFilters(): array
     {
         return ['role', 'status', 'search'];
+    }
+
+    /**
+     * Apply the role, status and search (name or email) filters.
+     */
+    protected function applyCustomFilters(Builder $query, Request $request): void
+    {
+        $this->applyFilters($query, $request, [
+            'role' => ['type' => 'enum', 'enum' => UserRole::class, 'scope' => 'withRole'],
+            'status' => ['type' => 'enum', 'enum' => UserStatus::class, 'scope' => 'withStatus'],
+            'search' => ['type' => 'search', 'scope' => 'search'],
+        ]);
     }
 
     /**
