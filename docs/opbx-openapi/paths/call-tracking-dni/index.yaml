@@ -6,11 +6,21 @@ paths:
       summary: Dynamic number insertion swap
       description: |
         Public endpoint used by client websites for dynamic number insertion
-        (DNI). Returns the best matching tracking number for the given
-        organization and UTM parameters. If no matching tracking number is
-        found, the provided default number is returned.
+        (DNI). No authentication.
 
-        This endpoint is rate-limited.
+        Matching: when both `utm_source` and `utm_medium` are given, the first
+        active campaign of the organization whose source and medium equal them
+        (case-insensitive) is selected; when `utm_campaign` is also given, the
+        campaign name must contain it. The first active tracking number of that
+        campaign is returned. If no campaign matches, or the matched campaign
+        has no active tracking number, the first active tracking number of the
+        organization (any campaign) is returned. `default_number` is returned
+        only when the organization has no active tracking number at all.
+
+        `campaign_id`, `campaign_name`, `source` and `medium` describe the
+        matched campaign and are null when no campaign matched.
+
+        Rate limit: 60 requests per minute per `organization_id` and client IP.
       operationId: callTrackingDniSwap
       security: []
       parameters:
@@ -20,7 +30,7 @@ paths:
         schema:
           type: integer
           minimum: 1
-        description: Organization ID
+        description: Organization ID (must exist, else 422)
         example: 1
       - name: utm_source
         in: query
@@ -66,7 +76,7 @@ paths:
                     type:
                     - string
                     - 'null'
-                    description: Phone number to display (matched tracking number, else default_number)
+                    description: Phone number to display (a tracking number, else `default_number`, else null)
                     example: '+12127773456'
                   campaign_id:
                     type:
@@ -85,10 +95,8 @@ paths:
                     type:
                     - string
                     - 'null'
-        '400':
-          $ref: ../../components/responses/BadRequest.yaml
-        '404':
-          $ref: ../../components/responses/NotFound.yaml
+        '422':
+          $ref: ../../components/responses/ValidationError.yaml
         '429':
           $ref: ../../components/responses/TooManyRequests.yaml
         '500':
