@@ -24,7 +24,9 @@ All workers run as Docker services in the standard Docker Compose stack and star
 | AMD | Cloudonix audio via Nginx `/ws/amd/`; Laravel callbacks | `AMD_WORKER_API_TOKEN` | `GET /health` on 8083 |
 | ACD | Called by Laravel; Redis | `ACD_WORKER_API_TOKEN` | `GET /health` on 8085 (fails when Redis is down) |
 
-All three images run as a non-root user (uid 10001), and none publishes a host port by default. The workers refuse to start without their token.
+All three images run as a non-root user (uid 10001), and none publishes a host port by default (`docker-compose.ports.yml` can publish the dialer worker's health port on `127.0.0.1:8181` for local tools). The workers refuse to start when their token is empty or a shipped placeholder, and Laravel refuses to boot in production without the three tokens.
+
+The [Platform Status](/opbx/administration/platform-management#platform-status) page probes each worker's health address every minute (`PLATFORM_STATUS_DIALER_URL`, `PLATFORM_STATUS_AMD_URL`, `PLATFORM_STATUS_ACD_URL`), and the Auto Dialer's [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) shows the dialer worker's health (`DIALER_WORKER_HEALTH_URL`).
 
 The PHP side has its own background services in the same stack: `queue-worker` and `queue-worker-long` (Laravel queue workers) and `scheduler` (runs `schedule:run` every minute). Their healthchecks check that the process is alive; the scheduler touches a heartbeat file on every tick and is unhealthy when it is older than 3 minutes.
 
