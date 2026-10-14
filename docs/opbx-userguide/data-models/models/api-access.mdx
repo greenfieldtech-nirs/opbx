@@ -118,7 +118,7 @@ $personalAccessToken->tokenable() → PersonalAccessToken (tokenable_id) [MorphT
 ```
 
 
-Extends Sanctum's model so `tokenable()` loads the user without `OrganizationScope`; otherwise Sanctum could not resolve the user before the tenant context exists. Tokens expire after `SANCTUM_EXPIRATION` minutes.
+Extends Sanctum's model so `tokenable()` loads the user without `OrganizationScope`; otherwise Sanctum could not resolve the user before the tenant context exists. Each token expires at its own `expires_at`: 24 hours after a login, or 30 days after a **Remember me** login.
 
 ## Related Documentation
 

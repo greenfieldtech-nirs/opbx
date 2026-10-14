@@ -30,9 +30,17 @@ Who can do this: any active user of an active organization.
 
 1. Open `http://localhost/ui/login` (use your own host and `APP_PORT` if you changed them).
 2. Enter your **Email** and **Password**.
-3. Click **Log In**.
+3. Optionally check **Remember me** to stay signed in on this browser.
+4. Click **Log In**.
 
-The toast "Login successful!" appears and the Dashboard opens. The session lasts 24 hours.
+The toast "Login successful!" appears and the Dashboard opens.
+
+| Remember me | Session lasts | Closing the browser |
+|-------------|---------------|---------------------|
+| Unchecked (default) | 24 hours | Signs you out (the session belongs to this browser tab) |
+| Checked | 30 days | Keeps you signed in |
+
+Signing in again with your email and password ends your earlier sessions on every device.
 
 {/* SCREENSHOT: login-page — Login page ("Welcome back!") with the Email and Password fields, Remember me, Forgot password? and the Log In button */}
 
@@ -46,7 +54,6 @@ The toast "Login successful!" appears and the Dashboard opens. The session lasts
 Other controls on the page:
 
 - **Forgot password?** does not send an email. It shows "Contact your administrator to reset password". An Owner or PBX Admin [sets a new password](/opbx/modules/user-management#set-a-users-password) on the Users page; on the server, `docker compose exec app php artisan user:reset-password user@example.com` prompts for a new one.
-- **Remember me** has no effect: every session lasts 24 hours.
 - **Create an organization** opens the registration page.
 - When Auth0 sign-in is configured, Google and GitHub buttons appear below the form. See [Auth0 Setup](/opbx/installation/auth0-setup).
 
@@ -93,9 +100,9 @@ Use a strong, unique password for the admin account. This account has full acces
 
 ## Authentication
 
-OPBX authenticates with Laravel Sanctum Bearer tokens, for the web app and API clients alike. Login returns an `access_token` in JSON, valid for 24 hours; the API does not use session cookies.
+OPBX authenticates with Laravel Sanctum Bearer tokens, for the web app and API clients alike. Login returns an `access_token` in JSON, valid for 24 hours, or 30 days when the request sends `"remember": true`; the API does not use session cookies.
 
-The frontend (`AuthContext`) stores the token in `localStorage` as `opbx_token` and attaches it to every API request via an Axios interceptor.
+The frontend (`AuthContext`) stores the token as `opbx_token` and attaches it to every API request via an Axios interceptor. With **Remember me** the token is kept in `localStorage` (survives a browser restart); otherwise in `sessionStorage` (cleared when the tab or browser closes).
 
 ## Dashboard Overview
 

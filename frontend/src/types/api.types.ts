@@ -130,6 +130,8 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  /** "Remember me": 30-day token kept across browser restarts (default: 24 hours, this browser session) */
+  remember?: boolean;
 }
 
 export interface CreateUserRequest {

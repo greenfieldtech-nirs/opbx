@@ -23,8 +23,8 @@ OPBX uses Laravel Sanctum Bearer tokens. The React web app and API clients authe
 - Used by the React web app, API clients, scripts and third-party integrations.
 - `POST /api/v1/auth/login` returns a Bearer token; the web app stores it and sends it on every request.
 - Tokens are role-scoped with Sanctum abilities instead of wildcard `*`.
-- Tokens expire after 24 hours (`SANCTUM_EXPIRATION=1440`).
-- `POST /api/v1/auth/refresh` revokes the current token and issues a new one.
+- Each token carries its own expiry: 24 hours, or 30 days when the login sends `"remember": true` (**Remember me**). There is no global Sanctum expiration.
+- `POST /api/v1/auth/refresh` revokes the current token and issues a new one with the same lifetime.
 
 ### Role-Scoped Token Abilities
 

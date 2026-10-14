@@ -40,6 +40,16 @@ class AuthController extends Controller
     private const TOKEN_EXPIRATION_MINUTES = 1440;
 
     /**
+     * Token expiration time in minutes with "Remember me" (30 days).
+     */
+    private const REMEMBER_ME_TOKEN_EXPIRATION_MINUTES = 43200;
+
+    /**
+     * Token name that marks a "Remember me" token, so a refresh keeps its lifetime.
+     */
+    private const REMEMBER_ME_TOKEN_NAME = 'api-token-remember';
+
+    /**
      * Authenticate user and issue authentication credentials.
      *
      * Supports two authentication modes:
@@ -162,16 +172,13 @@ class AuthController extends Controller
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
         $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
-        $token = $user->createToken(
-            'api-token',
-            $abilities,
-            now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
-        )->plainTextToken;
+        [$name, $minutes] = $this->tokenNameAndLifetime($request->boolean('remember'));
+        $token = $user->createToken($name, $abilities, now()->addMinutes($minutes))->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
+            'expires_in' => $minutes * 60,
             'user' => $this->formatUserResponse($user),
         ]);
     }
@@ -353,20 +360,20 @@ class AuthController extends Controller
         }
 
         // Token-based refresh
-        // Revoke current real token (if any), then issue a new one
+        // Revoke current real token (if any), then issue a new one with the same lifetime
+        // (a "Remember me" token stays a 30-day token).
+        $remember = false;
         $token = $request->user()->currentAccessToken();
         if ($token instanceof PersonalAccessToken) {
+            $remember = $token->name === self::REMEMBER_ME_TOKEN_NAME;
             $token->delete();
         }
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
         $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
-        $token = $user->createToken(
-            'api-token',
-            $abilities,
-            now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
-        )->plainTextToken;
+        [$name, $minutes] = $this->tokenNameAndLifetime($remember);
+        $token = $user->createToken($name, $abilities, now()->addMinutes($minutes))->plainTextToken;
 
         Log::info('Token refresh successful', [
             'request_id' => $requestId,
@@ -376,8 +383,18 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
+            'expires_in' => $minutes * 60,
         ]);
+    }
+
+    /**
+     * @return array{0: string, 1: int} token name and lifetime in minutes
+     */
+    private function tokenNameAndLifetime(bool $remember): array
+    {
+        return $remember
+            ? [self::REMEMBER_ME_TOKEN_NAME, self::REMEMBER_ME_TOKEN_EXPIRATION_MINUTES]
+            : ['api-token', self::TOKEN_EXPIRATION_MINUTES];
     }
 
     /**

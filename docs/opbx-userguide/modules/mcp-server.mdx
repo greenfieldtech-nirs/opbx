@@ -64,7 +64,7 @@ The client sends **its own OPBX credential** as a bearer token. The MCP server s
 | Credential | Format | Best for | Notes |
 |------------|--------|----------|-------|
 | API key | `opbxk_…` | Long-running agents | Never expires; can be revoked. Access is exactly the key's resource grants |
-| Personal access token | `id\|token` | Interactive use | Acts with the user's role. Expires after 24 hours by default (`SANCTUM_EXPIRATION`) and stops working when the user signs in again or changes the password |
+| Personal access token | `id\|token` | Interactive use | Acts with the user's role. Expires after 24 hours (30 days when the login sent `"remember": true`) and stops working when the user signs in again or changes the password |
 
 Example client configuration:
 

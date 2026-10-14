@@ -45,11 +45,12 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
-    | Default: 1440 minutes (24 hours)
+    | Disabled: every token OPBX issues carries its own "expires_at" (24 hours,
+    | or 30 days for a "Remember me" login), so no global cap is applied.
     |
     */
 
-    'expiration' => env('SANCTUM_EXPIRATION', 1440),
+    'expiration' => null,
 
     /*
     |--------------------------------------------------------------------------

@@ -10,7 +10,8 @@ paths:
         does not use session cookies.
 
         Login revokes all of the user's existing tokens and issues a
-        new one with role-scoped abilities, valid for 24 hours.
+        new one with role-scoped abilities, valid for 24 hours, or 30 days when
+        `remember` is `true` ("Remember me").
 
         Rate limited to 5 attempts per minute per IP (`RATE_LIMIT_AUTH`).
       operationId: login
@@ -34,6 +35,13 @@ paths:
                   minLength: 8
                   description: User password
                   example: SecurePass123!
+                remember:
+                  type: boolean
+                  default: false
+                  description: >-
+                    "Remember me": issue a 30-day token (expires_in 2592000) instead of
+                    the default 24-hour token (expires_in 86400)
+                  example: false
               required:
                 - email
                 - password
@@ -54,7 +62,7 @@ paths:
                     example: Bearer
                   expires_in:
                     type: integer
-                    description: Token expiration in seconds
+                    description: Token lifetime in seconds (86400, or 2592000 with `remember`)
                     example: 86400
                   user:
                     description: >-

@@ -103,8 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear sidebar state for fresh navigation experience
       clearSidebarState();
 
-      // Store auth data
-      storage.setToken(response.access_token);
+      // Store auth data ("Remember me" keeps it across browser restarts)
+      storage.setToken(response.access_token, credentials.remember === true);
       storage.setUser(response.user);
 
       setToken(response.access_token);

@@ -8,7 +8,8 @@ paths:
         Refresh the Bearer token: revokes the current token and issues a new one
         with role-scoped abilities (no `user` in the response).
 
-        Token expires in 24 hours (1440 minutes). Not rate limited.
+        The new token keeps the lifetime of the current one: 24 hours, or 30 days for a
+        token issued by a "Remember me" login. Not rate limited.
       operationId: refreshAuth
       security:
         - bearerAuth: []
@@ -29,7 +30,7 @@ paths:
                     example: Bearer
                   expires_in:
                     type: integer
-                    description: Token expiration in seconds
+                    description: Token lifetime in seconds (86400, or 2592000 for a "Remember me" token)
                     example: 86400
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'

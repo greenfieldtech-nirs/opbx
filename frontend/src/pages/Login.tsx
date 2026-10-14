@@ -55,7 +55,7 @@ export default function Login() {
         setIsLoading(true);
 
         try {
-            await login(data as LoginRequest, () => navigate('/ui/dashboard'));
+            await login({ ...(data as LoginRequest), remember: rememberMe }, () => navigate('/ui/dashboard'));
             try {
                 toast.success('Login successful!');
             } catch {
