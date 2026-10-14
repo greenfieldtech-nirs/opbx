@@ -4,6 +4,11 @@ paths:
       tags:
         - Settings
       summary: Validate Cloudonix credentials
+      description: |
+        Checks a domain UUID and API key against Cloudonix without saving anything. Owner
+        only. A `domain_api_key` containing `***` (a masked key) is replaced by the stored
+        key. On success, `profile_settings` carries values read from the domain profile that
+        the settings form can prefill.
       operationId: validateCloudonixCredentials
       security:
         - bearerAuth: []
@@ -20,7 +25,7 @@ paths:
                   format: uuid
                 domain_api_key:
                   type: string
-                  description: Full key; a masked key is accepted only when settings are saved
+                  description: Full key; a masked key (containing `***`) is accepted only when a key is already saved
               required: [domain_uuid, domain_api_key]
       responses:
         '200':
@@ -32,15 +37,41 @@ paths:
                 properties:
                   valid:
                     type: boolean
+                    enum: [true]
                   message:
                     type: string
+                    example: Cloudonix credentials are valid.
                   profile_settings:
-                    type:
-                      - object
-                      - 'null'
-                    additionalProperties: true
+                    type: object
+                    description: Each key is present only when the domain profile provides a usable value (an empty object when none)
+                    properties:
+                      domain_name:
+                        type: string
+                        example: sample.cloudonix.net
+                      no_answer_timeout:
+                        type: integer
+                        minimum: 5
+                        maximum: 120
+                        description: From the profile `call-timeout`, only when between 5 and 120
+                      recording_format:
+                        type: string
+                        enum: [wav, mp3]
+                        description: From the profile `recording-media-type`
+                      cloudonix_package:
+                        type: string
+                        description: Name of the tenant billing package
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not the organization Owner, or an API key (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '422':
-          description: Invalid credentials (or a masked key without saved settings); `valid` is false
+          description: |
+            Validation failed (standard validation body), the credentials are invalid, or a
+            masked key was sent without a saved key (`valid` is false).
           content:
             application/json:
               schema:
@@ -48,7 +79,23 @@ paths:
                 properties:
                   valid:
                     type: boolean
+                    enum: [false]
                   message:
                     type: string
+                    example: Invalid Cloudonix credentials. Please check your domain UUID and API key.
         '500':
-          description: Validation error
+          description: Error while contacting Cloudonix
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    enum: [false]
+                  message:
+                    type: string
+                    example: An error occurred while validating credentials.
+                  error:
+                    type: string
+                    description: The exception message

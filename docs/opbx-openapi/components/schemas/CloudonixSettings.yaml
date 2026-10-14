@@ -1,5 +1,7 @@
 type: object
-description: Cloudonix Settings as returned by the settings endpoints (keys masked)
+description: >-
+  Cloudonix settings as returned by the settings endpoints. Keys are masked: the first 4
+  characters, `***`, then the last 4 (a key of 8 characters or fewer is all asterisks).
 properties:
   id:
     type: integer
@@ -20,6 +22,7 @@ properties:
     - string
     - 'null'
     description: Cloudonix domain API key, masked
+    example: XI12***abcd
   domain_requests_api_key:
     type:
     - string
@@ -32,7 +35,7 @@ properties:
     format: uri
   embed_allowed_domains:
     type: array
-    description: Origins allowed to embed the dialer widget (GET only)
+    description: Origins allowed to embed the dialer widget (GET only; an empty array when unset)
     items:
       type: string
   no_answer_timeout:
@@ -50,8 +53,10 @@ properties:
     description: GET only
   is_configured:
     type: boolean
+    description: True when both `domain_uuid` and `domain_api_key` are set
   has_webhook_auth:
     type: boolean
+    description: True when `domain_requests_api_key` is set
   created_at:
     type: string
     format: date-time
