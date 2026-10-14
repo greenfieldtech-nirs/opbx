@@ -25,7 +25,7 @@ enum RingGroupFallbackAction: string
             self::AI_ASSISTANT => 'Forward to AI Assistant',
             self::AI_LOAD_BALANCER => 'Forward to AI Load Balancer',
             self::CALL_QUEUE => 'Forward to Call Queue',
-            self::HANGUP => 'Hangup',
+            self::HANGUP => 'Hang Up',
             self::UNAVAILABLE => 'Destination unavailable',
         };
     }

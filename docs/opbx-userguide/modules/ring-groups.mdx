@@ -63,7 +63,7 @@ The list shows each group's name, **Strategy**, **Members** (count), **Timeout /
 5. Click **Add Member** for each extension. Each click adds the next unused extension; change it with the row's list, which shows **Ext** *number* and the user's name (or **Forward to** *number* for a forward extension). Remove a row with its trash icon.
 6. Set the ring order: for Sequential, drag rows by their handle; for the other strategies, use the up and down arrows.
 7. Set **Extension Ring Timeout (seconds)** and **Ring Turns**.
-8. Under **Fallback Action**, choose the **Action** and, unless it is **Hangup** ("No destination needed"), the **Destination**.
+8. Under **Fallback Action**, choose the **Action** and, unless it is **Hang Up** ("No destination needed"), the **Destination**.
 9. Click **Create Ring Group**.
 
 The dialog closes, the toast "Ring group created successfully" appears and the group is listed as **Active**. It is now available as a destination everywhere in OPBX.
@@ -139,7 +139,7 @@ Change those first, then delete again. A group that falls back to itself does no
 | Extension Ring Timeout | 5 to 300 seconds. Default: 30 | How long the call rings (all members for Simultaneous, each member for the others) |
 | Ring Turns | 1 to 9. Default: 2 | How many rounds through the member list (Sequential and Round Robin) |
 | Fallback Action | Required. Default in the dialog: Extension | Where the call goes when nobody answers |
-| Fallback destination | Required for every action except Hangup | The extension, group, menu, assistant, load balancer or queue |
+| Fallback destination | Required for every action except Hang Up | The extension, group, menu, assistant, load balancer or queue |
 
 The API also accepts a **description** (up to 1000 characters) and a **status**; the dialog does not show them. New groups are always Active.
 
@@ -173,10 +173,10 @@ Because the caller is answered as soon as the members start ringing, the call re
 | AI Assistant | An AI assistant (the assistant itself, picked by name; no AI Assistant extension is needed) |
 | AI Load Balancer | An AI load balancer |
 | Call Queue | A call queue |
-| Hangup | The caller hears "No agents available" and the call ends |
+| Hang Up | The caller hears "No agents available" and the call ends |
 | Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-the-fallback) |
 
-The fallback target must belong to your organization and be **active** when you save. If it becomes inactive or is removed later, the call ends with the Hangup message instead, except an AI assistant that has become inactive: the caller hears "The AI assistant you are trying to reach is unavailable. Goodbye." and the call ends. An AI assistant used as a ring-group fallback cannot be deleted; the delete dialog lists the ring group (see [Delete an assistant](/opbx/modules/ai-assistants#delete-an-assistant)).
+The fallback target must belong to your organization and be **active** when you save. If it becomes inactive or is removed later, the call ends with the Hang Up message instead, except an AI assistant that has become inactive: the caller hears "The AI assistant you are trying to reach is unavailable. Goodbye." and the call ends. An AI assistant used as a ring-group fallback cannot be deleted; the delete dialog lists the ring group (see [Delete an assistant](/opbx/modules/ai-assistants#delete-an-assistant)).
 
 ## Routing calls to a ring group
 

@@ -187,7 +187,7 @@ The API and the MCP server (`duplicate_business_hours`) can copy a schedule with
 | Call Queue | A call queue |
 | Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-and-unprovisioned-schedules) |
 
-There is no "Hangup" action. Use Disconnect on an existing schedule, or route to a destination that ends the call.
+There is no "Hang Up" action. Use Disconnect on an existing schedule, or route to a destination that ends the call.
 
 :::caution Things to check before relying on a schedule
 - **Time zone.** The hours are evaluated in the schedule's own time zone (the `timezone` field, `UTC` by default), including daylight-saving changes. The dialog has no time-zone field, so a schedule created in it is saved as **UTC**: enter the hours in UTC or set `timezone` through the API.

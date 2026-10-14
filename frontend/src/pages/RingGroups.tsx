@@ -1119,7 +1119,7 @@ export default function RingGroups() {
                     <SelectItem value="hangup">
                       <div className="flex items-center gap-2">
                         <PhoneOff className="h-4 w-4" />
-                        <span>Hangup</span>
+                        <span>Hang Up</span>
                       </div>
                     </SelectItem>
                     {(formData.fallback_action === 'unavailable' || isEdit) && (

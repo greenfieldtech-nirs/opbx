@@ -854,7 +854,7 @@ export function WebPhone({
                           type="button"
                           onClick={handleHangup}
                           className="h-[72px] w-[72px] rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Hangup"
+                          aria-label="Hang Up"
                         >
                           <PhoneOff className="h-8 w-8" />
                         </button>
@@ -980,7 +980,7 @@ export function WebPhone({
                           onClick={handleHangup}
                           disabled={callState === 'idle' && !incomingSession}
                           className="h-[72px] w-[72px] rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center justify-center"
-                          aria-label="Hangup"
+                          aria-label="Hang Up"
                         >
                           <PhoneOff className="h-8 w-8" />
                         </button>

@@ -23,7 +23,7 @@ Use this module to:
 ## Prerequisites
 
 - **Owner** or **PBX Admin** role to change anything; **Reporter** may view.
-- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers), unless you route to Hangup for testing.
+- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers), unless you route to Hang Up for testing.
 - At least one **active** [phone number](/opbx/modules/phone-numbers) for the caller ID.
 - The [dialer worker](/opbx/workers/dialer-worker) running (single replica), and the [AMD worker](/opbx/workers/amd-worker) for voicemail detection.
 
@@ -103,7 +103,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 |-------|--------------------|
 | Name | Required, up to 255 characters |
 | Description | Up to 1000 characters (API only; the form does not show it) |
-| Routing destination | AI Assistant, AI Load Balancer or Hangup. A destination ID is required except for Hangup |
+| Routing destination | AI Assistant, AI Load Balancer or Hang Up. A destination ID is required except for Hang Up |
 | Caller ID | Required, E.164. The form uses the first number of the pool |
 | Caller-ID pool | 1 to 100 active numbers of your organization; weight 1 to 100 per number (API only, default 1) |
 | Caller-ID strategy | Round Robin (default), Random, Least Recently Used |

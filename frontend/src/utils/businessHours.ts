@@ -180,7 +180,7 @@ export function getRoutingActionText(action: RoutingAction): string {
     ring_group: 'Ring Group',
     voicemail: 'Voicemail',
     announcement: 'Announcement',
-    hangup: 'Hangup'
+    hangup: 'Hang Up'
   };
   return actionMap[action];
 }
