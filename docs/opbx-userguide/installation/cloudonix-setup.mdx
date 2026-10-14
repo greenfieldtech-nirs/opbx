@@ -33,62 +33,58 @@ Before configuring the integration, you need:
 Cloudonix offers a free tier for testing. You can sign up without a credit card and start exploring immediately.
 :::
 
-## Setup Steps
+## Connect your organization to Cloudonix
 
-### 1. Access Settings
+Who can do this: Owner. The **Settings** page is not available to other roles (they get an "Access denied" toast).
 
-Log into OPBX as an Owner and navigate to **Settings** in the left sidebar. The Cloudonix integration section appears at the top of the page.
+### 1. Find your Cloudonix credentials
 
-:::note Owner-Only Access
-Only users with the Owner role can configure Cloudonix integration. PBX Admins and other roles cannot access these settings.
-:::
+1. Log into [cockpit.cloudonix.io](https://cockpit.cloudonix.io).
+2. Select your domain and copy its **Domain UUID** from the domain settings page.
+3. In the **API Keys** section, create a domain API key or copy an existing one.
 
-### 2. Enter Domain UUID
+### 2. Enter them in OPBX
 
-Find your Domain UUID in the Cloudonix cockpit:
+1. In OPBX, click your name at the top right and choose **Settings**.
+2. Under **Cloudonix Integration**, paste the UUID into **Cloudonix Domain UUID** (format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+3. Paste the key into **Cloudonix Domain API Key**.
+4. Click **Validate and Save Settings**. The button stays disabled until both fields hold a value.
 
-1. Log into [cockpit.cloudonix.io](https://cockpit.cloudonix.io)
-2. Select your domain from the dropdown
-3. Copy the Domain UUID from the domain settings page
+A "Saving Settings" overlay is shown while OPBX works. When it is done, the badge next to the button shows **Saved**, the toast "Settings validated and saved successfully" appears, and "Cloudonix Domain: …" appears under the UUID.
 
-Paste this UUID into the **Domain UUID** field in OPBX settings.
+{/* SCREENSHOT: settings-cloudonix — Settings page, Cloudonix Integration card with Domain UUID, masked Domain API Key, the Validate and Save Settings button and a green Saved badge */}
 
-### 3. Enter Domain API Key
+What **Validate and Save Settings** does, in order:
 
-Generate or copy your API key:
+1. Checks the UUID and key against Cloudonix. Wrong credentials show the **Invalid** badge and the toast "Validation failed" ("Invalid Cloudonix credentials. Please check your domain UUID and API key."); nothing is saved.
+2. Copies the domain name, call timeout and recording format from your Cloudonix domain profile into the form.
+3. Saves the settings. A Cloudonix domain can belong to one organization only; a second organization is refused with "This Cloudonix domain is already registered to another organization."
+4. Generates a webhook key if the organization has none yet (see [Webhook Key](#webhook-key)).
+5. Pushes the call timeout, recording format, session-update URL, CDR URL and webhook key to the Cloudonix domain.
+6. Creates or updates the OPBX voice application in Cloudonix and makes it the domain default.
 
-1. In the Cloudonix cockpit, go to the **API Keys** section
-2. Create a new key or use an existing one
-3. Copy the key value
+If the save works locally but step 5 or 6 fails, the toast reads "Settings saved, but not synced to Cloudonix" with the reason. Fix the cause (usually the webhook base URL or the API key's rights) and click **Validate and Save Settings** again.
 
-Paste this key into the **Domain API Key** field in OPBX settings.
+The other fields on the page (webhook base URL, no-answer timeout, call recording, recording format, embedded dialer domains) are described in [Settings](/opbx/modules/settings).
 
-### 4. Validate Credentials
+### Webhook Key
 
-Click **Validate Credentials**. OPBX tests the connection to Cloudonix and verifies your credentials.
+Cloudonix authenticates the webhooks it sends to OPBX with a Bearer token, the **Cloudonix Domain Requests API Key**. OPBX compares it with the stored key on voice routing, status and CDR webhooks. The key is encrypted at rest and shown masked.
 
-If validation succeeds, click **Save Cloudonix Settings**. The system automatically:
+You do not need to create it: the first **Validate and Save Settings** generates one and pushes it to Cloudonix. To replace it, follow [Generate a new webhook key](/opbx/modules/settings#generate-a-new-webhook-key): click **Generate**, copy the key from the **New API Key Generated** box if you need it, and click **Validate and Save Settings**. A generated key takes effect only when you save.
 
-- Creates or updates a voice application on Cloudonix
-- Sets that voice application as the domain default
-- Stores the application ID and UUID in OPBX
-
-### 5. Generate Webhook API Key
-
-Click **Generate Webhook API Key** to create the key for webhook authentication. Cloudonix sends it as a Bearer token on the voice routing, status and CDR webhooks it sends to your OPBX instance, and OPBX compares it with the stored key. The key is encrypted at rest and masked in the UI.
-
-Until an organization has a key, its status and CDR webhooks are accepted without a token and logged as unauthenticated; voice routing webhooks always need it. A platform operator can give every organization a key with `php artisan cloudonix:provision-webhook-keys` and then require it with `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`.
+Voice routing webhooks are always refused without a valid key. Until an organization has a key, its status and CDR webhooks are accepted without a token and logged as unauthenticated. A platform operator can give every organization a key with `php artisan cloudonix:provision-webhook-keys` (`--dry-run` lists the organizations first) and then require it with `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`.
 
 :::warning Keep This Secret
-Store the webhook API key securely. Anyone with this key could potentially send fake call events to your system.
+Store the webhook key securely. Anyone with this key could potentially send fake call events to your system.
 :::
 
 ## Webhook URL Configuration
 
 OPBX automatically configures the webhook URLs for Cloudonix callbacks. The effective base URL is resolved in this priority order:
 
-1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable, whenever it is set to a valid http(s) URL (required when `OPBX_APPLICATION_MODE=production`). The webhook fields are then hidden in the UI.
-2. The **Webhook Base URL** field saved in Cloudonix settings
+1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable, whenever it is set to a valid http(s) URL (required when `OPBX_APPLICATION_MODE=production`). The Settings page then shows it read-only as **Webhook Base URL (Application Level)** ("Managed by system administrator") and hides the endpoint fields.
+2. The **Webhook Base URL** field saved on the Settings page
 3. `APP_URL` from the `.env` file
 
 The resulting callback URLs are:
@@ -117,7 +113,7 @@ OPBX_APPLICATION_WEBHOOK_BASEURL=https://your-public-domain
 
 **Option 2: Settings Page**
 
-Configure the webhook base URL directly in **Settings > Cloudonix > Advanced Options**.
+Enter the public base address in the **Webhook Base URL** field on the Settings page and click **Validate and Save Settings**. See [Set a webhook base URL](/opbx/modules/settings#set-a-webhook-base-url). The **Domain CDR Endpoint** and **Domain Session Update Callback URL** fields then show the resulting addresses.
 
 ### Local Development with Ngrok
 
@@ -135,7 +131,7 @@ For local development, use ngrok to expose your local OPBX instance:
 
 3. Access the ngrok dashboard at `http://localhost:4040` to see your public URL.
 
-4. Copy the HTTPS URL and set it as your webhook base URL in OPBX settings.
+4. Copy the HTTPS URL, enter it in **Webhook Base URL** on the Settings page and click **Validate and Save Settings**.
 
 :::tip Ngrok Free Tier
 The free ngrok tier provides temporary URLs that change on restart. For persistent development domains, consider upgrading to a paid plan or set `NGROK_DOMAIN`.
@@ -143,12 +139,12 @@ The free ngrok tier provides temporary URLs that change on restart. For persiste
 
 ## Syncing Extensions
 
-After Cloudonix integration is active, sync your user extensions as Cloudonix subscribers:
+New and changed user extensions are created in Cloudonix as SIP subscribers automatically. When OPBX and Cloudonix differ (for example after the domain is first connected, or subscribers were added in the cockpit), the **Sync Extensions** button on the **Extensions** page becomes active:
 
-1. Go to **Extensions** in the sidebar
-2. Click **Sync to Cloudonix**
-3. The system creates SIP subscribers for all USER-type extensions
-4. Each user receives SIP credentials for their phone configuration
+1. Open **Extensions** in the sidebar.
+2. Click **Sync Extensions**.
+
+The toast reports how many extensions were created in Cloudonix and how many were imported from Cloudonix. The button is disabled while there is nothing to sync. See [Sync with Cloudonix](/opbx/modules/extensions#sync-extensions-with-cloudonix).
 
 :::note Extension Types
 Only USER-type extensions sync to Cloudonix as SIP subscribers. Other extension types (conference, IVR, ring groups, AI assistants) are handled internally by OPBX.
@@ -183,7 +179,9 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 |-------|----------|
 | "Invalid credentials" error | Verify Domain UUID and API key are correct and belong to the same domain |
 | Webhooks not received | Check webhook base URL is publicly accessible; verify firewall rules |
-| Calls fail to connect | Ensure extensions are synced to Cloudonix; check SIP credentials |
+| Calls fail to connect | Ensure extensions are synced to Cloudonix (**Sync Extensions**); check SIP credentials |
+| "Settings saved, but not synced to Cloudonix" | The local save worked but the push to Cloudonix or the voice application setup failed. Check the reason in the toast and `docker compose logs app`, then save again |
+| "This Cloudonix domain is already registered to another organization." | Each Cloudonix domain can be connected to one OPBX organization only |
 | No audio on calls | Verify NAT settings; check Cloudonix media server connectivity |
 | Voice app update fails | OPBX reconciles stale voice apps automatically; verify the stored `voice_application_name` matches Cloudonix |
 
