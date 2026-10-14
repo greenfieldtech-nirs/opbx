@@ -171,7 +171,7 @@ export function CallerIdPoolSelector({
                   onValueChange={setSearchQuery}
                 />
                 <CommandList className="max-h-[300px]">
-                  <CommandEmpty>No phone numbers found</CommandEmpty>
+                  {filteredOptions.length === 0 && <CommandEmpty>No phone numbers found</CommandEmpty>}
                   <CommandGroup heading="Available Phone Numbers">
                     {filteredOptions.map((did) => (
                       <CommandItem
@@ -232,7 +232,7 @@ export function CallerIdPoolSelector({
                 onValueChange={setSearchQuery}
               />
               <CommandList className="max-h-[300px]">
-                <CommandEmpty>No phone numbers found</CommandEmpty>
+                {filteredOptions.length === 0 && <CommandEmpty>No phone numbers found</CommandEmpty>}
                 <CommandGroup heading="Available Phone Numbers">
                   {filteredOptions.map((did) => (
                     <CommandItem
