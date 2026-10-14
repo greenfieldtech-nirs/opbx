@@ -81,16 +81,16 @@ If the agent hangs up after the caller has joined, the call ends.
 2. Click **New Queue**. The **New Call Queue** dialog opens.
 3. Enter the **Name** and choose the **Agent Selection Strategy**.
 4. Set **Agent Ring Timeout**, **Max Wait** and **Wrap-up**.
-5. Optionally choose **Hold Music (MOH)**, switch on **Announce Position** (then pick the interval and language), **Immediate Connect** and, for Ring All, **Ring Agents in Separate Calls**.
+5. Optionally choose **Hold Music (MOH)**, switch on **Announce Position** (then pick the interval and language) and **Immediate Connect**. For Ring All, **Ring Agents in Separate Calls** is already on; switch it off only if you need it.
 6. Under **Agents**, pick each agent from **Add an agent (user with extension)…**. Each one appears as a chip; click **×** on a chip to remove it.
-7. Under **Overflow Fallback**, choose the type and the destination, or keep **Hang Up**. For **Call Queue**, pick the target queue in the destination list.
+7. Under **Overflow Fallback**, choose the type and the destination. While no type is chosen, the destination reads "Call will end": an overflowing caller is hung up. For **Call Queue**, pick the target queue in the destination list.
 8. Click **Create Queue**. The button stays disabled until the queue has a name and at least one agent.
 
 The toast "Call queue created" appears and the queue is listed as **Active**. It becomes available as a destination everywhere else in OPBX. Agents are not logged in automatically; each agent logs in (see [Join a queue as an agent](#join-a-queue-as-an-agent)).
 
-{/* SCREENSHOT: call-queues-list — Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the filter bar: Search call queues..., refresh, All Strategies, All Status, Unprovisioned */}
+![Call Queues list with Support Queue (ring all) and Billing Queue (round robin), both Active, and the filter bar with search, refresh, All Strategies, All Status and Unprovisioned](../img/screens/call-queues-list.jpg)
 
-![New Call Queue dialog showing the strategy, timeouts, hold music, the option switches, agents and the overflow fallback selector](../img/screens/call-queues-create-dialog.jpg)
+![New Call Queue dialog showing the timeouts, hold music, the option switches with Ring Agents in Separate Calls on, agents and the overflow fallback with no type and Call will end](../img/screens/call-queues-create-dialog.jpg)
 
 ### Edit a call queue
 
@@ -181,7 +181,7 @@ The code toggles your state: Logged Out becomes Available, any other state becom
 
 To add or remove agents, edit the queue.
 
-{/* SCREENSHOT: call-queues-agents-tab — queue detail Agents tab of Support Queue with three agents in Available, Wrap-up and Logged Out states */}
+![Agents tab of Support Queue with Henry Brooks and Isabel Novak Available and Jack Turner Logged Out](../img/screens/call-queues-agents-tab.jpg)
 
 ### Watch a queue live
 
@@ -190,7 +190,7 @@ To add or remove agents, edit the queue.
 1. On **Call Queues**, click the queue's row.
 2. The **Live** tab shows **Waiting Callers**, **Available Agents**, **Handled (60m)** and **Abandoned (60m)**, and a table of waiting callers with position, wait time, average wait (24h), caller ID, destination and call start. It refreshes every 5 seconds.
 
-{/* SCREENSHOT: call-queues-live-tab — queue detail Live tab with two waiting callers, the four counters and the waiting-callers table */}
+![Live tab of Support Queue with the Waiting Callers, Available Agents, Handled (60m) and Abandoned (60m) counters and an empty waiting-callers list (No one is waiting)](../img/screens/call-queues-live-tab.jpg)
 
 ### View queue statistics
 
@@ -211,7 +211,7 @@ The tab covers the last 24 hours and refreshes every 30 seconds. The API (`GET /
 
 The dashboard shows the queue's waiting callers, available agents, handled and abandoned counts, and an agent card per agent coloured by state.
 
-{/* SCREENSHOT: queues-dashboard — Queues Dashboard showing Support Queue with Last Hour selected, the counters and agent cards in Available, On Call and Logged Out colours */}
+![Queues Dashboard showing Support Queue with Last Hour selected, the counters and agent cards for two Available agents and one Logged Out agent](../img/screens/queues-dashboard.jpg)
 
 ### Share the public wallboard
 
@@ -235,7 +235,7 @@ The link has the form `/public/queues-dashboard/{token}`. Anyone with it can vie
 
 The table shows the call ID, queue, from number, entered time, waiting time, handling time and disposition. The CSV also has the to number, answered, abandoned and ended times and the answering agent's user ID.
 
-{/* SCREENSHOT: queue-reports — Queue Reports with Support Queue selected, a mix of Answered, Abandoned and Overflow rows, and the Export CSV button */}
+![Queue Reports filtered to Support Queue and a date range, with answered, abandoned and overflow rows and the Export CSV button](../img/screens/queue-reports.jpg)
 
 ## Live monitoring
 
