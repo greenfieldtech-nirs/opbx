@@ -195,6 +195,13 @@ class RecordingsController extends Controller
             abort(404);
         }
 
+        // updated_by is a FK to users; API keys have no user identity (same as store()).
+        if ($user instanceof ApiKey) {
+            return response()->json([
+                'message' => 'Updating recordings requires a user token; API keys cannot update recordings.',
+            ], 403);
+        }
+
         $validated = $request->validated();
 
         $recording->update(array_merge($validated, [

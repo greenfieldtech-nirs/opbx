@@ -153,7 +153,10 @@ paths:
       tags:
         - Recordings
       summary: Update recording
-      description: Owner and PBX Admin only. Every field is optional.
+      description: >-
+        Owner and PBX Admin only. Every field is optional. Requires a user token; API keys
+        get 403 ("Updating recordings requires a user token; API keys cannot update
+        recordings."), because `updated_by` records the user.
       operationId: updateRecording
       security:
         - bearerAuth: []

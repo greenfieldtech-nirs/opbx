@@ -6,6 +6,7 @@ namespace Tests\Feature\ApiKey;
 
 use App\Models\Extension;
 use App\Models\Organization;
+use App\Models\Recording;
 use App\Services\ApiKeyService;
 use App\Services\Email\Contracts\TransactionalEmailInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -98,5 +99,19 @@ class ApiKeyPrincipalCompatTest extends TestCase
         // 403, never a 500 from a FK violation.
         $response->assertStatus(403);
         $this->assertStringContainsString('user token', $response->json('message'));
+    }
+
+    public function test_recording_update_with_api_key_is_a_clean_403(): void
+    {
+        $org = Organization::factory()->create();
+        $recording = Recording::factory()->create(['organization_id' => $org->id, 'name' => 'Original']);
+        $token = $this->keyFor($org, [['resource' => 'recordings', 'level' => 'write']]);
+
+        $response = $this->withToken($token)->putJson("/api/v1/recordings/{$recording->id}", ['name' => 'Renamed by key']);
+
+        // updated_by is a users FK — keys get a clear 403 like on create.
+        $response->assertStatus(403);
+        $this->assertStringContainsString('API keys cannot update recordings', $response->json('message'));
+        $this->assertSame('Original', $recording->fresh()->name);
     }
 }

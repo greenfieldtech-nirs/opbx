@@ -32,7 +32,7 @@ Use this module to:
 
 Reporters can list, play and download recordings through the API, and by opening `/ui/announcements` directly; the sidebar does not show them the link. For them the page hides **Upload File**, **Remote URL** and the delete action, and the **Hold Music** switch is disabled.
 
-Creating a recording needs a signed-in user. API keys cannot create recordings ("Creating recordings requires a user token; API keys cannot create recordings.").
+Creating or editing a recording needs a signed-in user. API keys cannot create recordings ("Creating recordings requires a user token; API keys cannot create recordings.") or update them ("Updating recordings requires a user token; API keys cannot update recordings.").
 
 ## Workflows
 
@@ -192,7 +192,7 @@ The API can change a recording's **name**, **status** and **hold-music tag**. Th
 | GET | `/v1/recordings/{recording}/download` | Get a download token |
 | GET | `/v1/recordings/download` | Download with the token (Bearer header or `token` parameter) |
 
-Scoped API keys use the `recordings` resource; an API key cannot create recordings.
+Scoped API keys use the `recordings` resource; an API key cannot create or update recordings.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
