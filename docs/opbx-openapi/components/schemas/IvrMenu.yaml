@@ -21,6 +21,7 @@ properties:
     type:
       - integer
       - 'null'
+    description: Recording used as the greeting (set when the menu was saved with `recording_id` or a numeric `audio_file_path`)
   is_recording_url:
     type: boolean
     description: True when audio_file_path points at the recordings download endpoint
@@ -56,13 +57,13 @@ properties:
   is_unprovisioned:
     type: boolean
     readOnly: true
-    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+    description: True when the failover destination or any option is `unavailable` (saved for future use, or set when a deleted user's extension was the target). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   options_count:
     type: integer
-    description: Present in list responses that load options
+    description: Present only in list responses (not with per_page=100)
   options:
     type: array
-    description: Menu options ordered by priority. Omitted from list responses requested with per_page=100 (dropdown mode).
+    description: Menu options (ordered by priority in list responses). Omitted from list responses requested with per_page=100 (dropdown mode).
     items:
       type: object
       properties:
@@ -80,9 +81,8 @@ properties:
           type: string
           enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, hangup, unavailable]
         destination_id:
-          type:
-            - integer
-            - 'null'
+          type: integer
+          description: Target ID (0 for `unavailable`)
         priority:
           type: integer
   created_at:

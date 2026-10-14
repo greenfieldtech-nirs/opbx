@@ -4,6 +4,7 @@ paths:
       tags:
         - IVR Menus
       summary: Toggle IVR menu status
+      description: Sets the menu's status. Owner and PBX Admin only.
       operationId: toggleIvrMenuStatus
       security:
         - bearerAuth: []

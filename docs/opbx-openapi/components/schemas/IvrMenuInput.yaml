@@ -1,5 +1,11 @@
 type: object
-description: IVR menu create/update request (update uses the same rules; full replacement)
+description: |
+  IVR menu create/update request (update uses the same rules; full replacement).
+  Exactly one greeting source is required: `recording_id`, `audio_file_path` or `tts_text`
+  (422 on `recording_id`, `audio_file_path` or `audio_configuration` otherwise). With
+  `recording_id` (or a numeric `audio_file_path`) the stored `audio_file_path` becomes the
+  recording's playback URL (null when the recording is not active) and the TTS fields are
+  cleared; with a URL in `audio_file_path` or with `tts_text`, the other sources are cleared.
 properties:
   name:
     type: string
@@ -51,7 +57,7 @@ properties:
     type:
       - integer
       - 'null'
-    description: Must exist for destination types other than hangup/unavailable
+    description: Optional. When sent and the type is not hangup/unavailable, it must be a destination of that type in this organization.
   status:
     type: string
     enum: [active, inactive]
@@ -65,6 +71,7 @@ properties:
         input_digits:
           type: string
           maxLength: 10
+          description: Digits the caller presses
         description:
           type:
             - string
@@ -75,7 +82,7 @@ properties:
           enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, unavailable]
           description: '`unavailable` is rejected on create (422) and accepted on update'
         destination_id:
-          description: ID of an existing destination (ignored for `unavailable`)
+          description: Required. ID of a destination of that type in this organization; for `unavailable` it may be omitted and is stored as 0
           type:
             - integer
             - string
@@ -84,7 +91,7 @@ properties:
           type: integer
           minimum: 1
           maximum: 20
-      required: [input_digits, destination_type, destination_id, priority]
+      required: [input_digits, destination_type, priority]
 required:
   - name
   - max_timeout

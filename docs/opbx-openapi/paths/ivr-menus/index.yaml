@@ -4,7 +4,10 @@ paths:
       tags:
         - IVR Menus
       summary: List IVR Menus
-      description: Get paginated list of IVR Menus
+      description: |
+        Paginated list of the organization's IVR menus (any role). Each item includes its
+        options (ordered by priority) and `options_count`, except when `per_page=100`
+        (dropdown mode), which omits both.
       operationId: listIVRMenus
       security:
         - bearerAuth: []
@@ -20,17 +23,24 @@ paths:
             type: string
             enum: [name, status, created_at, updated_at]
             default: created_at
-        - $ref: '../../components/parameters/query/SortOrder.yaml'
+          description: Sort field; other values fall back to `created_at`.
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
         - name: status
           in: query
           schema:
             type: string
             enum: [active, inactive]
+          description: Filter by status; other values are ignored.
         - name: search
           in: query
           schema:
             type: string
-          description: Free-text search
+          description: Matches name or description (substring)
         - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
@@ -53,6 +63,7 @@ paths:
       tags:
         - IVR Menus
       summary: Create IVR Menu
+      description: Owner and PBX Admin only. Returns the menu with its options.
       operationId: createIVRMenu
       security:
         - bearerAuth: []
@@ -79,6 +90,8 @@ paths:
                     $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -94,6 +107,7 @@ paths:
       tags:
         - IVR Menus
       summary: Get IVR Menu
+      description: Any role. Returns the menu with its options (no `options_count`).
       operationId: getIVRMenu
       security:
         - bearerAuth: []
@@ -112,6 +126,8 @@ paths:
                     $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -119,6 +135,9 @@ paths:
       tags:
         - IVR Menus
       summary: Update IVR Menu
+      description: |
+        Owner and PBX Admin only. Full replacement with the same rules as create: the
+        existing options are deleted and recreated from `options`.
       operationId: updateIVRMenu
       security:
         - bearerAuth: []
@@ -145,6 +164,8 @@ paths:
                     $ref: '../../components/schemas/IvrMenu.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -154,7 +175,7 @@ paths:
       tags:
         - IVR Menus
       summary: Delete IVR Menu
-      description: Refused with 409 when the menu is still referenced by routing (for example from a DID or an option of another menu). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the menu is still referenced by routing (for example from a DID or an option of another menu). The 409 body lists the references.
       operationId: deleteIVRMenu
       security:
         - bearerAuth: []
@@ -166,6 +187,8 @@ paths:
           description: IVR Menu deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '409':
