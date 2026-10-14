@@ -43,6 +43,13 @@ Schedule::command('model:prune', ['--model' => [
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/model-prune.log'));
 
+// Previous versions of distribution lists past RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS (and old JSON backups).
+Schedule::command('distribution-lists:prune-versions')
+    ->dailyAt('03:15')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/model-prune.log'));
+
 // Tiered CDR storage (hot -> warm -> cold) and recording expiry, daily off-peak (UTC; model:prune is 03:00).
 Schedule::command('cdr:tier')
     ->dailyAt('04:00')
