@@ -16,7 +16,6 @@ import {
   Search,
   X,
   RefreshCw,
-  Trash2,
   PauseCircle,
   Play,
   Users,
@@ -46,7 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PlatformLayout } from '@/components/platform';
+import { PlatformLayout, DeleteOrganizationDialog } from '@/components/platform';
 import {
   StandardDataTable,
   Column,
@@ -145,8 +144,10 @@ export default function PlatformOrganizations() {
         data: { status: newStatus },
       });
       toast.success(`Organization ${newStatus === 'active' ? 'activated' : newStatus === 'suspended' ? 'suspended' : 'deleted'}`);
+      return true;
     } catch {
       toast.error('Failed to update status');
+      return false;
     }
   };
 
@@ -502,29 +503,15 @@ export default function PlatformOrganizations() {
         </Dialog>
 
         {/* Delete Confirmation */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete Organization</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedOrg?.name}? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => selectedOrg && handleStatusChange(selectedOrg, 'deleted')}
-                disabled={updateStatusMutation.isPending}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DeleteOrganizationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          organizationName={selectedOrg?.name}
+          onConfirm={async () => {
+            if (selectedOrg && (await handleStatusChange(selectedOrg, 'deleted'))) setShowDeleteDialog(false);
+          }}
+          isPending={updateStatusMutation.isPending}
+        />
       </div>
     </PlatformLayout>
   );

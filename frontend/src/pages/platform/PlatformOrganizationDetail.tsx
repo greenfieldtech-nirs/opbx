@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlatformLayout } from '@/components/platform';
+import { PlatformLayout, DeleteOrganizationDialog } from '@/components/platform';
 import { OrganizationStatusBadge } from '@/components/platform';
 import { usePlatformOrganization, useUpdateOrganizationSettings, useUpdateOrganizationStatus } from '@/hooks/platform';
 import { useOperateAs } from '@/context/OperateAsContext';
@@ -26,6 +26,7 @@ export default function PlatformOrganizationDetail() {
   const updateSettings = useUpdateOrganizationSettings();
   const updateStatus = useUpdateOrganizationStatus();
   const { enter: enterOperateAs } = useOperateAs();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -72,8 +73,17 @@ export default function PlatformOrganizationDetail() {
         data: { status: newStatus },
       });
       toast.success(`Organization ${newStatus}`);
+      return true;
     } catch {
       toast.error('Failed to update status');
+      return false;
+    }
+  };
+
+  const handleDelete = async () => {
+    if (await handleStatusChange('deleted')) {
+      setShowDeleteDialog(false);
+      navigate('/ui/platform/organizations'); // the organization no longer exists
     }
   };
 
@@ -143,7 +153,7 @@ export default function PlatformOrganizationDetail() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => handleStatusChange('deleted')}
+                  onClick={() => setShowDeleteDialog(true)}
                   disabled={updateStatus.isPending}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -163,7 +173,7 @@ export default function PlatformOrganizationDetail() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => handleStatusChange('deleted')}
+                  onClick={() => setShowDeleteDialog(true)}
                   disabled={updateStatus.isPending}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
@@ -287,6 +297,14 @@ export default function PlatformOrganizationDetail() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <DeleteOrganizationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          organizationName={organization.name}
+          onConfirm={handleDelete}
+          isPending={updateStatus.isPending}
+        />
       </div>
     </PlatformLayout>
   );
