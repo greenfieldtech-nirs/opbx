@@ -8,7 +8,7 @@ description: Where an answered auto-dialer call goes - AI assistant, AI load bal
 
 # Campaign Routing
 
-Every campaign has one **routing destination**. When a callee answers, Cloudonix connects the call there. A campaign can route to an **AI assistant**, an **AI load balancer**, or **Hangup**.
+Every campaign has one **routing destination**. When a callee answers, Cloudonix connects the call there. A campaign can route to an **AI assistant**, an **AI load balancer**, or **Hang Up**.
 
 ## Purpose
 
@@ -21,10 +21,15 @@ Choose the routing destination to decide who talks to the people your campaign c
 
 ## Set the destination
 
-1. Open the campaign form, **Basic Info** tab.
-2. Under **Routing Destination**, choose the type.
-3. Under **Select Destination**, choose the assistant or load balancer. Hangup needs no selection.
-4. Save.
+Who can do this: Owner and PBX Admin.
+
+1. Open **Auto Dialer → Campaign Manager**. Pause the campaign if it is Running.
+2. Click **Edit** on the campaign (or **Create Campaign** for a new one). The form opens on the **Basic Info** tab.
+3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer** or **Hang Up**. Changing the type clears the previous selection.
+4. Under **Select Destination**, choose the assistant or load balancer. **Hang Up** needs no selection.
+5. Click **Update Campaign** (or **Create Campaign**).
+
+Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears and the **Routing** column of Campaign Manager shows **AI Assistant**, **AI Load Balancer** or **Hangup**. Without a selection for an assistant or load balancer the save is refused with "A destination ID is required when routing to AI Assistant or AI Load Balancer." on create.
 
 ![Basic Info tab with Routing Destination = AI Assistant and Select Destination open, listing Aria - Front Desk Receptionist and Max - Support Triage](../../img/screens/auto-dialer-routing-selector.jpg)
 
@@ -36,7 +41,7 @@ The campaign form has no **Disconnect** or "Destination unavailable" choice: a c
 |------|-------------------------|-------------|
 | AI Assistant | One AI assistant, over SIP or WebSocket depending on how the assistant is set up | A single assistant handles the campaign |
 | AI Load Balancer | One of the load balancer's active assistants, picked by its strategy, with failover to the next one | Higher volume, redundancy |
-| Hangup | The call is ended as soon as it is answered | Testing the dialer, schedule and rates without using an assistant |
+| Hang Up | The call is ended as soon as it is answered | Testing the dialer, schedule and rates without using an assistant |
 
 ### AI assistant over SIP
 
@@ -74,13 +79,13 @@ An AI assistant or AI load balancer that a campaign routes to cannot be deleted.
 
 ## Call recording
 
-With **Record Calls** on (Advanced tab), Cloudonix records each call of the campaign. See [Recordings](/opbx/modules/recordings) for who can play recordings.
+With **Record Calls** on (Advanced tab), Cloudonix records each call of the campaign and reports the recording to OPBX when it is complete. See [Recordings](/opbx/modules/recordings) for who can play recordings.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
-| Callees answer and the line drops at once | Routing is Hangup, or the destination is missing or has no available member | Check the campaign's routing and the assistant's or load balancer's status |
+| Callees answer and the line drops at once | Routing is Hang Up, or the destination is missing or has no available member | Check the campaign's routing and the assistant's or load balancer's status |
 | Callees answer and the line drops after about 30 seconds | Voicemail detection with "If Detection Unclear = Hang up" | See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
 | The assistant does not receive the lead's details | The columns were not mapped as metadata, or the assistant ignores them | Re-upload with the columns ticked as metadata; check the assistant's header or parameter handling |
 
