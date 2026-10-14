@@ -123,7 +123,7 @@ The same state appears after a [user is deleted](/opbx/modules/user-management#d
 
 **Who can do this:** Owner, PBX Admin.
 
-Click the **Active** or **Disabled** badge in the **Status** column. The change is saved at once and the toast **AI Load Balancer updated successfully** appears. An inactive load balancer does not use its members; every call goes straight to the fallback.
+Click the **Active** or **Disabled** badge in the **Status** column. The change is saved at once and the toast **AI Load Balancer updated successfully** appears. An inactive load balancer takes no calls: every call sent to it is disconnected with a spoken message, on every path (phone number, AI Load Balancer extension, IVR option or failover, business-hours action, and ring group, call queue or load balancer fallbacks). Most paths say "The AI load balancer you are trying to reach is unavailable. Goodbye."; an IVR option says "Destination is no longer available." and a fallback says that no agents or AI assistants are available. Its own fallback is not used; the fallback only runs when an **active** load balancer's members cannot take the call.
 
 ### Delete a load balancer
 
@@ -158,7 +158,7 @@ If anything still points at the load balancer, the delete is refused and the **C
 | Weight | Percentage Based only | 0 to 100 % in steps of 5 in the dialog. Default for a new member: 100 | Share of calls for the member |
 | Follow Through | No | Off by default | Try the next member when one fails |
 | Fallback Action | Yes | PBX User Extension, Ring Group, IVR Menu, AI Assistant, Call Queue, AI Load Balancer or Hang Up. Default: Hang Up | What happens when no member can take the call |
-| Status | No | Active or Disabled (`inactive` in the API). Default: Active. Change it from the list | Inactive load balancers send every call straight to the fallback |
+| Status | No | Active or Disabled (`inactive` in the API). Default: Active. Change it from the list | Calls to an inactive load balancer are disconnected with a message (its fallback is not used) |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
 ### Strategies
@@ -255,9 +255,10 @@ With the [centralized logging stack](/opbx/administration/centralized-logs) enab
 
 Common causes of "callers always get the fallback":
 
-- the load balancer is inactive;
 - every member's assistant is inactive;
 - the provider rejects the call (check the assistant's phone number or agent ID).
+
+If callers hear "The AI load balancer you are trying to reach is unavailable." and are disconnected, the load balancer is inactive: activate it.
 
 ## Related modules
 

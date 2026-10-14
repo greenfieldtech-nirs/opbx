@@ -71,6 +71,8 @@ A failure is a provider leg that ends busy, no answer, failed, canceled or with 
 | AI Load Balancer | Hands the call to another load balancer. It cannot be this one, and a chain of fallbacks that leads back to this one is refused ("Fallback loop detected") |
 | Hang Up | Ends the call (the default) |
 
+The fallback runs only for an **active** load balancer. An inactive load balancer takes no calls: every call sent to it (phone number, extension, IVR, business hours or another destination's fallback) is disconnected with a spoken message, and its fallback is not used.
+
 On the edit dialog, **Disconnect** sets the fallback to "Destination unavailable". The load balancer is then marked **Unprovisioned** until you choose a real fallback. A new load balancer always needs a real fallback.
 
 ## Example: Acme Corp front desk

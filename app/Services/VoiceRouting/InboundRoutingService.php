@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\AlbsStatus;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
@@ -482,7 +481,7 @@ class InboundRoutingService
             $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $albsId)
                 ->where('organization_id', $did->organization_id)
-                ->where('status', AlbsStatus::ACTIVE)
+                // No status filter: the load balancer strategy ends the call for an inactive one.
                 ->first();
 
             if ($aiLoadBalancer) {

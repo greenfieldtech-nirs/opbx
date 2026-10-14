@@ -119,11 +119,10 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             }])
             ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $extension->organization_id)
-            ->where('status', AlbsStatus::ACTIVE)
             ->first();
 
         if (! $aiLoadBalancer) {
-            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found or inactive', [
+            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found', [
                 'ai_load_balancer_id' => $aiLoadBalancerId,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
@@ -155,7 +154,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
                 'status' => $aiLoadBalancer->status->value,
             ]);
 
-            return $this->handleFallback($aiLoadBalancer, $request);
+            // An inactive load balancer ends the call; its fallback is only for when an active one's members fail.
+            return response(
+                CxmlBuilder::unavailable('The AI load balancer you are trying to reach is unavailable.'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         }
 
         Log::info('AiLoadBalancerRoutingStrategy: Routing to AI Load Balancer', [
