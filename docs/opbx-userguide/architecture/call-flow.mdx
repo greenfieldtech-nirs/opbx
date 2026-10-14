@@ -167,7 +167,7 @@ If the route returns an IVR `Gather`, Cloudonix POSTs the caller's digits to `/a
 
 ## Step 6: Ring Group Callback
 
-For ring groups with sequential strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` determines the next action (try next member, failover, or hangup). When the dial was answered (`DialCallStatus` or `CallStatus` `answered`/`completed`), the member named by the callback URL's `dialed_extension` is recorded as the call's answering extension (see [CDR](#cdr)).
+For ring groups with sequential strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` first reads the dial outcome (`DialCallStatus`, else `CallStatus`). When the dial was answered (`answered`, `completed` or `in-progress`), the call is over: the member named by the callback URL's `dialed_extension` is recorded as the call's answering extension (see [CDR](#cdr)) and the response is `<Hangup/>`, so no further member is dialed and the fallback does not run, for every strategy. Any other outcome (`no-answer`, `busy`, `failed`, `canceled`, `unknown`, or no status) determines the next action as before (try the next member, or the fallback).
 
 ---
 

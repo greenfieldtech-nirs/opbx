@@ -7,7 +7,12 @@ paths:
       description: |
         `<Dial>` action of a ring group. The ring group routing strategy puts this URL, with
         the query parameters below, in the `action` of each `<Dial>` it returns; Cloudonix
-        calls it when that dial ends. The response is the next CXML step:
+        calls it when that dial ends. The response is the next CXML step.
+
+        When the dial was answered (`DialCallStatus`, else `CallStatus`, is `answered`,
+        `completed` or `in-progress`), the call is over whatever the strategy: the response
+        is `<Hangup/>` (no next member, no fallback). Otherwise (`no-answer`, `busy`,
+        `failed`, `canceled`, `unknown`, or no status):
 
         - Sequential and round-robin groups: dial the next member (attempt
           `attempt_number`), cycling through the members `ring_turns` times; after that the
@@ -50,7 +55,7 @@ paths:
       - name: dialed_extension
         in: query
         required: false
-        description: Extension number of the member this `<Dial>` rang (sequential and round-robin groups; set by the routing strategy). When `DialCallStatus` (or `CallStatus`) is `answered` or `completed` and this is a member of the ring group, it is recorded as the extension that answered the call (the call record's `extension_number`).
+        description: Extension number of the member this `<Dial>` rang (sequential and round-robin groups; set by the routing strategy). When `DialCallStatus` (or `CallStatus`) is `answered`, `completed` or `in-progress` and this is a member of the ring group, it is recorded as the extension that answered the call (the call record's `extension_number`).
         schema:
           type: string
       - name: session_data
@@ -98,17 +103,21 @@ paths:
                   - 'null'
                   maxLength: 20
                   enum:
+                  - queued
                   - ringing
+                  - in-progress
                   - answered
                   - completed
-                  - failed
                   - busy
+                  - canceled
+                  - failed
                   - no-answer
+                  - unknown
                   - null
-                  description: Dial outcome when `DialCallStatus` is absent (validated; not used for routing). `answered` or `completed` records `dialed_extension` as the answering extension
+                  description: Dial outcome when `DialCallStatus` is absent. `answered`, `completed` or `in-progress` ends the call (`<Hangup/>`) and records `dialed_extension` as the answering extension
                 DialCallStatus:
                   type: string
-                  description: Outcome of the `<Dial>`, sent by Cloudonix on the action callback. `answered` or `completed` records `dialed_extension` as the answering extension
+                  description: Outcome of the `<Dial>`, sent by Cloudonix on the action callback. `answered`, `completed` or `in-progress` ends the call (`<Hangup/>`) and records `dialed_extension` as the answering extension; any other value moves on to the next member or the fallback
                 SessionData:
                   type: object
                   description: Optional; `attempt_number` and `callback_type` here take precedence over the query parameters
@@ -151,7 +160,7 @@ paths:
               - To
       responses:
         '200':
-          description: CXML for the next step (next member, fallback, or a spoken error with hangup)
+          description: CXML for the next step (hangup after an answered dial, next member, fallback, or a spoken error with hangup)
           content:
             application/xml:
               schema:
