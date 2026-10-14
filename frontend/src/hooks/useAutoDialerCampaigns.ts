@@ -175,14 +175,3 @@ export function useUploadCampaignList() {
     },
   });
 }
-
-export function useDeleteCampaignList() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (campaignId: string) => autoDialerCampaignsApi.deleteList(campaignId),
-    onSuccess: (_) => {
-      invalidateCampaigns(queryClient);
-    },
-  });
-}

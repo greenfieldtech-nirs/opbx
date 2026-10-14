@@ -264,11 +264,6 @@ export const autoDialerCampaignsApi = {
       .then((r) => r.data);
   },
 
-  deleteList: (campaignId: string) =>
-    api
-      .delete<{ message: string }>(`/auto-dialer-campaigns/${campaignId}/list`)
-      .then((r) => r.data),
-
   // Destinations
   getDestinations: (campaignId: string, params?: { status?: string; per_page?: number; page?: number }) =>
     api
