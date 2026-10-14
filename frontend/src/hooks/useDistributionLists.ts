@@ -2,19 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { distributionListsApi } from '@/services/distributionListsApi';
 import type { CreateListRequest, CsvMappingConfig, DistributionListParams } from '@/types';
 
-// Query keys
+// Query keys. Params are appended only when given: a trailing `undefined` would make the
+// params-less key stop prefix-matching the paged queries, so invalidating it would miss them.
+const withParams = (params?: object) => (params ? [params] : []);
+
 export const distributionListKeys = {
   all: ['distributionLists'] as const,
   lists: (params?: DistributionListParams) =>
-    [...distributionListKeys.all, 'list', params] as const,
+    [...distributionListKeys.all, 'list', ...withParams(params)] as const,
   detail: (id: string | number) =>
     [...distributionListKeys.all, 'detail', id] as const,
   destinations: (id: string | number, params?: object) =>
-    [...distributionListKeys.all, 'destinations', id, params] as const,
+    [...distributionListKeys.all, 'destinations', id, ...withParams(params)] as const,
   versions: (id: string | number) =>
     [...distributionListKeys.all, 'versions', id] as const,
   versionDestinations: (id: string | number, versionId: number, params?: object) =>
-    [...distributionListKeys.all, 'versions', id, versionId, 'destinations', params] as const,
+    [...distributionListKeys.all, 'versions', id, versionId, 'destinations', ...withParams(params)] as const,
   parts: (id: string | number) =>
     [...distributionListKeys.all, 'parts', id] as const,
   progress: (jobId: string) =>
