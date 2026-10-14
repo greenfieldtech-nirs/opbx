@@ -4,7 +4,11 @@ paths:
       tags:
         - Call Detail Records
       summary: List Call Detail Records
-      description: Get a paginated, filterable list of Call Detail Records for the current organization.
+      description: |
+        Paginated, filterable list of the organization's Call Detail Records, newest
+        `session_timestamp` first by default. Any role can list; a Supervisor always sees only
+        CDRs whose `from` or `to` matches a resource they supervise (none when nothing is
+        assigned). An unknown `sort_by` falls back to `session_timestamp`.
       operationId: listCallDetailRecords
       security:
         - bearerAuth: []
@@ -38,14 +42,14 @@ paths:
           schema:
             type: string
             format: date
-          description: First day of the date range (inclusive).
+          description: First day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored.
         - name: to_date
           in: query
           required: false
           schema:
             type: string
             format: date
-          description: Last day of the date range (inclusive).
+          description: Last day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored.
         - name: disposition
           in: query
           schema:
@@ -68,9 +72,10 @@ paths:
           description: Exact session token (locates the CDR of a queue call)
         - name: supervisor
           in: query
+          deprecated: true
           schema:
             type: boolean
-          description: When true and the caller is a Supervisor, restrict to the resources they supervise
+          description: Ignored. Supervisors are always restricted to the resources they supervise.
         - name: sort_by
           in: query
           schema:
@@ -79,6 +84,7 @@ paths:
             default: session_timestamp
           description: '`user_full_name` is not available with `archive`'
         - $ref: '../../components/parameters/query/SortOrder.yaml'
+          description: Sort direction. Defaults to `desc` on this endpoint.
         - name: include
           in: query
           schema:
@@ -126,8 +132,9 @@ paths:
         - Call Detail Records
       summary: Get Call Detail Record
       description: >-
-        Retrieve a single CDR by ID. With an organisation API key, `archive=1` looks the CDR up in
-        the warm archive instead of the live table.
+        Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they
+        supervise. With an organisation API key, `archive=1` looks the CDR up in the warm archive
+        instead of the live table.
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'
         - name: include
@@ -153,5 +160,7 @@ paths:
                     $ref: '../../components/schemas/CallDetailRecord.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'

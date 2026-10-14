@@ -4,6 +4,10 @@ paths:
       tags:
         - Call Detail Records
       summary: Get CDR statistics
+      description: |
+        Totals over the CDRs whose `session_timestamp` date is between `from_date` and `to_date`
+        (inclusive). Any role; a Supervisor's totals cover only the resources they supervise.
+        The response is not wrapped in `data`. No other list filters apply.
       operationId: getCdrStatistics
       security:
         - bearerAuth: []
@@ -46,8 +50,10 @@ paths:
                     type:
                       - number
                       - 'null'
+                    description: Average over calls with a duration above 0
                   total_cost:
                     type: number
+                    description: Sum of `sell_cost`
                   by_disposition:
                     type: object
                     description: Call count per disposition

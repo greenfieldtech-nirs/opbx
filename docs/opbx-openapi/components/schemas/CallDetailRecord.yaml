@@ -89,7 +89,7 @@ properties:
     - 'null'
   user_full_name:
     type: string
-    description: Name of the extension's user, or `Unassigned User`
+    description: Name of the user of the extension matched by `subscriber`, or `Unassigned User` (always for archived rows)
   cx_trunk_id:
     type:
     - string
@@ -111,6 +111,7 @@ properties:
     type:
     - number
     - 'null'
+    description: Null when zero or unset (as are `approx_cost`, `sell_cost` and `amd_confidence`)
   approx_cost:
     type:
     - number
@@ -141,7 +142,7 @@ properties:
     - 'null'
   has_recording:
     type: boolean
-    description: True when a recording is available and the caller may play it (`GET .../recording`)
+    description: True when `recording_status` is `available` and the caller may play it (`GET .../recording`)
   raw_cdr:
     type:
     - object

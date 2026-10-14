@@ -14,8 +14,10 @@ paths:
       summary: Stream CDR recording
       description: |
         Streams the stored recording of a call for playback. Only recordings with
-        status `available` are served. Access follows the CDR view policy, so a
-        supervisor only gets the recordings of calls they are assigned to.
+        status `available` are served. Owner, PBX Admin, Reporter and Supervisor only
+        (PBX User gets 403), and a Supervisor only for calls of resources they
+        supervise. The content type is the recording's stored MIME type (default
+        `audio/mpeg`). Not available for archived CDRs.
       operationId: streamCallDetailRecordRecording
       security:
         - bearerAuth: []
@@ -30,6 +32,9 @@ paths:
               schema:
                 type: string
                 example: private, no-cache
+            Content-Length:
+              schema:
+                type: integer
           content:
             audio/mpeg:
               schema:
