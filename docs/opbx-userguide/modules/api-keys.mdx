@@ -50,6 +50,8 @@ A request authenticated with a key is checked like this:
 
 A key always acts inside the organization it was created in.
 
+Live calls (`session-updates`) are split on purpose: a key with Write can disconnect a call, but `POST /v1/session-updates/{sessionId}/coach-target` (spy, whisper, barge) always answers API keys with `403`. Coaching is dialed from a signed-in Owner's or Supervisor's own Web Phone extension, which a key does not have. See [Live Calls](/opbx/modules/live-calls).
+
 ### Grantable resources
 
 `users`, `extensions`, `conference-rooms`, `ai-assistants`, `ai-assistant-providers`, `ring-groups`, `call-queues`, `queue-calls`, `ai-assistant-load-balancers`, `ivr-menus`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`, `supervisors`, `auto-dialer-campaigns`, `distribution-lists`, `session-updates`, `call-notifications`, `dashboard`, `trunks`

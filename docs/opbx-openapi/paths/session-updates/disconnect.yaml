@@ -8,12 +8,12 @@ paths:
         Disconnects a call through the Cloudonix API, using the session token received from
         the session-update webhooks. Owner only (`SessionUpdatePolicy::disconnect`);
         Supervisors and PBX Admins cannot disconnect calls. An API key with
-        `session-updates:write` can. The session must belong to the organization; its
+        `session-updates:write` can disconnect calls, by design (unlike coaching,
+        which always answers API keys with 403). The session must belong to the organization; its
         status is not checked.
       operationId: disconnectSession
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: session-updates:write
       parameters:

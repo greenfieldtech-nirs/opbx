@@ -9,7 +9,7 @@ paths:
         whisper to, or barge into a live call via the in-browser Web Phone.
 
         This is the UI-facing authorization layer. It enforces:
-        - `owner`/`supervisor` role (403 otherwise; API keys always get 403);
+        - `owner`/`supervisor` role (403 otherwise);
         - for Supervisors, the session must be within their assigned scope (403 otherwise);
         - tenant isolation via an explicit `organization_id` filter (cross-org lookups return 404);
         - the latest stored update of the session must be `processing`/`ringing`/`connected`
@@ -20,10 +20,14 @@ paths:
         `CoachRoutingService` re-authorizes the request and emits `<Coach>` CXML — the
         real telephony-side gate. The token is only ever handed out per-request here;
         it is never included in the bulk active-calls list.
+
+        **API keys always get 403 here, by design**, even with `session-updates:write`:
+        coaching is done by a signed-in Owner or Supervisor dialing from their own
+        Web Phone extension, which an API key does not have. The same permission does
+        allow an API key to disconnect a call (`DELETE /v1/session-updates/{sessionId}/disconnect`).
       operationId: resolveCoachTarget
       security:
         - bearerAuth: []
-        - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: session-updates:write
       parameters:
