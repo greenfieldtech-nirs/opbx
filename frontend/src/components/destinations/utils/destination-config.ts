@@ -148,15 +148,13 @@ export function getAllDestinationTypeConfigs(
 ): TypeMetadata[] {
   let types = Object.values(DESTINATION_TYPE_CONFIG);
 
-  // Filter by allowed types if provided
-  if (allowedTypes && allowedTypes.length > 0) {
-    types = types.filter((config) => allowedTypes.includes(config.value));
-  }
-
-  // Exclude hangup unless explicitly included
-  if (!includeHangup) {
-    types = types.filter((config) => config.value !== 'hangup');
-  }
+  // Hang Up is offered when either includeHangup is set or allowedTypes lists it
+  const hangupAllowed = includeHangup || !!allowedTypes?.includes('hangup');
+  types = types.filter((config) =>
+    config.value === 'hangup'
+      ? hangupAllowed
+      : !allowedTypes?.length || allowedTypes.includes(config.value)
+  );
 
   // 'unavailable' is only ever set by the server; it is shown for the current value, never offered
   types = types.filter((config) => config.value !== 'unavailable');
