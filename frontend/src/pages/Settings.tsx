@@ -207,8 +207,6 @@ export default function Settings() {
       });
 
       if (result.valid) {
-        setValidationStatus('valid');
-
         // Step 2: Populate form fields with Cloudonix profile settings if available
         const formValues = watch();
         const updateData: UpdateCloudonixSettingsRequest = {
@@ -243,6 +241,8 @@ export default function Settings() {
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
 
           setSettingsData(savedSettings);
+          // The "Saved" badge only appears once the save request has succeeded.
+          setValidationStatus('valid');
 
           const settingsApplied = result.profile_settings &&
             (result.profile_settings.no_answer_timeout !== undefined ||
