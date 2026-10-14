@@ -71,6 +71,8 @@ class SeedDocsDemoTest extends TestCase
         $this->assertSame(0, DB::table('users')->where('organization_id', $id)->where('email', 'not like', '%@example.com')->count());
         $this->assertSame(1, DB::table('did_numbers')->where('organization_id', $id)->where('routing_type', 'unavailable')->count());
         $this->assertSame(0, DB::table('auto_dialer_campaigns')->where('organization_id', $id)->where('status', 'active')->count());
+        // A list assigned to a campaign is In Use, as the assign flow leaves it
+        $this->assertSame(0, DB::table('auto_dialer_lists')->where('organization_id', $id)->whereNotNull('campaign_id')->where('status', '!=', 'in_use')->count());
         $this->assertSame(1, Organization::count());
     }
 

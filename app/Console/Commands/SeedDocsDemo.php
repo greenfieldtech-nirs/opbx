@@ -635,7 +635,9 @@ class SeedDocsDemo extends Command
         $list = AutoDialerList::create([
             'organization_id' => $this->org, 'campaign_id' => $campaign->id, 'name' => 'Fall Webinar Leads',
             'description' => 'Attendees of the October webinar', 'version_number' => 1, 'is_latest_version' => true,
-            'status' => ListStatus::READY, 'original_filename' => 'webinar-leads.csv', 'processed_at' => now(),
+            // Assigned to the campaign, as markAsInUse() leaves it
+            'status' => ListStatus::IN_USE, 'used_by_campaign_id' => $campaign->id, 'used_at' => now(),
+            'original_filename' => 'webinar-leads.csv', 'processed_at' => now(),
             'total_rows' => 20, 'valid_rows' => 20, 'invalid_rows' => 0,
         ]);
 
