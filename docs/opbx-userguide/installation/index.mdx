@@ -65,6 +65,10 @@ cp docker-compose.yml.example docker-compose.yml
 
 `docker-compose.yml` is ignored by git, so you can adapt it to your host.
 
+:::tip Bootstrap script
+`./opbx_bootstrap.sh` does steps 2 and 3 for you and runs a few checks. It verifies that Docker and Docker Compose are installed and running, copies `docker-compose.yml` and `.env` from the examples when they are missing, generates `APP_KEY` when it is empty, runs `docker/scripts/generate-secrets.sh`, creates `config/broadcasting.php` if it is missing, creates the `storage/` and `bootstrap/cache` directories, and warns when `APP_NAME`, `APP_KEY`, `DB_DATABASE`, `DB_USERNAME` or `DB_PASSWORD` is empty. You still set `DB_PASSWORD`, `DB_ROOT_PASSWORD` and `REDIS_PASSWORD` by hand. Ignore its warning about `CLOUDONIX_API_TOKEN`: Cloudonix credentials are entered per organization in the web UI.
+:::
+
 ### 3. Set the Secrets
 
 Fill in the shared secrets the workers, Soketi and Grafana need. The script writes only values that are missing or still a placeholder, and prints no values:
@@ -85,7 +89,19 @@ Then edit `.env` and set the rest by hand:
 | `DB_ROOT_PASSWORD` | MySQL root password | `openssl rand -base64 32` |
 | `REDIS_PASSWORD` | Redis password | `openssl rand -base64 32` |
 
-The `.env.example` ships the S3 keys empty (the script above generates them). The app container refuses to start with `minioadmin` (or `secret`, `password`, `rootsecret`, `admin`, `123456`) as a database password or S3 key, and its environment check refuses empty or placeholder values for `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET` and the three worker tokens (and `GRAFANA_ADMIN_PASSWORD` when the log stack is enabled: `LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`). Compose itself refuses to start the stack (any service, any profile) while the worker tokens, `PUSHER_APP_SECRET`, the S3 keys or `GRAFANA_ADMIN_PASSWORD` are unset.
+The `.env.example` ships the S3 keys empty (the script above generates them). Compose itself refuses to start the stack (any service, any profile) while the worker tokens, `PUSHER_APP_SECRET`, the S3 keys or `GRAFANA_ADMIN_PASSWORD` are unset.
+
+The `app` container checks the values again on every start and exits when one fails:
+
+| Check | Fails when |
+|-------|-----------|
+| Weak passwords | `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `MINIO_ACCESS_KEY` or `MINIO_SECRET_KEY` is exactly `secret`, `password`, `rootsecret`, `minioadmin`, `admin` or `123456` |
+| Required secrets | `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET`, `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` or `ACD_WORKER_API_TOKEN` is empty, is `admin`, or **contains** a placeholder word: `CHANGE_ME`, `GENERATE_32_CHAR`, `64_CHAR_SECRET`, `default123`, `password`, `secret`, `change-in-production` or `pbxappsecret` |
+| Grafana | Same rule for `GRAFANA_ADMIN_PASSWORD`, only when the log stack is enabled (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`) |
+| Password length | `DB_PASSWORD` is shorter than 8 characters |
+| Production | `APP_ENV=production` with `APP_DEBUG=true`, or with `REDIS_EXPOSE_PORT` set |
+
+Because the check looks for the words inside the value, a generated secret must not contain `password` or `secret`. Values from `openssl rand` never do.
 
 Optional but commonly configured variables:
 
@@ -151,7 +167,7 @@ Two groups of services start only with a profile:
 | `logs` | `loki`, `alloy`, `grafana`, `docker-socket-proxy` | `docker compose --profile logs up -d` (see [Centralized Logs](/opbx/administration/centralized-logs)) |
 
 :::tip First Boot
-On start, the `app` container validates the environment, waits for MySQL, runs migrations, seeds a fresh database, checks object storage and validates the configuration. Wait **120 seconds** after starting the containers before testing.
+On start, the `app` container validates the environment, waits for MySQL (up to `MYSQL_WAIT_TIMEOUT`, default 60 seconds), runs migrations, seeds a fresh database, checks object storage and validates the configuration. Wait **120 seconds** after starting the containers before testing.
 :::
 
 ### 6. Create the Storage Buckets
@@ -195,7 +211,7 @@ curl http://localhost/api/health
 | `http://localhost/logs/` | Grafana log viewer (`logs` profile) |
 
 :::tip Next Steps
-Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
+Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Troubleshooting
@@ -215,7 +231,7 @@ FRONTEND_PORT=3001   # Vite on 3001 instead of 3000
 docker compose logs app | head -n 50
 ```
 
-Common causes: an empty or placeholder secret, a weak database password or S3 key, a missing `vendor/` directory, or MySQL not ready.
+Common causes: an empty or placeholder secret, a weak database password or S3 key, `APP_DEBUG=true` in production, a missing `vendor/` directory ("Composer dependencies are not installed"), or MySQL not ready within `MYSQL_WAIT_TIMEOUT` seconds ("MySQL not ready after …"). The log names the variable that failed.
 
 ### "No such image" Errors (podman-compose)
 
@@ -268,7 +284,7 @@ For Cloudonix to reach your local instance, start the ngrok tunnel:
 1. Add `NGROK_AUTHTOKEN` to `.env`.
 2. Start the tunnel: `docker compose --profile dev up -d ngrok`.
 3. Find your public HTTPS URL in the ngrok dashboard (`http://localhost:4040`) or with `docker compose logs ngrok`.
-4. Enter that URL as the webhook base URL in **Settings > Cloudonix**.
+4. Sign in as the Owner, open **Settings** from the user menu (top right), enter that URL in **Webhook Base URL** and click **Validate and Save Settings**.
 
 ## Updating OPBX
 
