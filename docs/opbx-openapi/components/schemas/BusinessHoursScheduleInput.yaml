@@ -1,9 +1,10 @@
 type: object
 description: >-
-  Business hours schedule create/update request. Create and update (PUT or PATCH)
-  both replace the whole schedule: the weekly days and the exceptions are deleted
-  and recreated from the request. `status` is required on update and defaults to
-  `active` on create.
+  Business hours schedule create/update request. On create, `name`, `timezone`,
+  `open_hours_action`, `closed_hours_action` and `schedule` are required, days that
+  are not sent are stored as disabled, and `status` defaults to `active`. On update
+  (PUT or PATCH) every field is optional: only the fields sent are validated and
+  saved, and the others keep their stored values.
 properties:
   name:
     type: string
@@ -13,7 +14,7 @@ properties:
   status:
     type: string
     enum: [active, inactive]
-    description: Required on update; defaults to `active` on create when omitted or empty
+    description: Defaults to `active` on create when omitted or empty; on update an omitted status is kept
   timezone:
     type: string
     description: Any valid timezone identifier
@@ -24,7 +25,9 @@ properties:
     $ref: '#/$defs/Action'
   schedule:
     type: object
-    description: Days that are not sent are stored as disabled with no time ranges
+    description: >-
+      On create, days that are not sent are stored as disabled with no time ranges.
+      On update, each day sent replaces that day and days not sent keep their hours.
     properties:
       monday:
         $ref: '#/$defs/Day'
@@ -47,6 +50,8 @@ properties:
     maxItems: 100
     description: >-
       Date exceptions. When two exceptions share a date only the first is kept.
+      On update, a sent `exceptions` (also `[]` or null) replaces every exception;
+      when omitted the stored exceptions are kept.
       `closed` exceptions must not have time ranges; `special_hours` exceptions
       need at least one.
     items:
@@ -73,12 +78,6 @@ properties:
           items:
             $ref: '#/$defs/TimeRange'
       required: [date, name, type]
-required:
-  - name
-  - timezone
-  - open_hours_action
-  - closed_hours_action
-  - schedule
 $defs:
   TimeRange:
     type: object

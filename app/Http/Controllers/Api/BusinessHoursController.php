@@ -16,6 +16,7 @@ use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -143,15 +144,17 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        $data = $this->prepareBusinessHoursData($validated);
+        // Partial update: only the fields sent are saved.
+        $data = Arr::only($validated, ['name', 'status', 'timezone']);
 
-        // Add action data
-        $data['basic']['open_hours_action'] = $data['actions']['open_hours']['action'];
-        $data['basic']['open_hours_action_type'] = $data['actions']['open_hours']['action_type'];
-        $data['basic']['closed_hours_action'] = $data['actions']['closed_hours']['action'];
-        $data['basic']['closed_hours_action_type'] = $data['actions']['closed_hours']['action_type'];
+        foreach (['open_hours_action', 'closed_hours_action'] as $action) {
+            if (isset($validated[$action])) {
+                $data[$action] = $validated[$action]['target_id'];
+                $data[$action.'_type'] = $validated[$action]['type'];
+            }
+        }
 
-        return $data['basic'];
+        return $data;
     }
 
     /**
@@ -159,17 +162,16 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function afterUpdate(Model $model, Request $request): void
     {
-        $validated = $request->all();
-        $data = $this->prepareBusinessHoursData($validated);
+        // Partial update: the days sent replace those days; exceptions, when sent, replace them all.
+        if ($request->has('schedule')) {
+            $days = $this->scheduleRows($request->input('schedule') ?? []);
+            $model->scheduleDays()->whereIn('day_of_week', array_column($days, 'day_of_week'))->delete();
+            $this->createScheduleDays($model, $days);
+        }
 
-        // Update schedule days
-        $model->scheduleDays()->delete();
-        $this->createScheduleDays($model, $data['schedule']);
-
-        // Update exceptions
-        $model->exceptions()->delete();
-        if (! empty($data['exceptions'])) {
-            $this->createExceptions($model, $data['exceptions']);
+        if ($request->has('exceptions')) {
+            $model->exceptions()->delete();
+            $this->createExceptions($model, $request->input('exceptions') ?? []);
         }
 
         // Load relationships for response
@@ -334,18 +336,7 @@ class BusinessHoursController extends AbstractApiCrudController
      */
     protected function prepareBusinessHoursData(array $validated): array
     {
-        // Convert schedule from named days format to array format with day_of_week
-        // Frontend sends: {monday: {...}, tuesday: {...}}
-        // Backend needs: [{day_of_week: 'monday', ...}, {day_of_week: 'tuesday', ...}]
-        $scheduleArray = [];
-
-        foreach ($validated['schedule'] as $dayName => $dayData) {
-            $scheduleArray[] = [
-                'day_of_week' => $dayName, // Keep as string: 'monday', 'tuesday', etc.
-                'enabled' => $dayData['enabled'],
-                'time_ranges' => $dayData['time_ranges'] ?? [],
-            ];
-        }
+        $scheduleArray = $this->scheduleRows($validated['schedule']);
 
         // Ensure status has a default value
         $status = $validated['status'] ?? BusinessHoursStatus::ACTIVE->value;
@@ -370,6 +361,27 @@ class BusinessHoursController extends AbstractApiCrudController
                 ],
             ],
         ];
+    }
+
+    /**
+     * Convert the named-days schedule ({monday: {...}, ...}) to rows with day_of_week.
+     *
+     * @param  array<string, array<string, mixed>>  $schedule
+     * @return array<int, array{day_of_week: string, enabled: mixed, time_ranges: array<int, mixed>}>
+     */
+    private function scheduleRows(array $schedule): array
+    {
+        $rows = [];
+
+        foreach ($schedule as $dayName => $dayData) {
+            $rows[] = [
+                'day_of_week' => $dayName,
+                'enabled' => $dayData['enabled'],
+                'time_ranges' => $dayData['time_ranges'] ?? [],
+            ];
+        }
+
+        return $rows;
     }
 
     /**

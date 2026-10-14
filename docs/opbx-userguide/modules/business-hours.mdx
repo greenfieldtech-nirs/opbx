@@ -258,7 +258,7 @@ Target prefixes checked by the API: `ext-` (extension), `rg-` (ring group), `que
 | GET | `/v1/business-hours` | List. Filters: `status`, `search`, `unprovisioned=1` |
 | POST | `/v1/business-hours` | Create. Rejects `unavailable` actions |
 | GET | `/v1/business-hours/{businessHour}` | One schedule with days and exceptions |
-| PUT | `/v1/business-hours/{businessHour}` | Update |
+| PUT or PATCH | `/v1/business-hours/{businessHour}` | Update only the fields sent; omitted fields, days not sent and (when `exceptions` is omitted) the exceptions keep their stored values |
 | DELETE | `/v1/business-hours/{businessHour}` | Delete. Returns 409 with `references` when in use |
 | POST | `/v1/business-hours/{businessHour}/duplicate` | Copy with the same time zone, saved as Inactive |
 | PATCH | `/v1/business-hours/{businessHour}/toggle-status` | Switch Active and Inactive |

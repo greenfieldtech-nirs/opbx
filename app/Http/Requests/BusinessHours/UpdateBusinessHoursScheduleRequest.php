@@ -15,6 +15,9 @@ use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating a business hours schedule.
+ *
+ * PUT and PATCH are partial: only the fields sent are validated and saved. A sent `schedule`
+ * replaces the days it names; a sent `exceptions` replaces every exception.
  */
 class UpdateBusinessHoursScheduleRequest extends FormRequest
 {
@@ -46,6 +49,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         return [
             // Basic schedule info
             'name' => [
+                'sometimes',
                 'required',
                 'string',
                 'min:2',
@@ -59,55 +63,60 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                     ->ignore($scheduleId),
             ],
             'status' => [
+                'sometimes',
                 'required',
                 new Enum(BusinessHoursStatus::class),
             ],
             'timezone' => [
+                'sometimes',
                 'required',
                 'string',
                 'timezone:all',
             ],
             'open_hours_action' => [
+                'sometimes',
                 'required',
                 'array',
             ],
             'open_hours_action.type' => [
-                'required',
+                'required_with:open_hours_action',
                 'string',
                 new Enum(BusinessHoursActionType::class),
             ],
             'open_hours_action.target_id' => [
-                'required',
+                'required_with:open_hours_action',
                 'string',
                 'max:255',
             ],
             'closed_hours_action' => [
+                'sometimes',
                 'required',
                 'array',
             ],
             'closed_hours_action.type' => [
-                'required',
+                'required_with:closed_hours_action',
                 'string',
                 new Enum(BusinessHoursActionType::class),
             ],
             'closed_hours_action.target_id' => [
-                'required',
+                'required_with:closed_hours_action',
                 'string',
                 'max:255',
             ],
 
-            // Weekly schedule (must have all 7 days)
+            // Weekly schedule: the days sent replace those days; days left out keep their hours
             'schedule' => [
+                'sometimes',
                 'required',
                 'array',
             ],
-            'schedule.monday' => ['required', 'array'],
-            'schedule.tuesday' => ['required', 'array'],
-            'schedule.wednesday' => ['required', 'array'],
-            'schedule.thursday' => ['required', 'array'],
-            'schedule.friday' => ['required', 'array'],
-            'schedule.saturday' => ['required', 'array'],
-            'schedule.sunday' => ['required', 'array'],
+            'schedule.monday' => ['sometimes', 'array'],
+            'schedule.tuesday' => ['sometimes', 'array'],
+            'schedule.wednesday' => ['sometimes', 'array'],
+            'schedule.thursday' => ['sometimes', 'array'],
+            'schedule.friday' => ['sometimes', 'array'],
+            'schedule.saturday' => ['sometimes', 'array'],
+            'schedule.sunday' => ['sometimes', 'array'],
 
             // Day schedule fields
             'schedule.*.enabled' => [
@@ -215,22 +224,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Ensure all 7 days are present in schedule
-        $schedule = $this->input('schedule', []);
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-        foreach ($days as $day) {
-            if (! isset($schedule[$day])) {
-                $schedule[$day] = [
-                    'enabled' => false,
-                    'time_ranges' => [],
-                ];
-            }
-        }
-
-        if (! empty($schedule)) {
-            $this->merge(['schedule' => $schedule]);
-        }
+        // No missing-day defaults: an update leaves the days it does not send untouched.
 
         // Deduplicate exception dates (silently use first occurrence)
         $exceptions = $this->input('exceptions', []);

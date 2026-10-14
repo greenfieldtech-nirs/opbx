@@ -62,7 +62,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
+              allOf:
+                - $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
+                - required: [name, timezone, open_hours_action, closed_hours_action, schedule]
       responses:
         '201':
           description: Business Hours Schedule created
@@ -121,8 +123,13 @@ paths:
         - Business Hours
       summary: Update Business Hours Schedule
       description: >
-        Owner and PBX Admin only. Full replacement: send the whole schedule,
-        including `status`.
+        Owner and PBX Admin only. PUT and PATCH both update only the fields sent:
+        every field is optional and an omitted field keeps its stored value (a body
+        with just `name` renames the schedule and changes nothing else). A field that
+        is sent is validated as on create, so it cannot be blanked; an action needs
+        both `type` and `target_id`. Each day sent in `schedule` replaces that day's
+        setting and time ranges, and days not sent are kept. `exceptions`, when sent
+        (also `[]` or null), replaces every exception.
       operationId: updateBusinessHoursSchedule
       security:
         - bearerAuth: []
@@ -161,8 +168,8 @@ paths:
         - Business Hours
       summary: Partially update Business Hours Schedule
       description: >
-        Same as PUT. Despite the method, the body is validated as a full
-        replacement (all required fields, including `status`).
+        Same as PUT: only the fields sent are validated and saved; omitted fields
+        keep their stored values.
       operationId: patchBusinessHoursSchedule
       security:
         - bearerAuth: []
