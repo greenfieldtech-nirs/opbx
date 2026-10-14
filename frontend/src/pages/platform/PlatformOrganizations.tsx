@@ -140,10 +140,14 @@ export default function PlatformOrganizations() {
 
   const handleStatusChange = async (org: PlatformOrganization, newStatus: OrganizationStatus) => {
     try {
-      await updateStatusMutation.mutateAsync({
+      const result = await updateStatusMutation.mutateAsync({
         id: org.id,
         data: { status: newStatus },
       });
+      // The edit dialog holds a snapshot of the org; reflect the new status there too
+      setSelectedOrg((prev) =>
+        prev && prev.id === org.id ? { ...prev, status: result.status as OrganizationStatus } : prev
+      );
       toast.success(`Organization ${newStatus === 'active' ? 'activated' : newStatus === 'suspended' ? 'suspended' : 'deleted'}`);
       return true;
     } catch (error) {
