@@ -121,6 +121,8 @@ The toast "Organization deleted" appears and the row disappears. OPBX revokes th
 
 The delete is refused when **any user in the organization is a platform manager** ("Cannot delete organization: one or more users in this organization are Platform Managers. …"). Revoke their platform-manager flag first. The page shows the toast "Failed to update status".
 
+{/* SCREENSHOT: platform-org-delete-blocked — Organization delete refused because one user is a platform manager */}
+
 :::danger
 Deleting an organization cannot be undone. Suspend first, take a database backup, and confirm with the customer.
 :::
