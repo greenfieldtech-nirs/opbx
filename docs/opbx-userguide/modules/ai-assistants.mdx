@@ -156,7 +156,7 @@ Click the **Active** or **Inactive** badge in the **Status** column. The change 
 
 An inactive assistant stays configured but is not used:
 
-- routes that point straight at it (a phone number, an IVR option, a business-hours action) do not connect callers to it;
+- every call sent to it is disconnected with a spoken message instead of reaching the provider. This holds on every path: a phone number, an AI Assistant extension, an IVR option or failover, a business-hours action, and a ring group, call queue or AI load balancer fallback. Most paths say "The AI assistant you are trying to reach is unavailable. Goodbye."; an IVR option says "Destination is no longer available." and a fallback says that no agents or AI assistants are available;
 - an AI load balancer skips it as a member;
 - it cannot be added as a load-balancer member or chosen as a load-balancer fallback while it is inactive.
 
@@ -207,7 +207,7 @@ Change or remove those references, then delete again. Call history (call logs an
 | Name | Yes | Up to 255 characters; unique within the organization | Shown in lists and destination pickers |
 | AI Service Provider | Yes | One of the providers above | Decides the protocol and the configuration fields |
 | Configuration fields | Per provider | See [Providers](#providers). DeepDub: Bot ID up to 255 characters, Authentication Token up to 512 | How OPBX reaches the agent |
-| Status | No | Active or Inactive. Default: Active | Inactive assistants are not used for calls |
+| Status | No | Active or Inactive. Default: Active | Calls to an inactive assistant are disconnected with a message |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
 The phone number of a SIP provider must be E.164 with the plus sign, for example `+12025550170`. A value without the plus sign, such as `2025550170`, is refused.

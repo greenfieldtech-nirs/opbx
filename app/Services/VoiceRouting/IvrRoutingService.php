@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
@@ -691,7 +690,7 @@ class IvrRoutingService
         $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $aiAssistantId)
             ->where('organization_id', $organizationId)
-            ->where('status', AiAssistantStatus::ACTIVE)
+            // No status filter: the AI assistant strategy ends the call for an inactive one.
             ->first();
 
         if (! $aiAssistant) {

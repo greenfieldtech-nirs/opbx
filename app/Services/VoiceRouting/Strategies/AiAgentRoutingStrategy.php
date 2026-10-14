@@ -8,6 +8,7 @@ use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -36,8 +37,10 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         // If we have an Extension, extract the AI Assistant from it
         if ($extension && ! $aiAssistant) {
             // Load AI Assistant relationship if not already loaded
+            // Webhooks have no authenticated user, so the organisation scope would hide the assistant.
             if (! $extension->relationLoaded('aiAssistant')) {
-                $extension->load('aiAssistant');
+                $extension->load(['aiAssistant' => fn ($query) => $query->withoutGlobalScope(OrganizationScope::class)
+                    ->where('organization_id', $extension->organization_id)]);
             }
             $aiAssistant = $extension->aiAssistant;
 
@@ -58,6 +61,20 @@ class AiAgentRoutingStrategy implements RoutingStrategy
 
         if (! $aiAssistant) {
             return response(CxmlBuilder::unavailable('AI Agent not found'), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        // Every path to an assistant comes through here: an inactive one ends the call instead of connecting it.
+        if (! $aiAssistant->isActive()) {
+            Log::warning('AI Assistant is inactive; ending the call', [
+                'ai_assistant_id' => $aiAssistant->id,
+                'extension_id' => $extension?->id,
+            ]);
+
+            return response(
+                CxmlBuilder::unavailable('The AI assistant you are trying to reach is unavailable.'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         }
 
         // Extract configuration from AI Assistant

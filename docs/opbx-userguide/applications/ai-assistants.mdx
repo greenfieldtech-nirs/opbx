@@ -66,7 +66,7 @@ The demo organization has two SIP assistants: **Aria - Front Desk Receptionist**
 | Status | Behaviour |
 |--------|-----------|
 | Active | Used for calls |
-| Inactive | Not used. Load balancers skip it, and it cannot be added to a load balancer |
+| Inactive | Not used. Every call sent to it (phone number, extension, IVR, business hours or a fallback) is disconnected with a spoken message. Load balancers skip it, and it cannot be added to a load balancer |
 
 Changing the status does not affect calls already connected.
 
