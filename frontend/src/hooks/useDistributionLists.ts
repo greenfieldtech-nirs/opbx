@@ -13,6 +13,10 @@ export const distributionListKeys = {
     [...distributionListKeys.all, 'destinations', id, params] as const,
   versions: (id: string | number) =>
     [...distributionListKeys.all, 'versions', id] as const,
+  versionDestinations: (id: string | number, versionId: number, params?: object) =>
+    [...distributionListKeys.all, 'versions', id, versionId, 'destinations', params] as const,
+  parts: (id: string | number) =>
+    [...distributionListKeys.all, 'parts', id] as const,
   progress: (jobId: string) =>
     [...distributionListKeys.all, 'progress', jobId] as const,
 };
@@ -169,13 +173,49 @@ export function useAddDestinationsBatch() {
 }
 
 /**
- * Hook to fetch version history
+ * Hook to fetch a list's previous versions
  */
-export function useListVersions(listId: string | number) {
+export function useListVersions(listId: string | number, enabled = true) {
   return useQuery({
     queryKey: distributionListKeys.versions(listId),
     queryFn: () => distributionListsApi.getVersions(listId),
-    enabled: !!listId,
+    enabled: !!listId && enabled,
+  });
+}
+
+/**
+ * Hook to page and search a previous version's entries
+ */
+export function useListVersionDestinations(
+  listId: string | number,
+  versionId: number | null,
+  params: { page?: number; per_page?: number; search?: string },
+) {
+  return useQuery({
+    queryKey: distributionListKeys.versionDestinations(listId, versionId ?? 0, params),
+    queryFn: () => distributionListsApi.getVersionDestinations(listId, versionId!, params),
+    enabled: !!listId && versionId !== null,
+  });
+}
+
+/**
+ * Hook to download a previous version as CSV
+ */
+export function useDownloadListVersion() {
+  return useMutation({
+    mutationFn: ({ listId, versionId }: { listId: string | number; versionId: number }) =>
+      distributionListsApi.downloadVersion(listId, versionId),
+  });
+}
+
+/**
+ * Hook to fetch the "(Part N)" lists a list was split into
+ */
+export function useListParts(listId: string | number, enabled = true) {
+  return useQuery({
+    queryKey: distributionListKeys.parts(listId),
+    queryFn: () => distributionListsApi.getParts(listId),
+    enabled: !!listId && enabled,
   });
 }
 

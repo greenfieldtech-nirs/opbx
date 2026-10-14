@@ -270,5 +270,10 @@ class DistributionListVersionsTest extends TestCase
         $this->getJson($this->url($list, '/versions'))
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.version_number', 1);
+
+        $this->getJson($this->url($list))
+            ->assertJsonPath('data.parts_count', 1)
+            ->assertJsonPath('data.has_versions', true);
+        $this->getJson($this->url($part))->assertJsonPath('data.parent_list', ['id' => $list->id, 'name' => 'Leads']);
     }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -66,6 +66,8 @@ import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
+import { ListVersionHistory } from './DistributionLists/components/ListVersionHistory';
+import { ListParts } from './DistributionLists/components/ListParts';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/services/api';
 import { useResourceInUse } from '@/components/ResourceInUseDialog';
@@ -122,6 +124,8 @@ export default function DistributionListDetail() {
   const returnUrl = (location.state as { from?: string })?.from || '/ui/auto-dialer/distribution-lists';
 
   const [activeTab, setActiveTab] = useState('destinations');
+  // Opening a part (or its source list) reuses this page: start each list on its entries.
+  useEffect(() => setActiveTab('destinations'), [id]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
@@ -317,11 +321,11 @@ export default function DistributionListDetail() {
           {list.description && (
             <p className="text-muted-foreground">{list.description}</p>
           )}
-          {list.parent_list_id && (
+          {list.parent_list && (
             <p className="text-sm text-muted-foreground">
-              Copied from{' '}
-              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.parent_list_id}`)}>
-                Version {list.parent_list?.version_number || 'Unknown'}
+              Part of{' '}
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.parent_list!.id}`)}>
+                {list.parent_list.name}
               </Button>
             </p>
           )}
@@ -435,7 +439,8 @@ export default function DistributionListDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="destinations">Destinations</TabsTrigger>
-          {list.versions?.length > 0 && <TabsTrigger value="versions">Version History</TabsTrigger>}
+          {list.has_versions && <TabsTrigger value="versions">Version History</TabsTrigger>}
+          {!!list.parts_count && <TabsTrigger value="parts">Parts ({list.parts_count})</TabsTrigger>}
           {list.status === 'failed' && <TabsTrigger value="errors">Validation Errors</TabsTrigger>}
           {list.original_filename && <TabsTrigger value="upload">Upload Info</TabsTrigger>}
         </TabsList>
@@ -666,51 +671,11 @@ export default function DistributionListDetail() {
         </TabsContent>
 
         <TabsContent value="versions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Version History</CardTitle>
-              <CardDescription>All versions of this list</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Destinations</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.versions?.map((version) => (
-                    <TableRow key={version.id}>
-                      <TableCell>v{version.version_number}</TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[version.status]}>
-                          {version.status_label}
-                        </Badge>
-                        {version.is_latest_version && (
-                          <Badge variant="secondary" className="ml-2">Latest</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{version.statistics?.valid_rows || 0} valid</TableCell>
-                      <TableCell>{new Date(version.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${version.id}`)}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <ListVersionHistory listId={id!} listName={list.name} canDownload={canManage} />
+        </TabsContent>
+
+        <TabsContent value="parts">
+          <ListParts listId={id!} />
         </TabsContent>
 
         <TabsContent value="errors">

@@ -59,6 +59,11 @@ class DistributionListResource extends JsonResource
                 'id' => $this->campaign->id,
                 'name' => $this->campaign->name,
             ]),
+            // The list a "(Part N)" list was split from
+            'parent_list' => $this->whenLoaded('parentList', fn () => $this->parentList ? [
+                'id' => $this->parentList->id,
+                'name' => $this->parentList->name,
+            ] : null),
             'used_by_campaign' => $this->whenLoaded('usedByCampaign', fn () => [
                 'id' => $this->usedByCampaign->id,
                 'name' => $this->usedByCampaign->name,

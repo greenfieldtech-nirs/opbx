@@ -1293,10 +1293,12 @@ export interface AutoDialerList {
     invalid_rows: number;
   };
   parent_list_id: number | null;
+  /** The list this "(Part N)" list was split from. */
   parent_list?: {
     id: number;
-    version_number: number;
+    name: string;
   };
+  /** Whether previous versions (entries replaced by a re-upload) are kept. */
   has_versions: boolean;
   /** "(Part N)" lists a large upload was split into; deleting the list deletes them too. */
   parts_count?: number;
@@ -1321,7 +1323,38 @@ export interface AutoDialerList {
     name: string;
     status: string;
   };
-  versions?: AutoDialerList[];
+}
+
+/** A previous version of a distribution list: the entries a re-upload replaced. */
+export interface ListVersion {
+  id: number;
+  list_id: number;
+  version_number: number;
+  original_filename: string | null;
+  uploaded_at: string | null;
+  uploaded_by: { id: number; name: string } | null;
+  replaced_at: string;
+  /** When the version is deleted; null when versions are kept indefinitely. */
+  expires_at: string | null;
+  entries_count: number;
+  total_rows: number | null;
+  valid_rows: number | null;
+  invalid_rows: number | null;
+}
+
+/** One entry of a previous version, as it was when the version was replaced. */
+export interface ListVersionDestination {
+  id: number;
+  phone_number: string;
+  name: string | null;
+  batch_identifier: string | null;
+  metadata: Record<string, string> | null;
+  status: string;
+  status_label: string;
+  dial_attempts: number;
+  last_disposition: string | null;
+  last_dialed_at: string | null;
+  duration: number;
 }
 
 export interface ListDestination {
