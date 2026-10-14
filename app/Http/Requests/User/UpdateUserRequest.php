@@ -23,6 +23,7 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        $currentUser = $this->user();
         $targetUser = $this->route('user');
 
         // Role changes need the owner-only gate; password changes the dedicated gate.
@@ -54,7 +55,6 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        $currentUser = $this->user();
         $targetUser = $this->route('user');
 
         return [
