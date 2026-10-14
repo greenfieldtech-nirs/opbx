@@ -42,7 +42,7 @@ Use this page to find:
 | Call Logs CSV export (button) | Yes | Yes | No | No | No |
 | Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | No |
 | Call Tracking Dashboard and Sessions | Yes | Yes | Yes | Yes | No |
-| Auto Dialer Real Time Monitor | Yes | Yes | No | No | No |
+| Auto Dialer Real Time Monitor | Yes | Yes | No | Yes | No |
 | Call Notifications delivery log | Yes | Yes | No | No | No |
 | Inbound Blacklist counts | Yes | Yes | No | No | No |
 
@@ -50,14 +50,15 @@ Use this page to find:
 
 The table shows what each role reaches through the sidebar. Several of these endpoints are readable by more roles through the API; the module pages describe the exact server rules.
 
-## The Dashboard
+## Workflows
 
-Every role lands on the Dashboard after signing in.
+### Read the Dashboard
 
-For Owners, PBX Admins, PBX Users and Reporters it shows:
+Who can do this: every role. Every role lands on the Dashboard after signing in.
 
-- **Active Calls**, **Extensions**, **Phone Numbers** and **Conference Rooms** counters;
-- **Last Calls**: the most recent call records, with time, from, to, status and duration.
+1. Open **Dashboard** in the sidebar (section **Dashboards**; for Supervisors, section **Supervisor**).
+2. Read the counters: **Active Calls**, **Extensions**, **Phone Numbers** and **Conference Rooms**. Click a counter to open its page (Live Calls, Extensions, Phone Numbers or Conference Rooms).
+3. Read **Last Calls**: the 10 most recent call records, with time, from, to, status and duration. When there are none, it reads "No recent calls".
 
 The active-call counter refreshes every 15 seconds and the other cards every 30 seconds, only while the browser tab is visible.
 
@@ -65,7 +66,14 @@ Supervisors see their own variant with assigned users, assigned ring groups, act
 
 ![Dashboard for Acme Corp (Demo) with the Active Calls, Extensions, Phone Numbers and Conference Rooms cards and the Last Calls table](../img/screens/dashboard.jpg)
 
-## Exporting data
+### Export a report to CSV
+
+Who can do this: Owner and PBX Admin for call records (the **Export** button is hidden for other roles); Owner, PBX Admin and Reporter for queue calls.
+
+1. Open the report page and apply the filters you need.
+2. Click **Export** (Call Logs) or **Export CSV** (Queue Reports). The browser downloads the CSV file.
+
+The step-by-step workflows are on [Call Logs](/opbx/modules/call-logs#export-call-logs-to-csv) and [Call Queues](/opbx/modules/call-queues#reporting).
 
 | Data | How to export | Format |
 |------|---------------|--------|
@@ -77,7 +85,7 @@ Exports use the same filters as the list on screen. Call records older than 6 mo
 
 ## Call statistics
 
-**Call Logs → Statistics** shows, for the current filters:
+The call statistics are available through the API only (`GET /v1/call-detail-records/statistics`); the app has no screen for them. They cover the `from_date` to `to_date` range (default: the last 30 days) and the Supervisor scope for a Supervisor:
 
 | Metric | Meaning |
 |--------|---------|
