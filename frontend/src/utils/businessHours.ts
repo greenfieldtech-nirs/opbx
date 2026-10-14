@@ -75,7 +75,7 @@ export function getScheduleSummary(schedule: WeeklySchedule): string {
 
   const is24x7 = enabledDays.length === 7 && enabledDays.every(day => {
     const ranges = schedule[day].time_ranges;
-    return ranges.length === 1 && ranges[0].start_time === '00:00' && ranges[0].end_time === '23:59';
+    return ranges.length === 1 && ranges[0].start_time === '00:00' && ['24:00', '23:59'].includes(ranges[0].end_time);
   });
 
   if (is24x7) {

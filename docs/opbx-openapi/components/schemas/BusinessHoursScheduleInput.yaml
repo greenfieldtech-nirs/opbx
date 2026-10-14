@@ -89,8 +89,8 @@ $defs:
         example: '09:00'
       end_time:
         type: string
-        pattern: ^\d{2}:\d{2}$
-        description: H:i, after start_time
+        pattern: ^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$
+        description: H:i, after start_time. 24:00 means end of day, so 00:00-24:00 is open the whole day
         example: '17:00'
     required: [start_time, end_time]
   Day:

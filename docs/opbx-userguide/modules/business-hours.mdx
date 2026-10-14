@@ -68,9 +68,10 @@ The toast "Business hours schedule has been created successfully." appears and t
 The **Weekly Schedule** section of the schedule dialog is a grid with one column per weekday and one row per hour (`0:00 - 1:00` to `23:00 - 24:00`). Open hours are green with a check mark.
 
 1. To start from a common pattern, pick one under **Template:** (see [Weekly schedule](#weekly-schedule)). It replaces the whole week.
-2. Click an hour cell to open or close that hour. Adjacent open hours join into one time range.
-3. Click **Clear All** to close every day.
-4. Save the schedule (**Create Schedule** or **Save Changes**). The hours are only stored when you save.
+2. Click an hour cell to open or close that hour. Adjacent open hours join into one time range. Closing the last open hour of a day closes the day.
+3. Click a day name in the header row to open that whole day (00:00 to 24:00). Click it again to close the day.
+4. Click **Clear All** to close every day.
+5. Save the schedule (**Create Schedule** or **Save Changes**). The hours are only stored when you save.
 
 ### Add an exception date
 
@@ -196,11 +197,11 @@ There is no "Hangup" action. Use Disconnect on an existing schedule, or route to
 
 ### Weekly schedule
 
-Each day of the week is either closed or has one or more time ranges in `HH:mm` format. The end time must be after the start time. A call at the end time is already closed.
+Each day of the week is either closed or has one or more time ranges in `HH:mm` format. The end time must be after the start time. A call at the end time is already closed. An end time of `24:00` means end of day, so `00:00` to `24:00` is open the whole day, up to midnight.
 
 The dialog shows the week as an hour grid. Click an hour to open or close it. Helpers:
 
-- **Template**: Monday-Friday 9:00-17:00, Monday-Friday all day, Sunday-Thursday 9:00-17:00, Sunday-Thursday all day, or 24 x 7. "All day" and 24 x 7 use 00:00 to 23:59.
+- **Template**: Monday-Friday 9:00-17:00, Monday-Friday all day, Sunday-Thursday 9:00-17:00, Sunday-Thursday all day, or 24 x 7. "All day" and 24 x 7 use 00:00 to 24:00.
 - **Clear All**: closes every day.
 
 ### Exception dates
@@ -223,6 +224,7 @@ Each exception has a date and a name (up to 255 characters). The server does not
 | A schedule with this name already exists in your organization. | Duplicate name | Choose another name |
 | *Day* is enabled but has no time ranges. | An open day without hours | Add a range or close the day |
 | End time must be after start time. | A range ends before it starts | Fix the times |
+| End time must be in HH:mm format (24:00 for end of day). | The end time is not a valid time | Use `HH:mm`, or `24:00` for midnight at the end of the day |
 | Special hours exceptions must have at least one time range. | Special Hours without hours | Add a range or use Closed All Day |
 | Maximum 100 exceptions allowed per schedule. | Too many exception dates | Remove old dates |
 | Choose a destination. | A create request used Destination unavailable | Pick a real destination |

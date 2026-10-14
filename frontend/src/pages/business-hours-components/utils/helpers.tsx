@@ -68,7 +68,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });
@@ -106,7 +106,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });
@@ -125,7 +125,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });

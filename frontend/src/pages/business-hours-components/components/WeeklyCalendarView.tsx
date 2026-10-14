@@ -71,8 +71,9 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
   };
 
   const handleHourClick = (day: DayOfWeek, hour: number) => {
-    const newSchedule = { ...schedule };
-    const daySchedule = newSchedule[day];
+    // Copy the day so the previous state (and the cached schedule being edited) is not mutated.
+    const daySchedule = { ...schedule[day], time_ranges: schedule[day].time_ranges.map((r) => ({ ...r })) };
+    const newSchedule = { ...schedule, [day]: daySchedule };
     const hourStart = `${hour.toString().padStart(2, '0')}:00`;
     const hourEnd = `${(hour + 1).toString().padStart(2, '0')}:00`;
 
@@ -150,6 +151,18 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
         const end = parseInt(range.end_time.split(':')[0]);
         return start < end;
       });
+      // Join adjacent hours into one range (09:00-10:00 + 10:00-11:00 -> 09:00-11:00).
+      daySchedule.time_ranges = daySchedule.time_ranges.reduce<typeof daySchedule.time_ranges>((merged, range) => {
+        const last = merged[merged.length - 1];
+        if (last && last.end_time === range.start_time) {
+          last.end_time = range.end_time;
+        } else {
+          merged.push(range);
+        }
+        return merged;
+      }, []);
+      // Clearing the last open hour closes the day (an enabled day with no ranges is rejected by the API).
+      daySchedule.enabled = daySchedule.time_ranges.length > 0;
     }
 
     onScheduleChange(newSchedule);
@@ -158,11 +171,11 @@ export const WeeklyCalendarView: React.FC<WeeklyCalendarViewProps> = ({
   /**
    * Toggle all hours for a specific day on or off.
    * If the day has any enabled hours, disable it completely.
-   * If the day has no enabled hours, enable all 24 hours (00:00 - 24:00).
+   * If the day has no enabled hours, enable all 24 hours (00:00 - 24:00; the API takes 24:00 as end of day).
    */
   const handleDayToggle = (day: DayOfWeek) => {
-    const newSchedule = { ...schedule };
-    const daySchedule = newSchedule[day];
+    const daySchedule = { ...schedule[day] };
+    const newSchedule = { ...schedule, [day]: daySchedule };
 
     // Check if day currently has any open hours
     const hasOpenHours = daySchedule.enabled && daySchedule.time_ranges.length > 0;

@@ -8,6 +8,7 @@ use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
 use App\Rules\RejectUnavailableOnCreate;
+use App\Rules\TimeRangeEnd;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -125,8 +126,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             ],
             'schedule.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:schedule.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
 
             // Exceptions (optional)
@@ -160,8 +160,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             ],
             'exceptions.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:exceptions.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
         ];
     }
@@ -196,8 +195,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             'schedule.*.time_ranges.*.start_time.required' => 'Start time is required for time ranges.',
             'schedule.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'schedule.*.time_ranges.*.end_time.required' => 'End time is required for time ranges.',
-            'schedule.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'schedule.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
             'exceptions.max' => 'Maximum 100 exceptions allowed per schedule.',
             'exceptions.*.date.required' => 'Exception date is required.',
             'exceptions.*.date.date_format' => 'Exception date must be in YYYY-MM-DD format.',
@@ -206,8 +203,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             'exceptions.*.time_ranges.*.start_time.required' => 'Start time is required for special hours.',
             'exceptions.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'exceptions.*.time_ranges.*.end_time.required' => 'End time is required for special hours.',
-            'exceptions.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'exceptions.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
         ];
     }
 
