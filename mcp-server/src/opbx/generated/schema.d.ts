@@ -20,19 +20,231 @@ export type paths = {
         put?: never;
         /**
          * ALB follow-through callback
-         * @description Handle AI Load Balancer follow-through callback from Cloudonix.
-         *     Called when a call to an AI Assistant fails (busy, no-answer, failed, canceled, unknown)
-         *     and the load balancer needs to try the next available AI assistant.
+         * @description `action` of the `<Connect>`/`<Dial>` that the AI load balancer strategy returns for an
+         *     AI assistant. Cloudonix calls it when that leg ends.
          *
-         *     Query Parameters:
-         *     - `albs_id`: Load balancer ID
-         *     - `current_assistant_id`: ID of the AI assistant that just failed
+         *     - The status comes from `DialCallStatus`, else `CallStatus`, else `status`. Only
+         *       `busy`, `no-answer`, `failed`, `canceled` and `unknown` trigger follow-through;
+         *       any other status (or none) answers `<Hangup/>`.
+         *     - Load balancer missing or not active: `<Say>Load balancer not available. Goodbye.</Say><Hangup/>`.
+         *     - Follow-through disabled on the load balancer: its fallback action runs at once.
+         *     - Otherwise the next active member that has not been tried on this call (tried
+         *       members are kept in Redis per call) is selected and the call is routed to it, with
+         *       this URL as the new `action`. When every member has been tried, the fallback action
+         *       runs (hangup, unavailable, extension, ring group, IVR menu, AI assistant, call
+         *       queue or AI load balancer).
+         *     - Missing call ID, `albs_id` or `current_assistant_id`:
+         *       `<Say>Missing required parameters. Goodbye.</Say><Hangup/>`.
          *
-         *     Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+         *     There is no FormRequest. `albs_id` and `current_assistant_id` are read from the query
+         *     string first, then from the body. The call ID is `CallSid`, else the `X-Cx-Session`
+         *     header, else `SessionData.callSid`, `Session` or `session`.
          *
-         *     Authentication: Bearer token (per-organization domain_requests_api_key)
+         *     Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+         *     be JSON because the middleware reads `Domain` and `To` from it (400/401 CXML on
+         *     failure). Unexpected exceptions answer 200 CXML (`We are sorry, an error occurred...`).
+         *     Not rate-limited.
          */
         post: operations["albsFollowThrough"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/conference-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Conference PIN callback
+         * @description Handle the digits a caller entered at a conference room PIN prompt.
+         *     Cloudonix calls this as the `<Gather>` action of the PIN prompt that conference routing returns.
+         *
+         *     - The room host PIN joins the caller as host (also when the room has no participant PIN but waits for a host).
+         *     - Without a participant PIN, any other input joins the caller as a participant.
+         *     - The room PIN joins the caller as a participant.
+         *     - A wrong PIN repeats the prompt; after 3 wrong attempts the call is hung up.
+         *     - An inactive or unknown room gets a "closed" message.
+         *
+         *     Query Parameters:
+         *     - `room_id`: Conference room ID
+         *     - `attempt`: Attempt number (starts at 1)
+         *
+         *     Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`). Unexpected exceptions answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
+         */
+        post: operations["conferencePinCallback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/queue-agent-connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conference ring-all agent leg
+         * @description Fetched by an originated agent leg when the agent answers (conference-mediated
+         *     ring-all). The first leg to arrive claims the call (agent from `agent_user_id` in
+         *     `sd`, session from the `Session` or `CallSid` request field) and is joined to the
+         *     call's conference room; every other leg gets `<Hangup/>`.
+         *
+         *     Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
+         *     agent ring timeout plus 60 seconds after it is issued. The route is registered with
+         *     `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+         *     rate-limited.
+         */
+        get: operations["queueAgentConnectGet"];
+        put?: never;
+        /**
+         * Conference ring-all agent leg
+         * @description Same as the GET form (the route accepts every HTTP method).
+         */
+        post: operations["queueAgentConnectPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/queue-conference-join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conference ring-all caller join
+         * @description Fetched by the caller's session after an agent claimed the call (application switch,
+         *     or the next poll). Joins the caller to the winner's conference room (recorded when
+         *     inbound recording applies); when no agent has claimed the call yet the caller keeps
+         *     holding.
+         *
+         *     Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
+         *     agent ring timeout plus 60 seconds after it is issued. The route is registered with
+         *     `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+         *     rate-limited.
+         */
+        get: operations["queueConferenceJoinGet"];
+        put?: never;
+        /**
+         * Conference ring-all caller join
+         * @description Same as the GET form (the route accepts every HTTP method).
+         */
+        post: operations["queueConferenceJoinPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/queue-dial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Queue proactive dial (immediate connect)
+         * @description Fetched by Cloudonix after OPBX switches the waiting caller's voice application
+         *     (immediate connect). Re-validates the offer with the ACD worker: when it still says
+         *     `dial`, returns the agent `<Dial>`; otherwise the caller keeps holding.
+         *
+         *     Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires 120 seconds
+         *     after it is issued (application-switched fetches may not carry a Bearer token). The
+         *     route is registered with `Route::any`, so every HTTP method is accepted; GET and POST
+         *     are documented. Not rate-limited.
+         */
+        get: operations["queueImmediateDialGet"];
+        put?: never;
+        /**
+         * Queue proactive dial (immediate connect)
+         * @description Same as the GET form (the route accepts every HTTP method).
+         */
+        post: operations["queueImmediateDialPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/queue-dial-callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call queue agent dial result
+         * @description `<Dial>` action for an agent dial of a queued call. `CallStatus` (default `completed`)
+         *     is recorded as the dial result.
+         *
+         *     - `busy`, `no-answer` or `failed` (and the call was not already bridged): the agent is
+         *       released, the call is re-offered at once (dialing the next agent if the ACD worker
+         *       offers one), otherwise the caller goes back on hold.
+         *     - Any other status, an already bridged call, a missing context or an unknown queue:
+         *       `<Hangup/>` (call finalization is driven by the CDR webhook).
+         *
+         *     Queue context is resolved as for `POST /callbacks/voice/queue-poll`.
+         *
+         *     Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+         *     be JSON because the middleware reads `Domain` and `To` from it. A validation failure
+         *     answers 200 CXML `<Say>Invalid queue callback request. Goodbye.</Say><Hangup/>` (never
+         *     a redirect). Unexpected exceptions answer 200 CXML (`We are sorry, an error
+         *     occurred...`). Not rate-limited.
+         */
+        post: operations["queueDialCallback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/callbacks/voice/queue-poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call queue poll
+         * @description Hold-loop callback for a call waiting in a call queue, called by Cloudonix after each
+         *     hold-music segment. Asks the ACD worker for a decision and returns the next CXML:
+         *     keep holding (hold music + `<Redirect>` back here), dial the offered agent(s), join
+         *     the conference room of the agent who claimed the call (conference-mediated ring-all),
+         *     or overflow to the queue's fallback action (with a short announcement unless the
+         *     fallback is hangup or unavailable). When the ACD worker is unreachable the caller
+         *     keeps holding. A call that is no longer waiting gets `<Hangup/>`.
+         *
+         *     Queue context comes from `SessionData` (when it has `call_queue_id`), else the
+         *     `session_data` JSON, else the top-level `call_queue_id`/`call_id`. Without it the
+         *     response is `<Say>Queue system error. Goodbye.</Say><Hangup/>`.
+         *
+         *     Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+         *     be JSON because the middleware reads `Domain` and `To` from it. A validation failure
+         *     answers 200 CXML `<Say>Invalid queue callback request. Goodbye.</Say><Hangup/>` (never
+         *     a redirect). Unexpected exceptions answer 200 CXML (`We are sorry, an error
+         *     occurred...`). Not rate-limited.
+         */
+        post: operations["queuePollCallback"];
         delete?: never;
         options?: never;
         head?: never;
@@ -50,13 +262,25 @@ export type paths = {
         put?: never;
         /**
          * Ring group callback
-         * @description Handle ring group member callback from Cloudonix.
-         *     Called when a ring group member finishes ringing (answered, busy, no-answer, etc.)
-         *     or to get the next member in sequence.
+         * @description `<Dial>` action of a ring group. The ring group routing strategy puts this URL, with
+         *     the query parameters below, in the `action` of each `<Dial>` it returns; Cloudonix
+         *     calls it when that dial ends. The response is the next CXML step:
          *
-         *     Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+         *     - Sequential and round-robin groups: dial the next member (attempt
+         *       `attempt_number`), cycling through the members `ring_turns` times; after that the
+         *       ring group's fallback action runs (extension, ring group, IVR menu, AI assistant,
+         *       AI load balancer, call queue, hangup or unavailable).
+         *     - Simultaneous groups (`session_data.callback_type` = `ring_group_fallback`): run the
+         *       fallback action.
          *
-         *     Authentication: Bearer token (per-organization domain_requests_api_key)
+         *     An unknown, inactive or other-organization ring group answers 200 CXML that says
+         *     `Ring group not found` and hangs up.
+         *
+         *     Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`); the body must
+         *     be JSON because the middleware reads `Domain` and `To` from it. Missing `Domain`/`To`
+         *     answers 400 CXML, a failed token check 401 CXML. A validation failure answers 422
+         *     JSON when the request accepts JSON, otherwise a 302 redirect. Unexpected exceptions
+         *     answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
          */
         post: operations["ringGroupCallback"];
         delete?: never;
@@ -98,6 +322,7 @@ export type paths = {
          * @description Returns a CSRF cookie for SPA authentication.
          *     Must be called before login when using cookie-based auth.
          *     Uses web middleware to enable sessions and set CSRF cookie.
+         *     Rate limited to 60 requests per minute per IP.
          */
         get: operations["getCsrfCookie"];
         put?: never;
@@ -117,7 +342,7 @@ export type paths = {
         };
         /**
          * Storage health check
-         * @description Detailed health check for the storage subsystem (MinIO/S3).
+         * @description Detailed health check for the storage subsystem (S3 / SeaweedFS).
          *     Tests connectivity, read/write operations.
          *     Requires authentication to prevent internal info leakage.
          */
@@ -137,7 +362,18 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Public recording download with HMAC */
+        /**
+         * Public recording download with HMAC
+         * @description Serves a stored recording through a signed, expiring URL. Used for audio that Cloudonix
+         *     fetches while playing IVR menu greetings and call queue hold music; the URLs are generated
+         *     by the voice-routing code (lifetime 1 hour). No authentication or rate limit applies.
+         *
+         *     `sig` is the hex HMAC-SHA256 of `<path>|<expires>` keyed with the application key.
+         *     The file is read from the recordings storage at `<path>`; if it is missing there, the
+         *     legacy local file `ivr/<filename>` is tried. `Content-Type` follows the file extension
+         *     (`wav` audio/wav, `mp3` audio/mpeg, `ogg` audio/ogg, `m4a` audio/m4a, `aac` audio/aac,
+         *     `flac` audio/flac, anything else audio/wav), with `Cache-Control: public, max-age=300`.
+         */
         get: operations["publicRecordingDownload"];
         put?: never;
         post?: never;
@@ -156,15 +392,21 @@ export type paths = {
         };
         /**
          * List AI load balancers
-         * @description Get paginated list of AI assistant load balancers with member details.
-         *     Supports filtering by strategy, status, and search.
+         * @description Paginated list of AI assistant load balancers with members and fallback targets. Any
+         *     authenticated user can list. Filters: `strategy`, `status`, `search`, `unprovisioned`
+         *     (unknown `strategy`/`status` values are ignored). Default order is `created_at` descending.
+         *     List items also carry `members_count` and `active_members_count`.
          */
         get: operations["listAiLoadBalancers"];
         put?: never;
         /**
          * Create AI load balancer
-         * @description Create a new AI assistant load balancer with members.
-         *     Fallback action determines which fallback fields are used.
+         * @description Create an AI assistant load balancer with members. Owner and PBX Admin only.
+         *     `strategy` defaults to `round_robin`, `status` to `active` and `fallback_action` to
+         *     `hangup`. Only the fallback_*_id matching `fallback_action` is stored; the others are
+         *     cleared. Every member must be an active AI assistant of the organization. A fallback
+         *     extension, ring group, IVR menu or AI assistant must be active, and the fallback AI
+         *     assistant cannot also be a member.
          */
         post: operations["createAiLoadBalancer"];
         delete?: never;
@@ -189,22 +431,30 @@ export type paths = {
         get: operations["getAiLoadBalancer"];
         /**
          * Update AI load balancer
-         * @description Update load balancer configuration. Members are replaced if provided.
-         *     Uses distributed locking to prevent concurrent updates.
+         * @description Update a load balancer. Owner and PBX Admin only. All fields are optional. When
+         *     `members` is sent it replaces the whole member list (at least one). When
+         *     `fallback_action` is omitted the stored action and target are kept. The same member
+         *     and fallback checks as create apply; in addition the load balancer cannot fall back to
+         *     itself, and a chain of `ai_load_balancer` fallbacks must not lead back to it (422).
+         *     A concurrent update of the same load balancer returns 409 after waiting up to 5 seconds.
          */
         put: operations["updateAiLoadBalancer"];
         post?: never;
         /**
          * Delete AI load balancer
-         * @description Delete load balancer if not referenced by extensions
+         * @description Owner and PBX Admin only. Refused with 409 when the load balancer is still referenced (for example by extensions or routing). The 409 body lists the references.
          */
         delete: operations["deleteAiLoadBalancer"];
         options?: never;
         head?: never;
         /**
          * Partially update AI load balancer
-         * @description Update load balancer configuration. Members are replaced if provided.
-         *     Uses distributed locking to prevent concurrent updates.
+         * @description Update a load balancer. Owner and PBX Admin only. All fields are optional. When
+         *     `members` is sent it replaces the whole member list (at least one). When
+         *     `fallback_action` is omitted the stored action and target are kept. The same member
+         *     and fallback checks as create apply; in addition the load balancer cannot fall back to
+         *     itself, and a chain of `ai_load_balancer` fallbacks must not lead back to it (422).
+         *     A concurrent update of the same load balancer returns 409 after waiting up to 5 seconds.
          */
         patch: operations["patchAiLoadBalancer"];
         trace?: never;
@@ -259,7 +509,7 @@ export type paths = {
         };
         /**
          * Get providers by protocol
-         * @description Get providers filtered by protocol (sip or websocket)
+         * @description Get providers filtered by protocol (sip, websocket or dummy)
          */
         get: operations["getProvidersByProtocol"];
         put?: never;
@@ -279,15 +529,21 @@ export type paths = {
         };
         /**
          * List AI assistants
-         * @description Get paginated list of AI assistants in the organization.
-         *     Supports filtering by status, protocol, provider, and search.
+         * @description Paginated list of AI assistants in the organization. Any authenticated user can list.
+         *     Filters: `status`, `protocol`, `provider` (exact match) and `search`. An unknown
+         *     `sort_by` value falls back to `name`; an unknown `status` value is ignored.
+         *     List items do not include `usage_count`, `used_by_extensions`, `created_by` or `updated_by`.
          */
         get: operations["listAiAssistants"];
         put?: never;
         /**
          * Create AI assistant
-         * @description Create a new AI assistant. Protocol is auto-detected from provider
-         *     if not specified.
+         * @description Create an AI assistant. Owner and PBX Admin only. `protocol` is set from the provider.
+         *     `provider` must be a key from the provider registry, and `configuration` is checked
+         *     against the provider's `config_fields` (required fields, and `email`/`url`/`tel`/`number`
+         *     formats). For `dograh-cloud` the server sets `configuration.websocket_endpoint` to the
+         *     fixed Dograh Cloud endpoint. `status` defaults to `active`.
+         *     The response includes `created_by` and `updated_by`.
          */
         post: operations["createAiAssistant"];
         delete?: never;
@@ -307,25 +563,37 @@ export type paths = {
         };
         /**
          * Get AI assistant
-         * @description Get AI assistant details including usage information
+         * @description AI assistant details. Includes `used_by_extensions` (up to 10 extensions that use the
+         *     assistant, omitted when none) and `usage_count`.
          */
         get: operations["getAiAssistant"];
         /**
          * Update AI assistant
-         * @description Update AI assistant configuration
+         * @description Update an AI assistant. Owner and PBX Admin only. All fields are optional; `status`,
+         *     `name` and `provider` cannot be null. Changing `provider` resets `protocol` from the
+         *     new provider. `configuration` is checked against the provider's `config_fields` only
+         *     when `provider` is sent in the same request. The response includes `created_by` and
+         *     `updated_by`.
          */
         put: operations["updateAiAssistant"];
         post?: never;
         /**
          * Delete AI assistant
-         * @description Delete an AI assistant. Cannot delete if in use by extensions.
+         * @description Delete an AI assistant. Owner and PBX Admin only. Refused with 409 while anything still
+         *     points at it: an AI assistant extension, a call queue or AI load balancer fallback, AI
+         *     load balancer membership, or other routing (DID routing, IVR options, business
+         *     hours). The 409 body lists the references.
          */
         delete: operations["deleteAiAssistant"];
         options?: never;
         head?: never;
         /**
          * Partially update AI assistant
-         * @description Update AI assistant configuration
+         * @description Update an AI assistant. Owner and PBX Admin only. All fields are optional; `status`,
+         *     `name` and `provider` cannot be null. Changing `provider` resets `protocol` from the
+         *     new provider. `configuration` is checked against the provider's `config_fields` only
+         *     when `provider` is sent in the same request. The response includes `created_by` and
+         *     `updated_by`.
          */
         patch: operations["patchAiAssistant"];
         trace?: never;
@@ -339,7 +607,7 @@ export type paths = {
         };
         /**
          * List API Keys
-         * @description List all API keys for the current organization. Owner only. Never returns the plaintext key value.
+         * @description List all API keys (active and revoked) for the current organization, newest first, not paginated. Owner only. Never returns the plaintext key value. Requests authenticated with an API key get 403 on every `/v1/api-keys` route.
          */
         get: operations["listApiKeys"];
         put?: never;
@@ -376,7 +644,7 @@ export type paths = {
         post?: never;
         /**
          * Revoke API Key
-         * @description Revoke (soft-delete) an API key. Owner only. Revoked keys can no longer authenticate requests but remain visible in the list with a revocation timestamp.
+         * @description Revoke (soft-delete) an API key. Owner only. Revoked keys can no longer authenticate requests but remain visible in the list with a revocation timestamp. Revoking an already-revoked key succeeds and resets `revoked_at` to now.
          */
         delete: operations["revokeApiKey"];
         options?: never;
@@ -420,6 +688,15 @@ export type paths = {
          * @description Callback endpoint invoked by the browser after Auth0 authentication.
          *     Exchanges the authorization `code` and `state` for a user profile and
          *     completes login, registration, account linking, or invitation acceptance.
+         *
+         *     - Login / register / invitation: returns a bearer token (24 hours).
+         *       With intent `register` and no existing account, a new organization and
+         *       owner are created. With intent `login` and no existing account, the
+         *       response is `409 AUTH0_REGISTRATION_REQUIRED` with an `onboarding_id`
+         *       (the verified profile is kept server-side for 60 minutes).
+         *     - Link: returns `{"message": "Identity linked successfully."}`.
+         *
+         *     Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
          */
         get: operations["auth0Callback"];
         put?: never;
@@ -466,6 +743,8 @@ export type paths = {
          * @description Start the Auth0 Universal Login / social-provider OAuth flow.
          *     Returns the Auth0 authorize URL and a state token the client should
          *     use when handling the callback.
+         *
+         *     Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
          */
         post: operations["auth0Redirect"];
         delete?: never;
@@ -511,12 +790,16 @@ export type paths = {
          *     - **Cookie-based (SPA)**: Returns user data, sets httpOnly session cookie
          *     - **Token-based (API)**: Returns API token for bearer authentication
          *
-         *     Mode is automatically detected based on request headers:
-         *     - Uses cookie auth if `X-Requested-With: XMLHttpRequest` header is present
-         *     - Uses cookie auth if `X-Auth-Mode: cookie` header is set
-         *     - Otherwise uses token-based auth
+         *     Mode is automatically detected based on request headers, in this order:
+         *     - Token auth if an `Authorization: Bearer` header is present
+         *     - Cookie auth if `X-Auth-Mode: cookie`; token auth if `X-Auth-Mode: token`
+         *     - Cookie auth if an `X-Requested-With` header is present (any value)
+         *     - Otherwise token-based auth
          *
-         *     Rate limited to 5 attempts per minute per IP.
+         *     Token-based login revokes all of the user's existing tokens and issues a
+         *     new one with role-scoped abilities, valid for 24 hours.
+         *
+         *     Rate limited to 5 attempts per minute per IP (`RATE_LIMIT_AUTH`).
          */
         post: operations["login"];
         delete?: never;
@@ -539,8 +822,9 @@ export type paths = {
          * @description Logout user and revoke authentication.
          *
          *     Supports both authentication modes:
-         *     - Cookie-based: Logs out of session, clears httpOnly cookie
-         *     - Token-based: Deletes current access token
+         *     - Cookie-based (session authenticated and no bearer token): logs out of
+         *       the session, invalidates it and regenerates the CSRF token
+         *     - Token-based: deletes the current access token only (other tokens stay valid)
          */
         post: operations["logout"];
         delete?: never;
@@ -560,6 +844,13 @@ export type paths = {
          * Get current user
          * @description Returns current authenticated user details including organization information.
          *     Validates that the user belongs to an active organization.
+         *
+         *     The `user` object is the same subset returned by login (`id`,
+         *     `organization_id`, `name`, `email`, `role`, `status`,
+         *     `is_platform_manager`, `social_identities`) plus `organization`.
+         *     When a platform owner is operating as another organization
+         *     (`X-Operate-As-Organization`), the fields describe the effective owner
+         *     of the target organization and an `operate_as` block is added.
          */
         get: operations["getCurrentUser"];
         put?: never;
@@ -584,10 +875,12 @@ export type paths = {
          * @description Refresh authentication credentials.
          *
          *     Supports both authentication modes:
-         *     - Cookie-based: Regenerates session, extends cookie expiration
-         *     - Token-based: Revokes current token and issues a new one
+         *     - Cookie-based (session authenticated and no bearer token): regenerates
+         *       the session and returns the user
+         *     - Token-based: revokes the current token and issues a new one with
+         *       role-scoped abilities (no `user` in the response)
          *
-         *     Token expires in 24 hours (1440 minutes).
+         *     Token expires in 24 hours (1440 minutes). Not rate limited.
          */
         post: operations["refreshAuth"];
         delete?: never;
@@ -614,7 +907,11 @@ export type paths = {
          *     2. Owner user with full permissions
          *     3. API token for immediate access
          *
-         *     Rate limited for registration attempts.
+         *     Rate limited to 10 registration attempts per hour per IP.
+         *
+         *     The admin email must be unique across all organizations and pass the
+         *     email-domain check (disposable, blocklisted, role-account, etc.). When
+         *     reCAPTCHA is enabled, a supplied `recaptcha_token` is verified with Google. The token is optional: a request without it is not checked.
          */
         post: operations["register"];
         delete?: never;
@@ -633,7 +930,8 @@ export type paths = {
         /**
          * Validate registration fields
          * @description Check availability of organization name, slug, and admin email
-         *     before submitting registration form.
+         *     before submitting registration form. Each `*_available` key is
+         *     returned only when its query parameter is sent. Not rate limited.
          */
         get: operations["validateRegistration"];
         put?: never;
@@ -653,17 +951,17 @@ export type paths = {
         };
         /**
          * List campaigns
-         * @description Get a paginated list of auto-dialer campaigns.
-         *     Supports filtering by status and search by name.
+         * @description Get a paginated list of auto-dialer campaigns, newest first. Owner, PBX Admin and
+         *     Reporter only. Supports filtering by status and search by name.
          */
         get: operations["listAutoDialerCampaigns"];
         put?: never;
         /**
          * Create campaign
-         * @description Create a new auto-dialer campaign.
+         * @description Create a new auto-dialer campaign. Owner and PBX Admin only.
          *
-         *     The campaign is created in 'draft' status and must be started manually
-         *     or via auto_start when ready.
+         *     The campaign is created in `draft` status with `caller_id_pool_enabled` true, and must be
+         *     started manually or via `auto_start` once a list is assigned.
          */
         post: operations["createAutoDialerCampaign"];
         delete?: never;
@@ -687,34 +985,39 @@ export type paths = {
         };
         /**
          * Get campaign
-         * @description Get a specific campaign by ID
+         * @description Get a campaign by ID. Owner, PBX Admin and Reporter only. Includes `caller_id_pool`; `lists_count` is 0.
          */
         get: operations["getAutoDialerCampaign"];
         /**
          * Update campaign
-         * @description Update an existing campaign.
+         * @description Update a campaign. Owner and PBX Admin only. PUT and PATCH behave the same: every field
+         *     is optional and only the fields sent are changed.
          *
-         *     Only campaigns in 'draft' status can be fully updated.
-         *     Some fields may be restricted for active campaigns.
+         *     A campaign in any status except `active` can be updated. An `active` campaign cannot be
+         *     edited: pause it first (`PATCH /v1/auto-dialer-campaigns/{campaign}/pause`), edit it, then
+         *     resume it. A request for an `active` campaign changes nothing and returns 409
+         *     (`Pause the campaign before editing it.`).
          */
         put: operations["updateAutoDialerCampaign"];
         post?: never;
         /**
          * Delete campaign
-         * @description Delete a campaign from the organization.
-         *
-         *     Only campaigns in 'draft' or 'archived' status can be deleted.
-         *     Active campaigns must be paused and archived first.
+         * @description Delete a campaign. Owner only, and only while the campaign is `draft` (any other status
+         *     returns 403). Its call sessions are deleted, its lists stay in the organization
+         *     unassigned, and its dialer Redis keys are cleared.
          */
         delete: operations["deleteAutoDialerCampaign"];
         options?: never;
         head?: never;
         /**
          * Partially update campaign
-         * @description Update an existing campaign.
+         * @description Update a campaign. Owner and PBX Admin only. PUT and PATCH behave the same: every field
+         *     is optional and only the fields sent are changed.
          *
-         *     Only campaigns in 'draft' status can be fully updated.
-         *     Some fields may be restricted for active campaigns.
+         *     A campaign in any status except `active` can be updated. An `active` campaign cannot be
+         *     edited: pause it first (`PATCH /v1/auto-dialer-campaigns/{campaign}/pause`), edit it, then
+         *     resume it. A request for an `active` campaign changes nothing and returns 409
+         *     (`Pause the campaign before editing it.`).
          */
         patch: operations["patchAutoDialerCampaign"];
         trace?: never;
@@ -740,10 +1043,11 @@ export type paths = {
         head?: never;
         /**
          * Archive campaign
-         * @description Archive a completed or paused auto-dialer campaign.
+         * @description Archive an auto-dialer campaign in any status. Owner only.
          *
-         *     Archived campaigns are kept for record-keeping but cannot
-         *     be modified or restarted. Use this for finished campaigns.
+         *     An `active` campaign is paused first (see Pause campaign). The campaign's dialer Redis
+         *     keys (CAC counter, caller ID cycle position) are cleared. An archived campaign cannot be
+         *     started, resumed or deleted.
          */
         patch: operations["archiveAutoDialerCampaign"];
         trace?: never;
@@ -763,10 +1067,9 @@ export type paths = {
         };
         /**
          * Get caller ID statistics
-         * @description Get per-caller-ID statistics for a campaign.
-         *
-         *     Returns usage counters and performance metrics for each DID
-         *     configured in the campaign's caller ID pool.
+         * @description Get per-Caller-ID usage statistics for a campaign's Caller ID pool (one row per DID
+         *     in the pool; removing a DID from the pool deletes its row). Owner, PBX Admin and
+         *     Reporter only. The response is not wrapped in `data`.
          */
         get: operations["getCampaignCallerIdStats"];
         put?: never;
@@ -792,10 +1095,13 @@ export type paths = {
         };
         /**
          * Get concurrency information
-         * @description Get real-time concurrency status for a campaign.
+         * @description Get real-time concurrency status for a campaign. Owner, PBX Admin and Reporter only.
          *
          *     Returns current CAC utilization, active sessions,
-         *     and rate limit status for real-time monitoring.
+         *     and rate limit status for real-time monitoring. Uses the same live sources as
+         *     the monitor detail: `active_calls` is the dialer worker's concurrent-call counter and
+         *     `active_sessions` are the campaign's live call sessions. Never cached. A paused
+         *     campaign always reports 0 active calls and no sessions.
          */
         get: operations["getCampaignConcurrency"];
         put?: never;
@@ -821,9 +1127,7 @@ export type paths = {
         };
         /**
          * List campaign destinations
-         * @description Get a paginated list of destinations for a campaign.
-         *
-         *     Supports filtering by status and searching by phone number.
+         * @description Paginated destinations from every list assigned to the campaign (per_page defaults to 50, max 100). Owner, PBX Admin and Reporter only. `data` is the raw Laravel paginator: the rows are in `data.data`, with `current_page`, `per_page`, `total`, `last_page` and the page URLs next to them. Rows are the raw destination records (no resource formatting), in database order.
          */
         get: operations["listCampaignDestinations"];
         put?: never;
@@ -848,24 +1152,69 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get campaign list
-         * @description Get the distribution list currently assigned to a campaign.
+         * Get campaign lists
+         * @description Get every distribution list assigned to a campaign, oldest assignment first (by list ID).
+         *     A campaign can hold several lists. Owner, PBX Admin and Reporter only.
          *
-         *     Returns 404 if no list has been uploaded or assigned.
+         *     `can_unassign` is false while the campaign is `active`, and for good once the campaign
+         *     has started processing the list's entries (any destination dialed or no longer pending);
+         *     `unassign_refusal` gives the reason.
+         *     Returns `{"data": []}` when no list is assigned.
          */
         get: operations["getCampaignList"];
         put?: never;
         /**
          * Upload campaign list
-         * @description Upload a CSV distribution list directly to a campaign.
+         * @description Upload a CSV as another distribution list of a campaign; the campaign's existing lists
+         *     are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active but
+         *     outside its schedule window right now (otherwise 422).
          *
-         *     The file must be a valid CSV or TXT file up to 10 MB.
-         *     An optional list name can be provided.
+         *     The file must be a CSV or TXT file up to 10 MB. The first row is a header and is skipped.
+         *     Only the first column is read: it must be an E.164 number (`+` then 2-15 digits);
+         *     other rows count as invalid. Duplicate numbers are removed (and counted as invalid).
+         *     The file is processed during the request: the list is created assigned to the campaign
+         *     (status `in_use`), and the number of valid rows is added to the campaign's
+         *     `total_destinations` and `pending_calls`. The list name defaults to the uploaded file name.
          */
         post: operations["uploadCampaignList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auto-dialer-campaigns/{campaign}/list/{list}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Campaign ID
+                 * @example 1
+                 */
+                campaign: number;
+                /**
+                 * @description Distribution list ID (must be assigned to this campaign)
+                 * @example 12
+                 */
+                list: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
         /**
-         * Delete campaign list
-         * @description Remove the distribution list currently assigned to a campaign.
+         * Unassign a campaign list
+         * @description Unassign one distribution list from a campaign. The list and its destinations are kept;
+         *     the list returns to `ready` and the campaign's other lists are not affected.
+         *     Owner and PBX Admin only; refused with 403 while the campaign is `active` ("Cannot
+         *     unassign list: its campaign is active. Pause the campaign first."). Same rules, status
+         *     codes and messages as `POST /v1/auto-dialer-campaigns/lists/{list}/unassign`.
+         *
+         *     Once the campaign has started processing the list's entries (any destination dialed or
+         *     no longer pending) the list can no longer be unassigned (422). Returns 404 when the list
+         *     is not assigned to this campaign.
          */
         delete: operations["deleteCampaignList"];
         options?: never;
@@ -888,11 +1237,13 @@ export type paths = {
         };
         /**
          * Get campaign monitor detail
-         * @description Get detailed monitoring view for a single campaign.
+         * @description Get detailed monitoring view for a single campaign (any status). Owner, PBX Admin
+         *     and Reporter only.
          *
          *     Returns campaign statistics, disposition breakdown,
          *     rate limit status, and active call sessions. Statistics
-         *     are cached for 10 seconds; active sessions are always fresh.
+         *     are cached for 10 seconds (cleared when the campaign is started, paused or resumed);
+         *     active sessions are always fresh.
          */
         get: operations["getMonitorDetail"];
         put?: never;
@@ -924,10 +1275,12 @@ export type paths = {
         head?: never;
         /**
          * Pause campaign
-         * @description Pause an active auto-dialer campaign.
+         * @description Pause an active auto-dialer campaign. Owner and PBX Admin only; a campaign that is not
+         *     `active` returns 403.
          *
-         *     Paused campaigns stop initiating new calls but active
-         *     calls continue until completion.
+         *     The dialer stops initiating new calls. Call sessions still `initiated`, `ringing` or
+         *     `answered` are marked `failed` with disposition `cancelled`, and the CAC counter is
+         *     reset to 0.
          */
         patch: operations["pauseAutoDialerCampaign"];
         trace?: never;
@@ -949,10 +1302,12 @@ export type paths = {
         put?: never;
         /**
          * Reset CAC counter
-         * @description Reset the Concurrent Active Calls (CAC) counter for a campaign.
+         * @description Reset the Concurrent Active Calls (CAC) counter for a campaign to 0, in any status.
+         *     Owner and PBX Admin only.
          *
          *     Useful when the CAC counter gets stuck due to missed CDR webhooks,
-         *     preventing new calls from being initiated.
+         *     preventing new calls from being initiated. (A scheduled job also reconciles the
+         *     counter every minute.)
          */
         post: operations["resetCampaignCac"];
         delete?: never;
@@ -978,10 +1333,9 @@ export type paths = {
         put?: never;
         /**
          * Reset caller ID cycle
-         * @description Reset the Caller ID cycle for Round-Robin strategies.
-         *
-         *     Only applicable when the campaign uses a Round-Robin caller ID
-         *     strategy. Resets the next index to the start of the pool.
+         * @description Reset the Caller ID cycle position to the start of the pool, so Round Robin starts over
+         *     from the first Caller ID. Owner and PBX Admin only. The campaign must be `paused`
+         *     (otherwise 409); the reset is not limited to the Round Robin strategy.
          */
         post: operations["resetCampaignCallerIdCycle"];
         delete?: never;
@@ -1011,11 +1365,11 @@ export type paths = {
         head?: never;
         /**
          * Resume campaign
-         * @description Resume a paused auto-dialer campaign.
+         * @description Resume a paused auto-dialer campaign. Owner and PBX Admin only; a campaign that is not
+         *     `paused` returns 403.
          *
-         *     Resumes campaign operations. If the campaign was paused
-         *     due to rate limiting, it will check if the resume time
-         *     has been reached before resuming.
+         *     The campaign becomes `active` immediately (a rate-limit `resumes_at` is not checked) and
+         *     the CAC counter is reset to 0.
          */
         patch: operations["resumeAutoDialerCampaign"];
         trace?: never;
@@ -1041,10 +1395,13 @@ export type paths = {
         head?: never;
         /**
          * Start campaign
-         * @description Start an auto-dialer campaign.
+         * @description Start an auto-dialer campaign. Owner and PBX Admin only.
          *
-         *     The campaign must be in 'draft' status and have a valid
-         *     distribution list assigned before it can be started.
+         *     The campaign must be `draft` or `paused` (any other status returns 403) and must have
+         *     a distribution list assigned whose status is `ready` or `in_use` (otherwise 422). The
+         *     campaign becomes `active`, `started_at` is set to now and the CAC counter is reset to 0.
+         *     A `draft` campaign with `auto_start` and a `ready` or `in_use` list is also started by the
+         *     scheduler (every minute) once the current time is inside its schedule.
          */
         patch: operations["startAutoDialerCampaign"];
         trace?: never;
@@ -1058,8 +1415,8 @@ export type paths = {
         };
         /**
          * Get available Caller IDs
-         * @description Get a list of active DID numbers that can be used as Caller IDs
-         *     for auto-dialer campaigns.
+         * @description Get the organization's active DID numbers that can be used as Caller IDs for
+         *     auto-dialer campaigns. Owner, PBX Admin and Reporter only.
          */
         get: operations["getAvailableCallerIds"];
         put?: never;
@@ -1079,10 +1436,13 @@ export type paths = {
         };
         /**
          * List distribution lists
-         * @description Get a paginated list of distribution lists.
+         * @description Get a paginated list of distribution lists, newest first (by `created_at`).
          *
-         *     Returns only the latest versions of each list.
-         *     Supports filtering by status and campaign assignment.
+         *     By default only the latest version of each list is returned. Archived lists are
+         *     not latest versions (archiving clears the flag), so they appear only with
+         *     `status=archived` or `status=all`.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["listDistributionLists"];
         put?: never;
@@ -1090,8 +1450,11 @@ export type paths = {
          * Create distribution list
          * @description Create a new empty distribution list.
          *
-         *     The list is created in 'draft' status and can be populated
-         *     via upload or by adding destinations individually.
+         *     The list is created in 'draft' status (version 1) and can be populated
+         *     via upload or by adding destinations individually. In this response the
+         *     `statistics` counters are `null` (they are not read back after the insert).
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["createDistributionList"];
         delete?: never;
@@ -1115,17 +1478,26 @@ export type paths = {
         };
         /**
          * Get distribution list
-         * @description Get a specific distribution list by ID with full details
+         * @description Get a specific distribution list by ID, with its `campaign` and
+         *     `used_by_campaign` relations loaded. Lists of other organizations return 404.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["getDistributionList"];
         put?: never;
         post?: never;
         /**
          * Delete distribution list
-         * @description Delete a distribution list.
+         * @description Delete a distribution list completely: the list, all its destinations, their dial
+         *     sessions and its previous versions. Nothing of the list remains. The lists created by splitting a large
+         *     upload into it ("*name* (Part 2)" and so on; counted in `parts_count`) are deleted
+         *     the same way, in the same transaction.
          *
-         *     Only lists in 'failed' status can be deleted by non-owners.
-         *     Owners can delete any list.
+         *     Lists in 'failed' status can be deleted by Owners and PBX Admins; lists in any
+         *     other status only by Owners. If the list, or any of its parts, is assigned to a
+         *     campaign the request returns 409 and deletes nothing; each reference names the
+         *     campaign, and for a part its `detail` is `assigned part "<part name>"`. Unassign
+         *     it first.
          */
         delete: operations["deleteDistributionList"];
         options?: never;
@@ -1156,8 +1528,14 @@ export type paths = {
          * Archive list
          * @description Archive a distribution list.
          *
-         *     Archived lists cannot be assigned to campaigns or modified.
-         *     Only lists in 'ready' or 'used' status can be archived.
+         *     Sets the status to 'archived', stamps `archived_at` and clears
+         *     `is_latest_version`. Archived lists cannot be assigned, uploaded to or
+         *     archived again; they can still be copied.
+         *
+         *     Only lists in 'ready', 'failed' or 'used' status can be archived (other
+         *     statuses return 403). A list that is assigned to a campaign returns 422.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         patch: operations["archiveDistributionList"];
         trace?: never;
@@ -1181,8 +1559,13 @@ export type paths = {
          * Assign list to campaign
          * @description Assign a distribution list to an auto-dialer campaign.
          *
-         *     The list must be in 'ready' status and the campaign must
-         *     be able to accept a list assignment.
+         *     The list must be in 'ready' status (otherwise 403). The campaign must be
+         *     Draft, Paused, or Active but outside its schedule window right now (otherwise
+         *     422). On success the list moves to 'in_use' and `campaign_id`,
+         *     `used_by_campaign_id` and `used_at` are set. A campaign can hold several
+         *     lists: assigning another list adds it next to the lists already assigned.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["assignListToCampaign"];
         delete?: never;
@@ -1210,8 +1593,12 @@ export type paths = {
          * Copy list
          * @description Create a copy of a distribution list.
          *
-         *     The new list will have the same destinations as the original
-         *     but will be in 'draft' status and unassigned.
+         *     The new list is an independent list (version 1) in 'ready' status and
+         *     unassigned. Every destination is copied (phone number, name, batch identifier,
+         *     metadata) and reset to pending with zero dial attempts; `total_rows` and
+         *     `valid_rows` are copied and `invalid_rows` is 0.
+         *
+         *     Roles: Owner and PBX Admin. The source may be in any status.
          */
         post: operations["copyDistributionList"];
         delete?: never;
@@ -1235,9 +1622,10 @@ export type paths = {
         };
         /**
          * List destinations
-         * @description Get a paginated list of destinations in a distribution list.
+         * @description Get a paginated list of destinations in a distribution list, newest first
+         *     (by `created_at`).
          *
-         *     Supports filtering by status and searching by phone number.
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["listListDestinations"];
         put?: never;
@@ -1245,7 +1633,12 @@ export type paths = {
          * Add single destination
          * @description Add a single destination to a distribution list.
          *
-         *     The list must be in a status that allows uploads.
+         *     The list must be in 'draft', 'pending' or 'failed' status (otherwise 403).
+         *     The number is validated with libphonenumber (default region US) and stored in
+         *     E.164; a number already in the list is rejected. Adding to a 'draft' list
+         *     moves it to 'ready'.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["addListDestination"];
         delete?: never;
@@ -1276,7 +1669,13 @@ export type paths = {
         put?: never;
         /**
          * Reset destination dial attempts
-         * @description Reset dial attempts for a single destination in a list.
+         * @description Reset dial attempts for a single destination in a list: the destination
+         *     is set to pending with zero dial attempts, and `last_disposition`, `last_dialed_at`
+         *     and the next retry time are cleared. Allowed in any list status, including
+         *     assigned lists. A destination that is not in this list returns 404
+         *     (`{"error": "Destination not found in this list"}`).
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["resetListDestinationDialAttempts"];
         delete?: never;
@@ -1304,8 +1703,14 @@ export type paths = {
          * Add destinations batch
          * @description Add multiple destinations to a distribution list in batch.
          *
-         *     Maximum 1000 destinations per request. The list must be
-         *     in a status that allows uploads.
+         *     Maximum 1000 destinations per request, and the list may not grow beyond
+         *     100,000 destinations. The list must be in 'draft', 'pending' or 'failed'
+         *     status (otherwise 403). Each number is validated like the single add; invalid
+         *     numbers and duplicates within the batch are reported in `errors`, numbers
+         *     already in the list are skipped. When at least one entry is valid the list
+         *     moves to 'ready'.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["addListDestinationsBatch"];
         delete?: never;
@@ -1333,7 +1738,12 @@ export type paths = {
          * Bulk reset dial attempts
          * @description Reset dial attempts for multiple destinations in a list.
          *
-         *     Accepts an array of destination IDs. All IDs must belong to the list.
+         *     Accepts an array of destination IDs; all IDs must belong to the list (otherwise
+         *     422). Each destination is set to pending with zero dial attempts, and
+         *     `last_disposition`, `last_dialed_at` and the next retry time are cleared.
+         *     Allowed in any list status, including assigned lists.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["bulkResetListDestinationDialAttempts"];
         delete?: never;
@@ -1357,12 +1767,45 @@ export type paths = {
         };
         /**
          * Download list as CSV
-         * @description Download a distribution list as a CSV file.
+         * @description Download a distribution list as a CSV file named `<list name>.csv`.
          *
-         *     The file includes all destinations with their phone numbers
-         *     and descriptions.
+         *     The file has a header row and one row per destination with the columns
+         *     `phone_number`, `name`, `batch_identifier`, `metadata` (JSON), `status`
+         *     and `dial_attempts`.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         get: operations["downloadDistributionList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auto-dialer-campaigns/lists/{list}/parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * List a list's parts
+         * @description The `<name> (Part N)` lists a large upload to this list was split into
+         *     (files of more than 100,000 rows), in creation order. Each is a list of its
+         *     own, with its own status and campaign; `campaign` is included.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
+         */
+        get: operations["listDistributionListParts"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1392,6 +1835,9 @@ export type paths = {
          *     so the UI can show a preview before committing to
          *     `POST .../{list}/upload`. The file is written to a temp path for
          *     parsing and deleted immediately afterward — nothing is stored.
+         *     Blank rows are skipped. Works for a list in any status.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         post: operations["previewDistributionListCsv"];
         delete?: never;
@@ -1419,7 +1865,11 @@ export type paths = {
          * Reset pending destinations
          * @description Reset all pending destinations in a list to zero dial attempts.
          *
-         *     Only destinations in pending status are affected.
+         *     Only destinations in pending status are affected; `last_disposition`,
+         *     `last_dialed_at` and the next retry time are cleared. Allowed in any list
+         *     status, including assigned lists.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["resetListPendingDestinations"];
         delete?: never;
@@ -1445,10 +1895,18 @@ export type paths = {
         put?: never;
         /**
          * Unassign list from campaign
-         * @description Unassign a distribution list from its campaign.
+         * @description Unassign a distribution list from its campaign. Same rules, status codes and
+         *     messages as `DELETE /v1/auto-dialer-campaigns/{campaign}/list/{list}`.
          *
-         *     The list must be currently assigned to a campaign.
-         *     After unassignment, the list returns to 'ready' status.
+         *     The list must be assigned to a campaign (otherwise 403). While the list's campaign
+         *     is `active` the unassign is refused with 403 ("Cannot unassign list: its campaign
+         *     is active. Pause the campaign first."). Once the campaign has started processing the
+         *     list's entries (any destination dialed or no longer pending), the list can no longer
+         *     be unassigned (422). After unassignment the list returns to 'ready' status and
+         *     `campaign_id`, `used_by_campaign_id` and `used_at` are cleared; the campaign's other
+         *     lists are not affected.
+         *
+         *     Roles: Owner and PBX Admin.
          */
         post: operations["unassignListFromCampaign"];
         delete?: never;
@@ -1474,13 +1932,27 @@ export type paths = {
         put?: never;
         /**
          * Upload CSV to list
-         * @description Upload a CSV file to populate a distribution list.
+         * @description Upload a CSV file to populate a distribution list. Processing runs in a
+         *     background job; poll `GET .../lists/upload-progress/{jobId}` with the
+         *     returned `job_id`.
          *
-         *     If the list is in DRAFT/PROCESSING/FAILED status, the file
-         *     is uploaded to the current list. If the list is in READY/USED
-         *     status, old destinations are backed up and the list is updated.
+         *     - List in `draft`, `pending` or `failed` status (`action: upload`): the
+         *       file is loaded into the current list.
+         *     - List in `ready` or `used` status (`action: update`): the existing
+         *       destinations are kept as a previous version (see
+         *       `GET .../lists/{list}/versions`) and deleted, the counters are reset,
+         *       `version_number` is incremented and the file is loaded into the same
+         *       list.
+         *     - Any other status (`processing`, `in_use`, `archived`): 422.
          *
-         *     CSV format: phone_number,description (first row is header)
+         *     The list moves to `processing` and ends in `ready` or `failed`. Phone
+         *     numbers are validated with libphonenumber (default region US) and stored
+         *     in E.164. Files with more than 100,000 data rows are split: the first
+         *     100,000 rows stay in this list and each further block of up to 100,000
+         *     rows goes into a new list named `<name> (Part N)`.
+         *
+         *     Columns are chosen with `mapping`; send the fields as multipart form
+         *     fields. Roles: Owner and PBX Admin.
          */
         post: operations["uploadDistributionListCsv"];
         delete?: never;
@@ -1504,9 +1976,13 @@ export type paths = {
         };
         /**
          * Get validation errors
-         * @description Get validation errors for a failed list upload.
+         * @description Get the stored validation errors of a failed list upload.
          *
-         *     Only available for lists in 'failed' status.
+         *     Only available for lists in 'failed' status. Each entry is either an
+         *     invalid row (`row`, `phone_number`, `error`) or a list-level failure with
+         *     only `error`.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["getListValidationErrors"];
         put?: never;
@@ -1531,12 +2007,89 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List versions
-         * @description Get version history for a distribution list.
+         * List previous versions
+         * @description Previous versions of a distribution list, newest first. Each time a file is
+         *     uploaded over a `ready` or `used` list, the destinations it replaces are kept
+         *     as a version, exactly as they were at that moment. A version is deleted
+         *     `meta.retention_days` days after it was replaced (`expires_at`); `null` means
+         *     versions are kept until the list is deleted. Deleting the list deletes its
+         *     versions.
          *
-         *     Returns all versions of the list, ordered by version number.
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["listListVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auto-dialer-campaigns/lists/{list}/versions/{version}/destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+                /**
+                 * @description Previous version ID (`id` from the versions endpoint, not `version_number`)
+                 * @example 7
+                 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * List a previous version's destinations
+         * @description The destinations of a previous version, in the order of the original list,
+         *     with their status, dial attempts and last result as they were when the
+         *     version was replaced. A version of another list returns 404.
+         *
+         *     Roles: Owner, PBX Admin and Reporter.
+         */
+        get: operations["listListVersionDestinations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auto-dialer-campaigns/lists/{list}/versions/{version}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+                /**
+                 * @description Previous version ID (`id` from the versions endpoint, not `version_number`)
+                 * @example 7
+                 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a previous version as CSV
+         * @description Download a previous version as a CSV file named
+         *     `<list name> (version <n>).csv`. The file has a header row and one row per
+         *     destination with the columns `phone_number`, `name`, `batch_identifier`,
+         *     `metadata` (JSON), `status`, `dial_attempts`, `last_disposition` and
+         *     `last_dialed_at`.
+         *
+         *     Roles: Owner and PBX Admin.
+         */
+        get: operations["downloadListVersion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1554,8 +2107,10 @@ export type paths = {
         };
         /**
          * Download example CSV
-         * @description Download an example CSV file showing the expected format
-         *     for distribution list uploads.
+         * @description Download an example CSV file (`distribution_list_example.csv`) showing
+         *     a header row and three rows with `phone_number`, `name` and `batch_identifier`
+         *     columns. Column names are free-form: the upload maps them with `mapping[...]`.
+         *     Any authenticated organization user can download it (no role check).
          */
         get: operations["downloadExampleCsv"];
         put?: never;
@@ -1573,7 +2128,7 @@ export type paths = {
             path: {
                 /**
                  * @description Upload job ID
-                 * @example upload-abc123
+                 * @example 9b2f6c1e-3d4a-4f6b-8c2d-1e5a7b9c0d3f
                  */
                 jobId: string;
             };
@@ -1581,9 +2136,13 @@ export type paths = {
         };
         /**
          * Get upload progress
-         * @description Get the progress of a CSV upload job.
+         * @description Get the progress of a CSV upload job, as stored in the cache by the
+         *     upload job. Progress entries expire 2 hours after the last update
+         *     (4 hours for split files). Row counts and errors are not part of this
+         *     response: read the list (`statistics`, `status`) and
+         *     `GET .../{list}/validation-errors` once the job finishes.
          *
-         *     Returns processing status, row counts, and any errors.
+         *     Roles: Owner, PBX Admin and Reporter.
          */
         get: operations["getUploadProgress"];
         put?: never;
@@ -1603,10 +2162,12 @@ export type paths = {
         };
         /**
          * Get monitor summary
-         * @description Get a bird's-eye view of all active and paused campaigns.
+         * @description Get a bird's-eye view of all active and paused campaigns. Owner, PBX Admin and
+         *     Reporter only.
          *
          *     Returns real-time concurrency data, progress statistics,
-         *     and dialer worker health status. Data is cached for 5 seconds.
+         *     and dialer worker health status. Data is cached for 5 seconds per organization;
+         *     starting, pausing or resuming a campaign clears the cache.
          */
         get: operations["getMonitorSummary"];
         put?: never;
@@ -1636,8 +2197,19 @@ export type paths = {
          * Authenticate broadcasting channel
          * @description Laravel Echo broadcasting authentication endpoint.
          *
-         *     Returns the authentication payload needed to subscribe to private
-         *     or presence channels from the SPA.
+         *     Returns the Pusher-protocol authentication payload needed to subscribe
+         *     to private or presence channels from the SPA. The body may be JSON or
+         *     form-encoded.
+         *
+         *     Channels:
+         *     - `presence-org.{organizationId}`: live call presence. Allowed for
+         *       owners and PBX admins of that organization (supervisors and other
+         *       roles are denied).
+         *     - `private-user.{userId}`: only the user themselves.
+         *     - `private-extension.{extensionId}`: users of the extension's organization.
+         *
+         *     Requires an authenticated user in an active organization
+         *     (`tenant.scope`). Denied channels return 403.
          */
         post: operations["authenticateBroadcastingChannel"];
         delete?: never;
@@ -1655,11 +2227,14 @@ export type paths = {
         };
         /**
          * List Business Hours Schedules
-         * @description Get paginated list of Business Hours Schedules
+         * @description Paginated list of the organization's schedules. Available to all roles. An unknown `sort_by` falls back to `name`; default order is ascending.
          */
         get: operations["listBusinessHoursSchedules"];
         put?: never;
-        /** Create Business Hours Schedule */
+        /**
+         * Create Business Hours Schedule
+         * @description Owner and PBX Admin only.
+         */
         post: operations["createBusinessHoursSchedule"];
         delete?: never;
         options?: never;
@@ -1678,14 +2253,23 @@ export type paths = {
         };
         /** Get Business Hours Schedule */
         get: operations["getBusinessHoursSchedule"];
-        /** Update Business Hours Schedule */
+        /**
+         * Update Business Hours Schedule
+         * @description Owner and PBX Admin only. PUT and PATCH both update only the fields sent: every field is optional and an omitted field keeps its stored value (a body with just `name` renames the schedule and changes nothing else). A field that is sent is validated as on create, so it cannot be blanked; an action needs both `type` and `target_id`. Each day sent in `schedule` replaces that day's setting and time ranges, and days not sent are kept. `exceptions`, when sent (also `[]` or null), replaces every exception.
+         */
         put: operations["updateBusinessHoursSchedule"];
         post?: never;
-        /** Delete Business Hours Schedule */
+        /**
+         * Delete Business Hours Schedule
+         * @description Owner and PBX Admin only. Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
+         */
         delete: operations["deleteBusinessHoursSchedule"];
         options?: never;
         head?: never;
-        /** Partially update Business Hours Schedule */
+        /**
+         * Partially update Business Hours Schedule
+         * @description Same as PUT: only the fields sent are validated and saved; omitted fields keep their stored values.
+         */
         patch: operations["patchBusinessHoursSchedule"];
         trace?: never;
     };
@@ -1698,7 +2282,10 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Duplicate business hours schedule */
+        /**
+         * Duplicate business hours schedule
+         * @description Owner and PBX Admin only. Copies the weekly schedule, the exceptions (with their type and special-hours time ranges) and the open/closed actions into a new schedule named "<name> (Copy)" with status `inactive` and the same `timezone` as the original.
+         */
         post: operations["duplicateBusinessHours"];
         delete?: never;
         options?: never;
@@ -1719,7 +2306,10 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle business hours status */
+        /**
+         * Toggle business hours status
+         * @description Sets the schedule status to the value sent.
+         */
         patch: operations["toggleBusinessHoursStatus"];
         trace?: never;
     };
@@ -1732,7 +2322,10 @@ export type paths = {
         };
         /**
          * List Call Detail Records
-         * @description Get a paginated, filterable list of Call Detail Records for the current organization.
+         * @description Paginated, filterable list of the organization's Call Detail Records, newest
+         *     `session_timestamp` first by default. Any role can list; a Supervisor always sees only
+         *     CDRs whose `from` or `to` matches a resource they supervise (none when nothing is
+         *     assigned). An unknown `sort_by` falls back to `session_timestamp`.
          */
         get: operations["listCallDetailRecords"];
         put?: never;
@@ -1754,9 +2347,36 @@ export type paths = {
         };
         /**
          * Get Call Detail Record
-         * @description Retrieve a single CDR by ID.
+         * @description Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they supervise. With an organisation API key, `archive=1` looks the CDR up in the warm archive instead of the live table.
          */
         get: operations["getCallDetailRecord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-detail-records/{call_detail_record}/recording": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Call detail record ID */
+                call_detail_record: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Stream CDR recording
+         * @description Streams the stored recording of a call for playback. Only recordings with
+         *     status `available` are served. Owner, PBX Admin, Reporter and Supervisor only
+         *     (PBX User gets 403), and a Supervisor only for calls of resources they
+         *     supervise. The content type is the recording's stored MIME type (default
+         *     `audio/mpeg`). Not available for archived CDRs.
+         */
+        get: operations["streamCallDetailRecordRecording"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1772,7 +2392,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Export CDR records */
+        /**
+         * Export CDR records
+         * @description Streams all matching CDRs as CSV, newest first, as `call-detail-records-YYYY-MM-DD-HHMMSS.csv`. Accepts the same filters as the list endpoint (from, to, disposition, direction, user, session_token, from_date, to_date); `sort_by`, `sort_order` and pagination are ignored. Any role can export; Supervisors are always limited to the resources they supervise. Columns: Timestamp, From, To, Call Start Time, Call Answer Time, Call End Time, Domain, Session Token, Duration (sec), Billable (sec), Status. Times are `Y-m-d H:i:s`; the call times, session token and status come from the raw CDR session.
+         */
         get: operations["exportCdr"];
         put?: never;
         post?: never;
@@ -1789,7 +2412,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get CDR statistics */
+        /**
+         * Get CDR statistics
+         * @description Totals over the CDRs whose `session_timestamp` date is between `from_date` and `to_date`
+         *     (inclusive). Any role; a Supervisor's totals cover only the resources they supervise.
+         *     The response is not wrapped in `data`. No other list filters apply.
+         */
         get: operations["getCdrStatistics"];
         put?: never;
         post?: never;
@@ -1806,7 +2434,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get notification logs */
+        /**
+         * Get notification logs
+         * @description Owner and PBX Admin only. By default returns the latest delivery per call session (only `status` filters). With `show_all=true` returns every delivery and honours all filters. Newest first. `per_page` defaults to 50 (max 100). The `meta` object has no `from`/`to` keys.
+         */
         get: operations["getNotificationLogs"];
         put?: never;
         post?: never;
@@ -1823,7 +2454,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get session notification logs */
+        /**
+         * Get session notification logs
+         * @description Owner and PBX Admin only. Every delivery for one call session, oldest first (not paginated).
+         */
         get: operations["getSessionNotificationLogs"];
         put?: never;
         post?: never;
@@ -1840,7 +2474,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get rate limit info */
+        /**
+         * Get rate limit info
+         * @description Owner and PBX Admin only. Webhook deliveries counted in the current one-minute window against the organization's `rate_limit_per_minute` (500 when no settings exist).
+         */
         get: operations["getNotificationRateLimit"];
         put?: never;
         post?: never;
@@ -1857,13 +2494,30 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get notification settings */
+        /**
+         * Get notification settings
+         * @description Owner and PBX Admin only. The organization has at most one settings record.
+         */
         get: operations["getNotificationSettings"];
-        /** Update notification settings */
+        /**
+         * Update notification settings
+         * @description Owner and PBX Admin only. Only the fields sent are changed; `webhook_url`,
+         *     `auth_method` and `enabled_events` cannot be null when sent. On update `auth_secret`
+         *     and `auth_username` are never required, and sending `auth_secret: null` clears the
+         *     stored secret.
+         */
         put: operations["updateNotificationSettings"];
-        /** Create notification settings */
+        /**
+         * Create notification settings
+         * @description Owner and PBX Admin only. Defaults: `retry_attempts` 3, `retry_backoff_seconds` 60,
+         *     `request_timeout_seconds` 30, `rate_limit_per_minute` 500, `is_active` true.
+         *     `auth_secret` is required for `bearer_token`; `auth_username` for `basic_auth`.
+         */
         post: operations["createNotificationSettings"];
-        /** Delete notification settings */
+        /**
+         * Delete notification settings
+         * @description Owner and PBX Admin only.
+         */
         delete: operations["deleteNotificationSettings"];
         options?: never;
         head?: never;
@@ -1879,7 +2533,12 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Test notification settings */
+        /**
+         * Test notification settings
+         * @description Owner and PBX Admin only. Sends one test `call.status_update` event (session status
+         *     `new`, `"test": true`, fake numbers) to the configured webhook through the normal
+         *     dispatcher, so it counts against the rate limit and is logged.
+         */
         post: operations["testNotificationSettings"];
         delete?: never;
         options?: never;
@@ -1894,10 +2553,25 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List call queues */
+        /**
+         * List call queues
+         * @description Paginated list of call queues. Any role can list; a Supervisor sees only the queues
+         *     assigned to them. Default order is `created_at` descending. Filters: `strategy`,
+         *     `status` (unknown values are ignored), `search` and `unprovisioned`. List items carry
+         *     `agents`, `agents_count`, `moh_recording` and the fallback target summaries.
+         */
         get: operations["listCallQueues"];
         put?: never;
-        /** Create call queue */
+        /**
+         * Create call queue
+         * @description Create a call queue. Owner and PBX Admin only. Only `name` and `agents` are required;
+         *     the other settings take the defaults shown in the schema. Every agent must be an active
+         *     user of the organization with an extension. `moh_recording_id` must be a recording
+         *     tagged as hold music. The fallback target must belong to the organization and be active.
+         *     Only the fallback_*_id matching `fallback_action` is stored; the others are cleared.
+         *     With `fallback_action: call_queue`, `fallback_call_queue_id` names the queue overflow
+         *     callers join (as new callers, at the back of its line).
+         */
         post: operations["createCallQueue"];
         delete?: never;
         options?: never;
@@ -1912,16 +2586,53 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get call queue */
+        /**
+         * Get call queue
+         * @description Queue details with `agents` and `moh_recording`. Any role in the organization can view; a Supervisor only the queues assigned to them (403 otherwise).
+         */
         get: operations["getCallQueue"];
-        /** Update call queue */
+        /**
+         * Update call queue
+         * @description Owner and PBX Admin only. PUT and PATCH both update only the fields sent: every field
+         *     is optional, an omitted field keeps its stored value, and no create default is applied
+         *     (a body with just `name` renames the queue and changes nothing else). A field that is
+         *     sent is validated as on create, so `name`, `strategy`, `status` and the other required
+         *     settings cannot be blanked, and `agents`, when sent, replaces the whole agent list (at
+         *     least one agent). The fallback columns change only when `fallback_action` or a
+         *     `fallback_*_id` is sent; the rules then use the stored value of the half that is left
+         *     out: sending `fallback_action: extension` alone keeps the stored
+         *     `fallback_extension_id` (422 when none is stored), and sending a target id alone is
+         *     checked against the stored action. The target columns of the other actions are cleared.
+         *     `fallback_action: unavailable` is accepted on update. A
+         *     `fallback_call_queue_id` must not be this queue, and the chain of call queue fallbacks
+         *     must not lead back to it (422 "Fallback loop detected: ...").
+         */
         put: operations["updateCallQueue"];
         post?: never;
-        /** Delete call queue */
+        /**
+         * Delete call queue
+         * @description Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, or a ring group / AI load balancer / call queue fallback). The 409 body lists the references.
+         */
         delete: operations["deleteCallQueue"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Partially update call queue
+         * @description Owner and PBX Admin only. PUT and PATCH both update only the fields sent: every field
+         *     is optional, an omitted field keeps its stored value, and no create default is applied
+         *     (a body with just `name` renames the queue and changes nothing else). A field that is
+         *     sent is validated as on create, so `name`, `strategy`, `status` and the other required
+         *     settings cannot be blanked, and `agents`, when sent, replaces the whole agent list (at
+         *     least one agent). The fallback columns change only when `fallback_action` or a
+         *     `fallback_*_id` is sent; the rules then use the stored value of the half that is left
+         *     out: sending `fallback_action: extension` alone keeps the stored
+         *     `fallback_extension_id` (422 when none is stored), and sending a target id alone is
+         *     checked against the stored action. The target columns of the other actions are cleared.
+         *     `fallback_action: unavailable` is accepted on update. A
+         *     `fallback_call_queue_id` must not be this queue, and the chain of call queue fallbacks
+         *     must not lead back to it (422 "Fallback loop detected: ...").
+         */
+        patch: operations["patchCallQueue"];
         trace?: never;
     };
     "/v1/call-queues/{call_queue}/agents/me/state": {
@@ -1933,7 +2644,12 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Update my agent state in a queue */
+        /**
+         * Update my agent state in a queue
+         * @description Set the caller's agent state in this queue. Allowed for agents of the queue, and for
+         *     Owner and PBX Admin (who may pass `user_id` to set another agent's state). Anyone else
+         *     gets 403. Returns 502 when the queue engine rejects the change.
+         */
         post: operations["updateMyQueueAgentState"];
         delete?: never;
         options?: never;
@@ -1948,7 +2664,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get live call queue snapshot */
+        /**
+         * Get live call queue snapshot
+         * @description Live waiting calls and agent states. Same access as `GET /v1/call-queues/{call_queue}`.
+         */
         get: operations["getCallQueueLive"];
         put?: never;
         post?: never;
@@ -1965,10 +2684,35 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get call queue statistics */
+        /**
+         * Get call queue statistics
+         * @description Statistics for calls that entered the queue between `from` and `to` (default the last 24 hours). Same access as `GET /v1/call-queues/{call_queue}`.
+         */
         get: operations["getCallQueueStats"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/call-queues/{call_queue}/toggle-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toggle call queue status
+         * @description Flips the queue between `active` and `inactive`. Owner and PBX Admin only. The returned queue does not include `agents`, `moh_recording` or the fallback summaries.
+         */
+        post: operations["toggleCallQueueStatus"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1982,352 +2726,11 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List my queue agent memberships */
+        /**
+         * List my queue agent memberships
+         * @description Every queue the authenticated user is an agent of (active or inactive), with the user's current state from the queue engine.
+         */
         get: operations["listMyQueueMemberships"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-ad-platform-integrations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get ad-platform integration settings
-         * @description Returns the organization's Google Ads and Meta conversion-upload integration
-         *     settings (singleton). When no integration exists a default disabled/unconfigured
-         *     shape is returned. Secret credentials are never echoed back.
-         */
-        get: operations["getAdPlatformIntegration"];
-        /**
-         * Update ad-platform integration settings
-         * @description Creates or updates the organization's Google Ads and Meta conversion-upload
-         *     integration settings. Only supplied secret credential fields are written;
-         *     omitting a credential leaves the stored value untouched.
-         */
-        put: operations["updateAdPlatformIntegration"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-analytics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get analytics
-         * @description Get aggregated call tracking analytics for a date range. Supports
-         *     filtering by campaign, source, medium and grouping by day, week or
-         *     month.
-         */
-        get: operations["getCallTrackingAnalytics"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-analytics/export": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export analytics
-         * @description Export call tracking analytics as a downloadable file. Accepts the same
-         *     filters as the analytics endpoint.
-         */
-        get: operations["exportCallTrackingAnalytics"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List campaigns
-         * @description Get a paginated list of call tracking campaigns for the authenticated
-         *     user's organization.
-         */
-        get: operations["listCallTrackingCampaigns"];
-        put?: never;
-        /**
-         * Create campaign
-         * @description Create a new call tracking campaign. The campaign name must be unique
-         *     within the organization.
-         */
-        post: operations["createCallTrackingCampaign"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        /**
-         * Get campaign
-         * @description Get a specific call tracking campaign by ID.
-         */
-        get: operations["getCallTrackingCampaign"];
-        /**
-         * Update campaign
-         * @description Update an existing call tracking campaign. The campaign name must remain
-         *     unique within the organization.
-         */
-        put: operations["updateCallTrackingCampaign"];
-        post?: never;
-        /**
-         * Delete campaign
-         * @description Delete a call tracking campaign from the organization.
-         */
-        delete: operations["deleteCallTrackingCampaign"];
-        options?: never;
-        head?: never;
-        /**
-         * Update campaign (partial)
-         * @description Equivalent to `PUT /v1/call-tracking-campaigns/{call_tracking_campaign}`
-         *     — Laravel's `apiResource` routing registers both PUT and PATCH
-         *     against the same update action.
-         */
-        patch: operations["patchCallTrackingCampaign"];
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        /**
-         * List campaign tracking numbers
-         * @description Get a paginated list of tracking numbers assigned to a campaign.
-         */
-        get: operations["listCallTrackingNumbers"];
-        put?: never;
-        /**
-         * Assign tracking number
-         * @description Assign an active DID number to a call tracking campaign. The DID must
-         *     belong to the same organization and cannot already be assigned to
-         *     another tracking campaign.
-         */
-        post: operations["createCallTrackingNumber"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-                /**
-                 * @description Call tracking number ID
-                 * @example 8
-                 */
-                call_tracking_number: number;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update tracking number
-         * @description Update an assigned tracking number (friendly name or status).
-         */
-        put: operations["updateCallTrackingNumber"];
-        post?: never;
-        /**
-         * Remove tracking number
-         * @description Remove a tracking number assignment from a campaign.
-         */
-        delete: operations["deleteCallTrackingNumber"];
-        options?: never;
-        head?: never;
-        /**
-         * Update tracking number (partial)
-         * @description Equivalent to `PUT .../{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}`
-         *     — Laravel's `apiResource` routing registers both PUT and PATCH
-         *     against the same update action.
-         */
-        patch: operations["patchCallTrackingNumber"];
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}/notification-logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        /**
-         * List notification logs
-         * @description Get a paginated list of webhook notification delivery logs for a
-         *     call tracking campaign.
-         */
-        get: operations["listCallTrackingNotificationLogs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        /**
-         * Get notification settings
-         * @description Get webhook notification settings for a call tracking campaign.
-         */
-        get: operations["getCallTrackingNotificationSettings"];
-        /**
-         * Update notification settings
-         * @description Create or update webhook notification settings for a call tracking
-         *     campaign. When `auth_method` is `bearer_token` or `basic_auth`,
-         *     `auth_secret` is required. When `auth_method` is `basic_auth`,
-         *     `auth_username` is also required.
-         */
-        put: operations["updateCallTrackingNotificationSettings"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Test notification settings
-         * @description Send a test webhook event to the configured notification URL for a
-         *     campaign. If no event_type is provided, a default test event is used.
-         */
-        post: operations["testCallTrackingNotificationSettings"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-dni/swap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Dynamic number insertion swap
-         * @description Public endpoint used by client websites for dynamic number insertion
-         *     (DNI). Returns the best matching tracking number for the given
-         *     organization and UTM parameters. If no matching tracking number is
-         *     found, the provided default number is returned.
-         *
-         *     This endpoint is rate-limited.
-         */
-        get: operations["callTrackingDniSwap"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/call-tracking-sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List sessions
-         * @description Get a paginated list of call tracking sessions. Supports filtering by
-         *     campaign, source, medium, date range, conversion status and search.
-         */
-        get: operations["listCallTrackingSessions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2343,10 +2746,16 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List conference rooms */
+        /**
+         * List conference rooms
+         * @description Paginated list of the organization's conference rooms. Available to all roles. `pin` and `host_pin` are returned only to Owners and PBX Admins. An unknown `sort_by` falls back to `name`; default order is ascending.
+         */
         get: operations["listConferenceRooms"];
         put?: never;
-        /** Create conference room */
+        /**
+         * Create conference room
+         * @description Owner and PBX Admin only. `status` defaults to `active` and every boolean defaults to `false` when omitted.
+         */
         post: operations["createConferenceRoom"];
         delete?: never;
         options?: never;
@@ -2365,10 +2774,16 @@ export type paths = {
         };
         /** Get conference room */
         get: operations["getConferenceRoom"];
-        /** Update conference room */
+        /**
+         * Update conference room
+         * @description Owner and PBX Admin only. All fields are optional; fields not sent keep their stored value. PUT and PATCH behave the same.
+         */
         put: operations["updateConferenceRoom"];
         post?: never;
-        /** Delete conference room */
+        /**
+         * Delete conference room
+         * @description Owner and PBX Admin only. Refused with 409 when the room is still referenced by routing. The 409 body lists the references.
+         */
         delete: operations["deleteConferenceRoom"];
         options?: never;
         head?: never;
@@ -2387,8 +2802,13 @@ export type paths = {
          * Get application configuration
          * @description Get application-level configuration for the frontend.
          *
-         *     Returns configuration details including SaaS mode, webhook URL
-         *     settings, reCAPTCHA configuration, and validation warnings.
+         *     Returns configuration details including deployment mode, webhook URL
+         *     settings, reCAPTCHA configuration, Auth0 (SaaS) social sign-in settings,
+         *     validation warnings, and the public API/MCP endpoint URLs.
+         *
+         *     Public: no authentication is required and the route is not rate-limited.
+         *     When a valid Sanctum bearer token is sent, `endpoints` is built from the
+         *     caller organization's Cloudonix webhook base URL (if set).
          */
         get: operations["getApplicationConfig"];
         put?: never;
@@ -2411,7 +2831,9 @@ export type paths = {
          * @description Returns dashboard statistics for assigned users and ring groups. Accessible
          *     to `owner`, `pbx_admin`, and `supervisor` roles
          *     (`UserRole::canViewAssignedDashboard`). Supervisors receive data scoped to
-         *     their own assignments; Owner and PBX Admin receive an unscoped, org-wide view.
+         *     their own assignments; Owner and PBX Admin (and API keys) receive an org-wide
+         *     view in which `assigned_users` are all users except supervisors and
+         *     `assigned_ring_groups` are all ring groups.
          */
         get: operations["getSupervisorDashboard"];
         put?: never;
@@ -2428,10 +2850,10 @@ export type paths = {
             header?: never;
             path: {
                 /**
-                 * @description Call session ID
-                 * @example CA550e8400e29b41d4a716446655440000
+                 * @description Call session ID (`session_id` returned by initiate)
+                 * @example 42
                  */
-                session: string;
+                session: number;
             };
             cookie?: never;
         };
@@ -2439,8 +2861,14 @@ export type paths = {
         put?: never;
         /**
          * Set call disposition
-         * @description Set the final disposition of a call.
-         *     Records the outcome for reporting and analytics.
+         * @description Set the final disposition of a call and apply the retry rules.
+         *
+         *     The server decides the outcome; `should_retry` and `next_retry_at` are validated
+         *     but ignored. answered / completed -> destination completed; busy / no-answer ->
+         *     destination pending with a back-off retry time when the campaign retries on busy /
+         *     no-answer and the destination has attempts left; anything else -> destination
+         *     failed. The session is marked completed or failed and the campaign counters are
+         *     updated. Not called by the current Go worker.
          */
         post: operations["setDisposition"];
         delete?: never;
@@ -2455,10 +2883,10 @@ export type paths = {
             header?: never;
             path: {
                 /**
-                 * @description Call session ID
-                 * @example CA550e8400e29b41d4a716446655440000
+                 * @description Call session ID (`session_id` returned by initiate)
+                 * @example 42
                  */
-                session: string;
+                session: number;
             };
             cookie?: never;
         };
@@ -2470,8 +2898,16 @@ export type paths = {
         head?: never;
         /**
          * Update call status
-         * @description Update the status of an active call session.
-         *     Used to track call progress and outcomes.
+         * @description Update the status of a call session.
+         *
+         *     Stores the session fields (`duration` / `billsec` default to 0) and decrements
+         *     the campaign pending-calls counter. When `disposition` is set, the server decides
+         *     the destination outcome: answered / completed -> completed; busy / no-answer ->
+         *     pending with a retry time when the campaign retries on busy / no-answer and the
+         *     destination has attempts left; anything else -> failed. `disposition` is optional:
+         *     when it is omitted or null the stored session disposition is left unchanged, the
+         *     destination is not touched and `destination_status` is `pending`. Not called by the
+         *     current Go worker.
          */
         patch: operations["updateCallStatus"];
         trace?: never;
@@ -2487,8 +2923,8 @@ export type paths = {
         put?: never;
         /**
          * Generate CXML for call
-         * @description Generate CXML document for an outbound call.
-         *     Returns the CXML that will be used to connect the call.
+         * @description Generate the CXML document for an answered outbound call, based on the
+         *     campaign routing destination (AI assistant, AI load balancer, or hangup).
          */
         post: operations["generateCxml"];
         delete?: never;
@@ -2508,8 +2944,13 @@ export type paths = {
         put?: never;
         /**
          * Initiate call
-         * @description Initiate an outbound call through Cloudonix.
-         *     Creates a call session and returns the call SID.
+         * @description Place an outbound call through Cloudonix and create a call session.
+         *
+         *     The destination is first claimed atomically (pending -> dialing, `dial_attempts`
+         *     + 1, `last_dialed_at` set); if it is not pending the request returns 409 and no
+         *     call is placed. When Cloudonix rejects the call the claim is released (the
+         *     attempt stays counted) and the request returns 500. On success the campaign
+         *     pending-calls counter is incremented.
          */
         post: operations["initiateCall"];
         delete?: never;
@@ -2533,8 +2974,10 @@ export type paths = {
         };
         /**
          * Get pending destinations
-         * @description Retrieve pending destinations for a campaign.
-         *     Returns destinations that are ready to be dialed.
+         * @description Retrieve destinations to dial for a campaign: destinations of the lists
+         *     assigned to the campaign that are pending, have fewer than `max_dial_attempts`
+         *     attempts and whose retry time (if any) has been reached, oldest first.
+         *     `meta.total` is the number of rows returned; `meta.offset` is always 0.
          */
         get: operations["getPendingDestinations"];
         put?: never;
@@ -2560,8 +3003,11 @@ export type paths = {
         };
         /**
          * Get retry destinations
-         * @description Retrieve destinations that need to be retried.
-         *     Returns destinations that failed previously and are eligible for retry.
+         * @description Retrieve destinations of the lists assigned to the campaign whose last
+         *     disposition is busy, no-answer or cancelled, that have fewer than
+         *     `max_dial_attempts` attempts and whose retry time (if any) has been reached,
+         *     ordered by retry time. The status is not checked. `meta.total` is the number of
+         *     rows returned; `meta.offset` is always 0. Not called by the current Go worker.
          */
         get: operations["getRetryDestinations"];
         put?: never;
@@ -2589,9 +3035,10 @@ export type paths = {
         put?: never;
         /**
          * Pause campaign
-         * @description Pause an active campaign from the worker side.
-         *     Typically called when the campaign reaches its daily/hourly limits
-         *     or encounters errors.
+         * @description Pause a campaign from the worker side (for example a circuit breaker or
+         *     the schedule). Sets the status to paused and stores `reason` as the pause reason
+         *     and `resume_at`, marks the campaign's in-flight call sessions as failed and resets
+         *     its pending-calls counter. The current status is not checked.
          */
         post: operations["pauseCampaignFromWorker"];
         delete?: never;
@@ -2609,8 +3056,10 @@ export type paths = {
         };
         /**
          * Get active campaigns
-         * @description Retrieve all active auto-dialer campaigns that are ready for dialing.
-         *     Used by the dialer worker to discover campaigns to execute.
+         * @description Retrieve all auto-dialer campaigns (all organizations) in active status
+         *     whose date range and schedule window, evaluated in the campaign timezone,
+         *     include the current time. Used by the dialer worker to discover campaigns to
+         *     execute.
          */
         get: operations["getActiveCampaigns"];
         put?: never;
@@ -2631,7 +3080,14 @@ export type paths = {
         /**
          * Dialer worker health check
          * @description Health check endpoint for the Go-based dialer worker service.
-         *     Used by the worker to verify connectivity to the API.
+         *
+         *     All `/v1/dialer/worker/*` endpoints authenticate with `Authorization: Bearer
+         *     <DIALER_WORKER_API_TOKEN>` (or `DIALER_WORKER_API_TOKEN_SECONDARY` during token
+         *     rotation). When no primary token is configured they return 503. They are rate
+         *     limited to `DIALER_WORKER_RATE_LIMIT` requests per minute per client IP
+         *     (default 1000); over the limit they return 429 with `{"error": "Too Many Requests",
+         *     "message": "Dialer worker rate limit exceeded.", "retry_after": ...}`. They act
+         *     across all organizations.
          */
         get: operations["dialerWorkerHealth"];
         put?: never;
@@ -2657,8 +3113,8 @@ export type paths = {
         };
         /**
          * Get worker state
-         * @description Retrieve the persisted state of a dialer worker.
-         *     Used during worker startup to resume from previous state.
+         * @description Retrieve the state last persisted for a dialer worker (kept for 10 minutes).
+         *     Not called by the current Go worker.
          */
         get: operations["getState"];
         put?: never;
@@ -2680,8 +3136,10 @@ export type paths = {
         put?: never;
         /**
          * Persist worker state
-         * @description Persist the current state of a dialer worker.
-         *     Used for worker recovery and load balancing.
+         * @description Persist the current state of a dialer worker in the cache for 10 minutes
+         *     (key: `worker_id`). The validated body is stored as-is. `active_calls`,
+         *     `retry_queue` and `campaign_states` must be present (they may be empty). Not called
+         *     by the current Go worker.
          */
         post: operations["persistState"];
         delete?: never;
@@ -2703,6 +3161,12 @@ export type paths = {
          *     user's extension, identical in shape to `GET /v1/webphone/calls-log`
          *     but authenticated by an embed token instead of a session/bearer token.
          *     Coaching sentinel destinations (spy/barge/whisper) are excluded.
+         *     Returns an empty list when the user has no extension.
+         *
+         *     Rate limited to 60 requests per minute per token and IP. An absent
+         *     `Origin` passes the allowlist check; a present one must match an
+         *     allowlisted host (or `host:port`). When an `Origin` is sent it is
+         *     reflected in `Access-Control-Allow-Origin`.
          */
         get: operations["getEmbedCallsLog"];
         put?: never;
@@ -2727,13 +3191,32 @@ export type paths = {
          *     authenticated by an embed token instead of a session/bearer token.
          *
          *     Called by the widget iframe (`/embed/dialer`), not directly by host
-         *     pages. See the [Embedded Dialer guide](/modules/embedded-dialer).
+         *     pages. See the [Embedded Dialer guide](/opbx/modules/embedded-dialer).
+         *
+         *     Because the response carries SIP credentials, a request with no
+         *     `Origin` header is accepted only when the browser marks it
+         *     `Sec-Fetch-Site: same-origin` (the widget iframe); otherwise 403.
+         *     The country defaults to `us` when the organization has no country setting.
+         *
+         *     Rate limited to 60 requests per minute per token and IP. An absent
+         *     `Origin` passes the allowlist check; a present one must match an
+         *     allowlisted host (or `host:port`). When an `Origin` is sent it is
+         *     reflected in `Access-Control-Allow-Origin`.
          */
         get: operations["getEmbedConfig"];
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
+        /**
+         * CORS preflight for embed config
+         * @description Answers the browser CORS preflight for the embedded dialer. Reflects the request
+         *     `Origin` and allows the `Authorization` and `Content-Type` headers, with a 600 second
+         *     max age. Not token-authenticated, because preflight requests cannot carry the bearer
+         *     token. The real GET enforces the token and the origin allowlist (`embed_allowed_domains`).
+         *     The same preflight answer is returned for any `OPTIONS /v1/embed/*` path,
+         *     including `/v1/embed/calls-log`.
+         */
+        options: operations["embedConfigPreflight"];
         head?: never;
         patch?: never;
         trace?: never;
@@ -2747,13 +3230,13 @@ export type paths = {
         };
         /**
          * List extensions
-         * @description Get paginated list of extensions in the organization
+         * @description Paginated list of the organization's extensions. Every role can list all extensions of the organization. Unknown `sort_by`, `type` or `status` values are ignored.
          */
         get: operations["listExtensions"];
         put?: never;
         /**
          * Create extension
-         * @description Create a new extension
+         * @description Create a new extension. Owner and PBX Admin only. A `user` extension gets a generated SIP password and is pushed to Cloudonix as a subscriber; a failed Cloudonix push does not fail the request.
          */
         post: operations["createExtension"];
         delete?: never;
@@ -2769,16 +3252,28 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get extension */
+        /**
+         * Get extension
+         * @description Owner, PBX Admin, PBX User and Reporter can read any extension of the organization; a Supervisor only the extensions of the users assigned to them.
+         */
         get: operations["getExtension"];
-        /** Update extension */
+        /**
+         * Update extension
+         * @description All fields are optional. Owner and PBX Admin can update any extension, except that only an Owner can update an extension assigned to an Owner. A PBX User can update only their own extension and cannot change `type`, `user_id` or `status`. Supervisor and Reporter get 403. Changing `type` to or from `user` creates or removes the Cloudonix subscriber and the SIP password.
+         */
         put: operations["updateExtension"];
         post?: never;
-        /** Delete extension */
+        /**
+         * Delete extension
+         * @description Owner and PBX Admin only (only an Owner can delete an extension assigned to an Owner). Refused with 409 when the extension is still referenced (for example by a ring group member, a queue membership, or a blacklist entry); the 409 body lists the references. A `user` extension is removed from Cloudonix first.
+         */
         delete: operations["deleteExtension"];
         options?: never;
         head?: never;
-        /** Partially update extension */
+        /**
+         * Partially update extension
+         * @description Same as `PUT`.
+         */
         patch: operations["patchExtension"];
         trace?: never;
     };
@@ -2789,7 +3284,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get extension SIP password */
+        /**
+         * Get extension SIP password
+         * @description Returns the SIP password of a `user` extension. Owner and PBX Admin can read any extension's password (only an Owner can read the password of an extension assigned to an Owner); any other user only the extension assigned to them. Not available to API keys. Other extension types have no password and return 204. Rate limited per user and IP: 10 requests per minute, 60 for Owner and PBX Admin. Sent with `Cache-Control: no-store`.
+         */
         get: operations["getExtensionPassword"];
         put?: never;
         post?: never;
@@ -2807,7 +3305,10 @@ export type paths = {
             cookie?: never;
         };
         get?: never;
-        /** Reset extension password */
+        /**
+         * Reset extension password
+         * @description Generates a new SIP password for a `user` extension and pushes it to Cloudonix. Owner and PBX Admin can reset any extension (only an Owner can reset an extension assigned to an Owner); a PBX User only their own extension. Not available to API keys. Rate limited per user and IP: 10 requests per minute, 60 for Owner and PBX Admin. Sent with `Cache-Control: no-store`.
+         */
         put: operations["resetExtensionPassword"];
         post?: never;
         delete?: never;
@@ -2825,7 +3326,10 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Sync extensions with Cloudonix */
+        /**
+         * Sync extensions with Cloudonix
+         * @description Two-way sync, Owner and PBX Admin only. Local `user` extensions missing in Cloudonix are created there; Cloudonix subscribers with no local extension (MSISDN of up to 5 characters) are imported as unassigned `user` extensions; local active/inactive status is updated from Cloudonix. Returns 500 when Cloudonix settings are missing or Cloudonix cannot be queried.
+         */
         post: operations["syncExtensions"];
         delete?: never;
         options?: never;
@@ -2840,7 +3344,10 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Compare sync status */
+        /**
+         * Compare sync status
+         * @description Compares the organization's local extensions with the Cloudonix subscribers of its domain. Any role can call it.
+         */
         get: operations["compareSyncStatus"];
         put?: never;
         post?: never;
@@ -2858,12 +3365,19 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List Inbound Blacklist Entrys
-         * @description Get paginated list of Inbound Blacklist Entrys
+         * List inbound blacklist entries
+         * @description Paginated list, newest first. `meta` has current_page, last_page, per_page and total.
+         *     Every authenticated user of the organization can list entries. Filters are applied
+         *     only when the parameter is present; values are not validated.
          */
         get: operations["listInboundBlacklistEntrys"];
         put?: never;
-        /** Create Inbound Blacklist Entry */
+        /**
+         * Create Inbound Blacklist Entry
+         * @description Owner and PBX Admin only. New entries are `active`. The 201 body is the created model
+         *     before a reload, so columns left at their database default (for example `blocked_count`,
+         *     and `torment_music_timeout` for non-torment entries) are absent from it.
+         */
         post: operations["createInboundBlacklistEntry"];
         delete?: never;
         options?: never;
@@ -2882,14 +3396,23 @@ export type paths = {
         };
         /** Get Inbound Blacklist Entry */
         get: operations["getInboundBlacklistEntry"];
-        /** Update Inbound Blacklist Entry */
+        /**
+         * Update Inbound Blacklist Entry
+         * @description Owner and PBX Admin only.
+         */
         put: operations["updateInboundBlacklistEntry"];
         post?: never;
-        /** Delete Inbound Blacklist Entry */
+        /**
+         * Delete Inbound Blacklist Entry
+         * @description Owner and PBX Admin only.
+         */
         delete: operations["deleteInboundBlacklistEntry"];
         options?: never;
         head?: never;
-        /** Partially update Inbound Blacklist Entry */
+        /**
+         * Partially update Inbound Blacklist Entry
+         * @description Owner and PBX Admin only.
+         */
         patch: operations["patchInboundBlacklistEntry"];
         trace?: never;
     };
@@ -2917,7 +3440,11 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get blocked call logs */
+        /**
+         * Get blocked call logs
+         * @description Paginated blocked-call log, newest first. Every authenticated user of the organization
+         *     can read it. Filters are applied only when present and are not validated.
+         */
         get: operations["getBlockedCallLogs"];
         put?: never;
         post?: never;
@@ -2953,11 +3480,16 @@ export type paths = {
         };
         /**
          * List IVR Menus
-         * @description Get paginated list of IVR Menus
+         * @description Paginated list of the organization's IVR menus (any role). Each item includes its
+         *     options (ordered by priority) and `options_count`, except when `per_page=100`
+         *     (dropdown mode), which omits both.
          */
         get: operations["listIVRMenus"];
         put?: never;
-        /** Create IVR Menu */
+        /**
+         * Create IVR Menu
+         * @description Owner and PBX Admin only. Returns the menu with its options.
+         */
         post: operations["createIVRMenu"];
         delete?: never;
         options?: never;
@@ -2974,12 +3506,22 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get IVR Menu */
+        /**
+         * Get IVR Menu
+         * @description Any role. Returns the menu with its options (no `options_count`).
+         */
         get: operations["getIVRMenu"];
-        /** Update IVR Menu */
+        /**
+         * Update IVR Menu
+         * @description Owner and PBX Admin only. Full replacement with the same rules as create: the
+         *     existing options are deleted and recreated from `options`.
+         */
         put: operations["updateIVRMenu"];
         post?: never;
-        /** Delete IVR Menu */
+        /**
+         * Delete IVR Menu
+         * @description Owner and PBX Admin only. Refused with 409 when the menu is still referenced by routing (for example from a DID or an option of another menu). The 409 body lists the references.
+         */
         delete: operations["deleteIVRMenu"];
         options?: never;
         head?: never;
@@ -2999,7 +3541,10 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle IVR menu status */
+        /**
+         * Toggle IVR menu status
+         * @description Sets the menu's status. Owner and PBX Admin only.
+         */
         patch: operations["toggleIvrMenuStatus"];
         trace?: never;
     };
@@ -3010,7 +3555,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get available voices */
+        /**
+         * Get available voices
+         * @description TTS voices available from Cloudonix for the organization's domain (any role).
+         *     The response also carries the organization's Cloudonix package tier, which the IVR
+         *     voice picker uses to limit premium voices. Errors carry `error` and a `troubleshooting` list.
+         */
         get: operations["getIvrVoices"];
         put?: never;
         post?: never;
@@ -3030,15 +3580,20 @@ export type paths = {
         /**
          * List pending organization join requests
          * @description Returns all pending join requests for the authenticated user's
-         *     organization. Requires appropriate authorization.
+         *     organization, newest first, as a plain JSON array. Owner and PBX Admin only.
+         *     Not available to API keys.
          */
         get: operations["listOrganizationJoinRequests"];
         put?: never;
         /**
          * Create organization join request
-         * @description Submit a request to join an organization using a social identity.
-         *     The request must be approved by an organization administrator before
-         *     the user is created.
+         * @description Submit a request to join an organization using the social identity captured
+         *     during Auth0 onboarding (422 `ONBOARDING_EXPIRED` when the onboarding ID is
+         *     unknown or already used).
+         *     The request must be approved by an Owner or PBX Admin of the organization before
+         *     the user is created. Public; rate limited to 5 requests per minute per IP. An
+         *     unknown `organization_slug` fails validation (422); an organization that exists but
+         *     is not active returns 404.
          */
         post: operations["createOrganizationJoinRequest"];
         delete?: never;
@@ -3058,8 +3613,11 @@ export type paths = {
         put?: never;
         /**
          * Approve organization join request
-         * @description Approve a pending join request. Creates a new user in the organization
-         *     with the `pbx_user` role and links the social identity.
+         * @description Approve a pending join request. Owner and PBX Admin of the request's organization
+         *     only; not available to API keys. Creates an `active` user in the organization with
+         *     the `pbx_user` role and a random password, links the social identity, and marks the
+         *     request `approved`. `user` is the newly created user record (not the `User`
+         *     resource shape).
          */
         post: operations["approveOrganizationJoinRequest"];
         delete?: never;
@@ -3079,7 +3637,7 @@ export type paths = {
         put?: never;
         /**
          * Reject organization join request
-         * @description Reject a pending organization join request.
+         * @description Mark a join request `rejected`. Owner and PBX Admin of the request's organization only; not available to API keys. The request's current status is not checked.
          */
         post: operations["rejectOrganizationJoinRequest"];
         delete?: never;
@@ -3096,12 +3654,20 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List Outbound Whitelist Entrys
-         * @description Get paginated list of Outbound Whitelist Entrys
+         * List outbound whitelist entries
+         * @description Paginated list. Every authenticated user of the organization can list entries.
+         *     `meta` has current_page, per_page, total, last_page, from and to. Unknown `sort_by`
+         *     or `sort_order` values fall back to the defaults. Only list responses include the
+         *     nested `default_caller_id` object.
          */
         get: operations["listOutboundWhitelistEntrys"];
         put?: never;
-        /** Create Outbound Whitelist Entry */
+        /**
+         * Create Outbound Whitelist Entry
+         * @description Owner and PBX Admin only. `name`, `destination_country` and `outbound_trunk_name` are
+         *     trimmed; runs of spaces in `destination_prefix` are collapsed. `status` cannot be set
+         *     here: new entries are `active` (use toggle-status).
+         */
         post: operations["createOutboundWhitelistEntry"];
         delete?: never;
         options?: never;
@@ -3120,14 +3686,23 @@ export type paths = {
         };
         /** Get Outbound Whitelist Entry */
         get: operations["getOutboundWhitelistEntry"];
-        /** Update Outbound Whitelist Entry */
+        /**
+         * Update Outbound Whitelist Entry
+         * @description Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
+         */
         put: operations["updateOutboundWhitelistEntry"];
         post?: never;
-        /** Delete Outbound Whitelist Entry */
+        /**
+         * Delete Outbound Whitelist Entry
+         * @description Owner and PBX Admin only.
+         */
         delete: operations["deleteOutboundWhitelistEntry"];
         options?: never;
         head?: never;
-        /** Partially update Outbound Whitelist Entry */
+        /**
+         * Partially update Outbound Whitelist Entry
+         * @description Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
+         */
         patch: operations["patchOutboundWhitelistEntry"];
         trace?: never;
     };
@@ -3144,7 +3719,10 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        /** Toggle whitelist entry status */
+        /**
+         * Toggle whitelist entry status
+         * @description Owner and PBX Admin only. Flips `status` between `active` and `inactive`.
+         */
         patch: operations["toggleWhitelistStatus"];
         trace?: never;
     };
@@ -3156,12 +3734,19 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List Phone Numbers
-         * @description Get paginated list of Phone Numbers
+         * List phone numbers
+         * @description Paginated list ordered by created_at descending (per_page default 20, max 100). Returned
+         *     as a Laravel resource collection (top-level `links`). Every authenticated user of the
+         *     organization can list phone numbers.
          */
         get: operations["listPhoneNumbers"];
         put?: never;
-        /** Create Phone Number */
+        /**
+         * Create phone number
+         * @description Owner and PBX Admin only. `status` defaults to `active` when omitted. The routing target
+         *     named in `routing_config` must exist in the organization and be active (a ring group also
+         *     needs at least one active member); `unavailable` is rejected (422, "Choose a destination.").
+         */
         post: operations["createPhoneNumber"];
         delete?: never;
         options?: never;
@@ -3178,16 +3763,31 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get Phone Number */
+        /** Get phone number */
         get: operations["getPhoneNumber"];
-        /** Update Phone Number */
+        /**
+         * Update phone number
+         * @description Owner and PBX Admin only. All fields are optional; `phone_number` and `enable_non_e164`
+         *     are not accepted (`phone_number` is prohibited). When `routing_type` is sent,
+         *     `routing_config` must be sent too and the target is validated as on create (`unavailable`
+         *     is accepted). `routing_config` sent without `routing_type` is stored without target checks.
+         */
         put: operations["updatePhoneNumber"];
         post?: never;
-        /** Delete Phone Number */
+        /**
+         * Delete phone number
+         * @description Owner and PBX Admin only. Refused with 409 when the DID is still referenced (for example by routing, an auto-dialer caller ID pool, or a blocked-DID entry). The 409 body lists the references.
+         */
         delete: operations["deletePhoneNumber"];
         options?: never;
         head?: never;
-        /** Partially update Phone Number */
+        /**
+         * Partially update phone number
+         * @description Owner and PBX Admin only. All fields are optional; `phone_number` and `enable_non_e164`
+         *     are not accepted (`phone_number` is prohibited). When `routing_type` is sent,
+         *     `routing_config` must be sent too and the target is validated as on create (`unavailable`
+         *     is accepted). `routing_config` sent without `routing_type` is stored without target checks.
+         */
         patch: operations["patchPhoneNumber"];
         trace?: never;
     };
@@ -3199,22 +3799,22 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * Get default outbound caller ID (deprecated)
-         * @deprecated
-         * @description **Deprecated.** The organization-wide default caller ID has been superseded by the
-         *     per-extension and per-outbound-whitelist `default_caller_id_did_id` settings, and is
-         *     no longer consulted during outbound call routing. See the Outbound Calling Overview.
+         * Get default outbound caller ID
+         * @description The organization-wide default outbound caller ID. Outbound call routing presents it
+         *     when neither the calling extension nor the matched outbound whitelist rule has an
+         *     active `default_caller_id_did_id`; only an active DID of the organization counts,
+         *     otherwise the call presents `Unknown`. See the Outbound Calling Overview.
          *
          *     Returns the organization's default outbound caller ID DID, or `null` if none
-         *     is configured. Requires the DID `viewAny` ability.
+         *     is configured. Every authenticated user of the organization can read it.
          */
         get: operations["getDefaultCallerId"];
         /**
-         * Set default outbound caller ID (deprecated)
-         * @deprecated
-         * @description **Deprecated.** The organization-wide default caller ID has been superseded by the
-         *     per-extension and per-outbound-whitelist `default_caller_id_did_id` settings, and is
-         *     no longer consulted during outbound call routing. See the Outbound Calling Overview.
+         * Set default outbound caller ID
+         * @description The organization-wide default outbound caller ID. Outbound call routing presents it
+         *     when neither the calling extension nor the matched outbound whitelist rule has an
+         *     active `default_caller_id_did_id`; only an active DID of the organization counts,
+         *     otherwise the call presents `Unknown`. See the Outbound Calling Overview.
          *
          *     Sets or clears the organization's default outbound caller ID. When `did_id`
          *     is non-null the DID must exist in the organization and be active; when null the
@@ -3237,9 +3837,30 @@ export type paths = {
         };
         /**
          * View audit logs
-         * @description Platform-wide audit trail
+         * @description Platform-wide audit trail of platform-manager actions, newest first.
+         *     Platform managers only. `per_page` defaults to 25 (max 100).
          */
         get: operations["getAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/cdr-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search archived CDRs
+         * @description Warm-tier CDRs (older than 6 months, up to 12 months) across all organisations, newest first (`session_timestamp` descending). Platform managers only. `per_page` defaults to 25 (max 100). Older CDRs are gzip CSV files in the private cdr-archive S3 bucket and are not served by the API.
+         */
+        get: operations["listPlatformCdrArchive"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3257,7 +3878,7 @@ export type paths = {
         };
         /**
          * Platform dashboard
-         * @description Get cross-tenant statistics and dashboard data
+         * @description Cross-tenant statistics and dashboard data. Platform managers only.
          */
         get: operations["getPlatformDashboard"];
         put?: never;
@@ -3322,7 +3943,7 @@ export type paths = {
          *     switch is driven by the client sending the `X-Operate-As-Organization`
          *     request header (set to the target organization ID) on every
          *     subsequent request; see
-         *     [`ApplyOperateAsOrganization`](/architecture/security) middleware.
+         *     the `ApplyOperateAsOrganization` middleware ([Security](/opbx/architecture/security)).
          *
          *     Only a real, authenticated platform-manager `User` may call this —
          *     API key principals and non-platform-manager users are rejected.
@@ -3341,7 +3962,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List all organizations */
+        /**
+         * List all organizations
+         * @description All organizations with user, extension and DID counts. Platform managers only.
+         *     `per_page` defaults to 25 (max 100). An unknown `sort_by` value leaves the
+         *     result unsorted; any `sort_direction` other than `asc` sorts descending.
+         */
         get: operations["listOrganizations"];
         put?: never;
         post?: never;
@@ -3360,9 +3986,21 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get organization details */
+        /**
+         * Get organization details
+         * @description The organization with its users and counts. Platform managers only. Sensitive
+         *     values under `settings.cloudonix` (`domain_api_key`, `domain_requests_api_key`,
+         *     `domain_cdr_auth_key`, `api_key`, `api_secret`, `password`, `secret`, `token`)
+         *     longer than 4 characters are masked to asterisks plus their last 4 characters.
+         */
         get: operations["getOrganization"];
-        /** Update organization */
+        /**
+         * Update organization
+         * @description Updates the name, timezone and/or settings. Platform managers only. A field that
+         *     is omitted or null is left unchanged. `settings` is merged into the existing
+         *     settings at the top level (a key you send replaces that whole key). Writes an
+         *     `organization.settings.updated` audit log entry.
+         */
         put: operations["updatePlatformOrganization"];
         post?: never;
         delete?: never;
@@ -3384,7 +4022,18 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update organization status */
+        /**
+         * Update organization status
+         * @description Changes the organization status. Platform managers only. Allowed transitions:
+         *     `active` to `suspended` or `deleted`, `suspended` to `active` or `deleted`.
+         *
+         *     `deleted` is a **hard delete** and cannot be undone: inside one transaction it
+         *     revokes the users' API tokens, deletes the organization's extensions, ring groups,
+         *     business hours schedules, DIDs, call logs and users, then force-deletes the
+         *     organization. It is refused while any user of the organization is a platform
+         *     manager. Writes an `organization.status.updated` (or `organization.deleted`)
+         *     audit log entry carrying `reason`.
+         */
         patch: operations["updateOrganizationStatus"];
         trace?: never;
     };
@@ -3395,11 +4044,60 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List users by organization */
+        /**
+         * List users by organization
+         * @description Users of one organization. Platform managers only. `per_page` defaults to 25
+         *     (max 100). An unknown `sort_by` leaves the result unsorted; any `sort_direction`
+         *     other than `asc` sorts descending.
+         */
         get: operations["listOrganizationUsers"];
         put?: never;
-        /** Create user in organization */
+        /**
+         * Create user in organization
+         * @description Creates a user directly in the organization (no invitation). Platform managers
+         *     only. `status` defaults to `active`. Writes a `user.created` audit log entry.
+         */
         post: operations["createOrganizationUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform component status
+         * @description Latest health result for every platform component plus the last 24 hours of history (5-minute buckets, worst status per bucket). Written every minute by `platform:health-check`. Platform managers only.
+         */
+        get: operations["getPlatformStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/status/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run all health checks now
+         * @description Runs and stores every check, then returns the same payload as GET. Platform managers only. Throttled to 6 requests per minute per user.
+         */
+        post: operations["runPlatformStatusCheck"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3413,7 +4111,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List all users (cross-tenant) */
+        /**
+         * List all users (cross-tenant)
+         * @description Users of every organization, each with its `organization` (`id`, `name`, `slug`).
+         *     Platform managers only. `per_page` defaults to 25 (max 100). An unknown `sort_by`
+         *     leaves the result unsorted; any `sort_direction` other than `asc` sorts descending.
+         */
         get: operations["listAllUsers"];
         put?: never;
         post?: never;
@@ -3432,13 +4135,52 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get user details */
+        /**
+         * Get user details
+         * @description Any user in any organization, with its `organization` (`id`, `name`, `slug`). Platform managers only.
+         */
         get: operations["getPlatformUser"];
-        /** Update user */
+        /**
+         * Update user
+         * @description Updates any user in any organization. Platform managers only. Every field is
+         *     optional; omitted fields are unchanged. A `password` is hashed before it is stored.
+         *     Writes a `user.updated` audit log entry.
+         */
         put: operations["updatePlatformUser"];
         post?: never;
-        /** Delete user */
+        /**
+         * Delete user
+         * @description Deletes any user in any organization. Platform managers only. Inside one
+         *     transaction it first applies the deletion impact (see
+         *     `GET /v1/platform/users/{user}/delete-impact`), then deletes the user. Writes a
+         *     `user.deleted` audit log entry.
+         */
         delete: operations["deletePlatformUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/users/{user}/delete-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID (any organization) */
+                user: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Preview user deletion impact (platform)
+         * @description Platform manager only. Returns what deleting the user would change, across
+         *     all organizations, without changing anything. Same preview as the organization
+         *     endpoint `GET /v1/users/{user}/delete-impact`.
+         */
+        get: operations["getPlatformUserDeleteImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3465,10 +4207,8 @@ export type paths = {
         head?: never;
         /**
          * Update user password
-         * @description Update a user's password (platform manager only).
-         *
-         *     Allows platform managers to reset passwords for any user
-         *     across all organizations.
+         * @description Sets the password of any user in any organization (platform managers only).
+         *     Writes a `user.password.updated` audit log entry.
          */
         patch: operations["updatePlatformUserPassword"];
         trace?: never;
@@ -3486,7 +4226,13 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        /** Set platform manager flag */
+        /**
+         * Set platform manager flag
+         * @description Grants or revokes platform manager status. Platform managers only. Revoking also
+         *     revokes all of the user's API tokens. Revoking the last platform manager is
+         *     refused. Writes a `user.platform_manager.granted` or `user.platform_manager.revoked`
+         *     audit log entry.
+         */
         patch: operations["setPlatformManager"];
         trace?: never;
     };
@@ -3500,15 +4246,16 @@ export type paths = {
         /**
          * Get user profile
          * @description Returns current authenticated user's profile including
-         *     organization details and contact information.
+         *     organization details, contact information and the user's own extension. Any role.
+         *     Not available to API keys (403).
          */
         get: operations["getProfile"];
         /**
          * Update user profile
          * @description Update current user's profile information.
-         *     Only fields provided will be updated.
+         *     Only fields provided will be updated. Any role. Not available to API keys (403).
          *
-         *     **Note**: Role changes require Owner permission.
+         *     **Note**: Sending `role` is always refused with 403, because nobody can change their own role (use `PUT /v1/users/{user}`). A platform manager operating as an organization cannot update their own profile (403 `OPERATE_AS_SELF_MUTATION_FORBIDDEN`).
          */
         put: operations["updateProfile"];
         post?: never;
@@ -3528,11 +4275,12 @@ export type paths = {
         get?: never;
         /**
          * Update organization
-         * @description Update organization details.
+         * @description Update organization details. Only fields provided are updated.
          *
-         *     **Authorization:** Only users with Owner role can update organization.
+         *     **Authorization:** Only users with Owner role can update organization. Not
+         *     available to API keys.
          *
-         *     Rate limited with `throttle:sensitive` middleware.
+         *     Rate limited with `throttle:sensitive`: 10 requests per minute per user.
          */
         put: operations["updateOrganization"];
         post?: never;
@@ -3561,9 +4309,114 @@ export type paths = {
          *
          *     **Security:** All authentication tokens are revoked after password change.
          *
-         *     Rate limited with `throttle:sensitive` middleware.
+         *     Any role. Not available to API keys. A platform manager operating as an organization
+         *     cannot change their own password (403 `OPERATE_AS_SELF_MUTATION_FORBIDDEN`).
+         *
+         *     Rate limited with `throttle:sensitive`: 10 requests per minute per user.
          */
         put: operations["updatePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/queues-dashboard/{token}/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization's public queues dashboard token (from `GET /v1/queues-dashboard/link`). */
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * List queues (wallboard)
+         * @description Public, unauthenticated wallboard endpoint keyed by the organization's dashboard token.
+         *     Returns every queue of the organization, sorted by name. Rate limited to 120
+         *     requests per minute per client IP. Returns 404 for an unknown token.
+         */
+        get: operations["getPublicQueuesDashboardQueues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/queues-dashboard/{token}/queues/{queue}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Queue ID */
+                queue: number;
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Live queue snapshot (wallboard)
+         * @description Current waiting callers, agent states and rolling counts for one queue of the token's
+         *     organization. Waiting callers and agent states come from the ACD worker; when it is
+         *     unreachable both arrays are empty. Rate limited to 120 requests per minute per client IP.
+         */
+        get: operations["getPublicQueuesDashboardLive"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/queues-dashboard/{token}/queues/{queue}/stats": {
+        parameters: {
+            query?: {
+                /** @description Start of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to 24 hours ago. */
+                from?: string;
+                /** @description End of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to now. */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Queue ID */
+                queue: number;
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Queue statistics (wallboard)
+         * @description Handled (answered), abandoned and overflowed totals plus waiting and handling time
+         *     statistics of answered calls, for calls that entered one queue during the period.
+         *     Rate limited to 120 requests per minute per client IP.
+         */
+        get: operations["getPublicQueuesDashboardStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public platform status
+         * @description Unauthenticated platform status for the public status page. Six service groups, each with its current status and 6 hours of history (5-minute buckets). Cached for 30 seconds; limited to 60 requests per minute per IP. Exposes no component names, versions, latency or error details.
+         */
+        get: operations["getPublicStatus"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3578,7 +4431,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List queue call report rows */
+        /**
+         * List queue call report rows
+         * @description One row per caller that entered a queue, newest `entered_at` first. Owner, PBX Admin,
+         *     Reporter and PBX User only (Supervisor gets 403). `from`/`to` filter on `entered_at`.
+         *     The `meta` object has no `from`/`to` keys.
+         */
         get: operations["listQueueCalls"];
         put?: never;
         post?: never;
@@ -3595,10 +4453,63 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Export queue calls (CSV) */
+        /**
+         * Export queue calls (CSV)
+         * @description Streams every matching row (no pagination) as `queue-calls-YYYY-MM-DD-HHMMSS.csv`, newest
+         *     first. Same filters and roles as `GET /v1/queue-calls`. Columns: Queue Call ID, Queue ID,
+         *     Call ID, From, To, Entered At, Answered At, Abandoned At, Ended At, Agent User ID,
+         *     Waiting Seconds, Handling Seconds, Disposition.
+         */
         get: operations["exportQueueCalls"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/queues-dashboard/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get queues dashboard link
+         * @description Returns the public wallboard URL for the organization's queues dashboard.
+         *     The token (a UUID) is created on the first call. The URL base is the organization's
+         *     effective webhook base URL (falling back to the app URL), so wallboard browsers can
+         *     reach it. Owner and PBX Admin only (also when operating as the organization); API keys
+         *     are refused because this route has no API-key grant.
+         *     Anyone holding the URL can read the queue dashboard endpoints under
+         *     `/v1/public/queues-dashboard/{token}`, so treat it as a secret.
+         */
+        get: operations["getQueuesDashboardLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/queues-dashboard/link/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate queues dashboard link
+         * @description Rotates the public queues dashboard token. The previous URL stops working
+         *     immediately. Owner and PBX Admin only.
+         */
+        post: operations["regenerateQueuesDashboardLink"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3613,12 +4524,21 @@ export type paths = {
             cookie?: never;
         };
         /**
-         * List Recordings
-         * @description Get paginated list of Recordings
+         * List recordings
+         * @description Paginated list, 20 per page (`per_page` is not accepted), in database order (no explicit
+         *     sort). Returned as a Laravel resource collection (top-level `links`). Owner, PBX Admin and
+         *     Reporter only.
          */
         get: operations["listRecordings"];
         put?: never;
-        /** Create Recording */
+        /**
+         * Create recording
+         * @description Owner and PBX Admin only. Requires a user token; API keys get 403. New recordings are
+         *     `active` with `is_moh` false. An uploaded file is processed in the background (metadata
+         *     such as duration is filled in later). A `remote` URL must also pass the server's URL check
+         *     (valid http(s) URL on an allowed domain when a domain allowlist is configured); a failure
+         *     returns 422 with `error: Invalid remote URL`.
+         */
         post: operations["createRecording"];
         delete?: never;
         options?: never;
@@ -3635,16 +4555,29 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get Recording */
+        /**
+         * Get recording
+         * @description Owner, PBX Admin and Reporter only.
+         */
         get: operations["getRecording"];
-        /** Update Recording */
+        /**
+         * Update recording
+         * @description Owner and PBX Admin only. Every field is optional.
+         */
         put: operations["updateRecording"];
         post?: never;
-        /** Delete Recording */
+        /**
+         * Delete recording
+         * @description Owner and PBX Admin only. Refused with 409 while an IVR menu greeting or a call queue's
+         *     hold music still uses the recording. Deletes the stored file of an uploaded recording.
+         */
         delete: operations["deleteRecording"];
         options?: never;
         head?: never;
-        /** Partially update Recording */
+        /**
+         * Partially update recording
+         * @description Owner and PBX Admin only. Every field is optional.
+         */
         patch: operations["patchRecording"];
         trace?: never;
     };
@@ -3655,7 +4588,13 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Download specific recording */
+        /**
+         * Download specific recording
+         * @description Issues an access token for `GET /v1/recordings/download`. Owner, PBX Admin and Reporter
+         *     only. `expires_in` is always reported as 1800; the token's real lifetime is
+         *     `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30). `filename` is the original upload
+         *     name, or the stored file name when that is unknown.
+         */
         get: operations["downloadRecording"];
         put?: never;
         post?: never;
@@ -3672,7 +4611,11 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Download recording with token */
+        /**
+         * Download recording with token
+         * @description Streams (or downloads) a recording using the access token issued by `GET /v1/recordings/{recording}/download` (also embedded in a recording's `playback_url`). The token is sent as `Authorization: Bearer <token>` (preferred) or `?token=`. No Sanctum session, API key or rate limit applies. The token is valid for `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30).
+         *     `Content-Type` is the recording's stored MIME type (`application/octet-stream` when unknown). The file is sent inline with `Accept-Ranges: bytes` when the request has `Sec-Fetch-Dest: audio` or an `Accept` header containing `audio`; otherwise it is sent as an attachment (`Content-Disposition: attachment; filename="<original filename>"`).
+         */
         get: operations["downloadRecordingWithToken"];
         put?: never;
         post?: never;
@@ -3689,10 +4632,22 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** List ring groups */
+        /**
+         * List ring groups
+         * @description Any role. Supervisors see only the ring groups assigned to them. Each item includes
+         *     its members (ordered by priority), `fallback_extension`, `members_count` and
+         *     `active_members_count`.
+         */
         get: operations["listRingGroups"];
         put?: never;
-        /** Create ring group */
+        /**
+         * Create ring group
+         * @description Owner and PBX Admin only. Omitted fields get defaults: `strategy` simultaneous,
+         *     `timeout` 30, `ring_turns` 2, `fallback_action` hangup, `status` active. Members must
+         *     be active `user` or `forward` extensions of the organization; a fallback target
+         *     (extension, ring group, IVR menu, AI assistant, AI load balancer, call queue) must be
+         *     active and, for `ai_assistant`, an AI assistant extension.
+         */
         post: operations["createRingGroup"];
         delete?: never;
         options?: never;
@@ -3709,16 +4664,32 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get ring group */
+        /**
+         * Get ring group
+         * @description Owner, PBX Admin, PBX User and Reporter; a Supervisor only for an assigned ring
+         *     group (otherwise 403). Includes members and `fallback_extension`.
+         */
         get: operations["getRingGroup"];
-        /** Update ring group */
+        /**
+         * Update ring group
+         * @description Owner and PBX Admin only. Every field is optional (no defaults are applied); sent
+         *     `members` replace the member list, omitted `members` are kept. The `fallback_*_id`
+         *     matching the effective `fallback_action` is kept or replaced; the others are cleared.
+         *     Answers 409 when another update of the same ring group holds its lock.
+         */
         put: operations["updateRingGroup"];
         post?: never;
-        /** Delete ring group */
+        /**
+         * Delete ring group
+         * @description Owner and PBX Admin only. Refused with 409 when the ring group is still referenced (for example as a fallback or from an extension). The 409 body lists the references.
+         */
         delete: operations["deleteRingGroup"];
         options?: never;
         head?: never;
-        /** Partially update ring group */
+        /**
+         * Partially update ring group
+         * @description Same as PUT.
+         */
         patch: operations["patchRingGroup"];
         trace?: never;
     };
@@ -3729,7 +4700,11 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get session details */
+        /**
+         * Get session details
+         * @description All session-update events of one session in the organization, oldest first. Any role;
+         *     for a Supervisor, a session outside their scope answers 404.
+         */
         get: operations["getSessionDetails"];
         put?: never;
         post?: never;
@@ -3754,11 +4729,11 @@ export type paths = {
          *     whisper to, or barge into a live call via the in-browser Web Phone.
          *
          *     This is the UI-facing authorization layer. It enforces:
-         *     - `owner`/`supervisor` role (403 otherwise);
+         *     - `owner`/`supervisor` role (403 otherwise; API keys always get 403);
          *     - for Supervisors, the session must be within their assigned scope (403 otherwise);
          *     - tenant isolation via an explicit `organization_id` filter (cross-org lookups return 404);
-         *     - the session must be active (`processing`/`ringing`/`connected`) with a
-         *       non-empty session token (422 otherwise).
+         *     - the latest stored update of the session must be `processing`/`ringing`/`connected`
+         *       with a non-empty session token (422 otherwise).
          *
          *     The returned `destination` embeds the target session's secret token and the
          *     coaching policy. Dialing it triggers the `/voice/route` webhook, where
@@ -3785,9 +4760,11 @@ export type paths = {
         post?: never;
         /**
          * Disconnect session
-         * @description Disconnects an active call. Owner only
-         *     (`SessionUpdatePolicy::disconnect`). Supervisors and PBX Admins cannot
-         *     disconnect calls.
+         * @description Disconnects a call through the Cloudonix API, using the session token received from
+         *     the session-update webhooks. Owner only (`SessionUpdatePolicy::disconnect`);
+         *     Supervisors and PBX Admins cannot disconnect calls. An API key with
+         *     `session-updates:write` can. The session must belong to the organization; its
+         *     status is not checked.
          */
         delete: operations["disconnectSession"];
         options?: never;
@@ -3802,7 +4779,17 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get active calls */
+        /**
+         * Get active calls
+         * @description Live calls of the organization (any role; Supervisors see only calls whose caller or
+         *     destination is in their assigned scope). A call is active when the latest
+         *     session-update row of its session has status `processing`, `ringing`, `connected` or
+         *     `answer`, was updated in the last 30 minutes, and the session has no `cdr_final_status`
+         *     or `deleted` event in the last 24 hours. Calls are ordered by last update (newest
+         *     first) and capped at 100. Not rate-limited.
+         *
+         *     `meta` counts are computed over the returned (filtered, capped) list.
+         */
         get: operations["getActiveSessions"];
         put?: never;
         post?: never;
@@ -3819,7 +4806,12 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get active calls statistics */
+        /**
+         * Get active calls statistics
+         * @description Aggregates over the same active-call set as `GET /v1/session-updates/active` (same
+         *     30-minute window and Supervisor scope), without the 100-call cap or filters. Any role.
+         *     `total_active` also counts calls in `answer` status, which `by_status` does not list.
+         */
         get: operations["getActiveSessionStats"];
         put?: never;
         post?: never;
@@ -3836,9 +4828,30 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get Cloudonix settings */
+        /**
+         * Get Cloudonix settings
+         * @description The organization's Cloudonix settings with masked keys, the webhook URLs to give
+         *     Cloudonix, and where the webhook base URL comes from. Owner only. When no settings
+         *     exist yet, `settings` is null, the URLs are built from the app URL and
+         *     `webhook_url_details` is omitted.
+         */
         get: operations["getCloudonixSettings"];
-        /** Update Cloudonix settings */
+        /**
+         * Update Cloudonix settings
+         * @description Creates or updates the organization's Cloudonix settings. Owner only. Optional fields
+         *     that are omitted keep their stored value; a nullable field sent as null is cleared.
+         *     A key value containing `***` (a masked key sent back unchanged) is ignored and the
+         *     stored key is kept.
+         *
+         *     When a domain UUID and API key are available, the domain profile is read from
+         *     Cloudonix and its domain name is stored; the request is refused with 422 when that
+         *     domain is already registered to another organization. When the settings are
+         *     configured (UUID and API key set), they are pushed to the Cloudonix domain profile:
+         *     if no `domain_requests_api_key` is set, one is generated and pushed in the same step.
+         *     On a successful push the organization's Cloudonix voice application is created or
+         *     updated. A failed push or voice application setup does not fail the request: the
+         *     settings stay saved and `message` and `warning` carry the error.
+         */
         put: operations["updateCloudonixSettings"];
         post?: never;
         delete?: never;
@@ -3856,7 +4869,11 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Generate API requests key */
+        /**
+         * Generate API requests key
+         * @description Returns a new random 32-character alphanumeric key for `domain_requests_api_key`.
+         *     Owner only. The key is not stored; send it in `PUT /v1/settings/cloudonix` to save it.
+         */
         post: operations["generateRequestsKey"];
         delete?: never;
         options?: never;
@@ -3871,7 +4888,11 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        /** Get outbound trunks */
+        /**
+         * Get outbound trunks
+         * @description Lists the outbound voice trunks of the organization's Cloudonix domain, as returned
+         *     by the Cloudonix API. Owner only.
+         */
         get: operations["getOutboundTrunks"];
         put?: never;
         post?: never;
@@ -3890,7 +4911,14 @@ export type paths = {
         };
         get?: never;
         put?: never;
-        /** Validate Cloudonix credentials */
+        /**
+         * Validate Cloudonix credentials
+         * @description Checks a domain UUID and API key against Cloudonix without saving anything. Owner
+         *     only. A `domain_api_key` containing `***` (a masked key) is replaced by the stored
+         *     key. On success, `profile_settings` carries values read from the domain profile that
+         *     the settings form can prefill. On success the domain's package tier is also written
+         *     to the organization's package cache (see `GET /v1/ivr-menus/voices`).
+         */
         post: operations["validateCloudonixCredentials"];
         delete?: never;
         options?: never;
@@ -3908,16 +4936,17 @@ export type paths = {
         /**
          * Get supervisor assignments
          * @description Returns the users and ring groups assigned to a Supervisor. If the target
-         *     user is not a Supervisor, the `user_ids` and `ring_group_ids` arrays are empty.
-         *     Owner and PBX Admin can view any supervisor's assignments; a supervisor may
-         *     view their own.
+         *     user is not a Supervisor, the `user_ids` and `ring_group_ids` arrays are empty
+         *     and `users` / `ring_groups` are omitted. Owner and PBX Admin can view any
+         *     supervisor's assignments in their organization; a supervisor may view their own.
          */
         get: operations["getSupervisorAssignments"];
         /**
          * Update supervisor assignments
          * @description Replaces the Supervisor's assigned users and ring groups with the supplied
-         *     sets. All resources must belong to the same organization. A Supervisor cannot
-         *     be assigned to themselves or to another Supervisor. Owner and PBX Admin only.
+         *     sets (duplicates are ignored; send empty arrays to clear). All resources must
+         *     belong to the caller's organization. Only users with the `pbx_user` role can be
+         *     assigned, and a Supervisor cannot be assigned to themselves. Owner and PBX Admin only.
          */
         put: operations["updateSupervisorAssignments"];
         post?: never;
@@ -3936,13 +4965,15 @@ export type paths = {
         };
         /**
          * List Trunks
-         * @description List SIP trunks proxied from Cloudonix, optionally filtered by direction.
+         * @description List the SIP trunks of the organization's Cloudonix domain, optionally filtered by
+         *     direction (exact match on the Cloudonix value). Owner and PBX Admin only. Each trunk
+         *     carries the names of the outbound whitelist entries that use it.
          */
         get: operations["listTrunks"];
         put?: never;
         /**
          * Create Trunk
-         * @description Create a trunk in Cloudonix. Only `inbound`/`outbound` directions are accepted; Cloudonix normalizes them to `public-inbound`/`public-outbound`. `password` is write-only and is never returned in responses.
+         * @description Create a trunk in Cloudonix. Only `inbound`/`outbound` directions are accepted; Cloudonix normalizes them to `public-inbound`/`public-outbound`. `password` is write-only and is never returned in responses. `overwrite_from` is sent to Cloudonix only together with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always empty in the response.
          */
         post: operations["createTrunk"];
         delete?: never;
@@ -3961,19 +4992,29 @@ export type paths = {
             };
             cookie?: never;
         };
-        /** Get Trunk */
+        /**
+         * Get Trunk
+         * @description One trunk of the organization's Cloudonix domain, with `in_use_by`. Owner and PBX Admin only.
+         */
         get: operations["getTrunk"];
         /**
          * Update Trunk
-         * @description Update a trunk in Cloudonix. `name` and `direction` are immutable post-create. All fields are optional. Omitting `password` leaves the stored credential untouched; `password` is write-only and is never returned in responses.
+         * @description Update a trunk in Cloudonix. `name` and `direction` are immutable post-create. All fields are optional. Omitting `password` leaves the stored credential untouched; `password` is write-only and is never returned in responses. Sending `prefix` as an empty string or null clears the prefix; omitting it leaves it unchanged. Sending `username` as an empty string or null (without a `password`) clears the stored username and password. `overwrite_from` is sent to Cloudonix only together with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always empty in the response.
          */
         put: operations["updateTrunk"];
         post?: never;
-        /** Delete Trunk */
+        /**
+         * Delete Trunk
+         * @description Deletes the trunk in Cloudonix. Owner and PBX Admin only. Outbound whitelist entries that use it are not changed.
+         */
         delete: operations["deleteTrunk"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Partially update a trunk
+         * @description Update a trunk in Cloudonix. `name` and `direction` are immutable post-create. All fields are optional. Omitting `password` leaves the stored credential untouched; `password` is write-only and is never returned in responses. Sending `prefix` as an empty string or null clears the prefix; omitting it leaves it unchanged. Sending `username` as an empty string or null (without a `password`) clears the stored username and password. `overwrite_from` is sent to Cloudonix only together with `username`/`password`. Owner and PBX Admin only. `in_use_by` is always empty in the response.
+         */
+        patch: operations["patchTrunk"];
         trace?: never;
     };
     "/v1/users": {
@@ -3985,20 +5026,19 @@ export type paths = {
         };
         /**
          * List users
-         * @description Get a paginated list of users in the organization.
-         *     Supports filtering and sorting.
+         * @description Get a paginated list of users in the organization, sorted by `sort_by` (newest first by default). Owner and PBX Admin see every user; a Supervisor sees only themselves and their assigned users; PBX User and Reporter get 403. Each user includes its assigned `extension`.
          */
         get: operations["listUsers"];
         put?: never;
         /**
          * Create user
-         * @description Create a new user in the organization.
+         * @description Create a new user in the organization. Owner and PBX Admin only.
          *
          *     **Role Restrictions:**
-         *     - Owner role cannot be assigned (single owner per organization)
-         *     - PBX Admins can only create PBX Users or Reporters
+         *     - Owner role cannot be assigned (422)
+         *     - A PBX Admin cannot create a PBX Admin (422)
          *
-         *     Default status is `active` if not specified.
+         *     Default status is `active` if not specified. An Embedded Dialer token is created for the new user.
          */
         post: operations["createUser"];
         delete?: never;
@@ -4016,39 +5056,67 @@ export type paths = {
         };
         /**
          * Get user
-         * @description Get a specific user by ID
+         * @description Get a specific user by ID. Owner and PBX Admin can read any user; a Supervisor themselves and their assigned users; PBX User and Reporter only themselves.
          */
         get: operations["getUser"];
         /**
          * Update user
-         * @description Update an existing user.
+         * @description Update an existing user. All fields are optional.
          *
          *     **Restrictions:**
-         *     - Users cannot change their own role
-         *     - Owner role cannot be assigned
-         *     - PBX Admins cannot modify Owner or PBX Admin users
+         *     - Owner and PBX Admin can update any user, except that only an Owner can update an Owner; a PBX User can update only themselves; Supervisor and Reporter get 403
+         *     - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
+         *     - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an Owner (403)
+         *     - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
          */
         put: operations["updateUser"];
         post?: never;
         /**
          * Delete user
-         * @description Delete a user from the organization.
+         * @description Delete a user from the organization. Owner and PBX Admin only; you cannot delete yourself, and only an Owner can delete an Owner. The last Owner of the organization cannot be deleted (409).
          *
-         *     **Restriction:** Cannot delete the last owner in the organization.
+         *     The user's extensions are kept but unassigned, their ring group and call queue memberships are removed, and routing entries that pointed at their extensions are switched to `unavailable`. Preview this with `GET /v1/users/{user}/delete-impact`.
          */
         delete: operations["deleteUser"];
         options?: never;
         head?: never;
         /**
          * Partially update user
-         * @description Update an existing user.
+         * @description Update an existing user. All fields are optional.
          *
          *     **Restrictions:**
-         *     - Users cannot change their own role
-         *     - Owner role cannot be assigned
-         *     - PBX Admins cannot modify Owner or PBX Admin users
+         *     - Owner and PBX Admin can update any user, except that only an Owner can update an Owner; a PBX User can update only themselves; Supervisor and Reporter get 403
+         *     - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
+         *     - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an Owner (403)
+         *     - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
          */
         patch: operations["patchUser"];
+        trace?: never;
+    };
+    "/v1/users/{user}/delete-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user: number;
+            };
+            cookie?: never;
+        };
+        /**
+         * Preview user deletion impact
+         * @description Returns what deleting this user would change, without changing anything: the
+         *     extensions it holds, the ring group and call queue memberships that would be
+         *     removed, and the routing entries that would be switched to `unavailable`. Use it to
+         *     confirm a delete. Authorization is the same as `DELETE /v1/users/{user}`.
+         */
+        get: operations["getUserDeleteImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/users/{user}/embed-token": {
@@ -4066,7 +5134,7 @@ export type paths = {
         };
         /**
          * Get user embed token settings
-         * @description Get the [Embedded Dialer](/modules/embedded-dialer) settings for a
+         * @description Get the [Embedded Dialer](/opbx/modules/embedded-dialer) settings for a
          *     user's embed token (icon position/color, last-used timestamp). Never
          *     returns the plaintext token — only the initial generate/regenerate
          *     response does.
@@ -4075,7 +5143,8 @@ export type paths = {
          *     settings) on first access.
          *
          *     Caller must be Owner or PBX Admin, in the same organization as the
-         *     target user.
+         *     target user (only an Owner can manage an Owner's token; a user of another
+         *     organization returns 403). Not available to API keys.
          */
         get: operations["getUserEmbedToken"];
         put?: never;
@@ -4090,7 +5159,8 @@ export type paths = {
          *     `regenerate` endpoint for that.
          *
          *     Caller must be Owner or PBX Admin, in the same organization as the
-         *     target user.
+         *     target user (only an Owner can manage an Owner's token; a user of another
+         *     organization returns 403). Not available to API keys.
          */
         patch: operations["updateUserEmbedToken"];
         trace?: never;
@@ -4119,8 +5189,9 @@ export type paths = {
          *     again after this response.
          *
          *     Caller must be Owner or PBX Admin, in the same organization as the
-         *     target user. See the
-         *     [Embedded Dialer guide](/modules/embedded-dialer) for how to install
+         *     target user (only an Owner can manage an Owner's token; a user of another
+         *     organization returns 403). Not available to API keys. See the
+         *     [Embedded Dialer guide](/opbx/modules/embedded-dialer) for how to install
          *     the snippet.
          */
         post: operations["regenerateUserEmbedToken"];
@@ -4151,10 +5222,10 @@ export type paths = {
         head?: never;
         /**
          * Update user password
-         * @description Update a user's password.
-         *
-         *     Requires appropriate authorization. Users can only change their own
-         *     password unless they have admin privileges.
+         * @description Set another user's password. You cannot change your own password here (use
+         *     `PUT /v1/profile/password`). An Owner can set any other user's password; a PBX Admin
+         *     only the password of a PBX User or Reporter. Everyone else gets 403. Not available to
+         *     API keys.
          */
         patch: operations["updateUserPassword"];
         trace?: never;
@@ -4170,9 +5241,12 @@ export type paths = {
         put?: never;
         /**
          * Invite a new user
-         * @description Invite a new user to the organization by email. An invitation email
-         *     is sent with a magic-link token. The invited user must authenticate
-         *     via Auth0 to activate their account.
+         * @description Invite a new user to the organization by email. Owner and PBX Admin only. The
+         *     email is lower-cased. A `pending` PBX User named after the email's local part is
+         *     created and an invitation email with a magic-link token (valid 24 hours) is sent.
+         *     The invited user must authenticate via Auth0 to activate their account. Inviting an
+         *     email that already belongs to a `pending` user of the organization re-sends the
+         *     invitation with a new token. At most 10 invitations per organization per hour.
          */
         post: operations["inviteUser"];
         delete?: never;
@@ -4192,8 +5266,9 @@ export type paths = {
         put?: never;
         /**
          * Accept invitation and start Auth0 binding
-         * @description Consume an invitation token and return an Auth0 authorize URL for the
-         *     invited user to authenticate and bind their social identity.
+         * @description Consume an invitation token (single use) and return an Auth0 authorize URL for the
+         *     invited user to authenticate and bind their social identity. Public; rate limited
+         *     to 5 requests per minute per IP.
          */
         post: operations["acceptInvitation"];
         delete?: never;
@@ -4212,7 +5287,8 @@ export type paths = {
         /**
          * Validate invitation token
          * @description Validate an invitation token without consuming it. Returns the email
-         *     and organization name associated with the invitation.
+         *     and organization name associated with the invitation. Public; rate limited to
+         *     5 requests per minute per IP.
          */
         get: operations["validateInvitationToken"];
         put?: never;
@@ -4234,7 +5310,7 @@ export type paths = {
          * Validate email address
          * @description Async email validation during registration.
          *     Uses UserCheck.com API for disposable/blocklisted email detection.
-         *     Rate limited to 10 requests per minute.
+         *     Rate limited to 10 requests per minute per IP.
          */
         get: operations["validateEmail"];
         put?: never;
@@ -4254,11 +5330,11 @@ export type paths = {
         };
         /**
          * Get Web Phone recent calls
-         * @description Returns the 50 most recent calls placed from the authenticated user's
-         *     own `user`-type extension, most recent first. Coaching sentinel
-         *     destinations (spy/barge/whisper) are excluded.
+         * @description Returns the 50 most recent CDRs whose caller (`from`) is the authenticated
+         *     user's own `user`-type extension number, most recent first. Coaching sentinel
+         *     destinations (`spy_*`, `barge_*`, `whisper_*`) are excluded.
          *
-         *     Available to any authenticated role. The user must have a
+         *     Available to any authenticated role (not to API keys). The user must have a
          *     `user`-type extension assigned, otherwise `404` is returned.
          */
         get: operations["getWebPhoneCallsLog"];
@@ -4282,10 +5358,11 @@ export type paths = {
          * @description Returns JsSIP-compatible SIP provisioning for the authenticated user's own
          *     extension so the in-browser softphone can register with Cloudonix over WebRTC.
          *
-         *     Available to any authenticated role. The user must have a `user`-type
-         *     extension assigned and the organization must have Cloudonix settings configured,
-         *     otherwise `404` is returned. The `country` field is read from the organization
-         *     `settings` JSON (defaults to `us`) and drives call-progress tone cadences.
+         *     Available to any authenticated role (not to API keys). The user must have a
+         *     `user`-type extension assigned, otherwise `404` is returned; the organization must
+         *     have Cloudonix settings with a domain name, otherwise `409` is returned. The
+         *     `country` field is read from the organization `settings` JSON (lowercased; defaults
+         *     to `us`) and drives call-progress tone cadences.
          */
         get: operations["getWebPhoneConfig"];
         put?: never;
@@ -4307,12 +5384,47 @@ export type paths = {
         put?: never;
         /**
          * AMD action handler
-         * @description Receives detection results from the AMD (Answering Machine Detection) worker.
-         *     Processes the AMD result and determines the next action for the call.
+         * @description Receives the Answering Machine Detection result from the AMD worker and runs the
+         *     auto-dialer campaign's configured action for that result (`action_voicemail`,
+         *     `action_human` or `action_unknown`; empty means `CONTINUE`). The action is never
+         *     taken from the request.
          *
-         *     Middleware: None (public endpoint)
+         *     - Stores `amd_result` and `amd_confidence` on the call session and writes an `amd`
+         *       object (result, confidence, detectionTimeMs, reason, timestamp) to the Cloudonix
+         *       session profile (best effort).
+         *     - `HANGUP`: disconnects the Cloudonix session; `status` is `error` when the
+         *       disconnect fails.
+         *     - `CONTINUE`: nothing else happens.
+         *
+         *     Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`, checked in the
+         *     controller (no route middleware). Not rate-limited.
          */
         post: operations["amdAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/voice/amd-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * AMD stream admission check
+         * @description Called by the AMD worker when a media stream starts. Checks that the session
+         *     token belongs to a known, active (not terminated) auto-dialer call. Only then
+         *     does the worker analyse the stream.
+         *
+         *     Authentication: `Authorization: Bearer <AMD_WORKER_API_TOKEN>`, checked in the
+         *     controller (no route middleware). Not rate-limited.
+         */
+        post: operations["amdSessionCheck"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4350,7 +5462,20 @@ export type paths = {
         put?: never;
         /**
          * Handle IVR digit input
-         * @description Process DTMF input from IVR menu
+         * @description `<Gather>` action of an IVR menu: receives the DTMF digits the caller pressed and
+         *     returns CXML. The IVR menu comes from the `menu_id` query parameter that the IVR
+         *     routing strategy puts in the Gather `action` URL.
+         *
+         *     - A matching option routes to that option's destination.
+         *     - An unknown option replays the menu, until the menu's `max_turns` is exceeded; then
+         *       the call goes to the menu's failover destination.
+         *     - An unknown or other-organization `menu_id`, or no IVR state for `CallSid`, answers
+         *       200 CXML that says the error and hangs up.
+         *
+         *     Authentication, 400/401 CXML responses and the 422/302 validation behaviour are the
+         *     same as `POST /voice/route`. The body must be JSON: the authentication middleware
+         *     reads `Domain` and `To` from the JSON body. Unexpected exceptions answer 200 CXML.
+         *     Not rate-limited.
          */
         post: operations["handleIvrInput"];
         delete?: never;
@@ -4370,14 +5495,35 @@ export type paths = {
         put?: never;
         /**
          * Inbound call routing
-         * @description Main inbound call routing endpoint.
+         * @description Main call routing webhook, called by Cloudonix for every new call. Returns a CXML
+         *     document (`Content-Type: application/xml`) that tells Cloudonix how to route the call.
          *
-         *     Returns CXML (Cloudonix XML) document instructing the platform
-         *     how to route the call based on organizational configuration.
+         *     Authentication: `Authorization: Bearer <domain_requests_api_key>` of the organization
+         *     named by `Domain` (`voiceWebhookAuth`). The middleware runs before validation and
+         *     answers with CXML (`<Say>` + `<Hangup/>`): 401 for a missing or wrong token, an
+         *     unknown domain or an organization without a key; 400 when `Domain` or `To` is missing.
+         *     The middleware sets `_organization_id`; a value sent by the caller is overwritten.
          *
-         *     Middleware: voice.webhook.auth, rate_limit_org:voice_routing
+         *     Routing, in order:
+         *     - `To` is a supervisor coaching target (`spy_`, `barge_`, `whisper_<party>_` + token):
+         *       a `<Coach>` verb for the supervisor's Web Phone.
+         *     - `To` is `*45<queue id>`: call queue agent login/logout toggle for the calling
+         *       extension, answered with a spoken confirmation and `<Hangup/>`.
+         *     - `Direction` `subscriber` or `application`: extension, then DID, then outbound
+         *       (outbound whitelist) routing.
+         *     - `Direction` `outbound`: outbound whitelist routing only.
+         *     - `Direction` `inbound` (or missing/other): inbound blacklist check on the DID, then
+         *       the DID's configured destination (extension, ring group, IVR menu, business hours,
+         *       conference room, call queue, AI assistant, AI load balancer). A call
+         *       from one of the organization's own DIDs is routed like a subscriber call.
          *
-         *     Authentication: Bearer token (per-organization domain_requests_api_key)
+         *     When nothing matches, the response is 200 CXML that says the reason (for example
+         *     `Extension not found`, `Outbound call not permitted`) and hangs up. Unexpected
+         *     exceptions also answer 200 CXML (`We are sorry, an error occurred...`). Not
+         *     rate-limited.
+         *
+         *     A validation failure (see the request schema) is not CXML: Laravel answers 422 JSON
+         *     when the request accepts JSON, otherwise a 302 redirect.
          */
         post: operations["voiceRoute"];
         delete?: never;
@@ -4397,9 +5543,23 @@ export type paths = {
         put?: never;
         /**
          * Auto-dialer AMD result
-         * @description Receives Answering Machine Detection (AMD) results for auto-dialer calls.
+         * @description Receives an Answering Machine Detection result for an auto-dialer call and stores
+         *     `result` and `confidence` on the call session found by `session_token`. No payload
+         *     validation; an unknown session token still answers `ok`.
          *
-         *     The result is stored on the matching call session.
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+         *
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
          */
         post: operations["autoDialerAmdResult"];
         delete?: never;
@@ -4419,11 +5579,26 @@ export type paths = {
         put?: never;
         /**
          * Auto-dialer call status
-         * @description Receives call status updates for auto-dialer calls from Cloudonix.
+         * @description Call status update for an auto-dialer call. No payload validation. Finds the call
+         *     session by `session_token` and applies `status`:
+         *     `answered`/`connected` mark the session answered and the destination `connected`
+         *     (with `last_call_id` = `call_id`); `completed` marks it completed;
+         *     `failed`/`busy`/`no-answer` mark it failed. Any other status changes nothing but
+         *     still answers `ok`.
          *
-         *     Updates the associated call session and destination based on the
-         *     reported status (`answered`, `connected`, `completed`, `failed`,
-         *     `busy`, `no-answer`).
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+         *
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
          */
         post: operations["autoDialerCallStatus"];
         delete?: never;
@@ -4443,17 +5618,26 @@ export type paths = {
         put?: never;
         /**
          * Call initiated webhook
-         * @description Async notification from Cloudonix when a call is initiated.
+         * @description Async notification from Cloudonix when a call is initiated. This is NOT the CXML
+         *     routing endpoint (see `POST /voice/route`).
          *
-         *     **Note**: This is NOT the CXML routing endpoint. For real-time
-         *     call routing that returns CXML, use `/voice/route`.
+         *     Validates the payload (`CallInitiatedRequest`), normalizes `from`/`to` (the code
+         *     prefers `CallSid`/`From`/`To` when present) and queues a job that creates the call log
+         *     and broadcasts a real-time event.
          *
-         *     This endpoint:
-         *     1. Logs the incoming call notification
-         *     2. Dispatches job to create CallLog record
-         *     3. Triggers real-time frontend events
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
          *
-         *     Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
          */
         post: operations["callInitiatedWebhook"];
         delete?: never;
@@ -4473,11 +5657,28 @@ export type paths = {
         put?: never;
         /**
          * Call status webhook
-         * @description Webhook from Cloudonix when call status changes.
+         * @description Webhook from Cloudonix when a call's status changes. There is no payload validation.
          *
-         *     Updates call log with current status, duration, etc.
+         *     - Updates the call log with the call ID (`CallSid`, else `call_id`): `status` from
+         *       `CallStatus` (else `status`) and `duration` from `Duration` (else `duration`).
+         *     - When `token` (session token) is present, updates the organization's auto-dialer call
+         *       session if it is still `initiated` or `ringing`: `ringing` → ringing, `connected` →
+         *       answered, `completed` → completed, `failed`/`busy`/`no-answer` → failed
+         *       (case-insensitive).
          *
-         *     Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+         *
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
          */
         post: operations["callStatusWebhook"];
         delete?: never;
@@ -4497,14 +5698,25 @@ export type paths = {
         put?: never;
         /**
          * CDR webhook
-         * @description Call Detail Record webhook sent after call completion.
+         * @description Call Detail Record webhook sent by Cloudonix after a call ends. Validated by
+         *     `CdrRequest` and processed synchronously: stores the call detail record (a replay of
+         *     an already stored CDR answers `CDR already recorded`), updates the call log
+         *     (recording URL, duration), records a final session status, and finalizes auto-dialer
+         *     and call queue calls. The AMD result in `session.profile.amd` is read for auto-dialer calls.
          *
-         *     Contains complete call information including:
-         *     - Call duration and billable seconds
-         *     - Cost information
-         *     - Recording URL (if available)
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
          *
-         *     Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) is still accepted on this route; one more than
+         *     60 s in the future answers 400 `Invalid Timestamp`.
          */
         post: operations["cdrWebhook"];
         delete?: never;
@@ -4524,14 +5736,80 @@ export type paths = {
         put?: never;
         /**
          * Dialer webhook proxy
-         * @description Receives Cloudonix webhooks on behalf of the auto-dialer.
+         * @description Receives Cloudonix call events for auto-dialer calls. No payload validation. The call
+         *     session is looked up in the authenticated organization by session token
+         *     (`session.token`, else `session_token`), then by `call_id`. Event `type`:
          *
-         *     Validates the webhook signature and idempotency key, then updates the
-         *     call session and destination status. Supported event types include
-         *     `call.initiated`, `call.ringing`, `call.answered`, `call.connected`,
-         *     `call.completed`, `call.failed`, `call.busy`, and `call.no-answer`.
+         *     - `call.initiated`, `call.ringing`: session `ringing` (stores `call_id`).
+         *     - `call.answered`, `call.connected`: session answered, destination `connected`, the
+         *       campaign's `completed_calls` incremented.
+         *     - `call.completed`: session `completed` with `disposition`, `duration`, `billsec`; the
+         *       destination is updated from the disposition (retry scheduling) and the campaign's
+         *       concurrency counter is released.
+         *     - `call.failed`, `call.busy`, `call.no-answer`: session `failed` with disposition
+         *       `busy`, `no-answer`, else `disposition` or `failed`; the destination is updated
+         *       (retry scheduling) and the concurrency counter released. `reason` is only logged.
+         *     - Any other type: 200 `{"status":"ignored","reason":"unknown_event_type"}`.
+         *
+         *     A known event without a matching session answers 404.
+         *
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+         *
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
          */
         post: operations["dialerWebhookProxy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/cloudonix/recording-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recording status webhook
+         * @description Receives Cloudonix recording status callbacks and queues the recording for download.
+         *
+         *     The payload has no `domain`, so the route has no `webhook.signature` middleware. The
+         *     controller finds the call detail record by call ID (`CallSid`, else `call_id`), then by
+         *     session token (`Session`, else `session_token`, else `session.token`), and only then
+         *     authenticates the request against that organization: when it has a
+         *     `domain_requests_api_key`, `Authorization: Bearer <key>` must match it; without a key
+         *     the request is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. An organization
+         *     without Cloudonix settings is always refused (401). No HMAC. Not rate-limited.
+         *
+         *     - No matching call detail record: 200 `No matching call detail record found` (nothing
+         *       is checked or written).
+         *     - `RecordingStatus` `absent`, or no recording URL: 200 `No recording to download`.
+         *     - Otherwise the CDR's recording is marked `pending` (source URL and duration stored)
+         *       and a download job is queued: 200 `Recording status processed`.
+         *
+         *     Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+         *     else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+         *     else the route name), else a hash of the whole payload. A repeat within
+         *     `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+         *     repeat while the first is still running answers 409. A body `timestamp` older than
+         *     `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+         *     60 s in the future 400 `Invalid Timestamp`.
+         */
+        post: operations["cloudonixRecordingStatusWebhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4549,11 +5827,23 @@ export type paths = {
         put?: never;
         /**
          * Session update webhook
-         * @description High-velocity session update webhook from Cloudonix.
+         * @description High-velocity session update webhook from Cloudonix, validated by
+         *     `SessionUpdateRequest`. `status` is lower-cased; only these statuses are stored:
+         *     new/initiated/created, ringing/ring/progress, connected/connect,
+         *     answer/answered/active, busy, cancel/cancelled/canceled, failed/fail/error,
+         *     congestion/congested. Other statuses answer `Status not processed` (terminal statuses
+         *     and deletions still end extension presence). A stored update triggers the call
+         *     notification webhook (when enabled) and call queue tracking. A repeated `eventId` for
+         *     the organization is not stored twice.
          *
-         *     Note: No rate limiting on this endpoint due to high message volume.
+         *     Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+         *     `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+         *     and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+         *     `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+         *     is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
          *
-         *     Middleware: webhook.signature (no rate limiting)
+         *     No `webhook.idempotency` middleware on this route (duplicates are detected by
+         *     `eventId`).
          */
         post: operations["sessionUpdateWebhook"];
         delete?: never;
@@ -4587,29 +5877,161 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
+        "$defs-Action": {
+            /** @description Prefixed target ID: `ext-{id}` (extension), `rg-{id}` (ring group), `queue-{id}` (call queue) and `ivr-{id}` (IVR menu) are format-checked; `conf-{id}` (conference room) and `alb-{id}` (AI load balancer) are the formats the UI sends; an AI assistant uses its plain ID. Prefixed extension, ring group, call queue, IVR menu and conference room targets must exist in the organization. */
+            target_id: string;
+            /**
+             * @description `unavailable` is rejected on create (422) and accepted on update
+             * @enum {string}
+             */
+            type: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "unavailable";
+        };
+        /** @description An enabled day needs at least one time range */
+        "$defs-Day": {
+            enabled: boolean;
+            time_ranges?: components["schemas"]["$defs-TimeRange"][] | null;
+        };
+        /** @description Related resource summary; `fallback_extension` carries `extension_number`, the others `name` */
+        "$defs-Ref": {
+            extension_number?: string;
+            id?: number;
+            name?: string;
+        } | null;
+        "$defs-TimeRange": {
+            /**
+             * @description H:i, after start_time
+             * @example 17:00
+             */
+            end_time: string;
+            /**
+             * @description H:i
+             * @example 09:00
+             */
+            start_time: string;
+        };
+        Action: {
+            /** @description Prefixed target ID as stored (for example `ext-12`, `rg-3`); empty string when none */
+            target_id?: string;
+            /**
+             * @description Falls back to `extension` when no type is stored
+             * @enum {string}
+             */
+            type?: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "unavailable";
+        };
         /** @description AI Assistant */
         AiAssistant: {
-            configuration?: Record<string, never>;
+            /** @description Provider-specific configuration */
+            configuration?: {
+                [key: string]: unknown;
+            } | null;
             /** Format: date-time */
             created_at?: string;
+            /** @description Create and update responses only (when the creator is known) */
+            created_by?: {
+                id?: number;
+                name?: string;
+            };
+            description?: string | null;
             id: number;
             /** @example Support Bot */
             name: string;
             organization_id: number;
-            /** @example openai */
+            /**
+             * @description Derived from the provider
+             * @enum {string|null}
+             */
+            protocol?: "sip" | "websocket" | "dummy" | null;
+            /**
+             * @description Provider key from the provider registry
+             * @example openai
+             */
             provider: string;
             /** @enum {string} */
             status: "active" | "inactive";
             /** Format: date-time */
             updated_at?: string;
+            /** @description Create and update responses only (when the updater is known) */
+            updated_by?: {
+                id?: number;
+                name?: string;
+            };
+            /** @description Number of extensions that use the assistant (the true total, also when `used_by_extensions` lists only some of them). */
+            usage_count?: number;
+            /** @description Show endpoint only, omitted when no extension uses the assistant. Lists up to 10 of the extensions; `usage_count` gives the total. */
+            used_by_extensions?: {
+                extension_number?: string;
+                id?: number;
+                status?: string;
+                type?: string;
+                /** @description Omitted when the extension has no user */
+                user?: {
+                    email?: string;
+                    id?: number;
+                    name?: string;
+                };
+            }[];
+        };
+        /** @description AI assistant create/update request. `protocol` is not accepted; it is derived from the provider. */
+        AiAssistantInput: {
+            /**
+             * @description Provider-specific configuration, keyed by the provider's `config_fields` names. Must be
+             *     present on create (may be `{}` for providers without required fields).
+             */
+            configuration?: {
+                [key: string]: unknown;
+            };
+            description?: string | null;
+            /** @description Unique within the organization */
+            name?: string;
+            /** @description Provider key (see `GET /v1/ai-assistant/providers`) */
+            provider?: string;
+            /**
+             * @description Defaults to `active` when omitted or null on create. Cannot be null on update. AI assistants have no `pending` status; any value other than `active` or `inactive` is a 422.
+             * @enum {string|null}
+             */
+            status?: "active" | "inactive" | null;
         };
         /** @description AI Assistant Load Balancer */
         AiAssistantLoadBalancer: {
+            /** @description List endpoint only. Members whose AI assistant is active. */
+            active_members_count?: number;
             /** Format: date-time */
             created_at?: string;
+            description?: string | null;
+            /**
+             * @description Only the fallback_*_id matching this action is set; the others are null.
+             * @enum {string}
+             */
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
+            fallback_ai_assistant?: components["schemas"]["Ref"];
+            fallback_ai_assistant_id?: number | null;
+            fallback_ai_load_balancer?: components["schemas"]["Ref"];
+            fallback_ai_load_balancer_id?: number | null;
+            fallback_call_queue?: components["schemas"]["Ref"];
+            fallback_call_queue_id?: number | null;
+            fallback_extension?: components["schemas"]["Ref"];
+            fallback_extension_id?: number | null;
+            fallback_ivr_menu?: components["schemas"]["Ref"];
+            fallback_ivr_menu_id?: number | null;
+            fallback_ring_group?: components["schemas"]["Ref"];
+            fallback_ring_group_id?: number | null;
+            follow_through?: boolean | null;
             id: number;
-            /** @description Load balancer members */
-            members?: unknown[];
+            /** @description True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned?: boolean;
+            /** @description Members ordered by position */
+            members?: {
+                ai_assistant_id?: number;
+                ai_assistant_name?: string | null;
+                id?: number;
+                position?: number;
+                priority?: number;
+                /** @enum {string} */
+                status?: "active" | "inactive";
+                weight?: number;
+            }[];
+            /** @description List endpoint only */
+            members_count?: number;
             /** @example Support Load Balancer */
             name: string;
             organization_id: number;
@@ -4619,20 +6041,72 @@ export type components = {
              * @example round_robin
              * @enum {string}
              */
-            strategy: "round_robin" | "priority" | "weighted" | "least_connections";
+            strategy: "round_robin" | "priority" | "percentage";
             /** Format: date-time */
             updated_at?: string;
+            $defs: {
+                /** @description Fallback target summary, null when that target is not set. `fallback_extension` carries `extension_number`; the others carry `name`. */
+                Ref: {
+                    extension_number?: string;
+                    id?: number;
+                    name?: string;
+                } | null;
+            };
+        };
+        /** @description AI load balancer create/update request */
+        AiAssistantLoadBalancerInput: {
+            description?: string | null;
+            /**
+             * @description Defaults to `hangup` on create. `unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, call_queue and ai_load_balancer (a load balancer cannot fall back to itself or through a chain back to itself).
+             * @enum {string}
+             */
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
+            fallback_ai_assistant_id?: number | null;
+            fallback_ai_load_balancer_id?: number | null;
+            fallback_call_queue_id?: number | null;
+            fallback_extension_id?: number | null;
+            fallback_ivr_menu_id?: number | null;
+            fallback_ring_group_id?: number | null;
+            follow_through?: boolean | null;
+            /** @description Replaces the whole member list when sent. Each AI assistant must be active and appear once. */
+            members?: {
+                /** @description Distinct assistant of the organization */
+                ai_assistant_id: number;
+                /** @description Defaults to the member's index in the array */
+                position?: number | null;
+                /** @description 0 is the highest priority. Defaults to the member's index in the array. */
+                priority?: number | null;
+                /**
+                 * @description Defaults to `active`
+                 * @enum {string|null}
+                 */
+                status?: "active" | "inactive" | null;
+                /** @description Defaults to 100 */
+                weight?: number | null;
+            }[];
+            /** @description Unique within the organization */
+            name?: string;
+            /**
+             * @description Defaults to `active` on create
+             * @enum {string}
+             */
+            status?: "active" | "inactive";
+            /**
+             * @description Defaults to `round_robin` on create
+             * @enum {string}
+             */
+            strategy?: "round_robin" | "priority" | "percentage";
         };
         /** @description A scoped, long-lived API key. Created by organization Owners only. The key's permissions are the sole authorization gate for requests authenticated with it; the user role model is not consulted. Keys never expire but can be revoked. The plaintext key value is only ever returned once, at creation time. */
         ApiKey: {
             /** Format: date-time */
-            created_at?: string | null;
+            created_at: string | null;
             id: number;
             /**
              * Format: date-time
              * @description When the key last authenticated a request. Write is throttled to at most once per 5 seconds per key.
              */
-            last_used_at?: string | null;
+            last_used_at: string | null;
             /** @example CI deploy key */
             name: string;
             permissions: components["schemas"]["ApiKeyPermission"][];
@@ -4640,7 +6114,7 @@ export type components = {
              * Format: date-time
              * @description When the key was revoked. Null for active keys.
              */
-            revoked_at?: string | null;
+            revoked_at: string | null;
         };
         /** @description A single resource grant on an API key. `write` implies `read`; `read` permits GET/HEAD only. */
         ApiKeyPermission: {
@@ -4652,8 +6126,9 @@ export type components = {
             /**
              * @description Grantable resource slug (see GET /v1/api-keys/grantable-resources).
              * @example business-hours
+             * @enum {string}
              */
-            resource: string;
+            resource: "users" | "extensions" | "conference-rooms" | "ai-assistants" | "ai-assistant-providers" | "ring-groups" | "call-queues" | "queue-calls" | "ai-assistant-load-balancers" | "ivr-menus" | "business-hours" | "phone-numbers" | "outbound-whitelist" | "inbound-blacklist" | "call-detail-records" | "recordings" | "supervisors" | "auto-dialer-campaigns" | "distribution-lists" | "session-updates" | "call-notifications" | "dashboard" | "trunks";
         };
         /** @description Successful Auth0 callback authentication response */
         Auth0CallbackResponse: {
@@ -4689,7 +6164,7 @@ export type components = {
                  * @example active
                  * @enum {string}
                  */
-                status: "active" | "inactive" | "suspended";
+                status: "active" | "suspended" | "deleted";
                 /**
                  * @description Default timezone for the organization
                  * @example America/New_York
@@ -4715,6 +6190,11 @@ export type components = {
                  */
                 id: number;
                 /**
+                 * @description Whether the user is the platform owner
+                 * @example false
+                 */
+                is_platform_manager: boolean;
+                /**
                  * @description Full name of the user
                  * @example John Doe
                  */
@@ -4729,7 +6209,20 @@ export type components = {
                  * @example owner
                  * @enum {string}
                  */
-                role: "owner" | "pbx_admin" | "pbx_user" | "reporter";
+                role: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                /** @description Social identities linked to the user */
+                social_identities: {
+                    /**
+                     * @example google
+                     * @enum {string}
+                     */
+                    provider?: "google" | "facebook" | "microsoft" | "github" | "x";
+                    /**
+                     * Format: email
+                     * @example john.doe@example.com
+                     */
+                    provider_email?: string | null;
+                }[];
                 /**
                  * @description Account status
                  * @example active
@@ -4756,36 +6249,20 @@ export type components = {
         /** @description Auto Dialer Campaign for outbound calling with rate limiting and scheduling */
         AutoDialerCampaign: {
             /**
-             * @description Whether answering machine detection is enabled
-             * @example true
+             * @description What to do when a human answers
+             * @enum {string|null}
              */
-            amd_enabled?: boolean;
+            action_human?: "HANGUP" | "CONTINUE" | null;
             /**
-             * @description AMD detection mode
-             * @example DetectMessageEnd
-             * @enum {string}
+             * @description What to do when detection is inconclusive
+             * @enum {string|null}
              */
-            amd_mode?: "Enabled" | "DetectMessageEnd";
+            action_unknown?: "HANGUP" | "CONTINUE" | null;
             /**
-             * @description AMD silence timeout in milliseconds
-             * @example 2500
+             * @description What to do when the AMD worker detects a voicemail
+             * @enum {string|null}
              */
-            amd_silence_timeout?: number | null;
-            /**
-             * @description AMD speech end threshold in milliseconds
-             * @example 2500
-             */
-            amd_speech_end_threshold?: number | null;
-            /**
-             * @description AMD speech threshold in milliseconds
-             * @example 2500
-             */
-            amd_speech_threshold?: number | null;
-            /**
-             * @description AMD timeout in seconds
-             * @example 30
-             */
-            amd_timeout?: number | null;
+            action_voicemail?: "HANGUP" | "CONTINUE" | null;
             /**
              * @description API interval in milliseconds (1000 / CPS)
              * @example 1000
@@ -4801,7 +6278,10 @@ export type components = {
              * @example +14155551212
              */
             caller_id: string;
-            /** @description Array of Caller IDs in the pool */
+            /**
+             * @description Caller IDs in the pool. Filled by list, get, create and update; the start, pause,
+             *     resume and archive responses (and the dialer worker endpoints) return an empty array.
+             */
             caller_id_pool?: {
                 /**
                  * @description ID of the DID number
@@ -4825,38 +6305,10 @@ export type components = {
                 weight?: number;
             }[];
             /**
-             * @description Whether Caller ID Pooling is enabled
+             * @description Whether Caller ID Pooling is enabled (always true for campaigns created through the API)
              * @example true
              */
             caller_id_pool_enabled: boolean;
-            /** @description Statistics for Caller ID usage */
-            caller_id_stats?: {
-                /** @description Breakdown per Caller ID */
-                by_did?: {
-                    /** @example 45 */
-                    completed?: number;
-                    /** @example 1 */
-                    did_id?: number;
-                    /** @example 5 */
-                    failed?: number;
-                    /** @example Sales Line 1 */
-                    friendly_name?: string | null;
-                    /** @example +12127773456 */
-                    phone_number?: string;
-                    /**
-                     * Format: float
-                     * @example 90
-                     */
-                    success_rate?: number;
-                    /** @example 50 */
-                    total_calls?: number;
-                }[];
-                /**
-                 * @description Total calls across all Caller IDs
-                 * @example 150
-                 */
-                total_calls?: number;
-            };
             /**
              * @description Distribution strategy for Caller ID Pool
              * @example round_robin
@@ -4864,7 +6316,7 @@ export type components = {
              */
             caller_id_strategy: "round_robin" | "random" | "least_recently_used";
             /**
-             * @description Human-readable label for the strategy
+             * @description Human-readable label for the strategy (Round Robin, Random, Least Recently Used)
              * @example Round Robin
              */
             caller_id_strategy_label?: string;
@@ -4874,8 +6326,7 @@ export type components = {
              */
             calls_per_second?: number;
             /**
-             * Format: date-time
-             * @description When the campaign completed
+             * @description When the campaign completed (`YYYY-MM-DD HH:MM:SS`, UTC)
              * @example 2024-01-20 17:00:00
              */
             completed_at?: string | null;
@@ -4885,13 +6336,12 @@ export type components = {
              */
             concurrent_active_calls: number;
             /**
-             * Format: date-time
-             * @description Creation timestamp
+             * @description Creation timestamp (`YYYY-MM-DD HH:MM:SS`, UTC)
              * @example 2024-01-10 08:00:00
              */
             created_at?: string;
             /**
-             * @description Days of the week when campaign is active
+             * @description Legacy. Days whose `schedule` entry is enabled (derived from `schedule` on create and on any update that sends it)
              * @example [
              *       "monday",
              *       "tuesday",
@@ -4924,12 +6374,12 @@ export type components = {
              */
             end_date?: string;
             /**
-             * @description End hour (0-23)
+             * @description Legacy. Hour of the end of that same time range (17 when there is none)
              * @example 17
              */
-            end_time?: number;
+            end_time?: number | null;
             /**
-             * @description Whether the campaign has a distribution list assigned
+             * @description Whether at least one distribution list is assigned to the campaign
              * @example true
              */
             has_list?: boolean;
@@ -4939,10 +6389,12 @@ export type components = {
              */
             readonly id: number;
             /**
-             * @description Whether the campaign can be started
+             * @description True when the campaign is `active` and, in its timezone, today is within start_date..end_date and the current time is inside an enabled `schedule` range
              * @example true
              */
             is_runnable?: boolean;
+            /** @description Number of distribution lists assigned. Only the list endpoint counts them; every other response returns 0 */
+            lists_count?: number;
             /**
              * @description Maximum allowed CAC value
              * @example 50
@@ -4973,13 +6425,19 @@ export type components = {
              * @example true
              */
             record_calls?: boolean;
+            /** @description Minutes to wait before the FIRST busy / no-answer retry (default 15). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours). */
+            retry_delay_minutes?: number;
+            /** @description Redial busy and no-answer destinations after the retry delay, within max_dial_attempts (default false). Cancelled and failed calls are never retried. */
+            retry_on_busy_no_answer?: boolean;
+            /** @description Retry the destination when a voicemail was detected */
+            retry_on_voicemail?: boolean;
             /**
              * @description ID of the routing destination (AI assistant or load balancer)
              * @example 5
              */
             routing_destination_id?: number | null;
             /**
-             * @description Human-readable label for routing destination type
+             * @description Label of the routing destination type (AI Assistant, AI Load Balancer, Hangup)
              * @example AI Assistant
              */
             routing_destination_label?: string;
@@ -4989,7 +6447,7 @@ export type components = {
              * @enum {string}
              */
             routing_destination_type: "ai_assistant" | "ai_load_balancer" | "hangup";
-            /** @description Full schedule configuration with daily time ranges */
+            /** @description Full schedule configuration with daily time ranges (in `timezone`). Calls are placed only while the current time falls inside an enabled day's range; an end_time of 24:00 means 23:59 */
             schedule?: {
                 friday?: {
                     enabled?: boolean;
@@ -5047,7 +6505,7 @@ export type components = {
                         start_time?: string;
                     }[];
                 };
-            };
+            } | null;
             /**
              * Format: date
              * @description Campaign start date
@@ -5055,13 +6513,12 @@ export type components = {
              */
             start_date?: string;
             /**
-             * @description Start hour (0-23)
+             * @description Legacy. Hour of the first time range of the first enabled day in `schedule` (9 when there is none)
              * @example 9
              */
-            start_time?: number;
+            start_time?: number | null;
             /**
-             * Format: date-time
-             * @description When the campaign started
+             * @description When the campaign was last started (`YYYY-MM-DD HH:MM:SS`, UTC)
              * @example 2024-01-15 09:00:00
              */
             started_at?: string | null;
@@ -5083,9 +6540,8 @@ export type components = {
                  */
                 pending_calls?: number;
                 /**
-                 * Format: float
-                 * @description Campaign progress percentage
-                 * @example 75
+                 * @description (completed_calls + failed_calls) / total_destinations x 100, rounded; 0 when total_destinations is 0
+                 * @example 80
                  */
                 progress_percentage?: number;
                 /**
@@ -5093,6 +6549,11 @@ export type components = {
                  * @example 1000
                  */
                 total_destinations?: number;
+                /**
+                 * @description Number of calls where the AMD worker detected a voicemail
+                 * @example 20
+                 */
+                voicemail_calls?: number;
             };
             /**
              * @description Current campaign status
@@ -5101,64 +6562,244 @@ export type components = {
              */
             status: "draft" | "active" | "paused" | "completed" | "archived";
             /**
-             * @description Human-readable status label
+             * @description Human-readable status label (Draft, Active, Paused, Completed, Archived)
              * @example Active
              */
             status_label?: string;
             /**
-             * @description Maximum call duration in seconds
+             * @description Maximum call duration in seconds (600 when not defined, on create or when set to null on update)
              * @example 300
              */
-            time_limit?: number | null;
+            time_limit?: number;
             /**
              * @description Timezone for scheduling
              * @example America/New_York
              */
             timezone?: string;
             /**
-             * Format: date-time
-             * @description Last update timestamp
+             * @description Last update timestamp (`YYYY-MM-DD HH:MM:SS`, UTC)
              * @example 2024-01-15 12:00:00
              */
             updated_at?: string;
         };
         /** @description Business Hours Schedule */
         BusinessHoursSchedule: {
-            /** @description Schedule configuration */
-            configuration?: Record<string, never>;
+            closed_hours_action: components["schemas"]["Action"];
             /** Format: date-time */
-            created_at?: string;
-            id: number;
+            created_at: string;
+            /**
+             * @description Whether the schedule is open right now (inactive schedules are always closed)
+             * @enum {string}
+             */
+            current_status: "open" | "closed";
+            /** @description Date exceptions, sorted by date */
+            exceptions: {
+                /** Format: date */
+                date?: string;
+                id?: string;
+                name?: string;
+                /** @description Present only for `special_hours` */
+                time_ranges?: components["schemas"]["TimeRange"][];
+                /** @enum {string} */
+                type?: "closed" | "special_hours";
+            }[];
+            /**
+             * @description Schedule ID (serialized as a string)
+             * @example 12
+             */
+            id: string;
+            /** @description True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned: boolean;
             /** @example Business Hours */
             name: string;
-            organization_id: number;
+            open_hours_action: components["schemas"]["Action"];
+            /**
+             * @description Organization ID (serialized as a string)
+             * @example 1
+             */
+            organization_id: string;
+            /** @description Weekly schedule; always contains all seven days */
+            schedule: {
+                friday?: components["schemas"]["Day"];
+                monday?: components["schemas"]["Day"];
+                saturday?: components["schemas"]["Day"];
+                sunday?: components["schemas"]["Day"];
+                thursday?: components["schemas"]["Day"];
+                tuesday?: components["schemas"]["Day"];
+                wednesday?: components["schemas"]["Day"];
+            };
             /** @enum {string} */
             status: "active" | "inactive";
-            /** @example America/New_York */
+            /**
+             * @description IANA timezone (defaults to UTC)
+             * @example America/New_York
+             */
             timezone: string;
             /** Format: date-time */
-            updated_at?: string;
+            updated_at: string;
+            $defs: {
+                TimeRange: {
+                    /**
+                     * @description HH:mm
+                     * @example 17:00
+                     */
+                    end_time?: string;
+                    id?: string;
+                    /**
+                     * @description HH:mm
+                     * @example 09:00
+                     */
+                    start_time?: string;
+                };
+                Day: {
+                    enabled?: boolean;
+                    time_ranges?: components["schemas"]["TimeRange"][];
+                };
+                Action: {
+                    /** @description Prefixed target ID as stored (for example `ext-12`, `rg-3`); empty string when none */
+                    target_id?: string;
+                    /**
+                     * @description Falls back to `extension` when no type is stored
+                     * @enum {string}
+                     */
+                    type?: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "unavailable";
+                };
+            };
+        };
+        /** @description Business hours schedule create/update request. On create, `name`, `timezone`, `open_hours_action`, `closed_hours_action` and `schedule` are required, days that are not sent are stored as disabled, and `status` defaults to `active`. On update (PUT or PATCH) every field is optional: only the fields sent are validated and saved, and the others keep their stored values. */
+        BusinessHoursScheduleInput: {
+            closed_hours_action?: components["schemas"]["$defs-Action"];
+            /** @description Date exceptions. When two exceptions share a date only the first is kept. On update, a sent `exceptions` (also `[]` or null) replaces every exception; when omitted the stored exceptions are kept. `closed` exceptions must not have time ranges; `special_hours` exceptions need at least one. */
+            exceptions?: {
+                /**
+                 * Format: date
+                 * @description Y-m-d
+                 */
+                date: string;
+                name: string;
+                time_ranges?: components["schemas"]["$defs-TimeRange"][] | null;
+                /**
+                 * @description Stored as sent. A `special_hours` exception is open only during its time ranges on that date; a `closed` exception is closed all day.
+                 * @enum {string}
+                 */
+                type: "closed" | "special_hours";
+            }[] | null;
+            /** @description Unique within the organization */
+            name?: string;
+            open_hours_action?: components["schemas"]["$defs-Action"];
+            /** @description On create, days that are not sent are stored as disabled with no time ranges. On update, each day sent replaces that day and days not sent keep their hours. */
+            schedule?: {
+                friday?: components["schemas"]["$defs-Day"];
+                monday?: components["schemas"]["$defs-Day"];
+                saturday?: components["schemas"]["$defs-Day"];
+                sunday?: components["schemas"]["$defs-Day"];
+                thursday?: components["schemas"]["$defs-Day"];
+                tuesday?: components["schemas"]["$defs-Day"];
+                wednesday?: components["schemas"]["$defs-Day"];
+            };
+            /**
+             * @description Defaults to `active` on create when omitted or empty; on update an omitted status is kept
+             * @enum {string}
+             */
+            status?: "active" | "inactive";
+            /**
+             * @description Any valid timezone identifier
+             * @example America/New_York
+             */
+            timezone?: string;
+            $defs: {
+                TimeRange: {
+                    /**
+                     * @description H:i, after start_time
+                     * @example 17:00
+                     */
+                    end_time: string;
+                    /**
+                     * @description H:i
+                     * @example 09:00
+                     */
+                    start_time: string;
+                };
+                /** @description An enabled day needs at least one time range */
+                Day: {
+                    enabled: boolean;
+                    time_ranges?: components["schemas"]["$defs-TimeRange"][] | null;
+                };
+                Action: {
+                    /** @description Prefixed target ID: `ext-{id}` (extension), `rg-{id}` (ring group), `queue-{id}` (call queue) and `ivr-{id}` (IVR menu) are format-checked; `conf-{id}` (conference room) and `alb-{id}` (AI load balancer) are the formats the UI sends; an AI assistant uses its plain ID. Prefixed extension, ring group, call queue, IVR menu and conference room targets must exist in the organization. */
+                    target_id: string;
+                    /**
+                     * @description `unavailable` is rejected on create (422) and accepted on update
+                     * @enum {string}
+                     */
+                    type: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "unavailable";
+                };
+            };
         };
         /** @description Call Detail Record */
         CallDetailRecord: {
+            amd_confidence?: number | null;
+            amd_result?: string | null;
+            amd_status?: string | null;
+            application?: string | null;
+            approx_cost?: number | null;
             /** @description Billable seconds */
-            billsec?: number;
-            call_id: string;
+            billsec?: number | null;
+            billsec_formatted?: string | null;
             /** Format: date-time */
-            created_at?: string;
-            /** @example ANSWERED */
-            disposition: string;
+            call_answer_time?: string | null;
+            /** Format: date-time */
+            call_end_time?: string | null;
+            call_id?: string | null;
+            /** Format: date-time */
+            call_start_time?: string | null;
+            /** Format: date-time */
+            created_at?: string | null;
+            cx_trunk_id?: string | number | null;
+            /** @description incoming, outgoing, internal or application */
+            direction?: string | null;
+            /** @example ANSWER */
+            disposition?: string | null;
+            domain?: string | null;
             /** @description Duration in seconds */
-            duration: number;
-            from_number?: string;
+            duration?: number | null;
+            duration_formatted?: string | null;
+            /** @description Caller number */
+            from?: string | null;
+            /** @description True when `recording_status` is `available` and the caller may play it (`GET .../recording`) */
+            has_recording?: boolean;
             id: number;
             organization_id: number;
+            /** @description Null when zero or unset (as are `approx_cost`, `sell_cost` and `amd_confidence`) */
             rated_cost?: number | null;
-            /** Format: uri */
-            recording_url?: string | null;
-            to_number?: string;
+            /** @description Complete raw CDR; only with `include=raw_cdr` */
+            raw_cdr?: {
+                [key: string]: unknown;
+            } | null;
+            recording_duration?: number | null;
+            recording_status?: string | null;
+            route?: string | null;
+            sell_cost?: number | null;
+            session_id?: string | null;
+            /** Format: date-time */
+            session_timestamp?: string | null;
+            session_token?: string | null;
+            status?: string | null;
+            subscriber?: string | null;
+            /** @description Called number */
+            to?: string | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** @description Name of the user of the extension matched by `subscriber`, or `Unassigned User` (always for archived rows) */
+            user_full_name?: string;
+            vapp_server?: string | null;
         };
-        /** @description Cloudonix call-initiated webhook payload */
+        /**
+         * @description Cloudonix call-initiated webhook payload, validated by `CallInitiatedRequest`. The
+         *     authentication middleware also needs `domain` (or `owner.domain.name` /
+         *     `owner.domain.uuid`). The controller prefers `CallSid`, `From` and `To` over `call_id`,
+         *     `from` and `to` when they are present.
+         */
         CallInitiatedPayload: {
             /**
              * @description Unique call identifier
@@ -5167,52 +6808,117 @@ export type components = {
             call_id: string;
             /**
              * @description DID number that received the call
-             * @example +1987654321
+             * @example +12025550102
              */
             did: string;
             /**
              * @example inbound
-             * @enum {string}
+             * @enum {string|null}
              */
-            direction?: "inbound" | "outbound";
+            direction?: "inbound" | "outbound" | null;
+            /**
+             * @description Cloudonix domain name or UUID (required by the authentication middleware)
+             * @example acme.cloudonix.net
+             */
+            domain?: string;
             /**
              * @description Caller number in E.164 format
-             * @example +1234567890
+             * @example +12025550101
              */
             from: string;
-            /**
-             * @description Organization ID (if known)
-             * @example 1
-             */
-            organization_id?: number;
+            /** @description Validated but not used; the organization comes from `domain` */
+            organization_id?: number | null;
             /**
              * @description Initial call status
              * @example initiated
              */
-            status?: string;
+            status?: string | null;
             /**
-             * @description Unix timestamp
+             * @description Unix timestamp (also checked for replay by the idempotency middleware)
              * @example 1705312800
              */
-            timestamp?: number;
+            timestamp?: number | null;
             /**
              * @description Called number in E.164 format
-             * @example +1987654321
+             * @example +12025550102
              */
             to: string;
         };
-        /** @description Call Notifications Settings */
-        CallNotificationsSettings: {
+        /** @description One call-notification webhook delivery attempt */
+        CallNotificationLog: {
+            attempt_number?: number;
+            call_session_token?: string;
             /** Format: date-time */
             created_at?: string;
-            enabled: boolean;
-            events?: ("call.initiated" | "call.answered" | "call.completed" | "call.missed")[];
+            error_message?: string | null;
+            event_id?: string;
+            event_type?: string;
+            id?: number;
+            is_success?: boolean;
+            request_body?: string | null;
+            /** @description Request headers with credentials redacted */
+            request_headers?: {
+                [key: string]: unknown;
+            } | null;
+            request_payload?: {
+                [key: string]: unknown;
+            } | null;
+            response_body?: string | null;
+            response_headers?: {
+                [key: string]: unknown;
+            } | null;
+            response_status_code?: number | null;
+            response_time_ms?: number | null;
+            /** @description Call status carried by the event */
+            status?: string | null;
+            webhook_url?: string;
+        };
+        /** @description Call Notifications Settings (organization webhook for call status events) */
+        CallNotificationsSettings: {
+            /** @enum {string} */
+            auth_method?: "bearer_token" | "basic_auth" | "none";
+            auth_username?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+            enabled_events?: ("new" | "ringing" | "connected" | "answered" | "busy" | "cancel" | "failed" | "congestion")[];
+            /** @description Whether a secret is stored (the secret itself is never returned) */
+            has_auth_secret?: boolean;
             id: number;
+            is_active?: boolean;
             organization_id: number;
+            rate_limit_per_minute?: number | null;
+            request_timeout_seconds?: number | null;
+            retry_attempts?: number | null;
+            retry_backoff_seconds?: number | null;
             /** Format: date-time */
             updated_at?: string;
             /** Format: uri */
-            webhook_url?: string | null;
+            webhook_url?: string;
+        };
+        /** @description Call notifications settings request. On create, webhook_url, auth_method and enabled_events are required; on update every field is optional. */
+        CallNotificationsSettingsInput: {
+            /** @enum {string} */
+            auth_method?: "bearer_token" | "basic_auth" | "none";
+            /** @description Required on create when auth_method is bearer_token. Never returned (see `has_auth_secret`). */
+            auth_secret?: string | null;
+            /** @description Required on create when auth_method is basic_auth */
+            auth_username?: string | null;
+            enabled_events?: ("new" | "ringing" | "connected" | "answered" | "busy" | "cancel" | "failed" | "congestion")[];
+            /** @description Defaults to true on create */
+            is_active?: boolean | null;
+            /** @description Defaults to 500 on create */
+            rate_limit_per_minute?: number | null;
+            /** @description Defaults to 30 on create */
+            request_timeout_seconds?: number | null;
+            /** @description Defaults to 3 on create */
+            retry_attempts?: number | null;
+            /** @description Defaults to 60 on create */
+            retry_backoff_seconds?: number | null;
+            /**
+             * Format: uri
+             * @description Public http(s) URL; internal network addresses are rejected
+             */
+            webhook_url?: string;
         };
         /** @description Call queue (ACD) with agent management and statistics */
         CallQueue: {
@@ -5221,35 +6927,64 @@ export type components = {
              * @example 20
              */
             agent_ring_timeout?: number;
+            /** @description Agent users. Not included in the toggle-status response. */
             agents?: {
                 extension_id?: number | null;
                 extension_number?: string | null;
+                /** @description User ID */
                 id?: number;
                 name?: string;
             }[];
-            /** @example 5 */
+            /**
+             * @description List endpoint only
+             * @example 5
+             */
             agents_count?: number;
+            /** @description Periodically announce the caller's queue position */
+            announce_position?: boolean;
+            announce_position_language?: string | null;
+            /** @description Seconds between position announcements */
+            announce_position_timeout?: number | null;
+            conference_ring_all?: boolean;
             /** Format: date-time */
             created_at?: string;
             /** @example Tier-1 support */
             description?: string | null;
             /**
+             * @description Only the fallback_*_id matching this action is set; the others are null.
              * @example extension
              * @enum {string}
              */
-            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "hangup";
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
+            /**
+             * @description List endpoint only (as are `fallback_extension`, `fallback_ring_group`,
+             *     `fallback_ivr_menu` and `fallback_call_queue`). Null when that target is not set. There is no
+             *     `fallback_ai_load_balancer` summary; use `fallback_ai_load_balancer_id`.
+             */
+            fallback_ai_assistant?: components["schemas"]["$defs-Ref"];
             fallback_ai_assistant_id?: number | null;
             fallback_ai_load_balancer_id?: number | null;
+            fallback_call_queue?: components["schemas"]["$defs-Ref"];
+            /** @description Target queue when fallback_action is `call_queue` (never this queue) */
+            fallback_call_queue_id?: number | null;
+            fallback_extension?: components["schemas"]["$defs-Ref"];
             fallback_extension_id?: number | null;
+            fallback_ivr_menu?: components["schemas"]["$defs-Ref"];
             fallback_ivr_menu_id?: number | null;
+            fallback_ring_group?: components["schemas"]["$defs-Ref"];
             fallback_ring_group_id?: number | null;
             /** @example 12 */
             readonly id?: number;
+            immediate_connect?: boolean;
+            /** @description True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned?: boolean;
             /**
              * @description Maximum caller wait before overflow to the fallback destination
              * @example 300
              */
             max_wait_seconds?: number;
+            /** @description Hold music recording summary (`id`, `name`); null when none. Not included in the toggle-status response. */
+            moh_recording?: components["schemas"]["$defs-Ref"];
             /**
              * @description Hold music recording (must be tagged is_moh)
              * @example 42
@@ -5276,602 +7011,116 @@ export type components = {
             /** Format: date-time */
             updated_at?: string;
             /**
-             * @description Post-call agent pause (0 = disabled)
+             * @description Post-call agent pause
              * @example 15
              */
             wrap_up_seconds?: number;
+            $defs: {
+                /** @description Related resource summary; `fallback_extension` carries `extension_number`, the others `name` */
+                Ref: {
+                    extension_number?: string;
+                    id?: number;
+                    name?: string;
+                } | null;
+            };
         };
-        /** @description Cloudonix call-status webhook payload */
+        /**
+         * @description Call queue create/update request. On create, `name` and `agents` are required and an omitted
+         *     field that has a default is set to that default. On update (PUT or PATCH) every field is
+         *     optional: only the fields sent are validated and saved, and the others keep their stored values.
+         */
+        CallQueueInput: {
+            /** @default 20 */
+            agent_ring_timeout: number;
+            /** @description Agent user IDs (distinct). Each must be an active user of the organization with an extension. Replaces the whole agent list. */
+            agents?: number[];
+            /** @default false */
+            announce_position: boolean;
+            announce_position_language?: string | null;
+            /**
+             * @description Required (non-null) when announce_position is true; null is stored as 60
+             * @default 60
+             */
+            announce_position_timeout: number | null;
+            /** @description No default; the stored value is kept when omitted on update */
+            conference_ring_all?: boolean;
+            description?: string | null;
+            /**
+             * @description `unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer and call_queue, and the target must belong to the organization and be active. A call_queue target must not be the queue itself, and the chain of call queue fallbacks must not lead back to it (422 "Fallback loop detected: ...").
+             * @default hangup
+             * @enum {string}
+             */
+            fallback_action: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
+            fallback_ai_assistant_id?: number | null;
+            fallback_ai_load_balancer_id?: number | null;
+            /** @description Target queue, required when fallback_action is `call_queue`. An active queue of the organization, not this queue. */
+            fallback_call_queue_id?: number | null;
+            fallback_extension_id?: number | null;
+            fallback_ivr_menu_id?: number | null;
+            fallback_ring_group_id?: number | null;
+            /** @default false */
+            immediate_connect: boolean;
+            /** @default 300 */
+            max_wait_seconds: number;
+            /** @description Recording of the organization tagged as hold music */
+            moh_recording_id?: number | null;
+            /** @description Unique within the organization */
+            name?: string;
+            /**
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "inactive";
+            /**
+             * @default ring_all
+             * @enum {string}
+             */
+            strategy: "ring_all" | "round_robin" | "least_talk_time" | "fewest_calls";
+            /** @default 15 */
+            wrap_up_seconds: number;
+        };
+        /**
+         * @description Cloudonix call-status webhook payload. Not validated; these are the fields the controller
+         *     reads. The authentication middleware also needs `domain` (or `owner.domain.name` /
+         *     `owner.domain.uuid`).
+         */
         CallStatusPayload: {
-            /** @description Alternative call ID field */
+            /** @description Fallback for `CallSid` */
             call_id?: string;
             /**
-             * @description Call SID
+             * @description Call ID used to find the call log
              * @example CA550e8400e29b41d4a716446655440000
              */
             CallSid?: string;
             /**
-             * @description Current call status
+             * @description Current call status, stored on the call log
              * @example completed
              */
             CallStatus?: string;
+            /**
+             * @description Cloudonix domain name or UUID (required by the authentication middleware)
+             * @example acme.cloudonix.net
+             */
+            domain?: string;
+            /** @description Fallback for `Duration` */
             duration?: number;
-            /** @description Call duration */
+            /** @description Call duration in seconds, stored on the call log */
             Duration?: number;
-            /** @description Caller number */
-            From?: string;
-            /** @description Alternative status field */
+            /** @description Fallback for `CallStatus` */
             status?: string;
-            /** @description Called number */
-            To?: string;
+            /** @description Optional Unix timestamp, checked for replay by the idempotency middleware */
+            timestamp?: number;
+            /** @description Session token; when present the matching auto-dialer call session is updated */
+            token?: string;
         };
-        /** @description Ad platform integration settings for conversion upload */
-        CallTrackingAdPlatformIntegration: {
-            /** @description Google Ads conversion upload configuration */
-            google_ads: {
-                /**
-                 * @description Whether Google Ads conversion upload is enabled
-                 * @example true
-                 */
-                enabled?: boolean;
-                /**
-                 * @description Whether all required Google Ads credentials are present
-                 * @example true
-                 */
-                is_configured?: boolean;
-            };
-            /** @description Meta (Facebook) pixel conversion configuration */
-            meta: {
-                /**
-                 * @description Whether Meta conversion upload is enabled
-                 * @example false
-                 */
-                enabled?: boolean;
-                /**
-                 * @description Whether all required Meta credentials are present
-                 * @example false
-                 */
-                is_configured?: boolean;
-            };
-            /**
-             * @description ID of the organization these settings belong to
-             * @example 1
-             */
-            organization_id: number;
-            /**
-             * Format: date-time
-             * @description Last update timestamp
-             * @example 2024-01-15T12:00:00Z
-             */
-            updated_at?: string;
-        };
-        /** @description Aggregated call tracking analytics for a date range */
-        CallTrackingAnalytics: {
-            /** @description Filters applied to the analytics query */
-            filters: {
-                /**
-                 * Format: date
-                 * @description End date of the analytics range
-                 * @example 2024-01-31
-                 */
-                end_date?: string;
-                /**
-                 * @description Time grouping applied to the time series
-                 * @example day
-                 * @enum {string|null}
-                 */
-                group_by?: "day" | "week" | "month" | null;
-                /**
-                 * Format: date
-                 * @description Start date of the analytics range
-                 * @example 2024-01-01
-                 */
-                start_date?: string;
-            };
-            /**
-             * @description Key performance indicators for the selected date range
-             * @example {
-             *       "total_calls": 150,
-             *       "answered_calls": 120,
-             *       "missed_calls": 30,
-             *       "conversion_rate": 0.65,
-             *       "total_conversions": 98,
-             *       "total_conversion_value": 2499.5
-             *     }
-             */
-            kpis: {
-                [key: string]: unknown;
-            };
-            /**
-             * @description Aggregated metrics grouped by the requested interval
-             * @example [
-             *       {
-             *         "period": "2024-01-15",
-             *         "total_calls": 50,
-             *         "answered_calls": 42,
-             *         "conversions": 28
-             *       }
-             *     ]
-             */
-            time_series: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * @description Top performing campaigns for the selected date range
-             * @example [
-             *       {
-             *         "id": 5,
-             *         "name": "Google Ads - Spring Sale",
-             *         "total_calls": 100,
-             *         "conversions": 65
-             *       }
-             *     ]
-             */
-            top_campaigns: {
-                [key: string]: unknown;
-            }[];
-            /**
-             * @description Top marketing sources for the selected date range
-             * @example [
-             *       {
-             *         "source": "google",
-             *         "total_calls": 80,
-             *         "conversions": 52
-             *       }
-             *     ]
-             */
-            top_sources: {
-                [key: string]: unknown;
-            }[];
-        };
-        /** @description Call tracking campaign for attributing inbound calls to marketing sources */
-        CallTrackingCampaign: {
-            /** @description Rules used to mark a call as converted */
-            conversion_rule?: {
-                /**
-                 * @description Optional monetary value assigned to each conversion
-                 * @example 25.5
-                 */
-                conversion_value?: number;
-                /**
-                 * @description Minimum answered duration in seconds for a call to count as converted
-                 * @example 30
-                 */
-                min_answered_duration_seconds?: number;
-                /**
-                 * @description Whether the call must have an answered disposition to convert
-                 * @example true
-                 */
-                requires_answered_disposition?: boolean;
-            };
-            /**
-             * Format: date-time
-             * @description Creation timestamp
-             * @example 2024-01-10T08:00:00Z
-             */
-            created_at?: string;
-            /**
-             * @description Campaign description
-             * @example Spring sale campaign tracked via Google Ads
-             */
-            description?: string | null;
-            /**
-             * @description Destination configuration. The required field depends on `destination_type`:
-             *     - `forward`: `forward_to`
-             *     - `extension`: `extension_id`
-             *     - `ring_group`: `ring_group_id`
-             *     - `business_hours`: `business_hours_schedule_id`
-             *     - `conference_room`: `conference_room_id`
-             *     - `ivr_menu`: `ivr_menu_id`
-             *     - `ai_assistant`: `ai_assistant_id`
-             *     - `ai_load_balancer`: `ai_load_balancer_id`
-             */
-            destination_config: {
-                /**
-                 * @description ID of the AI assistant to route calls to
-                 * @example 7
-                 */
-                ai_assistant_id?: number;
-                /**
-                 * @description ID of the AI assistant load balancer to route calls to
-                 * @example 8
-                 */
-                ai_load_balancer_id?: number;
-                /**
-                 * @description ID of the business hours schedule to use
-                 * @example 2
-                 */
-                business_hours_schedule_id?: number;
-                /**
-                 * @description ID of the conference room to route calls to
-                 * @example 4
-                 */
-                conference_room_id?: number;
-                /**
-                 * @description ID of the extension to route calls to
-                 * @example 5
-                 */
-                extension_id?: number;
-                /**
-                 * @description External number to forward calls to (E.164 format recommended)
-                 * @example +14155551212
-                 */
-                forward_to?: string;
-                /**
-                 * @description ID of the IVR menu to route calls to
-                 * @example 6
-                 */
-                ivr_menu_id?: number;
-                /**
-                 * @description ID of the ring group to route calls to
-                 * @example 3
-                 */
-                ring_group_id?: number;
-            };
-            /**
-             * @description Type of destination for incoming tracked calls
-             * @example forward
-             * @enum {string}
-             */
-            destination_type: "forward" | "extension" | "ring_group" | "business_hours" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer";
-            /**
-             * @description Whether conversion uploads to Google Ads are enabled
-             * @example false
-             */
-            google_ads_upload_enabled?: boolean;
-            /**
-             * @description Unique campaign identifier
-             * @example 1
-             */
-            readonly id: number;
-            /**
-             * @description Marketing medium (e.g. utm_medium)
-             * @example cpc
-             */
-            medium?: string | null;
-            /**
-             * @description Whether conversion uploads to Meta are enabled
-             * @example false
-             */
-            meta_upload_enabled?: boolean;
-            /**
-             * @description Campaign name
-             * @example Google Ads - Spring Sale
-             */
-            name: string;
-            /**
-             * @description ID of the organization this campaign belongs to
-             * @example 1
-             */
-            organization_id: number;
-            /**
-             * @description Marketing source (e.g. utm_source)
-             * @example google
-             */
-            source?: string | null;
-            /**
-             * @description Current campaign status
-             * @example active
-             * @enum {string}
-             */
-            status: "active" | "inactive";
-            /**
-             * @description Number of tracking numbers assigned to the campaign (when counted)
-             * @example 3
-             */
-            tracking_numbers_count?: number | null;
-            /**
-             * Format: date-time
-             * @description Last update timestamp
-             * @example 2024-01-15T12:00:00Z
-             */
-            updated_at?: string;
-        };
-        /** @description Delivery log for a call tracking webhook notification */
-        CallTrackingNotificationLog: {
-            /**
-             * @description Delivery attempt number
-             * @example 1
-             */
-            attempt_number: number;
-            /**
-             * @description Cloudonix call identifier
-             * @example call-abc123
-             */
-            call_id: string;
-            /**
-             * Format: date-time
-             * @description When the delivery attempt was made
-             * @example 2024-01-15T14:30:00Z
-             */
-            created_at?: string;
-            /**
-             * @description Error message if delivery failed
-             * @example Connection timeout
-             */
-            error_message?: string | null;
-            /**
-             * @description Unique event identifier
-             * @example evt-abc123
-             */
-            event_id: string;
-            /**
-             * @description Type of event that triggered the notification
-             * @example call.converted
-             */
-            event_type: string;
-            /**
-             * @description Unique log identifier
-             * @example 1
-             */
-            readonly id: number;
-            /**
-             * @description Whether the delivery was successful
-             * @example true
-             */
-            is_success: boolean;
-            /**
-             * @description HTTP status code returned by the receiving endpoint
-             * @example 200
-             */
-            response_status_code?: number | null;
-            /**
-             * @description Webhook response time in milliseconds
-             * @example 120
-             */
-            response_time_ms?: number | null;
-            /**
-             * Format: uri
-             * @description URL the webhook was delivered to
-             * @example https://example.com/webhooks/call-tracking
-             */
-            webhook_url: string;
-        };
-        /** @description Webhook notification settings for a call tracking campaign */
-        CallTrackingNotificationSettings: {
-            /**
-             * @description Authentication method used for webhook requests
-             * @example bearer_token
-             * @enum {string}
-             */
-            auth_method: "none" | "bearer_token" | "basic_auth";
-            /**
-             * @description Basic auth username (only present when auth_method is basic_auth)
-             * @example webhook_user
-             */
-            auth_username?: string | null;
-            /**
-             * @description ID of the campaign these settings belong to
-             * @example 5
-             */
-            call_tracking_campaign_id: number;
-            /**
-             * Format: date-time
-             * @description Creation timestamp
-             * @example 2024-01-10T08:00:00Z
-             */
-            created_at?: string;
-            /**
-             * @description List of event types that trigger webhook notifications
-             * @example [
-             *       "call.received",
-             *       "call.converted"
-             *     ]
-             */
-            enabled_events: ("call.received" | "call.answered" | "call.missed" | "call.converted" | "call.failed")[];
-            /**
-             * @description Unique settings identifier
-             * @example 1
-             */
-            readonly id: number;
-            /**
-             * @description Whether webhook notifications are active
-             * @example true
-             */
-            is_active: boolean;
-            /**
-             * @description ID of the organization this settings belongs to
-             * @example 1
-             */
-            organization_id: number;
-            /**
-             * Format: date-time
-             * @description Last update timestamp
-             * @example 2024-01-15T12:00:00Z
-             */
-            updated_at?: string;
-            /**
-             * Format: uri
-             * @description URL where webhook events are delivered
-             * @example https://example.com/webhooks/call-tracking
-             */
-            webhook_url: string;
-        };
-        /** @description DID number assigned to a call tracking campaign */
-        CallTrackingNumber: {
-            /**
-             * @description ID of the campaign this number is assigned to
-             * @example 5
-             */
-            call_tracking_campaign_id: number;
-            /**
-             * Format: date-time
-             * @description Creation timestamp
-             * @example 2024-01-10T08:00:00Z
-             */
-            created_at?: string;
-            /**
-             * @description ID of the underlying DID number
-             * @example 12
-             */
-            did_number_id: number;
-            /**
-             * @description Friendly name for the tracking number
-             * @example Sales Line 1
-             */
-            friendly_name?: string | null;
-            /**
-             * @description Unique tracking number identifier
-             * @example 1
-             */
-            readonly id: number;
-            /**
-             * @description ID of the organization this number belongs to
-             * @example 1
-             */
-            organization_id: number;
-            /**
-             * @description Phone number in E.164 format (included when DID is loaded)
-             * @example +12127773456
-             */
-            phone_number?: string | null;
-            /**
-             * @description Current tracking number status
-             * @example active
-             * @enum {string}
-             */
-            status: "active" | "inactive";
-            /**
-             * Format: date-time
-             * @description Last update timestamp
-             * @example 2024-01-15T12:00:00Z
-             */
-            updated_at?: string;
-        };
-        /** @description Record of an inbound call routed through a call tracking campaign */
-        CallTrackingSession: {
-            /**
-             * Format: date-time
-             * @description When the call was answered
-             * @example 2024-01-15T14:30:05Z
-             */
-            answered_at?: string | null;
-            /**
-             * @description Billed duration in seconds
-             * @example 42
-             */
-            billsec: number;
-            /**
-             * @description Cloudonix call identifier
-             * @example call-abc123
-             */
-            call_id: string;
-            /**
-             * @description ID of the campaign that handled the call
-             * @example 5
-             */
-            call_tracking_campaign_id: number;
-            /**
-             * @description ID of the tracking number that received the call
-             * @example 8
-             */
-            call_tracking_number_id: number;
-            /**
-             * @description Tracked number that was called
-             * @example +12127773456
-             */
-            called_number: string;
-            /**
-             * @description ISO country code of the caller
-             * @example US
-             */
-            caller_country?: string;
-            /**
-             * @description Caller number in E.164 format
-             * @example +14155559876
-             */
-            caller_number: string;
-            /** @description Campaign summary (when loaded) */
-            campaign?: {
-                /** @example 5 */
-                id?: number;
-                /** @example Google Ads - Spring Sale */
-                name?: string;
-            } | null;
-            /**
-             * @description Name of the campaign at the time of the call
-             * @example Google Ads - Spring Sale
-             */
-            campaign_name?: string | null;
-            /**
-             * @description Conversion value assigned to the call
-             * @example 25.5
-             */
-            conversion_value?: number | null;
-            /** @description DID summary (when loaded) */
-            did?: {
-                /** @example 12 */
-                id?: number;
-                /** @example +12127773456 */
-                phone_number?: string;
-            } | null;
-            /**
-             * @description ID of the underlying DID number
-             * @example 12
-             */
-            did_number_id: number;
-            /**
-             * @description Call disposition
-             * @example ANSWERED
-             */
-            disposition?: string | null;
-            /**
-             * @description Total call duration in seconds
-             * @example 45
-             */
-            duration: number;
-            /**
-             * Format: date-time
-             * @description When the call ended
-             * @example 2024-01-15T14:30:50Z
-             */
-            ended_at?: string | null;
-            /**
-             * @description Unique session identifier
-             * @example 1
-             */
-            readonly id: number;
-            /**
-             * @description Whether the call was answered
-             * @example true
-             */
-            is_answered: boolean;
-            /**
-             * @description Whether the call matched the conversion rule
-             * @example true
-             */
-            is_converted: boolean;
-            /**
-             * @description Marketing medium attributed to the call
-             * @example cpc
-             */
-            medium?: string | null;
-            /**
-             * @description ID of the organization this session belongs to
-             * @example 1
-             */
-            organization_id: number;
-            /**
-             * @description Cloudonix session identifier
-             * @example sess-abc123
-             */
-            session_id: string;
-            /**
-             * @description Marketing source attributed to the call
-             * @example google
-             */
-            source?: string | null;
-            /**
-             * Format: date-time
-             * @description When the call started
-             * @example 2024-01-15T14:30:00Z
-             */
-            started_at?: string | null;
-        };
-        /** @description Cloudonix CDR (Call Detail Record) webhook payload */
+        /**
+         * @description Cloudonix CDR (Call Detail Record) webhook payload, validated by `CdrRequest`. The whole
+         *     payload is passed to the CDR model, so other Cloudonix fields are kept as well. The
+         *     authentication middleware needs `domain` (or `owner.domain.name` / `owner.domain.uuid`).
+         */
         CdrPayload: {
-            application?: string;
-            approx_cost?: number;
+            application?: string | null;
+            approx_cost?: number | null;
             /**
              * @description Billable seconds
              * @example 115
@@ -5883,17 +7132,17 @@ export type components = {
              */
             call_id: string;
             /** @description Trunk ID */
-            cx_trunk_id?: number;
+            cx_trunk_id?: number | null;
             /**
              * @description Call disposition
              * @example ANSWERED
              */
             disposition: string;
             /**
-             * @description Cloudonix domain
-             * @example example.cloudonix.io
+             * @description Cloudonix domain name (required by the authentication middleware unless `owner.domain` is sent)
+             * @example acme.cloudonix.net
              */
-            domain?: string;
+            domain?: string | null;
             /**
              * @description Call duration in seconds
              * @example 120
@@ -5905,24 +7154,28 @@ export type components = {
              */
             from: string;
             /** @description Rated call cost */
-            rated_cost?: number;
+            rated_cost?: number | null;
             /**
              * Format: uri
              * @description URL to call recording
              */
-            recording_url?: string;
-            route?: string;
-            sell_cost?: number;
+            recording_url?: string | null;
+            route?: string | null;
+            sell_cost?: number | null;
             session?: {
                 callAnswerTime?: number;
                 callEndTime?: number;
                 callStartTime?: number;
                 id?: number;
+                /** @description Session profile; `amd.result` and `amd.confidence` are read for auto-dialer calls */
+                profile?: {
+                    [key: string]: unknown;
+                };
                 status?: string;
                 token?: string;
-            };
+            } | null;
             /** @description Subscriber identifier */
-            subscriber?: string;
+            subscriber?: string | null;
             /**
              * @description CDR timestamp (Unix)
              * @example 1705312860
@@ -5933,38 +7186,53 @@ export type components = {
              * @example +1987654321
              */
             to: string;
-            vapp_server?: string;
+            vapp_server?: string | null;
         };
-        /** @description Cloudonix Settings */
+        /** @description Cloudonix settings as returned by the settings endpoints. Keys are masked: the first 4 characters, `***`, then the last 4 (a key of 8 characters or fewer is all asterisks). */
         CloudonixSettings: {
-            /** @description Cloudonix API key (masked in responses) */
-            api_key?: string;
+            /** @enum {string} */
+            call_recording_mode?: "disabled" | "inbound" | "outbound" | "internal" | "inbound_outbound" | "all";
+            /** @description GET only. The Cloudonix package tier, read live from the domain profile (`tenant.billingPlan.package.name`) and cached per organization for one hour; null when unknown. Not stored and not accepted on update. */
+            cloudonix_package?: string | null;
             /** Format: date-time */
             created_at?: string;
+            /**
+             * @description Cloudonix domain API key, masked
+             * @example XI12***abcd
+             */
+            domain_api_key?: string | null;
             /** @example example.cloudonix.io */
-            domain: string;
-            /** @description API key for voice routing webhooks */
-            domain_requests_api_key?: string;
+            domain_name?: string | null;
+            /** @description Bearer key Cloudonix sends on voice webhooks, masked */
+            domain_requests_api_key?: string | null;
             /** Format: uuid */
-            domain_uuid?: string;
+            domain_uuid?: string | null;
+            /** @description Origins allowed to embed the dialer widget (GET only; an empty array when unset) */
+            embed_allowed_domains?: string[];
+            /** @description True when `domain_requests_api_key` is set */
+            has_webhook_auth?: boolean;
             id: number;
+            /** @description True when both `domain_uuid` and `domain_api_key` are set */
+            is_configured?: boolean;
+            no_answer_timeout?: number;
             organization_id: number;
-            outbound_trunk_id?: number | null;
+            /** @enum {string} */
+            recording_format?: "wav" | "mp3";
             /** Format: date-time */
             updated_at?: string;
             /** Format: uri */
-            webhook_base_url?: string;
+            webhook_base_url?: string | null;
         };
         /** @description Conference room for multi-party calls */
         ConferenceRoom: {
             /** @example true */
-            announce_join_leave?: boolean;
+            announce_join_leave: boolean;
             /** Format: date-time */
-            created_at?: string;
+            created_at: string;
             /** @example Team weekly meeting */
-            description?: string | null;
+            description: string | null;
             /**
-             * @description Host PIN for moderator access
+             * @description Host PIN for moderator access. Omitted unless the caller may update the room.
              * @example 5678
              */
             host_pin?: string | null;
@@ -5976,9 +7244,9 @@ export type components = {
              */
             max_participants: number;
             /** @example true */
-            music_on_hold?: boolean;
+            music_on_hold: boolean;
             /** @example true */
-            mute_on_entry?: boolean;
+            mute_on_entry: boolean;
             /**
              * @description Conference room name
              * @example Weekly Standup
@@ -5987,7 +7255,7 @@ export type components = {
             /** @example 1 */
             organization_id: number;
             /**
-             * @description Participant PIN
+             * @description Participant PIN. Omitted unless the caller may update the room.
              * @example 1234
              */
             pin?: string | null;
@@ -5995,46 +7263,87 @@ export type components = {
              * @description Whether PIN is required to join
              * @example true
              */
-            pin_required?: boolean;
+            pin_required: boolean;
             /** @example false */
-            recording_auto_start?: boolean;
+            recording_auto_start: boolean;
             /** @example false */
-            recording_enabled?: boolean;
+            recording_enabled: boolean;
             /**
              * Format: uri
              * @example https://example.com/webhooks/recording
              */
-            recording_webhook_url?: string | null;
+            recording_webhook_url: string | null;
             /**
              * @example active
              * @enum {string}
              */
-            status: "active" | "inactive";
+            status: "active" | "inactive" | "pending";
             /** @example false */
-            talk_detection_enabled?: boolean;
+            talk_detection_enabled: boolean;
             /** Format: uri */
-            talk_detection_webhook_url?: string | null;
+            talk_detection_webhook_url: string | null;
             /** Format: date-time */
-            updated_at?: string;
+            updated_at: string;
             /**
              * @description Wait for host to join before starting
              * @example true
              */
+            wait_for_host: boolean;
+        };
+        /** @description Writable conference room fields (create and update requests) */
+        ConferenceRoomInput: {
+            announce_join_leave?: boolean;
+            description?: string | null;
+            /** @description Digits only. Required when `wait_for_host` is true (on update, checked only when the request sends `wait_for_host` or `host_pin`). */
+            host_pin?: string | null;
+            /** @example 25 */
+            max_participants?: number;
+            music_on_hold?: boolean;
+            mute_on_entry?: boolean;
+            /**
+             * @description Unique within the organization
+             * @example Weekly Standup
+             */
+            name?: string;
+            /** @description Digits only. Required when `pin_required` is true. */
+            pin?: string | null;
+            pin_required?: boolean;
+            recording_auto_start?: boolean;
+            recording_enabled?: boolean;
+            /**
+             * Format: uri
+             * @description Must be a public http(s) URL
+             */
+            recording_webhook_url?: string | null;
+            /**
+             * @description Defaults to `active` on create
+             * @example active
+             * @enum {string}
+             */
+            status?: "active" | "inactive" | "pending";
+            talk_detection_enabled?: boolean;
+            /**
+             * Format: uri
+             * @description Required when `talk_detection_enabled` is true. Must be a public http(s) URL.
+             */
+            talk_detection_webhook_url?: string | null;
             wait_for_host?: boolean;
         };
         /**
-         * @description CXML (Cloudonix XML) response structure
+         * @description CXML (Cloudonix XML) document, built by `App\Services\CxmlBuilder\CxmlBuilder`
+         *     (DOMDocument, UTF-8). The root element is `<Response>`; the verbs below are the
+         *     ones the voice routing code emits. Call recording is an attribute of `<Dial>`
+         *     (`record`, `recordingStatusCallback`), not a separate `<Record>` verb.
+         *
+         *     When routing fails with an unexpected exception, `/voice/route`, `/voice/ivr-input`
+         *     and every `/callbacks/voice/*` route still answer 200 with
+         *     `<Say>We are sorry, an error occurred. Please try again later.</Say><Hangup/>`.
          * @example {
          *       "Response": {
-         *         "Connect": {
-         *           "Stream": {
-         *             "url": "wss://example.com/stream",
-         *             "name": "ai-stream"
-         *           },
-         *           "Number": {
-         *             "_": "+1234567890",
-         *             "sendDigits": "ww1234"
-         *           }
+         *         "Dial": {
+         *           "action": "https://opbx.example.com/api/callbacks/voice/ring-group-callback",
+         *           "timeout": 30,
+         *           "Number": "1001"
          *         }
          *       }
          *     }
@@ -6042,38 +7351,46 @@ export type components = {
         CxmlResponse: {
             /** @description Root CXML response element */
             Response?: {
-                /** @description Connect verb for routing calls */
-                Connect?: {
-                    /** @description Number to connect to */
-                    Number?: Record<string, never>;
-                    /** @description WebSocket stream configuration */
-                    Stream?: Record<string, never>;
-                };
-                /** @description Dial verb for outbound calls */
+                /** @description Supervisor call coaching on a session token (`policy` listen/whisper/barge, `finishOnKey`, `whisperDirection`, `spyDirection`; callee is spelled `calee`) */
+                Coach?: Record<string, never>;
+                /** @description `<Connect><Stream url name><Parameter name value/></Stream></Connect>` WebSocket stream (AI assistants), optionally with `action` */
+                Connect?: Record<string, never>;
+                /**
+                 * @description Dial verb. Attributes used: `action`, `timeout`, `callerId`, `callerName`,
+                 *     `trunks`, `record`, `recordingStatusCallback`. Children: `<Number>`, `<Sip>`,
+                 *     `<Service provider="...">` (AI assistant, with optional `<Header name value>`)
+                 *     or `<Conference>` (`startConferenceOnEnter`, `endConferenceOnExit`, `beep`,
+                 *     `muted`, `maxParticipants`, `holdMusic`, `waitUrl`, ...).
+                 */
                 Dial?: Record<string, never>;
-                /** @description Gather DTMF input */
+                /** @description Collect DTMF digits (`action`, `timeout`, `finishOnKey`, `minDigits`, `maxDigits`), with nested `<Say>`/`<Play>` prompts */
                 Gather?: Record<string, never>;
-                /** @description Hangup the call */
+                /** @description Hang up the call */
                 Hangup?: Record<string, never>;
-                /** @description Play audio file */
+                /** @description Silence (`length` seconds) */
+                Pause?: Record<string, never>;
+                /** @description Play an audio URL (`loop`) */
                 Play?: Record<string, never>;
-                /** @description Record call audio */
-                Record?: Record<string, never>;
-                /** @description Redirect to another URL */
+                /** @description Continue the call at another URL */
                 Redirect?: Record<string, never>;
-                /** @description Text-to-speech */
+                /** @description Text-to-speech (`voice`, `language`, `loop`) */
                 Say?: Record<string, never>;
+                /** @description Send the caller to voicemail (`transcribe`, `action`) */
+                Voicemail?: Record<string, never>;
             };
+        };
+        Day: {
+            enabled?: boolean;
+            time_ranges?: components["schemas"]["TimeRange"][];
         };
         /** @description Distribution List for auto-dialer campaigns */
         DistributionList: {
             /**
-             * Format: date-time
-             * @description When the list was archived
+             * @description When the list was archived (`Y-m-d H:i:s`)
              * @example null
              */
             archived_at?: string | null;
-            /** @description Associated campaign (when loaded) */
+            /** @description Assigned campaign. Present in the list, show and parts responses; omitted in the create and copy responses. */
             campaign?: {
                 /** @example 5 */
                 id?: number;
@@ -6086,28 +7403,37 @@ export type components = {
              */
             campaign_id?: number | null;
             /**
-             * @description Whether the list can be archived
+             * @description Status is ready, failed or used, and the list is not assigned to a campaign
              * @example true
              */
             can_archive?: boolean;
             /**
-             * @description Whether the list can be assigned to a campaign
+             * @description Status is ready
              * @example true
              */
             can_assign?: boolean;
             /**
-             * @description Whether the list can be copied
+             * @description Status is ready, in_use, used or archived
              * @example true
              */
             can_copy?: boolean;
             /**
-             * @description Whether the list can accept uploads
+             * @description The list is not assigned to a campaign (role rules still apply, see Delete distribution list)
+             * @example true
+             */
+            can_delete?: boolean;
+            /**
+             * @description The list is assigned to a campaign that is not active, and every destination is still pending with zero dial attempts
+             * @example false
+             */
+            can_unassign?: boolean;
+            /**
+             * @description Status is draft, pending or failed (destinations can be uploaded or added)
              * @example true
              */
             can_upload?: boolean;
             /**
-             * Format: date-time
-             * @description Creation timestamp
+             * @description Creation timestamp (`Y-m-d H:i:s`)
              * @example 2024-01-10 08:00:00
              */
             created_at?: string;
@@ -6117,7 +7443,7 @@ export type components = {
              */
             description?: string | null;
             /**
-             * @description Whether this list has version history
+             * @description Whether previous versions of the list are kept (destinations replaced by a re-upload; see the versions endpoint)
              * @example false
              */
             has_versions?: boolean;
@@ -6136,58 +7462,74 @@ export type components = {
              * @example Sales Leads Q1
              */
             name: string;
+            /** @description The list this "(Part N)" list was split from. Present in the show response only. */
+            parent_list?: {
+                /** @example 1 */
+                id?: number;
+                /** @example Fall Webinar Leads */
+                name?: string;
+            } | null;
             /**
-             * @description ID of the parent list (for versioned lists)
+             * @description For a "(Part N)" list, the ID of the list a large upload was split from
              * @example null
              */
             parent_list_id?: number | null;
             /**
-             * Format: date-time
-             * @description When the list was last processed
+             * @description Number of "(Part N)" lists a large upload into this list was split into; deleting the list deletes them too. Returned by the list index and show endpoints.
+             * @example 0
+             */
+            parts_count?: number;
+            /**
+             * @description When the last upload finished processing (`Y-m-d H:i:s`)
              * @example 2024-01-10 08:05:00
              */
             processed_at?: string | null;
-            /** @description List statistics */
+            /** @description List statistics (the counters are `null` in the create response) */
             statistics?: {
                 /**
                  * @description Number of invalid rows
                  * @example 50
                  */
-                invalid_rows?: number;
+                invalid_rows?: number | null;
                 /**
                  * @description Total number of rows in the list
                  * @example 1000
                  */
-                total_rows?: number;
+                total_rows?: number | null;
                 /**
                  * @description Number of valid rows
                  * @example 950
                  */
-                valid_rows?: number;
+                valid_rows?: number | null;
             };
             /**
              * @description Current list status
              * @example ready
              * @enum {string}
              */
-            status: "draft" | "processing" | "ready" | "in_use" | "used" | "failed" | "archived";
+            status: "draft" | "pending" | "processing" | "ready" | "in_use" | "used" | "failed" | "archived";
             /**
-             * @description Status color for UI display
+             * @description Badge color for the status (draft and archived are gray, pending yellow, processing blue, ready green, failed red, in_use purple, used orange)
              * @example green
+             * @enum {string}
              */
-            status_color?: string;
+            status_color?: "gray" | "yellow" | "blue" | "green" | "red" | "purple" | "orange";
             /**
              * @description Human-readable status label
              * @example Ready
              */
             status_label?: string;
             /**
-             * Format: date-time
-             * @description When the list was last used
+             * @description Why an assigned list cannot be unassigned now (its campaign is active, or its entries have started processing); null when it can, or when it is not assigned
+             * @example Cannot unassign list: its campaign is active. Pause the campaign first.
+             */
+            unassign_refusal?: string | null;
+            /**
+             * @description When the list was assigned to a campaign (`Y-m-d H:i:s`)
              * @example 2024-01-15 14:30:00
              */
             used_at?: string | null;
-            /** @description Campaign that used this list (when loaded) */
+            /** @description Campaign that used this list. Present in the list and show responses; omitted in the create, copy and parts responses. */
             used_by_campaign?: {
                 /** @example 3 */
                 id?: number;
@@ -6208,89 +7550,98 @@ export type components = {
         /** @description A user's Embedded Dialer authentication token. Maps to exactly one user and is stored hashed — the plaintext value is only ever returned once, at generate/regenerate time. Used to authenticate the embedded widget's runtime API (`/v1/embed/*`) via `Authorization: Bearer <token>`. */
         EmbedToken: {
             /**
-             * @description Hex color for the floating launcher.
+             * @description Hex color for the floating launcher. Defaults to `#007acc`.
              * @example #007acc
              */
-            icon_background_color?: string | null;
+            icon_background_color: string | null;
             /**
              * @description Floating launcher position. Defaults to bottom-right.
              * @example bottom-right
              * @enum {string|null}
              */
-            icon_position?: "bottom-right" | "bottom-left" | "top-right" | "top-left" | null;
+            icon_position: "bottom-right" | "bottom-left" | "top-right" | "top-left" | null;
             /**
              * Format: date-time
              * @description When the token last authenticated a request. Write is throttled to at most once per 5 seconds.
              */
-            last_used_at?: string | null;
+            last_used_at: string | null;
             /** @example 1 */
             user_id: number;
         };
-        /** @description Standard error response */
+        /**
+         * @description Error response. The API uses three shapes:
+         *     - Authentication/authorization and HTTP exceptions: `error` is a string
+         *       (`Unauthenticated`, `Forbidden`, or the exception class name such as
+         *       `NotFoundHttpException`), plus `message` (and `status` for HTTP exceptions).
+         *     - Controller errors (`errorResponse()`): `error` is an object
+         *       `{code, message, details}` and there is no top-level `message`.
+         *     - API-key scope denials, tenant-scope checks (suspended or inactive organization)
+         *       and some guards: only `message`.
+         *     - Rate-limit responses: string `error`, `message` and `retry_after`.
+         */
         Error: {
-            /**
-             * @description Machine-readable error code
-             * @example AUTH_REQUIRED
-             */
+            /** @description Machine-readable error code (returned by some endpoints next to a string `error`) */
             code?: string;
-            /**
-             * @description Error type/code
-             * @example UNAUTHORIZED
-             */
-            error?: string;
+            error?: string | {
+                /** @example CREATION_ERROR */
+                code: string;
+                details?: Record<string, never> | null;
+                message: string;
+            };
             /**
              * @description Human-readable error message
-             * @example Authentication required
+             * @example Authentication required to access this resource.
              */
-            message: string;
+            message?: string;
+            /** @description Seconds to wait (rate-limit responses only) */
+            retry_after?: number;
+            /**
+             * @description HTTP status code (HTTP exceptions only)
+             * @example 404
+             */
+            status?: number;
         };
         /**
          * Extension
          * @description Extension model representing a PBX extension
          */
         Extension: {
-            ai_assistant?: {
-                id?: number;
-                name?: string;
-            } | null;
+            /** @description Assigned AI assistant (present in the list and create responses; null when none) */
+            ai_assistant?: components["schemas"]["AiAssistant"] | null;
             /** @description ID of the assigned AI assistant */
             ai_assistant_id?: number | null;
+            /** @description Assigned AI load balancer (present in the list and create responses; null when none) */
             ai_load_balancer?: {
                 id?: number;
-                members?: unknown[];
+                members?: {
+                    ai_assistant_id?: number;
+                    ai_assistant_name?: string | null;
+                    position?: number;
+                    priority?: number;
+                    status?: string;
+                    weight?: number;
+                }[];
                 name?: string;
                 strategy?: string;
             } | null;
-            /** @description Cloudonix subscriber ID */
-            cloudonix_subscriber_id?: number | null;
             /**
-             * @description Whether extension is synced with Cloudonix
-             * @example true
-             */
-            cloudonix_synced?: boolean;
-            /**
-             * @description Cloudonix UUID
-             * @example 550e8400-e29b-41d4-a716-446655440000
-             */
-            cloudonix_uuid?: string | null;
-            /**
-             * @description Type-specific configuration
+             * @description Type-specific configuration (see the create request for the keys each type uses). An empty configuration is returned as an empty JSON array `[]`.
              * @example {
              *       "forward_to": "+1234567890"
              *     }
              */
             configuration?: {
                 [key: string]: unknown;
-            };
+            } | unknown[];
             /** Format: date-time */
             readonly created_at?: string;
-            /** @description Nested DID summary, present only when the relationship is loaded. */
+            /** @description Nested DID summary, present only in the list response. */
             default_caller_id?: {
                 friendly_name?: string | null;
                 id?: number;
                 phone_number?: string;
             } | null;
-            /** @description ID of an active DID owned by the organization to present as the caller ID when this extension places an outbound call. Takes precedence over the matched outbound whitelist rule's caller ID. See the Outbound Calling Overview. */
+            /** @description ID of a DID of the organization to present as the caller ID when this extension places an outbound call (used only while the DID is active). Takes precedence over the matched outbound whitelist rule's caller ID and the organization default. See the Outbound Calling Overview. */
             default_caller_id_did_id?: number | null;
             /**
              * @description The extension number (e.g., 1001)
@@ -6303,7 +7654,7 @@ export type components = {
              */
             readonly id: number;
             /**
-             * @description Display name (derived from user for USER type)
+             * @description Name of the assigned user, or `Unassigned` when no user is assigned
              * @example John Doe
              */
             name?: string;
@@ -6312,29 +7663,28 @@ export type components = {
              * @example 1
              */
             organization_id: number;
-            /** @description SIP configuration (USER type only, authorized users) */
+            /** @description SIP registration metadata. Present only on `user` extensions. The password is never included; read it with `GET /v1/extensions/{extension}/password`. */
             sip_config?: {
-                /** @example sip_password_xyz */
-                password?: string;
                 /** @example sip.cloudonix.io */
                 server?: string;
                 /** @example 1001 */
                 username?: string;
-            } | null;
+            };
             /**
              * @description Extension status
              * @example active
              * @enum {string}
              */
-            status: "active" | "inactive";
+            status: "active" | "inactive" | "pending";
             /**
              * @description Extension type
              * @example user
              * @enum {string}
              */
-            type: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "ai_load_balancer";
+            type: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "queue" | "ai_load_balancer";
             /** Format: date-time */
             readonly updated_at?: string;
+            /** @description Assigned user (present when loaded) */
             user?: components["schemas"]["User"];
             /**
              * @description ID of the assigned user (for USER type extensions)
@@ -6347,56 +7697,303 @@ export type components = {
              */
             voicemail_enabled?: boolean;
         };
-        /** @description Inbound Blacklist entry */
+        /** @description Inbound Blacklist entry (serialized model) */
         InboundBlacklist: {
+            /** @description Number of calls this entry has blocked */
+            blocked_count?: number;
+            /** @example +1234567890 */
+            caller_id_pattern: string;
             /** Format: date-time */
             created_at?: string;
-            /** @example Spam caller */
+            /** @description Not settable through the API */
             description?: string | null;
+            /** @description DIDs the entry applies to (DID-specific entries) */
+            did_numbers?: {
+                friendly_name?: string | null;
+                id?: number;
+                phone_number?: string;
+                /** @description Join-table row (`inbound_blacklist_id`, `did_number_id`, `created_at`, `updated_at`) */
+                pivot?: Record<string, never>;
+            }[];
+            /**
+             * Format: date-time
+             * @description Not settable through the API
+             */
+            expires_at?: string | null;
             id: number;
+            /** @description Applies to all DIDs when true; otherwise only to `did_numbers` */
+            is_global?: boolean;
             /**
              * @example exact
              * @enum {string}
              */
-            match_type: "exact" | "prefix" | "pattern";
+            match_type: "exact" | "prefix" | "wildcard";
             organization_id: number;
-            /** @example +1234567890 */
-            phone_number: string;
+            /** @enum {string} */
+            rejection_strategy?: "drop" | "reject" | "torment";
             /** @enum {string} */
             status: "active" | "inactive";
+            /** @description Seconds a tormented caller is held. 600 when set to `torment` through the API; database default 300. */
+            torment_music_timeout?: number;
+            /** @description Random 16-character prefix generated when `rejection_strategy` is set to `torment` */
+            torment_room_prefix?: string | null;
             /** Format: date-time */
             updated_at?: string;
         };
         /** @description IVR Menu */
         IvrMenu: {
+            /** @description Greeting audio URL (a recording download URL or an external URL) */
+            audio_file_path?: string | null;
             /** Format: date-time */
             created_at?: string;
-            /** @example Thank you for calling */
-            greeting_message?: string;
+            description?: string | null;
+            failover_destination_id?: number | null;
+            /** @enum {string|null} */
+            failover_destination_type?: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "business_hours" | "call_queue" | "hangup" | "unavailable" | null;
             id: number;
+            inter_digit_timeout?: number;
+            /** @description True when audio_file_path points at the recordings download endpoint */
+            is_recording_url?: boolean;
+            /** @description True when the failover destination or any option is `unavailable` (saved for future use, or set when a deleted user's extension was the target). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned?: boolean;
+            /** @description Seconds to wait for input */
+            max_timeout?: number;
+            max_turns?: number;
             /** @example Main Menu */
             name: string;
-            /** @description IVR menu options */
-            options?: unknown[];
+            /** @description Menu options (ordered by priority in list responses). Omitted from list responses requested with per_page=100 (dropdown mode). */
+            options?: {
+                description?: string | null;
+                /** @description Target ID (0 for `unavailable`) */
+                destination_id?: number;
+                /** @enum {string} */
+                destination_type?: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "business_hours" | "call_queue" | "hangup" | "unavailable";
+                id?: number;
+                input_digits?: string;
+                ivr_menu_id?: number;
+                priority?: number;
+            }[];
+            /** @description Present only in list responses (not with per_page=100) */
+            options_count?: number;
             organization_id: number;
+            /** @description Recording used as the greeting (set when the menu was saved with `recording_id` or a numeric `audio_file_path`) */
+            recording_id?: number | null;
             /** @enum {string} */
             status: "active" | "inactive";
+            /** @example Thank you for calling */
+            tts_text?: string | null;
+            /** @example en-US-Standard-A */
+            tts_voice?: string | null;
             /** Format: date-time */
             updated_at?: string;
-            /** @example en-US-Standard-A */
-            voice?: string;
+        };
+        /**
+         * @description IVR menu create/update request (update uses the same rules; full replacement).
+         *     Exactly one greeting source is required: `recording_id`, `audio_file_path` or `tts_text`
+         *     (422 on `recording_id`, `audio_file_path` or `audio_configuration` otherwise). With
+         *     `recording_id` (or a numeric `audio_file_path`) the stored `audio_file_path` becomes the
+         *     recording's playback URL (null when the recording is not active) and the TTS fields are
+         *     cleared; with a URL in `audio_file_path` or with `tts_text`, the other sources are cleared.
+         */
+        IvrMenuInput: {
+            /** @description Greeting audio as a URL (max 500 chars) or a recording ID of this organization */
+            audio_file_path?: string | number | null;
+            description?: string | null;
+            /** @description Optional. When sent and the type is not hangup/unavailable, it must be a destination of that type in this organization. */
+            failover_destination_id?: number | null;
+            /**
+             * @description `unavailable` is rejected on create (422) and accepted on update
+             * @enum {string}
+             */
+            failover_destination_type: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "business_hours" | "call_queue" | "hangup" | "unavailable";
+            inter_digit_timeout: number;
+            max_timeout: number;
+            max_turns: number;
+            name: string;
+            options: {
+                description?: string | null;
+                /** @description Required. ID of a destination of that type in this organization; for `unavailable` it may be omitted and is stored as 0 */
+                destination_id?: number | string | null;
+                /**
+                 * @description `unavailable` is rejected on create (422) and accepted on update
+                 * @enum {string}
+                 */
+                destination_type: "extension" | "ring_group" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "business_hours" | "call_queue" | "unavailable";
+                /** @description Digits the caller presses */
+                input_digits: string;
+                priority: number;
+            }[];
+            /** @description Recording of this organization */
+            recording_id?: number | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
+            tts_text?: string | null;
+            tts_voice?: string | null;
+        };
+        /** @description Destination (phone number) in a distribution list */
+        ListDestination: {
+            batch_identifier?: string | null;
+            /** @description Billable seconds of the last call */
+            billsec?: number | null;
+            /** @description Y-m-d H:i:s */
+            created_at?: string;
+            /** @description Calls placed to this destination so far */
+            dial_attempts?: number;
+            /** @description Duration of the last call in seconds */
+            duration?: number | null;
+            id?: number;
+            /** @description True when status is `invalid` */
+            is_invalid?: boolean;
+            /**
+             * @description Y-m-d H:i:s
+             * @example 2024-01-10 08:00:00
+             */
+            last_dialed_at?: string | null;
+            last_disposition?: string | null;
+            last_error?: string | null;
+            /** @description Values of the CSV columns mapped with `mapping[metadata]` */
+            metadata?: {
+                [key: string]: unknown;
+            } | null;
+            name?: string | null;
+            /**
+             * @description E.164 number
+             * @example +14155551212
+             */
+            phone_number?: string;
+            /** @description Dialing priority (1 when unset) */
+            priority?: number;
+            /** @enum {string} */
+            status?: "pending" | "dialing" | "connected" | "failed" | "completed" | "invalid";
+            status_label?: string;
+            /** @description Y-m-d H:i:s */
+            updated_at?: string;
+        };
+        /**
+         * ListVersion
+         * @description A previous version of a distribution list, the destinations one re-upload replaced. Kept until `expires_at`, then deleted by the daily `distribution-lists:prune-versions` job.
+         */
+        ListVersion: {
+            /**
+             * @description Destinations kept in the version
+             * @example 1200
+             */
+            entries_count: number;
+            /**
+             * @description When the version is deleted (`Y-m-d H:i:s`); `null` when retention is disabled and it is kept until the list is deleted
+             * @example 2026-11-13 12:00:00
+             */
+            expires_at: string | null;
+            /** @example 7 */
+            id: number;
+            /**
+             * @description Rows rejected from it
+             * @example 50
+             */
+            invalid_rows?: number | null;
+            /** @example 1 */
+            list_id: number;
+            /**
+             * @description File the version came from, when known
+             * @example leads.csv
+             */
+            original_filename?: string | null;
+            /**
+             * @description When a new upload replaced this version (`Y-m-d H:i:s`)
+             * @example 2026-10-14 12:00:00
+             */
+            replaced_at: string;
+            /**
+             * @description Rows in that version's CSV
+             * @example 1250
+             */
+            total_rows?: number | null;
+            /**
+             * @description When that file was uploaded (`Y-m-d H:i:s`), when known
+             * @example 2026-10-01 09:15:00
+             */
+            uploaded_at?: string | null;
+            /** @description User who uploaded that file, when known */
+            uploaded_by?: {
+                /** @example 3 */
+                id?: number;
+                /** @example Dana Levi */
+                name?: string;
+            } | null;
+            /**
+             * @description Rows imported from it
+             * @example 1200
+             */
+            valid_rows?: number | null;
+            /**
+             * @description The list's `version_number` while these destinations were current
+             * @example 1
+             */
+            version_number: number;
+        };
+        /**
+         * ListVersionDestination
+         * @description One destination of a previous list version, as it was when the version was replaced.
+         */
+        ListVersionDestination: {
+            /** @example batch-a */
+            batch_identifier?: string | null;
+            /** @example 2 */
+            dial_attempts: number;
+            /**
+             * @description Duration of the last call, seconds
+             * @example 42
+             */
+            duration?: number;
+            /**
+             * @description Ascending in the order of the original list
+             * @example 4411
+             */
+            id: number;
+            /**
+             * @description When the last attempt started (`Y-m-d H:i:s`)
+             * @example 2026-10-10 14:02:11
+             */
+            last_dialed_at?: string | null;
+            /**
+             * @description Result of the last attempt
+             * @example ANSWER
+             */
+            last_disposition?: string | null;
+            /**
+             * @example {
+             *       "account": "ACC-123"
+             *     }
+             */
+            metadata?: {
+                [key: string]: string;
+            } | null;
+            /** @example John Doe */
+            name?: string | null;
+            /** @example +14155551212 */
+            phone_number: string;
+            /**
+             * @example completed
+             * @enum {string}
+             */
+            status: "pending" | "dialing" | "connected" | "failed" | "completed" | "invalid";
+            /** @example Completed */
+            status_label?: string;
         };
         /** @description Detailed monitor view for a single campaign */
         MonitorDetail: {
-            /** @description Currently active call sessions */
+            /**
+             * @description Call sessions in `initiated`, `ringing` or `answered` status that started in the last
+             *     5 minutes, newest first. Never cached. Always empty for a paused campaign.
+             */
             active_sessions: {
                 /**
-                 * @description Cloudonix call ID
+                 * @description Cloudonix call ID (null until the call is placed)
                  * @example call-abc123
                  */
-                call_id?: string;
+                call_id?: string | null;
                 /**
-                 * @description Call duration in seconds
+                 * @description Seconds since initiated_at
                  * @example 45
                  */
                 duration_seconds?: number;
@@ -6415,7 +8012,7 @@ export type components = {
                  * @description Destination phone number
                  * @example +14155551212
                  */
-                phone_number?: string;
+                phone_number?: string | null;
                 /**
                  * @description Current call status
                  * @example answered
@@ -6426,13 +8023,13 @@ export type components = {
             /** @description Campaign overview */
             campaign: {
                 /**
-                 * @description Currently active calls
+                 * @description Active calls reported by the dialer worker (always 0 for a paused campaign)
                  * @example 5
                  */
                 active_calls?: number;
                 /**
                  * Format: float
-                 * @description CAC utilization percentage
+                 * @description active_calls / concurrent_active_calls x 100, one decimal
                  * @example 50
                  */
                 cac_utilization?: number;
@@ -6458,7 +8055,11 @@ export type components = {
                  */
                 status?: "active" | "paused" | "draft" | "completed" | "archived";
             };
-            /** @description Call disposition breakdown */
+            /**
+             * @description Call session dispositions, counted per session. Cloudonix spellings are normalized
+             *     (`answer` -> answered, `no-answer`/`noanswer` -> no_answer, `cancel` -> cancelled);
+             *     other dispositions are not counted. Every key is always present.
+             */
             dispositions: {
                 /**
                  * @description Number of answered calls
@@ -6499,12 +8100,12 @@ export type components = {
             /** @description Rate limiting status */
             rate_limit_status: {
                 /**
-                 * @description Whether campaign can be resumed now
+                 * @description True when resumes_at is null or already passed
                  * @example true
                  */
                 can_resume_now?: boolean;
                 /**
-                 * @description Whether campaign is rate limited
+                 * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
                  * @example false
                  */
                 is_rate_limited?: boolean;
@@ -6523,41 +8124,50 @@ export type components = {
             /** @description Campaign statistics */
             statistics: {
                 /**
-                 * @description Average billable seconds
+                 * @description Average billable seconds of completed call sessions with billsec above 0 (rounded; 0 when none)
                  * @example 95
                  */
                 avg_billsec_seconds?: number;
                 /**
-                 * @description Average call duration in seconds
+                 * @description Average duration of completed call sessions with a duration above 0 (rounded; 0 when none)
                  * @example 120
                  */
                 avg_duration_seconds?: number;
                 /**
-                 * @description Number of completed calls
+                 * @description Destinations in `completed` status
                  * @example 755
                  */
                 completed_calls?: number;
                 /**
-                 * @description Number of failed calls
+                 * @description Destinations in `dialing` status
+                 * @example 3
+                 */
+                dialing_calls?: number;
+                /**
+                 * @description Destinations in `failed` status
                  * @example 45
                  */
                 failed_calls?: number;
                 /**
-                 * @description Number of pending calls
+                 * @description Destinations in `pending` status
                  * @example 200
                  */
                 pending_calls?: number;
                 /**
-                 * Format: float
-                 * @description Campaign completion percentage
-                 * @example 75.5
+                 * @description (completed + failed) / total_destinations x 100, rounded; 0 when the campaign has no destinations
+                 * @example 80
                  */
                 progress_percentage?: number;
                 /**
-                 * @description Total number of destinations
+                 * @description Destinations across all lists assigned to the campaign
                  * @example 1000
                  */
                 total_destinations?: number;
+                /**
+                 * @description Calls where the AMD worker detected a voicemail
+                 * @example 12
+                 */
+                voicemail_calls?: number;
             };
         };
         /** @description Real-time monitor summary for all active campaigns */
@@ -6565,13 +8175,13 @@ export type components = {
             /** @description List of active and paused campaigns with monitoring data */
             campaigns: {
                 /**
-                 * @description Currently active calls
+                 * @description Active calls reported by the dialer worker (always 0 for a paused campaign)
                  * @example 5
                  */
                 active_calls?: number;
                 /**
                  * Format: float
-                 * @description CAC utilization percentage
+                 * @description active_calls / concurrent_active_calls x 100, one decimal
                  * @example 50
                  */
                 cac_utilization?: number;
@@ -6581,7 +8191,7 @@ export type components = {
                  */
                 caller_id?: string;
                 /**
-                 * @description Number of completed calls
+                 * @description Destinations in `completed` status
                  * @example 755
                  */
                 completed_calls?: number;
@@ -6591,13 +8201,18 @@ export type components = {
                  */
                 concurrent_active_calls?: number;
                 /**
+                 * @description Destinations in `dialing` status
+                 * @example 3
+                 */
+                dialing_calls?: number;
+                /**
                  * Format: date
                  * @description Campaign end date
                  * @example 2024-12-31
                  */
                 end_date?: string;
                 /**
-                 * @description Number of failed calls
+                 * @description Destinations in `failed` status
                  * @example 45
                  */
                 failed_calls?: number;
@@ -6612,19 +8227,18 @@ export type components = {
                  */
                 name?: string;
                 /**
-                 * @description Number of pending calls
+                 * @description Destinations in `pending` status
                  * @example 200
                  */
                 pending_calls?: number;
                 /**
-                 * Format: float
-                 * @description Campaign completion percentage
-                 * @example 75.5
+                 * @description (completed + failed) / total_destinations x 100, rounded; 0 when the campaign has no destinations
+                 * @example 76
                  */
                 progress_percentage?: number;
                 rate_limit_status?: {
                     /**
-                     * @description Whether campaign is rate limited
+                     * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
                      * @example false
                      */
                     is_rate_limited?: boolean;
@@ -6641,15 +8255,16 @@ export type components = {
                     resumes_at?: string | null;
                 };
                 /**
-                 * @description Routing destination label
-                 * @example Sales AI Assistant
+                 * @description Label of the routing destination type (AI Assistant, AI Load Balancer or Hangup)
+                 * @example AI Assistant
                  */
                 routing_destination_label?: string;
                 /**
                  * @description Routing destination type
                  * @example ai_assistant
+                 * @enum {string}
                  */
-                routing_destination_type?: string;
+                routing_destination_type?: "ai_assistant" | "ai_load_balancer" | "hangup";
                 /**
                  * Format: date
                  * @description Campaign start date
@@ -6663,10 +8278,15 @@ export type components = {
                  */
                 status?: "active" | "paused";
                 /**
-                 * @description Total number of destinations
+                 * @description Destinations across all lists assigned to the campaign
                  * @example 1000
                  */
                 total_destinations?: number;
+                /**
+                 * @description Calls where the AMD worker detected a voicemail
+                 * @example 12
+                 */
+                voicemail_calls?: number;
             }[];
             /** @description Aggregated totals across all campaigns */
             totals: {
@@ -6676,8 +8296,7 @@ export type components = {
                  */
                 active_campaigns?: number;
                 /**
-                 * Format: float
-                 * @description Overall CAC utilization percentage
+                 * @description total_active_calls / total_cac_capacity x 100, one decimal (0 when there is no capacity)
                  * @example 30
                  */
                 overall_utilization?: number;
@@ -6697,35 +8316,43 @@ export type components = {
                  */
                 total_cac_capacity?: number;
             };
-            /** @description Dialer worker health status */
+            /**
+             * @description Dialer worker health, read from the worker's health URL (`DIALER_WORKER_HEALTH_URL`, 5-second timeout).
+             *     The worker reports only its status, so the three counters are 0.
+             */
             worker_health: {
                 /**
-                 * @description Number of active calls
-                 * @example 15
+                 * @description Taken from the health response when present, otherwise 0
+                 * @example 0
                  */
                 active_calls?: number;
                 /**
-                 * @description Number of campaigns being processed
-                 * @example 4
+                 * @description Taken from the health response when present, otherwise 0
+                 * @example 0
                  */
                 active_campaigns?: number;
                 /**
-                 * @description Current queue depth
+                 * @description Taken from the health response when present, otherwise 0
                  * @example 0
                  */
                 queue_depth?: number;
                 /**
-                 * @description Worker health status
+                 * @description `healthy` when the health check answers 200, `offline` when it fails, `unknown` when no health URL is configured
                  * @example healthy
                  * @enum {string}
                  */
-                status?: "healthy" | "degraded" | "offline" | "unknown";
+                status?: "healthy" | "offline" | "unknown";
             };
         };
-        /** @description Organization model representing a tenant */
+        /** @description Organization (tenant), as returned by the platform manager endpoints. */
         Organization: {
             /** Format: date-time */
             readonly created_at?: string;
+            /**
+             * Format: date-time
+             * @description Soft-delete timestamp (platform manager endpoints only)
+             */
+            readonly deleted_at?: string | null;
             /**
              * @description Unique organization identifier
              * @example 1
@@ -6736,25 +8363,15 @@ export type components = {
              * @example Acme Corporation
              */
             name: string;
-            /** @description Organization-specific settings */
+            /**
+             * Format: uuid
+             * @description Token of the public Queues Dashboard link (null when no link was generated). Returned only by the platform manager endpoints.
+             */
+            public_queues_token?: string | null;
+            /** @description Free-form organization settings (JSON). Returned only by the platform manager endpoints. Known key: `default_outbound_caller_id_did_id` (organization-wide default outbound caller ID, used after the extension's and the whitelist rule's caller ID; see `GET /v1/phone-numbers/default-caller-id`). */
             settings?: {
-                features?: {
-                    call_recording?: boolean;
-                    call_waiting?: boolean;
-                    music_on_hold?: boolean;
-                    voicemail?: boolean;
-                };
-                pbx?: {
-                    default_extension_length?: number;
-                    extension_range_end?: string;
-                    extension_range_start?: string;
-                };
-                ui?: {
-                    date_format?: string;
-                    language?: string;
-                    time_format?: string;
-                };
-            };
+                [key: string]: unknown;
+            } | null;
             /**
              * @description URL-friendly identifier
              * @example acme-corporation
@@ -6765,9 +8382,9 @@ export type components = {
              * @example active
              * @enum {string}
              */
-            status: "active" | "inactive" | "suspended";
+            status: "active" | "suspended" | "deleted";
             /**
-             * @description Default timezone for the organization
+             * @description Default timezone for the organization (IANA identifier, default `UTC`)
              * @example America/New_York
              */
             timezone: string;
@@ -6784,7 +8401,7 @@ export type components = {
             readonly created_at?: string;
             /**
              * Format: date-time
-             * @description Timestamp when the request was soft-deleted
+             * @description Timestamp when the request was soft-deleted (absent in the create response)
              * @example 2024-01-15T10:30:00Z
              */
             readonly deleted_at?: string | null;
@@ -6800,7 +8417,7 @@ export type components = {
              */
             readonly id: number;
             /**
-             * @description Display name of the requester
+             * @description Display name from the social profile (the email when the profile has no name)
              * @example Jane Smith
              */
             name: string;
@@ -6821,7 +8438,7 @@ export type components = {
              */
             provider_subject: string;
             /**
-             * @description Role that will be assigned if the request is approved
+             * @description Role recorded on the request (always `pbx_user`; approval creates a PBX User)
              * @example pbx_user
              * @enum {string}
              */
@@ -6843,16 +8460,16 @@ export type components = {
         OutboundWhitelist: {
             /** Format: date-time */
             created_at?: string;
-            /** @description Nested DID summary, present only when the relationship is loaded. */
+            /** @description Nested DID summary. Present only in list responses (null when no caller ID is set). */
             default_caller_id?: {
                 friendly_name?: string | null;
                 id?: number;
                 phone_number?: string;
             } | null;
-            /** @description ID of an active DID owned by the organization to present as the caller ID on outbound calls matching this rule. Overridden by the calling extension's own default caller ID when set. See the Outbound Calling Overview in the user guide. */
+            /** @description ID of a DID owned by the organization to present as the caller ID on outbound calls matching this rule (used only while that DID is active). Overridden by the calling extension's own default caller ID when set; wins over the organization default outbound caller ID. See the Outbound Calling Overview in the user guide. */
             default_caller_id_did_id?: number | null;
             /**
-             * @description Destination country. Unique within the organization.
+             * @description Destination country (max 100 characters). Unique within the organization.
              * @example US
              */
             destination_country: string;
@@ -6874,6 +8491,13 @@ export type components = {
             status: "active" | "inactive";
             /** Format: date-time */
             updated_at?: string;
+        };
+        /** @description Top-level pagination links of a Laravel resource collection */
+        PaginationLinks: {
+            first?: string | null;
+            last?: string | null;
+            next?: string | null;
+            prev?: string | null;
         };
         /**
          * PaginationMeta
@@ -6913,21 +8537,180 @@ export type components = {
         };
         /** @description Phone Number (DID) */
         PhoneNumber: {
+            /** @description Routing target when routing_type is `ai_assistant` */
+            ai_assistant?: components["schemas"]["AiAssistant"];
+            /** @description Routing target when routing_type is `ai_load_balancer` */
+            ai_load_balancer?: components["schemas"]["AiAssistantLoadBalancer"];
+            /** @description Routing target when routing_type is `business_hours` */
+            business_hours_schedule?: components["schemas"]["BusinessHoursSchedule"];
+            /** @description Routing target when routing_type is `call_queue` */
+            call_queue?: {
+                id?: number;
+                name?: string;
+            };
+            /** @description Read-only Cloudonix data for the DID (`{}` when not set). Not settable through the API. */
+            cloudonix_config?: {
+                [key: string]: unknown;
+            };
+            /** @description Routing target when routing_type is `conference_room` */
+            conference_room?: components["schemas"]["ConferenceRoom"];
             /** Format: date-time */
             created_at?: string;
-            id: number;
+            /** @description Routing target when routing_type is `extension`. Each nested target below is present only for its own routing_type and only while the target exists in the organization. */
+            extension?: components["schemas"]["Extension"];
             /** @example Main Line */
-            label?: string | null;
+            friendly_name?: string | null;
+            id: number;
+            /** @description True when `routing_type` is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned?: boolean;
+            /** @description Routing target when routing_type is `ivr_menu` */
+            ivr_menu?: components["schemas"]["IvrMenu"];
             organization_id: number;
-            /** @example +1987654321 */
+            /** @example +14155550123 */
             phone_number: string;
-            routing_target_id?: number | null;
+            /** @description Routing target when routing_type is `ring_group` */
+            ring_group?: components["schemas"]["RingGroup"];
+            /** @description Routing target keyed by type, for example `{"extension_id": 12}`; empty for `unavailable` (`{}` when null) */
+            routing_config?: {
+                [key: string]: unknown;
+            };
             /** @enum {string} */
-            routing_type?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant";
+            routing_type?: "extension" | "ring_group" | "business_hours" | "conference_room" | "ai_assistant" | "ai_load_balancer" | "ivr_menu" | "call_queue" | "unavailable";
             /** @enum {string} */
             status: "active" | "inactive";
             /** Format: date-time */
             updated_at?: string;
+        };
+        /** @description Phone number create/update request */
+        PhoneNumberInput: {
+            /** @description Create only (validation flag, not stored). Allow non-E.164 numbers. */
+            enable_non_e164?: boolean | null;
+            friendly_name?: string | null;
+            /**
+             * @description Create only (prohibited on update). E.164 (`^\+[1-9]\d{1,14}$`) unless `enable_non_e164` is true, then digits, `+` and `#`. Unique across all organizations.
+             * @example +14155550123
+             */
+            phone_number?: string;
+            /** @description The target ID for the routing type (the key matching `routing_type`). Required (may be `{}` for `unavailable`); the referenced resource must exist in the organization and be active, and a ring group must have at least one active member. */
+            routing_config?: {
+                ai_assistant_id?: number;
+                ai_load_balancer_id?: number;
+                business_hours_schedule_id?: number;
+                call_queue_id?: number;
+                conference_room_id?: number;
+                extension_id?: number;
+                ivr_menu_id?: number;
+                ring_group_id?: number;
+            };
+            /**
+             * @description `unavailable` is rejected on create (422) and accepted on update
+             * @enum {string}
+             */
+            routing_type?: "extension" | "ring_group" | "business_hours" | "conference_room" | "ai_assistant" | "ai_load_balancer" | "ivr_menu" | "call_queue" | "unavailable";
+            /**
+             * @description Defaults to `active` on create when omitted.
+             * @enum {string}
+             */
+            status?: "active" | "inactive";
+        };
+        PlatformStatus: {
+            data?: {
+                /**
+                 * Format: date-time
+                 * @description Time of the most recent stored check across all components
+                 */
+                checked_at?: string | null;
+                /** @description One entry per component, in a fixed order */
+                components?: {
+                    /** Format: date-time */
+                    checked_at?: string | null;
+                    /**
+                     * @example redis
+                     * @enum {string}
+                     */
+                    component?: "app" | "mysql" | "mysql_archive" | "redis" | "queue" | "scheduler" | "seaweedfs" | "soketi" | "acd_worker" | "amd_worker" | "dialer_worker" | "mcp_server" | "cloudonix" | "loki" | "grafana";
+                    /** @description Latest check message (`No check recorded yet` when there is none) */
+                    detail?: string;
+                    /** @description Last 24 hours in 5-minute buckets, worst status per bucket */
+                    history?: {
+                        /**
+                         * Format: date-time
+                         * @description Time of the latest check in the bucket that had this status
+                         */
+                        check_at?: string;
+                        /**
+                         * Format: date-time
+                         * @description Start of the 5-minute bucket
+                         */
+                        checked_at?: string;
+                        /** @enum {string} */
+                        status?: "ok" | "degraded" | "down" | "unknown";
+                    }[];
+                    /** @example Redis */
+                    label?: string;
+                    latency_ms?: number | null;
+                    /** @description True for `loki` and `grafana` (the optional logs profile) */
+                    optional?: boolean;
+                    /**
+                     * @description Latest stored status (`unknown` when no check is recorded). The `scheduler` status is evaluated when the request is served, from the scheduler heartbeat.
+                     * @enum {string}
+                     */
+                    status?: "ok" | "degraded" | "down" | "unknown";
+                }[];
+                /** @description Component counts per status */
+                summary?: {
+                    degraded?: number;
+                    down?: number;
+                    ok?: number;
+                    unknown?: number;
+                };
+            };
+        };
+        PublicStatus: {
+            data?: {
+                groups?: {
+                    /** @description Last 6 hours in 5-minute buckets, worst member status per bucket */
+                    history?: {
+                        /**
+                         * Format: date-time
+                         * @description Start of the 5-minute bucket
+                         */
+                        at?: string;
+                        /**
+                         * Format: date-time
+                         * @description Time of the latest check in the bucket that had this status
+                         */
+                        check_at?: string;
+                        /** @enum {string} */
+                        status?: "ok" | "degraded" | "down" | "unknown";
+                    }[];
+                    /**
+                     * @example call_routing
+                     * @enum {string}
+                     */
+                    key?: "web_portal_api" | "call_routing" | "call_queues" | "dialer_voicemail" | "recordings_storage" | "realtime_updates";
+                    /**
+                     * @example Call routing
+                     * @enum {string}
+                     */
+                    name?: "Web portal & API" | "Call routing" | "Call queues" | "Auto dialer & voicemail detection" | "Recordings & storage" | "Real-time updates";
+                    /**
+                     * @description Worst latest status of the group's members (`unknown` for a member with no check in the last 6 hours)
+                     * @enum {string}
+                     */
+                    status?: "ok" | "degraded" | "down" | "unknown";
+                }[];
+                /**
+                 * @description Worst group status
+                 * @enum {string}
+                 */
+                status?: "ok" | "degraded" | "down" | "unknown";
+                /**
+                 * Format: date-time
+                 * @description Time of the most recent check in the last 6 hours (null if none)
+                 */
+                updated_at?: string | null;
+            };
         };
         /** @description Statistical record for one queued caller */
         QueueCall: {
@@ -6943,7 +8726,10 @@ export type components = {
             call_id?: string;
             /** @example 12 */
             call_queue_id?: number;
-            /** @enum {string|null} */
+            /**
+             * @description Null while the call is still in progress
+             * @enum {string|null}
+             */
             disposition?: "answered" | "abandoned" | "overflow" | null;
             /** Format: date-time */
             ended_at?: string | null;
@@ -6956,22 +8742,158 @@ export type components = {
             to_number?: string | null;
             waiting_seconds?: number | null;
         };
-        /** @description Recording */
+        /** @description Recording (uploaded audio file or remote URL) */
         Recording: {
-            call_log_id?: number;
             /** Format: date-time */
             created_at?: string;
-            /** @description Duration in seconds */
-            duration?: number;
+            /** @description Creator name, or `Unknown` */
+            created_by?: string;
+            duration_seconds?: number | null;
+            /** @description Stored file name within the organization's recordings folder (uploads only) */
+            file_path?: string | null;
             /** @description Size in bytes */
-            file_size?: number;
-            filename: string;
+            file_size?: number | null;
+            /** @description `MM:SS`, or `Unknown` while the duration is not known */
+            formatted_duration?: string;
+            /** @description Human-readable size (for example `1.2 MB`), or `Unknown` */
+            formatted_file_size?: string;
             id: number;
+            /** @description Usable as music on hold */
+            is_moh?: boolean;
+            mime_type?: string | null;
+            name: string;
             organization_id: number;
-            storage_path?: string;
+            original_filename?: string | null;
+            /**
+             * @description For `remote` recordings the remote URL. For uploaded recordings a
+             *     `GET /v1/recordings/download?token=...` URL on the organization's webhook base URL (or APP_URL),
+             *     with a fresh access token for the requesting user. Present in every response of the
+             *     recordings endpoints.
+             */
+            playback_url?: string;
+            /** @description Kept for backward compatibility. The remote URL for `remote` recordings, a storage URL for uploaded ones, or an empty string. */
+            public_url?: string;
+            remote_url?: string | null;
+            /** @enum {string} */
+            status?: "active" | "inactive";
+            /** @enum {string} */
+            type: "upload" | "remote";
+            /** Format: date-time */
+            updated_at?: string;
+            /** @description Last updater name, or `Unknown` */
+            updated_by?: string;
+        };
+        /**
+         * @description Recording status callback from Cloudonix. Both the PascalCase Cloudonix fields and the
+         *     snake_case fallbacks are accepted (`RecordingStatusRequest`). At least one call or session
+         *     identifier is needed to find the call detail record.
+         */
+        RecordingStatusPayload: {
+            /** @description Fallback for `CallSid`. */
+            call_id?: string;
+            /**
+             * @description Cloudonix call ID (matches `call_id` on the CDR).
+             * @example CA550e8400e29b41d4a716446655440000
+             */
+            CallSid?: string;
+            /** @description Fallback for `RecordingDuration`. */
+            recording_duration?: number;
+            /** @description Fallback for `RecordingStatus`. */
+            recording_status?: string;
+            /**
+             * Format: uri
+             * @description Fallback for `RecordingUrl`.
+             */
+            recording_url?: string;
+            /** @description Recording length in seconds. */
+            RecordingDuration?: number;
+            /**
+             * @description Recording state. `absent` means there is nothing to download.
+             * @example completed
+             */
+            RecordingStatus?: string;
+            /**
+             * Format: uri
+             * @description Location of the recording to download.
+             */
+            RecordingUrl?: string;
+            session?: {
+                /** @description Fallback for `Session` and `session_token`. */
+                token?: string;
+            };
+            /** @description Session token of the call (read, not validated). */
+            Session?: string;
+            /** @description Fallback for `Session`. */
+            session_token?: string;
+        };
+        /** @description Fallback target summary, null when that target is not set. `fallback_extension` carries `extension_number`; the others carry `name`. */
+        Ref: {
+            extension_number?: string;
+            id?: number;
+            name?: string;
+        } | null;
+        /** @description Pagination metadata of a Laravel resource collection (endpoints that return `XResource::collection($paginator)` directly). Comes with a top-level `links` object. */
+        ResourceCollectionMeta: components["schemas"]["PaginationMeta"] & {
+            links?: {
+                active?: boolean;
+                label?: string;
+                url?: string | null;
+            }[];
+            /** Format: uri */
+            path?: string;
+        };
+        /**
+         * @description Body of a 409 returned when a DELETE is refused because other resources still
+         *     reference the target (`App\Exceptions\ResourceInUseException`). The
+         *     `references` list is capped in `message` at 10 entries; the full list is always
+         *     in `references`. Remove the listed references, then retry the delete.
+         */
+        ResourceInUseError: {
+            /**
+             * @description Short error title naming the resource kind.
+             * @example Cannot delete IVR menu
+             */
+            error: string;
+            /**
+             * @description Human-readable explanation that names the referencing resources.
+             * @example This IVR menu is still used by: ring group "Sales" (fallback); and 1 more. Remove these references first.
+             */
+            message: string;
+            /** @description Every resource that still references the target. */
+            references: components["schemas"]["ResourceReference"][];
+        };
+        /**
+         * @description A resource that still references the resource being deleted. Produced by
+         *     `ResourceReferenceChecker`. The `type` value uses the checker's aliases
+         *     (for example `business_hours` for a business hours schedule, `did_number`
+         *     for a phone number).
+         */
+        ResourceReference: {
+            /**
+             * @description Human-readable context of the reference (for example the routing slot or field that points at the resource).
+             * @example option 1
+             */
+            detail: string;
+            /**
+             * @description ID of the referencing resource.
+             * @example 4
+             */
+            id: number;
+            /**
+             * @description Display name of the referencing resource.
+             * @example Main menu
+             */
+            name: string;
+            /**
+             * @description Kind of the referencing resource.
+             * @example ivr_menu
+             */
+            type: string;
         };
         /** @description Ring Group for call distribution */
         RingGroup: {
+            /** @description Members whose extension is active (list only) */
+            active_members_count?: number;
             /** Format: date-time */
             readonly created_at?: string;
             /**
@@ -6981,14 +8903,21 @@ export type components = {
             description?: string | null;
             /**
              * @description Action when no members answer
-             * @example voicemail
+             * @example hangup
              * @enum {string}
              */
-            fallback_action?: "voicemail" | "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "disconnect";
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
             /** @description AI assistant ID for fallback */
             fallback_ai_assistant_id?: number | null;
             /** @description AI load balancer ID for fallback */
             fallback_ai_load_balancer_id?: number | null;
+            /** @description Call queue ID for fallback */
+            fallback_call_queue_id?: number | null;
+            /** @description Fallback extension summary (null when there is no fallback extension). Absent where not loaded (supervisor assignments). */
+            fallback_extension?: {
+                extension_number?: string;
+                id?: number;
+            } | null;
             /** @description Extension ID for fallback */
             fallback_extension_id?: number | null;
             /** @description IVR menu ID for fallback */
@@ -6997,14 +8926,18 @@ export type components = {
             fallback_ring_group_id?: number | null;
             /** @example 789 */
             readonly id: number;
-            /** @description Ring group members */
+            /** @description True when `fallback_action` is `unavailable` (saved for future use, or set when a deleted user's extension was the fallback). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update. */
+            readonly is_unprovisioned?: boolean;
+            /** @description Ring group members (ordered by priority in list responses). Absent where not loaded (supervisor assignments). */
             members?: {
-                extension?: components["schemas"]["Extension"];
                 extension_id?: number;
+                extension_number?: string | null;
                 id?: number;
                 priority?: number;
-                weight?: number;
+                user_name?: string | null;
             }[];
+            /** @description Number of members (list only) */
+            members_count?: number;
             /**
              * @description Ring group name
              * @example Sales Team
@@ -7013,7 +8946,7 @@ export type components = {
             /** @example 1 */
             organization_id: number;
             /**
-             * @description Number of ring cycles before fallback (for round_robin)
+             * @description Passes through the member list before fallback (sequential and round_robin)
              * @example 2
              */
             ring_turns?: number;
@@ -7027,7 +8960,7 @@ export type components = {
              * @example simultaneous
              * @enum {string}
              */
-            strategy: "simultaneous" | "round_robin" | "priority" | "weighted" | "memory";
+            strategy: "simultaneous" | "round_robin" | "sequential";
             /**
              * @description Ring timeout in seconds
              * @example 30
@@ -7036,36 +8969,148 @@ export type components = {
             /** Format: date-time */
             readonly updated_at?: string;
         };
-        /** @description Session Update */
+        /**
+         * @description Writable ring group fields (create and update requests). On create, omitted `strategy`,
+         *     `timeout`, `ring_turns`, `fallback_action` and `status` default to simultaneous, 30, 2,
+         *     hangup and active.
+         */
+        RingGroupInput: {
+            description?: string | null;
+            /**
+             * @description Action when no member answers. `unavailable` is rejected on create (422) and accepted on update. The matching `fallback_*_id` is required for destination actions.
+             * @example hangup
+             * @enum {string}
+             */
+            fallback_action?: "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "ai_load_balancer" | "call_queue" | "hangup" | "unavailable";
+            /** @description Required when fallback_action is `ai_assistant` (an extension ID) */
+            fallback_ai_assistant_id?: number | null;
+            /** @description Required when fallback_action is `ai_load_balancer` */
+            fallback_ai_load_balancer_id?: number | null;
+            /** @description Required when fallback_action is `call_queue` */
+            fallback_call_queue_id?: number | null;
+            /** @description Required when fallback_action is `extension` */
+            fallback_extension_id?: number | null;
+            /** @description Required when fallback_action is `ivr_menu` */
+            fallback_ivr_menu_id?: number | null;
+            /** @description Required when fallback_action is `ring_group` */
+            fallback_ring_group_id?: number | null;
+            /** @description Replaces the member list. Each extension must be an active `user` or `forward` extension of the organization. */
+            members?: {
+                /** @description Extension in the organization; distinct across members */
+                extension_id: number;
+                priority: number;
+            }[];
+            /**
+             * @description Unique within the organization
+             * @example Sales Team
+             */
+            name?: string;
+            /** @example 2 */
+            ring_turns?: number;
+            /**
+             * @example active
+             * @enum {string}
+             */
+            status?: "active" | "inactive";
+            /**
+             * @example simultaneous
+             * @enum {string}
+             */
+            strategy?: "simultaneous" | "round_robin" | "sequential";
+            /**
+             * @description Ring timeout in seconds
+             * @example 30
+             */
+            timeout?: number;
+        };
+        schema: {
+            /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten. The tenant is never taken from the queue context. */
+            _organization_id?: number | null;
+            /** @description Queue call ID (defaults to `CallSid`) */
+            call_id?: string | null;
+            /** @description Top-level queue context, used when neither `SessionData` nor `session_data` is present */
+            call_queue_id?: number | null;
+            CallSid: string;
+            CallStatus?: string | null;
+            /** @description Cloudonix domain name or UUID (required by the authentication middleware) */
+            Domain?: string;
+            /** @description JSON queue context (`call_queue_id`, `call_id`, `moh_idx`), used when `SessionData` has no `call_queue_id` */
+            session_data?: string | null;
+            /** @description Queue context (`call_queue_id`, `call_id`, `moh_idx`) when Cloudonix sends it flattened; used only when it carries `call_queue_id` */
+            SessionData?: {
+                [key: string]: unknown;
+            };
+            /** @description Called number (required by the authentication middleware) */
+            To?: string;
+        };
+        /**
+         * @description A stored session-update event (one row of `session_updates`), written by the Cloudonix
+         *     session-update webhook. No endpoint returns this object as is: the Session Updates
+         *     endpoints return derived views of these rows.
+         */
         SessionUpdate: {
-            call_id?: string;
+            action?: string;
+            caller_id?: string;
             /** Format: date-time */
             created_at?: string;
-            from_number?: string;
-            id: number;
-            session_id?: number;
-            session_token: string;
+            destination?: string;
             /** @enum {string} */
-            status: "initiated" | "active" | "on_hold" | "transferred" | "completed" | "failed";
-            to_number?: string;
+            direction?: "incoming" | "outgoing" | "application" | "internal";
+            domain?: string;
+            domain_id?: number;
+            event_id?: string;
+            id: number;
+            organization_id?: number;
+            outgoing_subscriber_id?: number | null;
+            reason?: string;
+            /** Format: date-time */
+            session_created_at?: string;
+            /** @description Cloudonix numeric session ID */
+            session_id: number;
+            /** @description Cloudonix session token (never returned in list responses) */
+            session_token?: string | null;
+            /** @description Cloudonix session status (for example `processing`, `ringing`, `connected`, `answer`) */
+            status: string;
+            subscriber_id?: number | null;
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description Cloudonix session-update webhook payload */
+        /** @description Cloudonix session-update webhook payload (validated by SessionUpdateRequest) */
         SessionUpdatePayload: {
-            /** @description Associated call ID */
-            call_id?: string;
-            /** @description Session ID */
-            session_id?: number;
-            /** @description Session token */
-            session_token?: string;
+            action: string;
+            answerTime?: string | null;
+            callAnswerTime?: number | null;
+            callerId?: string | null;
+            callIds?: string[] | null;
+            callStartTime?: number | null;
+            createdAt: string;
+            destination: string;
+            /** @enum {string|null} */
+            direction?: "incoming" | "outgoing" | "internal" | "application" | null;
+            /** @description Cloudonix domain name (required by the authentication middleware unless `owner.domain` is sent; also used to identify the organization) */
+            domain?: string | null;
+            domainId?: number | null;
+            eventId?: string | null;
+            /** @description Cloudonix session ID */
+            id: number;
+            lastError?: string | null;
+            modifiedAt: string;
+            outgoingSubscriberId?: number | null;
+            profile?: {
+                [key: string]: unknown;
+            } | null;
+            reason?: string | null;
+            startTime?: string | null;
             /**
-             * @description Session status
-             * @example active
+             * @description Session status, lower-cased before filtering
+             * @example connected
              */
-            status?: string;
-            /** @description Unix timestamp */
-            timestamp?: number;
+            status?: string | null;
+            subscriberId?: number | null;
+            timeLimit?: number | null;
+            /** @description Session token */
+            token?: string | null;
+            vappServer?: string | null;
         };
         /** @description Generic success message response */
         SuccessMessage: {
@@ -7107,17 +9152,34 @@ export type components = {
             /** @description Assigned user objects (present when the relation is loaded). */
             users?: components["schemas"]["User"][];
         };
+        TimeRange: {
+            /**
+             * @description HH:mm
+             * @example 17:00
+             */
+            end_time?: string;
+            id?: string;
+            /**
+             * @description HH:mm
+             * @example 09:00
+             */
+            start_time?: string;
+        };
         /** @description SIP trunk proxied from Cloudonix (trunks are not stored locally). `password` is WRITE-ONLY: it is accepted on create/update requests but is never serialized in responses. Cloudonix normalizes `direction` on create: `inbound` becomes `public-inbound` and `outbound` becomes `public-outbound`. */
         Trunk: {
+            /** @description True when Cloudonix omits the flag. */
             active?: boolean;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description Cloudonix `createdAt`.
+             */
             created_at?: string | null;
             /** @enum {string} */
             direction: "inbound" | "outbound" | "public-inbound" | "public-outbound";
             /** @description True when the trunk has authentication credentials configured. */
             has_credentials?: boolean;
             id: number;
-            /** @description Names of outbound-whitelist entries referencing this trunk. */
+            /** @description Names of outbound-whitelist entries referencing this trunk (filled on list and get only; empty on create/update). */
             in_use_by?: string[];
             /** @description IPv4, IPv6, or hostname of the trunk peer. */
             ip: string;
@@ -7146,6 +9208,8 @@ export type components = {
              * @example john.doe@example.com
              */
             email: string;
+            /** @description The user's assigned extension. Present only where the endpoint loads it (the `/v1/users` list, detail, create and update responses); null when none is assigned. */
+            extension?: components["schemas"]["Extension"] | null;
             /**
              * @description Unique user identifier
              * @example 123
@@ -7166,24 +9230,78 @@ export type components = {
              * @example 1
              */
             organization_id: number;
+            /** @example +1-555-123-4567 */
+            phone?: string | null;
             /**
              * @description User's role within the organization
              * @example pbx_admin
              * @enum {string}
              */
-            role: "owner" | "pbx_admin" | "pbx_user" | "reporter";
+            role: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+            /** @description Linked social login identities */
+            social_identities?: {
+                /**
+                 * @example google
+                 * @enum {string}
+                 */
+                provider?: "google" | "facebook" | "microsoft" | "github" | "x";
+                /** Format: email */
+                provider_email?: string | null;
+            }[];
             /**
-             * @description Account status
+             * @description Account status (`pending` = invited, not yet accepted)
              * @example active
              * @enum {string}
              */
-            status: "active" | "inactive";
+            status: "active" | "inactive" | "pending";
             /**
              * Format: date-time
              * @description Timestamp when user was last updated
              * @example 2024-01-15T10:30:00Z
              */
             readonly updated_at?: string;
+        };
+        /**
+         * @description Read-only preview of what deleting a user would change. Produced by
+         *     `UserDeletionImpactService::preview()`, the same code that runs during the delete.
+         *     Nothing is changed by the preview.
+         */
+        UserDeletionImpact: {
+            /**
+             * @description Number of entries in `memberships` with `becomes_empty` set to true.
+             * @example 0
+             */
+            empty_groups: number;
+            /** @description Extensions currently assigned to the user (they are unassigned on delete, not removed). */
+            extensions: {
+                /** @example 1001 */
+                extension_number: string;
+                /** @example 12 */
+                id: number;
+            }[];
+            /**
+             * @description True when the delete would change any membership or route.
+             * @example true
+             */
+            has_changes: boolean;
+            /** @description Ring group memberships of the user's extensions and call queue agent memberships of the user that the delete removes. */
+            memberships: {
+                /** @description True when removing these members leaves the group or queue with no members. */
+                becomes_empty: boolean;
+                id: number;
+                name: string;
+                /** @enum {string} */
+                type: "ring_group" | "call_queue";
+            }[];
+            /** @description Routing entries (fallbacks, IVR options, JSON destinations, business-hours actions) that point at the user's extensions; the delete switches them to the `unavailable` destination. */
+            routes: {
+                /** @description Human-readable description of the affected route. */
+                detail: string;
+                id: number;
+                name: string;
+                /** @description Kind of routing entry (for example `business_hours`, `did_number`). */
+                type: string;
+            }[];
         };
         /** @description Response wrapper for a user invitation */
         UserInvitation: {
@@ -7194,7 +9312,7 @@ export type components = {
              */
             invite_sent: boolean;
         };
-        /** @description Social identity linked to a user account */
+        /** @description Social identity linked to a user account (database model; the API exposes only `provider` and `provider_email`, in `User.social_identities`). A user has at most one identity per provider. */
         UserSocialIdentity: {
             /**
              * Format: date-time
@@ -7222,13 +9340,13 @@ export type components = {
              */
             provider_data?: {
                 [key: string]: unknown;
-            };
+            } | null;
             /**
              * Format: email
              * @description Email address returned by the provider
              * @example john.doe@gmail.com
              */
-            provider_email: string;
+            provider_email?: string | null;
             /**
              * @description Provider-specific subject identifier
              * @example 112233445566778899001
@@ -7252,11 +9370,10 @@ export type components = {
              * @description Field-level validation errors
              * @example {
              *       "email": [
-             *         "The email field is required.",
-             *         "The email must be a valid email address."
+             *         "The email field is required."
              *       ],
              *       "password": [
-             *         "The password must be at least 8 characters."
+             *         "The password field must be at least 8 characters."
              *       ]
              *     }
              */
@@ -7264,15 +9381,53 @@ export type components = {
                 [key: string]: string[];
             };
             /**
-             * @description General validation error message
-             * @example The given data was invalid.
+             * @description The first validation error, followed by `(and N more error[s])` when there are more
+             * @example The email field is required. (and 1 more error)
              */
             message: string;
         };
-        /** @description Validation Error - Input validation failed */
-        "ValidationError-2": unknown;
     };
     responses: {
+        /** @description Queue statistics */
+        200: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: {
+                        call_queue_id?: number;
+                        /** Format: date-time */
+                        from?: string;
+                        /** @description Handling time of answered calls, in seconds */
+                        handling_time?: {
+                            /** @description 2 decimals */
+                            avg?: number | null;
+                            max?: number | null;
+                            min?: number | null;
+                            /** @description 2 decimals */
+                            stddev?: number | null;
+                        };
+                        /** Format: date-time */
+                        to?: string;
+                        totals?: {
+                            abandoned?: number;
+                            handled?: number;
+                            overflowed?: number;
+                        };
+                        /** @description Waiting time of answered calls, in seconds */
+                        waiting_time?: {
+                            /** @description 2 decimals */
+                            avg?: number | null;
+                            max?: number | null;
+                            min?: number | null;
+                            /** @description 2 decimals */
+                            stddev?: number | null;
+                        };
+                    };
+                };
+            };
+        };
         /** @description Bad Request - Invalid input data */
         BadRequest: {
             headers: {
@@ -7281,15 +9436,17 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "error": "BAD_REQUEST",
-                 *       "message": "Invalid request parameters",
-                 *       "code": "INVALID_PARAMS"
+                 *       "error": {
+                 *         "code": "BAD_REQUEST",
+                 *         "message": "Invalid request parameters",
+                 *         "details": null
+                 *       }
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Forbidden - Insufficient permissions */
+        /** @description Forbidden - Insufficient permissions (role/policy denial, an API key without the required grant, or a suspended or inactive organization) */
         Forbidden: {
             headers: {
                 [name: string]: unknown;
@@ -7297,15 +9454,14 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "error": "FORBIDDEN",
-                 *       "message": "You do not have permission to access this resource",
-                 *       "code": "INSUFFICIENT_PERMISSIONS"
+                 *       "error": "Forbidden",
+                 *       "message": "This action is unauthorized."
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Not Found - Resource does not exist */
+        /** @description Not Found - Resource does not exist (JSON when the request sends Accept: application/json) */
         NotFound: {
             headers: {
                 [name: string]: unknown;
@@ -7313,12 +9469,92 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "error": "NOT_FOUND",
-                 *       "message": "Resource not found",
-                 *       "code": "RESOURCE_NOT_FOUND"
+                 *       "error": "NotFoundHttpException",
+                 *       "message": "Resource not found.",
+                 *       "status": 404
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
+            };
+        };
+        /**
+         * @description The resource is still referenced by other resources (routing, extensions, campaigns,
+         *     and so on) and cannot be deleted. Nothing is deleted. The `references` array lists
+         *     what still points at the resource; remove those references and retry.
+         */
+        ResourceInUse: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "error": "Cannot delete IVR menu",
+                 *       "message": "This IVR menu is still used by: ring group \"Sales\" (fallback); extension \"1001\" (no-answer destination). Remove these references first.",
+                 *       "references": [
+                 *         {
+                 *           "type": "ring_group",
+                 *           "id": 7,
+                 *           "name": "Sales",
+                 *           "detail": "fallback"
+                 *         },
+                 *         {
+                 *           "type": "extension",
+                 *           "id": 12,
+                 *           "name": "1001",
+                 *           "detail": "no-answer destination"
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/json": components["schemas"]["ResourceInUseError"];
+            };
+        };
+        /** @description Live snapshot */
+        "responses-200": {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: {
+                        /** @description One entry per queue agent that has an extension */
+                        agents?: {
+                            extensionNumber?: string;
+                            /** @enum {string} */
+                            state?: "AVAILABLE" | "BUSY" | "WRAP_UP" | "LOGGED_OUT";
+                            userId?: string;
+                            /** @description Seconds left in a timed wrap-up as a string; empty string otherwise */
+                            wrapUpRemainingSeconds?: string;
+                        }[];
+                        call_queue_id?: number;
+                        call_queue_name?: string;
+                        /** @description Answered (`handled_*`) and abandoned calls that entered the queue in the last 15, 30 and 60 minutes and 24 hours */
+                        rolling?: {
+                            abandoned_15m?: number;
+                            abandoned_24h?: number;
+                            abandoned_30m?: number;
+                            abandoned_60m?: number;
+                            handled_15m?: number;
+                            handled_24h?: number;
+                            handled_30m?: number;
+                            handled_60m?: number;
+                        };
+                        /** @description Callers waiting in the queue, in queue order */
+                        waiting?: {
+                            callId?: string;
+                            /** Format: date-time */
+                            entered_at?: string | null;
+                            from_number?: string | null;
+                            /** @description 1-based queue position */
+                            position?: number;
+                            to_number?: string | null;
+                            waitedSeconds?: number;
+                        }[];
+                        /** @description Average waiting time of answered calls in the last 24 hours (1 decimal) */
+                        waiting_time_avg_seconds?: number | null;
+                    };
+                };
             };
         };
         /** @description Server Error - Internal server error */
@@ -7329,15 +9565,22 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "error": "SERVER_ERROR",
-                 *       "message": "An internal server error occurred",
-                 *       "code": "INTERNAL_ERROR"
+                 *       "error": {
+                 *         "code": "INTERNAL_ERROR",
+                 *         "message": "An internal server error occurred",
+                 *         "details": null
+                 *       }
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Too Many Requests - Rate limit exceeded */
+        /**
+         * @description Too Many Requests - Rate limit exceeded. The per-organization API limiter answers
+         *     `Maximum <n> requests per <m> minute(s) allowed`; named throttles (`auth`, `sensitive`,
+         *     and so on) answer with their own `error` and `message` text. Every 429 carries
+         *     `retry_after` and a `Retry-After` header.
+         */
         TooManyRequests: {
             headers: {
                 /**
@@ -7347,20 +9590,21 @@ export type components = {
                 "Retry-After"?: number;
                 "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
                 "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
+                "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                 [name: string]: unknown;
             };
             content: {
                 /**
                  * @example {
-                 *       "error": "TOO_MANY_REQUESTS",
-                 *       "message": "Rate limit exceeded. Please try again later.",
-                 *       "code": "RATE_LIMIT_EXCEEDED"
+                 *       "error": "Rate limit exceeded",
+                 *       "message": "Maximum 60 requests per 1 minute(s) allowed",
+                 *       "retry_after": 60
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
             };
         };
-        /** @description Unauthorized - Authentication required */
+        /** @description Unauthorized - Authentication required (missing, invalid or revoked token or API key) */
         Unauthorized: {
             headers: {
                 [name: string]: unknown;
@@ -7368,9 +9612,8 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "error": "UNAUTHORIZED",
-                 *       "message": "Authentication required",
-                 *       "code": "AUTH_REQUIRED"
+                 *       "error": "Unauthenticated",
+                 *       "message": "Authentication required to access this resource."
                  *     }
                  */
                 "application/json": components["schemas"]["Error"];
@@ -7384,14 +9627,13 @@ export type components = {
             content: {
                 /**
                  * @example {
-                 *       "message": "The given data was invalid.",
+                 *       "message": "The email field is required. (and 1 more error)",
                  *       "errors": {
                  *         "email": [
-                 *           "The email field is required.",
-                 *           "The email must be a valid email address."
+                 *           "The email field is required."
                  *         ],
                  *         "password": [
-                 *           "The password must be at least 8 characters."
+                 *           "The password field must be at least 8 characters."
                  *         ]
                  *       }
                  *     }
@@ -7401,6 +9643,8 @@ export type components = {
         };
     };
     parameters: {
+        /** @description Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users, including organisation owners. Archived rows have no extension user. CDRs older than the warm period are stored as files and are not available through the API. */
+        CdrArchive: boolean;
         /**
          * @description Extension ID
          * @example 789
@@ -7422,20 +9666,22 @@ export type components = {
          */
         Page: number;
         /**
-         * @description Number of items per page
+         * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
          * @example 20
          */
         PerPage: number;
         /**
-         * @description Field to sort by
+         * @description Field to sort by. Each endpoint has its own allowed fields and default; a value that is not allowed falls back to the default.
          * @example created_at
          */
         SortBy: string;
         /**
-         * @description Sort order direction
+         * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
          * @example desc
          */
         SortOrder: "asc" | "desc";
+        /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+        Unprovisioned: boolean;
         /**
          * @description User ID
          * @example 456
@@ -7445,20 +9691,20 @@ export type components = {
     requestBodies: never;
     headers: {
         /**
-         * @description Rate limit maximum requests per window
+         * @description Maximum number of requests allowed in the current rate-limit window
          * @example 60
          */
         "X-RateLimit-Limit": number;
         /**
-         * @description Remaining requests in current window
+         * @description Requests left in the current rate-limit window
          * @example 45
          */
         "X-RateLimit-Remaining": number;
         /**
-         * @description Unique request identifier for tracing
-         * @example 550e8400-e29b-41d4-a716-446655440000
+         * @description Unix timestamp (seconds) at which the current rate-limit window resets
+         * @example 1760443260
          */
-        "X-Request-Id": string;
+        "X-RateLimit-Reset": number;
     };
     pathItems: never;
 };
@@ -7485,50 +9731,38 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Organization ID (set by VerifyVoiceWebhookAuth middleware) */
+                    /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten */
                     _organization_id?: number | null;
                     /**
-                     * @description Unique call identifier (also passed in X-Cx-Session header)
+                     * @description Call identifier (falls back to the X-Cx-Session header, SessionData.callSid, Session or session)
                      * @example CA550e8400e29b41d4a716446655440000
                      */
-                    CallSid: string;
+                    CallSid?: string;
+                    /** @description Second status source */
+                    CallStatus?: string | null;
                     /**
-                     * @description Alternative status field
+                     * @description Dial result (first status source). `busy`, `no-answer`, `failed`, `canceled` and `unknown` trigger follow-through.
                      * @example busy
-                     * @enum {string|null}
                      */
-                    CallStatus?: "busy" | "no-answer" | "failed" | "canceled" | "unknown" | "completed" | null;
+                    DialCallStatus?: string | null;
                     /**
-                     * @description Dial action status (preferred source)
-                     * @example busy
-                     * @enum {string|null}
+                     * @description Cloudonix domain name or UUID (required by the authentication middleware)
+                     * @example acme.cloudonix.net
                      */
-                    DialCallStatus?: "busy" | "no-answer" | "failed" | "canceled" | "unknown" | "completed" | null;
-                    /**
-                     * @description Cloudonix domain
-                     * @example example.cloudonix.io
-                     */
-                    Domain?: string | null;
+                    Domain?: string;
                     /**
                      * @description Caller number
-                     * @example +1234567890
+                     * @example +12025550101
                      */
                     From?: string;
+                    /** @description Third status source */
+                    status?: string | null;
                     /**
-                     * @description Called number
-                     * @example +1987654321
+                     * @description Called number (required by the authentication middleware)
+                     * @example +12025550102
                      */
                     To?: string;
                 };
-                "application/x-www-form-urlencoded": {
-                    CallSid?: string;
-                    CallStatus?: string;
-                    DialCallStatus?: string;
-                    Domain?: string;
-                    From?: string;
-                    To?: string;
-                };
-                "application/xml": Record<string, never>;
             };
         };
         responses: {
@@ -7541,30 +9775,292 @@ export interface operations {
                     "application/xml": components["schemas"]["CxmlResponse"];
                 };
             };
-            /** @description Empty response when follow-through is not needed */
-            204: {
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
             };
-            /** @description Unauthorized - Invalid Bearer token */
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
                 };
-                content?: never;
             };
         };
     };
-    ringGroupCallback: {
+    conferencePinCallback: {
+        parameters: {
+            query: {
+                /**
+                 * @description PIN attempt number
+                 * @example 1
+                 */
+                attempt?: number;
+                /**
+                 * @description Conference room ID
+                 * @example 7
+                 */
+                room_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Unique call identifier from Cloudonix
+                     * @example CA550e8400e29b41d4a716446655440000
+                     */
+                    CallSid?: string;
+                    /**
+                     * @description Digits the caller entered (empty when the prompt timed out)
+                     * @example 4321
+                     */
+                    Digits?: string;
+                    /**
+                     * @description Cloudonix domain name or UUID (required by the authentication middleware)
+                     * @example acme.cloudonix.net
+                     */
+                    Domain?: string;
+                    /** @description Caller number */
+                    From?: string;
+                    /** @description Called number (required by the authentication middleware) */
+                    To?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description CXML that joins the conference, repeats the PIN prompt, or hangs up */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueAgentConnectGet: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueAgentConnectPost: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueConferenceJoinGet: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueConferenceJoinPost: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueImmediateDialGet: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueImmediateDialPost: {
+        parameters: {
+            query: {
+                /** @description Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`) */
+                sd: string;
+                /** @description HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`) */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queueDialCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["schema"];
+            };
+        };
+        responses: {
+            /** @description CXML instructions for the call */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    queuePollCallback: {
         parameters: {
             query?: never;
             header?: never;
@@ -7574,18 +10070,84 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Organization ID (set by VerifyVoiceWebhookAuth middleware) */
+                    /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten. The tenant is never taken from the queue context. */
+                    _organization_id?: number | null;
+                    /** @description Queue call ID (defaults to `CallSid`) */
+                    call_id?: string | null;
+                    /** @description Top-level queue context, used when neither `SessionData` nor `session_data` is present */
+                    call_queue_id?: number | null;
+                    CallSid: string;
+                    CallStatus?: string | null;
+                    /** @description Cloudonix domain name or UUID (required by the authentication middleware) */
+                    Domain?: string;
+                    /** @description JSON queue context (`call_queue_id`, `call_id`, `moh_idx`), used when `SessionData` has no `call_queue_id` */
+                    session_data?: string | null;
+                    /** @description Queue context (`call_queue_id`, `call_id`, `moh_idx`) when Cloudonix sends it flattened; used only when it carries `call_queue_id` */
+                    SessionData?: {
+                        [key: string]: unknown;
+                    };
+                    /** @description Called number (required by the authentication middleware) */
+                    To?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description CXML instructions for the call */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+        };
+    };
+    ringGroupCallback: {
+        parameters: {
+            query: {
+                /** @description Attempt to make now (0-based member attempt counter; set by the routing strategy) */
+                attempt_number?: number;
+                /** @description Ring group ID (set by the routing strategy) */
+                ring_group_id: number;
+                /** @description Round-robin starting member offset chosen on the first attempt */
+                rr_start?: number;
+                /** @description JSON with `ring_group_id`, `attempt_number` and, for simultaneous groups, `organization_id` and `callback_type` (`ring_group_fallback`). Read when `attempt_number` is 0 or missing. */
+                session_data?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten */
                     _organization_id?: number | null;
                     /**
-                     * @description Action type for this callback
-                     * @example next_member
+                     * @description Validated but not used
                      * @enum {string|null}
                      */
                     action?: "next_member" | "timeout" | "completed" | "failed" | null;
-                    /**
-                     * @description Number of attempts made so far
-                     * @example 1
-                     */
+                    /** @description Validated but not used (the attempt comes from `attempt_number`) */
                     attempt_count?: number | null;
                     /**
                      * @description Unique call identifier from Cloudonix
@@ -7593,52 +10155,37 @@ export interface operations {
                      */
                     CallSid: string;
                     /**
-                     * @description Current call status
-                     * @example no-answer
+                     * @description Current call status (validated, not used for routing)
                      * @enum {string|null}
                      */
                     CallStatus?: "ringing" | "answered" | "completed" | "failed" | "busy" | "no-answer" | null;
-                    /**
-                     * @description Current member index in the ring sequence
-                     * @example 0
-                     */
+                    /** @description Validated but not used */
                     current_index?: number | null;
                     /**
-                     * @description Cloudonix domain
-                     * @example example.cloudonix.io
+                     * @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it.
+                     * @example acme.cloudonix.net
                      */
                     Domain?: string | null;
                     /**
                      * @description Caller number in E.164 format or extension
-                     * @example +1234567890
+                     * @example +12025550101
                      */
                     From: string;
-                    /**
-                     * @description ID of the ring group being processed
-                     * @example 11
-                     */
-                    ring_group_id: number;
+                    /** @description Optional; `attempt_number` and `callback_type` here take precedence over the query parameters */
+                    SessionData?: {
+                        attempt_number?: number;
+                        callback_type?: string;
+                    };
                     /**
                      * @description Called number in E.164 format or extension
-                     * @example +1987654321
+                     * @example +12025550102
                      */
                     To: string;
-                };
-                "application/x-www-form-urlencoded": {
-                    action?: string;
-                    attempt_count?: number;
-                    CallSid?: string;
-                    CallStatus?: string;
-                    current_index?: number;
-                    Domain?: string;
-                    From?: string;
-                    ring_group_id?: number;
-                    To?: string;
                 };
             };
         };
         responses: {
-            /** @description CXML routing response */
+            /** @description CXML for the next step (next member, fallback, or a spoken error with hangup) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -7647,35 +10194,33 @@ export interface operations {
                     /**
                      * @example <?xml version="1.0" encoding="UTF-8"?>
                      *     <Response>
-                     *       <Connect>
-                     *         <Stream url="wss://ai.example.com/stream" name="ai-assistant"/>
-                     *       </Connect>
+                     *       <Dial action="https://opbx.example.com/api/callbacks/voice/ring-group-callback?ring_group_id=11&amp;attempt_number=2" timeout="20">
+                     *         <Number>1002</Number>
+                     *       </Dial>
                      *     </Response>
                      */
                     "application/xml": components["schemas"]["CxmlResponse"];
                 };
             };
-            /** @description Empty response to continue call normally */
-            204: {
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
             };
-            /** @description Unauthorized - Invalid Bearer token */
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
                 };
-                content?: never;
             };
+            422: components["responses"]["ValidationError"];
         };
     };
     publicHealthCheck: {
@@ -7740,6 +10285,7 @@ export interface operations {
                     };
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     storageHealthCheck: {
@@ -7794,21 +10340,57 @@ export interface operations {
     };
     publicRecordingDownload: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description Unix expiry timestamp */
+                expires: number;
+                /** @description HMAC signature */
+                sig: string;
+            };
             header?: never;
             path: {
+                /** @description `<organization_id>/<filename>`; the route only matches `[0-9]+/.+` */
                 path: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Recording downloaded */
+            /** @description Recording file */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "audio/mpeg": string;
+                    "audio/wav": string;
+                };
+            };
+            /** @description Missing or invalid signature (`Forbidden`) or URL expired (`URL expired`), as plain text */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description File not found in either location (`{error: File not found}`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unexpected error (plain text `Internal server error`) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
             };
         };
     };
@@ -7821,19 +10403,22 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Substring match on name or description */
                 search?: string;
                 sort_by?: "name" | "strategy" | "status" | "created_at" | "updated_at";
                 /**
-                 * @description Sort order direction
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
                  * @example desc
                  */
                 sort_order?: components["parameters"]["SortOrder"];
                 status?: "active" | "inactive";
-                strategy?: "round_robin" | "priority" | "weighted" | "least_connections";
+                strategy?: "round_robin" | "priority" | "percentage";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -7865,47 +10450,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    description?: string | null;
-                    /**
-                     * @default hangup
-                     * @enum {string}
-                     */
-                    fallback_action?: "hangup" | "extension" | "ring_group" | "ivr_menu" | "ai_assistant";
-                    fallback_ai_assistant_id?: number | null;
-                    fallback_extension_id?: number | null;
-                    fallback_ivr_menu_id?: number | null;
-                    fallback_ring_group_id?: number | null;
-                    /** @description Load balancer members */
-                    members?: {
-                        ai_assistant_id?: number;
-                        /** @default 0 */
-                        position?: number;
-                        /** @default 0 */
-                        priority?: number;
-                        /**
-                         * @default active
-                         * @enum {string}
-                         */
-                        status?: "active" | "inactive";
-                        /** @default 100 */
-                        weight?: number;
-                    }[];
-                    /** @example Support Load Balancer */
-                    name: string;
-                    /**
-                     * @default active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                    /**
-                     * @example round_robin
-                     * @enum {string}
-                     */
-                    strategy: "round_robin" | "priority" | "weighted" | "least_connections";
-                    /** @default 30 */
-                    timeout?: number;
-                };
+                "application/json": components["schemas"]["AiAssistantLoadBalancerInput"] & unknown;
             };
         };
         responses: {
@@ -7917,11 +10462,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistantLoadBalancer"];
+                        /** @example Aiassistantloadbalancer created successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -7962,29 +10509,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    description?: string;
-                    /** @enum {string} */
-                    fallback_action?: "hangup" | "extension" | "ring_group" | "ivr_menu" | "ai_assistant";
-                    fallback_ai_assistant_id?: number | null;
-                    fallback_extension_id?: number | null;
-                    fallback_ivr_menu_id?: number | null;
-                    fallback_ring_group_id?: number | null;
-                    members?: {
-                        ai_assistant_id?: number;
-                        position?: number;
-                        priority?: number;
-                        /** @enum {string} */
-                        status?: "active" | "inactive";
-                        weight?: number;
-                    }[];
-                    name?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                    /** @enum {string} */
-                    strategy?: "round_robin" | "priority" | "weighted" | "least_connections";
-                    timeout?: number;
-                };
+                "application/json": components["schemas"]["AiAssistantLoadBalancerInput"];
             };
         };
         responses: {
@@ -7996,11 +10521,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistantLoadBalancer"];
+                        /** @example Aiassistantloadbalancer updated successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             /** @description Concurrent modification conflict */
             409: {
@@ -8039,22 +10566,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Load balancer in use */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": "CONFLICT",
-                     *       "message": "Cannot delete load balancer that is in use"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchAiLoadBalancer: {
@@ -8068,29 +10582,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    description?: string;
-                    /** @enum {string} */
-                    fallback_action?: "hangup" | "extension" | "ring_group" | "ivr_menu" | "ai_assistant";
-                    fallback_ai_assistant_id?: number | null;
-                    fallback_extension_id?: number | null;
-                    fallback_ivr_menu_id?: number | null;
-                    fallback_ring_group_id?: number | null;
-                    members?: {
-                        ai_assistant_id?: number;
-                        position?: number;
-                        priority?: number;
-                        /** @enum {string} */
-                        status?: "active" | "inactive";
-                        weight?: number;
-                    }[];
-                    name?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                    /** @enum {string} */
-                    strategy?: "round_robin" | "priority" | "weighted" | "least_connections";
-                    timeout?: number;
-                };
+                "application/json": components["schemas"]["AiAssistantLoadBalancerInput"];
             };
         };
         responses: {
@@ -8102,11 +10594,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistantLoadBalancer"];
+                        /** @example Aiassistantloadbalancer updated successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             /** @description Concurrent modification conflict */
             409: {
@@ -8143,28 +10637,122 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
+                            /** @description The same provider objects, grouped by protocol */
                             grouped?: {
-                                sip?: unknown[];
-                                websocket?: unknown[];
+                                dummy?: {
+                                    /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                                    config_fields?: {
+                                        default_value?: string | null;
+                                        description?: string | null;
+                                        label?: string;
+                                        /** @description Key in the assistant `configuration` object */
+                                        name?: string;
+                                        placeholder?: string | null;
+                                        /** @description Fixed value; the server overwrites what the client sends */
+                                        read_only?: boolean;
+                                        required?: boolean;
+                                        /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                        type?: string;
+                                        validation_rules?: string[];
+                                    }[];
+                                    description?: string | null;
+                                    /** @example dograh-cloud */
+                                    key?: string;
+                                    name?: string;
+                                    /** @enum {string} */
+                                    protocol?: "sip" | "websocket" | "dummy";
+                                    /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                                    url_template?: string | null;
+                                }[];
+                                sip?: {
+                                    /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                                    config_fields?: {
+                                        default_value?: string | null;
+                                        description?: string | null;
+                                        label?: string;
+                                        /** @description Key in the assistant `configuration` object */
+                                        name?: string;
+                                        placeholder?: string | null;
+                                        /** @description Fixed value; the server overwrites what the client sends */
+                                        read_only?: boolean;
+                                        required?: boolean;
+                                        /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                        type?: string;
+                                        validation_rules?: string[];
+                                    }[];
+                                    description?: string | null;
+                                    /** @example dograh-cloud */
+                                    key?: string;
+                                    name?: string;
+                                    /** @enum {string} */
+                                    protocol?: "sip" | "websocket" | "dummy";
+                                    /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                                    url_template?: string | null;
+                                }[];
+                                websocket?: {
+                                    /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                                    config_fields?: {
+                                        default_value?: string | null;
+                                        description?: string | null;
+                                        label?: string;
+                                        /** @description Key in the assistant `configuration` object */
+                                        name?: string;
+                                        placeholder?: string | null;
+                                        /** @description Fixed value; the server overwrites what the client sends */
+                                        read_only?: boolean;
+                                        required?: boolean;
+                                        /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                        type?: string;
+                                        validation_rules?: string[];
+                                    }[];
+                                    description?: string | null;
+                                    /** @example dograh-cloud */
+                                    key?: string;
+                                    name?: string;
+                                    /** @enum {string} */
+                                    protocol?: "sip" | "websocket" | "dummy";
+                                    /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                                    url_template?: string | null;
+                                }[];
                             };
                             /**
                              * @example [
                              *       "sip",
-                             *       "websocket"
+                             *       "websocket",
+                             *       "dummy"
                              *     ]
                              */
                             protocols?: string[];
                             providers?: {
-                                config_fields?: unknown[];
+                                /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                                config_fields?: {
+                                    default_value?: string | null;
+                                    description?: string | null;
+                                    label?: string;
+                                    /** @description Key in the assistant `configuration` object */
+                                    name?: string;
+                                    placeholder?: string | null;
+                                    /** @description Fixed value; the server overwrites what the client sends */
+                                    read_only?: boolean;
+                                    required?: boolean;
+                                    /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                    type?: string;
+                                    validation_rules?: string[];
+                                }[];
+                                description?: string | null;
+                                /** @example dograh-cloud */
                                 key?: string;
                                 name?: string;
                                 /** @enum {string} */
-                                protocol?: "sip" | "websocket";
+                                protocol?: "sip" | "websocket" | "dummy";
+                                /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                                url_template?: string | null;
                             }[];
                         };
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getAiAssistantProvider: {
@@ -8186,16 +10774,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: Record<string, never>;
+                        data?: {
+                            /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                            config_fields?: {
+                                default_value?: string | null;
+                                description?: string | null;
+                                label?: string;
+                                /** @description Key in the assistant `configuration` object */
+                                name?: string;
+                                placeholder?: string | null;
+                                /** @description Fixed value; the server overwrites what the client sends */
+                                read_only?: boolean;
+                                required?: boolean;
+                                /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                type?: string;
+                                validation_rules?: string[];
+                            }[];
+                            description?: string | null;
+                            /** @example dograh-cloud */
+                            key?: string;
+                            name?: string;
+                            /** @enum {string} */
+                            protocol?: "sip" | "websocket" | "dummy";
+                            /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                            url_template?: string | null;
+                        };
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
             /** @description Provider not found */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "message": "Provider not found"
+                     *     }
+                     */
                     "application/json": components["schemas"]["Error"];
                 };
             };
@@ -8206,8 +10824,11 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @example websocket */
-                protocol: "sip" | "websocket";
+                /**
+                 * @description Any other value returns 400.
+                 * @example websocket
+                 */
+                protocol: "sip" | "websocket" | "dummy";
             };
             cookie?: never;
         };
@@ -8220,7 +10841,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: Record<string, never>[];
+                        data?: {
+                            /** @description Fields the assistant `configuration` object takes. Empty for dummy providers; SIP providers take `phone_number`. */
+                            config_fields?: {
+                                default_value?: string | null;
+                                description?: string | null;
+                                label?: string;
+                                /** @description Key in the assistant `configuration` object */
+                                name?: string;
+                                placeholder?: string | null;
+                                /** @description Fixed value; the server overwrites what the client sends */
+                                read_only?: boolean;
+                                required?: boolean;
+                                /** @description Input type (for example `text`, `url`, `tel`, `email`, `number`) */
+                                type?: string;
+                                validation_rules?: string[];
+                            }[];
+                            description?: string | null;
+                            /** @example dograh-cloud */
+                            key?: string;
+                            name?: string;
+                            /** @enum {string} */
+                            protocol?: "sip" | "websocket" | "dummy";
+                            /** @description Template for the URL the assistant connects to, e.g. `{websocket_endpoint}/{agent_uuid}`. Null for SIP and dummy providers. */
+                            url_template?: string | null;
+                        }[];
                     };
                 };
             };
@@ -8232,12 +10877,13 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "message": "Invalid protocol. Must be \"sip\" or \"websocket\"."
+                     *       "message": "Invalid protocol. Must be \"sip\", \"websocket\", or \"dummy\"."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
     listAiAssistants: {
@@ -8249,16 +10895,17 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
-                protocol?: "sip" | "websocket";
+                protocol?: "sip" | "websocket" | "dummy";
                 provider?: string;
+                /** @description Case-insensitive substring match on name, description or provider */
                 search?: string;
                 sort_by?: "name" | "provider" | "protocol" | "status" | "created_at" | "updated_at";
                 /**
-                 * @description Sort order direction
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
                  * @example desc
                  */
                 sort_order?: components["parameters"]["SortOrder"];
@@ -8294,33 +10941,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @description Provider-specific configuration */
-                    configuration?: Record<string, never>;
-                    /** @example Customer support AI assistant */
-                    description?: string | null;
-                    /**
-                     * @description AI assistant name
-                     * @example Support Bot
-                     */
-                    name: string;
-                    /**
-                     * @description Auto-detected from provider if not specified
-                     * @example websocket
-                     * @enum {string|null}
-                     */
-                    protocol?: "sip" | "websocket" | null;
-                    /**
-                     * @description Provider key (e.g., openai, anthropic)
-                     * @example openai
-                     */
-                    provider: string;
-                    /**
-                     * @default active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
+                "application/json": components["schemas"]["AiAssistantInput"] & unknown;
             };
         };
         responses: {
@@ -8332,12 +10953,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistant"];
-                        /** @example AI Assistant created successfully. */
+                        /** @example Aiassistant created successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -8378,16 +11000,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    configuration?: Record<string, never>;
-                    description?: string | null;
-                    name?: string;
-                    /** @enum {string} */
-                    protocol?: "sip" | "websocket";
-                    provider?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                };
+                "application/json": components["schemas"]["AiAssistantInput"];
             };
         };
         responses: {
@@ -8399,11 +11012,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistant"];
+                        /** @example Aiassistant updated successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -8427,22 +11042,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description AI assistant in use */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": "CONFLICT",
-                     *       "message": "Cannot delete AI Assistant that is in use by 3 extension(s). Please reassign these extensions first."
-                     *     }
-                     */
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchAiAssistant: {
@@ -8456,16 +11058,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    configuration?: Record<string, never>;
-                    description?: string | null;
-                    name?: string;
-                    /** @enum {string} */
-                    protocol?: "sip" | "websocket";
-                    provider?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                };
+                "application/json": components["schemas"]["AiAssistantInput"];
             };
         };
         responses: {
@@ -8477,11 +11070,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["AiAssistant"];
+                        /** @example Aiassistant updated successfully. */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -8587,6 +11182,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description When sent, must not be empty */
                     name?: string;
                     permissions?: components["schemas"]["ApiKeyPermission"][];
                 };
@@ -8627,6 +11223,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "message": "API key revoked."
+                     *     }
+                     */
                     "application/json": components["schemas"]["SuccessMessage"];
                 };
             };
@@ -8647,6 +11248,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description When sent, must not be empty */
                     name?: string;
                     permissions?: components["schemas"]["ApiKeyPermission"][];
                 };
@@ -8692,14 +11294,25 @@ export interface operations {
                          *       "extensions",
                          *       "conference-rooms",
                          *       "ai-assistants",
+                         *       "ai-assistant-providers",
                          *       "ring-groups",
+                         *       "call-queues",
+                         *       "queue-calls",
                          *       "ai-assistant-load-balancers",
+                         *       "ivr-menus",
                          *       "business-hours",
                          *       "phone-numbers",
                          *       "outbound-whitelist",
                          *       "inbound-blacklist",
                          *       "call-detail-records",
-                         *       "recordings"
+                         *       "recordings",
+                         *       "supervisors",
+                         *       "auto-dialer-campaigns",
+                         *       "distribution-lists",
+                         *       "session-updates",
+                         *       "call-notifications",
+                         *       "dashboard",
+                         *       "trunks"
                          *     ]
                          */
                         data?: string[];
@@ -8745,26 +11358,36 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Account conflict or registration required */
+            /** @description Resolved user account is not active */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "ACCOUNT_INACTIVE",
+                     *         "message": "Account is not active."
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Account conflict, identity already linked, or registration required */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error?: {
-                            /** @example AUTH0_ACCOUNT_EXISTS */
-                            code: string;
-                            /** @example An account with this email already exists. Please log in with your password and link this account in Profile settings. */
+                        error: {
+                            /** @enum {string} */
+                            code: "AUTH0_ACCOUNT_EXISTS" | "AUTH0_LINK_ALREADY_LINKED" | "AUTH0_REGISTRATION_REQUIRED";
                             message: string;
                         };
-                    } | {
-                        error?: {
-                            /** @example AUTH0_REGISTRATION_REQUIRED */
-                            code: string;
-                            /** @example Please complete onboarding. */
-                            message: string;
-                        };
+                        /** @description Only with `AUTH0_REGISTRATION_REQUIRED` */
                         profile?: {
                             /**
                              * Format: email
@@ -8773,10 +11396,10 @@ export interface operations {
                             email: string;
                             /** @example John Doe */
                             name: string;
+                            /** @description Opaque 48-character id of the verified profile, cached server-side for 60 minutes; pass it to the organization join-request flow. */
+                            onboarding_id: string;
                             /** @example google */
                             provider: string;
-                            /** @example 112233445566778899001 */
-                            subject: string;
                         };
                     };
                 };
@@ -8887,7 +11510,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             422: components["responses"]["ValidationError"];
-            429: components["responses"]["TooManyRequests"];
             /** @description Auth0 is not configured */
             503: {
                 headers: {
@@ -9053,22 +11675,24 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @example Login successful */
-                        message?: string;
-                        user?: components["schemas"]["User"];
+                        message: string;
+                        /** @description Subset of the User object: `id`, `organization_id`, `name`, `email`, `role`, `status`, `is_platform_manager` and `social_identities` (`[{provider, provider_email}]`). `phone`, `extension` and timestamps are not returned. */
+                        user: components["schemas"]["User"];
                     } | {
                         /**
                          * @description Bearer token for API authentication
                          * @example 1|laravel_sanctum_token_xyz123
                          */
-                        access_token?: string;
+                        access_token: string;
                         /**
                          * @description Token expiration in seconds
                          * @example 86400
                          */
-                        expires_in?: number;
+                        expires_in: number;
                         /** @example Bearer */
-                        token_type?: string;
-                        user?: components["schemas"]["User"];
+                        token_type: string;
+                        /** @description Same user subset as the cookie response. */
+                        user: components["schemas"]["User"];
                     };
                 };
             };
@@ -9080,9 +11704,14 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "UNAUTHORIZED",
-                     *       "message": "Invalid credentials.",
-                     *       "code": "INVALID_CREDENTIALS"
+                     *       "error": {
+                     *         "code": "UNAUTHORIZED",
+                     *         "message": "Invalid credentials.",
+                     *         "details": {
+                     *           "email": "john@example.com"
+                     *         },
+                     *         "request_id": "9b2f6c1e-3a4d-4e5f-8a9b-0c1d2e3f4a5b"
+                     *       }
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -9098,7 +11727,22 @@ export interface operations {
                 };
             };
             422: components["responses"]["ValidationError"];
-            429: components["responses"]["TooManyRequests"];
+            /** @description Too many login attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many login attempts. Please try again later.",
+                     *       "retry_after": 60
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     logout: {
@@ -9150,6 +11794,7 @@ export interface operations {
                      *         "role": "owner",
                      *         "status": "active",
                      *         "is_platform_manager": false,
+                     *         "social_identities": [],
                      *         "organization": {
                      *           "id": 1,
                      *           "name": "Acme Corporation",
@@ -9162,6 +11807,17 @@ export interface operations {
                      */
                     "application/json": {
                         user?: components["schemas"]["User"] & {
+                            /** @description Present only while operate-as (platform-owner impersonation) is active */
+                            operate_as?: {
+                                /** @example true */
+                                active?: boolean;
+                                organization?: {
+                                    id?: number;
+                                    name?: string;
+                                } | null;
+                                /** @description ID of the real platform-manager user */
+                                real_user_id?: number;
+                            };
                             organization?: {
                                 /** @example 1 */
                                 id?: number;
@@ -9208,6 +11864,7 @@ export interface operations {
                     "application/json": {
                         /** @example Session refreshed successfully */
                         message?: string;
+                        /** @description Same user subset as `POST /v1/auth/login`. */
                         user?: components["schemas"]["User"];
                     } | {
                         /**
@@ -9268,22 +11925,22 @@ export interface operations {
                     };
                     organization: {
                         /**
-                         * @description Organization name
+                         * @description Organization name (must be unique)
                          * @example Acme Corporation
                          */
                         name: string;
                         /**
-                         * @description URL-friendly slug (auto-generated if not provided)
+                         * @description URL-friendly slug, must be unique (generated from the name when empty or omitted)
                          * @example acme-corporation
                          */
-                        slug?: string;
+                        slug?: string | null;
                         /**
-                         * @description Organization timezone (PHP timezone identifier)
+                         * @description Organization timezone (any PHP timezone identifier)
                          * @example America/New_York
                          */
                         timezone: string;
                     };
-                    /** @description reCAPTCHA v3 token (if enabled) */
+                    /** @description Optional reCAPTCHA v3 token. Verified when reCAPTCHA is enabled and the token is sent; omitting it skips the check. */
                     recaptcha_token?: string | null;
                 };
             };
@@ -9331,14 +11988,51 @@ export interface operations {
                         expires_in?: number;
                         /** @example Organization registered successfully */
                         message?: string;
-                        organization?: components["schemas"]["Organization"];
+                        /** @description The new organization */
+                        organization?: {
+                            id?: number;
+                            name?: string;
+                            slug?: string;
+                            /** @example active */
+                            status?: string;
+                            timezone?: string;
+                        };
                         /** @example Bearer */
                         token_type?: string;
-                        user?: components["schemas"]["User"];
+                        /** @description The new owner user */
+                        user?: {
+                            /** Format: email */
+                            email?: string;
+                            id?: number;
+                            name?: string;
+                            organization_id?: number;
+                            /** @enum {string} */
+                            role?: "owner";
+                            /** @enum {string} */
+                            status?: "active";
+                        };
                     };
                 };
             };
             422: components["responses"]["ValidationError"];
+            /** @description Too many registration attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "RATE_LIMIT_EXCEEDED",
+                     *         "message": "Too many registration attempts. Please try again in 1 hour.",
+                     *         "retry_after": 3600
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Registration failed */
             500: {
                 headers: {
@@ -9406,19 +12100,18 @@ export interface operations {
     listAutoDialerCampaigns: {
         parameters: {
             query?: {
+                /** @description Exclude campaigns with this status (an unknown value returns 422) */
+                exclude_status?: "draft" | "active" | "paused" | "completed" | "archived";
                 /**
                  * @description Page number for pagination
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Search in campaign name */
+                /** @description Number of items per page */
+                per_page?: number;
+                /** @description Substring match on the campaign name */
                 search?: string;
-                /** @description Filter by campaign status */
+                /** @description Filter by campaign status (not validated; an unknown value returns no rows) */
                 status?: "draft" | "active" | "paused" | "completed" | "archived";
             };
             header?: never;
@@ -9427,7 +12120,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of campaigns */
+            /** @description List of campaigns (meta has no from/to). Each campaign includes `caller_id_pool` and `lists_count`. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9441,6 +12134,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     createAutoDialerCampaign: {
@@ -9454,38 +12148,23 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description Whether answering machine detection is enabled
-                     * @example true
+                     * @description What to do when a human answers
+                     * @enum {string|null}
                      */
-                    amd_enabled?: boolean;
+                    action_human?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description AMD detection mode (required if amd_enabled is true)
-                     * @example DetectMessageEnd
-                     * @enum {string}
+                     * @description What to do when detection is inconclusive
+                     * @enum {string|null}
                      */
-                    amd_mode?: "Enabled" | "DetectMessageEnd";
+                    action_unknown?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description AMD silence timeout in milliseconds
-                     * @example 2500
+                     * @description What to do when the AMD worker detects a voicemail
+                     * @enum {string|null}
                      */
-                    amd_silence_timeout?: number | null;
+                    action_voicemail?: "HANGUP" | "CONTINUE" | null;
                     /**
-                     * @description AMD speech end threshold in milliseconds
-                     * @example 2500
-                     */
-                    amd_speech_end_threshold?: number | null;
-                    /**
-                     * @description AMD speech threshold in milliseconds
-                     * @example 2500
-                     */
-                    amd_speech_threshold?: number | null;
-                    /**
-                     * @description AMD timeout in seconds
-                     * @example 30
-                     */
-                    amd_timeout?: number | null;
-                    /**
-                     * @description Whether to auto-start when ready
+                     * @description Let the scheduler start this draft campaign once it has a ready list and the current time is inside its schedule
+                     * @default false
                      * @example false
                      */
                     auto_start?: boolean;
@@ -9494,13 +12173,13 @@ export interface operations {
                      * @example +14155551212
                      */
                     caller_id: string;
-                    /** @description Array of Caller IDs for the pool (1-100 items) */
+                    /** @description Caller IDs to rotate through. Each DID must belong to your organization and be active, otherwise 422 `Invalid Caller ID pool`. */
                     caller_id_pool?: {
                         /**
                          * @description ID of the DID number
                          * @example 1
                          */
-                        did_id?: number;
+                        did_id: number;
                         /**
                          * @description Weight for distribution
                          * @default 1
@@ -9509,7 +12188,7 @@ export interface operations {
                         weight?: number;
                     }[];
                     /**
-                     * @description Distribution strategy for Caller ID Pool
+                     * @description Distribution strategy for the Caller ID pool
                      * @default round_robin
                      * @example round_robin
                      * @enum {string}
@@ -9517,6 +12196,7 @@ export interface operations {
                     caller_id_strategy?: "round_robin" | "random" | "least_recently_used";
                     /**
                      * @description Calls per second rate (CPS)
+                     * @default 1
                      * @example 1
                      */
                     calls_per_second?: number;
@@ -9525,6 +12205,8 @@ export interface operations {
                      * @example 10
                      */
                     concurrent_active_calls: number;
+                    /** @description Legacy; accepted but ignored (derived from `schedule`) */
+                    days_active?: unknown[] | null;
                     /**
                      * @description Campaign description
                      * @example Outbound campaign for Q1 sales leads
@@ -9537,22 +12219,23 @@ export interface operations {
                      */
                     destination_connect: "connected" | "immediately";
                     /**
-                     * @description Timeout in seconds for dial attempts
+                     * @description Seconds to ring each destination
                      * @example 30
                      */
                     dial_timeout: number;
                     /**
                      * Format: date
-                     * @description Campaign end date
-                     * @example 2024-12-31
+                     * @description Last calling day (inclusive); on or after start_date
+                     * @example 2026-12-31
                      */
                     end_date: string;
+                    /** @description Legacy hour; accepted but ignored (derived from `schedule`) */
+                    end_time?: number | null;
                     /**
                      * @description Maximum number of dial attempts per destination
-                     * @default 1
                      * @example 3
                      */
-                    max_dial_attempts?: number;
+                    max_dial_attempts: number;
                     /**
                      * @description Campaign name
                      * @example Q1 Sales Campaign
@@ -9560,68 +12243,152 @@ export interface operations {
                     name: string;
                     /**
                      * @description Whether to record calls
+                     * @default false
                      * @example true
                      */
                     record_calls?: boolean;
                     /**
-                     * @description ID of the routing destination (required unless type is 'hangup')
+                     * @description Minutes to wait before the FIRST busy / no-answer retry (15 when omitted or null). Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours).
+                     * @default 15
+                     */
+                    retry_delay_minutes?: number | null;
+                    /**
+                     * @description Redial busy and no-answer destinations after the retry delay, within max_dial_attempts. Cancelled and failed calls are never retried.
+                     * @default false
+                     */
+                    retry_on_busy_no_answer?: boolean;
+                    /**
+                     * @description Retry the destination when a voicemail was detected
+                     * @default false
+                     */
+                    retry_on_voicemail?: boolean;
+                    /**
+                     * @description ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type. Required unless routing_destination_type is `hangup`.
                      * @example 5
                      */
                     routing_destination_id?: number | null;
                     /**
-                     * @description Type of destination for connected calls
+                     * @description Where answered calls are sent
                      * @example ai_assistant
                      * @enum {string}
                      */
                     routing_destination_type: "ai_assistant" | "ai_load_balancer" | "hangup";
-                    /** @description Weekly schedule configuration */
+                    /** @description Weekly calling windows, in `timezone`. All seven days are required. */
                     schedule: {
-                        friday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
-                        };
-                        monday?: {
-                            enabled?: boolean;
+                        friday: {
+                            enabled: boolean;
                             time_ranges?: {
-                                end_time?: string;
-                                id?: string;
-                                start_time?: string;
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
                             }[];
                         };
-                        saturday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
+                        monday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
                         };
-                        sunday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
+                        saturday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
                         };
-                        thursday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
+                        sunday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
                         };
-                        tuesday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
+                        thursday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
                         };
-                        wednesday?: {
-                            enabled?: boolean;
-                            time_ranges?: Record<string, never>[];
+                        tuesday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        wednesday: {
+                            enabled: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
                         };
                     };
                     /**
                      * Format: date
-                     * @description Campaign start date
-                     * @example 2024-01-01
+                     * @description First calling day; today or later
+                     * @example 2026-11-01
                      */
                     start_date: string;
+                    /** @description Legacy hour; accepted but ignored (derived from `schedule`) */
+                    start_time?: number | null;
                     /**
-                     * @description Maximum call duration in seconds
+                     * @description Maximum call duration in seconds (600 when omitted or null)
                      * @example 300
                      */
                     time_limit?: number | null;
                     /**
-                     * @description Timezone for scheduling
+                     * @description IANA timezone of the schedule
                      * @example America/New_York
                      */
                     timezone: string;
@@ -9629,7 +12396,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Campaign created successfully */
+            /** @description Campaign created successfully (`lists_count` is 0) */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -9694,72 +12461,243 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @example true */
-                    amd_enabled?: boolean;
                     /**
-                     * @example DetectMessageEnd
+                     * @description What to do when a human answers
+                     * @enum {string|null}
+                     */
+                    action_human?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description What to do when detection is inconclusive
+                     * @enum {string|null}
+                     */
+                    action_unknown?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description What to do when the AMD worker detects a voicemail
+                     * @enum {string|null}
+                     */
+                    action_voicemail?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description Let the scheduler start this draft campaign once it has a ready list and the current time is inside its schedule
+                     * @example false
+                     */
+                    auto_start?: boolean;
+                    /**
+                     * @description Default Caller ID in E.164 format (legacy single Caller ID)
+                     * @example +14155551212
+                     */
+                    caller_id?: string;
+                    /** @description Caller IDs to rotate through. Each DID must belong to your organization and be active, otherwise 422 `Invalid Caller ID pool`. Replaces the whole pool. */
+                    caller_id_pool?: {
+                        /**
+                         * @description ID of the DID number
+                         * @example 1
+                         */
+                        did_id: number;
+                        /**
+                         * @description Weight for distribution
+                         * @default 1
+                         * @example 1
+                         */
+                        weight?: number;
+                    }[];
+                    /**
+                     * @description Distribution strategy for the Caller ID pool
+                     * @example round_robin
                      * @enum {string}
                      */
-                    amd_mode?: "Enabled" | "DetectMessageEnd";
-                    /** @example 2500 */
-                    amd_silence_timeout?: number | null;
-                    /** @example 2500 */
-                    amd_speech_end_threshold?: number | null;
-                    /** @example 2500 */
-                    amd_speech_threshold?: number | null;
-                    /** @example 30 */
-                    amd_timeout?: number | null;
-                    /** @example false */
-                    auto_start?: boolean;
-                    /** @example +14155551212 */
-                    caller_id?: string;
-                    /** @example 1 */
+                    caller_id_strategy?: "round_robin" | "random" | "least_recently_used";
+                    /**
+                     * @description Calls per second rate (CPS)
+                     * @example 1
+                     */
                     calls_per_second?: number;
-                    /** @example 10 */
+                    /**
+                     * @description Maximum concurrent active calls (CAC)
+                     * @example 10
+                     */
                     concurrent_active_calls?: number;
-                    /** @example Updated description */
+                    /** @description Legacy; stored as sent unless `schedule` is also sent (use `schedule`) */
+                    days_active?: unknown[] | null;
+                    /**
+                     * @description Campaign description
+                     * @example Outbound campaign for Q1 sales leads
+                     */
                     description?: string | null;
                     /**
+                     * @description When to connect the destination
                      * @example connected
                      * @enum {string}
                      */
                     destination_connect?: "connected" | "immediately";
-                    /** @example 30 */
+                    /**
+                     * @description Seconds to ring each destination
+                     * @example 30
+                     */
                     dial_timeout?: number;
                     /**
                      * Format: date
-                     * @example 2024-12-31
+                     * @description Last calling day (inclusive); on or after start_date
+                     * @example 2026-12-31
                      */
                     end_date?: string;
-                    /** @example 3 */
+                    /** @description Legacy hour; stored as sent unless `schedule` is also sent */
+                    end_time?: number | null;
+                    /**
+                     * @description Maximum number of dial attempts per destination
+                     * @example 3
+                     */
                     max_dial_attempts?: number;
-                    /** @example Updated Campaign Name */
+                    /**
+                     * @description Campaign name
+                     * @example Q1 Sales Campaign
+                     */
                     name?: string;
-                    /** @example true */
+                    /**
+                     * @description Whether to record calls
+                     * @example true
+                     */
                     record_calls?: boolean;
-                    /** @example 5 */
+                    /** @description Minutes to wait before the FIRST busy / no-answer retry. Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours). */
+                    retry_delay_minutes?: number;
+                    /** @description Redial busy and no-answer destinations after the retry delay, within max_dial_attempts. Cancelled and failed calls are never retried. */
+                    retry_on_busy_no_answer?: boolean;
+                    /** @description Retry the destination when a voicemail was detected */
+                    retry_on_voicemail?: boolean;
+                    /**
+                     * @description ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
+                     * @example 5
+                     */
                     routing_destination_id?: number | null;
                     /**
+                     * @description Where answered calls are sent
                      * @example ai_assistant
                      * @enum {string}
                      */
                     routing_destination_type?: "ai_assistant" | "ai_load_balancer" | "hangup";
-                    /** @description Weekly schedule configuration */
-                    schedule?: Record<string, never>;
+                    /** @description Weekly calling windows, in `timezone`. Replaces the stored schedule (days left out are no longer scheduled) and recomputes the legacy days_active / start_time / end_time. */
+                    schedule?: {
+                        friday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        monday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        saturday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        sunday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        thursday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        tuesday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        wednesday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                    };
                     /**
                      * Format: date
-                     * @example 2024-01-01
+                     * @description First calling day
+                     * @example 2026-11-01
                      */
                     start_date?: string;
-                    /** @example 300 */
+                    /** @description Legacy hour; stored as sent unless `schedule` is also sent */
+                    start_time?: number | null;
+                    /**
+                     * @description Maximum call duration in seconds. Omit to keep the current value; null sets the default 600
+                     * @example 300
+                     */
                     time_limit?: number | null;
-                    /** @example America/New_York */
+                    /**
+                     * @description IANA timezone of the schedule
+                     * @example America/New_York
+                     */
                     timezone?: string;
                 };
             };
         };
         responses: {
-            /** @description Campaign updated successfully */
+            /** @description Campaign updated successfully (`lists_count` is 0) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9775,6 +12713,18 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            /** @description The campaign is active; nothing was changed. Pause it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Pause the campaign before editing it. */
+                        message?: string;
+                    };
+                };
+            };
             422: components["responses"]["ValidationError"];
         };
     };
@@ -9794,31 +12744,22 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Campaign deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            /** @description Cannot delete campaign in current status */
-            409: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     /**
                      * @example {
-                     *       "error": "DELETE_BLOCKED",
-                     *       "message": "Cannot delete active campaign. Pause and archive first.",
-                     *       "code": "CAMPAIGN_ACTIVE"
+                     *       "message": "Campaign deleted successfully"
                      *     }
                      */
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["SuccessMessage"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     patchAutoDialerCampaign: {
@@ -9837,72 +12778,243 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @example true */
-                    amd_enabled?: boolean;
                     /**
-                     * @example DetectMessageEnd
+                     * @description What to do when a human answers
+                     * @enum {string|null}
+                     */
+                    action_human?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description What to do when detection is inconclusive
+                     * @enum {string|null}
+                     */
+                    action_unknown?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description What to do when the AMD worker detects a voicemail
+                     * @enum {string|null}
+                     */
+                    action_voicemail?: "HANGUP" | "CONTINUE" | null;
+                    /**
+                     * @description Let the scheduler start this draft campaign once it has a ready list and the current time is inside its schedule
+                     * @example false
+                     */
+                    auto_start?: boolean;
+                    /**
+                     * @description Default Caller ID in E.164 format (legacy single Caller ID)
+                     * @example +14155551212
+                     */
+                    caller_id?: string;
+                    /** @description Caller IDs to rotate through. Each DID must belong to your organization and be active, otherwise 422 `Invalid Caller ID pool`. Replaces the whole pool. */
+                    caller_id_pool?: {
+                        /**
+                         * @description ID of the DID number
+                         * @example 1
+                         */
+                        did_id: number;
+                        /**
+                         * @description Weight for distribution
+                         * @default 1
+                         * @example 1
+                         */
+                        weight?: number;
+                    }[];
+                    /**
+                     * @description Distribution strategy for the Caller ID pool
+                     * @example round_robin
                      * @enum {string}
                      */
-                    amd_mode?: "Enabled" | "DetectMessageEnd";
-                    /** @example 2500 */
-                    amd_silence_timeout?: number | null;
-                    /** @example 2500 */
-                    amd_speech_end_threshold?: number | null;
-                    /** @example 2500 */
-                    amd_speech_threshold?: number | null;
-                    /** @example 30 */
-                    amd_timeout?: number | null;
-                    /** @example false */
-                    auto_start?: boolean;
-                    /** @example +14155551212 */
-                    caller_id?: string;
-                    /** @example 1 */
+                    caller_id_strategy?: "round_robin" | "random" | "least_recently_used";
+                    /**
+                     * @description Calls per second rate (CPS)
+                     * @example 1
+                     */
                     calls_per_second?: number;
-                    /** @example 10 */
+                    /**
+                     * @description Maximum concurrent active calls (CAC)
+                     * @example 10
+                     */
                     concurrent_active_calls?: number;
-                    /** @example Updated description */
+                    /** @description Legacy; stored as sent unless `schedule` is also sent (use `schedule`) */
+                    days_active?: unknown[] | null;
+                    /**
+                     * @description Campaign description
+                     * @example Outbound campaign for Q1 sales leads
+                     */
                     description?: string | null;
                     /**
+                     * @description When to connect the destination
                      * @example connected
                      * @enum {string}
                      */
                     destination_connect?: "connected" | "immediately";
-                    /** @example 30 */
+                    /**
+                     * @description Seconds to ring each destination
+                     * @example 30
+                     */
                     dial_timeout?: number;
                     /**
                      * Format: date
-                     * @example 2024-12-31
+                     * @description Last calling day (inclusive); on or after start_date
+                     * @example 2026-12-31
                      */
                     end_date?: string;
-                    /** @example 3 */
+                    /** @description Legacy hour; stored as sent unless `schedule` is also sent */
+                    end_time?: number | null;
+                    /**
+                     * @description Maximum number of dial attempts per destination
+                     * @example 3
+                     */
                     max_dial_attempts?: number;
-                    /** @example Updated Campaign Name */
+                    /**
+                     * @description Campaign name
+                     * @example Q1 Sales Campaign
+                     */
                     name?: string;
-                    /** @example true */
+                    /**
+                     * @description Whether to record calls
+                     * @example true
+                     */
                     record_calls?: boolean;
-                    /** @example 5 */
+                    /** @description Minutes to wait before the FIRST busy / no-answer retry. Each further retry waits twice as long as the previous one (delay x 2^(attempt-1)), capped at 1440 minutes (24 hours). */
+                    retry_delay_minutes?: number;
+                    /** @description Redial busy and no-answer destinations after the retry delay, within max_dial_attempts. Cancelled and failed calls are never retried. */
+                    retry_on_busy_no_answer?: boolean;
+                    /** @description Retry the destination when a voicemail was detected */
+                    retry_on_voicemail?: boolean;
+                    /**
+                     * @description ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
+                     * @example 5
+                     */
                     routing_destination_id?: number | null;
                     /**
+                     * @description Where answered calls are sent
                      * @example ai_assistant
                      * @enum {string}
                      */
                     routing_destination_type?: "ai_assistant" | "ai_load_balancer" | "hangup";
-                    /** @description Weekly schedule configuration */
-                    schedule?: Record<string, never>;
+                    /** @description Weekly calling windows, in `timezone`. Replaces the stored schedule (days left out are no longer scheduled) and recomputes the legacy days_active / start_time / end_time. */
+                    schedule?: {
+                        friday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        monday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        saturday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        sunday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        thursday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        tuesday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                        wednesday?: {
+                            enabled?: boolean;
+                            time_ranges?: {
+                                /**
+                                 * @description HH:MM, or 24:00 for end of day
+                                 * @example 17:00
+                                 */
+                                end_time: string;
+                                /** @description Client-side identifier of the range */
+                                id: string;
+                                /** @example 09:00 */
+                                start_time: string;
+                            }[];
+                        };
+                    };
                     /**
                      * Format: date
-                     * @example 2024-01-01
+                     * @description First calling day
+                     * @example 2026-11-01
                      */
                     start_date?: string;
-                    /** @example 300 */
+                    /** @description Legacy hour; stored as sent unless `schedule` is also sent */
+                    start_time?: number | null;
+                    /**
+                     * @description Maximum call duration in seconds. Omit to keep the current value; null sets the default 600
+                     * @example 300
+                     */
                     time_limit?: number | null;
-                    /** @example America/New_York */
+                    /**
+                     * @description IANA timezone of the schedule
+                     * @example America/New_York
+                     */
                     timezone?: string;
                 };
             };
         };
         responses: {
-            /** @description Campaign updated successfully */
+            /** @description Campaign updated successfully (`lists_count` is 0) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9918,6 +13030,18 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            /** @description The campaign is active; nothing was changed. Pause it first. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Pause the campaign before editing it. */
+                        message?: string;
+                    };
+                };
+            };
             422: components["responses"]["ValidationError"];
         };
     };
@@ -9952,22 +13076,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot archive campaign */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": "ARCHIVE_FAILED",
-                     *       "message": "Only completed or paused campaigns can be archived",
-                     *       "code": "CAMPAIGN_CANNOT_ARCHIVE"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
         };
     };
     getCampaignCallerIdStats: {
@@ -9992,7 +13100,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: unknown;
+                        /** @example 9 */
+                        campaign_id?: number;
+                        stats?: {
+                            /** @example 45 */
+                            completed_calls?: number;
+                            /** @example 1 */
+                            did_id?: number;
+                            /** @example 5 */
+                            failed_calls?: number;
+                            /** @example Sales Line 1 */
+                            friendly_name?: string | null;
+                            /**
+                             * Format: date-time
+                             * @example 2026-04-10T14:35:00+00:00
+                             */
+                            last_used_at?: string | null;
+                            /**
+                             * @description Null when the DID no longer exists
+                             * @example +12127773456
+                             */
+                            phone_number?: string | null;
+                            /**
+                             * @description completed_calls / total_calls x 100, two decimals (0 when no calls)
+                             * @example 90
+                             */
+                            success_rate?: number;
+                            /** @example 50 */
+                            total_calls?: number;
+                        }[];
+                        /**
+                         * @example round_robin
+                         * @enum {string}
+                         */
+                        strategy?: "round_robin" | "random" | "least_recently_used";
+                        /**
+                         * @description Sum of total_calls over all rows
+                         * @example 150
+                         */
+                        total_calls?: number;
                     };
                 };
             };
@@ -10025,31 +13171,50 @@ export interface operations {
                     "application/json": {
                         data?: {
                             /**
-                             * @description Currently active calls
+                             * @description Currently active calls (the dialer worker's counter; 0 while paused)
                              * @example 5
                              */
                             active_calls?: number;
-                            /** @description Active call sessions */
+                            /**
+                             * @description Call sessions in `initiated`, `ringing` or `answered` status that started in the
+                             *     last 5 minutes, newest first. Always empty for a paused campaign.
+                             */
                             active_sessions?: {
-                                /** @example 456 */
-                                destination_id?: number;
-                                /** @example 45 */
+                                /**
+                                 * @description Cloudonix call ID (null until the call is placed)
+                                 * @example call-abc123
+                                 */
+                                call_id?: string | null;
+                                /**
+                                 * @description Seconds since initiated_at
+                                 * @example 45
+                                 */
                                 duration_seconds?: number;
-                                /** @example +14155551212 */
-                                phone_number?: string;
-                                /** @example 123 */
-                                session_id?: number;
-                                /** @example sess-abc123 */
-                                session_token?: string;
+                                /**
+                                 * @description Session ID
+                                 * @example 123
+                                 */
+                                id?: number;
                                 /**
                                  * Format: date-time
+                                 * @description When the call was initiated
                                  * @example 2024-01-15T14:30:00Z
                                  */
-                                started_at?: string;
+                                initiated_at?: string;
+                                /**
+                                 * @description Destination phone number
+                                 * @example +14155551212
+                                 */
+                                phone_number?: string | null;
+                                /**
+                                 * @description Current call status
+                                 * @example answered
+                                 * @enum {string}
+                                 */
+                                status?: "initiated" | "ringing" | "answered";
                             }[];
                             /**
-                             * Format: float
-                             * @description API interval between calls
+                             * @description Seconds between call initiations (1 / calls_per_second)
                              * @example 1
                              */
                             api_interval_seconds?: number;
@@ -10065,12 +13230,12 @@ export interface operations {
                             cac_limit?: number;
                             rate_limit_status?: {
                                 /**
-                                 * @description Whether campaign can be resumed
+                                 * @description True when resumes_at is null or already passed
                                  * @example true
                                  */
                                 can_resume_now?: boolean;
                                 /**
-                                 * @description Whether campaign is rate limited
+                                 * @description True when the campaign is paused with pause_reason `cloudonix_rate_limit`
                                  * @example false
                                  */
                                 is_rate_limited?: boolean;
@@ -10083,8 +13248,7 @@ export interface operations {
                                 resumes_at?: string | null;
                             };
                             /**
-                             * Format: float
-                             * @description CAC utilization percentage
+                             * @description active_calls / cac_limit x 100, one decimal
                              * @example 50
                              */
                             utilization_percentage?: number;
@@ -10105,15 +13269,10 @@ export interface operations {
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Search by phone number */
-                search?: string;
-                /** @description Filter by destination status */
-                status?: "pending" | "dialing" | "completed" | "failed";
+                /** @description Number of items per page */
+                per_page?: number;
+                /** @description Filter by destination status (not validated; an unknown value returns no rows) */
+                status?: "pending" | "dialing" | "connected" | "failed" | "completed" | "invalid";
             };
             header?: never;
             path: {
@@ -10135,31 +13294,79 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            /**
-                             * Format: date-time
-                             * @example 2024-01-10 08:00:00
-                             */
-                            created_at?: string;
-                            /** @example John Doe - Sales Lead */
-                            description?: string | null;
-                            /** @example 0 */
-                            dial_attempts?: number;
-                            /** @example 1 */
-                            id?: number;
-                            /**
-                             * Format: date-time
-                             * @example null
-                             */
-                            last_dialed_at?: string | null;
-                            /** @example +14155551212 */
-                            phone_number?: string;
-                            /**
-                             * @example pending
-                             * @enum {string}
-                             */
-                            status?: "pending" | "dialing" | "completed" | "failed";
-                        }[];
-                        meta?: components["schemas"]["PaginationMeta"];
+                            current_page?: number;
+                            data?: {
+                                batch_identifier?: string | null;
+                                /** @example 0 */
+                                billsec?: number;
+                                /** @example 0 */
+                                consecutive_initiate_failures?: number;
+                                /**
+                                 * Format: date-time
+                                 * @example 2024-01-10T08:00:00.000000Z
+                                 */
+                                created_at?: string;
+                                /** @example 0 */
+                                dial_attempts?: number;
+                                /**
+                                 * @description Seconds, last attempt
+                                 * @example 0
+                                 */
+                                duration?: number;
+                                /** @example 1 */
+                                id?: number;
+                                /**
+                                 * @description Campaign ID (added by the list-to-destination join)
+                                 * @example 1
+                                 */
+                                laravel_through_key?: number;
+                                last_call_id?: string | null;
+                                last_cdr_id?: number | null;
+                                /**
+                                 * Format: date-time
+                                 * @example null
+                                 */
+                                last_dialed_at?: string | null;
+                                /** @example null */
+                                last_disposition?: string | null;
+                                last_error?: string | null;
+                                last_session_token?: string | null;
+                                /** @example 12 */
+                                list_id?: number;
+                                metadata?: {
+                                    [key: string]: unknown;
+                                } | null;
+                                /** @example John Doe */
+                                name?: string | null;
+                                /**
+                                 * Format: date-time
+                                 * @description When a busy / no-answer retry is due
+                                 * @example null
+                                 */
+                                next_retry_at?: string | null;
+                                /** @example 1 */
+                                organization_id?: number;
+                                /** @example +14155551212 */
+                                phone_number?: string;
+                                /** @example 1 */
+                                priority?: number;
+                                /**
+                                 * @example pending
+                                 * @enum {string}
+                                 */
+                                status?: "pending" | "dialing" | "connected" | "failed" | "completed" | "invalid";
+                                /**
+                                 * Format: date-time
+                                 * @example 2024-01-10T08:00:00.000000Z
+                                 */
+                                updated_at?: string;
+                            }[];
+                            from?: number | null;
+                            last_page?: number;
+                            per_page?: number;
+                            to?: number | null;
+                            total?: number;
+                        };
                     };
                 };
             };
@@ -10183,7 +13390,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Campaign list details */
+            /** @description The campaign's lists */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -10191,8 +13398,37 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            [key: string]: unknown;
-                        };
+                            /**
+                             * @description True while the campaign is not active and every entry of the list is still pending with zero dial attempts
+                             * @example true
+                             */
+                            can_unassign?: boolean;
+                            /** @example 12 */
+                            id?: number;
+                            /** @example 2 */
+                            invalid_rows?: number;
+                            /** @example leads.csv */
+                            name?: string;
+                            /**
+                             * Format: date-time
+                             * @example 2026-04-10T14:35:00+00:00
+                             */
+                            processed_at?: string | null;
+                            /**
+                             * @example in_use
+                             * @enum {string}
+                             */
+                            status?: "draft" | "pending" | "processing" | "ready" | "failed" | "in_use" | "used" | "archived";
+                            /** @example 120 */
+                            total_rows?: number;
+                            /**
+                             * @description Why the list cannot be unassigned now; null when it can
+                             * @example null
+                             */
+                            unassign_refusal?: string | null;
+                            /** @example 118 */
+                            valid_rows?: number;
+                        }[];
                     };
                 };
             };
@@ -10219,10 +13455,10 @@ export interface operations {
                 "multipart/form-data": {
                     /**
                      * Format: binary
-                     * @description CSV/TXT file containing phone numbers and optional descriptions
+                     * @description CSV/TXT file (max 10 MB); header row, then one E.164 number in the first column of each row
                      */
                     file: string;
-                    /** @description Optional name for the uploaded list */
+                    /** @description List name (defaults to the uploaded file name) */
                     name?: string | null;
                 };
             };
@@ -10236,7 +13472,23 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            [key: string]: unknown;
+                            /**
+                             * @description Rows with an invalid number plus removed duplicates
+                             * @example 2
+                             */
+                            invalid_rows?: number;
+                            /** @example 12 */
+                            list_id?: number;
+                            /**
+                             * @description Data rows read (header excluded)
+                             * @example 120
+                             */
+                            total_rows?: number;
+                            /**
+                             * @description Unique valid numbers stored as destinations
+                             * @example 118
+                             */
+                            valid_rows?: number;
                         };
                         /** @example List uploaded successfully */
                         message?: string;
@@ -10246,7 +13498,15 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /** @description Request validation failed, or the campaign cannot take a list now (`{"error": "Cannot assign list to \"…\" because it is currently running. Pause the campaign first, then assign the list."}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     deleteCampaignList: {
@@ -10259,26 +13519,57 @@ export interface operations {
                  * @example 1
                  */
                 campaign: number;
+                /**
+                 * @description Distribution list ID (must be assigned to this campaign)
+                 * @example 12
+                 */
+                list: number;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description List deleted successfully */
+            /** @description List unassigned */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example List deleted successfully */
+                        data?: {
+                            /** @example 12 */
+                            list_id?: number;
+                        };
+                        /** @example List unassigned from campaign successfully */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not allowed, or the list's campaign is active */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
+            /** @description The list's entries have started processing */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending)."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getMonitorDetail: {
@@ -10343,22 +13634,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot pause campaign */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": "PAUSE_FAILED",
-                     *       "message": "Only active campaigns can be paused",
-                     *       "code": "CAMPAIGN_NOT_ACTIVE"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
         };
     };
     resetCampaignCac: {
@@ -10389,7 +13664,10 @@ export interface operations {
                         message?: string;
                         /** @example 0 */
                         new_value?: number;
-                        /** @example 5 */
+                        /**
+                         * @description Counter value before the reset (0 when unset)
+                         * @example 5
+                         */
                         previous_value?: number;
                     };
                 };
@@ -10397,7 +13675,21 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            500: components["responses"]["ServerError"];
+            /** @description The dialer Redis could not be reached */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Failed to reset CAC counter",
+                     *       "error": "Connection refused"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     resetCampaignCallerIdCycle: {
@@ -10428,21 +13720,53 @@ export interface operations {
                         message?: string;
                         /** @example 0 */
                         next_index?: number;
-                        /** @example round_robin */
-                        strategy?: string;
+                        /**
+                         * @example round_robin
+                         * @enum {string}
+                         */
+                        strategy?: "round_robin" | "random" | "least_recently_used";
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot reset cycle */
+            /** @description The campaign is not paused */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    /**
+                     * @example {
+                     *       "message": "Caller ID cycle can only be reset when campaign is PAUSED",
+                     *       "errors": {
+                     *         "status": [
+                     *           "Caller ID cycle can only be reset when campaign is PAUSED"
+                     *         ]
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
+            /** @description The dialer Redis could not be reached */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Failed to reset Caller ID cycle",
+                     *       "errors": {
+                     *         "status": [
+                     *           "Failed to reset Caller ID cycle"
+                     *         ]
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"];
                 };
             };
         };
@@ -10478,22 +13802,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot resume campaign */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    /**
-                     * @example {
-                     *       "error": "RESUME_FAILED",
-                     *       "message": "Campaign is rate limited and cannot resume yet",
-                     *       "code": "RATE_LIMITED"
-                     *     }
-                     */
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
         };
     };
     startAutoDialerCampaign: {
@@ -10527,7 +13835,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot start campaign */
+            /** @description No usable distribution list is assigned */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10535,9 +13843,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "START_FAILED",
-                     *       "message": "Campaign cannot be started. Ensure it has a valid list assigned.",
-                     *       "code": "NO_LIST_ASSIGNED"
+                     *       "message": "Cannot start campaign without a destination list"
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -10548,7 +13854,7 @@ export interface operations {
     getAvailableCallerIds: {
         parameters: {
             query?: {
-                /** @description Campaign ID to exclude DIDs already in that campaign's pool */
+                /** @description Campaign ID whose Caller ID pool is left out of the list (the numbers already in that campaign's pool are not returned). Must be a positive integer, otherwise 422. An id that is not a campaign of the organization excludes nothing. */
                 exclude_campaign_id?: number;
             };
             header?: never;
@@ -10581,17 +13887,18 @@ export interface operations {
                              */
                             phone_number?: string;
                             /**
-                             * @description DID status
+                             * @description DID status (only active DIDs are returned)
                              * @example active
                              * @enum {string}
                              */
-                            status?: "active" | "inactive";
+                            status?: "active";
                         }[];
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listDistributionLists: {
@@ -10604,15 +13911,12 @@ export interface operations {
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Search by list name */
+                /** @description Items per page (values outside 1-100 are clamped) */
+                per_page?: number;
+                /** @description Substring match on the list name */
                 search?: string;
-                /** @description Filter by list status */
-                status?: "draft" | "processing" | "ready" | "in_use" | "used" | "failed" | "archived";
+                /** @description Filter by list status. `archived` returns archived lists; `all` returns the latest versions plus archived lists; any other value filters the latest versions by that status. */
+                status?: "draft" | "pending" | "processing" | "ready" | "in_use" | "used" | "failed" | "archived" | "all";
             };
             header?: never;
             path?: never;
@@ -10739,6 +14043,21 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
+            /** @description Deleting the list failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to delete list: ..."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     archiveDistributionList: {
@@ -10779,9 +14098,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "ARCHIVE_FAILED",
-                     *       "message": "List cannot be archived in its current status",
-                     *       "code": "INVALID_STATUS"
+                     *       "error": "Cannot archive list \"Sales Leads Q1\": it is assigned to campaign \"Q1 Sales Campaign\". Unassign it first."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -10806,7 +14123,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description ID of the campaign to assign the list to
+                     * @description ID of the campaign to assign the list to (must exist; a campaign of another organization returns 404)
                      * @example 5
                      */
                     campaign_id: number;
@@ -10837,7 +14154,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot assign list */
+            /** @description Request validation failed, or the campaign cannot take a list now (`{"error": "..."}`). */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -10845,9 +14162,21 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "ASSIGN_FAILED",
-                     *       "message": "List is not ready for assignment",
-                     *       "code": "LIST_NOT_READY"
+                     *       "error": "Cannot assign list to \"Q1 Sales Campaign\" because it is currently running. Pause the campaign first, then assign the list."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description Assignment failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to assign list to campaign: ..."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -10896,7 +14225,20 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /** @description Request validation failed, or a non-archived list with the same name already exists in the organization (`{"error": "A list with this name already exists"}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "A list with this name already exists"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     listListDestinations: {
@@ -10907,15 +14249,12 @@ export interface operations {
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Search by phone number */
+                /** @description Items per page (values outside 1-100 are clamped) */
+                per_page?: number;
+                /** @description Substring match on the phone number */
                 search?: string;
                 /** @description Filter by destination status */
-                status?: "pending" | "dialing" | "completed" | "failed";
+                status?: "pending" | "dialing" | "connected" | "failed" | "completed" | "invalid";
             };
             header?: never;
             path: {
@@ -10936,31 +14275,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: {
-                            /**
-                             * Format: date-time
-                             * @example 2024-01-10 08:00:00
-                             */
-                            created_at?: string;
-                            /** @example John Doe - Sales Lead */
-                            description?: string | null;
-                            /** @example 0 */
-                            dial_attempts?: number;
-                            /** @example 1 */
-                            id?: number;
-                            /**
-                             * Format: date-time
-                             * @example null
-                             */
-                            last_dialed_at?: string | null;
-                            /** @example +14155551212 */
-                            phone_number?: string;
-                            /**
-                             * @example pending
-                             * @enum {string}
-                             */
-                            status?: "pending" | "dialing" | "completed" | "failed";
-                        }[];
+                        data?: components["schemas"]["ListDestination"][];
                         meta?: components["schemas"]["PaginationMeta"];
                     };
                 };
@@ -10987,12 +14302,12 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description Optional description
+                     * @description Optional contact name
                      * @example John Doe - Sales Lead
                      */
-                    description?: string | null;
+                    name?: string | null;
                     /**
-                     * @description Phone number in E.164 format
+                     * @description Phone number. E.164 is recommended; numbers without a country code are parsed as US numbers.
                      * @example +14155551212
                      */
                     phone_number: string;
@@ -11007,21 +14322,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: {
-                            /**
-                             * Format: date-time
-                             * @example 2024-01-10 08:00:00
-                             */
-                            created_at?: string;
-                            /** @example John Doe - Sales Lead */
-                            description?: string | null;
-                            /** @example 1 */
-                            id?: number;
-                            /** @example +14155551212 */
-                            phone_number?: string;
-                            /** @example pending */
-                            status?: string;
-                        };
+                        data?: components["schemas"]["ListDestination"];
                         /** @example Destination added successfully */
                         message?: string;
                     };
@@ -11030,7 +14331,20 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /** @description Request validation failed, or the number is invalid or already in the list (`{"error": "..."}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Phone number already exists in this list"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     resetListDestinationDialAttempts: {
@@ -11095,12 +14409,12 @@ export interface operations {
                     /** @description Array of destinations to add */
                     destinations: {
                         /**
-                         * @description Optional description
+                         * @description Optional contact name
                          * @example John Doe - Sales Lead
                          */
-                        description?: string | null;
+                        name?: string | null;
                         /**
-                         * @description Phone number in E.164 format
+                         * @description Phone number (E.164 recommended; numbers without a country code are parsed as US numbers)
                          * @example +14155551212
                          */
                         phone_number: string;
@@ -11118,28 +14432,25 @@ export interface operations {
                     "application/json": {
                         data?: {
                             /**
-                             * @description Number of destinations added
-                             * @example 98
+                             * @description Number of destinations inserted
+                             * @example 97
                              */
                             added?: number;
+                            /**
+                             * @description Valid numbers skipped because they are already in the list
+                             * @example 1
+                             */
+                            duplicates_skipped?: number;
+                            /**
+                             * @description Rejected entries keyed by their zero-based index in `destinations` (value: the reason). An empty JSON array `[]` when nothing was rejected.
+                             * @example {
+                             *       "5": "Invalid phone number format",
+                             *       "8": "Duplicate phone number in batch"
+                             *     }
+                             */
                             errors?: {
-                                /** @example 5 */
-                                index?: number;
-                                /** @example invalid-number */
-                                phone_number?: string;
-                            }[];
-                            /**
-                             * @description Number of destinations that failed
-                             * @example 2
-                             */
-                            failed?: number;
-                            /** @example Invalid phone number format */
-                            message?: string;
-                            /**
-                             * @description Total destinations in batch
-                             * @example 100
-                             */
-                            total?: number;
+                                [key: string]: string;
+                            } | unknown[];
                         };
                         /** @example Batch processing completed */
                         message?: string;
@@ -11149,7 +14460,20 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /** @description Request validation failed, or the batch would exceed the 100,000-destination list limit (`{"error": "..."}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Batch would exceed maximum list size of 100000"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     bulkResetListDestinationDialAttempts: {
@@ -11193,7 +14517,20 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /** @description Request validation failed, or one or more IDs are not in this list (`{"error": "One or more destinations not found in this list"}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "One or more destinations not found in this list"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     downloadDistributionList: {
@@ -11220,6 +14557,37 @@ export interface operations {
                 };
                 content: {
                     "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDistributionListParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list's parts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["DistributionList"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -11268,19 +14636,20 @@ export interface operations {
                             /** @example true */
                             has_header?: boolean;
                             /**
-                             * @description Column headers (empty if has_header is false).
+                             * @description Column headers. When has_header is false they are generated as `column_1`, `column_2`, ...
                              * @example [
                              *       "phone_number",
-                             *       "description"
+                             *       "name",
+                             *       "batch_identifier"
                              *     ]
                              */
                             headers?: string[];
-                            /** @description Up to 5 parsed data rows, keyed by header name (or column index when has_header is false). */
+                            /** @description Up to 5 parsed data rows, keyed by header name (or `column_N` when has_header is false). */
                             rows?: {
                                 [key: string]: string;
                             }[];
                             /**
-                             * @description Total data row count in the file (excluding the header row).
+                             * @description Non-blank data rows in the file (excluding the header row).
                              * @example 1000
                              */
                             total_rows?: number;
@@ -11364,7 +14733,15 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not allowed, or the list's campaign is active */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             /** @description Cannot unassign list */
             422: {
@@ -11374,9 +14751,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "UNASSIGN_FAILED",
-                     *       "message": "List is not assigned to any campaign",
-                     *       "code": "NOT_ASSIGNED"
+                     *       "error": "Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending)."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -11402,9 +14777,25 @@ export interface operations {
                 "multipart/form-data": {
                     /**
                      * Format: binary
-                     * @description CSV file to upload (max 50MB)
+                     * @description CSV or TXT file to upload (max 50 MB)
                      */
                     file: string;
+                    /**
+                     * @description Whether the first row is a header row. Without a header the columns are addressed as `column_1`, `column_2`, ...
+                     * @default true
+                     */
+                    has_header?: boolean | null;
+                    /** @description Column mapping, sent as form fields `mapping[phone]`, `mapping[name]`, `mapping[batch_identifier]` and `mapping[metadata][]`. */
+                    mapping: {
+                        /** @description CSV column holding the batch identifier */
+                        batch_identifier?: string | null;
+                        /** @description CSV columns stored as metadata on each destination */
+                        metadata?: string[] | null;
+                        /** @description CSV column holding the contact name */
+                        name?: string | null;
+                        /** @description CSV column holding the phone number */
+                        phone: string;
+                    };
                 };
             };
         };
@@ -11424,8 +14815,14 @@ export interface operations {
                              */
                             action?: "upload" | "update";
                             /**
+                             * @description The file has more than 100,000 data rows and is split across several lists
+                             * @example false
+                             */
+                            is_large_file?: boolean;
+                            /**
+                             * Format: uuid
                              * @description Job ID for tracking progress
-                             * @example upload-abc123
+                             * @example 9b2f6c1e-3d4a-4f6b-8c2d-1e5a7b9c0d3f
                              */
                             job_id?: string;
                             /**
@@ -11434,15 +14831,20 @@ export interface operations {
                              */
                             list_id?: number;
                             /**
-                             * @description New version number (for updates)
+                             * @description Same as `version_number` (`update` only)
                              * @example 2
                              */
                             new_version_number?: number;
                             /**
-                             * @description Total rows in file
+                             * @description Data rows in the file (the first row is always skipped when counting)
                              * @example 1000
                              */
                             total_rows?: number;
+                            /**
+                             * @description New version number (`update` only)
+                             * @example 2
+                             */
+                            version_number?: number;
                         };
                         /** @example File uploaded successfully. Processing started. */
                         message?: string;
@@ -11452,7 +14854,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot upload to list */
+            /** @description Request validation failed (Laravel validation error body), or the list status does not allow an upload (`{"error": "..."}`). */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -11460,9 +14862,21 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "UPLOAD_FAILED",
-                     *       "message": "Cannot upload to list in status: In Use",
-                     *       "code": "INVALID_STATUS"
+                     *       "error": "Cannot upload to list in status: In Use"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description Processing could not be started */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to process upload: ..."
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -11493,14 +14907,18 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            /** @example phone_number */
-                            column?: string;
                             /** @example Invalid phone number format */
-                            message?: string;
-                            /** @example 15 */
+                            error: string;
+                            /**
+                             * @description Raw value from the phone column (invalid-row entries only)
+                             * @example 12345
+                             */
+                            phone_number?: string;
+                            /**
+                             * @description Row number in the file (invalid-row entries only)
+                             * @example 15
+                             */
                             row?: number;
-                            /** @example invalid */
-                            value?: string;
                         }[];
                     };
                 };
@@ -11513,9 +14931,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "BAD_REQUEST",
-                     *       "message": "Validation errors only available for failed lists",
-                     *       "code": "NOT_FAILED"
+                     *       "error": "Validation errors only available for failed lists"
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -11541,15 +14957,105 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of versions */
+            /** @description Previous versions */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["DistributionList"][];
+                        data?: components["schemas"]["ListVersion"][];
+                        meta?: {
+                            /**
+                             * @description Days a version is kept after it is replaced (`RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS`)
+                             * @example 30
+                             */
+                            retention_days?: number | null;
+                        };
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listListVersionDestinations: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /** @description Items per page (values outside 1-100 are clamped) */
+                per_page?: number;
+                /** @description Substring match on the phone number or the name */
+                search?: string;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+                /**
+                 * @description Previous version ID (`id` from the versions endpoint, not `version_number`)
+                 * @example 7
+                 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of the version's destinations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["ListVersionDestination"][];
+                        meta?: components["schemas"]["PaginationMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadListVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Distribution List ID
+                 * @example 1
+                 */
+                list: number;
+                /**
+                 * @description Previous version ID (`id` from the versions endpoint, not `version_number`)
+                 * @example 7
+                 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file download */
+            200: {
+                headers: {
+                    /** @description Attachment filename */
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -11575,10 +15081,10 @@ export interface operations {
                 };
                 content: {
                     /**
-                     * @example phone_number,description
-                     *     +14155551212,John Doe - Sales Lead
-                     *     +14155551213,Jane Smith - Support Case
-                     *     +14155551214,Bob Johnson - Follow-up Call
+                     * @example phone_number,name,batch_identifier
+                     *     +14155551212,John Doe,batch-a
+                     *     +14155551213,Jane Smith,batch-b
+                     *     +14155551214,Bob Johnson,batch-a
                      */
                     "text/csv": string;
                 };
@@ -11594,7 +15100,7 @@ export interface operations {
             path: {
                 /**
                  * @description Upload job ID
-                 * @example upload-abc123
+                 * @example 9b2f6c1e-3d4a-4f6b-8c2d-1e5a7b9c0d3f
                  */
                 jobId: string;
             };
@@ -11610,32 +15116,23 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            errors?: {
-                                /** @example Invalid phone number format */
-                                message?: string;
-                                /** @example 15 */
-                                row?: number;
-                            }[];
-                            /** @example 20 */
-                            invalid_rows?: number;
-                            /** @example upload-abc123 */
-                            job_id?: string;
-                            /** @example 500 */
-                            processed_rows?: number;
+                            /** @description Chunk being processed (split files only) */
+                            current_chunk?: number;
+                            /** @example 40 */
+                            percentage: number;
                             /**
-                             * Format: float
-                             * @example 50
-                             */
-                            progress_percentage?: number;
-                            /**
-                             * @example processing
+                             * @description Job stage. `queued` right after the upload; then `started`, `validating`, `processing`, `creating_destinations`, `finalizing`; split files report `splitting` and `processing_chunk`. Final values: `completed`, `failed`, `validation_failed` and `error` (a failed attempt that is retried).
+                             * @example creating_destinations
                              * @enum {string}
                              */
-                            status?: "pending" | "processing" | "completed" | "failed";
-                            /** @example 1000 */
-                            total_rows?: number;
-                            /** @example 480 */
-                            valid_rows?: number;
+                            status: "queued" | "started" | "validating" | "processing" | "creating_destinations" | "finalizing" | "splitting" | "processing_chunk" | "completed" | "failed" | "validation_failed" | "error";
+                            /** @description Number of chunks (split files only) */
+                            total_chunks?: number;
+                            /**
+                             * Format: date-time
+                             * @example 2026-10-14T09:30:00+00:00
+                             */
+                            updated_at: string;
                         };
                     };
                 };
@@ -11650,9 +15147,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "error": "NOT_FOUND",
-                     *       "message": "Job not found or expired",
-                     *       "code": "JOB_NOT_FOUND"
+                     *       "error": "Job not found or expired"
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
@@ -11687,7 +15182,7 @@ export interface operations {
     authenticateBroadcastingChannelGet: {
         parameters: {
             query: {
-                /** @example private-organization.1 */
+                /** @example presence-org.1 */
                 channel_name: string;
                 /** @example 1234.5678 */
                 socket_id: string;
@@ -11705,7 +15200,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: unknown;
+                        /** @description Signature in the form `<app-key>:<hmac>` */
+                        auth: string;
+                        /** @description Presence channels only: JSON string with `user_id` and `user_info` (`id`, `name`, `email`, `role`) */
+                        channel_data?: string;
                     };
                 };
             };
@@ -11723,7 +15221,7 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @example private-organization.1 */
+                    /** @example presence-org.1 */
                     channel_name: string;
                     /** @example 1234.5678 */
                     socket_id: string;
@@ -11738,7 +15236,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        [key: string]: unknown;
+                        /** @description Signature in the form `<app-key>:<hmac>` */
+                        auth: string;
+                        /** @description Presence channels only: JSON string with `user_id` and `user_info` (`id`, `name`, `email`, `role`) */
+                        channel_data?: string;
                     };
                 };
             };
@@ -11755,10 +15256,19 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                sort_by?: "name" | "status" | "created_at" | "updated_at";
+                /**
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
+                 * @example desc
+                 */
+                sort_order?: components["parameters"]["SortOrder"];
+                status?: "active" | "inactive";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -11790,9 +15300,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name?: string;
-                };
+                "application/json": components["schemas"]["BusinessHoursScheduleInput"] & unknown;
             };
         };
         responses: {
@@ -11801,9 +15309,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["BusinessHoursSchedule"];
+                        /** @example Businesshoursschedule created successfully. */
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -11823,7 +15338,11 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["BusinessHoursSchedule"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
@@ -11840,7 +15359,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["BusinessHoursScheduleInput"];
             };
         };
         responses: {
@@ -11849,9 +15368,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["BusinessHoursSchedule"];
+                        /** @example Businesshoursschedule updated successfully. */
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -11875,7 +15401,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchBusinessHoursSchedule: {
@@ -11889,7 +15417,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["BusinessHoursScheduleInput"];
             };
         };
         responses: {
@@ -11898,9 +15426,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["BusinessHoursSchedule"];
+                        /** @example Businesshoursschedule updated successfully. */
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -11916,13 +15451,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Schedule duplicated */
+            /** @description Schedule duplicated as "<name> (Copy)" with status inactive */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["BusinessHoursSchedule"];
+                        /** @example Business hours schedule duplicated successfully. */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     toggleBusinessHoursStatus: {
@@ -11934,36 +15478,82 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "active" | "inactive";
+                };
+            };
+        };
         responses: {
-            /** @description Status toggled */
+            /** @description Status set */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            id?: number;
+                            /** @enum {string} */
+                            status?: "active" | "inactive";
+                        };
+                        /** @example Business hours schedule status updated successfully. */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     listCallDetailRecords: {
         parameters: {
             query?: {
-                /** @description Filter by destination extension. */
-                extension_id?: number;
-                /** @description Start of the date range (ISO 8601). */
+                /** @description Search the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users. Archived rows have no extension user, and the `user` filter and `user_full_name` sort are not available. CDRs older than the warm period are stored as files and are not available through the API. */
+                archive?: boolean;
+                direction?: "incoming" | "outgoing" | "internal" | "application";
+                /** @description Exact disposition (for example ANSWER, BUSY, NOANSWER) */
+                disposition?: string;
+                /** @description Caller number filter. A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
                 from?: string;
+                /** @description First day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored. */
+                from_date?: string;
+                /** @description Include the complete raw CDR in each row */
+                include?: "raw_cdr";
                 /**
                  * @description Page number for pagination
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
-                /** @description End of the date range (ISO 8601). */
+                /** @description Exact session token (locates the CDR of a queue call) */
+                session_token?: string;
+                /** @description `user_full_name` is not available with `archive` */
+                sort_by?: "session_timestamp" | "from" | "to" | "duration" | "billsec" | "disposition" | "user_full_name" | "direction";
+                /**
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
+                 * @example desc
+                 */
+                sort_order?: components["parameters"]["SortOrder"];
+                /**
+                 * @deprecated
+                 * @description Ignored. Supervisors are always restricted to the resources they supervise.
+                 */
+                supervisor?: boolean;
+                /** @description Called number filter. A term without a wildcard matches numbers that start with it (with or without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal. */
                 to?: string;
+                /** @description Last day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored. */
+                to_date?: string;
+                /** @description Partial name of the extension's user (not available with `archive`) */
+                user?: string;
             };
             header?: never;
             path?: never;
@@ -11988,7 +15578,11 @@ export interface operations {
     };
     getCallDetailRecord: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users, including organisation owners. Archived rows have no extension user. CDRs older than the warm period are stored as files and are not available through the API. */
+                archive?: components["parameters"]["CdrArchive"];
+                include?: "raw_cdr";
+            };
             header?: never;
             path: {
                 call_detail_record: number;
@@ -12003,34 +15597,101 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CallDetailRecord"];
+                    "application/json": {
+                        data?: components["schemas"]["CallDetailRecord"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    streamCallDetailRecordRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Call detail record ID */
+                call_detail_record: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Recording audio */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    "Content-Length"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/mpeg": string;
+                    "audio/wav": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Recording not available, or the file is missing from storage */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        error?: "Recording not available" | "Recording file not found in storage";
+                    };
+                };
+            };
         };
     };
     exportCdr: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users, including organisation owners. Archived rows have no extension user. CDRs older than the warm period are stored as files and are not available through the API. */
+                archive?: components["parameters"]["CdrArchive"];
+                direction?: "incoming" | "outgoing" | "internal" | "application";
+                /** @description Exact disposition (for example ANSWER, BUSY, NOANSWER) */
+                disposition?: string;
+                from?: string;
+                from_date?: string;
+                /** @description Exact session token (locates the CDR of a queue call) */
+                session_token?: string;
+                to?: string;
+                to_date?: string;
+                /** @description Partial name of the extension's user (not available with `archive`) */
+                user?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description CDR export */
+            /** @description CSV file (Content-Disposition attachment) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "text/csv": string;
+                };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getCdrStatistics: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live table. Honoured only for requests authenticated with an organisation API key; ignored for session (browser) users, including organisation owners. Archived rows have no extension user. CDRs older than the warm period are stored as files and are not available through the API. */
+                archive?: components["parameters"]["CdrArchive"];
+                /** @description Defaults to 30 days ago */
+                from_date?: string;
+                /** @description Defaults to today */
+                to_date?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -12042,26 +15703,70 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @description Average over calls with a duration above 0 */
+                        average_duration?: number | null;
+                        /** @description Call count per disposition */
+                        by_disposition?: {
+                            [key: string]: number;
+                        };
+                        total_billsec?: number;
+                        total_calls?: number;
+                        /** @description Sum of `sell_cost` */
+                        total_cost?: number;
+                        total_duration?: number;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
     getNotificationLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description show_all only. Lower bound on the delivery time (`created_at`). */
+                from?: string;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                /** @description show_all only */
+                session_token?: string;
+                show_all?: boolean;
+                /** @description Call status carried by the event (for example `ringing`, `answered`) */
+                status?: string;
+                /** @description show_all only. true = successful deliveries, false = failed ones. */
+                success?: boolean;
+                /** @description show_all only. Upper bound on the delivery time (`created_at`). */
+                to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Logs retrieved */
+            /** @description Delivery log page (per_page defaults to 50) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallNotificationLog"][];
+                        meta?: components["schemas"]["PaginationMeta"];
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getSessionNotificationLogs: {
@@ -12075,13 +15780,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Session logs retrieved */
+            /** @description All deliveries for the call session */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallNotificationLog"][];
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getNotificationRateLimit: {
@@ -12093,13 +15804,24 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Rate limit info */
+            /** @description Current webhook rate-limit window */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            current?: number;
+                            limit?: number;
+                            remaining?: number;
+                            reset_in_seconds?: number;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getNotificationSettings: {
@@ -12111,13 +15833,21 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Settings retrieved */
+            /** @description Settings, or `data` null with a message when none are configured */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallNotificationsSettings"] | null;
+                        /** @example Notification settings not configured */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     updateNotificationSettings: {
@@ -12127,15 +15857,44 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallNotificationsSettingsInput"];
+            };
+        };
         responses: {
             /** @description Settings updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallNotificationsSettings"];
+                        /** @example Notification settings updated successfully */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description No settings yet (use POST) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Notification settings not found. Use POST to create."
+                     *     }
+                     */
+                    "application/json": {
+                        error?: string;
+                    };
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     createNotificationSettings: {
@@ -12145,15 +15904,44 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallNotificationsSettingsInput"] & unknown;
+            };
+        };
         responses: {
             /** @description Settings created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallNotificationsSettings"];
+                        /** @example Notification settings created successfully */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Settings already exist (use PUT) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Notification settings already exist. Use PUT to update."
+                     *     }
+                     */
+                    "application/json": {
+                        error?: string;
+                    };
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     deleteNotificationSettings: {
@@ -12166,11 +15954,34 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Settings deleted */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example Notification settings deleted successfully */
+                        message?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description No settings to delete */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Notification settings not found"
+                     *     }
+                     */
+                    "application/json": {
+                        error?: string;
+                    };
+                };
             };
         };
     };
@@ -12183,12 +15994,60 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Test completed */
+            /** @description Test webhook delivered */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example Test webhook delivered successfully */
+                        message?: string;
+                        webhook_url?: string;
+                    };
+                };
+            };
+            /** @description No settings, no webhook URL, or the settings are inactive */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Notification settings not configured"
+                     *     }
+                     */
+                    "application/json": {
+                        error?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Delivery raised an error (`error` is "Test webhook delivery failed: " plus the exception message) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Delivery failed (the receiver did not accept the test event) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Test webhook delivery failed */
+                        error?: string;
+                        webhook_url?: string;
+                    };
+                };
             };
         };
     };
@@ -12201,10 +16060,22 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Substring match on name or description */
+                search?: string;
+                sort_by?: "name" | "strategy" | "status" | "created_at" | "updated_at";
+                /**
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
+                 * @example desc
+                 */
+                sort_order?: components["parameters"]["SortOrder"];
+                status?: "active" | "inactive";
+                strategy?: "ring_all" | "round_robin" | "least_talk_time" | "fewest_calls";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -12236,7 +16107,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CallQueue"];
+                "application/json": components["schemas"]["CallQueueInput"] & unknown;
             };
         };
         responses: {
@@ -12245,9 +16116,17 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"];
+                        /** @example Callqueue created successfully. */
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getCallQueue: {
@@ -12273,6 +16152,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -12287,7 +16167,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CallQueue"];
+                "application/json": components["schemas"]["CallQueueInput"];
             };
         };
         responses: {
@@ -12296,10 +16176,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"];
+                        /** @example Callqueue updated successfully. */
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     deleteCallQueue: {
@@ -12321,7 +16209,43 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
+        };
+    };
+    patchCallQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallQueueInput"];
+            };
+        };
+        responses: {
+            /** @description Call queue updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"];
+                        /** @example Callqueue updated successfully. */
+                        message?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateMyQueueAgentState: {
@@ -12341,6 +16265,8 @@ export interface operations {
                      * @enum {string}
                      */
                     state: "available" | "wrap_up" | "logged_out";
+                    /** @description Owner/PBX Admin only - set the state of this agent instead of their own */
+                    user_id?: number;
                 };
             };
         };
@@ -12350,10 +16276,26 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example Agent state updated. */
+                        message?: string;
+                        /** @enum {string} */
+                        state?: "available" | "wrap_up" | "logged_out";
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            /** @description The queue engine did not accept the state change */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getCallQueueLive: {
@@ -12367,14 +16309,9 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Waiting callers with positions, agent states, and rolling counts (15m/30m/1h/24h) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            200: components["responses"]["responses-200"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -12392,14 +16329,38 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Waiting/handling time aggregates (min/max/avg/stddev) and totals */
+            200: components["responses"]["200"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    toggleCallQueueStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                call_queue: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue status toggled */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallQueue"];
+                        /** @enum {string} */
+                        message?: "Call queue activated." | "Call queue deactivated.";
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -12417,1185 +16378,21 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    getAdPlatformIntegration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Integration settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["CallTrackingAdPlatformIntegration"];
+                        data?: {
+                            id?: number;
+                            name?: string;
+                            /**
+                             * @description Agent state from the queue engine (LOGGED_OUT when unknown)
+                             * @enum {string}
+                             */
+                            state?: "AVAILABLE" | "BUSY" | "WRAP_UP" | "LOGGED_OUT";
+                        }[];
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    updateAdPlatformIntegration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    google_ads_conversion_action_resource_name?: string | null;
-                    google_ads_customer_id?: string | null;
-                    google_ads_developer_token?: string | null;
-                    google_ads_enabled: boolean;
-                    google_ads_refresh_token?: string | null;
-                    meta_access_token?: string | null;
-                    meta_enabled: boolean;
-                    meta_pixel_id?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Updated integration settings */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingAdPlatformIntegration"];
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    getCallTrackingAnalytics: {
-        parameters: {
-            query: {
-                /** @description Filter by campaign IDs */
-                campaign_ids?: number[];
-                /**
-                 * @description End date of the analytics range
-                 * @example 2024-01-31
-                 */
-                end_date: string;
-                /**
-                 * @description Time grouping for the time series
-                 * @example day
-                 */
-                group_by?: "day" | "week" | "month";
-                /** @description Filter by marketing mediums */
-                mediums?: string[];
-                /** @description Filter by marketing sources */
-                sources?: string[];
-                /**
-                 * @description Start date of the analytics range
-                 * @example 2024-01-01
-                 */
-                start_date: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Analytics data */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingAnalytics"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    exportCallTrackingAnalytics: {
-        parameters: {
-            query: {
-                /** @description Filter by campaign IDs */
-                campaign_ids?: number[];
-                /**
-                 * @description End date of the analytics range
-                 * @example 2024-01-31
-                 */
-                end_date: string;
-                /**
-                 * @description Time grouping for the export
-                 * @example day
-                 */
-                group_by?: "day" | "week" | "month";
-                /** @description Filter by marketing mediums */
-                mediums?: string[];
-                /** @description Filter by marketing sources */
-                sources?: string[];
-                /**
-                 * @description Start date of the analytics range
-                 * @example 2024-01-01
-                 */
-                start_date: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Analytics export file */
-            200: {
-                headers: {
-                    /**
-                     * @description Attachment filename for the exported file
-                     * @example attachment; filename="call-tracking-analytics.csv"
-                     */
-                    "Content-Disposition"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/octet-stream": string;
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    listCallTrackingCampaigns: {
-        parameters: {
-            query?: {
-                /**
-                 * @description Page number for pagination
-                 * @example 1
-                 */
-                page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of campaigns */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingCampaign"][];
-                        meta?: components["schemas"]["PaginationMeta"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createCallTrackingCampaign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description Conversion rule configuration */
-                    conversion_rule?: {
-                        /**
-                         * @description Monetary value for each conversion
-                         * @example 25.5
-                         */
-                        conversion_value?: number;
-                        /**
-                         * @description Minimum answered duration in seconds
-                         * @example 30
-                         */
-                        min_answered_duration_seconds?: number;
-                        /**
-                         * @description Whether answered disposition is required
-                         * @example false
-                         */
-                        requires_answered_disposition?: boolean;
-                    } | null;
-                    /**
-                     * @description Campaign description
-                     * @example Spring sale campaign tracked via Google Ads
-                     */
-                    description?: string | null;
-                    /**
-                     * @description Destination configuration. Required field depends on `destination_type`:
-                     *     - `forward`: `forward_to`
-                     *     - `extension`: `extension_id`
-                     *     - `ring_group`: `ring_group_id`
-                     *     - `business_hours`: `business_hours_schedule_id`
-                     *     - `conference_room`: `conference_room_id`
-                     *     - `ivr_menu`: `ivr_menu_id`
-                     *     - `ai_assistant`: `ai_assistant_id`
-                     *     - `ai_load_balancer`: `ai_load_balancer_id`
-                     */
-                    destination_config: {
-                        /**
-                         * @description AI assistant ID
-                         * @example 7
-                         */
-                        ai_assistant_id?: number;
-                        /**
-                         * @description AI assistant load balancer ID
-                         * @example 8
-                         */
-                        ai_load_balancer_id?: number;
-                        /**
-                         * @description Business hours schedule ID
-                         * @example 2
-                         */
-                        business_hours_schedule_id?: number;
-                        /**
-                         * @description Conference room ID
-                         * @example 4
-                         */
-                        conference_room_id?: number;
-                        /**
-                         * @description Extension ID
-                         * @example 5
-                         */
-                        extension_id?: number;
-                        /**
-                         * @description External number to forward to
-                         * @example +14155551212
-                         */
-                        forward_to?: string;
-                        /**
-                         * @description IVR menu ID
-                         * @example 6
-                         */
-                        ivr_menu_id?: number;
-                        /**
-                         * @description Ring group ID
-                         * @example 3
-                         */
-                        ring_group_id?: number;
-                    };
-                    /**
-                     * @description Destination type for incoming calls
-                     * @default forward
-                     * @example forward
-                     * @enum {string}
-                     */
-                    destination_type?: "forward" | "extension" | "ring_group" | "business_hours" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer";
-                    /**
-                     * @description Enable Google Ads conversion upload
-                     * @example false
-                     */
-                    google_ads_upload_enabled?: boolean;
-                    /**
-                     * @description Marketing medium
-                     * @example cpc
-                     */
-                    medium?: string | null;
-                    /**
-                     * @description Enable Meta conversion upload
-                     * @example false
-                     */
-                    meta_upload_enabled?: boolean;
-                    /**
-                     * @description Campaign name
-                     * @example Google Ads - Spring Sale
-                     */
-                    name: string;
-                    /**
-                     * @description Marketing source
-                     * @example google
-                     */
-                    source?: string | null;
-                    /**
-                     * @description Campaign status
-                     * @default active
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
-            };
-        };
-        responses: {
-            /** @description Campaign created successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingCampaign"];
-                        /** @example Campaign created successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    getCallTrackingCampaign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Campaign details */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingCampaign"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    updateCallTrackingCampaign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @description Conversion rule configuration */
-                    conversion_rule?: {
-                        /**
-                         * @description Monetary value for each conversion
-                         * @example 25.5
-                         */
-                        conversion_value?: number;
-                        /**
-                         * @description Minimum answered duration in seconds
-                         * @example 30
-                         */
-                        min_answered_duration_seconds?: number;
-                        /**
-                         * @description Whether answered disposition is required
-                         * @example false
-                         */
-                        requires_answered_disposition?: boolean;
-                    } | null;
-                    /**
-                     * @description Campaign description
-                     * @example Updated description
-                     */
-                    description?: string | null;
-                    /** @description Destination configuration. Required field depends on `destination_type`. */
-                    destination_config?: {
-                        /**
-                         * @description AI assistant ID
-                         * @example 7
-                         */
-                        ai_assistant_id?: number;
-                        /**
-                         * @description AI assistant load balancer ID
-                         * @example 8
-                         */
-                        ai_load_balancer_id?: number;
-                        /**
-                         * @description Business hours schedule ID
-                         * @example 2
-                         */
-                        business_hours_schedule_id?: number;
-                        /**
-                         * @description Conference room ID
-                         * @example 4
-                         */
-                        conference_room_id?: number;
-                        /**
-                         * @description Extension ID
-                         * @example 5
-                         */
-                        extension_id?: number;
-                        /**
-                         * @description External number to forward to
-                         * @example +14155551212
-                         */
-                        forward_to?: string;
-                        /**
-                         * @description IVR menu ID
-                         * @example 6
-                         */
-                        ivr_menu_id?: number;
-                        /**
-                         * @description Ring group ID
-                         * @example 3
-                         */
-                        ring_group_id?: number;
-                    };
-                    /**
-                     * @description Destination type for incoming calls
-                     * @example forward
-                     * @enum {string}
-                     */
-                    destination_type?: "forward" | "extension" | "ring_group" | "business_hours" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer";
-                    /**
-                     * @description Enable Google Ads conversion upload
-                     * @example false
-                     */
-                    google_ads_upload_enabled?: boolean;
-                    /**
-                     * @description Marketing medium
-                     * @example cpc
-                     */
-                    medium?: string | null;
-                    /**
-                     * @description Enable Meta conversion upload
-                     * @example false
-                     */
-                    meta_upload_enabled?: boolean;
-                    /**
-                     * @description Campaign name
-                     * @example Updated Campaign Name
-                     */
-                    name?: string;
-                    /**
-                     * @description Marketing source
-                     * @example google
-                     */
-                    source?: string | null;
-                    /**
-                     * @description Campaign status
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
-            };
-        };
-        responses: {
-            /** @description Campaign updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingCampaign"];
-                        /** @example Campaign updated successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    deleteCallTrackingCampaign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Campaign deleted successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    patchCallTrackingCampaign: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description Campaign description
-                     * @example Updated description
-                     */
-                    description?: string | null;
-                    /** @description Destination configuration. Required field depends on `destination_type`. */
-                    destination_config?: Record<string, never>;
-                    /**
-                     * @description Destination type for incoming calls
-                     * @example forward
-                     * @enum {string}
-                     */
-                    destination_type?: "forward" | "extension" | "ring_group" | "business_hours" | "conference_room" | "ivr_menu" | "ai_assistant" | "ai_load_balancer";
-                    /**
-                     * @description Marketing medium
-                     * @example cpc
-                     */
-                    medium?: string | null;
-                    /**
-                     * @description Campaign name
-                     * @example Updated Campaign Name
-                     */
-                    name?: string;
-                    /**
-                     * @description Marketing source
-                     * @example google
-                     */
-                    source?: string | null;
-                    /**
-                     * @description Campaign status
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                } & {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Campaign updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingCampaign"];
-                        /** @example Campaign updated successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    listCallTrackingNumbers: {
-        parameters: {
-            query?: {
-                /**
-                 * @description Page number for pagination
-                 * @example 1
-                 */
-                page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-            };
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of tracking numbers */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNumber"][];
-                        meta?: components["schemas"]["PaginationMeta"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    createCallTrackingNumber: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description ID of the active DID number to assign
-                     * @example 12
-                     */
-                    did_number_id: number;
-                    /**
-                     * @description Friendly name for the tracking number
-                     * @example Sales Line 1
-                     */
-                    friendly_name?: string | null;
-                    /**
-                     * @description Tracking number status
-                     * @default active
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
-            };
-        };
-        responses: {
-            /** @description Tracking number assigned successfully */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNumber"];
-                        /** @example Tracking number assigned successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    updateCallTrackingNumber: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-                /**
-                 * @description Call tracking number ID
-                 * @example 8
-                 */
-                call_tracking_number: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description Friendly name for the tracking number
-                     * @example Updated Sales Line
-                     */
-                    friendly_name?: string | null;
-                    /**
-                     * @description Tracking number status
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
-            };
-        };
-        responses: {
-            /** @description Tracking number updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNumber"];
-                        /** @example Tracking number updated successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    deleteCallTrackingNumber: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-                /**
-                 * @description Call tracking number ID
-                 * @example 8
-                 */
-                call_tracking_number: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Tracking number removed successfully */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    patchCallTrackingNumber: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-                /**
-                 * @description Call tracking number ID
-                 * @example 8
-                 */
-                call_tracking_number: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description Friendly name for the tracking number
-                     * @example Updated Sales Line
-                     */
-                    friendly_name?: string | null;
-                    /**
-                     * @description Tracking number status
-                     * @example active
-                     * @enum {string}
-                     */
-                    status?: "active" | "inactive";
-                };
-            };
-        };
-        responses: {
-            /** @description Tracking number updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNumber"];
-                        /** @example Tracking number updated successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    listCallTrackingNotificationLogs: {
-        parameters: {
-            query?: {
-                /** @description Filter by event type */
-                event_type?: "call.received" | "call.answered" | "call.missed" | "call.converted" | "call.failed";
-                /** @description Filter from date */
-                from?: string;
-                /**
-                 * @description Page number for pagination
-                 * @example 1
-                 */
-                page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Filter by delivery success */
-                success?: boolean;
-                /** @description Filter to date */
-                to?: string;
-            };
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of notification logs */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNotificationLog"][];
-                        meta?: components["schemas"]["PaginationMeta"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    getCallTrackingNotificationSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Notification settings retrieved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNotificationSettings"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    updateCallTrackingNotificationSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description Authentication method for webhook requests
-                     * @example bearer_token
-                     * @enum {string}
-                     */
-                    auth_method: "none" | "bearer_token" | "basic_auth";
-                    /**
-                     * @description Auth secret/token (required when auth_method is not none)
-                     * @example sk_live_abc123
-                     */
-                    auth_secret?: string | null;
-                    /**
-                     * @description Basic auth username (required when auth_method is basic_auth)
-                     * @example webhook_user
-                     */
-                    auth_username?: string | null;
-                    /**
-                     * @description Event types that trigger webhook notifications
-                     * @example [
-                     *       "call.received",
-                     *       "call.converted"
-                     *     ]
-                     */
-                    enabled_events: ("call.received" | "call.answered" | "call.missed" | "call.converted" | "call.failed")[];
-                    /**
-                     * @description Whether webhook notifications are active
-                     * @example true
-                     */
-                    is_active: boolean;
-                    /**
-                     * Format: uri
-                     * @description URL where webhook events are delivered
-                     * @example https://example.com/webhooks/call-tracking
-                     */
-                    webhook_url: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Notification settings updated */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingNotificationSettings"];
-                        /** @example Notification settings updated successfully */
-                        message?: string;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    testCallTrackingNotificationSettings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /**
-                 * @description Call tracking campaign ID
-                 * @example 1
-                 */
-                call_tracking_campaign: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /**
-                     * @description Event type to test
-                     * @example call.received
-                     * @enum {string|null}
-                     */
-                    event_type?: "call.received" | "call.answered" | "call.missed" | "call.converted" | "call.failed" | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Test notification sent */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @example Test notification sent successfully */
-                        message?: string;
-                        /** @example 200 */
-                        response_status_code?: number | null;
-                        /** @example true */
-                        success?: boolean;
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
-        };
-    };
-    callTrackingDniSwap: {
-        parameters: {
-            query: {
-                /**
-                 * @description Default number to return if no match is found (E.164 format)
-                 * @example +14155551212
-                 */
-                default_number?: string;
-                /**
-                 * @description Organization ID
-                 * @example 1
-                 */
-                organization_id: number;
-                /**
-                 * @description Marketing campaign name
-                 * @example spring-sale
-                 */
-                utm_campaign?: string;
-                /**
-                 * @description Marketing medium
-                 * @example cpc
-                 */
-                utm_medium?: string;
-                /**
-                 * @description Marketing source
-                 * @example google
-                 */
-                utm_source?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Swap result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /**
-                         * @description ID of the matched tracking number, or null if default was returned
-                         * @example 8
-                         */
-                        call_tracking_number_id?: number | null;
-                        /**
-                         * @description Phone number to display (tracking number or default)
-                         * @example +12127773456
-                         */
-                        phone_number?: string;
-                    };
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            404: components["responses"]["NotFound"];
-            429: components["responses"]["TooManyRequests"];
-            500: components["responses"]["ServerError"];
-        };
-    };
-    listCallTrackingSessions: {
-        parameters: {
-            query?: {
-                /** @description Filter by campaign IDs */
-                campaign_ids?: number[];
-                /** @description Filter to date */
-                end_date?: string;
-                /** @description Filter by conversion status */
-                is_converted?: boolean;
-                /** @description Filter by marketing mediums */
-                mediums?: string[];
-                /**
-                 * @description Page number for pagination
-                 * @example 1
-                 */
-                page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
-                /** @description Search term (minimum 3 characters) */
-                search?: string;
-                /** @description Filter by marketing sources */
-                sources?: string[];
-                /** @description Filter from date */
-                start_date?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description List of sessions */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: components["schemas"]["CallTrackingSession"][];
-                        meta?: components["schemas"]["PaginationMeta"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            422: components["responses"]["ValidationError"];
         };
     };
     listConferenceRooms: {
@@ -13607,10 +16404,19 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Matches name or description (substring) */
+                search?: string;
+                sort_by?: "name" | "max_participants" | "status" | "created_at" | "updated_at";
+                /**
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
+                 * @example desc
+                 */
+                sort_order?: components["parameters"]["SortOrder"];
+                status?: "active" | "inactive" | "pending";
             };
             header?: never;
             path?: never;
@@ -13642,12 +16448,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @example 25 */
-                    max_participants?: number;
-                    /** @example Weekly Standup */
-                    name?: string;
-                };
+                "application/json": components["schemas"]["ConferenceRoomInput"] & unknown;
             };
         };
         responses: {
@@ -13659,10 +16460,14 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["ConferenceRoom"];
+                        /** @example Conferenceroom created successfully. */
                         message?: string;
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getConferenceRoom: {
@@ -13702,7 +16507,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ConferenceRoom"];
+                "application/json": components["schemas"]["ConferenceRoomInput"];
             };
         };
         responses: {
@@ -13714,10 +16519,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["ConferenceRoom"];
+                        /** @example Conferenceroom updated successfully. */
                         message?: string;
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     deleteConferenceRoom: {
@@ -13738,6 +16548,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchConferenceRoom: {
@@ -13751,7 +16565,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ConferenceRoom"];
+                "application/json": components["schemas"]["ConferenceRoomInput"];
             };
         };
         responses: {
@@ -13763,10 +16577,15 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["ConferenceRoom"];
+                        /** @example Conferenceroom updated successfully. */
                         message?: string;
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getApplicationConfig: {
@@ -13785,21 +16604,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @description Public API and MCP endpoint URLs, derived from the incoming request origin and the configured MCP port. */
+                        /** @description Auth0 settings for the login and register pages. When Auth0 is disabled only `enabled: false` is returned. */
+                        auth0?: {
+                            /** @description Auth0 client ID (`AUTH0_CLIENT_ID`; only when enabled) */
+                            client_id?: string | null;
+                            /**
+                             * @description Auth0 tenant domain (`AUTH0_DOMAIN`; only when enabled)
+                             * @example example.us.auth0.com
+                             */
+                            domain?: string | null;
+                            /** @example true */
+                            enabled: boolean;
+                            /**
+                             * @description Enabled social providers, from the comma-separated `AUTH0_PROVIDERS` (only when enabled). Supported values: google, facebook, microsoft, github, x.
+                             * @example [
+                             *       "google",
+                             *       "microsoft"
+                             *     ]
+                             */
+                            providers?: string[];
+                        };
+                        /** @description Public API and MCP endpoint URLs. When the caller is authenticated and its organization has a Cloudonix webhook base URL, that URL is the base; otherwise the base is the public origin of the request (`X-Forwarded-Host` / `X-Forwarded-Proto` when present). MCP is proxied at `/mcp` on the same origin. */
                         endpoints?: {
                             /**
-                             * @description REST API base URL (request origin + /api/v1)
+                             * @description REST API base URL (base + /api/v1)
                              * @example https://pbx.example.com/api/v1
                              */
                             api_base_url?: string;
                             /**
-                             * @description Configured MCP host port (MCP_PORT)
+                             * @description Configured MCP host port (`MCP_PORT`, default 8080)
                              * @example 8080
                              */
                             mcp_port?: number;
                             /**
-                             * @description MCP server endpoint (request host + MCP port)
-                             * @example https://pbx.example.com:8080/mcp
+                             * @description MCP server endpoint (base + /mcp, no port)
+                             * @example https://pbx.example.com/mcp
                              */
                             mcp_url?: string;
                         };
@@ -13824,7 +16663,7 @@ export interface operations {
                          */
                         is_valid_configuration?: boolean;
                         /**
-                         * @description Application deployment mode
+                         * @description Application deployment mode (`OPBX_APPLICATION_MODE`; any other value falls back to `development`)
                          * @example production
                          * @enum {string}
                          */
@@ -13842,12 +16681,16 @@ export interface operations {
                              */
                             site_key?: string | null;
                         };
+                        /**
+                         * @description Whether Auth0 social sign-in is enabled (`OPBX_SAAS_ENABLED`)
+                         * @example false
+                         */
+                        saas_enabled?: boolean;
                         /** @description Configuration warnings (if any) */
                         warnings?: string[];
                     };
                 };
             };
-            401: components["responses"]["Unauthorized"];
         };
     };
     getSupervisorDashboard: {
@@ -13877,14 +16720,14 @@ export interface operations {
                         assigned_ring_groups_count?: number;
                         /** @description Users in scope. */
                         assigned_users?: {
-                            extension_number?: string;
+                            extension_number?: string | null;
                             id?: number;
                             name?: string;
                         }[];
                         /** @description Number of users in scope. */
                         assigned_users_count?: number;
-                        /** @description Recent calls in scope. */
-                        recent_calls?: Record<string, never>[];
+                        /** @description The 5 most recent CDRs in scope (for a supervisor, the caller or callee is the supervisor's own extension, an assigned user's extension, or an assigned ring group's extension). */
+                        recent_calls?: components["schemas"]["CallDetailRecord"][];
                     };
                 };
             };
@@ -13898,37 +16741,68 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description Call session ID
-                 * @example CA550e8400e29b41d4a716446655440000
+                 * @description Call session ID (`session_id` returned by initiate)
+                 * @example 42
                  */
-                session: string;
+                session: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Logged only */
+                    attempt_number: number;
+                    billsec?: number | null;
                     /** @enum {string} */
-                    disposition: "answered" | "voicemail" | "busy" | "no_answer" | "failed" | "fax_machine";
-                    notes?: string | null;
+                    disposition: "answered" | "completed" | "busy" | "no-answer" | "failed" | "cancelled" | "congestion";
+                    duration?: number | null;
+                    /**
+                     * Format: date-time
+                     * @description Ignored (the server computes the retry time)
+                     */
+                    next_retry_at?: string | null;
+                    /** @description Ignored (the server decides) */
+                    should_retry: boolean;
                 };
             };
         };
         responses: {
-            /** @description Disposition set */
+            /** @description Disposition recorded */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Disposition recorded successfully */
+                        data?: {
+                            /** @enum {string} */
+                            destination_status?: "pending" | "completed" | "failed";
+                            disposition?: string;
+                            session_id?: number;
+                            /** @description True when destination_status is pending */
+                            will_retry?: boolean;
+                        };
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Session, or its campaign or destination, not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Session not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     updateCallStatus: {
@@ -13937,37 +16811,63 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description Call session ID
-                 * @example CA550e8400e29b41d4a716446655440000
+                 * @description Call session ID (`session_id` returned by initiate)
+                 * @example 42
                  */
-                session: string;
+                session: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
+                    billsec?: number | null;
+                    /** Format: date-time */
+                    completed_at?: string | null;
+                    /** @description Optional. Omit (or send null) on updates that carry no disposition */
+                    disposition?: string | null;
                     duration?: number | null;
-                    /** @enum {string} */
-                    status: "initiated" | "ringing" | "answered" | "completed" | "failed" | "busy" | "no_answer";
+                    recording_url?: string | null;
+                    status: string;
                 };
             };
         };
         responses: {
-            /** @description Status updated */
+            /** @description Call status updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Status updated successfully */
+                        data?: {
+                            /**
+                             * @description `pending` when no disposition was sent
+                             * @enum {string}
+                             */
+                            destination_status?: "pending" | "completed" | "failed";
+                            session_id?: number;
+                        };
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Session not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     generateCxml: {
@@ -13980,62 +16880,155 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    call_sid: string;
                     campaign_id: number;
-                    destination_id: number;
+                    phone_number: string;
+                    session_id: number;
                 };
             };
         };
         responses: {
-            /** @description CXML generated */
+            /** @description CXML for the answered call, wrapped in JSON */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/xml": components["schemas"]["CxmlResponse"];
+                    "application/json": {
+                        data?: {
+                            cxml?: string;
+                            /** @enum {string|null} */
+                            routing_type?: "ai_assistant" | "ai_load_balancer" | "hangup" | null;
+                        };
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            /** @description Campaign not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Campaign not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["ValidationError"];
+            /** @description CXML generation failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to generate CXML: ..."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     initiateCall: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Replays of the same key for the same destination within one hour return the original 201 response instead of placing a second call */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    caller_id: string;
+                    /** @description Phone number (DID) ID of the selected caller ID */
+                    caller_did_id?: number | null;
+                    /** @description Caller ID to present (selected from the pool). Defaults to the campaign caller ID */
+                    caller_id?: string | null;
                     campaign_id: number;
                     destination_id: number;
+                    /** Format: date-time */
+                    initiated_at: string;
+                    /** @description Stored on the call session */
                     phone_number: string;
+                    worker_id: string;
                 };
             };
         };
         responses: {
             /** @description Call initiated */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        call_sid?: string;
-                        session_id?: string;
+                        data?: {
+                            /** @description Cloudonix call ID */
+                            call_id?: number | null;
+                            /** @description Status callback URL given to Cloudonix (`<webhook base>/api/webhooks/cloudonix/call-status`) */
+                            callback_url?: string;
+                            caller_did_id?: number | null;
+                            caller_id?: string | null;
+                            session_id?: number;
+                        };
+                        message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationError"];
+            /** @description The destination is not pending (already claimed or finished); no call was placed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Destination is not pending (already claimed or finished)"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request validation failed, the campaign or destination does not exist (validation error body naming `campaign_id` / `destination_id`), or Cloudonix is not configured for the organization (`{"message": "Cloudonix not configured for this organization"}`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix rejected the call */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Failed to initiate call: ..."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getPendingDestinations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Maximum number of destinations to return */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /**
@@ -14048,30 +17041,45 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of pending destinations */
+            /** @description Destinations to dial */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data?: {
-                            dial_attempts?: number;
-                            id?: number;
-                            /** Format: date-time */
-                            last_dial_attempt_at?: string | null;
-                            phone_number?: string;
-                        }[];
+                        data?: components["schemas"]["ListDestination"][];
+                        meta?: {
+                            limit?: number;
+                            offset?: number;
+                            total?: number;
+                        };
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Campaign not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Campaign not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getRetryDestinations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Maximum number of destinations to return */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /**
@@ -14084,25 +17092,37 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of retry destinations */
+            /** @description Destinations to dial */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data?: {
-                            dial_attempts?: number;
-                            id?: number;
-                            /** Format: date-time */
-                            last_dial_attempt_at?: string;
-                            phone_number?: string;
-                        }[];
+                        data?: components["schemas"]["ListDestination"][];
+                        meta?: {
+                            limit?: number;
+                            offset?: number;
+                            total?: number;
+                        };
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Campaign not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Campaign not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     pauseCampaignFromWorker: {
@@ -14118,22 +17138,52 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    paused_by: string;
+                    reason: string;
+                    /** Format: date-time */
+                    resume_at?: string | null;
+                };
+            };
+        };
         responses: {
-            /** @description Campaign paused successfully */
+            /** @description Campaign paused */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Campaign paused successfully */
+                        data?: {
+                            /** @example 1 */
+                            campaign_id?: number;
+                            reason?: string;
+                            /** @example paused */
+                            status?: string;
+                        };
+                        /** @example Campaign paused */
                         message?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Campaign not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Campaign not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     getActiveCampaigns: {
@@ -14168,21 +17218,40 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Worker service is healthy */
+            /** @description Worker API is healthy */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example ok */
+                        /** @description Call sessions in progress */
+                        active_calls?: number;
+                        /** @description Campaigns in active status */
+                        active_campaigns?: number;
+                        /** @description Destinations (all organizations) whose last disposition is busy, no-answer or cancelled and whose retry time has been reached */
+                        queue_depth?: number;
+                        /** @example healthy */
                         status?: string;
-                        /** Format: date-time */
-                        timestamp?: string;
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            /** @description DIALER_WORKER_API_TOKEN is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Service Unavailable",
+                     *       "message": "Worker authentication not configured"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getState: {
@@ -14207,15 +17276,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        state?: Record<string, never>;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        worker_id?: string;
+                        /** @description The body stored by `POST /v1/dialer/worker/state/persist` */
+                        data?: {
+                            active_calls?: unknown[];
+                            campaign_states?: unknown[];
+                            last_updated?: string;
+                            retry_queue?: unknown[];
+                            worker_id?: string;
+                        };
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description No state stored for this worker (or it expired) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "State not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     persistState: {
@@ -14228,7 +17314,11 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    state: Record<string, never>;
+                    active_calls: unknown[];
+                    campaign_states: unknown[];
+                    /** Format: date-time */
+                    last_updated: string;
+                    retry_queue: unknown[];
                     worker_id: string;
                 };
             };
@@ -14247,6 +17337,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getEmbedCallsLog: {
@@ -14273,10 +17364,13 @@ export interface operations {
                              * @example 125
                              */
                             duration?: number;
-                            /** @example 02:05 */
+                            /**
+                             * @description MM:SS
+                             * @example 02:05
+                             */
                             duration_formatted?: string;
                             /** Format: date-time */
-                            session_timestamp?: string;
+                            session_timestamp?: string | null;
                             /** @example +14155551212 */
                             to?: string;
                         }[];
@@ -14295,18 +17389,18 @@ export interface operations {
                     };
                 };
             };
-            /** @description Request Origin is not in the organization's embed allowlist */
+            /** @description Origin not in the allowlist, or the token's user or organization is not active */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Origin not allowed. */
                         message?: string;
                     };
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getEmbedConfig: {
@@ -14365,14 +17459,13 @@ export interface operations {
                     };
                 };
             };
-            /** @description Request Origin is not in the organization's embed allowlist */
+            /** @description Origin not in the allowlist, no Origin on a cross-site request, or the token's user or organization is not active */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example Origin not allowed. */
                         message?: string;
                     };
                 };
@@ -14389,6 +17482,31 @@ export interface operations {
                     };
                 };
             };
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    embedConfigPreflight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Preflight accepted */
+            204: {
+                headers: {
+                    "Access-Control-Allow-Headers"?: string;
+                    "Access-Control-Allow-Methods"?: string;
+                    /** @description Echo of the request `Origin`. */
+                    "Access-Control-Allow-Origin"?: string;
+                    "Access-Control-Max-Age"?: string;
+                    Vary?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listExtensions: {
@@ -14400,20 +17518,22 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
-                /** @description Search in extension number or name */
+                /** @description Substring match on the extension number */
                 search?: string;
-                sort_by?: "extension_number" | "name" | "type" | "status" | "created_at";
+                sort_by?: "extension_number" | "type" | "status" | "created_at" | "updated_at";
                 /**
-                 * @description Sort order direction
+                 * @description Sort order direction. The default depends on the endpoint (for example ascending for extensions, descending for users, IVR menus, ring groups, call queues, CDRs, AI load balancers and outbound whitelist entries); any other value falls back to that default.
                  * @example desc
                  */
                 sort_order?: components["parameters"]["SortOrder"];
-                status?: "active" | "inactive";
-                type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "forward" | "ai_load_balancer";
+                status?: "active" | "inactive" | "pending";
+                type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "queue" | "ai_load_balancer";
+                /** @description Only extensions assigned to this user */
+                user_id?: number;
             };
             header?: never;
             path?: never;
@@ -14434,6 +17554,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createExtension: {
@@ -14446,30 +17567,53 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    ai_assistant_id?: number | null;
+                    /** @description Type-specific settings. The key for the extension's type is required. */
                     configuration?: {
+                        /** @description Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`. */
+                        ai_assistant_id?: number | null;
+                        /** @description Required for `ai_load_balancer`. Must be an AI load balancer of the organization. */
+                        ai_load_balancer_id?: number | null;
+                        /** @description Required for `queue`. Must be an active call queue of the organization. */
+                        call_queue_id?: number | null;
+                        /** @description Required for `conference` */
+                        conference_room_id?: number | null;
+                        /** @description Required for `custom_logic` */
+                        container_application_name?: string | null;
+                        /** @description Required for `custom_logic` */
+                        container_block_name?: string | null;
+                        /** @description Required for `forward` */
+                        forward_to?: string | null;
+                        /** @description Required for `ivr` */
+                        ivr_id?: number | null;
+                        /** @description Required for `ring_group` */
+                        ring_group_id?: number | null;
+                    } & {
                         [key: string]: unknown;
                     };
-                    /** @description Must reference an active DID owned by the authenticated organization. */
+                    /** @description A phone number (DID) of the organization. Used as the outbound caller ID only while that DID is active. */
                     default_caller_id_did_id?: number | null;
                     /**
-                     * @description Extension number (must be unique in organization)
+                     * @description 3-5 digits, unique in the organization
                      * @example 1001
                      */
                     extension_number: string;
                     /**
                      * @default active
+                     * @example active
                      * @enum {string}
                      */
-                    status?: "active" | "inactive";
+                    status?: "active" | "inactive" | "pending";
                     /**
                      * @example user
                      * @enum {string}
                      */
-                    type: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "ai_load_balancer";
-                    /** @description User ID (required for USER type) */
+                    type: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "queue" | "ai_load_balancer";
+                    /** @description Assigned user ID (a user of the organization). Only allowed on `user` extensions. */
                     user_id?: number | null;
-                    /** @default true */
+                    /**
+                     * @description Can be true only on `user` extensions.
+                     * @default false
+                     */
                     voicemail_enabled?: boolean;
                 };
             };
@@ -14488,6 +17632,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -14518,6 +17663,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -14537,16 +17683,49 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    ai_assistant_id?: number | null;
-                    configuration?: Record<string, never>;
-                    /** @description Must reference an active DID owned by the authenticated organization. */
+                    /** @description Type-specific settings. When `type` is sent, the key for that type is required. */
+                    configuration?: {
+                        /** @description Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`. */
+                        ai_assistant_id?: number | null;
+                        /** @description Required for `ai_load_balancer`. Must be an AI load balancer of the organization. */
+                        ai_load_balancer_id?: number | null;
+                        /** @description Required for `queue`. Must be an active call queue of the organization. */
+                        call_queue_id?: number | null;
+                        /** @description Required for `conference` */
+                        conference_room_id?: number | null;
+                        /** @description Required for `custom_logic` */
+                        container_application_name?: string | null;
+                        /** @description Required for `custom_logic` */
+                        container_block_name?: string | null;
+                        /** @description Required for `forward` */
+                        forward_to?: string | null;
+                        /** @description Required for `ivr` */
+                        ivr_id?: number | null;
+                        /** @description Required for `ring_group` */
+                        ring_group_id?: number | null;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    /** @description A phone number (DID) of the organization. Used as the outbound caller ID only while that DID is active. */
                     default_caller_id_did_id?: number | null;
+                    /**
+                     * @description Cannot be changed after creation; only the current value is accepted.
+                     * @example 1001
+                     */
                     extension_number?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                    /** @enum {string} */
-                    type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "ai_load_balancer";
+                    /**
+                     * @example active
+                     * @enum {string}
+                     */
+                    status?: "active" | "inactive" | "pending";
+                    /**
+                     * @example user
+                     * @enum {string}
+                     */
+                    type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "queue" | "ai_load_balancer";
+                    /** @description Assigned user ID (a user of the organization). Only allowed on `user` extensions. */
                     user_id?: number | null;
+                    /** @description Can be true only on `user` extensions. */
                     voicemail_enabled?: boolean;
                 };
             };
@@ -14565,6 +17744,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -14592,7 +17772,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchExtension: {
@@ -14611,16 +17793,49 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    ai_assistant_id?: number | null;
-                    configuration?: Record<string, never>;
-                    /** @description Must reference an active DID owned by the authenticated organization. */
+                    /** @description Type-specific settings. When `type` is sent, the key for that type is required. */
+                    configuration?: {
+                        /** @description Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`. */
+                        ai_assistant_id?: number | null;
+                        /** @description Required for `ai_load_balancer`. Must be an AI load balancer of the organization. */
+                        ai_load_balancer_id?: number | null;
+                        /** @description Required for `queue`. Must be an active call queue of the organization. */
+                        call_queue_id?: number | null;
+                        /** @description Required for `conference` */
+                        conference_room_id?: number | null;
+                        /** @description Required for `custom_logic` */
+                        container_application_name?: string | null;
+                        /** @description Required for `custom_logic` */
+                        container_block_name?: string | null;
+                        /** @description Required for `forward` */
+                        forward_to?: string | null;
+                        /** @description Required for `ivr` */
+                        ivr_id?: number | null;
+                        /** @description Required for `ring_group` */
+                        ring_group_id?: number | null;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                    /** @description A phone number (DID) of the organization. Used as the outbound caller ID only while that DID is active. */
                     default_caller_id_did_id?: number | null;
+                    /**
+                     * @description Cannot be changed after creation; only the current value is accepted.
+                     * @example 1001
+                     */
                     extension_number?: string;
-                    /** @enum {string} */
-                    status?: "active" | "inactive";
-                    /** @enum {string} */
-                    type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "ai_load_balancer";
+                    /**
+                     * @example active
+                     * @enum {string}
+                     */
+                    status?: "active" | "inactive" | "pending";
+                    /**
+                     * @example user
+                     * @enum {string}
+                     */
+                    type?: "user" | "conference" | "ring_group" | "ivr" | "ai_assistant" | "custom_logic" | "forward" | "queue" | "ai_load_balancer";
+                    /** @description Assigned user ID (a user of the organization). Only allowed on `user` extensions. */
                     user_id?: number | null;
+                    /** @description Can be true only on `user` extensions. */
                     voicemail_enabled?: boolean;
                 };
             };
@@ -14639,6 +17854,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -14659,7 +17875,52 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": {
+                        data?: {
+                            password?: string;
+                            /** @example This password is only shown once. Store it securely. */
+                            warning?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Not a `user` extension; no password */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+            /** @description The extension has no password set */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Too many password requests (sensitive-operation limit) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too many requests",
+                     *       "message": "Please wait before trying again.",
+                     *       "retry_after": 42
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -14679,7 +17940,56 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            new_password?: string;
+                            /** @example This is the only time the password will be shown. Store it securely. */
+                            warning?: string;
+                        };
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Only `user` extensions have SIP passwords */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Too many password requests (sensitive-operation limit) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too many requests",
+                     *       "message": "Please wait before trying again.",
+                     *       "retry_after": 42
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["ServerError"];
+            /** @description Reset locally but the Cloudonix sync failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -14697,8 +18007,28 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        from_cloudonix?: {
+                            created?: number;
+                            failed?: number;
+                        };
+                        message?: string;
+                        status_sync?: {
+                            failed?: number;
+                            updated?: number;
+                        };
+                        success?: boolean;
+                        to_cloudonix?: {
+                            created?: number;
+                            failed?: number;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["ServerError"];
         };
     };
     compareSyncStatus: {
@@ -14710,28 +18040,45 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sync comparison */
+            /** @description Sync comparison (an `error` key is set when Cloudonix could not be queried) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        cloudonix_only?: number;
+                        error?: string;
+                        local_only?: number;
+                        needs_sync?: boolean;
+                        synced?: number;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listInboundBlacklistEntrys: {
         parameters: {
             query?: {
+                match_type?: "exact" | "prefix" | "wildcard";
                 /**
                  * @description Page number for pagination
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                rejection_strategy?: "drop" | "reject" | "torment";
+                /** @description `global` = `is_global` true, `did_specific` = `is_global` false; other values are ignored */
+                scope?: "global" | "did_specific";
+                /** @description Substring match on `caller_id_pattern` */
+                search?: string;
+                status?: "active" | "inactive";
             };
             header?: never;
             path?: never;
@@ -14739,7 +18086,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of Inbound Blacklist Entrys */
+            /** @description List of inbound blacklist entries */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14752,6 +18099,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createInboundBlacklistEntry: {
@@ -14764,19 +18112,45 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    name?: string;
+                    /** @description Digits, `+`, and the wildcards `*` and `?` */
+                    caller_id_pattern: string;
+                    /**
+                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     *     Each ID must be a DID of the organization. On update, sending the field
+                     *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
+                     */
+                    did_number_ids?: number[] | null;
+                    /**
+                     * @description Apply the entry to every DID of the organization. Forced to `false` when a
+                     *     non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
+                     */
+                    is_global?: boolean;
+                    /** @enum {string} */
+                    match_type: "exact" | "prefix" | "wildcard";
+                    /**
+                     * @description Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                     *     and sets `torment_music_timeout` to 600 seconds.
+                     * @enum {string}
+                     */
+                    rejection_strategy: "drop" | "reject" | "torment";
                 };
             };
         };
         responses: {
-            /** @description Inbound Blacklist Entry created */
+            /** @description Blacklist entry created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["InboundBlacklist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -14791,14 +18165,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Inbound Blacklist Entry details */
+            /** @description Blacklist entry */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["InboundBlacklist"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -14813,18 +18192,46 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    /** @description Digits, `+`, and the wildcards `*` and `?` */
+                    caller_id_pattern?: string;
+                    /**
+                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     *     Each ID must be a DID of the organization. On update, sending the field
+                     *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
+                     */
+                    did_number_ids?: number[] | null;
+                    /**
+                     * @description Apply the entry to every DID of the organization. Forced to `false` when a
+                     *     non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
+                     */
+                    is_global?: boolean;
+                    /** @enum {string} */
+                    match_type?: "exact" | "prefix" | "wildcard";
+                    /**
+                     * @description Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                     *     and sets `torment_music_timeout` to 600 seconds.
+                     * @enum {string}
+                     */
+                    rejection_strategy?: "drop" | "reject" | "torment";
+                };
             };
         };
         responses: {
-            /** @description Inbound Blacklist Entry updated */
+            /** @description Blacklist entry updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["InboundBlacklist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -14840,14 +18247,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Inbound Blacklist Entry deleted */
-            204: {
+            /** @description Blacklist entry deleted */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -14862,18 +18274,46 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    /** @description Digits, `+`, and the wildcards `*` and `?` */
+                    caller_id_pattern?: string;
+                    /**
+                     * @description DIDs the entry applies to. Required when `is_global` is sent as `false`.
+                     *     Each ID must be a DID of the organization. On update, sending the field
+                     *     replaces the attached DIDs; omitting it (or sending null) leaves them unchanged.
+                     */
+                    did_number_ids?: number[] | null;
+                    /**
+                     * @description Apply the entry to every DID of the organization. Forced to `false` when a
+                     *     non-empty `did_number_ids` is sent. Defaults to `false` when omitted.
+                     */
+                    is_global?: boolean;
+                    /** @enum {string} */
+                    match_type?: "exact" | "prefix" | "wildcard";
+                    /**
+                     * @description Sending `torment` (re)generates `torment_room_prefix` (16 random characters)
+                     *     and sets `torment_music_timeout` to 600 seconds.
+                     * @enum {string}
+                     */
+                    rejection_strategy?: "drop" | "reject" | "torment";
+                };
             };
         };
         responses: {
-            /** @description Inbound Blacklist Entry updated */
+            /** @description Blacklist entry updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["InboundBlacklist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -14889,31 +18329,92 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Status toggled */
+            /** @description Status flipped between active and inactive (no request body) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["InboundBlacklist"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getBlockedCallLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                blacklist_id?: number;
+                /** @description Partial caller ID match */
+                caller_id?: string;
+                did_number_id?: number;
+                /** @description Inclusive `blocked_at` lower bound (any date/time string MySQL can compare, e.g. `2026-10-01` or `2026-10-01 00:00:00`) */
+                from_date?: string;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                rejection_strategy?: "drop" | "reject" | "torment";
+                /** @description Inclusive `blocked_at` upper bound (same format as `from_date`) */
+                to_date?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Blocked logs retrieved */
+            /** @description Blocked call log page */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** Format: date-time */
+                            blocked_at?: string;
+                            call_sid?: string | null;
+                            called_number?: string;
+                            caller_id?: string;
+                            did_number?: {
+                                id?: number;
+                                phone_number?: string;
+                            } | null;
+                            did_number_id?: number | null;
+                            id?: number;
+                            inbound_blacklist?: {
+                                caller_id_pattern?: string;
+                                id?: number;
+                            } | null;
+                            inbound_blacklist_id?: number | null;
+                            organization_id?: number;
+                            /** @enum {string} */
+                            rejection_strategy?: "drop" | "reject" | "torment";
+                            session_id?: string | null;
+                            source_ip?: string | null;
+                            torment_duration?: number | null;
+                            torment_room_id?: string | null;
+                            /** @description Voice-routing request payload recorded when the call was blocked */
+                            webhook_payload?: Record<string, never> | null;
+                        }[];
+                        meta?: components["schemas"]["PaginationMeta"];
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getBlacklistStatistics: {
@@ -14925,13 +18426,36 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Statistics retrieved */
+            /** @description Statistics (cached for 5 minutes) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            active_entries?: number;
+                            blocked_calls_this_week?: number;
+                            blocked_calls_today?: number;
+                            by_match_type?: {
+                                exact?: number;
+                                prefix?: number;
+                                wildcard?: number;
+                            };
+                            by_strategy?: {
+                                drop?: number;
+                                reject?: number;
+                                torment?: number;
+                            };
+                            global_entries?: number;
+                            total_blocked_calls?: number;
+                            total_entries?: number;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listIVRMenus: {
@@ -14943,10 +18467,19 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Matches name or description (substring) */
+                search?: string;
+                /** @description Sort field; other values fall back to `created_at`. */
+                sort_by?: "name" | "status" | "created_at" | "updated_at";
+                sort_order?: "asc" | "desc";
+                /** @description Filter by status; other values are ignored. */
+                status?: "active" | "inactive";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -14978,9 +18511,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name?: string;
-                };
+                "application/json": components["schemas"]["IvrMenuInput"];
             };
         };
         responses: {
@@ -14989,9 +18520,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["IvrMenu"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -15011,9 +18548,14 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["IvrMenu"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -15028,7 +18570,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["IvrMenuInput"];
             };
         };
         responses: {
@@ -15037,9 +18579,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["IvrMenu"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -15063,7 +18611,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     toggleIvrMenuStatus: {
@@ -15075,15 +18625,35 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "active" | "inactive";
+                };
+            };
+        };
         responses: {
-            /** @description Status toggled */
+            /** @description Status set */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            id?: number;
+                            /** @enum {string} */
+                            status?: "active" | "inactive";
+                        };
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getIvrVoices: {
@@ -15100,7 +18670,62 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Cloudonix package tier of the organization's domain (domain profile `tenant.billingPlan.package.name`), read live from Cloudonix and cached per organization for one hour. Never stored in the database. Null when unknown (Cloudonix unreachable or no package in the profile); the IVR voice picker then offers standard voices only, as it does for `Free Tier`.
+                         * @example Business
+                         */
+                        cloudonix_package?: string | null;
+                        data?: {
+                            [key: string]: unknown;
+                        }[];
+                        /** @description Filter options derived from the voice list */
+                        filters?: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /**
+             * @description Not authenticated, or Cloudonix rejected the organization's domain API key
+             *     (`error: Authentication failed with Cloudonix API.` plus `troubleshooting`).
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: string;
+                        message?: string;
+                        troubleshooting?: string[];
+                    };
+                };
+            };
+            /** @description Cloudonix API unreachable or returned an error */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: string;
+                        troubleshooting?: string[];
+                    };
+                };
+            };
+            /** @description Cloudonix settings missing, or the domain UUID or domain API key is not set */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: string;
+                        troubleshooting?: string[];
+                    };
+                };
             };
         };
     };
@@ -15136,33 +18761,13 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Single-use onboarding ID issued by the Auth0 callback for an unknown social identity. The provider, subject, email and name come from that cached profile. */
+                    onboarding_id: string;
                     /**
-                     * Format: email
-                     * @description Email address of the requester
-                     * @example jane.smith@example.com
-                     */
-                    email: string;
-                    /**
-                     * @description Display name of the requester
-                     * @example Jane Smith
-                     */
-                    name?: string | null;
-                    /**
-                     * @description Slug of the organization to join
+                     * @description Slug of an existing, active organization to join
                      * @example acme-corporation
                      */
                     organization_slug: string;
-                    /**
-                     * @description Social identity provider
-                     * @example google
-                     * @enum {string}
-                     */
-                    provider: "google" | "facebook" | "microsoft" | "github" | "x";
-                    /**
-                     * @description Provider-specific subject identifier
-                     * @example 112233445566778899001
-                     */
-                    provider_subject: string;
                 };
             };
         };
@@ -15176,26 +18781,32 @@ export interface operations {
                     "application/json": components["schemas"]["OrganizationJoinRequest"];
                 };
             };
-            400: components["responses"]["BadRequest"];
-            /** @description Organization not found or inactive */
-            404: {
+            404: components["responses"]["NotFound"];
+            /** @description Validation error (for example an unknown `organization_slug`), or the onboarding ID is unknown, expired or already used (`ONBOARDING_EXPIRED`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts (5 requests per minute per IP) */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     /**
                      * @example {
-                     *       "error": {
-                     *         "code": "ORGANIZATION_NOT_FOUND",
-                     *         "message": "Organization not found."
-                     *       }
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many login attempts. Please try again later.",
+                     *       "retry_after": 60
                      *     }
                      */
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            422: components["responses"]["ValidationError"];
-            429: components["responses"]["TooManyRequests"];
         };
     };
     approveOrganizationJoinRequest: {
@@ -15219,7 +18830,21 @@ export interface operations {
                     "application/json": {
                         /** @example Join request approved. */
                         message: string;
-                        user: components["schemas"]["User"];
+                        user: {
+                            /** Format: date-time */
+                            created_at?: string;
+                            /** Format: email */
+                            email?: string;
+                            id?: number;
+                            name?: string;
+                            organization_id?: number;
+                            /** @example pbx_user */
+                            role?: string;
+                            /** @example active */
+                            status?: string;
+                            /** Format: date-time */
+                            updated_at?: string;
+                        };
                     };
                 };
             };
@@ -15284,11 +18909,12 @@ export interface operations {
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
+                /** @description Items per page (clamped to 1-100) */
+                per_page?: number;
+                /** @description Substring match on name, destination_country, destination_prefix or outbound_trunk_name */
+                search?: string;
+                sort_by?: "destination_country" | "destination_prefix" | "outbound_trunk_name" | "created_at" | "updated_at";
+                sort_order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -15296,7 +18922,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of Outbound Whitelist Entrys */
+            /** @description List of outbound whitelist entries */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -15309,6 +18935,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createOutboundWhitelistEntry: {
@@ -15321,7 +18948,10 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Must reference an active DID owned by the authenticated organization. */
+                    /**
+                     * @description ID of a DID of the organization (any status). At call time it is used only
+                     *     while the DID is active.
+                     */
                     default_caller_id_did_id?: number | null;
                     /** @description Unique within the organization. */
                     destination_country: string;
@@ -15333,14 +18963,20 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Outbound Whitelist Entry created */
+            /** @description Whitelist entry created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["OutboundWhitelist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -15355,14 +18991,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Outbound Whitelist Entry details */
+            /** @description Whitelist entry */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["OutboundWhitelist"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -15378,24 +19019,35 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Must reference an active DID owned by the authenticated organization. */
+                    /**
+                     * @description ID of a DID of the organization (any status). At call time it is used only
+                     *     while the DID is active.
+                     */
                     default_caller_id_did_id?: number | null;
-                    destination_country?: string;
+                    /** @description Unique within the organization. */
+                    destination_country: string;
+                    /** @description Digits, spaces, '+' and '-' only. */
                     destination_prefix?: string | null;
-                    name?: string;
-                    outbound_trunk_name?: string;
+                    name: string;
+                    outbound_trunk_name: string;
                 };
             };
         };
         responses: {
-            /** @description Outbound Whitelist Entry updated */
+            /** @description Whitelist entry updated (update requires the same fields as create) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["OutboundWhitelist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -15411,7 +19063,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Outbound Whitelist Entry deleted */
+            /** @description Outbound whitelist entry deleted (empty body) */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -15419,6 +19071,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -15433,18 +19086,36 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    /**
+                     * @description ID of a DID of the organization (any status). At call time it is used only
+                     *     while the DID is active.
+                     */
+                    default_caller_id_did_id?: number | null;
+                    /** @description Unique within the organization. */
+                    destination_country: string;
+                    /** @description Digits, spaces, '+' and '-' only. */
+                    destination_prefix?: string | null;
+                    name: string;
+                    outbound_trunk_name: string;
+                };
             };
         };
         responses: {
-            /** @description Outbound Whitelist Entry updated */
+            /** @description Whitelist entry updated (update requires the same fields as create) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["OutboundWhitelist"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -15460,13 +19131,21 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Status toggled */
+            /** @description Status flipped between active and inactive (no request body) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["OutboundWhitelist"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listPhoneNumbers: {
@@ -15478,10 +19157,18 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Other values (including `call_queue` and `unavailable`) are ignored */
+                routing_type?: "extension" | "ring_group" | "business_hours" | "conference_room" | "ai_assistant" | "ai_load_balancer" | "ivr_menu";
+                /** @description Matches phone number or friendly name */
+                search?: string;
+                /** @description Other values are ignored */
+                status?: "active" | "inactive";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -15489,7 +19176,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of Phone Numbers */
+            /** @description List of phone numbers */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -15497,11 +19184,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["PhoneNumber"][];
-                        meta?: components["schemas"]["PaginationMeta"];
+                        links?: components["schemas"]["PaginationLinks"];
+                        meta?: components["schemas"]["ResourceCollectionMeta"];
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createPhoneNumber: {
@@ -15513,20 +19202,23 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name?: string;
-                };
+                "application/json": components["schemas"]["PhoneNumberInput"] & unknown;
             };
         };
         responses: {
-            /** @description Phone Number created */
+            /** @description Phone number created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["PhoneNumber"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
         };
     };
@@ -15541,14 +19233,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Phone Number details */
+            /** @description Phone number details */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["PhoneNumber"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -15563,18 +19260,23 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["PhoneNumberInput"];
             };
         };
         responses: {
-            /** @description Phone Number updated */
+            /** @description Phone number updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["PhoneNumber"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -15590,7 +19292,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Phone Number deleted */
+            /** @description Phone number deleted (empty body) */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -15598,7 +19300,9 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchPhoneNumber: {
@@ -15612,18 +19316,23 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["PhoneNumberInput"];
             };
         };
         responses: {
-            /** @description Phone Number updated */
+            /** @description Phone number updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["PhoneNumber"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -15689,33 +19398,170 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            /** @description DID does not belong to the organization or is inactive */
+            /**
+             * @description `did_id` missing or not an integer (validation error body), or the DID does not
+             *     exist in the organization (`error: Invalid DID`) or is inactive (`error: Inactive DID`).
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["Error"] | components["schemas"]["ValidationError"];
                 };
             };
         };
     };
     getAuditLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Exact action, for example `operate_as.started` */
+                action?: string;
+                /** @description Entries created on or after the start of this day */
+                date_from?: string;
+                /** @description Entries created on or before the end of this day */
+                date_to?: string;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                platform_manager_user_id?: number;
+                target_organization_id?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Audit logs */
+            /** @description Audit log entries, newest first (per_page defaults to 25) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            action?: string;
+                            after_state?: Record<string, never> | null;
+                            before_state?: Record<string, never> | null;
+                            /** Format: date-time */
+                            created_at?: string;
+                            id?: number;
+                            ip_address?: string | null;
+                            platform_manager?: {
+                                email?: string;
+                                id?: number;
+                                name?: string;
+                            } | null;
+                            platform_manager_user_id?: number;
+                            reason?: string | null;
+                            target_entity_id?: number | null;
+                            target_entity_type?: string | null;
+                            target_organization?: {
+                                id?: number;
+                                name?: string;
+                                slug?: string;
+                            } | null;
+                            target_organization_id?: number | null;
+                            /** Format: date-time */
+                            updated_at?: string;
+                            user_agent?: string | null;
+                        }[];
+                        meta?: components["schemas"]["PaginationMeta"] & {
+                            has_more?: boolean;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    listPlatformCdrArchive: {
+        parameters: {
+            query?: {
+                /** @description Exact disposition */
+                disposition?: string;
+                /** @description Caller number filter, starts-with match. A leading `+` is ignored; `%` and `_` match literally (no wildcards). */
+                from?: string;
+                /** @description CDRs with a session timestamp on or after the start of this day */
+                from_date?: string;
+                organization_id?: number;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                /** @description Called number filter, starts-with match. A leading `+` is ignored; `%` and `_` match literally (no wildcards). */
+                to?: string;
+                /** @description CDRs with a session timestamp on or before the end of this day */
+                to_date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page of archived CDRs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["CallDetailRecord"][];
+                        meta?: {
+                            current_page?: number;
+                            last_page?: number;
+                            per_page?: number;
+                            total?: number;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     getPlatformDashboard: {
@@ -15727,20 +19573,99 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Dashboard data */
+            /** @description Cross-tenant counts plus the latest organizations and audit log entries */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            dids?: {
+                                total?: number;
+                            };
+                            extensions?: {
+                                total?: number;
+                            };
+                            organizations?: {
+                                active?: number;
+                                deleted?: number;
+                                suspended?: number;
+                                total?: number;
+                            };
+                            /** @description The 10 most recent audit log entries */
+                            recent_audit_logs?: {
+                                action?: string;
+                                after_state?: Record<string, never> | null;
+                                before_state?: Record<string, never> | null;
+                                /** Format: date-time */
+                                created_at?: string;
+                                id?: number;
+                                platform_manager?: {
+                                    email?: string;
+                                    id?: number;
+                                    name?: string;
+                                } | null;
+                                platform_manager_user_id?: number;
+                                reason?: string | null;
+                                target_entity_id?: number | null;
+                                target_entity_type?: string | null;
+                                target_organization?: {
+                                    id?: number;
+                                    name?: string;
+                                    slug?: string;
+                                } | null;
+                                target_organization_id?: number | null;
+                            }[];
+                            /** @description The 10 most recently created organizations */
+                            recent_organizations?: {
+                                /** Format: date-time */
+                                created_at?: string;
+                                dids_count?: number;
+                                extensions_count?: number;
+                                id?: number;
+                                name?: string;
+                                slug?: string;
+                                /** @enum {string} */
+                                status?: "active" | "suspended" | "deleted";
+                                timezone?: string;
+                                /** Format: date-time */
+                                updated_at?: string;
+                                users_count?: number;
+                            }[];
+                            users?: {
+                                active?: number;
+                                inactive?: number;
+                                platform_managers?: number;
+                                total?: number;
+                            };
+                        };
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     stopOperateAsOrganization: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Same as the body field `organization_id`. */
+                organization_id?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -15766,6 +19691,20 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     startOperateAsOrganization: {
@@ -15808,8 +19747,11 @@ export interface operations {
                                 name?: string;
                                 /** @example acme-corporation */
                                 slug?: string;
-                                /** @example active */
-                                status?: string;
+                                /**
+                                 * @example active
+                                 * @enum {string}
+                                 */
+                                status?: "active";
                                 /** @example America/New_York */
                                 timezone?: string;
                             };
@@ -15819,61 +19761,94 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             /**
-             * @description Caller is not a platform manager, or the target organization is
-             *     suspended/deleted.
+             * @description The caller is not a platform manager (`{"message": "Forbidden. Platform manager access required."}`),
+             *     or the target organization has status `suspended` or `deleted` (`OPERATE_AS_ORG_INACTIVE`).
              */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        error?: {
-                            /**
-                             * @example OPERATE_AS_ORG_INACTIVE
-                             * @enum {string}
-                             */
-                            code?: "OPERATE_AS_FORBIDDEN" | "OPERATE_AS_ORG_INACTIVE";
-                            /** @example The target organization is not active. */
-                            message?: string;
-                        };
-                    };
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "OPERATE_AS_ORG_INACTIVE",
+                     *         "message": "The target organization is not active."
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Target organization not found */
+            /**
+             * @description No organization with this ID (soft-deleted organizations included). Standard
+             *     route-model-binding 404. The `OPERATE_AS_FORBIDDEN` and `OPERATE_AS_ORG_NOT_FOUND`
+             *     codes come from the `X-Operate-As-Organization` header handling on tenant routes,
+             *     not from this endpoint.
+             */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        error?: {
-                            /** @example OPERATE_AS_ORG_NOT_FOUND */
-                            code?: string;
-                            /** @example The target organization could not be found. */
-                            message?: string;
-                        };
-                    };
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
     };
     listOrganizations: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                /** @description Substring match on name or slug */
+                search?: string;
+                sort_by?: "id" | "name" | "status" | "created_at" | "users_count" | "extensions_count" | "dids_count";
+                sort_direction?: "asc" | "desc";
+                status?: "active" | "suspended" | "deleted";
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Organizations list */
+            /** @description Organizations with users/extensions/DID counts (per_page defaults to 25) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: (components["schemas"]["Organization"] & {
+                            dids_count?: number;
+                            extensions_count?: number;
+                            users_count?: number;
+                        } & {
+                            /** Format: date-time */
+                            deleted_at?: string | null;
+                            /**
+                             * Format: uuid
+                             * @description Token of the public queues dashboard link (null until the link is first requested)
+                             */
+                            public_queues_token?: string | null;
+                        })[];
+                        meta?: components["schemas"]["PaginationMeta"] & {
+                            has_more?: boolean;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getOrganization: {
@@ -15887,13 +19862,40 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Organization details */
+            /** @description Organization with its users, counts and masked Cloudonix settings */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Organization"] & {
+                            business_hours_count?: number;
+                            /** Format: date-time */
+                            deleted_at?: string | null;
+                            dids_count?: number;
+                            extensions_count?: number;
+                            /** Format: uuid */
+                            public_queues_token?: string | null;
+                            ring_groups_count?: number;
+                            users?: {
+                                /** Format: date-time */
+                                created_at?: string;
+                                email?: string;
+                                id?: number;
+                                name?: string;
+                                organization_id?: number;
+                                role?: string;
+                                status?: string;
+                            }[];
+                            users_count?: number;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     updatePlatformOrganization: {
@@ -15905,15 +19907,45 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string | null;
+                    /** @description Merged into the existing settings (top-level keys replace) */
+                    settings?: {
+                        [key: string]: unknown;
+                    } | null;
+                    /**
+                     * @description A valid PHP timezone identifier
+                     * @example America/New_York
+                     */
+                    timezone?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description Organization updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Organization"] & {
+                            /** Format: date-time */
+                            deleted_at?: string | null;
+                            /** Format: uuid */
+                            public_queues_token?: string | null;
+                        };
+                        /** @example Organization updated successfully. */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     updateOrganizationStatus: {
@@ -15925,20 +19957,90 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason?: string | null;
+                    /** @enum {string} */
+                    status: "active" | "suspended" | "deleted";
+                };
+            };
+        };
         responses: {
-            /** @description Status updated */
+            /** @description Status changed (for `deleted`, the organization no longer exists) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            id?: number;
+                            /** @enum {string} */
+                            previous_status?: "active" | "suspended";
+                            /** @enum {string} */
+                            status?: "active" | "suspended" | "deleted";
+                        };
+                        /** @example Organization status updated successfully. */
+                        message?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /**
+             * @description Validation failed (standard validation body), the transition is not allowed
+             *     (including to the current status), or the organization still has platform
+             *     managers (on `deleted`).
+             */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Cannot transition from active to active.",
+                     *       "allowed_transitions": [
+                     *         "suspended",
+                     *         "deleted"
+                     *       ]
+                     *     }
+                     */
+                    "application/json": {
+                        /** @description Present only when the transition is not allowed */
+                        allowed_transitions?: string[];
+                        /** @description Present only on validation failures */
+                        errors?: {
+                            [key: string]: string[];
+                        };
+                        message?: string;
+                    };
+                };
             };
         };
     };
     listOrganizationUsers: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                role?: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                /** @description Substring match on name or email */
+                search?: string;
+                sort_by?: "id" | "name" | "email" | "status" | "is_platform_manager" | "created_at";
+                sort_direction?: "asc" | "desc";
+                status?: "active" | "inactive" | "pending";
+            };
             header?: never;
             path: {
                 organization: number;
@@ -15947,13 +20049,46 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Users list */
+            /** @description Users of the organization */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** Format: date-time */
+                            created_at?: string;
+                            email?: string;
+                            id?: number;
+                            is_platform_manager?: boolean;
+                            name?: string;
+                            organization_id?: number;
+                            role?: string;
+                            status?: string;
+                        }[];
+                        meta?: components["schemas"]["PaginationMeta"] & {
+                            has_more?: boolean;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     createOrganizationUser: {
@@ -15965,18 +20100,64 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    city?: string | null;
+                    country?: string | null;
+                    /** Format: email */
+                    email: string;
+                    name: string;
+                    /** Format: password */
+                    password: string;
+                    phone?: string | null;
+                    postal_code?: string | null;
+                    /** @enum {string} */
+                    role: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                    state_province?: string | null;
+                    /**
+                     * @description Defaults to `active`
+                     * @enum {string|null}
+                     */
+                    status?: "active" | "inactive" | "pending" | null;
+                    street_address?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description User created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"];
+                        /** @example User created successfully. */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
-    listAllUsers: {
+    getPlatformStatus: {
         parameters: {
             query?: never;
             header?: never;
@@ -15985,12 +20166,149 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Users list */
+            /** @description Component statuses */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["PlatformStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    runPlatformStatusCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fresh component statuses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many requests (Laravel `throttle:6,1`) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    "X-RateLimit-Limit"?: number;
+                    "X-RateLimit-Remaining"?: number;
+                    [name: string]: unknown;
+                };
                 content?: never;
+            };
+        };
+    };
+    listAllUsers: {
+        parameters: {
+            query?: {
+                is_platform_manager?: boolean;
+                organization_id?: number;
+                /**
+                 * @description Page number for pagination
+                 * @example 1
+                 */
+                page?: components["parameters"]["Page"];
+                /**
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
+                 * @example 20
+                 */
+                per_page?: components["parameters"]["PerPage"];
+                role?: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                /** @description Substring match on name or email */
+                search?: string;
+                sort_by?: "id" | "name" | "email" | "status" | "is_platform_manager" | "created_at";
+                sort_direction?: "asc" | "desc";
+                status?: "active" | "inactive" | "pending";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users across all organizations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** Format: date-time */
+                            created_at?: string;
+                            email?: string;
+                            id?: number;
+                            is_platform_manager?: boolean;
+                            name?: string;
+                            organization?: {
+                                id?: number;
+                                name?: string;
+                                slug?: string;
+                            } | null;
+                            organization_id?: number;
+                            role?: string;
+                            status?: string;
+                        }[];
+                        meta?: components["schemas"]["PaginationMeta"] & {
+                            has_more?: boolean;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -16005,13 +20323,39 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description User details */
+            /** @description User (serialized model, without `password` and `remember_token`) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"] & {
+                            organization?: {
+                                id?: number;
+                                name?: string;
+                                slug?: string;
+                            } | null;
+                        };
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     updatePlatformUser: {
@@ -16023,15 +20367,57 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    city?: string | null;
+                    country?: string | null;
+                    /** Format: email */
+                    email?: string;
+                    name?: string;
+                    /** Format: password */
+                    password?: string;
+                    phone?: string | null;
+                    postal_code?: string | null;
+                    /** @enum {string} */
+                    role?: "owner" | "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
+                    state_province?: string | null;
+                    /** @enum {string} */
+                    status?: "active" | "inactive" | "pending";
+                    street_address?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description User updated */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
         };
     };
     deletePlatformUser: {
@@ -16046,12 +20432,88 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description User deleted */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example User deleted successfully. */
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description Cannot delete yourself, or the user is the last owner of the organization */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Cannot delete the last owner of an organization."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getPlatformUserDeleteImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID (any organization) */
+                user: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deletion impact preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["UserDeletionImpact"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     updatePlatformUserPassword: {
@@ -16072,10 +20534,7 @@ export interface operations {
                 "application/json": {
                     /**
                      * Format: password
-                     * @description New password requirements:
-                     *     - At least 8 characters
-                     *     - Upper and lowercase letters
-                     *     - At least one number
+                     * @description New password, at least 8 characters
                      * @example NewSecurePass123
                      */
                     password: string;
@@ -16106,7 +20565,20 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -16120,14 +20592,59 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    is_platform_manager: boolean;
+                };
+            };
+        };
         responses: {
-            /** @description Platform manager status updated */
+            /** @description Flag updated (revoking also invalidates the user's tokens) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: {
+                            id?: number;
+                            is_platform_manager?: boolean;
+                        };
+                        /** @example Platform manager status granted. */
+                        message?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not a platform manager */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Forbidden. Platform manager access required."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description Validation failed, or this would revoke the last platform manager */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Cannot revoke the last platform manager."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -16154,13 +20671,30 @@ export interface operations {
                             created_at?: string;
                             /** Format: email */
                             email?: string;
+                            /** @description The user's own `user` extension, or null when none is assigned */
+                            extension?: {
+                                extension_number?: string;
+                                id?: number;
+                            } | null;
                             id?: number;
+                            is_platform_manager?: boolean;
                             name?: string;
-                            organization?: components["schemas"]["Organization"];
+                            /** @description Organization summary */
+                            organization?: {
+                                id?: number;
+                                name?: string;
+                                slug?: string;
+                                status?: string;
+                                timezone?: string;
+                            };
                             organization_id?: number;
                             phone?: string | null;
                             postal_code?: string | null;
                             role?: string;
+                            social_identities?: {
+                                provider?: string;
+                                provider_email?: string | null;
+                            }[];
                             state_province?: string | null;
                             status?: string;
                             street_address?: string | null;
@@ -16171,6 +20705,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     updateProfile: {
@@ -16195,7 +20730,7 @@ export interface operations {
                     country?: string | null;
                     /**
                      * Format: email
-                     * @description Email address (must be unique)
+                     * @description Email address (must not be used by any other user)
                      * @example john.doe@example.com
                      */
                     email?: string;
@@ -16215,7 +20750,7 @@ export interface operations {
                      */
                     postal_code?: string | null;
                     /**
-                     * @description User role (Owner only)
+                     * @description Always refused with 403 (you cannot change your own role)
                      * @example pbx_admin
                      * @enum {string}
                      */
@@ -16247,12 +20782,21 @@ export interface operations {
                             city?: string | null;
                             country?: string | null;
                             email?: string;
+                            /** @description The user's own `user` extension, or null when none is assigned */
+                            extension?: {
+                                extension_number?: string;
+                                id?: number;
+                            } | null;
                             id?: number;
                             name?: string;
                             organization_id?: number;
                             phone?: string | null;
                             postal_code?: string | null;
                             role?: string;
+                            social_identities?: {
+                                provider?: string;
+                                provider_email?: string | null;
+                            }[];
                             state_province?: string | null;
                             status?: string;
                             street_address?: string | null;
@@ -16279,12 +20823,12 @@ export interface operations {
             content: {
                 "application/json": {
                     /**
-                     * @description Organization name
+                     * @description Organization name (cannot be empty when sent)
                      * @example Acme Corporation Inc.
                      */
                     name?: string;
                     /**
-                     * @description PHP timezone identifier
+                     * @description PHP timezone identifier (any identifier PHP accepts; cannot be empty when sent)
                      * @example America/Los_Angeles
                      */
                     timezone?: string;
@@ -16301,14 +20845,38 @@ export interface operations {
                     "application/json": {
                         /** @example Organization updated successfully. */
                         message?: string;
-                        organization?: components["schemas"]["Organization"];
+                        organization?: {
+                            id?: number;
+                            name?: string;
+                            slug?: string;
+                            /** @enum {string} */
+                            status?: "active" | "suspended" | "deleted";
+                            timezone?: string;
+                            /** Format: date-time */
+                            updated_at?: string;
+                        };
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
-            429: components["responses"]["TooManyRequests"];
+            /** @description Too many attempts (10 requests per minute per user), or the per-organization API limit */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many attempts. Please try again later.",
+                     *       "retry_after": 60
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["ServerError"];
         };
     };
@@ -16361,9 +20929,292 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationError"];
-            429: components["responses"]["TooManyRequests"];
+            /** @description Too many attempts (10 requests per minute per user), or the per-organization API limit */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many attempts. Please try again later.",
+                     *       "retry_after": 60
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["ServerError"];
+        };
+    };
+    getPublicQueuesDashboardQueues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization's public queues dashboard token (from `GET /v1/queues-dashboard/link`). */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queues of the organization */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            id?: number;
+                            name?: string;
+                            /** @enum {string} */
+                            status?: "active" | "inactive";
+                            /** @enum {string} */
+                            strategy?: "ring_all" | "round_robin" | "least_talk_time" | "fewest_calls";
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid dashboard link */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Invalid dashboard link. */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Too many requests (Laravel `throttle:120,1`, per client IP) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    "X-RateLimit-Limit"?: number;
+                    "X-RateLimit-Remaining"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Too Many Attempts. */
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPublicQueuesDashboardLive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Queue ID */
+                queue: number;
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @description One entry per queue agent that has an extension */
+                            agents?: {
+                                extensionNumber?: string;
+                                /** @enum {string} */
+                                state?: "AVAILABLE" | "BUSY" | "WRAP_UP" | "LOGGED_OUT";
+                                userId?: string;
+                                /** @description Seconds left in a timed wrap-up as a string; empty string otherwise */
+                                wrapUpRemainingSeconds?: string;
+                            }[];
+                            call_queue_id?: number;
+                            call_queue_name?: string;
+                            /** @description Answered (`handled_*`) and abandoned calls that entered the queue in the last 15, 30 and 60 minutes and 24 hours */
+                            rolling?: {
+                                abandoned_15m?: number;
+                                abandoned_24h?: number;
+                                abandoned_30m?: number;
+                                abandoned_60m?: number;
+                                handled_15m?: number;
+                                handled_24h?: number;
+                                handled_30m?: number;
+                                handled_60m?: number;
+                            };
+                            /** @description Callers waiting in the queue, in queue order */
+                            waiting?: {
+                                callId?: string;
+                                /** Format: date-time */
+                                entered_at?: string | null;
+                                from_number?: string | null;
+                                /** @description 1-based queue position */
+                                position?: number;
+                                to_number?: string | null;
+                                waitedSeconds?: number;
+                            }[];
+                            /** @description Average waiting time of answered calls in the last 24 hours (1 decimal) */
+                            waiting_time_avg_seconds?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid dashboard link or queue not in the organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Invalid dashboard link. */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Too many requests (Laravel `throttle:120,1`, per client IP) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    "X-RateLimit-Limit"?: number;
+                    "X-RateLimit-Remaining"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Too Many Attempts. */
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPublicQueuesDashboardStats: {
+        parameters: {
+            query?: {
+                /** @description Start of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to 24 hours ago. */
+                from?: string;
+                /** @description End of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to now. */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Queue ID */
+                queue: number;
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue statistics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            call_queue_id?: number;
+                            /** Format: date-time */
+                            from?: string;
+                            /** @description Handling time of answered calls, in seconds */
+                            handling_time?: {
+                                /** @description 2 decimals */
+                                avg?: number | null;
+                                max?: number | null;
+                                min?: number | null;
+                                /** @description 2 decimals */
+                                stddev?: number | null;
+                            };
+                            /** Format: date-time */
+                            to?: string;
+                            totals?: {
+                                abandoned?: number;
+                                handled?: number;
+                                overflowed?: number;
+                            };
+                            /** @description Waiting time of answered calls, in seconds */
+                            waiting_time?: {
+                                /** @description 2 decimals */
+                                avg?: number | null;
+                                max?: number | null;
+                                min?: number | null;
+                                /** @description 2 decimals */
+                                stddev?: number | null;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Invalid dashboard link or queue not in the organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Invalid dashboard link. */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Too many requests (Laravel `throttle:120,1`, per client IP) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    "X-RateLimit-Limit"?: number;
+                    "X-RateLimit-Remaining"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Too Many Attempts. */
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getPublicStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Group statuses */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicStatus"];
+                };
+            };
+            /** @description Too many requests (Laravel `throttle:60,1`, per IP) */
+            429: {
+                headers: {
+                    /** @description Seconds to wait before retrying */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listQueueCalls: {
@@ -16377,10 +21228,11 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Call queue ID */
                 queue_id?: number;
                 to?: string;
             };
@@ -16403,6 +21255,8 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     exportQueueCalls: {
@@ -16410,6 +21264,7 @@ export interface operations {
             query?: {
                 disposition?: "answered" | "abandoned" | "overflow";
                 from?: string;
+                /** @description Call queue ID */
                 queue_id?: number;
                 to?: string;
             };
@@ -16425,25 +21280,85 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/csv": unknown;
+                    "text/csv": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
+        };
+    };
+    getQueuesDashboardLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /**
+                             * Format: uri
+                             * @example https://opbx.cloudonix.cloud/public/queues-dashboard/3f1c8a3e-7b2d-4c1e-9a55-2d6e0f9b1a10
+                             */
+                            url?: string;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    regenerateQueuesDashboardLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description New dashboard link (previous link is revoked) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** Format: uri */
+                            url?: string;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listRecordings: {
         parameters: {
             query?: {
+                /** @description When true (`1`, `true`, `on`, `yes`), only recordings with `is_moh` true */
+                moh?: boolean;
                 /**
                  * @description Page number for pagination
                  * @example 1
                  */
                 page?: components["parameters"]["Page"];
-                /**
-                 * @description Number of items per page
-                 * @example 20
-                 */
-                per_page?: components["parameters"]["PerPage"];
+                /** @description Partial name match */
+                search?: string;
+                /** @description Other values are ignored */
+                status?: "active" | "inactive";
             };
             header?: never;
             path?: never;
@@ -16451,7 +21366,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description List of Recordings */
+            /** @description List of recordings */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -16459,11 +21374,13 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Recording"][];
-                        meta?: components["schemas"]["PaginationMeta"];
+                        links?: components["schemas"]["PaginationLinks"];
+                        meta?: components["schemas"]["ResourceCollectionMeta"];
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createRecording: {
@@ -16475,8 +21392,20 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    name?: string;
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description Required when type is `upload`. mp3 or wav, max 5 MB.
+                     */
+                    file?: string;
+                    name: string;
+                    /**
+                     * Format: uri
+                     * @description Required when type is `remote`. http(s) URL.
+                     */
+                    remote_url?: string;
+                    /** @enum {string} */
+                    type: "upload" | "remote";
                 };
             };
         };
@@ -16486,10 +21415,24 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Recording"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationError"];
+            403: components["responses"]["Forbidden"];
+            /** @description Validation failed, or the remote URL was refused (`{error, message}`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
+                };
+            };
         };
     };
     getRecording: {
@@ -16508,9 +21451,14 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Recording"];
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -16525,7 +21473,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    is_moh?: boolean;
+                    name?: string;
+                    /** @enum {string} */
+                    status?: "active" | "inactive";
+                };
             };
         };
         responses: {
@@ -16534,9 +21487,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Recording"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -16553,14 +21512,20 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Recording deleted */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchRecording: {
@@ -16574,7 +21539,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    is_moh?: boolean;
+                    name?: string;
+                    /** @enum {string} */
+                    status?: "active" | "inactive";
+                };
             };
         };
         responses: {
@@ -16583,9 +21553,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Recording"];
+                        message?: string;
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -16601,30 +21577,86 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Recording downloaded */
+            /** @description A 30-minute access token for `GET /v1/recordings/download` (uploaded recordings only). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        authorization_header?: string;
+                        /** @example /api/v1/recordings/download */
+                        download_endpoint?: string;
+                        /** @example 1800 */
+                        expires_in?: number;
+                        filename?: string;
+                        security_note?: string;
+                        token?: string;
+                    };
+                };
             };
+            /** @description Only uploaded recordings can be downloaded (`{error}`); remote recordings are refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     downloadRecordingWithToken: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Recording access token (alternative to the Authorization header) */
+                token?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Recording downloaded */
+            /** @description Audio file (inline when the request accepts audio, otherwise as an attachment) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "audio/mpeg": string;
+                    "audio/wav": string;
+                };
+            };
+            /** @description No token supplied (`{error, message}`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Token invalid or expired (`{error: Access denied or token expired}`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The recording has no stored file, or the file is missing from storage (`{error}`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -16637,10 +21669,19 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
+                /** @description Matches name or description (substring). Unknown `strategy` or `status` values are ignored. */
+                search?: string;
+                /** @description Sort field; other values fall back to `created_at`. */
+                sort_by?: "name" | "strategy" | "status" | "created_at" | "updated_at";
+                sort_order?: "asc" | "desc";
+                status?: "active" | "inactive";
+                strategy?: "simultaneous" | "round_robin" | "sequential";
+                /** @description When 1/true, return only unprovisioned resources, i.e. those that hold at least one route of type `unavailable` (saved for future use, see `is_unprovisioned`). */
+                unprovisioned?: components["parameters"]["Unprovisioned"];
             };
             header?: never;
             path?: never;
@@ -16672,19 +21713,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** @enum {string} */
-                    fallback_action?: "voicemail" | "extension" | "ring_group" | "ivr_menu" | "ai_assistant" | "disconnect";
-                    /** @example Sales Team */
-                    name?: string;
-                    /**
-                     * @example simultaneous
-                     * @enum {string}
-                     */
-                    strategy?: "simultaneous" | "round_robin" | "priority" | "weighted" | "memory";
-                    /** @example 30 */
-                    timeout?: number;
-                };
+                "application/json": components["schemas"]["RingGroupInput"] & unknown;
             };
         };
         responses: {
@@ -16693,8 +21722,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["RingGroup"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationError"];
         };
     };
     getRingGroup: {
@@ -16719,6 +21756,9 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     updateRingGroup: {
@@ -16732,7 +21772,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RingGroup"];
+                "application/json": components["schemas"]["RingGroupInput"];
             };
         };
         responses: {
@@ -16741,8 +21781,32 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["RingGroup"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The ring group is being modified by another request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Conflict",
+                     *       "message": "Ring group is currently being modified. Please try again."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     deleteRingGroup: {
@@ -16763,6 +21827,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["ResourceInUse"];
         };
     };
     patchRingGroup: {
@@ -16776,7 +21844,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RingGroup"];
+                "application/json": components["schemas"]["RingGroupInput"];
             };
         };
         responses: {
@@ -16785,8 +21853,32 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["RingGroup"];
+                        message?: string;
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The ring group is being modified by another request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Conflict",
+                     *       "message": "Ring group is currently being modified. Please try again."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     getSessionDetails: {
@@ -16794,6 +21886,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Cloudonix numeric session ID */
                 sessionId: number;
             };
             cookie?: never;
@@ -16810,6 +21903,7 @@ export interface operations {
                         data?: {
                             events?: {
                                 action?: string;
+                                /** Format: date-time */
                                 created_at?: string;
                                 event_id?: string;
                                 id?: number;
@@ -16821,6 +21915,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description Session not found */
             404: {
                 headers: {
@@ -16828,6 +21924,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @example Session not found */
                         message?: string;
                         session_id?: number;
                     };
@@ -16889,14 +21986,31 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            404: components["responses"]["NotFound"];
-            /** @description Call is not active, has no session token, or whisper_party missing */
+            /** @description No session with this ID in the organization */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Session not found"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Validation error (`policy` missing or invalid, `whisper_party` missing for
+             *     `whisper` or invalid), or the call is not active / has no session token
+             *     (`{"error": "Unprocessable", "message": "This call is not active or has no session token"}`).
+             */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
                 };
             };
         };
@@ -16925,12 +22039,18 @@ export interface operations {
                     };
                 };
             };
-            /** @description Dial token not available */
+            /** @description The session token has not been received from Cloudonix yet */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "error": "Session token not available",
+                     *       "message": "Unable to disconnect: session token not yet received from Cloudonix. Please try again in a moment."
+                     *     }
+                     */
                     "application/json": components["schemas"]["Error"];
                 };
             };
@@ -16944,19 +22064,22 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Session not found */
+            /** @description Session not found in the organization */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        message?: string;
-                        session_id?: number;
-                    };
+                    /**
+                     * @example {
+                     *       "error": "Not Found",
+                     *       "message": "Session not found or does not belong to your organization"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Cloudonix configuration or API error */
+            /** @description Cloudonix settings missing, the Cloudonix API call failed, or another error (`error` + `message`) */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -16970,11 +22093,14 @@ export interface operations {
     getActiveSessions: {
         parameters: {
             query?: {
-                /** @description Filter by call direction. */
+                /** @description Filter by call direction; other values are ignored. */
                 direction?: "incoming" | "outgoing";
-                /** @description Filter by call status. */
+                /** @description Filter by call status; other values are ignored. */
                 status?: "processing" | "ringing" | "connected";
-                /** @description When true, scope results to the supervisor's assigned resources. */
+                /**
+                 * @deprecated
+                 * @description Ignored. Supervisors are always scoped by role.
+                 */
                 supervisor?: boolean;
             };
             header?: never;
@@ -16992,18 +22118,30 @@ export interface operations {
                     "application/json": {
                         data?: {
                             call_ids?: string[];
+                            /** @description Caller (E.164, or a plain extension number when it is one of the organization's extensions) */
                             caller_id?: string;
+                            /** @description Destination (same formatting as `caller_id`) */
                             destination?: string;
-                            direction?: string;
+                            /** @enum {string} */
+                            direction?: "incoming" | "outgoing" | "application" | "internal";
                             domain?: string;
                             duration_seconds?: number;
+                            /** @description Only on an item that could not be processed (`Data processing error`); such an item carries only `session_id`, `caller_id`, `destination`, `direction`, `status`, `user_full_name` and `error`. */
+                            error?: string;
+                            /** @example 2m 5s */
                             formatted_duration?: string;
                             has_qos_data?: boolean;
+                            /** @description Time of the latest session update (`YYYY-MM-DD HH:MM:SS`) */
                             last_updated_at?: string;
+                            /** @description Session start as stored (`YYYY-MM-DD HH:MM:SS`) */
                             session_created_at?: string;
                             session_id?: number;
-                            status?: string;
-                            subscriber_id?: string;
+                            /** @enum {string} */
+                            status?: "processing" | "ringing" | "connected" | "answer";
+                            /** @description Cloudonix subscriber ID of the extension leg */
+                            subscriber_id?: number | null;
+                            /** @description Name of the user whose extension matches `subscriber_id`, or `Unassigned` */
+                            user_full_name?: string;
                         }[];
                         meta?: {
                             by_direction?: {
@@ -17015,11 +22153,30 @@ export interface operations {
                                 processing?: number;
                                 ringing?: number;
                             };
+                            /** @description Always 5 */
                             cache_expires_in?: number;
+                            /** Format: date-time */
                             last_updated?: string;
                             total_active_calls?: number;
                         };
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Query failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to retrieve active calls",
+                     *       "message": "SQLSTATE[...]"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -17041,8 +22198,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
+                            /** @description Average time since session start, in seconds (0 when there are no calls) */
                             average_duration?: number;
-                            /** @description Currently always 0 for both directions. */
                             by_direction?: {
                                 incoming?: number;
                                 outgoing?: number;
@@ -17052,12 +22209,15 @@ export interface operations {
                                 processing?: number;
                                 ringing?: number;
                             };
+                            /** @description Longest time since session start, in seconds */
                             longest_call?: number;
                             total_active?: number;
                         };
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getCloudonixSettings: {
@@ -17069,12 +22229,48 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Settings retrieved */
+            /** @description Settings (settings is null when not configured yet) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: uri
+                         * @description Session-update webhook URL (`<effective base>/api/webhooks/cloudonix/session-update`)
+                         */
+                        callback_url?: string;
+                        /**
+                         * Format: uri
+                         * @description CDR webhook URL (`<effective base>/api/webhooks/cloudonix/cdr`)
+                         */
+                        cdr_url?: string;
+                        settings?: components["schemas"]["CloudonixSettings"] | null;
+                        /** @description Present when settings exist */
+                        webhook_url_details?: {
+                            application_url?: string | null;
+                            effective_url?: string | null;
+                            is_overridden?: boolean;
+                            organization_url?: string | null;
+                            /**
+                             * @description `application` when an application-wide webhook base URL is configured (it overrides the organization URL)
+                             * @enum {string}
+                             */
+                            source?: "application" | "organization";
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not the organization Owner (Cloudonix settings are Owner only), or an API key (no API-key grant covers these routes) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17085,14 +22281,84 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    call_recording_mode: "disabled" | "inbound" | "outbound" | "internal" | "inbound_outbound" | "all";
+                    /** @description A value containing `***` keeps the stored key */
+                    domain_api_key?: string | null;
+                    /** @description Bearer key Cloudonix sends on webhooks. A value containing `***` keeps the stored key. */
+                    domain_requests_api_key?: string | null;
+                    /**
+                     * Format: uuid
+                     * @description Must not be used by another organization (validation), and its Cloudonix domain must not be registered to another organization
+                     */
+                    domain_uuid?: string | null;
+                    /** @description Optional; omit to keep the stored list */
+                    embed_allowed_domains?: string[];
+                    no_answer_timeout: number;
+                    /** @enum {string} */
+                    recording_format: "wav" | "mp3";
+                    /** Format: uri */
+                    webhook_base_url?: string | null;
+                };
+            };
+        };
         responses: {
-            /** @description Settings updated */
+            /** @description Settings saved (and synced to Cloudonix when configured) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        callback_url?: string;
+                        /** Format: uri */
+                        cdr_url?: string;
+                        /** @description `Cloudonix settings updated successfully.`, or the sync / voice application error */
+                        message?: string;
+                        /** @description Same as the GET settings, without `embed_allowed_domains` and `cloudonix_package` */
+                        settings?: components["schemas"]["CloudonixSettings"];
+                        /** @description Present only when the Cloudonix sync or voice application setup failed (same text as `message`) */
+                        warning?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not the organization Owner (Cloudonix settings are Owner only), or an API key (no API-key grant covers these routes) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation failed, or the Cloudonix domain is already registered to another organization (reported on `domain_uuid`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
+            /** @description Unexpected error while saving */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to update settings",
+                     *       "message": "An error occurred while updating Cloudonix settings."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17105,12 +22371,28 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Key generated */
+            /** @description A new random key (not stored) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        api_key?: string;
+                        /** @example API key generated successfully. Copy and save this key as it cannot be retrieved later. */
+                        message?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not the organization Owner, or an API key (no API-key grant covers this route) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17123,12 +22405,59 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Trunks retrieved */
+            /** @description Outbound trunks of the Cloudonix domain */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        count?: number;
+                        trunks?: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not the organization Owner, or an API key (no API-key grant covers this route) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix settings not configured (domain UUID or API key missing) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Cloudonix settings not configured",
+                     *       "message": "Please configure Cloudonix settings before fetching outbound trunks."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The Cloudonix API call failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Failed to fetch outbound trunks",
+                     *       "message": "Unable to retrieve outbound trunks from Cloudonix API."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17139,14 +22468,87 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Full key; a masked key (containing `***`) is accepted only when a key is already saved */
+                    domain_api_key: string;
+                    /** Format: uuid */
+                    domain_uuid: string;
+                };
+            };
+        };
         responses: {
-            /** @description Validation completed */
+            /** @description Credentials are valid */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** @example Cloudonix credentials are valid. */
+                        message?: string;
+                        /** @description Each key is present only when the domain profile provides a usable value (an empty object when none) */
+                        profile_settings?: {
+                            /** @description Name of the tenant billing package */
+                            cloudonix_package?: string;
+                            /** @example sample.cloudonix.net */
+                            domain_name?: string;
+                            /** @description From the profile `call-timeout`, only when between 5 and 120 */
+                            no_answer_timeout?: number;
+                            /**
+                             * @description From the profile `recording-media-type`
+                             * @enum {string}
+                             */
+                            recording_format?: "wav" | "mp3";
+                        };
+                        /** @enum {boolean} */
+                        valid?: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not the organization Owner, or an API key (no API-key grant covers this route) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /**
+             * @description Validation failed (standard validation body), the credentials are invalid, or a
+             *     masked key was sent without a saved key (`valid` is false).
+             */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Invalid Cloudonix credentials. Please check your domain UUID and API key. */
+                        message?: string;
+                        /** @enum {boolean} */
+                        valid?: false;
+                    };
+                };
+            };
+            /** @description Error while contacting Cloudonix */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The exception message */
+                        error?: string;
+                        /** @example An error occurred while validating credentials. */
+                        message?: string;
+                        /** @enum {boolean} */
+                        valid?: false;
+                    };
+                };
             };
         };
     };
@@ -17191,9 +22593,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description IDs of ring groups this Supervisor may monitor. */
+                    /** @description IDs of ring groups this Supervisor may monitor. Required, may be empty. */
                     ring_group_ids: number[];
-                    /** @description IDs of organization users this Supervisor may monitor. */
+                    /** @description IDs of organization users (role `pbx_user`) this Supervisor may monitor. Required, may be empty. */
                     user_ids: number[];
                 };
             };
@@ -17213,7 +22615,25 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationError"];
+            /**
+             * @description Validation failed (standard validation body, for example an ID that does not
+             *     exist in the organization), or a rule was broken (`{"message": ...}`): the
+             *     target user is not a Supervisor, a user or ring group belongs to another
+             *     organization, the Supervisor is in `user_ids`, or a user is not a PBX User.
+             */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "message": "Only PBX Users can be assigned as supervised users."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listTrunks: {
@@ -17236,16 +22656,49 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Trunk"][];
+                        meta?: {
+                            /**
+                             * @description SIP hostname of the domain (`<domain uuid, lowercase>.sip.cloudonix.net`)
+                             * @example 3f1c8a3e-7b2d-4c1e-9a55-2d6e0f9b1a10.sip.cloudonix.net
+                             */
+                            sip_hostname?: string;
+                        };
                     };
                 };
             };
             401: components["responses"]["Unauthorized"];
-            /** @description Cloudonix API unavailable */
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The organization has no Cloudonix settings */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix API unavailable or returned an error */
             502: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17264,6 +22717,7 @@ export interface operations {
                     /** @description IPv4, IPv6, or hostname of the trunk peer. */
                     ip: string;
                     name: string;
+                    /** @description Applied only when `username` or `password` is sent */
                     overwrite_from?: boolean;
                     /** @description Required when `username` is provided. Never serialized in responses. */
                     password?: string | null;
@@ -17289,14 +22743,39 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The organization has no Cloudonix settings */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["ValidationError"];
-            /** @description Cloudonix API unavailable */
+            /** @description Cloudonix API unavailable or returned an error */
             502: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17324,13 +22803,38 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            /** @description Cloudonix API unavailable */
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no Cloudonix settings (standard 404 body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix API unavailable or returned an error */
             502: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17349,14 +22853,16 @@ export interface operations {
                 "application/json": {
                     /** @description IPv4, IPv6, or hostname of the trunk peer. */
                     ip?: string;
+                    /** @description Applied only when `username` or `password` is sent */
                     overwrite_from?: boolean;
                     /** @description Requires `username`. Never serialized in responses. */
                     password?: string | null;
                     port?: number;
+                    /** @description Empty string or null clears the prefix; omit to keep it. */
                     prefix?: string | null;
                     /** @enum {string} */
                     transport?: "udp" | "tcp" | "tls";
-                    /** @description May be sent alone (keeps the stored password). */
+                    /** @description May be sent alone (keeps the stored password). Empty string or null clears the stored username and password. */
                     username?: string | null;
                 };
             };
@@ -17374,14 +22880,39 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no Cloudonix settings (standard 404 body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             422: components["responses"]["ValidationError"];
-            /** @description Cloudonix API unavailable */
+            /** @description Cloudonix API unavailable or returned an error */
             502: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17405,13 +22936,116 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            /** @description Cloudonix API unavailable */
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no Cloudonix settings (standard 404 body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix API unavailable or returned an error */
             502: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patchTrunk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cloudonix trunk id or uuid. */
+                trunk: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description IPv4, IPv6, or hostname of the trunk peer. */
+                    ip?: string;
+                    /** @description Applied only when `username` or `password` is sent */
+                    overwrite_from?: boolean;
+                    /** @description Requires `username`. Never serialized in responses. */
+                    password?: string | null;
+                    port?: number;
+                    /** @description Empty string or null clears the prefix; omit to keep it. */
+                    prefix?: string | null;
+                    /** @enum {string} */
+                    transport?: "udp" | "tcp" | "tls";
+                    /** @description May be sent alone (keeps the stored password). Empty string or null clears the stored username and password. */
+                    username?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Trunk updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Trunk"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description Not an Owner or PBX Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Trunk not found in Cloudonix (`error` is `not_found`), or the organization has no Cloudonix settings (standard 404 body). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            /** @description Cloudonix API unavailable or returned an error */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_unavailable",
+                     *       "message": "Unable to reach the Cloudonix API. Please try again later."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
@@ -17424,22 +23058,12 @@ export interface operations {
                  */
                 page?: components["parameters"]["Page"];
                 /**
-                 * @description Number of items per page
+                 * @description Number of items per page. Most list endpoints clamp out-of-range values into 1-100; endpoints that validate the value answer 422 instead.
                  * @example 20
                  */
                 per_page?: components["parameters"]["PerPage"];
-                /** @description Filter by user role */
-                role?: "owner" | "pbx_admin" | "pbx_user" | "reporter";
-                /** @description Search in name and email */
-                search?: string;
                 sort_by?: "name" | "email" | "role" | "status" | "created_at" | "updated_at";
-                /**
-                 * @description Sort order direction
-                 * @example desc
-                 */
-                sort_order?: components["parameters"]["SortOrder"];
-                /** @description Filter by user status */
-                status?: "active" | "inactive";
+                sort_order?: "asc" | "desc";
             };
             header?: never;
             path?: never;
@@ -17499,11 +23123,11 @@ export interface operations {
                     phone?: string | null;
                     postal_code?: string | null;
                     /**
-                     * @description User role (owner cannot be assigned)
+                     * @description User role (owner cannot be assigned; a PBX Admin cannot assign pbx_admin)
                      * @example pbx_user
                      * @enum {string}
                      */
-                    role: "pbx_admin" | "pbx_user" | "reporter";
+                    role: "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
                     state_province?: string | null;
                     /**
                      * @description Account status
@@ -17511,7 +23135,7 @@ export interface operations {
                      * @example active
                      * @enum {string|null}
                      */
-                    status?: "active" | "inactive" | null;
+                    status?: "active" | "inactive" | "pending" | null;
                     street_address?: string | null;
                 };
             };
@@ -17593,23 +23217,24 @@ export interface operations {
                     name?: string;
                     /**
                      * Format: password
-                     * @description Leave empty to keep current password
+                     * @description Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                      * @example NewSecurePass123
                      */
-                    password?: string;
+                    password?: string | null;
                     phone?: string | null;
                     postal_code?: string | null;
                     /**
+                     * @description Owner cannot be assigned; users cannot change their own role
                      * @example pbx_admin
                      * @enum {string}
                      */
-                    role?: "pbx_admin" | "pbx_user" | "reporter";
+                    role?: "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
                     state_province?: string | null;
                     /**
                      * @example active
                      * @enum {string}
                      */
-                    status?: "active" | "inactive";
+                    status?: "active" | "inactive" | "pending";
                     street_address?: string | null;
                 };
             };
@@ -17659,7 +23284,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Cannot delete last owner */
+            /** @description The user is the organization's last Owner (`LAST_OWNER_DELETE_BLOCKED`), or the owner-deletion lock could not be acquired (`LOCK_ACQUISITION_FAILED`, retry) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -17672,7 +23297,13 @@ export interface operations {
                      *       "error_code": "LAST_OWNER_DELETE_BLOCKED"
                      *     }
                      */
-                    "application/json": components["schemas"]["Error"];
+                    "application/json": {
+                        /** @enum {string} */
+                        error_code?: "LAST_OWNER_DELETE_BLOCKED" | "LOCK_ACQUISITION_FAILED";
+                        message?: string;
+                        /** @example false */
+                        success?: boolean;
+                    };
                 };
             };
         };
@@ -17704,23 +23335,24 @@ export interface operations {
                     name?: string;
                     /**
                      * Format: password
-                     * @description Leave empty to keep current password
+                     * @description Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                      * @example NewSecurePass123
                      */
-                    password?: string;
+                    password?: string | null;
                     phone?: string | null;
                     postal_code?: string | null;
                     /**
+                     * @description Owner cannot be assigned; users cannot change their own role
                      * @example pbx_admin
                      * @enum {string}
                      */
-                    role?: "pbx_admin" | "pbx_user" | "reporter";
+                    role?: "pbx_admin" | "pbx_user" | "reporter" | "supervisor";
                     state_province?: string | null;
                     /**
                      * @example active
                      * @enum {string}
                      */
-                    status?: "active" | "inactive";
+                    status?: "active" | "inactive" | "pending";
                     street_address?: string | null;
                 };
             };
@@ -17743,6 +23375,57 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
+        };
+    };
+    getUserDeleteImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deletion impact preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "extensions": [
+                     *           {
+                     *             "id": 12,
+                     *             "extension_number": "1001"
+                     *           }
+                     *         ],
+                     *         "memberships": [
+                     *           {
+                     *             "type": "ring_group",
+                     *             "id": 7,
+                     *             "name": "Sales",
+                     *             "becomes_empty": false
+                     *           }
+                     *         ],
+                     *         "routes": [],
+                     *         "empty_groups": 0,
+                     *         "has_changes": true
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        data: components["schemas"]["UserDeletionImpact"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getUserEmbedToken: {
@@ -17876,10 +23559,7 @@ export interface operations {
                 "application/json": {
                     /**
                      * Format: password
-                     * @description New password requirements:
-                     *     - At least 8 characters
-                     *     - Upper and lowercase letters
-                     *     - At least one number
+                     * @description New password, at least 8 characters.
                      * @example NewSecurePass123
                      */
                     password: string;
@@ -17912,7 +23592,22 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            /** @description Not allowed to change this user's password */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example UNAUTHORIZED_PASSWORD_CHANGE */
+                        error_code?: string;
+                        /** @example You are not authorized to change this user's password. */
+                        message?: string;
+                        /** @example false */
+                        success?: boolean;
+                    };
+                };
+            };
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationError"];
         };
@@ -17948,11 +23643,13 @@ export interface operations {
                      *       "data": {
                      *         "id": 124,
                      *         "organization_id": 1,
-                     *         "name": "Jane Smith",
+                     *         "name": "jane.smith",
                      *         "email": "jane.smith@example.com",
                      *         "role": "pbx_user",
-                     *         "status": "inactive",
+                     *         "status": "pending",
+                     *         "phone": null,
                      *         "is_platform_manager": false,
+                     *         "social_identities": [],
                      *         "created_at": "2024-01-15T10:30:00Z",
                      *         "updated_at": "2024-01-15T10:30:00Z"
                      *       },
@@ -17964,16 +23661,16 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            /** @description Validation error or user already exists */
+            /** @description Validation error, or a non-pending user with this email already exists in the organization (or in another organization) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ValidationError-2"] | components["schemas"]["Error"];
+                    "application/json": components["schemas"]["ValidationError"] | components["schemas"]["Error"];
                 };
             };
-            /** @description Invitation rate limited */
+            /** @description More than 10 invitations from this organization in the last hour */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -17983,7 +23680,7 @@ export interface operations {
                      * @example {
                      *       "error": {
                      *         "code": "INVITE_RATE_LIMITED",
-                     *         "message": "Too many invitations sent to this email."
+                     *         "message": "Invitation rate limit exceeded for this organization."
                      *       }
                      *     }
                      */
@@ -18078,7 +23775,23 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Auth0 is not configured */
+            /** @description Too many attempts (5 requests per minute per IP) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many login attempts. Please try again later.",
+                     *       "retry_after": 60
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Auth0 is not configured (or has no provider) */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -18166,6 +23879,22 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Too many attempts (5 requests per minute per IP) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "Too Many Requests",
+                     *       "message": "Too many login attempts. Please try again later.",
+                     *       "retry_after": 60
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     validateEmail: {
@@ -18183,28 +23912,74 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Email validation result */
+            /**
+             * @description Email validation result. An address that fails the basic format
+             *     check returns only `valid: false` and `message`. Otherwise the
+             *     UserCheck flags are returned; `message` is present only when
+             *     `valid` is false and `suggestion` only when UserCheck suggests a
+             *     correction.
+             */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        checks?: {
-                            blocklisted?: boolean;
-                            disposable?: boolean;
-                            role_account?: boolean;
-                            spam?: boolean;
-                        };
-                        /** @description Human-readable validation message */
+                        blocklisted?: boolean;
+                        disposable?: boolean;
+                        /** @description Reason the address is not allowed (only when `valid` is false) */
                         message?: string;
+                        public_domain?: boolean;
+                        relay_domain?: boolean;
+                        role_account?: boolean;
+                        spam?: boolean;
+                        /**
+                         * Format: email
+                         * @description Suggested corrected address (only when available)
+                         */
+                        suggestion?: string;
                         /** @description Whether the email is valid and allowed */
+                        valid: boolean;
+                    };
+                };
+            };
+            /** @description The `email` parameter is missing or not a string */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "valid": false,
+                     *       "message": "Email address is required."
+                     *     }
+                     */
+                    "application/json": {
+                        message?: string;
                         valid?: boolean;
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
             429: components["responses"]["TooManyRequests"];
+            /** @description The validation service failed */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "valid": false,
+                     *       "message": "Unable to validate email. Please try again later."
+                     *     }
+                     */
+                    "application/json": {
+                        message?: string;
+                        valid?: boolean;
+                    };
+                };
+            };
         };
     };
     getWebPhoneCallsLog: {
@@ -18224,17 +23999,23 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            /** @example answered */
-                            disposition?: string;
+                            /**
+                             * @description Cloudonix CDR disposition
+                             * @example ANSWER
+                             */
+                            disposition?: string | null;
                             /**
                              * @description Duration in seconds
                              * @example 125
                              */
                             duration?: number;
-                            /** @example 02:05 */
+                            /**
+                             * @description MM:SS (minutes are not wrapped into hours)
+                             * @example 02:05
+                             */
                             duration_formatted?: string;
                             /** Format: date-time */
-                            session_timestamp?: string;
+                            session_timestamp?: string | null;
                             /** @example +14155551212 */
                             to?: string;
                         }[];
@@ -18242,6 +24023,15 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            /** @description API keys are refused (no API-key grant covers this route) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description No extension is assigned to this user */
             404: {
                 headers: {
@@ -18311,12 +24101,41 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            /** @description No extension assigned or Cloudonix settings missing */
+            /** @description API keys are refused (no API-key grant covers this route) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No `user`-type extension is assigned to this user */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    /**
+                     * @example {
+                     *       "message": "No extension is assigned to this user."
+                     *     }
+                     */
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Cloudonix settings (domain name) are not configured for the organization */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": "cloudonix_not_configured",
+                     *       "message": "Cloudonix settings are not configured for this organization."
+                     *     }
+                     */
                     "application/json": components["schemas"]["Error"];
                 };
             };
@@ -18332,33 +24151,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Action the worker suggests. Ignored by the server. */
+                    action?: string | null;
                     /**
-                     * Format: float
-                     * @description Confidence score of the detection
-                     * @example 0.95
-                     */
-                    confidence?: number;
-                    /**
-                     * @description Detection duration in milliseconds
-                     * @example 2500
-                     */
-                    duration?: number;
-                    /**
-                     * @description AMD detection result
-                     * @example human
-                     * @enum {string}
-                     */
-                    result: "human" | "machine" | "unknown";
-                    /**
-                     * @description Call session ID
+                     * @description Cloudonix call SID.
                      * @example CA550e8400e29b41d4a716446655440000
                      */
-                    session_id: string;
+                    callSid: string;
+                    /**
+                     * Format: float
+                     * @description Confidence score of the detection.
+                     * @example 0.95
+                     */
+                    confidence?: number | null;
+                    /**
+                     * @description Detection duration in milliseconds.
+                     * @example 2500
+                     */
+                    detectionTimeMs?: number | null;
+                    /** @description Free-text reason from the worker. */
+                    reason?: string | null;
+                    /**
+                     * @description AMD detection result.
+                     * @example voicemail
+                     * @enum {string}
+                     */
+                    result: "voicemail" | "human" | "unknown";
+                    /**
+                     * @description Auto-dialer session token of the call (see `POST /voice/amd-session`).
+                     * @example 9d1f3c2a7b8e4f60a1c2d3e4f5a6b7c8
+                     */
+                    session: string;
+                    /** @description Media stream SID the worker analysed. */
+                    streamSid: string;
                 };
             };
         };
         responses: {
-            /** @description AMD action processed */
+            /** @description AMD result processed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -18366,16 +24196,148 @@ export interface operations {
                 content: {
                     "application/json": {
                         /**
-                         * @example connect
+                         * @example hangup
                          * @enum {string}
                          */
-                        action?: "connect" | "leave_voicemail" | "hangup";
-                        /** @example processed */
+                        action?: "hangup" | "continue";
+                        /** @description Whether the Cloudonix session profile update succeeded */
+                        profile_updated?: boolean;
+                        /**
+                         * @description `error` only when a HANGUP disconnect failed
+                         * @example ok
+                         * @enum {string}
+                         */
+                        status?: "ok" | "error";
+                    };
+                };
+            };
+            /** @description Missing or wrong AMD worker token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized */
+                        message?: string;
+                        /** @example error */
                         status?: string;
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description No call session for the token, or its campaign's organization has no Cloudonix settings */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example No Cloudonix settings found for this session */
+                        message?: string;
+                        /** @example error */
+                        status?: string;
+                    };
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            /** @description Exception while updating the session or calling Cloudonix (`message` is the exception message) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message?: string;
+                        /** @example error */
+                        status?: string;
+                    };
+                };
+            };
+            /** @description AMD worker authentication is not configured on the server */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example AMD worker authentication is not configured */
+                        message?: string;
+                        /** @example error */
+                        status?: string;
+                    };
+                };
+            };
+        };
+    };
+    amdSessionCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Auto-dialer session token of the call. */
+                    session: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Session is active */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        active?: true;
+                    };
+                };
+            };
+            /** @description Missing or wrong AMD worker token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized */
+                        message?: string;
+                        /** @example error */
+                        status?: string;
+                    };
+                };
+            };
+            /** @description Unknown or inactive session */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        active?: false;
+                    };
+                };
+            };
+            422: components["responses"]["ValidationError"];
+            /** @description AMD worker authentication is not configured on the server */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example AMD worker authentication is not configured */
+                        message?: string;
+                        /** @example error */
+                        status?: string;
+                    };
+                };
+            };
         };
     };
     voiceHealth: {
@@ -18407,14 +24369,35 @@ export interface operations {
     };
     handleIvrInput: {
         parameters: {
-            query?: never;
+            query: {
+                /** @description IVR menu ID (set by the IVR routing strategy in the Gather action URL) */
+                menu_id: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": {
+                    /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten */
+                    _organization_id?: number | null;
+                    /** @description Call SID */
+                    CallSid: string;
+                    /**
+                     * @description Call status
+                     * @enum {string|null}
+                     */
+                    CallStatus?: "ringing" | "answered" | "completed" | "failed" | "busy" | "no-answer" | "in-progress" | null;
+                    /** @description Collected DTMF digits */
+                    Digits: string;
+                    /** @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it. */
+                    Domain?: string | null;
+                    /** @description Caller number */
+                    From: string;
+                    /** @description Called number */
+                    To: string;
+                };
             };
         };
         responses: {
@@ -18427,6 +24410,25 @@ export interface operations {
                     "application/xml": components["schemas"]["CxmlResponse"];
                 };
             };
+            /** @description `Domain` or `To` missing (CXML) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            422: components["responses"]["ValidationError"];
         };
     };
     voiceRoute: {
@@ -18439,26 +24441,23 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /** @description Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten */
+                    _organization_id?: number | null;
+                    /** @description Call SID */
+                    CallSid: string;
                     /**
-                     * @description Call SID
-                     * @example CA550e8400e29b41d4a716446655440000
+                     * @description Call status
+                     * @enum {string|null}
                      */
-                    CallSid?: string;
-                    /**
-                     * @description Cloudonix domain
-                     * @example example.cloudonix.io
-                     */
-                    Domain?: string;
-                    /**
-                     * @description Caller number
-                     * @example +1234567890
-                     */
-                    From?: string;
-                    /**
-                     * @description Called number
-                     * @example +1987654321
-                     */
-                    To?: string;
+                    CallStatus?: "ringing" | "in-progress" | "answered" | "completed" | "failed" | "busy" | "no-answer" | "new" | null;
+                    /** @enum {string|null} */
+                    Direction?: "subscriber" | "inbound" | "outbound" | "application" | null;
+                    /** @description Cloudonix domain name. Optional for validation, but the authentication middleware answers 400 without it. */
+                    Domain?: string | null;
+                    /** @description Caller number */
+                    From: string;
+                    /** @description Called number, a `*`-feature code, or a supervisor coaching target (spy_/barge_/whisper_<party>_ + hex token) */
+                    To: string;
                 };
             };
         };
@@ -18470,23 +24469,27 @@ export interface operations {
                 };
                 content: {
                     "application/xml": components["schemas"]["CxmlResponse"];
-                    "text/xml": components["schemas"]["CxmlResponse"];
                 };
             };
-            /** @description Unauthorized - Invalid Bearer token */
+            /** @description `Domain` or `To` missing (CXML `<Say>Bad request. ...</Say><Hangup/>`) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
+                };
+            };
+            /** @description Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML `<Say>Unauthorized. Authentication failed.</Say><Hangup/>`) */
             401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-            /** @description Rate limit exceeded */
-            429: {
-                headers: {
-                    [name: string]: unknown;
+                content: {
+                    "application/xml": components["schemas"]["CxmlResponse"];
                 };
-                content?: never;
             };
+            422: components["responses"]["ValidationError"];
         };
     };
     autoDialerAmdResult: {
@@ -18506,13 +24509,17 @@ export interface operations {
                      */
                     confidence?: number | null;
                     /**
-                     * @description AMD detection result
-                     * @example human
-                     * @enum {string}
+                     * @description Cloudonix domain name or UUID (required by the authentication middleware)
+                     * @example acme.cloudonix.net
                      */
-                    result?: "human" | "machine" | "unknown";
+                    domain?: string;
                     /**
-                     * @description Auto-dialer session token
+                     * @description AMD detection result (stored as sent, for example `human`, `machine` or `unknown`)
+                     * @example human
+                     */
+                    result?: string;
+                    /**
+                     * @description Auto-dialer session token (400 when missing)
                      * @example sess-abc123
                      */
                     session_token?: string;
@@ -18532,15 +24539,40 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad request (missing session token) */
+            /** @description Missing `session_token` (`{"status":"error"}`), missing `domain`, or an expired/future `timestamp` */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        error?: string;
                         /** @example error */
                         status?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
                     };
                 };
             };
@@ -18562,15 +24594,20 @@ export interface operations {
                      */
                     call_id?: string;
                     /**
-                     * @description Auto-dialer session token
+                     * @description Cloudonix domain name or UUID (required by the authentication middleware)
+                     * @example acme.cloudonix.net
+                     */
+                    domain?: string;
+                    /**
+                     * @description Auto-dialer session token (400 when missing)
                      * @example sess-abc123
                      */
                     session_token?: string;
                     /**
+                     * @description `answered`, `connected`, `completed`, `failed`, `busy` or `no-answer` change the session; other values are ignored
                      * @example completed
-                     * @enum {string}
                      */
-                    status?: "answered" | "connected" | "completed" | "failed" | "busy" | "no-answer";
+                    status?: string;
                 };
             };
         };
@@ -18587,15 +24624,28 @@ export interface operations {
                     };
                 };
             };
-            /** @description Bad request (missing session token) */
+            /** @description Missing `session_token` (`{"status":"error"}`), missing `domain`, or an expired/future `timestamp` */
             400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
+                        error?: string;
                         /** @example error */
                         status?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
                     };
                 };
             };
@@ -18608,6 +24658,18 @@ export interface operations {
                     "application/json": {
                         /** @example not_found */
                         status?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
                     };
                 };
             };
@@ -18626,7 +24688,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Webhook received */
+            /** @description Notification accepted (`status` is `warning` when no organization could be identified) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -18635,12 +24697,60 @@ export interface operations {
                     "application/json": {
                         /** @example Call notification received */
                         message?: string;
-                        /** @example accepted */
-                        status?: string;
+                        /**
+                         * @example accepted
+                         * @enum {string}
+                         */
+                        status?: "accepted" | "warning";
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Missing `domain` (`VerifyCloudonixSignature`), or an expired/future `timestamp` (`EnsureWebhookIdempotency`) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Bad Request - Missing domain parameter */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
         };
     };
     callStatusWebhook: {
@@ -18663,12 +24773,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @example processed */
+                        /** @example Call status received */
+                        message?: string;
+                        /** @example accepted */
                         status?: string;
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Missing `domain` (`VerifyCloudonixSignature`), or an expired/future `timestamp` (`EnsureWebhookIdempotency`) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Bad Request - Missing domain parameter */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
+                    };
+                };
+            };
         };
     };
     cdrWebhook: {
@@ -18684,19 +24832,80 @@ export interface operations {
             };
         };
         responses: {
-            /** @description CDR processed */
+            /** @description CDR stored (or already stored) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example processed */
-                        status?: string;
+                        /**
+                         * @example CDR Inserted successfully
+                         * @enum {string}
+                         */
+                        message?: "CDR Inserted successfully" | "CDR already recorded";
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Missing `domain` (`VerifyCloudonixSignature`), or an expired/future `timestamp` (`EnsureWebhookIdempotency`) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Bad Request - Missing domain parameter */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
+            /** @description CDR processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Call Detail Record processing failed */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
         };
     };
     dialerWebhookProxy: {
@@ -18709,11 +24918,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /**
-                     * @description Organization ID injected by Cloudonix
-                     * @example 1
-                     */
-                    _organization_id?: number;
                     /** @example 32 */
                     billsec?: number | null;
                     /**
@@ -18721,7 +24925,7 @@ export interface operations {
                      * @example call-xyz789
                      */
                     call_id?: string;
-                    /** @description Custom data passed when the call was initiated */
+                    /** @description Custom data passed when the call was initiated (logged only) */
                     custom_data?: {
                         /** @example 1 */
                         campaign_id?: number;
@@ -18734,8 +24938,15 @@ export interface operations {
                     };
                     /** @example completed */
                     disposition?: string | null;
+                    /**
+                     * @description Cloudonix domain name or UUID (required by the authentication middleware)
+                     * @example acme.cloudonix.net
+                     */
+                    domain?: string;
                     /** @example 45 */
                     duration?: number | null;
+                    /** @description Failure reason (logged only) */
+                    reason?: string | null;
                     /** @description Session information (Cloudonix native shape) */
                     session?: {
                         /** @example sess-abc123 */
@@ -18762,8 +24973,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** @example ok */
-                        status?: string;
+                        /**
+                         * @description Present when `status` is `ignored`
+                         * @example unknown_event_type
+                         */
+                        reason?: string;
+                        /**
+                         * @example ok
+                         * @enum {string}
+                         */
+                        status?: "ok" | "ignored";
+                    };
+                };
+            };
+            /** @description Missing `domain`, or an expired/future `timestamp` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Bad Request - Missing domain parameter */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
                     };
                 };
             };
@@ -18781,6 +25025,95 @@ export interface operations {
                     };
                 };
             };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
+                    };
+                };
+            };
+        };
+    };
+    cloudonixRecordingStatusWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordingStatusPayload"];
+                "application/x-www-form-urlencoded": components["schemas"]["RecordingStatusPayload"];
+            };
+        };
+        responses: {
+            /** @description Processed, nothing to download, or no matching call detail record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @example Recording status processed
+                         * @enum {string}
+                         */
+                        message?: "Recording status processed" | "No recording to download" | "No matching call detail record found";
+                    };
+                };
+            };
+            /** @description Expired or future `timestamp` (`EnsureWebhookIdempotency`) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook Expired */
+                        error?: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Webhook authentication failed for the matched organization (or it has no Cloudonix settings) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description The same webhook is still being processed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Webhook is being processed */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
         };
     };
     sessionUpdateWebhook: {
@@ -18796,19 +25129,80 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Session update processed */
+            /** @description Session update stored, already stored, or ignored */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @example processed */
-                        status?: string;
+                        /**
+                         * @example Session record updated successfully
+                         * @enum {string}
+                         */
+                        message?: "Session record updated successfully" | "Status not processed";
                     };
                 };
             };
-            400: components["responses"]["BadRequest"];
+            /** @description Missing `domain` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Bad Request - Missing domain parameter */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Unknown domain, or missing/invalid Bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Unauthorized - Invalid Bearer token */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description No organization matches `domain` (checked again by the controller) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Organization not identified */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
+            };
+            /** @description Processing failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example Session update processing failed */
+                        error?: string;
+                        /** @example An internal error occurred. */
+                        message?: string;
+                    };
+                };
+            };
         };
     };
     websocketHealthCheck: {
