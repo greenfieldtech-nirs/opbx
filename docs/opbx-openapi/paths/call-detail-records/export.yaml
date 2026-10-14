@@ -12,16 +12,16 @@ paths:
       x-api-key-scope: call-detail-records:read
       description: >-
         Streams all matching CDRs as CSV, newest first, as `call-detail-records-YYYY-MM-DD-HHMMSS.csv`.
-        Accepts the same filters as the list endpoint (from, to, disposition, direction, user,
-        session_token, from_date, to_date); `sort_by`, `sort_order` and pagination are ignored.
-        Any role can export; Supervisors are always limited to the resources they supervise and
-        PBX Users to calls from or to their own extensions.
-        Columns: Timestamp, From, To, Call Start Time, Call Answer Time, Call End Time, Domain,
+        Accepts the same filters as the list endpoint (extension, to, extension_destination_match,
+        disposition, direction, user, session_token, from_date, to_date); `sort_by`, `sort_order` and
+        pagination are ignored. Any role can export; Supervisors are always limited to the resources
+        they supervise and PBX Users to calls of or to their own extensions.
+        Columns: Timestamp, Extension (`extension_number`), From (the Caller ID), To, Call Start Time, Call Answer Time, Call End Time, Domain,
         Session Token, Duration (sec), Billable (sec), Status. Times are `Y-m-d H:i:s`; the call
         times, session token and status come from the raw CDR session.
       parameters:
         - $ref: '../../components/parameters/query/CdrArchive.yaml'
-        - name: from
+        - name: extension
           in: query
           schema:
             type: string
@@ -29,7 +29,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: from_to_match
+        - name: extension_destination_match
           in: query
           required: false
           schema:
@@ -37,10 +37,9 @@ paths:
             enum: [all, any]
             default: all
           description: >-
-            How `from` and `to` combine when both are sent. `all` (default) returns calls whose caller
-            matches `from` AND whose called number matches `to`. `any` returns calls matching either one.
-            Ignored when only one of them is sent; the other filters always still apply. Other values
-            return 422.
+            How `extension` and `to` combine when both are sent. `all` (default) returns calls of the
+            extension AND to the destination. `any` returns calls matching either one. Ignored when only
+            one of them is sent; the other filters always still apply. Other values return 422.
         - name: from_date
           in: query
           schema:

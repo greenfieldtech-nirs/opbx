@@ -18,16 +18,24 @@ properties:
     type:
     - string
     - 'null'
+  extension_number:
+    type:
+    - string
+    - 'null'
+    description: >-
+      The organization's extension the call belongs to: the extension that placed it, an extension
+      number used as the caller ID (API-initiated calls), or the extension its DID routes to directly
+      (inbound). Null when none applies, for example an inbound call to a DID routed to a ring group.
   from:
     type:
     - string
     - 'null'
-    description: Caller number
+    description: Caller ID the call presented (for an outbound call this can be a DID). Display only, not a filter
   to:
     type:
     - string
     - 'null'
-    description: Called number
+    description: Called number (destination)
   direction:
     type:
     - string

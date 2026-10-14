@@ -85,10 +85,13 @@ unassigned resources.
 ### PBX User Call-Record Scope
 
 A PBX User's call records (`/v1/call-detail-records` list, single record, statistics,
-CSV export and recording) are limited by role on the server to calls whose From or
-To is one of their own extension numbers (bare or `+`-prefixed). Another user's call
-returns 403. Owners, PBX Admins and Reporters are unrestricted; API keys follow
-their scopes.
+CSV export and recording) are limited by role on the server to calls whose
+`extension_number` (the extension the call belongs to) or `to` (destination) is one of
+their own extension numbers (bare or `+`-prefixed). The Caller ID (`from`) does not
+count, so an outbound call presenting a DID is still theirs and a call that merely
+presents their number is not. Another user's call returns 403. Supervisors match the
+same identifiers against `extension_number`, `from` and `to`. Owners, PBX Admins and
+Reporters are unrestricted; API keys follow their scopes.
 
 ### Call Coaching Authorization
 
