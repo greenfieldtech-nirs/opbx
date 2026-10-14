@@ -22,22 +22,25 @@ Every finished call to an active tracking number becomes a **session**: the call
 | See **Call Tracking → Dashboard** and **Sessions** in the sidebar | Yes | Yes | No | Yes | No |
 | Read analytics, sessions and the CSV export (API) | Yes | Yes | Yes | Yes | Yes |
 
-Every signed-in user of the organization can read the analytics through the API; the pages are in the **Apps and Security** sidebar section, which only Owners, PBX Admins and Reporters see.
+Every signed-in user of the organization can read the analytics through the API; the pages are in the **Apps and Security** sidebar section, which only Owners, PBX Admins and Reporters see. The pages are read-only for every role.
 
-## Dashboard
+## Workflows
 
-Open **Call Tracking → Dashboard**.
+### View the dashboard
 
-| Control | Default | Meaning |
-|---------|---------|---------|
-| Start date, end date | The last 30 days | The days included (whole days). The start must not be after the end |
-| Group by | Day | Day, Week or Month for the chart |
-| Refresh button | | Loads the figures again |
-| Reset | Shown when a filter changed | Back to the defaults |
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+1. Open **Call Tracking → Dashboard**. It shows the period from 30 days ago to today, grouped by day.
+2. To change the period, set the start date and the end date in the two date fields. Whole days are included.
+3. To change the chart buckets, choose **Day**, **Week** or **Month** in the group-by list.
+4. Click the refresh button to load the figures again.
+5. **Reset** appears when a date or the grouping differs from the defaults; click it to go back to them.
+
+The KPI cards, the **Calls vs Conversions** chart and the **Top Campaigns** and **Top Sources** tables follow the period. If the start date is after the end date, the page shows "Failed to load analytics: …" with a **Try Again** button; fix the dates.
 
 ![Call Tracking Dashboard for the last 30 days with the KPI cards and the Calls vs Conversions chart grouped by day](../img/screens/call-tracking-dashboard.jpg)
 
-### KPI cards
+#### KPI cards
 
 | Card | Calculation |
 |------|-------------|
@@ -49,7 +52,7 @@ Open **Call Tracking → Dashboard**.
 | Conversions | Sessions marked converted |
 | Conversion Rate | Conversions divided by total calls, in percent |
 
-### Calls vs Conversions chart
+#### Calls vs Conversions chart
 
 Calls and conversions per bucket. The bucket comes from the session's start time:
 
@@ -59,35 +62,33 @@ Calls and conversions per bucket. The bucket comes from the session's start time
 | Week | ISO year and week, for example `2026-42` |
 | Month | `2026-10` |
 
-### Top Campaigns and Top Sources
+#### Top Campaigns and Top Sources
 
 The ten campaigns and the ten sources with the most calls in the period, each with its call and conversion counts.
 
-## Sessions
+### Find a session
 
-Open **Call Tracking → Sessions**. The list shows 25 sessions per page, newest first.
+**Who can do this:** Owner, PBX Admin, Reporter.
 
-| Column | Content |
-|--------|---------|
-| Caller (first column) | The caller's number, with the campaign name below it |
-| Called Number | The tracking number dialled |
-| Campaign | Campaign name at the time of the call |
-| Source / Medium | Copied from the campaign when the session was created |
-| Duration | Total seconds |
-| Disposition | For example `CONNECTED`, `NO ANSWER`, `BUSY` |
-| Converted | Yes or No |
-
-| Filter | Meaning |
-|--------|---------|
-| Search | Part of the caller or called number. Type at least 3 characters |
-| Start date, end date | Days of the call start. Default: the last 30 days |
-| Converted Only | Show converted sessions only |
-
-**Clear Filters** returns to the defaults.
+1. Open **Call Tracking → Sessions**. The list shows the sessions of the last 30 days, 25 per page, newest first.
+2. To find a number, type at least 3 characters of the caller or called number in **Search caller or called number...**. Shorter input is ignored and the list stays unfiltered.
+3. To change the period, set the start date and the end date. If the start is after the end, the page shows "Start date must be before or equal to end date." and loads nothing.
+4. Turn on **Converted Only** to show converted sessions only.
+5. Click the refresh button to load the list again. **Clear Filters** appears when a filter is set and returns to the defaults.
 
 ![Call Tracking Sessions page with the last 30 days of demo sessions from both campaigns, a mix of Converted Yes and No, and the search, date and Converted Only filters](../img/screens/call-tracking-sessions-list.jpg)
 
-Source, medium and campaign name are copied into the session when it is created. Renaming a campaign later does not change past sessions. Deleting a campaign deletes its sessions.
+| Column | Content |
+|--------|---------|
+| Caller (first column) | The caller's number, with the campaign name below it (or the called number when the session has no campaign name) |
+| Called Number | The tracking number dialled |
+| Campaign | Campaign name at the time of the call |
+| Source / Medium | Copied from the campaign when the session was created |
+| Duration | Total duration as minutes and seconds, for example `1:27` |
+| Disposition | **Answered** for a call with billable seconds, otherwise the disposition, for example `NO ANSWER` or `BUSY` |
+| Converted | Yes or No |
+
+The page cannot open, change or delete a session. Source, medium and campaign name are copied into the session when it is created. Renaming a campaign later does not change past sessions. Deleting a campaign deletes its sessions.
 
 ## CSV export
 
@@ -128,8 +129,8 @@ The [MCP server](/opbx/modules/mcp-server) has the read-only tools `get_call_tra
 
 | Message (summary) | What it means | What to do |
 |-------------------|---------------|-----------|
-| Start date must be before or equal to end date (Sessions page); "Failed to load analytics" (Dashboard) | The range is reversed | Fix the dates |
-| The search field must be at least 3 characters | One or two characters typed in Search | Type more, or clear the field |
+| Start date must be before or equal to end date. (Sessions page); "Failed to load analytics: …" (Dashboard) | The range is reversed | Fix the dates |
+| The search field must be at least 3 characters | One or two characters sent as `search` through the API (the Sessions page ignores such input instead) | Send at least 3 characters, or leave it out |
 
 ## Best practices
 
