@@ -270,7 +270,7 @@ Set in `config/security.php` and applied by the `SecurityHeaders` middleware. Se
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HSTS_MAX_AGE` | `31536000` | `Strict-Transport-Security` max-age, sent on HTTPS requests |
+| `HSTS_MAX_AGE` | `31536000` | `Strict-Transport-Security` max-age. The header is sent only when `APP_ENV=production` |
 | `HSTS_INCLUDE_SUBDOMAINS` | `true` | Add `includeSubDomains` |
 | `HSTS_PRELOAD` | `false` | Add `preload` |
 | `CSP_REPORT_URI` | — | CSP `report-uri` |
