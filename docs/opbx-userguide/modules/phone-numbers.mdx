@@ -99,7 +99,7 @@ Who can do this: Owner and PBX Admin.
 2. Change **Route calls to** or the **Destination**.
 3. Click **Update**.
 
-{/* SCREENSHOT: phone-numbers-edit-dialog — Edit Phone Number dialog for +12025550100 (Main Line) with the read-only number, Route calls to IVR Menu and the menu selected as Destination */}
+![Edit Phone Number dialog for +12025550100 with the read-only number, Route calls to Business Hours and Main Office Hours as the Destination](../img/screens/phone-numbers-edit-dialog.jpg)
 
 Result: the toast "Phone number updated successfully" appears and the list shows the new routing type and destination.
 
@@ -156,7 +156,7 @@ Result: the toast "Default outbound caller ID updated" appears.
 This selector stores the organization-wide default caller ID (`GET` and `PUT /v1/phone-numbers/default-caller-id`). Outbound calls present it when neither the calling [extension](/opbx/modules/extensions#default-caller-id) nor the matched [outbound whitelist](/opbx/modules/outbound-whitelist) rule has a caller ID of its own. Only an active number of your organization counts; otherwise the call presents `Unknown`. See the [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
-{/* SCREENSHOT: phone-numbers-default-caller-id — Phone Numbers page header with the Default Outbound Caller ID selector open, showing None (Unknown) and the demo numbers */}
+![Phone Numbers page header with the Default Outbound Caller ID selector open, showing None (Unknown) ticked and the demo numbers](../img/screens/phone-numbers-default-caller-id.jpg)
 
 ## Delete
 
@@ -167,7 +167,7 @@ Who can do this: Owner and PBX Admin.
 1. In the **Phone Numbers** list, click the trash icon in the number's **Actions** column.
 2. In the **Delete Phone Number** dialog, click **Delete**.
 
-{/* SCREENSHOT: phone-numbers-delete-dialog — Delete Phone Number dialog asking to delete the demo number +12025550105, with Cancel and Delete buttons */}
+![Delete Phone Number dialog asking to delete +1 (202) 555-0105, with the Cancel and Delete buttons](../img/screens/phone-numbers-delete-dialog.jpg)
 
 Result: the toast "Phone number deleted successfully" appears and the number leaves the list.
 
