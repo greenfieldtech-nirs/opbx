@@ -60,7 +60,8 @@ export function PhoneNumberDialog({
     if (open) {
       if (phoneNumber) {
         // Edit mode - populate with existing data
-        const targetId =
+        // Selector option ids are strings; the API may return numeric ids, which would not match
+        const targetId = String(
           phoneNumber.routing_config.extension_id ||
           phoneNumber.routing_config.ai_assistant_id ||
           phoneNumber.routing_config.ai_load_balancer_id ||
@@ -69,7 +70,8 @@ export function PhoneNumberDialog({
           phoneNumber.routing_config.conference_room_id ||
           phoneNumber.routing_config.ivr_menu_id ||
           phoneNumber.routing_config.call_queue_id ||
-          '';
+          ''
+        );
 
         setFormData({
           phone_number: phoneNumber.phone_number,
