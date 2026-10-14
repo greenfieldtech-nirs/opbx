@@ -36,23 +36,117 @@ Use a load balancer to:
 | Create, edit, activate or deactivate | Yes | Yes | No | No | No |
 | Delete | Yes | Yes | No | No | No |
 
-## Create a load balancer
+## Workflows
 
-1. Open **AI Load Balancers** in the sidebar (under **AI Configuration**).
-2. Click **Create AI Load Balancer**.
-3. Enter a **Name**.
-4. Choose the **Distribution Strategy**.
-5. Click **Add Member** once per assistant. Each click adds the next unused active assistant; change it with the member's dropdown.
-6. For **Priority Based**, drag the members into order (top = first choice). For **Percentage Based**, set each member's **Weight**.
-7. Turn **Follow Through** on or off.
-8. Choose the **Fallback Action** and, where needed, its destination.
+### Create a load balancer
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Apps and Security → AI Configuration → AI Load Balancers** in the sidebar.
+2. Click **Create AI Load Balancer** (top right). The **Create AI Load Balancer** dialog opens.
+3. Enter a **Name** of at least 2 characters, for example `Front Desk AI Pool`.
+4. Under **Distribution Strategy**, click **Round Robin**, **Priority Based** or **Percentage Based**.
+5. Under **AI Assistant Members**, click **Add Member** once per assistant. Each click adds the next active assistant that is not yet a member and shows the toast **Added *name* to load balancer**. To use a different assistant, pick it in the member's dropdown. Click **X** on a member to remove it.
+6. For **Priority Based**, [order the members](#order-members-for-priority-based); for **Percentage Based**, [set the weights](#set-weights-for-percentage-based).
+7. Turn **Follow Through** on (**Enabled**) to try the next member when one fails, or leave it **Disabled**.
+8. Under **Fallback Action**, choose the **Action** and, when it needs one, the **Destination** (for example a ring group of people).
 9. Click **Create AI Load Balancer**.
 
-On save, the load balancer is stored as **Active** and becomes available as a destination everywhere AI load balancers are accepted. A new load balancer must have a real fallback: the create dialog does not offer **Disconnect**.
+The dialog closes, the toast **AI Load Balancer created successfully** appears and the load balancer is listed as **Active**. It is now offered everywhere an AI load balancer can be chosen. A new load balancer must have a real fallback: the create dialog does not offer **Disconnect**.
+
+If something is missing, the dialog stays open and shows the problem under the field, for example **Name must be at least 2 characters**, **At least one AI Assistant member is required** or **Fallback ring group is required**.
 
 ![AI Load Balancers list with Front Desk AI Pool: strategy Round Robin, members 2 / 2 active, fallback hangup, status Active, and the strategy, status and Unprovisioned filters](../img/screens/ai-load-balancers-list.jpg)
 
+{/* SCREENSHOT: ai-load-balancers-create-dialog — Create AI Load Balancer dialog for "Front Desk AI Pool" with Round Robin selected, the members Aria - Front Desk Receptionist and Max - Support Triage, Follow Through Enabled and the Fallback Action Ring Group "Support Team" */}
+
+**Add Member** is disabled when every active assistant is already a member; the dialog then says **All available AI Assistants have been added to this load balancer.** A load balancer has at most 50 members.
+
+### Order members for Priority Based
+
+**Who can do this:** Owner, PBX Admin.
+
+1. In the create or edit dialog, select **Priority Based**. Each member gets a drag handle.
+2. Drag the members by the handle. The top member is the first choice; the next one is used only when the first cannot take the call (with **Follow Through** on) or is inactive.
+3. Click **Create AI Load Balancer** or **Save Changes**.
+
+{/* SCREENSHOT: ai-load-balancers-priority-order — Edit AI Load Balancer dialog with Priority Based selected and the drag handles next to Aria (top) and Max */}
+
+### Set weights for Percentage Based
+
+**Who can do this:** Owner, PBX Admin.
+
+1. In the create or edit dialog, select **Percentage Based**. Each member gets a **Weight** dropdown (0 % to 100 % in steps of 5). A new member starts at 100 %.
+2. Set the weights so that **Total Distribution** shows 100 %, for example 80 % for the current assistant and 20 % for the one under test.
+3. Click **Create AI Load Balancer** or **Save Changes**.
+
+If the total is not 100 %, saving stops with **Percentage distribution must equal 100% (currently: N%). Please adjust the weights.**
+
+![Edit AI Load Balancer dialog with Percentage Based selected, Aria at 50% and Max at 50%, and Total Distribution: 100%](../img/screens/ai-load-balancers-percentage-weights.jpg)
+
+### Find a load balancer
+
+**Who can do this:** Owner, PBX Admin, Reporter.
+
+- Type in **Search AI Load Balancers...** to filter by name.
+- Use the **Strategy** filter (**All Strategies**, **Round Robin**, **Priority Based**, **Percentage Based**) and the **Status** filter (**All Status**, **Active**, **Disabled**).
+- Turn on the **Unprovisioned** filter to see only load balancers whose fallback is disconnected.
+- Click the refresh button to reload, and the **Strategy** or **Status** column header to sort. The list shows 25 load balancers per page.
+
+Reporters see a **Read-Only** badge, no **Create AI Load Balancer** button and no row actions.
+
+### Edit a load balancer
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the load balancer's row or name. The **Edit AI Load Balancer** dialog opens.
+2. Change the name, strategy, members, **Follow Through** or **Fallback Action**.
+3. Click **Save Changes**.
+
+The toast **AI Load Balancer updated successfully** appears. Saving replaces the member list with the one in the dialog. If another person is saving the same load balancer at that moment, the save is refused with "Load balancer is currently being modified. Please try again."
+
 ![Edit AI Load Balancer dialog for Front Desk AI Pool with the Round Robin strategy, the members Aria and Max, Follow Through off and the Fallback Action set to Hang Up](../img/screens/ai-load-balancers-edit-dialog.jpg)
+
+### Disconnect the fallback
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the load balancer's **Edit AI Load Balancer** dialog.
+2. Under **Fallback Action**, choose **Disconnect** (offered on the edit dialog only).
+3. Click **Save Changes**.
+
+This stores "Destination unavailable": callers who reach the fallback hear "Destination doesn't exist" and the call ends. The load balancer then shows the **Unprovisioned** badge in the list and in the dialog title, and the **Unprovisioned** filter on the list finds it. Pick a real fallback to clear the badge.
+
+The same state appears after a [user is deleted](/opbx/modules/user-management#delete-a-user) whose extension was the fallback.
+
+### Activate or deactivate
+
+**Who can do this:** Owner, PBX Admin.
+
+Click the **Active** or **Disabled** badge in the **Status** column. The change is saved at once and the toast **AI Load Balancer updated successfully** appears. An inactive load balancer does not use its members; every call goes straight to the fallback.
+
+### Delete a load balancer
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click the delete (trash) action on the row.
+2. The **Delete AI Load Balancer** dialog asks: Are you sure you want to delete "*name*"? This action cannot be undone.
+3. Click **Delete**.
+
+The toast **AI Load Balancer deleted successfully** appears and the row disappears.
+
+![Delete AI Load Balancer confirmation for Front Desk AI Pool](../img/screens/ai-load-balancers-delete-confirm.jpg)
+
+If anything still points at the load balancer, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, business-hours actions, ring-group, call-queue and AI load balancer fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. Change those, then delete again. Call history never blocks a delete.
+
+## Where a load balancer can be used
+
+- [Phone Numbers](/opbx/modules/phone-numbers): routing type **AI load balancer**.
+- [IVR Menus](/opbx/modules/ivr-menus): an option target or the failover.
+- [Business Hours](/opbx/modules/business-hours): the open-hours or closed-hours action.
+- [Ring Groups](/opbx/modules/ring-groups) and [Call Queues](/opbx/modules/call-queues): the fallback.
+- [Extensions](/opbx/modules/extensions): an extension of type **AI Load Balancer**.
+- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) and [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) (API).
 
 ## Fields
 
@@ -63,8 +157,8 @@ On save, the load balancer is stored as **Active** and becomes available as a de
 | Members | Yes | 1 to 50 active AI assistants; each assistant once | The assistants that take calls |
 | Weight | Percentage Based only | 0 to 100 % in steps of 5 in the dialog. Default for a new member: 100 | Share of calls for the member |
 | Follow Through | No | Off by default | Try the next member when one fails |
-| Fallback Action | Yes | Extension, Ring Group, IVR Menu, AI Assistant, Call Queue, AI Load Balancer or Hangup. Default: Hangup | What happens when no member can take the call |
-| Status | No | Active or Inactive. Default: Active. Change it from the list | Inactive load balancers send every call straight to the fallback |
+| Fallback Action | Yes | PBX User Extension, Ring Group, IVR Menu, AI Assistant, Call Queue, AI Load Balancer or Hang Up. Default: Hang Up | What happens when no member can take the call |
+| Status | No | Active or Disabled (`inactive` in the API). Default: Active. Change it from the list | Inactive load balancers send every call straight to the fallback |
 | Description | No (API only) | Up to 1000 characters | Free text. The dialog does not show it |
 
 ### Strategies
@@ -76,8 +170,6 @@ On save, the load balancer is stored as **Active** and becomes available as a de
 | **Percentage Based** | Weighted random choice. In the dialog the weights must add up to 100 % ("Percentage distribution must equal 100%"). A member with weight 0 is never chosen while others have weight |
 
 Only members whose assistant is **active** take part. An assistant you deactivate later is skipped automatically.
-
-![Edit AI Load Balancer dialog with Percentage Based selected, Aria at 50% and Max at 50%, and Total Distribution: 100%](../img/screens/ai-load-balancers-percentage-weights.jpg)
 
 ### Follow Through
 
@@ -92,50 +184,15 @@ A call counts as failed when the provider leg ends **busy**, **no answer**, **fa
 
 | Fallback Action | Result |
 |-----------------|--------|
-| Extension | Rings the chosen extension |
+| PBX User Extension | Rings the chosen extension. The dialog lists active PBX User extensions |
 | Ring Group | Sends the call to the ring group |
 | IVR Menu | Plays the menu |
 | AI Assistant | Connects one more assistant, without Follow Through. It cannot be a member of the same load balancer ("Circular reference detected") |
 | Call Queue | Puts the caller in the call queue |
 | AI Load Balancer | Hands the call to another load balancer's selection. Saving is refused (422) if the chain of AI Load Balancer fallbacks would ever return to this balancer: A to A, A to B to A, A to B to C to A and so on. The message names the loop. If a loop still exists at call time, the call ends |
-| Hangup | Ends the call |
+| Hang Up | Ends the call |
 
 Call Queue and AI Load Balancer need a target: saving without one is refused. The fallback target must belong to your organization and be **active** when you save.
-
-## Edit a load balancer
-
-1. Click the load balancer's row.
-2. Change the fields and click **Save Changes**.
-
-Saving replaces the member list with the one in the dialog. If another person is saving the same load balancer at that moment, the save is refused with "Load balancer is currently being modified. Please try again."
-
-### Disconnect the fallback
-
-On the edit dialog only, the fallback picker offers **Disconnect**. It stores "Destination unavailable": callers who reach the fallback hear "Destination doesn't exist" and the call ends. The load balancer then shows the **Unprovisioned** badge in the list and in the dialog title, and the **Unprovisioned** filter on the list finds it. Pick a real fallback to clear the badge.
-
-The same state appears after a [user is deleted](/opbx/modules/user-management#delete-a-user) whose extension was the fallback.
-
-## Activate or deactivate
-
-Click the **Active** or **Disabled** badge in the **Status** column. An inactive load balancer does not use its members; every call goes straight to the fallback.
-
-## Delete a load balancer
-
-1. Click the delete action on the row.
-2. Confirm in the **Delete AI Load Balancer** dialog.
-
-If anything still points at the load balancer, the delete is refused and the **Cannot delete: still in use** dialog lists every place: phone numbers, IVR options and failovers, business-hours actions, ring-group, call-queue and AI load balancer fallbacks, extensions of type AI Load Balancer, auto-dialer campaigns and call-tracking campaigns. Change those, then delete again. Call history never blocks a delete.
-
-![Delete AI Load Balancer confirmation for Front Desk AI Pool](../img/screens/ai-load-balancers-delete-confirm.jpg)
-
-## Where a load balancer can be used
-
-- [Phone Numbers](/opbx/modules/phone-numbers): routing type **AI load balancer**.
-- [IVR Menus](/opbx/modules/ivr-menus): an option target or the failover.
-- [Business Hours](/opbx/modules/business-hours): the open-hours or closed-hours action.
-- [Ring Groups](/opbx/modules/ring-groups) and [Call Queues](/opbx/modules/call-queues): the fallback.
-- [Extensions](/opbx/modules/extensions): an extension of type **AI Load Balancer**.
-- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) and [Call Tracking Campaigns](/opbx/modules/call-tracking-campaigns) (API).
 
 ## Common errors
 
