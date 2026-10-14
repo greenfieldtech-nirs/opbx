@@ -27,7 +27,9 @@ properties:
     description: Cloudonix call identifier
     example: call-abc123
   session_id:
-    type: string
+    type:
+    - string
+    - 'null'
     description: Cloudonix session identifier
     example: sess-abc123
   caller_number:
@@ -35,7 +37,9 @@ properties:
     description: Caller number in E.164 format
     example: '+14155559876'
   caller_country:
-    type: string
+    type:
+    - string
+    - 'null'
     description: ISO country code of the caller
     example: US
   called_number:
@@ -61,9 +65,7 @@ properties:
     description: Name of the campaign at the time of the call
     example: Google Ads - Spring Sale
   disposition:
-    type:
-    - string
-    - 'null'
+    type: string
     description: Call disposition
     example: ANSWERED
   duration:
@@ -84,14 +86,12 @@ properties:
     example: true
   conversion_value:
     type:
-    - number
-    - 'null'
-    description: Conversion value assigned to the call
-    example: 25.5
-  started_at:
-    type:
     - string
     - 'null'
+    description: Conversion value assigned to the call, as a decimal string with 4 places
+    example: '25.5000'
+  started_at:
+    type: string
     format: date-time
     description: When the call started
     example: '2024-01-15T14:30:00Z'
@@ -110,10 +110,8 @@ properties:
     description: When the call ended
     example: '2024-01-15T14:30:50Z'
   campaign:
-    type:
-    - object
-    - 'null'
-    description: Campaign summary (when loaded)
+    type: object
+    description: Campaign summary
     properties:
       id:
         type: integer
@@ -122,10 +120,8 @@ properties:
         type: string
         example: Google Ads - Spring Sale
   did:
-    type:
-    - object
-    - 'null'
-    description: DID summary (when loaded)
+    type: object
+    description: DID summary
     properties:
       id:
         type: integer

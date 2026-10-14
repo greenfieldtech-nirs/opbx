@@ -5,8 +5,11 @@ paths:
       - Call Tracking Sessions
       summary: List sessions
       description: |
-        Get a paginated list of call tracking sessions. Supports filtering by
-        campaign, source, medium, date range, conversion status and search.
+        Get a paginated list of call tracking sessions, newest `started_at`
+        first. Supports filtering by campaign, source, medium, date range,
+        conversion status and search. Each `campaign_ids` value must be a
+        campaign of the caller's organization (else 422). Available to every
+        role.
       operationId: listCallTrackingSessions
       security:
       - bearerAuth: []
@@ -46,14 +49,14 @@ paths:
         schema:
           type: string
           format: date
-        description: Filter from date
+        description: Only calls started on or after this date
       - name: end_date
         in: query
         required: false
         schema:
           type: string
           format: date
-        description: Filter to date
+        description: Only calls started on or before this date (must not be before `start_date`)
       - name: is_converted
         in: query
         required: false
@@ -66,7 +69,7 @@ paths:
         schema:
           type: string
           minLength: 3
-        description: Search term (minimum 3 characters)
+        description: Substring match on caller number or called number (minimum 3 characters)
       responses:
         '200':
           description: List of sessions
