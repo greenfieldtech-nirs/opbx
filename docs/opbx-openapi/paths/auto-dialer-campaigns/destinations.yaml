@@ -155,10 +155,6 @@ paths:
                               type: integer
                               description: Seconds, last attempt
                               example: 0
-                            total_duration:
-                              type: integer
-                              description: Seconds, all attempts
-                              example: 0
                             billsec:
                               type: integer
                               example: 0

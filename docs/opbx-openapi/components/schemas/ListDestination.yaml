@@ -52,11 +52,6 @@ properties:
     - integer
     - 'null'
     description: Billable seconds of the last call
-  total_duration:
-    type:
-    - integer
-    - 'null'
-    description: Cumulative-duration column in seconds; nothing updates it after creation, so it stays 0
   last_error:
     type:
     - string
