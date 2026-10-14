@@ -11,8 +11,10 @@ paths:
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
       description: >-
-        By default returns the latest delivery per call session (only `status` filters).
-        With `show_all=true` returns every delivery and honours all filters.
+        Owner and PBX Admin only. By default returns the latest delivery per call session
+        (only `status` filters). With `show_all=true` returns every delivery and honours all
+        filters. Newest first. `per_page` defaults to 50 (max 100). The `meta` object has no
+        `from`/`to` keys.
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
@@ -23,6 +25,7 @@ paths:
             default: false
         - name: status
           in: query
+          description: Call status carried by the event (for example `ringing`, `answered`)
           schema:
             type: string
         - name: session_token
@@ -34,19 +37,19 @@ paths:
           in: query
           schema:
             type: boolean
-          description: show_all only
+          description: show_all only. true = successful deliveries, false = failed ones.
         - name: from
           in: query
           schema:
             type: string
             format: date-time
-          description: show_all only
+          description: show_all only. Lower bound on the delivery time (`created_at`).
         - name: to
           in: query
           schema:
             type: string
             format: date-time
-          description: show_all only
+          description: show_all only. Upper bound on the delivery time (`created_at`).
       responses:
         '200':
           description: Delivery log page (per_page defaults to 50)
@@ -61,3 +64,7 @@ paths:
                       $ref: '../../components/schemas/CallNotificationLog.yaml'
                   meta:
                     $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

@@ -10,6 +10,7 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
+      description: Owner and PBX Admin only. The organization has at most one settings record.
       responses:
         '200':
           description: Settings, or `data` null with a message when none are configured
@@ -24,6 +25,11 @@ paths:
                       - type: 'null'
                   message:
                     type: string
+                    example: Notification settings not configured
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
     
     post:
       tags:
@@ -35,6 +41,10 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
+      description: |
+        Owner and PBX Admin only. Defaults: `retry_attempts` 3, `retry_backoff_seconds` 60,
+        `request_timeout_seconds` 30, `rate_limit_per_minute` 500, `is_active` true.
+        `auth_secret` is required for `bearer_token`; `auth_username` for `basic_auth`.
       requestBody:
         required: true
         content:
@@ -56,10 +66,24 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Notification settings created successfully
                   data:
                     $ref: '../../components/schemas/CallNotificationsSettings.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '409':
           description: Settings already exist (use PUT)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Notification settings already exist. Use PUT to update.
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
     
@@ -73,6 +97,11 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
+      description: |
+        Owner and PBX Admin only. Only the fields sent are changed; `webhook_url`,
+        `auth_method` and `enabled_events` cannot be null when sent. On update `auth_secret`
+        and `auth_username` are never required, and sending `auth_secret: null` clears the
+        stored secret.
       requestBody:
         required: true
         content:
@@ -89,10 +118,24 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Notification settings updated successfully
                   data:
                     $ref: '../../components/schemas/CallNotificationsSettings.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           description: No settings yet (use POST)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Notification settings not found. Use POST to create.
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
     
@@ -106,6 +149,7 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:write
+      description: Owner and PBX Admin only.
       responses:
         '200':
           description: Settings deleted
@@ -116,5 +160,19 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Notification settings deleted successfully
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           description: No settings to delete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Notification settings not found

@@ -10,6 +10,7 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
+      description: Owner and PBX Admin only. Every delivery for one call session, oldest first (not paginated).
       parameters:
         - name: sessionToken
           in: path
@@ -28,3 +29,7 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/CallNotificationLog.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

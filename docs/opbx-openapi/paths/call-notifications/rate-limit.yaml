@@ -10,6 +10,7 @@ paths:
         - cookieAuth: []
         - apiKeyAuth: []
       x-api-key-scope: call-notifications:read
+      description: Owner and PBX Admin only. Webhook deliveries counted in the current one-minute window against the organization's `rate_limit_per_minute` (500 when no settings exist).
       responses:
         '200':
           description: Current webhook rate-limit window
@@ -29,3 +30,7 @@ paths:
                         type: integer
                       reset_in_seconds:
                         type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
