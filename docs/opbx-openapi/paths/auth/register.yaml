@@ -23,7 +23,8 @@ paths:
 
         email-domain check (disposable, blocklisted, role-account, etc.). When
 
-        reCAPTCHA is enabled, a supplied `recaptcha_token` is verified with Google.
+        reCAPTCHA is enabled, a supplied `recaptcha_token` is verified with Google. The token is optional:
+        a request without it is not checked.
 
         '
       operationId: register
@@ -104,7 +105,7 @@ paths:
                   type:
                   - string
                   - 'null'
-                  description: reCAPTCHA v3 token (if enabled)
+                  description: 'Optional reCAPTCHA v3 token. Verified when reCAPTCHA is enabled and the token is sent; omitting it skips the check.'
               required:
               - organization
               - admin
