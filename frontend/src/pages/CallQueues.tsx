@@ -745,7 +745,7 @@ export default function CallQueues() {
                   excludeIds={editing && form.fallback_action === 'call_queue' ? [String(editing.id)] : undefined}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used when a caller exceeds max wait or no agents are available.
+                  Used when a caller has waited longer than Max Wait. Callers keep waiting while no agent is available.
                 </p>
               </div>
           </div>
