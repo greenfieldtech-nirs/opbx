@@ -41,7 +41,13 @@ properties:
     default: false
   conference_ring_all:
     type: boolean
-    description: No default; the stored value is kept when omitted on update
+    default: true
+    description: >-
+      Ring Agents in Separate Calls (used with the `ring_all` strategy). On create, defaults to
+      `true` when the strategy is `ring_all` (also when `strategy` is omitted, which means
+      `ring_all`) and to `false` otherwise. On update, the stored value is kept when omitted.
+      When `false`, a Ring All queue rings all agents in one call and the answering agent is not
+      recorded on the call log or CDR.
   announce_position_timeout:
     type:
       - integer

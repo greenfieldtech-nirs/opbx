@@ -180,7 +180,7 @@ OPBX stores the extension on the call record when Cloudonix reports the call, by
 
    The first extension recorded for a call is kept, so a call belongs to the agent who took it first.
 
-Otherwise the Extension is empty: a call that nobody answered in a ring group or queue and a **Ring All** call queue that rings several agents at once without **Ring Agents in Separate Calls**. A ring group is attributed the same way however the call reaches it (phone number, IVR, business hours action, or another group's, queue's or AI load balancer's fallback). Such a call can still be found by its Destination.
+Otherwise the Extension is empty: a call that nobody answered in a ring group or queue and a **Ring All** call queue whose **Ring Agents in Separate Calls** has been switched off (it is on by default), which rings several agents in one call. A ring group is attributed the same way however the call reaches it (phone number, IVR, business hours action, or another group's, queue's or AI load balancer's fallback). Such a call can still be found by its Destination.
 
 A PBX User therefore sees the inbound calls they answered through a ring group, IVR or queue. Records that existed before this column was added were filled in once with rules 1 to 3 and the current DID routing; answered call queue calls were also filled in once with their agent's extension. Other older calls answered through a ring group or IVR stay empty.
 

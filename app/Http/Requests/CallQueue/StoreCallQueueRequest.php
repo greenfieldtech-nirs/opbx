@@ -106,7 +106,6 @@ class StoreCallQueueRequest extends FormRequest
             'immediate_connect' => [
                 'boolean',
             ],
-            // No prepareForValidation default on purpose: an omitted flag must not silently switch it off.
             'conference_ring_all' => [
                 'sometimes',
                 'boolean',
@@ -358,6 +357,8 @@ class StoreCallQueueRequest extends FormRequest
             'announce_position_timeout' => 60,
             'immediate_connect' => false,
             'fallback_action' => RingGroupFallbackAction::HANGUP->value,
+            // Create only (updates keep the stored value): a new Ring All queue rings agents in separate calls.
+            'conference_ring_all' => ($this->input('strategy') ?? CallQueueStrategy::RING_ALL->value) === CallQueueStrategy::RING_ALL->value,
         ];
 
         foreach ($defaults as $key => $value) {

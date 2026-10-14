@@ -80,7 +80,7 @@ const emptyForm: QueueFormState = {
   announce_position_timeout: 60,
   announce_position_language: '',
   immediate_connect: false,
-  conference_ring_all: false,
+  conference_ring_all: true,
   moh_recording_id: '',
   fallback_action: 'hangup',
   fallback_extension_id: '',

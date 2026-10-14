@@ -32,7 +32,7 @@ A call queue. Live state (waiting callers, agent states) is kept by the [ACD wor
 | `announce_position_timeout` | smallint unsigned | No | `60` | Seconds between position announcements |
 | `announce_position_language` | varchar(20) | Yes | null | Language of the announcements |
 | `immediate_connect` | boolean | No | `false` | When an agent becomes available, connect the first waiting caller at once instead of waiting for the next poll |
-| `conference_ring_all` | boolean | No | `false` | With the `ring_all` strategy, offer the call to the agents as per-agent conference sessions |
+| `conference_ring_all` | boolean | No | `false` | With the `ring_all` strategy, offer the call to the agents as per-agent conference sessions. The create request defaults it to `true` for a `ring_all` queue (column default stays `false`); migration `2026_10_15_110000_enable_conference_ring_all_on_ring_all_queues` switched it on for existing `ring_all` queues |
 | `moh_recording_id` | bigint unsigned | Yes | null | Music-on-hold recording. Foreign key to `recordings`, on delete set null |
 | `fallback_action` | enum | No | `hangup` | Where the call goes when the queue gives up. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `unavailable`, `call_queue` (cast to `RingGroupFallbackAction`) |
 | `fallback_extension_id` | bigint unsigned | Yes | null | Fallback extension. Foreign key to `extensions`, on delete set null |

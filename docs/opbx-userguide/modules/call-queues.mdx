@@ -261,7 +261,7 @@ Each queue's detail page has three tabs: **Live** (waiting callers and counters,
 | Announce Position Timeout | Every 15, 30, 60 or 120 seconds in the dialog (the API accepts 10 to 600). Default: 60 | The announcement interval |
 | Announce Position Language | **Default (English)** or a text-to-speech language (API: a code up to 20 characters) | The language of the announcements and of the `*45` confirmations |
 | Immediate Connect | Off by default | When an agent becomes available while callers wait, connect the next caller straight away (the hold music is interrupted) instead of waiting for the next hold loop |
-| Ring Agents in Separate Calls | Off by default. Shown only for Ring All | Each agent is rung in a call of their own; the first to answer is connected and the others stop ringing. Prevents late rings and three-way calls |
+| Ring Agents in Separate Calls | On by default for a new Ring All queue (existing Ring All queues were switched on too). Shown only for Ring All | Each agent is rung in a call of their own; the first to answer is connected and the others stop ringing. Prevents late rings and three-way calls. If you switch it off, all agents are rung in one call: the call log and CDR then do not show which agent answered (the Extension stays empty) |
 | Agents | At least 1, at most 100 active users with extensions | Who takes calls |
 | Overflow Fallback | Default: **Hang Up**. See [Fallback](#fallback-destination) | Where overflow calls go |
 | Status | Active or Inactive. Set from the list. New queues are Active | Inactive queues do not accept calls: callers hear a short "not available" message |
