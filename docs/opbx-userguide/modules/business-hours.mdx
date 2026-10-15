@@ -57,7 +57,7 @@ Use this module to:
 
 The toast "Business hours schedule has been created successfully." appears and the schedule is listed as **Active**. It becomes available as a routing type on phone numbers. If the name or an action is missing, the dialog marks the field and shows "Please fix the errors in the form."
 
-![Business Hours list with Holiday Hotline Hours (Unprovisioned), Main Office Hours and Support Desk Hours, showing timezone, exception count, last-modified date and status, with the search box, refresh button and status filter](../img/screens/business-hours-list.jpg)
+{/* SCREENSHOT: business-hours-list — Business Hours list with Holiday Hotline Hours showing Unprovisioned in the Status column, Main Office Hours and Support Desk Hours Active; timezone, exception count, last-modified date; toolbar with search, refresh and status filter */}
 
 ![Schedule dialog for Main Office Hours with the open-hours action IVR Menu Main Menu, the closed-hours action IVR Menu After Hours Menu and the weekly calendar](../img/screens/business-hours-create-dialog.jpg)
 
@@ -121,6 +121,8 @@ The toast "Business hours schedule has been updated successfully." appears. Edit
 
 The toast "Business hours schedule status updated" appears and the badge switches. **Disabled** is how the list shows an Inactive schedule. An Inactive schedule always uses its closed-hours action.
 
+An unprovisioned schedule shows **Unprovisioned** in the **Status** column instead. That badge is not a switch: open the schedule, choose a destination for the action that has none, and save; the status badge then comes back.
+
 ### Disconnect an action
 
 **Who can do this:** Owner, PBX Admin.
@@ -129,7 +131,7 @@ The toast "Business hours schedule status updated" appears and the badge switche
 2. In **Open Hours Action** or **Closed Hours Action**, choose **Disconnect** as the type.
 3. Click **Save Changes**.
 
-The action now stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule shows the **Unprovisioned** badge in the list and in the dialog title. See [Disconnect and unprovisioned schedules](#disconnect-and-unprovisioned-schedules).
+The action now stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule's **Status** column shows **Unprovisioned**, and the dialog title shows the same badge. See [Disconnect and unprovisioned schedules](#disconnect-and-unprovisioned-schedules).
 
 ### Find a schedule
 
@@ -140,7 +142,7 @@ The action now stores **Destination unavailable**: callers in that period hear "
 3. Click a column title (**Name**, **Last Modified** or **Status**) to sort by it; click it again to reverse the order.
 4. Click the refresh button to reload the list.
 
-A schedule with an action set to Destination unavailable shows the **Unprovisioned** badge next to its name; open it and choose a new destination.
+A schedule with an action set to Destination unavailable shows **Unprovisioned** in the **Status** column; open it and choose a new destination.
 
 ### Delete a schedule
 
@@ -155,11 +157,11 @@ The toast "Business hours schedule has been deleted." appears and the row disapp
 
 ## Disconnect and unprovisioned schedules
 
-On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows the **Unprovisioned** badge in the list and the dialog title.
+On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows **Unprovisioned** in the list's **Status** column and in the dialog title, and its status can't be switched from the list until every action has a destination again.
 
 The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
 
-An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Look for the **Unprovisioned** badge in the list to find these schedules, then choose a new destination.
+An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Look for **Unprovisioned** in the list's **Status** column to find these schedules, then choose a new destination.
 
 ## Duplicate a schedule
 

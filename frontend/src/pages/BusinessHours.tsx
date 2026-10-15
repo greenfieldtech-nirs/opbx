@@ -30,6 +30,7 @@ EmptyState
 } from '@/components/design-system';
 import type { BusinessHoursSchedule,ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 import {
 useBusinessHours,
 CreateEditScheduleDialog,
@@ -219,6 +220,7 @@ const BusinessHours: React.FC = () => {
             sortField={sortBy === 'name' ? 'identity' : sortBy}
             sortDirection={sortDirection}
             onSort={setSortBy}
+            showUnprovisionedBadge={false}
             canView={false}
             canEdit={false}
             onDelete={handleOpenDelete}
@@ -249,7 +251,11 @@ const BusinessHours: React.FC = () => {
               {
                 header: 'Status',
                 sortKey: 'status',
-                cell: (schedule) => (
+                cell: (schedule) => schedule.is_unprovisioned ? (
+                  // An action has no destination: the rule is unprovisioned until it is edited.
+                  // The badge is not a status toggle.
+                  <UnprovisionedBadge className="text-xs" />
+                ) : (
                   <Badge
                     variant={schedule.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
