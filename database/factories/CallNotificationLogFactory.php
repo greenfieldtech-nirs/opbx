@@ -9,7 +9,7 @@ use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<CallNotificationLog>
+ * @extends Factory<CallNotificationLog>
  */
 class CallNotificationLogFactory extends Factory
 {

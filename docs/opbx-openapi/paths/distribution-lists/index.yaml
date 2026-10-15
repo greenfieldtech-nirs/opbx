@@ -4,21 +4,35 @@ paths:
       tags:
       - Distribution Lists
       summary: List distribution lists
-      description: 'Get a paginated list of distribution lists.
+      description: 'Get a paginated list of distribution lists, newest first (by `created_at`).
 
 
-        Returns only the latest versions of each list.
+        By default only the latest version of each list is returned. Archived lists are
 
-        Supports filtering by status and campaign assignment.
+        not latest versions (archiving clears the flag), so they appear only with
+
+        `status=archived` or `status=all`.
+
+
+        Roles: Owner, PBX Admin and Reporter.
 
         '
       operationId: listDistributionLists
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
-      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: per_page
+        in: query
+        required: false
+        description: Items per page (values outside 1-100 are clamped)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
       - name: status
         in: query
         required: false
@@ -26,13 +40,17 @@ paths:
           type: string
           enum:
           - draft
+          - pending
           - processing
           - ready
           - in_use
           - used
           - failed
           - archived
-        description: Filter by list status
+          - all
+        description: Filter by list status. `archived` returns archived lists; `all` returns
+          the latest versions plus archived lists; any other value filters the latest versions
+          by that status.
       - name: campaign_id
         in: query
         required: false
@@ -44,7 +62,7 @@ paths:
         required: false
         schema:
           type: string
-        description: Search by list name
+        description: Substring match on the list name
       responses:
         '200':
           description: List of distribution lists
@@ -70,15 +88,21 @@ paths:
       description: 'Create a new empty distribution list.
 
 
-        The list is created in ''draft'' status and can be populated
+        The list is created in ''draft'' status (version 1) and can be populated
 
-        via upload or by adding destinations individually.
+        via upload or by adding destinations individually. In this response the
+
+        `statistics` counters are `null` (they are not read back after the insert).
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: createDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -124,15 +148,20 @@ paths:
       tags:
       - Distribution Lists
       summary: Download example CSV
-      description: 'Download an example CSV file showing the expected format
+      description: 'Download an example CSV file (`distribution_list_example.csv`) showing
 
-        for distribution list uploads.
+        a header row and three rows with `phone_number`, `name` and `batch_identifier`
+
+        columns. Column names are free-form: the upload maps them with `mapping[...]`.
+
+        Any authenticated organization user can download it (no role check).
 
         '
       operationId: downloadExampleCsv
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Example CSV file
@@ -141,13 +170,13 @@ paths:
               schema:
                 type: string
                 format: binary
-              example: 'phone_number,description
+              example: 'phone_number,name,batch_identifier
 
-                +14155551212,John Doe - Sales Lead
+                +14155551212,John Doe,batch-a
 
-                +14155551213,Jane Smith - Support Case
+                +14155551213,Jane Smith,batch-b
 
-                +14155551214,Bob Johnson - Follow-up Call
+                +14155551214,Bob Johnson,batch-a
 
                 '
           headers:
@@ -173,11 +202,19 @@ paths:
       tags:
       - Distribution Lists
       summary: Get distribution list
-      description: Get a specific distribution list by ID with full details
+      description: 'Get a specific distribution list by ID, with its `campaign` and
+
+        `used_by_campaign` relations loaded. Lists of other organizations return 404.
+
+
+        Roles: Owner, PBX Admin and Reporter.
+
+        '
       operationId: getDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Distribution list details
@@ -198,18 +235,22 @@ paths:
       tags:
       - Distribution Lists
       summary: Delete distribution list
-      description: 'Delete a distribution list.
+      description: |
+        Delete a distribution list completely: the list, all its destinations, their dial
+        sessions and its previous versions. Nothing of the list remains. The lists created by splitting a large
+        upload into it ("*name* (Part 2)" and so on; counted in `parts_count`) are deleted
+        the same way, in the same transaction.
 
-
-        Only lists in ''failed'' status can be deleted by non-owners.
-
-        Owners can delete any list.
-
-        '
+        Lists in 'failed' status can be deleted by Owners and PBX Admins; lists in any
+        other status only by Owners. If the list, or any of its parts, is assigned to a
+        campaign the request returns 409 and deletes nothing; each reference names the
+        campaign, and for a part its `detail` is `assigned part "<part name>"`. Unassign
+        it first.
       operationId: deleteDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: List deleted successfully
@@ -227,3 +268,13 @@ paths:
           $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '409':
+          $ref: ../../components/responses/ResourceInUse.yaml
+        '500':
+          description: Deleting the list failed
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: 'Failed to delete list: ...'

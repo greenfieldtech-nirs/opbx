@@ -43,6 +43,10 @@ public class StreamSession {
     public volatile String actionVoicemail = null;
     public volatile String actionUnknown = null;
     public volatile String sessionToken = null;
+    /** null while the Laravel session check is in flight; TRUE = active session, FALSE = rejected. */
+    public volatile Boolean sessionVerified = null;
+    /** Action callback produced before verification finished; sent on TRUE, dropped on FALSE. */
+    public Runnable heldCallback;
 
     private final java.util.List<double[]> rawAudioChunks = new java.util.ArrayList<>();
     private static final int MAX_RETAINED_AUDIO_MS = 5000; // Keep last 5 seconds for rolling buffer checks
@@ -87,13 +91,14 @@ public class StreamSession {
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
                            java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
-                           boolean dumpAudio, String dumpAudioPath) {
-        this(vertx, callSid, streamSid, timeoutMs, detectors, beepMl, dumpAudio, dumpAudioPath, null, null, null, null);
+                           boolean dumpAudio, String dumpAudioPath, int minBeepStartMs) {
+        this(vertx, callSid, streamSid, timeoutMs, detectors, beepMl, dumpAudio, dumpAudioPath, minBeepStartMs,
+            null, null, null, null);
     }
 
     public StreamSession(Vertx vertx, String callSid, String streamSid, int timeoutMs,
                            java.util.List<String> detectors, com.cloudonix.opbx.amd.detector.BeepMlDetector beepMl,
-                           boolean dumpAudio, String dumpAudioPath,
+                           boolean dumpAudio, String dumpAudioPath, int minBeepStartMs,
                            String sessionToken, String actionHuman, String actionVoicemail, String actionUnknown) {
         this.callSid = callSid;
         this.streamSid = streamSid;
@@ -103,12 +108,12 @@ public class StreamSession {
         this.actionVoicemail = actionVoicemail;
         this.actionUnknown = actionUnknown;
         this.vad = new EnergyVad(16000, 10, 200, 3000, 3, 20);
-        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, result -> {
+        this.pipeline = new DetectionPipeline(timeoutMs, detectors, beepMl, minBeepStartMs, resolved, result -> {
             if (onResultLogged != null) {
                 onResultLogged.accept(result);
             }
         });
-        this.dumper = new AudioDumper(dumpAudio, dumpAudioPath, callSid, streamSid);
+        this.dumper = new AudioDumper(dumpAudio, dumpAudioPath, callSid, streamSid, timeoutMs * 16); // 16 kHz
     }
 
     public void startTimeoutTimer(Vertx vertx) {
@@ -131,7 +136,7 @@ public class StreamSession {
         clearTimeout(vertx);
         resolved.set(true);
         if (dumper != null && dumper.isEnabled()) {
-            dumper.finalizeDump();
+            dumper.finalizeDump(vertx);
         }
     }
 }

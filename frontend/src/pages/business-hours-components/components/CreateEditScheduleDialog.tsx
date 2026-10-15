@@ -1,10 +1,10 @@
-import React from 'react';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -38,11 +38,13 @@ import type {
 import { applyScheduleTemplate } from '../utils/helpers';
 import { HolidayImportButton } from './HolidayImportButton';
 import { formatExceptionDate } from '@/utils/businessHours';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 interface CreateEditScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editing: boolean;
+  unprovisioned?: boolean;
   formData: Partial<BusinessHoursSchedule>;
   formErrors: Record<string, string>;
   onFormChange: (field: string, value: unknown) => void;
@@ -69,6 +71,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
   open,
   onOpenChange,
   editing,
+  unprovisioned,
   formData,
   formErrors,
   onFormChange,
@@ -85,31 +88,30 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
   closedHoursAction,
   onOpenHoursActionChange,
   onClosedHoursActionChange,
-  extensions,
-  ringGroups,
-  ivrMenus,
-  conferenceRooms,
 }) => {
   const handleApplyTemplate = (template: string) => {
     const newSchedule = applyScheduleTemplate(template);
     onFormChange('schedule', newSchedule);
   };
 
-  const days: { key: DayOfWeek; label: string }[] = [
-    { key: 'monday', label: 'Monday' },
-    { key: 'tuesday', label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday', label: 'Thursday' },
-    { key: 'friday', label: 'Friday' },
-    { key: 'saturday', label: 'Saturday' },
-    { key: 'sunday', label: 'Sunday' },
-  ];
+
+  // Tabs: Basic Information, Weekly Schedule, Exception Dates. Reopening the dialog starts on Basic Information.
+  const [tab, setTab] = useState<'basic' | 'weekly' | 'exceptions'>('basic');
+  useEffect(() => {
+    if (open) setTab('basic');
+  }, [open]);
+  // The dialog's own validation errors are all Basic Information fields: show that tab when they appear.
+  const basicHasErrors = !!(formErrors.name || formErrors.open_hours_action || formErrors.closed_hours_action);
+  useEffect(() => {
+    if (basicHasErrors) setTab('basic');
+  }, [basicHasErrors]);
+  const exceptionCount = formData.exceptions?.length ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit Schedule' : 'Create Schedule'}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Schedule' : 'Create Schedule'}{unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>
             {editing
               ? 'Update the business hours schedule configuration.'
@@ -117,10 +119,20 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="basic">
+              Basic Information
+              {basicHasErrors && <span className="ml-2 h-2 w-2 rounded-full bg-destructive" aria-label="has errors" />}
+            </TabsTrigger>
+            <TabsTrigger value="weekly">Weekly Schedule</TabsTrigger>
+            <TabsTrigger value="exceptions">
+              Exception Dates{exceptionCount > 0 && ` (${exceptionCount})`}
+            </TabsTrigger>
+          </TabsList>
+
           {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="font-semibold">Basic Information</h3>
+          <TabsContent value="basic" className="space-y-4 pt-2 min-h-[440px]">
 
             <div>
               <Label htmlFor="name">
@@ -204,14 +216,11 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
                 <p className="text-sm text-muted-foreground mt-2">Where to forward calls during closed hours</p>
               </Card>
             </div>
-          </div>
-
-          <Separator />
+          </TabsContent>
 
           {/* Weekly Schedule */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Weekly Schedule</h3>
+          <TabsContent value="weekly" className="space-y-4 pt-2 min-h-[440px]">
+            <div className="flex items-center justify-end">
               <div className="flex items-center gap-4">
                 <Button
                   variant="outline"
@@ -248,16 +257,14 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
               onOpenCopyHours={onOpenCopyHours}
               errors={formErrors}
             />
-          </div>
-
-          <Separator />
+          </TabsContent>
 
           {/* Exception Dates */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Exception Dates</h3>
+          <TabsContent value="exceptions" className="space-y-4 pt-2 min-h-[440px]">
+            <div className="flex items-center justify-end">
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   onClick={onAddException}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
@@ -341,8 +348,8 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
                 No exception dates added
               </div>
             )}
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

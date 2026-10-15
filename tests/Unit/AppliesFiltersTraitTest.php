@@ -29,8 +29,8 @@ class AppliesFiltersTraitTest extends TestCase
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
-            ]
+                'scope' => 'withStatus',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -50,8 +50,8 @@ class AppliesFiltersTraitTest extends TestCase
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
-            ]
+                'scope' => 'withStatus',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -72,8 +72,8 @@ class AppliesFiltersTraitTest extends TestCase
         $config = [
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -92,8 +92,8 @@ class AppliesFiltersTraitTest extends TestCase
         $config = [
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
-            ]
+                'scope' => 'search',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -115,8 +115,8 @@ class AppliesFiltersTraitTest extends TestCase
             'user_id' => [
                 'type' => 'column',
                 'scope' => 'forUser',
-                'require_filled' => true
-            ]
+                'require_filled' => true,
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -136,8 +136,8 @@ class AppliesFiltersTraitTest extends TestCase
 
         $config = [
             'category' => [
-                'type' => 'column'
-            ]
+                'type' => 'column',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);
@@ -151,7 +151,7 @@ class AppliesFiltersTraitTest extends TestCase
         $request = Request::create('/', 'GET', [
             'status' => 'active',
             'search' => 'test',
-            'category' => 'example'
+            'category' => 'example',
         ]);
 
         $query->shouldReceive('withStatus')
@@ -173,15 +173,15 @@ class AppliesFiltersTraitTest extends TestCase
             'status' => [
                 'type' => 'enum',
                 'enum' => UserStatus::class,
-                'scope' => 'withStatus'
+                'scope' => 'withStatus',
             ],
             'search' => [
                 'type' => 'search',
-                'scope' => 'search'
+                'scope' => 'search',
             ],
             'category' => [
-                'type' => 'column'
-            ]
+                'type' => 'column',
+            ],
         ];
 
         $result = $this->applyFilters($query, $request, $config);

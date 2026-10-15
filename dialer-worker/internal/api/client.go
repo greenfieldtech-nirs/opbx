@@ -47,7 +47,7 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 	}
 
 	// Debug: log the data type
-	c.logger.Info("GetActiveCampaigns response", "data_type", fmt.Sprintf("%T", response.Data))
+	c.logger.Debug("GetActiveCampaigns response", "data_type", fmt.Sprintf("%T", response.Data))
 
 	// Extract campaigns from data wrapper
 	campaignsData, err := json.Marshal(response.Data)
@@ -60,9 +60,9 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 		return nil, fmt.Errorf("failed to unmarshal campaigns: %w", err)
 	}
 
-	c.logger.Info("GetActiveCampaigns result", "count", len(campaigns))
+	c.logger.Debug("GetActiveCampaigns result", "count", len(campaigns))
 	for i, camp := range campaigns {
-		c.logger.Info("Campaign details",
+		c.logger.Debug("Campaign details",
 			"index", i,
 			"id", camp.ID,
 			"name", camp.Name,
@@ -74,7 +74,7 @@ func (c *Client) GetActiveCampaigns(ctx context.Context) ([]models.Campaign, err
 		)
 		// Log pool items
 		for j, item := range camp.CallerIDPool {
-			c.logger.Info("Pool item",
+			c.logger.Debug("Pool item",
 				"campaign_id", camp.ID,
 				"index", j,
 				"did_id", item.DIDID,
@@ -109,13 +109,8 @@ func (c *Client) GetPendingDestinations(ctx context.Context, campaignID int64, l
 	return destinations, nil
 }
 
-// InitiateCall creates a new call session via Laravel
-func (c *Client) InitiateCall(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string) (*models.InitiateCallResponse, error) {
-	return c.InitiateCallWithCallerID(ctx, campaignID, destinationID, phoneNumber, workerID, "", 0)
-}
-
 // InitiateCallWithCallerID creates a new call session via Laravel with a specific Caller ID
-func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64) (*models.InitiateCallResponse, error) {
+func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64, destinationID int64, phoneNumber string, workerID string, callerID string, callerDIDID int64, idemKey string) (*models.InitiateCallResponse, error) {
 	req := models.InitiateCallRequest{
 		CampaignID:    campaignID,
 		DestinationID: destinationID,
@@ -127,7 +122,7 @@ func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64,
 	}
 
 	var response models.APIResponse
-	err := c.post(ctx, "/api/v1/dialer/worker/calls/initiate", req, &response)
+	err := c.doRequest(ctx, http.MethodPost, "/api/v1/dialer/worker/calls/initiate", req, &response, map[string]string{"Idempotency-Key": idemKey})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate call: %w", err)
 	}
@@ -146,51 +141,17 @@ func (c *Client) InitiateCallWithCallerID(ctx context.Context, campaignID int64,
 	return &callResp, nil
 }
 
-// UpdateCallStatus updates the status of a call session
-func (c *Client) UpdateCallStatus(ctx context.Context, sessionID int64, req models.UpdateCallStatusRequest) error {
-	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/status", sessionID)
-	return c.patch(ctx, url, req, nil)
-}
-
-// SetCallDisposition sets the disposition for a completed call
-func (c *Client) SetCallDisposition(ctx context.Context, sessionID int64, req models.SetDispositionRequest) (*models.SetDispositionResponse, error) {
-	url := fmt.Sprintf("/api/v1/dialer/worker/calls/%d/disposition", sessionID)
-
-	var response models.APIResponse
-	err := c.post(ctx, url, req, &response)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set disposition: %w", err)
-	}
-
-	// Extract response data
-	responseData, err := json.Marshal(response.Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response data: %w", err)
-	}
-
-	var dispResp models.SetDispositionResponse
-	if err := json.Unmarshal(responseData, &dispResp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &dispResp, nil
-}
-
 // HTTP helper methods
 
 func (c *Client) get(ctx context.Context, path string, result interface{}) error {
-	return c.doRequest(ctx, http.MethodGet, path, nil, result)
+	return c.doRequest(ctx, http.MethodGet, path, nil, result, nil)
 }
 
 func (c *Client) post(ctx context.Context, path string, body, result interface{}) error {
-	return c.doRequest(ctx, http.MethodPost, path, body, result)
+	return c.doRequest(ctx, http.MethodPost, path, body, result, nil)
 }
 
-func (c *Client) patch(ctx context.Context, path string, body, result interface{}) error {
-	return c.doRequest(ctx, http.MethodPatch, path, body, result)
-}
-
-func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}) error {
+func (c *Client) doRequest(ctx context.Context, method, path string, body, result interface{}, headers map[string]string) error {
 	url := c.baseURL + path
 
 	var bodyReader io.Reader
@@ -210,6 +171,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 	req.Header.Set("Authorization", "Bearer "+c.apiToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -232,8 +196,12 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 		}
 	}
 
+	if resp.StatusCode == http.StatusConflict {
+		return fmt.Errorf("%w (%s)", errors.ErrDestinationConflict, path)
+	}
+
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512)) // never log unbounded error pages
 		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(bodyBytes))
 	}
 

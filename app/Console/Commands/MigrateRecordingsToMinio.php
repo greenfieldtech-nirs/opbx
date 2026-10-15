@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Recording;
+use App\Scopes\OrganizationScope;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -44,10 +45,11 @@ class MigrateRecordingsToMinio extends Command
             $this->info("Migrating recordings for organization ID: {$organizationId}");
         }
 
-        $recordings = $query->get();
+        $recordings = OrganizationScope::bypass(fn () => $query->get());
 
         if ($recordings->isEmpty()) {
             $this->info('No recordings found to migrate.');
+
             return;
         }
 
@@ -88,13 +90,13 @@ class MigrateRecordingsToMinio extends Command
         $progressBar->finish();
         $this->newLine(2);
 
-        $this->info("Migration completed:");
+        $this->info('Migration completed:');
         $this->info("- Migrated: {$migrated}");
         $this->info("- Skipped: {$skipped}");
         $this->info("- Errors: {$errors}");
 
-        if (!$dryRun && $errors > 0) {
-            $this->warn("Some recordings failed to migrate. Check logs for details.");
+        if (! $dryRun && $errors > 0) {
+            $this->warn('Some recordings failed to migrate. Check logs for details.');
         }
     }
 
@@ -107,8 +109,9 @@ class MigrateRecordingsToMinio extends Command
         $minioPath = "{$recording->organization_id}/{$recording->file_path}";
 
         // Check if file exists locally
-        if (!file_exists($localPath)) {
+        if (! file_exists($localPath)) {
             $this->warn("Local file not found for recording {$recording->id}: {$localPath}");
+
             return 'error';
         }
 
@@ -130,7 +133,7 @@ class MigrateRecordingsToMinio extends Command
             'private'
         );
 
-        if (!$uploaded) {
+        if (! $uploaded) {
             throw new \Exception("Failed to upload file to MinIO: {$minioPath}");
         }
 

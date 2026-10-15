@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { JsonViewer } from '@textea/json-viewer';
+import { JsonViewer } from '@/components/ui/JsonViewer';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import type { CallDetailRecord } from '@/types/api.types';
@@ -35,11 +35,15 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
             <div className="space-y-4 min-w-0">
               <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-muted-foreground">From</div>
+                  <div className="text-sm font-medium text-muted-foreground">Extension</div>
+                  <div className="text-base break-words">{cdr.extension_number || '-'}</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-muted-foreground">Caller ID</div>
                   <div className="text-base break-words">{formatPhoneNumber(cdr.from)}</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-muted-foreground">To</div>
+                  <div className="text-sm font-medium text-muted-foreground">Destination</div>
                   <div className="text-base break-words">{formatPhoneNumber(cdr.to)}</div>
                 </div>
                 <div className="min-w-0">
@@ -151,13 +155,13 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
                             </div>
                             <div className="mb-2 min-w-0">
                               <div className="text-xs font-medium text-gray-700 mb-1">URL:</div>
-                              <div className="text-xs font-mono bg-white p-2 rounded border text-gray-800 break-all overflow-wrap-anywhere max-w-full">
+                              <div className="text-xs font-mono bg-white p-2 rounded-sm border text-gray-800 break-all overflow-wrap-anywhere max-w-full">
                                 {execution.url}
                               </div>
                             </div>
                             <div className="min-w-0">
                               <div className="text-xs font-medium text-gray-700 mb-1">CXML Response:</div>
-                              <div className="rounded border overflow-auto max-w-full">
+                              <div className="rounded-sm border overflow-auto max-w-full">
                                 <SyntaxHighlighter
                                   language="xml"
                                   style={vscDarkPlus}
@@ -194,23 +198,9 @@ export function CdrDetailsDialog({ cdr, open, onOpenChange }: CdrDetailsDialogPr
                   {cdr.raw_cdr ? (
                     <div className="min-w-0">
                       <div className="text-sm font-semibold mb-2">Raw CDR Data</div>
-                      <div className="border rounded overflow-x-auto bg-slate-900 max-w-full">
+                      <div className="border rounded-sm overflow-x-auto bg-slate-900 max-w-full">
                         <div className="p-4 min-w-0">
-                          <JsonViewer
-                            value={cdr.raw_cdr}
-                            theme="dark"
-                            defaultInspectDepth={1}
-                            enableClipboard={true}
-                            displayDataTypes={false}
-                            quotesOnKeys={false}
-                            style={{
-                              backgroundColor: '#0f172a',
-                              fontSize: '0.875rem',
-                              wordBreak: 'break-word',
-                              overflowWrap: 'break-word',
-                              maxWidth: '100%',
-                            }}
-                          />
+                          <JsonViewer data={cdr.raw_cdr} collapsed={1} />
                         </div>
                       </div>
                     </div>

@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { HomeHeader } from './Home/HomeHeader';
 import { AnnouncementBanner } from './Home/AnnouncementBanner';
 import { Hero } from './Home/Hero';
@@ -15,6 +17,18 @@ import { FinalCTA } from './Home/FinalCTA';
 import { Footer } from './Home/Footer';
 
 export default function Home() {
+  const { hash } = useLocation();
+
+  // Arriving from another page (e.g. /status -> /#pricing) the browser looks for the anchor before
+  // the sections render, so scroll once they exist and again once web fonts settle the layout.
+  useEffect(() => {
+    if (!hash) return;
+    const scroll = () => document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
+    const frame = requestAnimationFrame(scroll);
+    document.fonts?.ready.then(scroll);
+    return () => cancelAnimationFrame(frame);
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular">
       <AnnouncementBanner />

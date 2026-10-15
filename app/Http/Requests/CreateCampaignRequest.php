@@ -8,6 +8,7 @@ use App\Enums\CallerIdStrategy;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class CreateCampaignRequest extends FormRequest
 {
@@ -36,6 +37,7 @@ class CreateCampaignRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::requiredIf(fn () => $this->input('routing_destination_type') !== 'hangup'),
+                $this->routingDestinationExists(),
             ],
 
             // Cloudonix API Parameters
@@ -110,16 +112,34 @@ class CreateCampaignRequest extends FormRequest
             'action_human' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
             'action_unknown' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],
             'retry_on_voicemail' => ['boolean'],
+            'retry_on_busy_no_answer' => ['boolean'],
+            'retry_delay_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
 
             // Auto-start option
             'auto_start' => ['boolean'],
 
             // Caller ID Pooling
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
-            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
             'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'caller_id_strategy' => ['sometimes', Rule::enum(CallerIdStrategy::class)],
         ];
+    }
+
+    /**
+     * The routing destination must exist in the caller's organization (table chosen by destination type).
+     */
+    private function routingDestinationExists(): \Closure|Exists
+    {
+        $table = match ($this->input('routing_destination_type')) {
+            'ai_assistant' => 'ai_assistants',
+            'ai_load_balancer' => 'ai_assistant_load_balancers',
+            default => null,
+        };
+
+        return $table === null
+            ? fn () => true
+            : Rule::exists($table, 'id')->where('organization_id', $this->user()?->organization_id);
     }
 
     /**
@@ -162,6 +182,8 @@ class CreateCampaignRequest extends FormRequest
             'action_human' => 'human action',
             'action_unknown' => 'unknown action',
             'retry_on_voicemail' => 'retry on voicemail',
+            'retry_on_busy_no_answer' => 'retry on busy / no-answer',
+            'retry_delay_minutes' => 'retry delay',
         ];
     }
 }

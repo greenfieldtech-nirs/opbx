@@ -30,12 +30,11 @@ class CallDetailRecordResource extends JsonResource
             'session_token' => $this->session_token,
             'session_id' => $this->session_id,
 
-            // Call participants
+            // Call participants: the extension the call belongs to; `from` is the Caller ID it presented
+            'extension_number' => $this->extension_number,
             'from' => $this->from,
             'to' => $this->to,
-            'direction' => $this->resource->relationLoaded('sessionUpdate')
-                ? $this->sessionUpdate?->direction
-                : null,
+            'direction' => $this->direction,
 
             // Call details
             'disposition' => $this->disposition,
@@ -75,7 +74,9 @@ class CallDetailRecordResource extends JsonResource
             // Call recording
             'recording_status' => $this->recording_status,
             'recording_duration' => $this->recording_duration,
-            'has_recording' => $this->recording_status === 'available',
+            // Only roles allowed to play (D13) see the player.
+            'has_recording' => $this->recording_status === 'available'
+                && (bool) $request->user()?->can('playRecording', $this->resource),
 
             // Complete raw CDR (only when explicitly requested via ?include=raw_cdr)
             'raw_cdr' => $this->when(

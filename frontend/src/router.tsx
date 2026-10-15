@@ -16,57 +16,60 @@ import Auth0Callback from '@/pages/Auth0Callback';
 import Auth0Onboarding from '@/pages/Auth0Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
+import PublicStatus from '@/pages/PublicStatus';
 
-// Lazy load pages for code splitting
-import { lazy } from 'react';
+// Lazy load pages for code splitting. trackedLazy() is React.lazy() plus a
+// signal to the global page loading indicator while the chunk downloads.
+import { trackedLazy } from '@/lib/pageLoadingStore';
 
-const Users = lazy(() => import('@/pages/UsersComplete'));
-const Supervisors = lazy(() => import('@/pages/Supervisors'));
-const Extensions = lazy(() => import('@/pages/Extensions'));
-const ConferenceRooms = lazy(() => import('@/pages/ConferenceRooms'));
-const AiAssistants = lazy(() => import('@/pages/AiAssistants'));
-const AiAssistantLoadBalancers = lazy(() => import('@/pages/AiAssistantLoadBalancers'));
-const PhoneNumbers = lazy(() => import('@/pages/PhoneNumbers'));
-const RingGroups = lazy(() => import('@/pages/RingGroups'));
-const CallQueues = lazy(() => import('@/pages/CallQueues'));
-const CallQueueDetail = lazy(() => import('@/pages/CallQueueDetail'));
-const QueueReports = lazy(() => import('@/pages/QueueReports'));
-const QueuesDashboard = lazy(() => import('@/pages/QueuesDashboard'));
-const PublicQueuesDashboard = lazy(() => import('@/pages/PublicQueuesDashboard'));
-const IVRMenus = lazy(() => import('@/pages/IVRMenus'));
-const BusinessHours = lazy(() => import('@/pages/BusinessHours'));
-const CallLogs = lazy(() => import('@/pages/CallLogs'));
-const LiveCalls = lazy(() => import('@/pages/LiveCalls'));
-const Announcements = lazy(() => import('@/pages/Announcements'));
-const Profile = lazy(() => import('@/pages/Profile'));
-const Settings = lazy(() => import('@/pages/Settings'));
-const OutboundWhitelistPage = lazy(() => import('@/pages/OutboundWhitelist'));
-const InboundBlacklistPage = lazy(() => import('@/pages/InboundBlacklist'));
-const TrunksPage = lazy(() => import('@/pages/Trunks'));
-const CallNotificationsSettings = lazy(() => import('@/pages/CallNotificationsSettings'));
-const ApiKeysSettings = lazy(() => import('@/pages/ApiKeysSettings'));
-const AutoDialerCampaigns = lazy(() => import('@/pages/AutoDialerCampaigns'));
-const AutoDialerCampaignDetail = lazy(() => import('@/pages/AutoDialerCampaignDetail'));
-const AutoDialerCampaignForm = lazy(() => import('@/pages/AutoDialerCampaignForm'));
-const AutoDialerUploadList = lazy(() => import('@/pages/AutoDialerUploadList'));
-const AutoDialerMonitor = lazy(() => import('@/pages/AutoDialerMonitor'));
-const DistributionLists = lazy(() => import('@/pages/DistributionLists'));
-const AcceptInvitation = lazy(() => import('@/pages/AcceptInvitation'));
-const DistributionListDetail = lazy(() => import('@/pages/DistributionListDetail'));
-const CallTrackingDashboard = lazy(() => import('@/pages/CallTrackingDashboard'));
-const CallTrackingCampaigns = lazy(() => import('@/pages/CallTrackingCampaigns'));
-const CallTrackingCampaignForm = lazy(() => import('@/pages/CallTrackingCampaignForm'));
-const CallTrackingCampaignDetail = lazy(() => import('@/pages/CallTrackingCampaignDetail'));
-const CallTrackingSessions = lazy(() => import('@/pages/CallTrackingSessions'));
-const CallTrackingDniSnippet = lazy(() => import('@/pages/CallTrackingDniSnippet'));
-const CallTrackingIntegrations = lazy(() => import('@/pages/CallTrackingIntegrations'));
+const Users = trackedLazy(() => import('@/pages/UsersComplete'));
+const Supervisors = trackedLazy(() => import('@/pages/Supervisors'));
+const Extensions = trackedLazy(() => import('@/pages/Extensions'));
+const ConferenceRooms = trackedLazy(() => import('@/pages/ConferenceRooms'));
+const AiAssistants = trackedLazy(() => import('@/pages/AiAssistants'));
+const AiAssistantLoadBalancers = trackedLazy(() => import('@/pages/AiAssistantLoadBalancers'));
+const PhoneNumbers = trackedLazy(() => import('@/pages/PhoneNumbers'));
+const RingGroups = trackedLazy(() => import('@/pages/RingGroups'));
+const CallQueues = trackedLazy(() => import('@/pages/CallQueues'));
+const CallQueueDetail = trackedLazy(() => import('@/pages/CallQueueDetail'));
+const QueueReports = trackedLazy(() => import('@/pages/QueueReports'));
+const QueuesDashboard = trackedLazy(() => import('@/pages/QueuesDashboard'));
+const PublicQueuesDashboard = trackedLazy(() => import('@/pages/PublicQueuesDashboard'));
+const IVRMenus = trackedLazy(() => import('@/pages/IVRMenus'));
+const BusinessHours = trackedLazy(() => import('@/pages/BusinessHours'));
+const CallLogs = trackedLazy(() => import('@/pages/CallLogs'));
+const LiveCalls = trackedLazy(() => import('@/pages/LiveCalls'));
+const Announcements = trackedLazy(() => import('@/pages/Announcements'));
+const Profile = trackedLazy(() => import('@/pages/Profile'));
+const Settings = trackedLazy(() => import('@/pages/Settings'));
+const OutboundWhitelistPage = trackedLazy(() => import('@/pages/OutboundWhitelist'));
+const InboundBlacklistPage = trackedLazy(() => import('@/pages/InboundBlacklist'));
+const TrunksPage = trackedLazy(() => import('@/pages/Trunks'));
+const CallNotificationsSettings = trackedLazy(() => import('@/pages/CallNotificationsSettings'));
+const ApiKeysSettings = trackedLazy(() => import('@/pages/ApiKeysSettings'));
+const AutoDialerCampaigns = trackedLazy(() => import('@/pages/AutoDialerCampaigns'));
+const AutoDialerCampaignDetail = trackedLazy(() => import('@/pages/AutoDialerCampaignDetail'));
+const AutoDialerCampaignForm = trackedLazy(() => import('@/pages/AutoDialerCampaignForm'));
+const AutoDialerUploadList = trackedLazy(() => import('@/pages/AutoDialerUploadList'));
+const AutoDialerMonitor = trackedLazy(() => import('@/pages/AutoDialerMonitor'));
+const DistributionLists = trackedLazy(() => import('@/pages/DistributionLists'));
+const AcceptInvitation = trackedLazy(() => import('@/pages/AcceptInvitation'));
+const DistributionListDetail = trackedLazy(() => import('@/pages/DistributionListDetail'));
+const CallTrackingDashboard = trackedLazy(() => import('@/pages/CallTrackingDashboard'));
+const CallTrackingCampaigns = trackedLazy(() => import('@/pages/CallTrackingCampaigns'));
+const CallTrackingCampaignForm = trackedLazy(() => import('@/pages/CallTrackingCampaignForm'));
+const CallTrackingCampaignDetail = trackedLazy(() => import('@/pages/CallTrackingCampaignDetail'));
+const CallTrackingSessions = trackedLazy(() => import('@/pages/CallTrackingSessions'));
+const CallTrackingDniSnippet = trackedLazy(() => import('@/pages/CallTrackingDniSnippet'));
+const CallTrackingIntegrations = trackedLazy(() => import('@/pages/CallTrackingIntegrations'));
 
 // Platform Management (lazy loaded)
-const PlatformDashboard = lazy(() => import('@/pages/platform/PlatformDashboard'));
-const PlatformOrganizations = lazy(() => import('@/pages/platform/PlatformOrganizations'));
-const PlatformOrganizationDetail = lazy(() => import('@/pages/platform/PlatformOrganizationDetail'));
-const PlatformUsers = lazy(() => import('@/pages/platform/PlatformUsers'));
-const PlatformAuditLog = lazy(() => import('@/pages/platform/PlatformAuditLog'));
+const PlatformDashboard = trackedLazy(() => import('@/pages/platform/PlatformDashboard'));
+const PlatformOrganizations = trackedLazy(() => import('@/pages/platform/PlatformOrganizations'));
+const PlatformOrganizationDetail = trackedLazy(() => import('@/pages/platform/PlatformOrganizationDetail'));
+const PlatformUsers = trackedLazy(() => import('@/pages/platform/PlatformUsers'));
+const PlatformAuditLog = trackedLazy(() => import('@/pages/platform/PlatformAuditLog'));
+const PlatformStatus = trackedLazy(() => import('@/pages/platform/PlatformStatus'));
 
 
 // Unified router - NO basename, handles all routes
@@ -75,6 +78,11 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <Home />,
+  },
+  // Public platform status page
+  {
+    path: '/status',
+    element: <PublicStatus />,
   },
   // Public auth routes (under /ui for consistency with existing setup)
   {
@@ -195,7 +203,7 @@ export const router = createBrowserRouter([
       {
         path: 'outbound-whitelist',
         element: (
-          <OwnerRoute>
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
             <OutboundWhitelistPage />
           </OwnerRoute>
         ),
@@ -242,35 +250,67 @@ export const router = createBrowserRouter([
       },
       {
         path: 'auto-dialer/campaigns',
-        element: <AutoDialerCampaigns />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerCampaigns />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/new',
-        element: <AutoDialerCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id',
-        element: <AutoDialerCampaignDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerCampaignDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id/edit',
-        element: <AutoDialerCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/campaigns/:id/upload',
-        element: <AutoDialerUploadList />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AutoDialerUploadList />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/distribution-lists',
-        element: <DistributionLists />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <DistributionLists />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/distribution-lists/:id',
-        element: <DistributionListDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <DistributionListDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'auto-dialer/monitor',
-        element: <AutoDialerMonitor />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <AutoDialerMonitor />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking',
@@ -278,36 +318,64 @@ export const router = createBrowserRouter([
       },
       {
         path: 'call-tracking/dashboard',
-        element: <CallTrackingDashboard />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingDashboard />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns',
-        element: <CallTrackingCampaigns />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingCampaigns />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/new',
-        element: <CallTrackingCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/:id',
-        element: <CallTrackingCampaignDetail />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingCampaignDetail />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/campaigns/:id/edit',
-        element: <CallTrackingCampaignForm />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingCampaignForm />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/sessions',
-        element: <CallTrackingSessions />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin', 'reporter']}>
+            <CallTrackingSessions />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/dni-snippet',
-        element: <CallTrackingDniSnippet />,
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <CallTrackingDniSnippet />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'call-tracking/integrations',
         element: (
-          <OwnerRoute>
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
             <CallTrackingIntegrations />
           </OwnerRoute>
         ),
@@ -358,6 +426,14 @@ export const router = createBrowserRouter([
         element: (
           <PlatformManagerRoute>
             <PlatformAuditLog />
+          </PlatformManagerRoute>
+        ),
+      },
+      {
+        path: 'platform/status',
+        element: (
+          <PlatformManagerRoute>
+            <PlatformStatus />
           </PlatformManagerRoute>
         ),
       },

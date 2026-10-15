@@ -9,7 +9,9 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Settings\UpdateCloudonixSettingsRequest;
 use App\Http\Requests\Settings\ValidateCloudonixRequest;
 use App\Models\CloudonixSettings;
+use App\Services\Cloudonix\CloudonixPackageService;
 use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\CloudonixClient\CloudonixProfileSync;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +88,8 @@ class SettingsController extends Controller
                 'no_answer_timeout' => $settings->no_answer_timeout,
                 'call_recording_mode' => $settings->call_recording_mode,
                 'recording_format' => $settings->recording_format,
-                'cloudonix_package' => $settings->cloudonix_package,
+                // Live from Cloudonix via the per-organization cache; the DB column is unused.
+                'cloudonix_package' => app(CloudonixPackageService::class)->get((int) $user->organization_id),
                 'is_configured' => $settings->isConfigured(),
                 'has_webhook_auth' => $settings->hasWebhookAuth(),
                 'created_at' => $settings->created_at->toIso8601String(),
@@ -124,6 +127,26 @@ class SettingsController extends Controller
             foreach (['domain_api_key', 'domain_requests_api_key'] as $keyField) {
                 if (isset($validated[$keyField]) && str_contains($validated[$keyField], '***')) {
                     unset($validated[$keyField]);
+                }
+            }
+
+            // domain_name is never client-supplied: it comes from the validated Cloudonix domain profile.
+            unset($validated['domain_name']);
+            $existing = CloudonixSettings::where('organization_id', $user->organization_id)->first();
+            $uuid = $validated['domain_uuid'] ?? $existing?->domain_uuid;
+            $domainKey = $validated['domain_api_key'] ?? $existing?->domain_api_key;
+            if ($uuid && $domainKey) {
+                $profileDomain = CloudonixClient::validateDomainCredentials($uuid, $domainKey)['profile']['domain'] ?? null;
+                if ($profileDomain) {
+                    $taken = DB::table('cloudonix_settings')->where('domain_name', $profileDomain)
+                        ->where('organization_id', '!=', $user->organization_id)->exists();
+                    if ($taken) {
+                        return response()->json([
+                            'message' => 'This Cloudonix domain is already registered to another organization.',
+                            'errors' => ['domain_uuid' => ['This Cloudonix domain is already registered to another organization.']],
+                        ], 422);
+                    }
+                    $validated['domain_name'] = $profileDomain;
                 }
             }
 
@@ -183,34 +206,11 @@ class SettingsController extends Controller
             // Sync settings to Cloudonix if credentials are configured
             $cloudonixSyncWarning = null;
             if ($settings->isConfigured()) {
-                // Map local field names to Cloudonix profile field names
-                $profileData = [
-                    'call-timeout' => $settings->no_answer_timeout,
-                    'recording-media-type' => $settings->recording_format,
-                ];
-
-                // Add callback URL if available
-                $callbackUrl = $settings->getCallbackUrl();
-                if ($callbackUrl) {
-                    $profileData['session-update-endpoint'] = $callbackUrl;
-                }
-
-                // Add requests API key if available (authorization for webhook callbacks)
-                if ($settings->domain_requests_api_key) {
-                    $profileData['authorization-api-key'] = $settings->domain_requests_api_key;
-                }
-
-                // Add CDR endpoint (auto-generated from app URL)
-                $cdrUrl = $settings->getCdrUrl();
-                if ($cdrUrl) {
-                    $profileData['cdr-endpoint'] = $cdrUrl;
-                }
-
-                $syncResult = $this->getCloudonixClient()->updateDomain(
-                    $settings->domain_uuid,
-                    $settings->domain_api_key,
-                    $profileData
-                );
+                $sync = app(CloudonixProfileSync::class);
+                // Orgs without a webhook key get one generated and pushed in the same call.
+                $syncResult = $settings->hasWebhookAuth()
+                    ? $sync->push($settings)
+                    : $sync->provisionWebhookKey($settings);
 
                 if (! $syncResult['success']) {
                     Log::warning('Failed to sync settings to Cloudonix', [
@@ -364,8 +364,9 @@ class SettingsController extends Controller
                 }
 
                 // Extract tenant billing package information
-                if (isset($domainProfile['tenant']['billingPlan']['package']['name'])) {
-                    $profileSettings['cloudonix_package'] = $domainProfile['tenant']['billingPlan']['package']['name'];
+                $package = CloudonixPackageService::packageFromProfile($domainProfile);
+                if ($package !== null) {
+                    $profileSettings['cloudonix_package'] = $package;
                 }
             }
 
@@ -380,6 +381,9 @@ class SettingsController extends Controller
             ]);
 
             if ($isValid) {
+                // Validate and Save refreshes the cached package tier.
+                app(CloudonixPackageService::class)->put((int) $user->organization_id, CloudonixPackageService::packageFromProfile($domainProfile));
+
                 return response()->json([
                     'valid' => true,
                     'message' => 'Cloudonix credentials are valid.',

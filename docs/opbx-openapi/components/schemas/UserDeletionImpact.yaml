@@ -1,0 +1,72 @@
+type: object
+description: |
+  Read-only preview of what deleting a user would change. Produced by
+  `UserDeletionImpactService::preview()`, the same code that runs during the delete.
+  Nothing is changed by the preview.
+required:
+  - extensions
+  - memberships
+  - routes
+  - empty_groups
+  - has_changes
+properties:
+  extensions:
+    type: array
+    description: Extensions currently assigned to the user (they are unassigned on delete, not removed).
+    items:
+      type: object
+      required: [id, extension_number]
+      properties:
+        id:
+          type: integer
+          example: 12
+        extension_number:
+          type: string
+          example: '1001'
+  memberships:
+    type: array
+    description: >-
+      Ring group memberships of the user's extensions and call queue agent memberships of the
+      user that the delete removes.
+    items:
+      type: object
+      required: [type, id, name, becomes_empty]
+      properties:
+        type:
+          type: string
+          enum: [ring_group, call_queue]
+        id:
+          type: integer
+        name:
+          type: string
+        becomes_empty:
+          type: boolean
+          description: True when removing these members leaves the group or queue with no members.
+  routes:
+    type: array
+    description: >-
+      Routing entries (fallbacks, IVR options, JSON destinations, business-hours actions) that
+      point at the user's extensions; the delete switches them to the `unavailable`
+      destination.
+    items:
+      type: object
+      required: [type, id, name, detail]
+      properties:
+        type:
+          type: string
+          description: Kind of routing entry (for example `business_hours`, `did_number`).
+        id:
+          type: integer
+        name:
+          type: string
+        detail:
+          type: string
+          description: Human-readable description of the affected route.
+  empty_groups:
+    type: integer
+    description: Number of entries in `memberships` with `becomes_empty` set to true.
+    example: 0
+  has_changes:
+    type: boolean
+    description: True when the delete would change any membership or route.
+    example: true

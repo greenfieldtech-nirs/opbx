@@ -3,6 +3,7 @@
  * Per-call history rows across all queues with filters and CSV export.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, PhoneCall, RefreshCw } from 'lucide-react';
@@ -11,7 +12,6 @@ import { toast } from 'sonner';
 import {
   callQueuesService,
   queueReportsService,
-  type QueueCallDisposition,
   type QueueCallRow,
 } from '@/services/callQueues.service';
 import { cdrService } from '@/services/cdr.service';
@@ -24,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const DISPOSITION_VARIANTS: Record<string, 'default' | 'destructive' | 'secondary'> = {
   answered: 'default',
@@ -64,17 +65,16 @@ export default function QueueReports() {
   };
 
   const { data: queuesData } = useQuery({
-    queryKey: ['call-queues'],
+    queryKey: queryKeys.callQueues.list({ per_page: 100 }),
     queryFn: () => callQueuesService.getAll({ per_page: 100 }),
   });
 
   const queueNameById = new Map((queuesData?.data ?? []).map((q) => [q.id, q.name]));
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['queue-calls', params],
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: queryKeys.queueCalls.list(params),
     queryFn: () => queueReportsService.list(params),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
-    refetchIntervalInBackground: true,
   });
 
   const columns: Column<QueueCallRow>[] = [
@@ -106,6 +106,10 @@ export default function QueueReports() {
     },
   ];
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load queue report" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -136,11 +140,14 @@ export default function QueueReports() {
             <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button asChild variant="outline">
-            <a href={queueReportsService.exportCsvUrl(params)} download>
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </a>
+          <Button
+            variant="outline"
+            onClick={() =>
+              queueReportsService.exportCsv(params).catch(() => toast.error('Failed to export CSV'))
+            }
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
           </Button>
         </div>
       </div>

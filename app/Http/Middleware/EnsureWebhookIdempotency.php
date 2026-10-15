@@ -18,13 +18,13 @@ class EnsureWebhookIdempotency
     /**
      * Handle an incoming request.
      *
-     * @param \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response) $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $idempotencyKey = $this->getIdempotencyKey($request);
 
-        if (!$idempotencyKey) {
+        if (! $idempotencyKey) {
             Log::warning('Webhook received without idempotency key', [
                 'url' => $request->fullUrl(),
                 'ip' => $request->ip(),
@@ -94,63 +94,77 @@ class EnsureWebhookIdempotency
         $cacheKey = "idem:webhook:{$idempotencyKey}";
         $ttl = config('webhooks.idempotency.ttl', 86400);
 
-        // Check if webhook was already processed
-        if (Cache::has($cacheKey)) {
+        // Only successful responses are stored, so a replay is always a real success.
+        $cachedResponse = Cache::get($cacheKey);
+        if ($cachedResponse !== null) {
             Log::info('Duplicate webhook detected (idempotent)', [
                 'idempotency_key' => $idempotencyKey,
                 'url' => $request->fullUrl(),
             ]);
 
-            // Return cached response or 200 OK
-            $cachedResponse = Cache::get($cacheKey);
+            return $this->replay($cachedResponse);
+        }
 
-            if (is_array($cachedResponse)) {
-                $status = $cachedResponse['status'] ?? 200;
+        // Atomic claim: only one concurrent delivery runs the handler.
+        $claimKey = $cacheKey.':lock';
+        if (! Cache::add($claimKey, 1, 60)) {
+            Log::info('Duplicate webhook while the first is still processing', [
+                'idempotency_key' => $idempotencyKey,
+                'url' => $request->fullUrl(),
+            ]);
 
-                // If full content was cached, return it
-                if (isset($cachedResponse['content'])) {
-                    return response($cachedResponse['content'], $status)
-                        ->header('Content-Type', 'application/xml');
-                }
+            // Concurrent duplicate. Cloudonix does not retry webhooks (owner, 2026-10-11), so 409 only
+            // signals the duplicate; if the first attempt then fails, the event is not redelivered.
+            return response()->json(['error' => 'Webhook is being processed'], 409);
+        }
 
-                // If only metadata was cached (oversized response), return simple success
-                if (isset($cachedResponse['metadata_only']) && $cachedResponse['metadata_only']) {
-                    Log::debug('Returning success for oversized cached response', [
+        try {
+            $response = $next($request);
+
+            if ($response->isSuccessful()) {
+                try {
+                    $this->cacheResponse($cacheKey, $response, $ttl, $idempotencyKey);
+                } catch (\Exception $e) {
+                    Log::error('Failed to cache webhook idempotency key', [
                         'idempotency_key' => $idempotencyKey,
-                        'original_size' => $cachedResponse['size'] ?? 'unknown',
+                        'exception' => $e->getMessage(),
                     ]);
-
-                    return response('', $status);
                 }
             }
 
+            return $response;
+        } finally {
+            // Success stored the result above; failure leaves nothing, so a retry is processed.
+            Cache::forget($claimKey);
+        }
+    }
+
+    /**
+     * Rebuild a stored successful response, preserving its original Content-Type.
+     */
+    private function replay(mixed $cached): Response
+    {
+        if (! is_array($cached)) {
             return response('', 200);
         }
 
-        // Process the request
-        $response = $next($request);
+        $status = $cached['status'] ?? 200;
 
-        // Cache the idempotency key with response (with size limits)
-        try {
-            $this->cacheResponse($cacheKey, $response, $ttl, $idempotencyKey);
-        } catch (\Exception $e) {
-            Log::error('Failed to cache webhook idempotency key', [
-                'idempotency_key' => $idempotencyKey,
-                'exception' => $e->getMessage(),
-            ]);
+        if (isset($cached['content'])) {
+            return response($cached['content'], $status)
+                ->header('Content-Type', $cached['content_type'] ?? 'application/xml');
         }
 
-        return $response;
+        return response('', $status);
     }
 
     /**
      * Cache webhook response with size limits to prevent Redis memory exhaustion.
      *
-     * @param string $cacheKey Redis cache key
-     * @param Response $response HTTP response to cache
-     * @param int $ttl Time to live in seconds
-     * @param string $idempotencyKey Idempotency key for logging
-     * @return void
+     * @param  string  $cacheKey  Redis cache key
+     * @param  Response  $response  HTTP response to cache
+     * @param  int  $ttl  Time to live in seconds
+     * @param  string  $idempotencyKey  Idempotency key for logging
      */
     private function cacheResponse(string $cacheKey, Response $response, int $ttl, string $idempotencyKey): void
     {
@@ -165,6 +179,7 @@ class EnsureWebhookIdempotency
             Cache::put($cacheKey, [
                 'status' => $status,
                 'content' => $content,
+                'content_type' => $response->headers->get('Content-Type'),
                 'size' => $contentSize,
                 'processed_at' => now()->toIso8601String(),
             ], $ttl);
@@ -212,7 +227,7 @@ class EnsureWebhookIdempotency
 
         // Use route name as fallback event type - the event type is implicit in the
         // route for webhooks like call-initiated that don't carry a status field
-        if ($callId && !$eventType) {
+        if ($callId && ! $eventType) {
             $eventType = $request->route()?->getName();
         }
 
@@ -233,12 +248,10 @@ class EnsureWebhookIdempotency
         // This ensures the same payload always produces the same hash
         $payload = $request->all();
 
-        if (!empty($payload)) {
+        if (! empty($payload)) {
             return hash('sha256', json_encode($payload, JSON_PRESERVE_ZERO_FRACTION));
         }
 
         return null;
     }
-
-
 }

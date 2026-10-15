@@ -16,6 +16,7 @@ use App\Models\CallTrackingNotificationLog;
 use App\Models\CallTrackingNotificationSettings;
 use App\Models\CallTrackingSession;
 use App\Services\CallTracking\CallTrackingWebhookDispatcher;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -170,11 +171,11 @@ class CallTrackingNotificationSettingsController extends Controller
         }
 
         if (! empty($validated['from'])) {
-            $query->whereDate('created_at', '>=', $validated['from']);
+            $query->where('created_at', '>=', Carbon::parse($validated['from'])->startOfDay());
         }
 
         if (! empty($validated['to'])) {
-            $query->whereDate('created_at', '<=', $validated['to']);
+            $query->where('created_at', '<=', Carbon::parse($validated['to'])->endOfDay());
         }
 
         $logs = $query->orderByDesc('created_at')

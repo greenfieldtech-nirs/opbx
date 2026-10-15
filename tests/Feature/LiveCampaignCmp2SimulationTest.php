@@ -60,7 +60,7 @@ class LiveCampaignCmp2SimulationTest extends TestCase
             'organization_id' => $this->organization->id,
             'domain_uuid' => '6ff6c13b-809e-3d08-a305-24e9fd6b3da9',
             'domain_name' => 'dograh-ejm4ke.cloudonix.net',
-            'domain_requests_api_key' => 'XIBB0E3CD4FB1F46698DE5FC51B49A012E',
+            'domain_requests_api_key' => 'XI-test-not-a-real-key',
         ]);
 
         // Create Campaign CMP 2 (matching the user's request)

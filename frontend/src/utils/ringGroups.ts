@@ -5,7 +5,6 @@
 import type {
   RingGroup,
   RingGroupStrategy,
-  RingGroupMember,
 } from '@/types';
 
 export type RingGroupStatus = 'active' | 'inactive';
@@ -66,7 +65,7 @@ export function getFallbackDisplayText(
     case 'ai_assistant':
       return '→ AI Assistant';
     case 'hangup':
-      return 'Hangup';
+      return 'Hang Up';
     case 'repeat':
       return 'Repeat';
     default:

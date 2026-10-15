@@ -11,6 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating an existing user.
@@ -19,12 +20,32 @@ class UpdateUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
-        return true; // Authorization is handled by the controller via policy
+        $currentUser = $this->user();
+        $targetUser = $this->route('user');
+
+        // Role changes need the owner-only gate; password changes the dedicated gate.
+        if ($this->filled('role') && $this->input('role') !== $targetUser->role->value
+            && $currentUser->cannot('updateRole', $targetUser)) {
+            return false;
+        }
+
+        // Status (activate/deactivate) is a user-management action for Owner/PBX Admin,
+        // never on themselves or on the organization owner.
+        if ($this->filled('status') && $this->input('status') !== $targetUser->status->value
+            && (! $currentUser->role->canManageUsers()
+                || $currentUser->id === $targetUser->id
+                || $targetUser->role->isOwner())) {
+            return false;
+        }
+
+        if ($this->filled('password') && $currentUser->cannot('updatePassword', $targetUser)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -34,7 +55,6 @@ class UpdateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        $currentUser = $this->user();
         $targetUser = $this->route('user');
 
         return [
@@ -44,10 +64,8 @@ class UpdateUserRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
-                // Email must be unique within the organization, excluding current user
-                Rule::unique('users', 'email')->where(function ($query) use ($currentUser) {
-                    return $query->where('organization_id', $currentUser->organization_id);
-                })->ignore($targetUser->id),
+                // Email is globally unique across all organizations, excluding this user
+                Rule::unique('users', 'email')->ignore($targetUser->id),
             ],
             'password' => [
                 'nullable',
@@ -101,8 +119,7 @@ class UpdateUserRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {

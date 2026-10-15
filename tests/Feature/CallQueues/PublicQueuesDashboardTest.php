@@ -6,6 +6,8 @@ namespace Tests\Feature\CallQueues;
 
 use App\Enums\UserRole;
 use App\Models\CallQueue;
+use App\Models\CallQueueAgent;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\QueueCall;
 use App\Models\User;
@@ -70,12 +72,12 @@ class PublicQueuesDashboardTest extends TestCase
         // Regression: without an authenticated org context the tenant scope
         // must be bypassed or agents disappear from the public snapshot.
         $agent = User::factory()->create(['organization_id' => $this->organization->id]);
-        \App\Models\CallQueueAgent::factory()->create([
+        CallQueueAgent::factory()->create([
             'organization_id' => $this->organization->id,
             'call_queue_id' => $this->queue->id,
             'user_id' => $agent->id,
         ]);
-        \App\Models\Extension::factory()->create([
+        Extension::factory()->create([
             'organization_id' => $this->organization->id,
             'user_id' => $agent->id,
             'extension_number' => '3001',

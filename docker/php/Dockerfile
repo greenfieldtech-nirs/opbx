@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     supervisor \
     icu-dev \
     su-exec \
+    ffmpeg \
     && docker-php-ext-install \
     pdo_mysql \
     mbstring \
@@ -29,7 +30,7 @@ RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
     && apk del .build-deps
 
 # Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.10.3 /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www/html

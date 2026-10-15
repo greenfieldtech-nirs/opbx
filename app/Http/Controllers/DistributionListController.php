@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\CampaignStatus;
 use App\Enums\ListStatus;
+use App\Exceptions\ResourceInUseException;
 use App\Http\Resources\DistributionListResource;
 use App\Http\Resources\ListDestinationResource;
+use App\Http\Resources\ListVersionDestinationResource;
+use App\Http\Resources\ListVersionResource;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\AutoDialerListVersion;
 use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\ListManagementService;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DistributionListController extends Controller
 {
@@ -33,15 +39,22 @@ class DistributionListController extends Controller
         $this->authorize('viewAny', AutoDialerList::class);
 
         $lists = AutoDialerList::where('organization_id', Auth::user()->organization_id)
-            ->where('is_latest_version', true) // Only show latest versions
+            // Latest versions only; archiving clears the flag, so archived lists are matched explicitly.
+            ->where(fn ($q) => match ($request->status) {
+                'archived' => $q->where('status', ListStatus::ARCHIVED),
+                'all' => $q->where('is_latest_version', true)->orWhere('status', ListStatus::ARCHIVED),
+                default => $q->where('is_latest_version', true),
+            })
             ->with(['campaign', 'usedByCampaign'])
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->withExists('versions as has_versions')
+            ->withCount('parts')
+            ->when($request->status && $request->status !== 'all', fn ($q) => $q->where('status', $request->status))
             ->when($request->campaign_id, fn ($q) => $q->where('campaign_id', $request->campaign_id))
             ->when($request->search, function ($q, $search) {
                 $q->where('name', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 25);
+            ->paginate($this->perPage($request, 25));
 
         return response()->json([
             'data' => DistributionListResource::collection($lists),
@@ -85,7 +98,7 @@ class DistributionListController extends Controller
     {
         $this->authorize('view', $list);
 
-        $list->load(['campaign', 'usedByCampaign', 'parentList', 'versions']);
+        $list->load(['campaign', 'usedByCampaign', 'parentList'])->loadCount('parts');
 
         return response()->json([
             'data' => new DistributionListResource($list),
@@ -102,6 +115,7 @@ class DistributionListController extends Controller
     {
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:51200'],
+            'has_header' => ['nullable', 'boolean'],
             'mapping' => ['required', 'array'],
             'mapping.phone' => ['required', 'string'],
             'mapping.name' => ['nullable', 'string'],
@@ -112,6 +126,7 @@ class DistributionListController extends Controller
 
         $file = $validated['file'];
         $mapping = $validated['mapping'];
+        $mapping['has_header'] = filter_var($validated['has_header'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
         // Determine action based on list status
         $canUploadToCurrent = $list->status->canUpload();
@@ -139,14 +154,13 @@ class DistributionListController extends Controller
                     ],
                 ]);
             } else {
-                // Update existing list - backup old destinations first
+                // Replace the entries; the old ones are kept as a previous version
                 $this->authorize('createVersion', $list);
 
-                // Backup old destinations and update same list
                 $result = $this->listService->updateListWithBackup($list->id, $file, $mapping);
 
                 return response()->json([
-                    'message' => 'List updated with new data. Old destinations backed up. Processing started.',
+                    'message' => 'List updated with new data. Previous entries kept as a previous version. Processing started.',
                     'data' => [
                         ...$result,
                         'action' => 'update',
@@ -171,6 +185,8 @@ class DistributionListController extends Controller
      */
     public function uploadProgress(string $jobId): JsonResponse
     {
+        $this->authorize('viewAny', AutoDialerList::class);
+
         $progress = $this->listService->getUploadProgress($jobId);
 
         if (! $progress) {
@@ -288,7 +304,7 @@ class DistributionListController extends Controller
                 $q->where('phone_number', 'like', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 50);
+            ->paginate($this->perPage($request, 50));
 
         return response()->json([
             'data' => ListDestinationResource::collection($destinations),
@@ -302,16 +318,58 @@ class DistributionListController extends Controller
     }
 
     /**
-     * Get version history.
+     * Previous versions of the list (the entries each re-upload replaced), newest first.
      */
     public function getVersions(AutoDialerList $list): JsonResponse
     {
         $this->authorize('view', $list);
 
-        $versions = $list->getVersionHistory();
+        return response()->json([
+            'data' => ListVersionResource::collection($list->versions()->with('uploader')->orderByDesc('version_number')->get()),
+            'meta' => ['retention_days' => config('retention.auto_dialer_list_versions_days')],
+        ]);
+    }
+
+    /**
+     * Entries of a previous version, in file order, optionally searched by number or name.
+     */
+    public function getVersionDestinations(Request $request, AutoDialerList $list, AutoDialerListVersion $version): JsonResponse
+    {
+        $this->authorize('view', $list);
+
+        $destinations = $version->destinations()
+            ->when($request->string('search')->trim()->value(), fn ($q, string $search) => $q->where(
+                fn ($q) => $q->where('phone_number', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%")
+            ))
+            ->orderBy('id')
+            ->paginate($this->perPage($request, 50));
+
+        return $this->paginatedResponse($destinations, ListVersionDestinationResource::collection($destinations));
+    }
+
+    /**
+     * Download a previous version as CSV.
+     */
+    public function downloadVersion(AutoDialerList $list, AutoDialerListVersion $version): StreamedResponse
+    {
+        $this->authorize('download', $list);
+
+        return response()->streamDownload(
+            fn () => $this->listService->writeVersionCsv($version),
+            "{$list->name} (version {$version->version_number}).csv",
+            ['Content-Type' => 'text/csv'],
+        );
+    }
+
+    /**
+     * The "(Part N)" lists a large upload to this list was split into.
+     */
+    public function getParts(AutoDialerList $list): JsonResponse
+    {
+        $this->authorize('view', $list);
 
         return response()->json([
-            'data' => DistributionListResource::collection($versions),
+            'data' => DistributionListResource::collection($list->parts()->with('campaign')->orderBy('id')->get()),
         ]);
     }
 
@@ -413,12 +471,18 @@ class DistributionListController extends Controller
     {
         $this->authorize('delete', $list);
 
-        try {
-            // Delete associated destinations first
-            $list->destinations()->delete();
+        // The list and every part it was split into must be unassigned; deleting the list deletes the parts.
+        $checker = app(ResourceReferenceChecker::class);
+        $references = collect([$list, ...$list->allParts()])->flatMap(fn (AutoDialerList $each) => array_map(
+            fn (array $ref): array => $each->is($list) ? $ref : [...$ref, 'detail' => "assigned part \"{$each->name}\""],
+            $checker->checkReferences('distribution_list', $each->id, $each->organization_id)['references'],
+        ))->all();
+        if ($references !== []) {
+            throw new ResourceInUseException('distribution_list', $references);
+        }
 
-            // Delete the list
-            $list->delete();
+        try {
+            $this->listService->deleteList($list);
 
             return response()->json([
                 'message' => 'List deleted successfully',
@@ -450,25 +514,8 @@ class DistributionListController extends Controller
             ], 403);
         }
 
-        // Check if campaign can accept a list
-        if (! $campaign->canAcceptList()) {
-            return response()->json([
-                'error' => sprintf(
-                    'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (but not yet running).',
-                    $campaign->name,
-                    $campaign->status->label()
-                ),
-            ], 422);
-        }
-
-        // Additional check: active campaigns can only accept lists if they haven't started running yet
-        if ($campaign->status === CampaignStatus::ACTIVE && $campaign->isRunnable()) {
-            return response()->json([
-                'error' => sprintf(
-                    'Cannot assign list to "%s" because it is currently running. Pause the campaign first, then assign the list.',
-                    $campaign->name
-                ),
-            ], 422);
+        if ($refusal = $campaign->listAssignmentRefusal()) {
+            return response()->json(['error' => $refusal], 422);
         }
 
         // Check if list is ready for assignment
@@ -587,30 +634,10 @@ class DistributionListController extends Controller
     {
         $this->authorize('unassign', $list);
 
-        // Check if list is assigned to a campaign
-        if (! $list->campaign_id) {
-            return response()->json([
-                'error' => 'List is not assigned to any campaign',
-            ], 422);
-        }
-
-        // Check if all destinations are pending with zero dial attempts
-        if (! $list->canUnassign()) {
-            return response()->json([
-                'error' => 'Cannot unassign list: some destinations have already been dialed or are not in pending status. All entries must be pending with zero dial attempts.',
-            ], 422);
-        }
+        $campaignName = $list->campaign?->name;
 
         try {
-            $campaignName = $list->campaign?->name;
-
-            // Update the list to unassign it
-            $list->update([
-                'campaign_id' => null,
-                'status' => ListStatus::READY,
-                'used_by_campaign_id' => null,
-                'used_at' => null,
-            ]);
+            $this->listService->unassignList($list);
 
             return response()->json([
                 'message' => 'List unassigned from campaign successfully',
@@ -619,10 +646,10 @@ class DistributionListController extends Controller
                     'previous_campaign_name' => $campaignName,
                 ],
             ]);
-        } catch (\Exception $e) {
+        } catch (\InvalidArgumentException $e) {
             return response()->json([
-                'error' => 'Failed to unassign list from campaign: '.$e->getMessage(),
-            ], 500);
+                'error' => $e->getMessage(),
+            ], 422);
         }
     }
 }

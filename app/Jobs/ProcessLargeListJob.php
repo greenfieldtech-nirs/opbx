@@ -38,7 +38,9 @@ class ProcessLargeListJob implements ShouldQueue
         public string $jobId,
         public int $totalRows,
         public array $mapping = [],
-    ) {}
+    ) {
+        $this->onConnection('auto-dialer')->onQueue('auto-dialer-long');
+    }
 
     /**
      * Execute the job.
@@ -116,8 +118,8 @@ class ProcessLargeListJob implements ShouldQueue
 
                 // Dispatch job for this chunk
                 $chunkJobId = "{$this->jobId}_chunk_{$chunkNumber}";
-                ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, $this->mapping)
-                    ->onQueue('auto-dialer');
+                // Chunk files always carry a header row (real or synthesised column_N).
+                ProcessListUploadJob::dispatch($list->id, $chunkFile, $chunkJobId, false, [...$this->mapping, 'has_header' => true]);
 
                 Log::info('ProcessLargeListJob: Dispatched chunk', [
                     'source_list_id' => $this->sourceListId,
@@ -198,6 +200,12 @@ class ProcessLargeListJob implements ShouldQueue
             fclose($handle);
 
             return [];
+        }
+
+        if (! ($this->mapping['has_header'] ?? true)) {
+            // No header row: the first row is data and the chunk files get column_N headers.
+            $headers = array_map(fn ($i) => 'column_'.($i + 1), array_keys($headers));
+            rewind($handle);
         }
 
         $records = [];

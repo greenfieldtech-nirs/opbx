@@ -25,6 +25,13 @@ class ReconcileQueueCallDispositionJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public int $tries = 3;
+
+    public int $timeout = 30;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     public function __construct(
         public readonly int $queueCallId,
     ) {}
@@ -47,8 +54,9 @@ class ReconcileQueueCallDispositionJob implements ShouldQueue
             return;
         }
 
-        Redis::del("acd:cdr:{$queueCall->call_id}");
-
         $lifecycle->finalizeFromCdr($queueCall->organization_id, json_decode($payloadJson, true));
+
+        // Only after a successful finalize: a throw leaves the parked CDR for the retry.
+        Redis::del("acd:cdr:{$queueCall->call_id}");
     }
 }

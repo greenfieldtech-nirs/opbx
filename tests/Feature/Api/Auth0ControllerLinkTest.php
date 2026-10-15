@@ -38,6 +38,15 @@ class Auth0ControllerLinkTest extends TestCase
         $response->assertJsonPath('redirect_url', fn ($url) => str_contains($url, 'connection=google-oauth2'));
     }
 
+    public function test_link_refuses_unsupported_provider(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/v1/auth/auth0/link', ['provider' => 'facebook'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['provider']);
+    }
+
     public function test_callback_links_identity_when_emails_match(): void
     {
         $this->enableAuth0();

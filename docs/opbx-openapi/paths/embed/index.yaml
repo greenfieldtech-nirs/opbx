@@ -1,5 +1,43 @@
 paths:
   /v1/embed/config:
+    options:
+      tags:
+        - Embedded Dialer
+      summary: CORS preflight for embed config
+      description: |
+        Answers the browser CORS preflight for the embedded dialer. Reflects the request
+        `Origin` and allows the `Authorization` and `Content-Type` headers, with a 600 second
+        max age. Not token-authenticated, because preflight requests cannot carry the bearer
+        token. The real GET enforces the token and the origin allowlist (`embed_allowed_domains`).
+        The same preflight answer is returned for any `OPTIONS /v1/embed/*` path,
+        including `/v1/embed/calls-log`.
+      operationId: embedConfigPreflight
+      security: []
+      responses:
+        '204':
+          description: Preflight accepted
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              description: Echo of the request `Origin`.
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: GET, OPTIONS
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: Authorization, Content-Type
+            Access-Control-Max-Age:
+              schema:
+                type: string
+                example: '600'
+            Vary:
+              schema:
+                type: string
+                example: Origin
+
     get:
       tags:
         - Embedded Dialer
@@ -10,7 +48,17 @@ paths:
         authenticated by an embed token instead of a session/bearer token.
 
         Called by the widget iframe (`/embed/dialer`), not directly by host
-        pages. See the [Embedded Dialer guide](/modules/embedded-dialer).
+        pages. See the [Embedded Dialer guide](/opbx/modules/embedded-dialer).
+
+        Because the response carries SIP credentials, a request with no
+        `Origin` header is accepted only when the browser marks it
+        `Sec-Fetch-Site: same-origin` (the widget iframe); otherwise 403.
+        The country defaults to `us` when the organization has no country setting.
+
+        Rate limited to 60 requests per minute per token and IP. An absent
+        `Origin` passes the allowlist check; a present one must match an
+        allowlisted host (or `host:port`). When an `Origin` is sent it is
+        reflected in `Access-Control-Allow-Origin`.
       operationId: getEmbedConfig
       security:
         - embedTokenAuth: []
@@ -71,7 +119,9 @@ paths:
                     type: string
                     example: Invalid embed token.
         '403':
-          description: Request Origin is not in the organization's embed allowlist
+          description: >-
+            Origin not in the allowlist, no Origin on a cross-site request, or the
+            token's user or organization is not active
           content:
             application/json:
               schema:
@@ -79,7 +129,18 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Origin not allowed.
+              examples:
+                originNotAllowed:
+                  value:
+                    message: Origin not allowed.
+                originRequired:
+                  value:
+                    message: Origin required.
+                inactive:
+                  value:
+                    message: Embed token is not active.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
         '404':
           description: The target user has no extension assigned or the organization has no Cloudonix settings configured
           content:
@@ -101,6 +162,12 @@ paths:
         user's extension, identical in shape to `GET /v1/webphone/calls-log`
         but authenticated by an embed token instead of a session/bearer token.
         Coaching sentinel destinations (spy/barge/whisper) are excluded.
+        Returns an empty list when the user has no extension.
+
+        Rate limited to 60 requests per minute per token and IP. An absent
+        `Origin` passes the allowlist check; a present one must match an
+        allowlisted host (or `host:port`). When an `Origin` is sent it is
+        reflected in `Access-Control-Allow-Origin`.
       operationId: getEmbedCallsLog
       security:
         - embedTokenAuth: []
@@ -121,7 +188,9 @@ paths:
                           type: string
                           example: '+14155551212'
                         session_timestamp:
-                          type: string
+                          type:
+                            - string
+                            - 'null'
                           format: date-time
                         duration:
                           type: integer
@@ -129,6 +198,7 @@ paths:
                           example: 125
                         duration_formatted:
                           type: string
+                          description: MM:SS
                           example: '02:05'
                         disposition:
                           type: string
@@ -144,7 +214,7 @@ paths:
                     type: string
                     example: Invalid embed token.
         '403':
-          description: Request Origin is not in the organization's embed allowlist
+          description: Origin not in the allowlist, or the token's user or organization is not active
           content:
             application/json:
               schema:
@@ -152,4 +222,12 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: Origin not allowed.
+              examples:
+                originNotAllowed:
+                  value:
+                    message: Origin not allowed.
+                inactive:
+                  value:
+                    message: Embed token is not active.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'

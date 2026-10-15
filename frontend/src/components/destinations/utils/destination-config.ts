@@ -121,6 +121,14 @@ export const DESTINATION_TYPE_CONFIG: Record<DestinationType, TypeMetadata> = {
     category: 'termination',
     requiresDestination: false,
   },
+  unavailable: {
+    value: 'unavailable',
+    label: 'Destination unavailable',
+    description: "Tells the caller the destination doesn't exist, then hangs up",
+    icon: PhoneOff,
+    category: 'termination',
+    requiresDestination: false,
+  },
 };
 
 /**
@@ -140,15 +148,16 @@ export function getAllDestinationTypeConfigs(
 ): TypeMetadata[] {
   let types = Object.values(DESTINATION_TYPE_CONFIG);
 
-  // Filter by allowed types if provided
-  if (allowedTypes && allowedTypes.length > 0) {
-    types = types.filter((config) => allowedTypes.includes(config.value));
-  }
+  // Hang Up is offered when either includeHangup is set or allowedTypes lists it
+  const hangupAllowed = includeHangup || !!allowedTypes?.includes('hangup');
+  types = types.filter((config) =>
+    config.value === 'hangup'
+      ? hangupAllowed
+      : !allowedTypes?.length || allowedTypes.includes(config.value)
+  );
 
-  // Exclude hangup unless explicitly included
-  if (!includeHangup) {
-    types = types.filter((config) => config.value !== 'hangup');
-  }
+  // 'unavailable' is only ever set by the server; it is shown for the current value, never offered
+  types = types.filter((config) => config.value !== 'unavailable');
 
   return types;
 }
@@ -165,6 +174,17 @@ export function getDestinationTypeIcon(type: DestinationType): LucideIcon {
  */
 export function getDestinationTypeLabel(type: DestinationType): string {
   return DESTINATION_TYPE_CONFIG[type].label;
+}
+
+/**
+ * Human label for any raw routing/destination value coming from the API (e.g. 'call_queue' -> 'Call Queue').
+ * Falls back to a spaced title-case for values the config does not know (e.g. 'call_tracking').
+ */
+export function labelForRoutingType(type: string | null | undefined): string {
+  if (!type) return '-';
+  const known = (DESTINATION_TYPE_CONFIG as Record<string, TypeMetadata | undefined>)[type];
+  if (known) return known.label;
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -200,6 +220,7 @@ export const DESTINATION_BADGE_CONFIG: Record<string, { color: string; icon: str
   ai_load_balancer: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: 'Scale' },
   call_queue: { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: 'ListOrdered' },
   hangup: { color: 'bg-red-100 text-red-800 border-red-200', icon: 'PhoneOff' },
+  unavailable: { color: 'bg-red-100 text-red-800 border-red-200', icon: 'PhoneOff' },
 };
 
 /**
@@ -252,6 +273,7 @@ export const DEFAULT_EMPTY_MESSAGES: Record<DestinationType, string> = {
   ai_load_balancer: 'No AI load balancers available',
   call_queue: 'No call queues available',
   hangup: '',
+  unavailable: '',
 };
 
 /**

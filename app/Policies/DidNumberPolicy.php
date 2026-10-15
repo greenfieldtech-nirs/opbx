@@ -26,7 +26,7 @@ class DidNumberPolicy
      *
      * All authenticated users can view phone numbers within their organization.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to view phone numbers list
      */
     public function viewAny(User $user): bool
@@ -40,8 +40,8 @@ class DidNumberPolicy
      *
      * Users can view any phone number within their organization.
      *
-     * @param User $user The authenticated user
-     * @param DidNumber $didNumber The phone number being viewed
+     * @param  User  $user  The authenticated user
+     * @param  DidNumber  $didNumber  The phone number being viewed
      * @return bool True if authorized to view the phone number
      */
     public function view(User $user, DidNumber $didNumber): bool
@@ -55,7 +55,7 @@ class DidNumberPolicy
      *
      * Only Owner and PBX Admin can create phone numbers.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to create phone numbers
      */
     public function create(User $user): bool
@@ -68,8 +68,8 @@ class DidNumberPolicy
      *
      * Only Owner and PBX Admin can update phone numbers.
      *
-     * @param User $user The authenticated user
-     * @param DidNumber $didNumber The phone number being updated
+     * @param  User  $user  The authenticated user
+     * @param  DidNumber  $didNumber  The phone number being updated
      * @return bool True if authorized to update the phone number
      */
     public function update(User $user, DidNumber $didNumber): bool
@@ -88,8 +88,8 @@ class DidNumberPolicy
      *
      * Only Owner and PBX Admin can delete phone numbers.
      *
-     * @param User $user The authenticated user
-     * @param DidNumber $didNumber The phone number being deleted
+     * @param  User  $user  The authenticated user
+     * @param  DidNumber  $didNumber  The phone number being deleted
      * @return bool True if authorized to delete the phone number
      */
     public function delete(User $user, DidNumber $didNumber): bool

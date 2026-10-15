@@ -77,7 +77,7 @@ final class UserEmbedTokenController extends Controller
             abort(404);
         }
 
-        if (! $actor->role->canManageUsers() || $actor->organization_id !== $target->organization_id) {
+        if ($actor->cannot('manageEmbedToken', $target)) {
             abort(403);
         }
 

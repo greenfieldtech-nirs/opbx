@@ -5,14 +5,17 @@ paths:
         - Auto Dialer Campaigns
       summary: Get monitor summary
       description: |
-        Get a bird's-eye view of all active and paused campaigns.
-        
+        Get a bird's-eye view of all active and paused campaigns. Owner, PBX Admin and
+        Reporter only.
+
         Returns real-time concurrency data, progress statistics,
-        and dialer worker health status. Data is cached for 5 seconds.
+        and dialer worker health status. Data is cached for 5 seconds per organization;
+        starting, pausing or resuming a campaign clears the cache.
       operationId: getMonitorSummary
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Monitor summary data
@@ -44,15 +47,18 @@ paths:
         - Auto Dialer Campaigns
       summary: Get campaign monitor detail
       description: |
-        Get detailed monitoring view for a single campaign.
-        
-        Returns campaign statistics, disposition breakdown,
-        rate limit status, and active call sessions. Statistics
-        are cached for 10 seconds; active sessions are always fresh.
+        Get detailed monitoring view for a single campaign (any status). Owner, PBX Admin
+        and Reporter only.
+
+        Returns campaign statistics, disposition breakdown
+        and active call sessions. Statistics
+        are cached for 10 seconds (cleared when the campaign is started, paused or resumed);
+        active sessions are always fresh.
       operationId: getMonitorDetail
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Campaign monitor detail

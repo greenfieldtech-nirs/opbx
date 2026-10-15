@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, RefreshCw, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,6 +28,9 @@ import {
 } from '@/hooks/useCallTrackingCampaigns';
 import { cn } from '@/lib/utils';
 import type { CallTrackingCampaign } from '@/types/callTracking';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 
 export default function CallTrackingCampaigns() {
   const navigate = useNavigate();
@@ -37,6 +41,7 @@ export default function CallTrackingCampaigns() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'status' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +60,7 @@ export default function CallTrackingCampaigns() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useCallTrackingCampaigns({
     search: debouncedSearch || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
+    unprovisioned: unprovisionedOnly ? 1 : undefined,
     page: currentPage,
     per_page: perPage,
     sort_by: sortField,
@@ -66,9 +72,10 @@ export default function CallTrackingCampaigns() {
   const totalPages = data?.meta?.last_page ?? 1;
 
   const deleteMutation = useDeleteCallTrackingCampaign();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const updateMutation = useUpdateCallTrackingCampaign();
 
-  const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all';
+  const hasActiveFilters = debouncedSearch !== '' || statusFilter !== 'all' || unprovisionedOnly;
 
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
@@ -93,6 +100,8 @@ export default function CallTrackingCampaigns() {
       toast.success('Campaign deleted successfully');
       setCampaignToDelete(null);
     } catch (err) {
+      setCampaignToDelete(null);
+      if (showIfInUse(err)) return;
       toast.error((err as Error)?.message || 'Failed to delete campaign');
     }
   };
@@ -100,6 +109,7 @@ export default function CallTrackingCampaigns() {
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setUnprovisionedOnly(false);
     setCurrentPage(1);
   };
 
@@ -126,7 +136,7 @@ export default function CallTrackingCampaigns() {
       header: 'Destination',
       cell: (campaign) => (
         <Badge variant="outline" className="capitalize">
-          {campaign.destination_type.replace('_', ' ')}
+          {labelForRoutingType(campaign.destination_type)}
         </Badge>
       ),
     },
@@ -277,6 +287,8 @@ export default function CallTrackingCampaigns() {
               </SelectContent>
             </Select>
 
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={(v) => { setUnprovisionedOnly(v); setCurrentPage(1); }} />
+
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 Clear Filters
@@ -297,7 +309,7 @@ export default function CallTrackingCampaigns() {
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(campaign) => campaign.name}
-            getIdentitySecondary={(campaign) => 'Call Tracking Campaign'}
+            getIdentitySecondary={() => 'Call Tracking Campaign'}
             onIdentityClick={canManage ? (campaign) => navigate(`/ui/call-tracking/campaigns/${campaign.id}`) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
@@ -361,6 +373,7 @@ export default function CallTrackingCampaigns() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+      {inUseDialog}
     </div>
   );
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting;
 
 use App\Enums\ExtensionType;
+use App\Models\CallDetailRecord;
 use App\Models\DidNumber;
 use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
@@ -21,6 +22,9 @@ use Illuminate\Support\Facades\Log;
  */
 class RingGroupRoutingService
 {
+    /** Dial outcomes that mean a member answered; anything else (no-answer, busy, failed, canceled, unknown) moves on. */
+    private const ANSWERED_DIAL_STATUSES = ['answered', 'completed', 'in-progress'];
+
     public function __construct(
         private readonly VoiceRoutingStrategyExecutor $strategyExecutor
     ) {}
@@ -76,6 +80,24 @@ class RingGroupRoutingService
             'ring_group_name' => $ringGroup->name,
             'strategy' => $ringGroup->strategy->value,
         ]);
+
+        // The dial was answered: the call is over (no next member, no fallback). A sequential/round-robin
+        // member answered: the call belongs to it (a simultaneous <Dial> doesn't report the winner).
+        $dialStatus = $request->input('DialCallStatus') ?? $request->input('CallStatus');
+        if (in_array($dialStatus, self::ANSWERED_DIAL_STATUSES, true)) {
+            $dialed = (string) $request->query('dialed_extension', '');
+            if ($dialed !== '' && $ringGroup->getMembers()->contains('extension_number', $dialed)) {
+                CallDetailRecord::recordAnsweringExtension($orgId, $request->input('Session') ?: $callSid, $dialed);
+            }
+
+            Log::info('RingGroupRoutingService: Ring group dial was answered, ending the call', [
+                'call_sid' => $callSid,
+                'ring_group_id' => $ringGroup->id,
+                'dial_status' => $dialStatus,
+            ]);
+
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
 
         // Create destination array for the strategy
         $destination = ['ring_group' => $ringGroup];

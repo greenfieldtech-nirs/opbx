@@ -70,16 +70,16 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup' | 'unavailable';
 
 // Ring Group Status
 export type RingGroupStatus = Status;
 
 // Routing Type
-export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue';
+export type RoutingType = 'extension' | 'ai_assistant' | 'ring_group' | 'business_hours' | 'conference_room' | 'ivr_menu' | 'voicemail' | 'ai_load_balancer' | 'call_queue' | 'unavailable';
 
 // IVR Destination Type (for menu options; hangup is allowed only on failover)
-export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours';
+export type IvrDestinationType = 'extension' | 'ring_group' | 'conference_room' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'business_hours' | 'unavailable';
 
 // IVR Failover Destination Type (options + hangup)
 export type IvrFailoverDestinationType = IvrDestinationType | 'hangup';
@@ -130,6 +130,8 @@ export interface AuthResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  /** "Remember me": 30-day token kept across browser restarts (default: 24 hours, this browser session) */
+  remember?: boolean;
 }
 
 export interface CreateUserRequest {
@@ -204,6 +206,8 @@ export interface UpdateExtensionRequest {
 // ============================================================================
 
 export interface DIDNumber {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   phone_number: string;
@@ -298,6 +302,8 @@ export interface RingGroupMember {
 }
 
 export interface RingGroup {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -361,6 +367,8 @@ export interface IvrMenuOption {
 }
 
 export interface IvrMenu {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -636,7 +644,8 @@ export interface CallDetailRecord {
   session_id: string;
 
   // Call participants
-  from: string;
+  extension_number: string | null; // the extension the call belongs to
+  from: string; // Caller ID (display only)
   to: string;
   direction: string | null;
 
@@ -693,8 +702,9 @@ export interface CallDetailRecord {
 export interface CDRFilters {
   page?: number;
   per_page?: number;
-  from?: string; // partial match on 'from' number
-  to?: string; // partial match on 'to' number
+  extension?: string; // starts-with match on the call's extension number
+  to?: string; // starts-with match on the destination number
+  extension_destination_match?: 'any' | 'all'; // with both: either matches (any) or both must (all, default)
   from_date?: string; // ISO date string
   to_date?: string; // ISO date string
   disposition?: string;

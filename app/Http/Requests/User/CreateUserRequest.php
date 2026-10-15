@@ -10,6 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for creating a new user.
@@ -18,8 +19,6 @@ class CreateUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
@@ -33,18 +32,14 @@ class CreateUserRequest extends FormRequest
      */
     public function rules(): array
     {
-        $user = $this->user();
-
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => [
                 'required',
                 'email',
                 'max:255',
-                // Email must be unique within the organization
-                Rule::unique('users', 'email')->where(function ($query) use ($user) {
-                    return $query->where('organization_id', $user->organization_id);
-                }),
+                // Email is globally unique: a user belongs to exactly one organization
+                Rule::unique('users', 'email'),
             ],
             'password' => [
                 'required',
@@ -95,13 +90,11 @@ class CreateUserRequest extends FormRequest
 
     /**
      * Prepare the data for validation.
-     *
-     * @return void
      */
     protected function prepareForValidation(): void
     {
         // Set default status if not provided
-        if (!$this->has('status')) {
+        if (! $this->has('status')) {
             $this->merge([
                 'status' => 'active',
             ]);
@@ -111,8 +104,7 @@ class CreateUserRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param \Illuminate\Validation\Validator $validator
-     * @return void
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {

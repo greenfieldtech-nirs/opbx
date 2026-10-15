@@ -8,7 +8,7 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
-use App\Models\AiAssistantLoadBalancer;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
 #[ScopedBy([OrganizationScope::class])]
 class RingGroup extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     /**
      * Default field list for lazy loading minimal relationships in CRUD operations.
@@ -111,7 +111,7 @@ class RingGroup extends Model
      */
     public function fallbackAiAssistant(): BelongsTo
     {
-        return $this->belongsTo(Extension::class, 'fallback_ai_assistant_id');
+        return $this->belongsTo(AiAssistant::class, 'fallback_ai_assistant_id');
     }
 
     /**
@@ -167,7 +167,7 @@ class RingGroup extends Model
             ->get()
             ->map(function ($row) {
                 // Convert to Extension model instance
-                return \App\Models\Extension::withoutGlobalScopes()->find($row->id);
+                return Extension::withoutGlobalScopes()->find($row->id);
             })
             ->filter(); // Remove any null extensions
     }
@@ -221,5 +221,11 @@ class RingGroup extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', RingGroupStatus::ACTIVE->value);
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['fallback_action'];
     }
 }

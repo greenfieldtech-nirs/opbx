@@ -306,11 +306,12 @@ class CloudonixSubscribersClient extends CloudonixBaseClient
                         'error_summary' => $this->extractErrorSummary($responseBody, $statusCode),
                     ]);
 
-                    throw new \RuntimeException(
+                    throw new CloudonixApiException(
                         sprintf('Failed to fetch voices from Cloudonix API: HTTP %d - %s',
                             $statusCode,
                             $this->extractErrorMessage($responseBody, $statusCode)
-                        )
+                        ),
+                        $statusCode
                     );
                 }
 

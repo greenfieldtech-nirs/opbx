@@ -1,5 +1,6 @@
 type: object
-description: Organization model representing a tenant
+description: >-
+  Organization (tenant), as returned by the platform manager endpoints.
 properties:
   id:
     type: integer
@@ -18,47 +19,32 @@ properties:
     type: string
     enum:
       - active
-      - inactive
       - suspended
+      - deleted
     description: Organization status
     example: active
   timezone:
     type: string
-    description: Default timezone for the organization
+    description: Default timezone for the organization (IANA identifier, default `UTC`)
     example: America/New_York
   settings:
-    type: object
-    description: Organization-specific settings
-    properties:
-      features:
-        type: object
-        properties:
-          call_recording:
-            type: boolean
-          voicemail:
-            type: boolean
-          music_on_hold:
-            type: boolean
-          call_waiting:
-            type: boolean
-      ui:
-        type: object
-        properties:
-          language:
-            type: string
-          date_format:
-            type: string
-          time_format:
-            type: string
-      pbx:
-        type: object
-        properties:
-          default_extension_length:
-            type: integer
-          extension_range_start:
-            type: string
-          extension_range_end:
-            type: string
+    type:
+    - object
+    - 'null'
+    description: >-
+      Free-form organization settings (JSON). Returned only by the platform manager
+      endpoints. Known key: `default_outbound_caller_id_did_id` (organization-wide default
+      outbound caller ID, used after the extension's and the whitelist rule's caller ID;
+      see `GET /v1/phone-numbers/default-caller-id`).
+    additionalProperties: true
+  public_queues_token:
+    type:
+    - string
+    - 'null'
+    format: uuid
+    description: >-
+      Token of the public Queues Dashboard link (null when no link was generated).
+      Returned only by the platform manager endpoints.
   created_at:
     type: string
     format: date-time
@@ -67,6 +53,13 @@ properties:
     type: string
     format: date-time
     readOnly: true
+  deleted_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    readOnly: true
+    description: Soft-delete timestamp (platform manager endpoints only)
 required:
   - id
   - name

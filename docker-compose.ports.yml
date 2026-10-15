@@ -1,0 +1,20 @@
+# Opt-in, loopback-only host ports for local tooling (DB client, redis-cli, SeaweedFS UI, MCP clients).
+# Never use in production. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d
+services:
+  mysql:
+    ports:
+      - "127.0.0.1:${DB_EXPOSE_PORT:-3306}:3306"
+  redis:
+    ports:
+      - "127.0.0.1:${REDIS_EXPOSE_PORT:-6379}:6379"
+  seaweedfs:
+    ports:
+      - "127.0.0.1:${MINIO_EXPOSE_PORT:-8333}:8333"  # S3 API
+      - "127.0.0.1:${MINIO_CONSOLE_EXPOSE_PORT:-9333}:9333"  # master UI
+  dialer-worker:
+    ports:
+      - "127.0.0.1:${DIALER_WEBHOOK_HOST_PORT:-8181}:8081"
+  mcp-server:
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8080}:8080"

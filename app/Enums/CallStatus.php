@@ -20,7 +20,7 @@ enum CallStatus: string
             self::COMPLETED,
             self::BUSY,
             self::NO_ANSWER,
-            self::FAILED
+            self::FAILED,
         ], true);
     }
 
@@ -29,7 +29,7 @@ enum CallStatus: string
         return in_array($this, [
             self::INITIATED,
             self::RINGING,
-            self::ANSWERED
+            self::ANSWERED,
         ], true);
     }
 }

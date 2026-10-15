@@ -15,14 +15,21 @@ paths:
         - Auto Dialer Campaigns
       summary: Get caller ID statistics
       description: |
-        Get per-caller-ID statistics for a campaign.
+        Get per-Caller-ID usage statistics for a campaign's Caller ID pool (one row per DID
+        in the pool; removing a DID from the pool deletes its row). Owner, PBX Admin and
+        Reporter only. The response is not wrapped in `data`.
 
-        Returns usage counters and performance metrics for each DID
-        configured in the campaign's caller ID pool.
+        A call is counted once, when its session first reaches a final status, against the pool
+        DID it was placed from: `completed` adds to `completed_calls`, `failed` (busy, no answer,
+        failed, or an attempt that will be retried) adds to `failed_calls`, and both add to
+        `total_calls` and set `last_used_at`. Retried webhooks do not count a call twice. Calls
+        still in progress, and sessions failed in bulk when the campaign is paused or stopped,
+        are not counted.
       operationId: getCampaignCallerIdStats
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
           description: Caller ID statistics
@@ -30,12 +37,56 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
-                example:
-                  caller_ids:
-                    - phone_number: "+14155551212"
-                      calls: 42
-                      answered: 35
+                properties:
+                  campaign_id:
+                    type: integer
+                    example: 9
+                  total_calls:
+                    type: integer
+                    description: Sum of total_calls over all rows
+                    example: 150
+                  strategy:
+                    type: string
+                    enum: [round_robin, random, least_recently_used]
+                    example: round_robin
+                  stats:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        did_id:
+                          type: integer
+                          example: 1
+                        phone_number:
+                          type:
+                          - string
+                          - 'null'
+                          description: Null when the DID no longer exists
+                          example: '+12127773456'
+                        friendly_name:
+                          type:
+                          - string
+                          - 'null'
+                          example: Sales Line 1
+                        total_calls:
+                          type: integer
+                          example: 50
+                        completed_calls:
+                          type: integer
+                          example: 45
+                        failed_calls:
+                          type: integer
+                          example: 5
+                        success_rate:
+                          type: number
+                          description: completed_calls / total_calls x 100, two decimals (0 when no calls)
+                          example: 90.0
+                        last_used_at:
+                          type:
+                          - string
+                          - 'null'
+                          format: date-time
+                          example: '2026-04-10T14:35:00+00:00'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':

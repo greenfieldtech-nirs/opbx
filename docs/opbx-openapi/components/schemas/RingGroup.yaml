@@ -1,6 +1,10 @@
 type: object
 description: Ring Group for call distribution
 properties:
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when `fallback_action` is `unavailable` (saved for future use, or set when a deleted user's extension was the fallback). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
     readOnly: true
@@ -23,9 +27,7 @@ properties:
     enum:
     - simultaneous
     - round_robin
-    - priority
-    - weighted
-    - memory
+    - sequential
     description: Ring strategy
     example: simultaneous
   timeout:
@@ -34,20 +36,21 @@ properties:
     example: 30
   ring_turns:
     type: integer
-    description: Number of ring cycles before fallback (for round_robin)
+    description: Passes through the member list before fallback (sequential and round_robin)
     example: 2
   fallback_action:
     type: string
     enum:
-    - voicemail
     - extension
     - ring_group
     - ivr_menu
     - ai_assistant
     - ai_load_balancer
-    - disconnect
+    - call_queue
+    - hangup
+    - unavailable
     description: Action when no members answer
-    example: voicemail
+    example: hangup
   fallback_extension_id:
     type:
     - integer
@@ -67,12 +70,17 @@ properties:
     type:
     - integer
     - 'null'
-    description: AI assistant ID for fallback
+    description: AI assistant ID for the `ai_assistant` fallback (references ai_assistants; set to null when the assistant is deleted)
   fallback_ai_load_balancer_id:
     type:
     - integer
     - 'null'
     description: AI load balancer ID for fallback
+  fallback_call_queue_id:
+    type:
+    - integer
+    - 'null'
+    description: Call queue ID for fallback
   status:
     type: string
     enum:
@@ -81,7 +89,7 @@ properties:
     example: active
   members:
     type: array
-    description: Ring group members
+    description: Ring group members (ordered by priority in list responses). Absent where not loaded (supervisor assignments).
     items:
       type: object
       properties:
@@ -89,12 +97,32 @@ properties:
           type: integer
         extension_id:
           type: integer
+        extension_number:
+          type:
+          - string
+          - 'null'
+        user_name:
+          type:
+          - string
+          - 'null'
         priority:
           type: integer
-        weight:
-          type: integer
-        extension:
-          $ref: ./Extension.yaml
+  members_count:
+    type: integer
+    description: Number of members (list only)
+  active_members_count:
+    type: integer
+    description: Members whose extension is active (list only)
+  fallback_extension:
+    type:
+    - object
+    - 'null'
+    description: Fallback extension summary (null when there is no fallback extension). Absent where not loaded (supervisor assignments).
+    properties:
+      id:
+        type: integer
+      extension_number:
+        type: string
   created_at:
     type: string
     format: date-time

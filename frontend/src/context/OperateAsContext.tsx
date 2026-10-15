@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { platformApi } from '@/services/platformApi';
 import { getApiErrorMessage } from '@/services/api';
 import { storage, type OperateAsOrg } from '@/utils/storage';
+import { echoService } from '@/services/echo.service';
 import { clearSidebarState } from '@/components/Layout/Sidebar';
 import { toast } from 'sonner';
 
@@ -67,6 +68,7 @@ export function OperateAsProvider({ children }: { children: React.ReactNode }) {
     // Persist first so the interceptor attaches the header on refreshUser().
     storage.setOperateAsOrg(org);
     setOperateAsOrg(org);
+    echoService.reconnect();
 
     // Drop all cached data + sidebar state so the org-admin experience is fresh.
     queryClient.clear();
@@ -92,6 +94,7 @@ export function OperateAsProvider({ children }: { children: React.ReactNode }) {
     // returns the real platform-owner identity.
     storage.clearOperateAsOrg();
     setOperateAsOrg(null);
+    echoService.reconnect();
 
     queryClient.clear();
     clearSidebarState();

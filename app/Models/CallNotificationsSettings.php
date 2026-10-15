@@ -45,12 +45,20 @@ class CallNotificationsSettings extends Model
     ];
 
     /**
+     * Never serialize the webhook auth secret.
+     *
+     * @var array<string>
+     */
+    protected $hidden = ['auth_secret'];
+
+    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
      */
     protected $casts = [
         'auth_method' => 'string',
+        'auth_secret' => 'encrypted',
         'retry_attempts' => 'integer',
         'retry_backoff_seconds' => 'integer',
         'request_timeout_seconds' => 'integer',

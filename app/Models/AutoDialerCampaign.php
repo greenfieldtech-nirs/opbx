@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerCampaign extends Model
@@ -41,6 +42,11 @@ class AutoDialerCampaign extends Model
     public const MIN_CPS = 1;
 
     public const MAX_CPS = 30;
+
+    /**
+     * Call time limit (seconds) used when a campaign defines none.
+     */
+    public const DEFAULT_TIME_LIMIT = 600;
 
     /**
      * The attributes that are mass assignable.
@@ -74,6 +80,8 @@ class AutoDialerCampaign extends Model
         'action_human',
         'action_unknown',
         'retry_on_voicemail',
+        'retry_on_busy_no_answer',
+        'retry_delay_minutes',
         'voicemail_calls',
         'total_destinations',
         'completed_calls',
@@ -103,6 +111,8 @@ class AutoDialerCampaign extends Model
         'end_date' => 'date',
         'record_calls' => 'boolean',
         'retry_on_voicemail' => 'boolean',
+        'retry_on_busy_no_answer' => 'boolean',
+        'retry_delay_minutes' => 'integer',
         'voicemail_calls' => 'integer',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
@@ -135,16 +145,6 @@ class AutoDialerCampaign extends Model
     public function lists(): HasMany
     {
         return $this->hasMany(AutoDialerList::class, 'campaign_id');
-    }
-
-    /**
-     * Get the first/primary list for this campaign (backward compatibility).
-     *
-     * @deprecated Use lists() instead
-     */
-    public function list(): HasOne
-    {
-        return $this->hasOne(AutoDialerList::class, 'campaign_id');
     }
 
     /**
@@ -218,6 +218,19 @@ class AutoDialerCampaign extends Model
     }
 
     /**
+     * Delete this campaign's keys on the dialer Redis (CAC counter, caller-id cycle index).
+     * Call when the campaign completes, is archived or is deleted. Best effort.
+     */
+    public function clearRedisKeys(): void
+    {
+        try {
+            Redis::connection('dialer')->del("dialer:cac:{$this->id}:active", "campaign:{$this->id}:caller_id_index");
+        } catch (\Throwable $e) {
+            Log::warning('Failed to clear campaign Redis keys', ['campaign_id' => $this->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
      * Check if the campaign can be started.
      */
     public function canStart(): bool
@@ -239,6 +252,33 @@ class AutoDialerCampaign extends Model
     public function canAcceptList(): bool
     {
         return $this->status->canAcceptList();
+    }
+
+    /**
+     * Why a list cannot be added to this campaign right now, or null when it can.
+     */
+    public function listAssignmentRefusal(): ?string
+    {
+        if (! $this->canAcceptList()) {
+            return sprintf(
+                'Cannot assign list to "%s" because it is %s. Lists can only be assigned to campaigns that are Draft, Paused, or Active (before their start date).',
+                $this->name,
+                $this->status->label()
+            );
+        }
+
+        // An Active campaign takes a list only before its start date (the Assign dialog's rule), in the campaign's timezone.
+        $startsLater = $this->start_date !== null
+            && now($this->timezone ?? 'UTC')->format('Y-m-d') < $this->start_date->format('Y-m-d');
+
+        if ($this->status === CampaignStatus::ACTIVE && ! $startsLater) {
+            return sprintf(
+                'Cannot assign list to "%s" because it has already started. Pause the campaign first, then assign the list.',
+                $this->name
+            );
+        }
+
+        return null;
     }
 
     /**
@@ -322,7 +362,7 @@ class AutoDialerCampaign extends Model
      */
     public function hasList(): bool
     {
-        return $this->list !== null;
+        return $this->lists()->exists();
     }
 
     /**

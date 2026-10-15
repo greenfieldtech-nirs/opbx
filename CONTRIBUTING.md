@@ -88,7 +88,7 @@ docker compose exec frontend npm run dev
 
 - Access the application at `http://localhost`
 - Access the frontend at `http://localhost:3000`
-- Access ngrok for webhook testing at `http://localhost:4040`
+- Access ngrok for webhook testing at `http://localhost:4040` (start it with `docker compose --profile dev up -d ngrok`)
 - Check logs: `docker compose logs -f`
 
 ### 5. Sync Your Fork

@@ -6,13 +6,14 @@ paths:
       summary: Get user profile
       description: 'Returns current authenticated user''s profile including
 
-        organization details and contact information.
+        organization details, contact information and the user''s own extension. Any role.
+
+        Not available to API keys (403).
 
         '
       operationId: getProfile
       security:
       - bearerAuth: []
-      - cookieAuth: []
       responses:
         '200':
           description: User profile
@@ -67,26 +68,64 @@ paths:
                       updated_at:
                         type: string
                         format: date-time
+                      is_platform_manager:
+                        type: boolean
+                      extension:
+                        type:
+                        - object
+                        - 'null'
+                        description: The user's own `user` extension, or null when none is assigned
+                        properties:
+                          id:
+                            type: integer
+                          extension_number:
+                            type: string
+                      social_identities:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            provider:
+                              type: string
+                            provider_email:
+                              type:
+                              - string
+                              - 'null'
                       organization:
-                        $ref: ../../components/schemas/Organization.yaml
+                        type: object
+                        description: Organization summary
+                        properties:
+                          id:
+                            type: integer
+                          name:
+                            type: string
+                          slug:
+                            type: string
+                          status:
+                            type: string
+                          timezone:
+                            type: string
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
     put:
       tags:
       - Profile
       summary: Update user profile
       description: 'Update current user''s profile information.
 
-        Only fields provided will be updated.
+        Only fields provided will be updated. Any role. Not available to API keys (403).
 
 
-        **Note**: Role changes require Owner permission.
+        **Note**: Sending `role` is always refused with 403, because nobody can change their
+        own role (use `PUT /v1/users/{user}`). A platform manager operating as an organization
+        cannot update their own profile (403 `OPERATE_AS_SELF_MUTATION_FORBIDDEN`).
 
         '
       operationId: updateProfile
       security:
       - bearerAuth: []
-      - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -103,7 +142,7 @@ paths:
                   type: string
                   format: email
                   maxLength: 255
-                  description: Email address (must be unique)
+                  description: Email address (must not be used by any other user)
                   example: john.doe@example.com
                 phone:
                   type:
@@ -139,7 +178,7 @@ paths:
                   - 'null'
                   maxLength: 20
                   description: Postal code
-                  example: 10001
+                  example: '10001'
                 country:
                   type:
                   - string
@@ -154,7 +193,7 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
-                  description: User role (Owner only)
+                  description: Always refused with 403 (you cannot change your own role)
                   example: pbx_admin
       responses:
         '200':
@@ -209,6 +248,27 @@ paths:
                       updated_at:
                         type: string
                         format: date-time
+                      extension:
+                        type:
+                        - object
+                        - 'null'
+                        description: The user's own `user` extension, or null when none is assigned
+                        properties:
+                          id:
+                            type: integer
+                          extension_number:
+                            type: string
+                      social_identities:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            provider:
+                              type: string
+                            provider_email:
+                              type:
+                              - string
+                              - 'null'
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':

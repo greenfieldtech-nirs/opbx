@@ -7,7 +7,10 @@ namespace App\Http\Requests\BusinessHours;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
+use App\Rules\RejectUnavailableOnCreate;
+use App\Rules\TimeRangeEnd;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Validator;
@@ -72,6 +75,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                 'required',
                 'string',
                 new Enum(BusinessHoursActionType::class),
+                new RejectUnavailableOnCreate,
             ],
             'open_hours_action.target_id' => [
                 'required',
@@ -86,6 +90,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                 'required',
                 'string',
                 new Enum(BusinessHoursActionType::class),
+                new RejectUnavailableOnCreate,
             ],
             'closed_hours_action.target_id' => [
                 'required',
@@ -121,8 +126,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             ],
             'schedule.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:schedule.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
 
             // Exceptions (optional)
@@ -156,8 +160,7 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             ],
             'exceptions.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:exceptions.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
         ];
     }
@@ -192,8 +195,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             'schedule.*.time_ranges.*.start_time.required' => 'Start time is required for time ranges.',
             'schedule.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'schedule.*.time_ranges.*.end_time.required' => 'End time is required for time ranges.',
-            'schedule.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'schedule.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
             'exceptions.max' => 'Maximum 100 exceptions allowed per schedule.',
             'exceptions.*.date.required' => 'Exception date is required.',
             'exceptions.*.date.date_format' => 'Exception date must be in YYYY-MM-DD format.',
@@ -202,8 +203,6 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
             'exceptions.*.time_ranges.*.start_time.required' => 'Start time is required for special hours.',
             'exceptions.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'exceptions.*.time_ranges.*.end_time.required' => 'End time is required for special hours.',
-            'exceptions.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'exceptions.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
         ];
     }
 
@@ -360,6 +359,23 @@ class StoreBusinessHoursScheduleRequest extends FormRequest
                         'IVR menu target ID must be in format: ivr-{identifier}'
                     );
                 }
+            }
+            // The prefixed target must exist in the caller's organization.
+            $tables = [
+                BusinessHoursActionType::EXTENSION->value => ['ext', 'extensions'],
+                BusinessHoursActionType::RING_GROUP->value => ['rg', 'ring_groups'],
+                BusinessHoursActionType::CALL_QUEUE->value => ['queue', 'call_queues'],
+                BusinessHoursActionType::IVR_MENU->value => ['ivr', 'ivr_menus'],
+                BusinessHoursActionType::CONFERENCE_ROOM->value => ['conf', 'conference_rooms'],
+            ];
+
+            if (isset($tables[$type])
+                && preg_match('/^'.$tables[$type][0].'-(\d+)$/', (string) $targetId, $matches) === 1
+                && ! DB::table($tables[$type][1])
+                    ->where('id', (int) $matches[1])
+                    ->where('organization_id', $this->user()?->organization_id)
+                    ->exists()) {
+                $validator->errors()->add($field.'.target_id', 'The selected target does not exist in your organization.');
             }
         }
     }

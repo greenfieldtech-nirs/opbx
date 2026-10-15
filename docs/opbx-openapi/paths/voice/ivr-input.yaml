@@ -4,16 +4,88 @@ paths:
       tags:
         - Voice Routing
       summary: Handle IVR digit input
-      description: Process DTMF input from IVR menu
+      description: |
+        `<Gather>` action of an IVR menu: receives the DTMF digits the caller pressed and
+        returns CXML. The IVR menu comes from the `menu_id` query parameter that the IVR
+        routing strategy puts in the Gather `action` URL.
+
+        - A matching option routes to that option's destination.
+        - An unknown option, or no input at all (`Digits` missing or empty: the caller pressed
+          nothing before the Gather `maxTimeout`), counts as one turn and replays the menu. The
+          IVR Gather sets `actionOnEmptyResult="true"`, so Cloudonix posts here on no input too.
+          Unknown and missing input share the same count; when it reaches the menu's
+          `max_turns`, the call goes to the menu's failover destination.
+        - An unknown or other-organization `menu_id`, or no IVR state for `CallSid`, answers
+          200 CXML that says the error and hangs up.
+
+        Authentication, 400/401 CXML responses and the 422/302 validation behaviour are the
+        same as `POST /voice/route`. The body must be JSON: the authentication middleware
+        reads `Domain` and `To` from the JSON body. Unexpected exceptions answer 200 CXML.
+        Not rate-limited.
       operationId: handleIvrInput
       security:
         - voiceWebhookAuth: []
+      parameters:
+        - name: menu_id
+          in: query
+          required: true
+          description: IVR menu ID (set by the IVR routing strategy in the Gather action URL)
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                CallSid:
+                  type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
+                  description: Call SID
+                Digits:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 10
+                  pattern: '^[0-9*#]+$'
+                  description: Collected DTMF digits. Missing, empty or null means the caller pressed nothing.
+                From:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Caller number
+                To:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Called number
+                Domain:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                  description: >-
+                    Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for
+                    validation, but the authentication middleware answers 400 without it. Must be
+                    the name, not the domain UUID: the authentication middleware would match a UUID,
+                    but this request's validation rejects it with 422, by design.
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                  enum: [ringing, answered, completed, failed, busy, no-answer, in-progress, null]
+                  description: Call status
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
+              required: [CallSid, From, To]
       responses:
         '200':
           description: CXML response
@@ -21,3 +93,17 @@ paths:
             application/xml:
               schema:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '401':
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

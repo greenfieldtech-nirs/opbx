@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
+use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\PhoneNumber\StorePhoneNumberRequest;
@@ -19,6 +20,7 @@ use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -82,6 +84,10 @@ class PhoneNumberController extends Controller
             }
         }
 
+        if ($request->filled('unprovisioned')) {
+            $query->unprovisioned($request->input('unprovisioned'));
+        }
+
         // Apply search filter
         if ($request->has('search') && $request->filled('search')) {
             $search = $request->input('search');
@@ -92,8 +98,7 @@ class PhoneNumberController extends Controller
         }
 
         // Paginate
-        $perPage = (int) $request->input('per_page', 20);
-        $perPage = min(max($perPage, 1), 100); // Clamp between 1 and 100
+        $perPage = $this->perPage($request, 20);
 
         $phoneNumbers = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
@@ -383,6 +388,12 @@ class PhoneNumberController extends Controller
             'phone_number_id' => $phoneNumber->id,
             'phone_number' => $phoneNumber->phone_number,
         ]);
+
+        // Reject while the DID is assigned as configuration (outside the try: the 409 must not become a 500).
+        $check = app(ResourceReferenceChecker::class)->checkReferences('did_number', $phoneNumber->id, $phoneNumber->organization_id);
+        if ($check['has_references']) {
+            throw new ResourceInUseException('did_number', $check['references']);
+        }
 
         try {
             DB::transaction(function () use ($phoneNumber): void {

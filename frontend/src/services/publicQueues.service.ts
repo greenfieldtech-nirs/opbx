@@ -1,4 +1,4 @@
-import api from './api';
+import { publicApi as api } from './api';
 import type { QueueLive, QueueStats } from './callQueues.service';
 
 export interface PublicQueueSummary {
@@ -10,7 +10,9 @@ export interface PublicQueueSummary {
 
 /**
  * Token-authed client for the public (wallboard) queues dashboard.
- * No Sanctum session - the org's unguessable token is the credential.
+ * No Sanctum session - the org's unguessable token is the credential, so this
+ * uses the interceptor-free client (a stale login token must never be sent or
+ * trigger the 401 logout redirect).
  */
 export const publicQueuesService = {
   queues: async (token: string): Promise<{ data: PublicQueueSummary[] }> => {

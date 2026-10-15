@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { AlbsStrategySelector } from '@/components/design-system';
@@ -25,12 +24,6 @@ import {
   X,
   Info,
   GripVertical,
-  Bot,
-  PhoneForwarded,
-  Users,
-  Menu,
-  PhoneOff,
-  Phone,
   Bot as BotIcon,
 } from 'lucide-react';
 import {
@@ -102,6 +95,8 @@ interface FormData {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   members: MemberFormData[];
 }
 
@@ -117,31 +112,23 @@ interface LoadBalancerFormProps {
   onRemoveMember: (assistantId: string) => void;
   onUpdateMember: (index: number, assistantId: string) => void;
   onDragEnd: (event: any) => void;
+  /** Edit dialog only: offer "Disconnect" for the fallback */
+  allowDisconnect?: boolean;
 }
 
 const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5);
 
-function getStrategyDescription(strategy: AlbsStrategy): string {
-  const descriptions: Record<AlbsStrategy, string> = {
-    round_robin: 'Distribute calls evenly across AI assistants in sequential order.',
-    priority: 'Route calls to AI assistants in priority order using drag and drop.',
-    percentage: 'Route calls based on configured weight percentages.',
-  };
-  return descriptions[strategy] || '';
-}
 
 export function LoadBalancerForm({
   formData,
   formErrors,
   availableAiAssistants,
-  availableExtensions,
-  availableRingGroups,
-  availableIvrMenus,
   onChange,
   onAddMember,
   onRemoveMember,
   onUpdateMember,
   onDragEnd,
+  allowDisconnect = false,
 }: LoadBalancerFormProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -430,6 +417,7 @@ export function LoadBalancerForm({
           Fallback Action <span className="text-red-500">*</span>
         </Label>
         <DestinationTypeAndSelector
+          allowDisconnect={allowDisconnect}
           typeValue={formData.fallback_action as DestinationType}
           destinationValue={
             formData.fallback_action === 'extension'
@@ -440,6 +428,10 @@ export function LoadBalancerForm({
               ? formData.fallback_ivr_menu_id || ''
               : formData.fallback_action === 'ai_assistant'
               ? formData.fallback_ai_assistant_id || ''
+              : formData.fallback_action === 'call_queue'
+              ? formData.fallback_call_queue_id || ''
+              : formData.fallback_action === 'ai_load_balancer'
+              ? formData.fallback_ai_load_balancer_id || ''
               : ''
           }
           onChange={(type, destinationId) => {
@@ -450,9 +442,11 @@ export function LoadBalancerForm({
               fallback_ring_group_id: type === 'ring_group' ? destinationId : undefined,
               fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : undefined,
               fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : undefined,
+              fallback_call_queue_id: type === 'call_queue' ? destinationId : undefined,
+              fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : undefined,
             });
           }}
-          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'hangup']}
+          allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'call_queue', 'ai_load_balancer', 'hangup']}
           includeHangup={true}
           typeLabel="Action"
           destinationLabel="Destination"

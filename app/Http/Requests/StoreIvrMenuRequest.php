@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHours;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
+use App\Models\Recording;
 use App\Models\RingGroup;
+use App\Rules\RejectUnavailableOnCreate;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreIvrMenuRequest extends FormRequest
 {
@@ -25,7 +31,7 @@ class StoreIvrMenuRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -45,25 +51,31 @@ class StoreIvrMenuRequest extends FormRequest
                     // If it's an integer, validate it exists as a recording
                     if (is_int($value) || (is_string($value) && ctype_digit($value))) {
                         $recordingId = (int) $value;
-                        $exists = \App\Models\Recording::where('id', $recordingId)->exists();
+                        $exists = Recording::where('id', $recordingId)->where('organization_id', $this->user()?->organization_id)->exists();
                         if (! $exists) {
                             $fail('The selected recording does not exist.');
                         }
                     }
                 },
             ],
-            'recording_id' => 'nullable|integer|exists:recordings,id',
+            'recording_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('recordings', 'id')->where('organization_id', $this->user()?->organization_id),
+            ],
             'tts_text' => 'nullable|string|max:1000',
             'tts_voice' => 'nullable|string|max:50',
             'max_timeout' => 'required|integer|min:1|max:30',
             'inter_digit_timeout' => 'required|integer|min:1|max:30',
             'max_turns' => 'required|integer|min:1|max:9',
-            'failover_destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup',
+            'failover_destination_type' => ['required', 'string', 'in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,hangup,unavailable', new RejectUnavailableOnCreate],
+            // Self-references (failover or an option back to this menu) are allowed: repeat-menu
+            // loops are bounded by max_turns at runtime (owner decision, 2026-10-11).
             'failover_destination_id' => [
                 'nullable',
                 'integer',
                 function ($attribute, $value, $fail) {
-                    if ($value && $this->input('failover_destination_type') !== 'hangup') {
+                    if ($value && ! in_array($this->input('failover_destination_type'), ['hangup', 'unavailable'], true)) {
                         if (! $this->destinationExists($this->input('failover_destination_type'), $value)) {
                             $fail('The selected failover destination does not exist.');
                         }
@@ -72,9 +84,10 @@ class StoreIvrMenuRequest extends FormRequest
             ],
             'status' => 'required|string|in:active,inactive',
             'options' => 'required|array|min:1|max:20',
-            'options.*.input_digits' => 'required|string|max:10',
+            // distinct: the (ivr_menu_id, input_digits) unique index would otherwise fail with a 500
+            'options.*.input_digits' => 'required|string|max:10|distinct',
             'options.*.description' => 'nullable|string|max:255',
-            'options.*.destination_type' => 'required|string|in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue',
+            'options.*.destination_type' => ['required', 'string', 'in:extension,ring_group,conference_room,ivr_menu,ai_assistant,ai_load_balancer,business_hours,call_queue,unavailable', new RejectUnavailableOnCreate],
             'options.*.destination_id' => [
                 'required',
                 function ($attribute, $value, $fail) {
@@ -85,6 +98,11 @@ class StoreIvrMenuRequest extends FormRequest
                         $options = $this->input('options', []);
                         if (isset($options[$index]['destination_type'])) {
                             $destinationType = $options[$index]['destination_type'];
+
+                            // 'unavailable' = provisioned for future use: no destination to check.
+                            if ($destinationType === 'unavailable') {
+                                return;
+                            }
 
                             // For all destination types, destination_id should be an integer (model ID)
                             if (! is_int($value) && ! ctype_digit((string) $value)) {
@@ -103,6 +121,21 @@ class StoreIvrMenuRequest extends FormRequest
             ],
             'options.*.priority' => 'required|integer|min:1|max:20',
         ];
+    }
+
+    /** An 'unavailable' option has no target; the NOT NULL destination_id column gets 0. */
+    protected function prepareForValidation(): void
+    {
+        $options = $this->input('options');
+        if (! is_array($options)) {
+            return;
+        }
+        foreach ($options as $i => $option) {
+            if (is_array($option) && ($option['destination_type'] ?? null) === 'unavailable' && empty($option['destination_id'])) {
+                $options[$i]['destination_id'] = 0;
+            }
+        }
+        $this->merge(['options' => $options]);
     }
 
     /**
@@ -161,30 +194,20 @@ class StoreIvrMenuRequest extends FormRequest
 
         $organizationId = $user->organization_id;
 
-        return match ($type) {
-            'extension' => Extension::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'ring_group' => RingGroup::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'conference_room' => ConferenceRoom::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'ivr_menu' => IvrMenu::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'ai_assistant' => AiAssistant::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'ai_load_balancer' => \App\Models\AiAssistantLoadBalancer::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            'business_hours' => BusinessHours::where('id', (int) $id)
-                ->where('organization_id', $organizationId)
-                ->exists(),
-            default => false,
+        $model = match ($type) {
+            'extension' => Extension::class,
+            'ring_group' => RingGroup::class,
+            'conference_room' => ConferenceRoom::class,
+            'ivr_menu' => IvrMenu::class,
+            'ai_assistant' => AiAssistant::class,
+            'ai_load_balancer' => AiAssistantLoadBalancer::class,
+            'business_hours' => BusinessHours::class,
+            'call_queue' => CallQueue::class,
+            default => null,
         };
+
+        return $model !== null
+            && $model::where('id', (int) $id)->where('organization_id', $organizationId)->exists();
     }
 
     /**
@@ -197,6 +220,7 @@ class StoreIvrMenuRequest extends FormRequest
             'options.min' => 'At least one menu option is required.',
             'options.max' => 'Maximum 20 menu options are allowed.',
             'options.*.input_digits.required' => 'Input digits are required for each option.',
+            'options.*.input_digits.distinct' => 'Each menu option must use a different key.',
             'options.*.destination_type.required' => 'Destination type is required for each option.',
             'options.*.destination_id.required' => 'Destination is required for each option.',
             'options.*.priority.required' => 'Priority is required for each option.',

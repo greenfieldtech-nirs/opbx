@@ -47,7 +47,7 @@ class DialerWebhookProxyTest extends TestCase
             'organization_id' => $this->organization->id,
             'domain_uuid' => '6ff6c13b-809e-3d08-a305-24e9fd6b3da9',
             'domain_name' => 'dograh-ejm4ke.cloudonix.net',
-            'domain_requests_api_key' => 'XIBB0E3CD4FB1F46698DE5FC51B49A012E',
+            'domain_requests_api_key' => 'XI-test-not-a-real-key',
         ]);
 
         // Create campaign
@@ -55,6 +55,8 @@ class DialerWebhookProxyTest extends TestCase
             'organization_id' => $this->organization->id,
             'status' => CampaignStatus::ACTIVE,
             'max_dial_attempts' => 3,
+            'retry_on_busy_no_answer' => true,
+            'retry_delay_minutes' => 10,
         ]);
 
         // Create list
@@ -374,62 +376,53 @@ class DialerWebhookProxyTest extends TestCase
             ->assertJson(['status' => 'ignored', 'reason' => 'unknown_event_type']);
     }
 
-    /**
-     * Test exponential backoff calculation.
-     */
-    public function test_exponential_backoff_calculation(): void
+    private function postBusy(): void
     {
-        // Update campaign to allow more retry attempts
-        $this->campaign->update(['max_dial_attempts' => 10]);
+        $this->postJson('/api/webhooks/cloudonix/dialer', [
+            'type' => 'call.busy',
+            'call_id' => 'test-call-id-456',
+            'session_token' => 'test-session-token-123',
+            'domain' => $this->cloudonixSettings->domain_name,
+        ], ['Authorization' => 'Bearer '.$this->cloudonixSettings->domain_requests_api_key])->assertStatus(200);
+    }
 
-        // Create destinations with different attempt counts
-        $attempts = [1, 2, 3, 4, 5];
-        $expectedDelays = [5, 10, 20, 40, 60]; // minutes
+    public function test_retry_uses_campaign_delay(): void
+    {
+        $this->postBusy();
 
-        foreach ($attempts as $index => $attemptCount) {
-            $destination = AutoDialerDestination::factory()->create([
-                'organization_id' => $this->organization->id,
-                'list_id' => $this->list->id,
-                'status' => DestinationStatus::DIALING,
-                'dial_attempts' => $attemptCount,
-            ]);
+        $delay = now()->diffInMinutes($this->destination->fresh()->next_retry_at, false);
+        $this->assertEqualsWithDelta(10, $delay, 1);
+    }
 
-            $session = AutoDialerCallSession::factory()->create([
-                'organization_id' => $this->organization->id,
-                'campaign_id' => $this->campaign->id,
-                'destination_id' => $destination->id,
-                'status' => 'initiated',
-                'session_token' => "test-token-{$attemptCount}",
-            ]);
+    public function test_busy_is_not_retried_when_campaign_switch_is_off(): void
+    {
+        $this->campaign->update(['retry_on_busy_no_answer' => false]);
 
-            $payload = [
-                'type' => 'call.busy',
-                'call_id' => "test-call-id-{$attemptCount}",
-                'session_token' => "test-token-{$attemptCount}",
-                'domain' => $this->cloudonixSettings->domain_name,
-            ];
+        $this->postBusy();
 
-            $response = $this->postJson(
-                '/api/webhooks/cloudonix/dialer',
-                $payload,
-                ['Authorization' => 'Bearer '.$this->cloudonixSettings->domain_requests_api_key]
-            );
+        $fresh = $this->destination->fresh();
+        $this->assertEquals(DestinationStatus::FAILED, $fresh->status);
+        $this->assertNull($fresh->next_retry_at);
+    }
 
-            $response->assertStatus(200);
+    public function test_webhook_cannot_touch_another_orgs_session(): void
+    {
+        $otherOrg = Organization::factory()->create();
+        $otherSettings = CloudonixSettings::factory()->create([
+            'organization_id' => $otherOrg->id,
+            'domain_uuid' => '7aa6c13b-809e-3d08-a305-24e9fd6b3da9',
+            'domain_name' => 'other-org.cloudonix.net',
+            'domain_requests_api_key' => 'other-org-test-key',
+        ]);
 
-            $destination = $destination->fresh();
+        // Authenticated as the other org, but naming this org's session.
+        $this->postJson('/api/webhooks/cloudonix/dialer', [
+            'type' => 'call.initiated',
+            'call_id' => 'test-call-id-456',
+            'session_token' => 'test-session-token-123',
+            'domain' => $otherSettings->domain_name,
+        ], ['Authorization' => 'Bearer other-org-test-key'])->assertNotFound(); // not found within the authenticated org
 
-            $this->assertNotNull($destination->next_retry_at);
-
-            // Calculate expected time
-            $expectedDelay = $expectedDelays[$index];
-            $expectedTime = now()->addMinutes($expectedDelay);
-
-            // Allow 1 minute tolerance for test execution time
-            $this->assertTrue(
-                $destination->next_retry_at->diffInMinutes($expectedTime) <= 1,
-                "Attempt {$attemptCount} should have delay of {$expectedDelay} minutes"
-            );
-        }
+        $this->assertEquals('initiated', $this->session->fresh()->status);
     }
 }

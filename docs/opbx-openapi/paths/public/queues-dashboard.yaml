@@ -1,0 +1,310 @@
+paths:
+  /v1/public/queues-dashboard/{token}/queues:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        description: Organization's public queues dashboard token (from `GET /v1/queues-dashboard/link`).
+        schema:
+          type: string
+
+    get:
+      tags:
+        - Public
+      summary: List queues (wallboard)
+      description: |
+        Public, unauthenticated wallboard endpoint keyed by the organization's dashboard token.
+        Returns every queue of the organization, sorted by name. Rate limited to 120
+        requests per minute per client IP. Returns 404 for an unknown token.
+      operationId: getPublicQueuesDashboardQueues
+      security: []
+      responses:
+        '200':
+          description: Queues of the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        strategy:
+                          type: string
+                          enum: [ring_all, round_robin, least_talk_time, fewest_calls]
+                        status:
+                          type: string
+                          enum: [active, inactive]
+        '404':
+          description: Invalid dashboard link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          description: Too many requests (Laravel `throttle:120,1`, per client IP)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Too Many Attempts.
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/live:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: queue
+        in: path
+        required: true
+        description: Queue ID
+        schema:
+          type: integer
+
+    get:
+      tags:
+        - Public
+      summary: Live queue snapshot (wallboard)
+      description: |
+        Current waiting callers, agent states and rolling counts for one queue of the token's
+        organization. Waiting callers and agent states come from the ACD worker; when it is
+        unreachable both arrays are empty. Rate limited to 120 requests per minute per client IP.
+      operationId: getPublicQueuesDashboardLive
+      security: []
+      responses:
+        '200':
+          description: Live snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      call_queue_id:
+                        type: integer
+                      call_queue_name:
+                        type: string
+                      waiting:
+                        type: array
+                        description: Callers waiting in the queue, in queue order
+                        items:
+                          type: object
+                          properties:
+                            callId:
+                              type: string
+                            position:
+                              type: integer
+                              description: 1-based queue position
+                            waitedSeconds:
+                              type: integer
+                            from_number:
+                              type: [string, 'null']
+                            to_number:
+                              type: [string, 'null']
+                            entered_at:
+                              type: [string, 'null']
+                              format: date-time
+                      agents:
+                        type: array
+                        description: One entry per queue agent that has an extension
+                        items:
+                          type: object
+                          properties:
+                            userId:
+                              type: string
+                            extensionNumber:
+                              type: string
+                            state:
+                              type: string
+                              enum: [AVAILABLE, BUSY, WRAP_UP, LOGGED_OUT]
+                            wrapUpRemainingSeconds:
+                              type: string
+                              description: Seconds left in a timed wrap-up as a string; empty string otherwise
+                      rolling:
+                        type: object
+                        description: Answered (`handled_*`) and abandoned calls that entered the queue in the last 15, 30 and 60 minutes and 24 hours
+                        properties:
+                          handled_15m: {type: integer}
+                          abandoned_15m: {type: integer}
+                          handled_30m: {type: integer}
+                          abandoned_30m: {type: integer}
+                          handled_60m: {type: integer}
+                          abandoned_60m: {type: integer}
+                          handled_24h: {type: integer}
+                          abandoned_24h: {type: integer}
+                      waiting_time_avg_seconds:
+                        type: [number, 'null']
+                        description: Average waiting time of answered calls in the last 24 hours (1 decimal)
+        '404':
+          description: Invalid dashboard link or queue not in the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          description: Too many requests (Laravel `throttle:120,1`, per client IP)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Too Many Attempts.
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/stats:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: queue
+        in: path
+        required: true
+        description: Queue ID
+        schema:
+          type: integer
+      - name: from
+        in: query
+        required: false
+        description: Start of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to 24 hours ago.
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        description: End of the period (any date/time PHP can parse, e.g. ISO 8601). Defaults to now.
+        schema:
+          type: string
+          format: date-time
+
+    get:
+      tags:
+        - Public
+      summary: Queue statistics (wallboard)
+      description: |
+        Handled (answered), abandoned and overflowed totals plus waiting and handling time
+        statistics of answered calls, for calls that entered one queue during the period.
+        Rate limited to 120 requests per minute per client IP.
+      operationId: getPublicQueuesDashboardStats
+      security: []
+      responses:
+        '200':
+          description: Queue statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      call_queue_id:
+                        type: integer
+                      from:
+                        type: string
+                        format: date-time
+                      to:
+                        type: string
+                        format: date-time
+                      waiting_time:
+                        description: Waiting time of answered calls, in seconds
+                        type: object
+                        properties:
+                          min: {type: [integer, 'null']}
+                          max: {type: [integer, 'null']}
+                          avg: {type: [number, 'null'], description: 2 decimals}
+                          stddev: {type: [number, 'null'], description: 2 decimals}
+                      handling_time:
+                        description: Handling time of answered calls, in seconds
+                        type: object
+                        properties:
+                          min: {type: [integer, 'null']}
+                          max: {type: [integer, 'null']}
+                          avg: {type: [number, 'null'], description: 2 decimals}
+                          stddev: {type: [number, 'null'], description: 2 decimals}
+                      totals:
+                        type: object
+                        properties:
+                          handled:
+                            type: integer
+                          abandoned:
+                            type: integer
+                          overflowed:
+                            type: integer
+        '404':
+          description: Invalid dashboard link or queue not in the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid dashboard link.
+        '429':
+          description: Too many requests (Laravel `throttle:120,1`, per client IP)
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Too Many Attempts.

@@ -4,13 +4,43 @@ paths:
       tags:
         - Conference Rooms
       summary: List conference rooms
+      description: >
+        Paginated list of the organization's conference rooms. Available to all
+        roles. `pin` and `host_pin` are returned only to Owners and PBX Admins.
+        An unknown `sort_by` falls back to `name`; default order is ascending.
       operationId: listConferenceRooms
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum:
+              - name
+              - max_participants
+              - status
+              - created_at
+              - updated_at
+            default: name
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - pending
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches name or description (substring)
       responses:
         '200':
           description: List of conference rooms
@@ -32,23 +62,24 @@ paths:
       tags:
         - Conference Rooms
       summary: Create conference room
+      description: >
+        Owner and PBX Admin only. `status` defaults to `active` and every boolean
+        defaults to `false` when omitted.
       operationId: createConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: Weekly Standup
-                max_participants:
-                  type: integer
-                  example: 25
+              allOf:
+                - $ref: '../../components/schemas/ConferenceRoomInput.yaml'
+                - required:
+                    - name
+                    - max_participants
       responses:
         '201':
           description: Conference room created
@@ -59,8 +90,15 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Conferenceroom created successfully.
                   data:
                     $ref: '../../components/schemas/ConferenceRoom.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
   /v1/conference-rooms/{conference_room}:
     parameters:
@@ -77,7 +115,8 @@ paths:
       operationId: getConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:read
       responses:
         '200':
           description: Conference room details
@@ -97,16 +136,20 @@ paths:
       tags:
         - Conference Rooms
       summary: Update conference room
+      description: >
+        Owner and PBX Admin only. All fields are optional; fields not sent keep
+        their stored value. PUT and PATCH behave the same.
       operationId: updateConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/ConferenceRoom.yaml'
+              $ref: '../../components/schemas/ConferenceRoomInput.yaml'
       responses:
         '200':
           description: Conference room updated
@@ -117,8 +160,17 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Conferenceroom updated successfully.
                   data:
                     $ref: '../../components/schemas/ConferenceRoom.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
     patch:
       tags:
         - Conference Rooms
@@ -126,13 +178,14 @@ paths:
       operationId: patchConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/ConferenceRoom.yaml'
+              $ref: '../../components/schemas/ConferenceRoomInput.yaml'
       responses:
         '200':
           description: Conference room updated
@@ -143,17 +196,38 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Conferenceroom updated successfully.
                   data:
                     $ref: '../../components/schemas/ConferenceRoom.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
     delete:
       tags:
         - Conference Rooms
       summary: Delete conference room
+      description: >
+        Owner and PBX Admin only. Refused with 409 when the room is still
+        referenced by routing. The 409 body lists the references.
       operationId: deleteConferenceRoom
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: conference-rooms:write
       responses:
         '204':
           description: Conference room deleted
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

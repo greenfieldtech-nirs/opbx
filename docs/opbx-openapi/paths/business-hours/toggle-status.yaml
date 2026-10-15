@@ -4,16 +4,53 @@ paths:
       tags:
         - Business Hours
       summary: Toggle business hours status
+      description: Sets the schedule status to the value sent.
       operationId: toggleBusinessHoursStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       parameters:
         - name: businessHour
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, inactive]
+              required: [status]
       responses:
         '200':
-          description: Status toggled
+          description: Status set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Business hours schedule status updated successfully.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                        enum: [active, inactive]
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

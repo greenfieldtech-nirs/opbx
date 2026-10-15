@@ -89,7 +89,7 @@ export default function CallTrackingDniSnippet() {
       <Alert>
         <AlertDescription>
           Add this snippet to your website to dynamically swap phone numbers based on the visitor's source.
-          Mark any element with <code className="bg-muted px-1 rounded">data-ct-phone</code> and the script will replace its content.
+          Mark any element with <code className="bg-muted px-1 rounded-sm">data-ct-phone</code> and the script will replace its content.
         </AlertDescription>
       </Alert>
 

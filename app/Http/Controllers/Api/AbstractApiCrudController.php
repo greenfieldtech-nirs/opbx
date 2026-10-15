@@ -7,18 +7,20 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
-use App\Http\Controllers\Traits\HandlesApiErrors;
 use App\Http\Controllers\Traits\LogsOperations;
 use App\Services\ResourceReferenceChecker;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Abstract base controller for CRUD API operations.
@@ -28,7 +30,7 @@ use Illuminate\Support\Str;
  */
 abstract class AbstractApiCrudController extends Controller
 {
-    use ApiRequestHandler, HandlesApiErrors, LogsOperations;
+    use ApiRequestHandler, LogsOperations;
 
     // ============================================================================
     // CONTROLLER CONSTANTS
@@ -340,7 +342,24 @@ abstract class AbstractApiCrudController extends Controller
             return $modelClass::forOrganization($currentUser->organization_id)->findOrFail($key);
         }
 
-        return $modelClass::findOrFail($key);
+        $model = $modelClass::findOrFail($key);
+
+        // Unscoped models: refuse another tenant's row with the same 404 shape.
+        if ($currentUser && $model->organization_id !== $currentUser->organization_id) {
+            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($this->getLoggingContext(), [
+                'user_id' => $currentUser->id,
+                'organization_id' => $currentUser->organization_id,
+                'target_'.$this->getResourceKey().'_id' => $model->id,
+                'target_organization_id' => $model->organization_id,
+            ]));
+
+            throw new HttpResponseException(response()->json([
+                'error' => 'Not Found',
+                'message' => ucfirst($this->getResourceKey()).' not found.',
+            ], 404));
+        }
+
+        return $model;
     }
 
     /**
@@ -619,17 +638,7 @@ abstract class AbstractApiCrudController extends Controller
         $resourceClass = $this->getResourceClass();
         $collection = $resourceClass::collection($models);
 
-        return response()->json([
-            'data' => $collection->resolve(),
-            'meta' => [
-                'current_page' => $models->currentPage(),
-                'per_page' => $models->perPage(),
-                'total' => $models->total(),
-                'last_page' => $models->lastPage(),
-                'from' => $models->firstItem(),
-                'to' => $models->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($models, $collection->resolve(), withRange: true);
     }
 
     /**
@@ -643,15 +652,11 @@ abstract class AbstractApiCrudController extends Controller
         $this->authorize($this->getCreateAbility(), $this->getModelClass());
 
         // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
-        $formRequestClass = $this->getStoreRequestClass();
-        if ($formRequestClass !== null) {
-            $request = app($formRequestClass);
-        }
+        $formRequestClass = $this->getStoreRequestClass()
+            ?? throw new \LogicException(static::class.' must declare a store FormRequest');
+        $request = app($formRequestClass);
 
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
+        $validated = $request->validated();
 
         // Log will be handled by success/failure methods below
 
@@ -705,6 +710,8 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getCreateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ], 201);
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'creation', [
                 'creator_id' => $currentUser->id,
@@ -734,22 +741,6 @@ abstract class AbstractApiCrudController extends Controller
         $model = $this->resolveModel($request);
         $this->authorize($this->getViewAbility(), $model);
 
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
         $this->logDetailsRetrieved($this->getResourceKey(), [
             'user_id' => $currentUser->id,
             'organization_id' => $currentUser->organization_id,
@@ -777,35 +768,17 @@ abstract class AbstractApiCrudController extends Controller
         $model = $this->resolveModel($request);
         $this->authorize($this->getUpdateAbility(), $model);
 
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' update attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
         // Resolve a specific FormRequest class if configured; this triggers validation and authorization.
-        $formRequestClass = $this->getUpdateRequestClass();
-        if ($formRequestClass !== null) {
-            // Bind the resolved model to the route parameter so the FormRequest can
-            // access it via route model binding in authorize()/rules().
-            $request->route()->setParameter($this->getRouteParameterName(), $model);
-            $request = app($formRequestClass);
-        }
+        $formRequestClass = $this->getUpdateRequestClass()
+            ?? throw new \LogicException(static::class.' must declare an update FormRequest');
+        // Bind the resolved model to the route parameter so the FormRequest can
+        // access it via route model binding in authorize()/rules().
+        $request->route()->setParameter($this->getRouteParameterName(), $model);
+        $request = app($formRequestClass);
 
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
+        $validated = $request->validated();
+        // Never allow re-parenting a record to another tenant.
+        unset($validated['organization_id']);
 
         // Track changed fields for logging (handles JSON/array fields properly)
         $changedFields = $this->getChangedFields($model, $validated);
@@ -859,6 +832,8 @@ abstract class AbstractApiCrudController extends Controller
                 'message' => $this->getUpdateSuccessMessage(),
                 'data' => new $resourceClass($model),
             ]);
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'update', [
                 'updater_id' => $currentUser->id,
@@ -891,22 +866,6 @@ abstract class AbstractApiCrudController extends Controller
 
         $model = $this->resolveModel($request);
         $this->authorize($this->getDeleteAbility(), $model);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' deletion attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
 
         // Log will be handled by success/failure methods below
 
@@ -945,6 +904,9 @@ abstract class AbstractApiCrudController extends Controller
             ]);
 
             return response()->json(null, 204);
+        } catch (HttpResponseException|ResourceInUseException|ValidationException|HttpException $e) {
+            // Designed responses from hooks (e.g. last-owner 409) must not become 500s.
+            throw $e;
         } catch (\Exception $e) {
             $this->logOperationFailed($this->getResourceKey(), 'deletion', [
                 'deleter_id' => $currentUser->id,

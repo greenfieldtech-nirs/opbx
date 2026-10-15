@@ -1,4 +1,4 @@
-description: Rate limit maximum requests per window
+description: Maximum number of requests allowed in the current rate-limit window
 schema:
   type: integer
 example: 60

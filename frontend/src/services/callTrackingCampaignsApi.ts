@@ -9,6 +9,7 @@ export interface CampaignListParams {
   per_page?: number;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
+  unprovisioned?: 1;
 }
 
 export interface CampaignFormData {

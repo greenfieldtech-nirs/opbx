@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Exceptions\OperateAsSelfMutationException;
 use App\Http\Middleware\ApplyOperateAsOrganization;
 use App\Http\Middleware\BypassOrganizationScope;
 use App\Http\Middleware\DialerWorkerAuth;
@@ -9,21 +10,27 @@ use App\Http\Middleware\EnforceApiKeyScope;
 use App\Http\Middleware\EnsurePlatformManager;
 use App\Http\Middleware\EnsureTenantScope;
 use App\Http\Middleware\EnsureWebhookIdempotency;
+use App\Http\Middleware\LogVoiceRequests;
 use App\Http\Middleware\RateLimitPerOrganization;
 use App\Http\Middleware\RateLimitSensitiveOperations;
 use App\Http\Middleware\ResolveApiKey;
 use App\Http\Middleware\ResolveEmbedToken;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TagCallFlowLogs;
 use App\Http\Middleware\VerifyCloudonixSignature;
 use App\Http\Middleware\VerifyVoiceWebhookAuth;
+use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -52,7 +59,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.scope' => EnsureTenantScope::class,
             'webhook.signature' => VerifyCloudonixSignature::class,
-            'log.callflow' => \App\Http\Middleware\TagCallFlowLogs::class,
+            'log.callflow' => TagCallFlowLogs::class,
+            'log.voice' => LogVoiceRequests::class,
             'webhook.idempotency' => EnsureWebhookIdempotency::class,
             'voice.webhook.auth' => VerifyVoiceWebhookAuth::class,
             'rate_limit_org' => RateLimitPerOrganization::class,
@@ -73,6 +81,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(
             before: AuthenticatesRequests::class,
             prepend: ResolveApiKey::class,
+        );
+
+        // ApplyOperateAsOrganization swaps the auth principal that OrganizationScope reads.
+        // Unlisted middleware sorts AFTER SubstituteBindings, so implicit route-model binding
+        // ran with the platform manager's own org and 404'd every single-record route while
+        // operating as another org. It must run after Authenticate and before binding.
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: ApplyOperateAsOrganization::class,
         );
 
         // DO NOT add EnforceApiKeyScope to the priority list. It must keep its
@@ -147,9 +164,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // saving() hook) into a clean 403 instead of a 500. This fires only if
         // a request attempts to persist the platform owner's own account while
         // they are operating as an organization.
-        $exceptions->render(function (\RuntimeException $e, $request) {
-            if (str_contains($e->getMessage(), 'operate-as effective user')
-                && ($request->is('api/*') || $request->expectsJson())) {
+        $exceptions->render(function (OperateAsSelfMutationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'error' => [
                         'code' => 'OPERATE_AS_SELF_MUTATION_FORBIDDEN',
@@ -158,6 +174,27 @@ return Application::configure(basePath: dirname(__DIR__))
                     ],
                 ], 403);
             }
+        });
+
+        // Voice routes are consumed by Cloudonix, which can only act on CXML: an HTML/JSON 500 drops the
+        // caller. (A middleware cannot do this: the router converts controller exceptions to responses
+        // before middleware sees them.) Auth/validation/HTTP errors keep their own status.
+        $exceptions->render(function (Throwable $e, $request) {
+            if (! $request->is('api/voice/route', 'api/voice/ivr-input', 'api/callbacks/voice/*')
+                || $e instanceof HttpExceptionInterface
+                || $e instanceof AuthenticationException
+                || $e instanceof AuthorizationException
+                || $e instanceof ValidationException) {
+                return null;
+            }
+
+            report($e);
+
+            return response(
+                CxmlBuilder::sayWithHangup('We are sorry, an error occurred. Please try again later.', true),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         });
 
         // Handle authorization exceptions for API routes
@@ -199,7 +236,10 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->expectsJson()) {
                 return response()->json([
                     'error' => class_basename(get_class($e)),
-                    'message' => $e->getMessage() ?: 'An error occurred.',
+                    // Laravel turns ModelNotFoundException into a 404 whose message names the model class.
+                    'message' => $e->getPrevious() instanceof ModelNotFoundException
+                        ? 'Resource not found.'
+                        : ($e->getMessage() ?: 'An error occurred.'),
                     'status' => $statusCode,
                 ], $statusCode);
             }

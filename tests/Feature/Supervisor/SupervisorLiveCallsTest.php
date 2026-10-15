@@ -81,4 +81,32 @@ final class SupervisorLiveCallsTest extends TestCase
 
         $response->assertOk()->assertJsonCount(1, 'data');
     }
+
+    public function test_supervisor_is_scoped_without_the_flag_and_sees_own_calls(): void
+    {
+        $org = Organization::factory()->create();
+        $supervisor = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::SUPERVISOR]);
+        $assignedUser = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::PBX_USER]);
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $assignedUser->id, 'type' => 'user', 'extension_number' => '1001']);
+        Extension::factory()->create(['organization_id' => $org->id, 'user_id' => $supervisor->id, 'type' => 'user', 'extension_number' => '1002']);
+        $supervisor->supervisedUsers()->attach($assignedUser->id, ['organization_id' => $org->id]);
+
+        foreach (['+1001', '+1002', '+9999'] as $caller) {
+            SessionUpdate::factory()->create([
+                'organization_id' => $org->id,
+                'caller_id' => $caller,
+                'status' => 'ringing',
+                'session_modified_at' => now(),
+            ]);
+        }
+
+        $this->actingAs($supervisor)->getJson('/api/v1/session-updates/active')
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->actingAs($supervisor)->getJson('/api/v1/session-updates/active/stats')
+            ->assertOk()->assertJsonPath('data.total_active', 2);
+
+        $owner = User::factory()->create(['organization_id' => $org->id, 'role' => UserRole::OWNER]);
+        $this->actingAs($owner)->getJson('/api/v1/session-updates/active')
+            ->assertOk()->assertJsonCount(3, 'data');
+    }
 }

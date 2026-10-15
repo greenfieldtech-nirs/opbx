@@ -17,8 +17,10 @@ import org.slf4j.LoggerFactory;
  *      indicating a stable-amplitude tone (not speech)
  *    - The spectral purity ratio is high (≥ 10.0), meaning most energy
  *      is concentrated in the target band
- * 4. Only accept detections starting at ≥ 10.5 seconds, since the real
- *    voicemail beep in this system consistently appears around 12-13s
+ * 4. The tone's onset (walking back over tone-like windows) must be visible inside
+ *    the analyzed audio and at ≥ minBeepStartMs (AMD_MIN_BEEP_START_MS, default 2s):
+ *    a beep follows a greeting, while a tone already running when the audio began
+ *    (in-band ringback/early media at answer) is not a beep
  *
  * This detector is stateless and thread-safe — a single instance can be
  * reused across all streams.
@@ -33,7 +35,11 @@ public class ToneEnergyDetector implements Detector {
     private static final double SILENCE_THR = 0.0005;
     private static final double MAX_CV = 0.22;
     private static final double MIN_RATIO = 10.0;
-    private static final int MIN_BEEP_START_MS = 10500;
+    private final int minBeepStartMs;
+
+    public ToneEnergyDetector(int minBeepStartMs) {
+        this.minBeepStartMs = minBeepStartMs;
+    }
 
     @Override
     public String name() {
@@ -89,10 +95,14 @@ public class ToneEnergyDetector implements Detector {
             double variance = (meanSq / RUN_WINDOWS) - (meanRms * meanRms);
             double cv = (meanRms > 0) ? Math.sqrt(variance) / meanRms : 999;
 
-            double beepStartMs = segment.startTimestampMs + (start * WINDOW_MS);
+            int onset = start;
+            while (onset > 0 && targetEnergies[onset - 1] > SILENCE_THR && ratios[onset - 1] >= MIN_RATIO) {
+                onset--;
+            }
+            double beepStartMs = segment.startTimestampMs + (onset * WINDOW_MS);
             double beepEndMs = segment.startTimestampMs + (end * WINDOW_MS);
 
-            if (cv <= MAX_CV && meanRatio >= MIN_RATIO && beepStartMs >= MIN_BEEP_START_MS) {
+            if (cv <= MAX_CV && meanRatio >= MIN_RATIO && onset > 0 && beepStartMs >= minBeepStartMs) {
                 logger.info("ToneEnergy detected beep start_ms={} end_ms={} cv={} ratio={} band={}-{}Hz",
                     (int) beepStartMs, (int) beepEndMs, String.format("%.3f", cv), String.format("%.1f", meanRatio), LOW_FREQ, HIGH_FREQ);
                 return new DetectionResult(

@@ -56,7 +56,7 @@ class PlatformOrganizationController extends Controller
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
             }
 
-            $perPage = $request->input('per_page', 25);
+            $perPage = $this->perPage($request, 25);
 
             $paginator = $query->paginate(min($perPage, 100));
 
@@ -96,16 +96,7 @@ class PlatformOrganizationController extends Controller
                 'businessHoursSchedules as business_hours_count',
             ]);
 
-            // Mask sensitive Cloudonix settings
-            $settings = $organization->settings;
-            if (is_array($settings) && isset($settings['cloudonix'])) {
-                $settings['cloudonix'] = $this->maskSensitiveSettings($settings['cloudonix']);
-            }
-
-            return array_merge(
-                $organization->toArray(),
-                ['settings' => $settings]
-            );
+            return $this->withMaskedSettings($organization->toArray());
         });
 
         return response()->json([
@@ -122,7 +113,7 @@ class PlatformOrganizationController extends Controller
         PlatformAuditService $auditService
     ): JsonResponse {
         $validated = $request->validated();
-        $beforeState = $organization->only(['name', 'timezone', 'settings']);
+        $beforeState = $this->withMaskedSettings($organization->only(['name', 'timezone', 'settings']));
 
         // Update only provided fields
         if (isset($validated['name'])) {
@@ -146,12 +137,12 @@ class PlatformOrganizationController extends Controller
             targetEntityType: 'Organization',
             targetEntityId: $organization->id,
             beforeState: $beforeState,
-            afterState: $organization->only(['name', 'timezone', 'settings']),
+            afterState: $this->withMaskedSettings($organization->only(['name', 'timezone', 'settings'])),
         );
 
         return response()->json([
             'message' => 'Organization updated successfully.',
-            'data' => $organization->fresh(),
+            'data' => $this->withMaskedSettings($organization->fresh()->toArray()),
         ]);
     }
 
@@ -198,7 +189,7 @@ class PlatformOrganizationController extends Controller
         // For hard delete with cascade
         if ($newStatus === OrganizationStatus::DELETED) {
             // Capture organization data before deletion for audit log
-            $organizationData = $organization->toArray();
+            $organizationData = $this->withMaskedSettings($organization->toArray());
             $organizationId = $organization->id;
 
             DB::transaction(function () use ($organization) {
@@ -299,6 +290,21 @@ class PlatformOrganizationController extends Controller
         ];
 
         return $transitions[$currentStatus] ?? [];
+    }
+
+    /**
+     * Mask the Cloudonix secrets in an organization array's `settings` (for responses and audit snapshots).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withMaskedSettings(array $data): array
+    {
+        if (is_array($data['settings']['cloudonix'] ?? null)) {
+            $data['settings']['cloudonix'] = $this->maskSensitiveSettings($data['settings']['cloudonix']);
+        }
+
+        return $data;
     }
 
     /**

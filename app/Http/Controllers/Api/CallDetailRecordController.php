@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\CallDetailRecordResource;
 use App\Models\ApiKey;
+use App\Models\ArchivedCallDetailRecord;
 use App\Models\CallDetailRecord;
 use App\Models\User;
 use App\Services\Supervisor\SupervisorFilterService;
@@ -16,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -28,7 +30,24 @@ class CallDetailRecordController extends AbstractApiCrudController
 {
     protected function getModelClass(): string
     {
-        return CallDetailRecord::class;
+        return $this->wantsArchive() ? ArchivedCallDetailRecord::class : CallDetailRecord::class;
+    }
+
+    /**
+     * ?archive=1 switches index, show, export and statistics to the warm tier (6-12 months old). Only organisation
+     * API keys may; for the SPA (session users, incl. org Owners) the flag is ignored.
+     */
+    private function wantsArchive(): bool
+    {
+        $request = request();
+
+        return $request->boolean('archive') && $request->user() instanceof ApiKey;
+    }
+
+    /** The route parameter is the same for both tiers (the archived model would otherwise snake to another name). */
+    protected function getRouteParameterName(): string
+    {
+        return 'call_detail_record';
     }
 
     protected function getResourceClass(): string
@@ -38,12 +57,17 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['from', 'to', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
+        return ['extension', 'to', 'extension_destination_match', 'disposition', 'from_date', 'to_date', 'user', 'direction'];
     }
 
     protected function getAllowedSortFields(): array
     {
-        return ['session_timestamp', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
+        // user_full_name needs a join to extensions/users on the main connection, which the warm tier is not on.
+        if ($this->wantsArchive()) {
+            return ['session_timestamp', 'extension_number', 'from', 'to', 'duration', 'billsec', 'disposition', 'direction'];
+        }
+
+        return ['session_timestamp', 'extension_number', 'from', 'to', 'duration', 'billsec', 'disposition', 'user_full_name', 'direction'];
     }
 
     protected function getDefaultSortField(): string
@@ -58,21 +82,20 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
-        $query->with(['extension.user:id,name', 'sessionUpdate']);
+        $query->with(['extension.user:id,name']);
 
-        // Sorting by the assigned user's name or call direction requires joining
-        // through to tables that aren't directly on call_detail_records. The
-        // joined subqueries deliberately avoid selecting `organization_id` -
-        // joining the raw `extensions`/`session_updates` tables would pull an
-        // ambiguous `organization_id` column into scope and break the
-        // unqualified `organization_id` predicate Eloquent's OrganizationScope
-        // adds elsewhere in the query. Matching on `cloudonix_uuid`/`session_id`
-        // alone is safe since both are Cloudonix-assigned, platform-wide unique
-        // identifiers, not values scoped per organization.
+        // Sorting by the assigned user's name requires joining through to a table
+        // that isn't directly on call_detail_records. The joined subquery
+        // deliberately avoids selecting `organization_id` - joining the raw
+        // `extensions` table would pull an ambiguous `organization_id` column into
+        // scope and break the unqualified `organization_id` predicate Eloquent's
+        // OrganizationScope adds elsewhere in the query. Matching on
+        // `cloudonix_uuid` alone is safe since it is Cloudonix-assigned and
+        // platform-wide unique, not scoped per organization.
         $sortBy = $request->input('sort_by');
         $organizationId = $request->user()?->organization_id;
 
-        if ($sortBy === 'user_full_name') {
+        if ($sortBy === 'user_full_name' && ! $this->wantsArchive()) {
             $extensionUsers = DB::table('extensions')
                 ->join('users', 'users.id', '=', 'extensions.user_id')
                 ->where('extensions.organization_id', $organizationId)
@@ -84,48 +107,21 @@ class CallDetailRecordController extends AbstractApiCrudController
                 })
                 ->addSelect('extension_users.user_name as user_full_name');
         }
-
-        if ($sortBy === 'direction') {
-            $latestSessionUpdates = DB::table('session_updates')
-                ->where('organization_id', $organizationId)
-                ->select('session_id', DB::raw('MAX(id) as max_id'))
-                ->groupBy('session_id');
-
-            $callDirections = DB::table('session_updates')
-                ->joinSub($latestSessionUpdates, 'latest_session_updates', function ($join): void {
-                    $join->on('session_updates.id', '=', 'latest_session_updates.max_id');
-                })
-                ->select('session_updates.session_id', 'session_updates.direction');
-
-            $query->select('call_detail_records.*')
-                ->leftJoinSub($callDirections, 'call_directions', function ($join): void {
-                    $join->on('call_directions.session_id', '=', 'call_detail_records.session_id');
-                })
-                ->addSelect('call_directions.direction as direction');
-        }
     }
 
     protected function afterShow(Model $model, Request $request): void
     {
-        $model->loadMissing(['extension.user:id,name', 'sessionUpdate']);
+        $model->loadMissing(['extension.user:id,name']);
     }
 
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Supervisor-scoped filter: restrict CDRs to resources the Supervisor manages
-        if ($request->boolean('supervisor') && $request->user()?->isSupervisor()) {
-            $this->applySupervisorFilter($query, $request->user());
+        // Supervisors and PBX Users are always restricted to their scope (the legacy ?supervisor= flag is ignored).
+        if ($request->user() !== null) {
+            $this->applyCallRecordScope($query, $request->user());
         }
 
-        // Filter by caller number (from)
-        if ($request->filled('from')) {
-            $query->where('from', 'like', '%'.$request->input('from').'%');
-        }
-
-        // Filter by called number (to)
-        if ($request->filled('to')) {
-            $query->where('to', 'like', '%'.$request->input('to').'%');
-        }
+        $this->applyExtensionDestinationFilter($query, $request);
 
         // Filter by disposition
         if ($request->filled('disposition')) {
@@ -138,7 +134,7 @@ class CallDetailRecordController extends AbstractApiCrudController
         }
 
         // Filter by the extension's assigned user (partial name match)
-        if ($request->filled('user')) {
+        if ($request->filled('user') && ! $this->wantsArchive()) {
             $search = $request->input('user');
             $query->whereHas('extension.user', function ($q) use ($search): void {
                 $q->where('name', 'like', '%'.$search.'%');
@@ -146,34 +142,89 @@ class CallDetailRecordController extends AbstractApiCrudController
         }
 
         // Filter by call direction (incoming/outgoing/internal/application),
-        // as reported by the session-update webhooks for this CDR's session.
+        // stored on the CDR at ingest from the session-update webhooks.
         if ($request->filled('direction')) {
-            $direction = $request->input('direction');
-            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
-                $q->where('direction', $direction);
-            });
+            $query->where('direction', $request->input('direction'));
         }
 
-        // Filter by date range
-        if ($request->filled('from_date')) {
-            $query->whereDate('session_timestamp', '>=', $request->input('from_date'));
+        // Filter by date range (sargable: plain comparisons on session_timestamp)
+        if ($request->filled('from_date') && ($start = $this->parseDay((string) $request->input('from_date'))) !== null) {
+            $query->where('session_timestamp', '>=', $start->startOfDay());
         }
 
-        if ($request->filled('to_date')) {
-            $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
+        if ($request->filled('to_date') && ($end = $this->parseDay((string) $request->input('to_date'))) !== null) {
+            $query->where('session_timestamp', '<=', $end->endOfDay());
         }
     }
 
     /**
-     * Apply Supervisor resource filter to a CDR query.
+     * Extension (extension_number) and Destination (to) filters: both must match (all, the default) or either (any).
+     * The Caller ID (`from`) is display-only and not a filter.
      */
-    private function applySupervisorFilter(Builder $query, User|ApiKey $user): void
+    private function applyExtensionDestinationFilter(Builder $query, Request $request): void
     {
-        if (! $user->isSupervisor()) {
+        $match = $request->validate(['extension_destination_match' => ['nullable', Rule::in(['any', 'all'])]])['extension_destination_match'] ?? 'all';
+        $extension = $request->filled('extension') ? (string) $request->input('extension') : null;
+        $to = $request->filled('to') ? (string) $request->input('to') : null;
+
+        if ($match === 'any' && $extension !== null && $to !== null) {
+            $query->where(function (Builder $q) use ($extension, $to): void {
+                $this->wherePhonePrefix($q, 'extension_number', $extension);
+                $q->orWhere(fn (Builder $q) => $this->wherePhonePrefix($q, 'to', $to));
+            });
+
             return;
         }
 
-        $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
+        if ($extension !== null) {
+            $this->wherePhonePrefix($query, 'extension_number', $extension);
+        }
+        if ($to !== null) {
+            $this->wherePhonePrefix($query, 'to', $to);
+        }
+    }
+
+    /**
+     * Phone-number search, with or without the leading '+'. '*' and '%' are wildcards for any characters;
+     * a term without a wildcard is a prefix match (served by cdr_org_from_idx / cdr_org_to_idx). A leading
+     * wildcard (contains / ends-with) works but cannot use the index. '_' and '\' stay literal.
+     */
+    private function wherePhonePrefix(Builder $query, string $column, string $value): void
+    {
+        $pattern = str_replace(['*', '%'], '%', addcslashes(ltrim($value, '+'), '_\\'));
+        if (! str_contains($pattern, '%')) {
+            $pattern .= '%';
+        }
+
+        $query->where(function (Builder $q) use ($column, $pattern): void {
+            $q->where($column, 'like', $pattern);
+            if (! str_starts_with($pattern, '%')) {
+                $q->orWhere($column, 'like', '+'.$pattern);
+            }
+        });
+    }
+
+    private function parseDay(string $value): ?Carbon
+    {
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Restrict a CDR query to the user's call-record scope (Supervisor: assigned resources; PBX User: own extensions).
+     */
+    private function applyCallRecordScope(Builder $query, User|ApiKey $user): void
+    {
+        $scope = app(SupervisorFilterService::class);
+        $identifiers = $scope->callRecordScopeFor($user);
+        $columns = $scope->callRecordScopeColumns($user);
+
+        if ($identifiers === null) {
+            return;
+        }
 
         if (count($identifiers) === 0) {
             $query->whereRaw('1 = 0');
@@ -181,9 +232,10 @@ class CallDetailRecordController extends AbstractApiCrudController
             return;
         }
 
-        $query->where(function ($q) use ($identifiers): void {
-            $q->whereIn('from', $identifiers)
-                ->orWhereIn('to', $identifiers);
+        $query->where(function ($q) use ($identifiers, $columns): void {
+            foreach ($columns as $column) {
+                $q->orWhereIn($column, $identifiers);
+            }
         });
     }
 
@@ -192,12 +244,12 @@ class CallDetailRecordController extends AbstractApiCrudController
      *
      * Route model binding scopes this to the authenticated user's
      * organization via CallDetailRecord's OrganizationScope, but that alone
-     * doesn't apply the supervisor resource-scoping CallDetailRecordPolicy::view()
+     * doesn't apply the Supervisor / PBX User scoping CallDetailRecordPolicy::view()
      * enforces - authorize() below is required, not just defense in depth.
      */
     public function recording(CallDetailRecord $call_detail_record): StreamedResponse|JsonResponse
     {
-        $this->authorize('view', $call_detail_record);
+        $this->authorize('playRecording', $call_detail_record);
 
         if ($call_detail_record->recording_status !== 'available' || ! $call_detail_record->recording_stored_path) {
             return response()->json(['error' => 'Recording not available'], 404);
@@ -209,14 +261,17 @@ class CallDetailRecordController extends AbstractApiCrudController
             return response()->json(['error' => 'Recording file not found in storage'], 404);
         }
 
-        $fileContent = Storage::disk('recordings')->get($storagePath);
+        $disk = Storage::disk('recordings');
 
-        return response()->stream(function () use ($fileContent) {
-            echo $fileContent;
+        return response()->stream(function () use ($disk, $storagePath): void {
+            $source = $disk->readStream($storagePath);
+            $output = fopen('php://output', 'w');
+            stream_copy_to_stream($source, $output);
+            fclose($source);
+            fclose($output);
         }, 200, [
             'Content-Type' => $call_detail_record->recording_mime_type ?? 'audio/mpeg',
-            'Content-Length' => strlen($fileContent),
-            'Accept-Ranges' => 'bytes',
+            'Content-Length' => $disk->size($storagePath),
             'Cache-Control' => 'private, no-cache',
         ]);
     }
@@ -229,45 +284,9 @@ class CallDetailRecordController extends AbstractApiCrudController
         $user = $this->getAuthenticatedUser();
 
         // Build query with same filters as index
-        $query = CallDetailRecord::forOrganization($user->organization_id);
+        $query = $this->getModelClass()::forOrganization($user->organization_id);
 
-        // Apply Supervisor-scoped filter
-        $this->applySupervisorFilter($query, $user);
-
-        // Apply filters
-        if ($request->filled('from')) {
-            $query->where('from', 'like', '%'.$request->input('from').'%');
-        }
-
-        if ($request->filled('to')) {
-            $query->where('to', 'like', '%'.$request->input('to').'%');
-        }
-
-        if ($request->filled('disposition')) {
-            $query->where('disposition', $request->input('disposition'));
-        }
-
-        if ($request->filled('user')) {
-            $search = $request->input('user');
-            $query->whereHas('extension.user', function ($q) use ($search): void {
-                $q->where('name', 'like', '%'.$search.'%');
-            });
-        }
-
-        if ($request->filled('direction')) {
-            $direction = $request->input('direction');
-            $query->whereHas('sessionUpdate', function ($q) use ($direction): void {
-                $q->where('direction', $direction);
-            });
-        }
-
-        if ($request->filled('from_date')) {
-            $query->whereDate('session_timestamp', '>=', $request->input('from_date'));
-        }
-
-        if ($request->filled('to_date')) {
-            $query->whereDate('session_timestamp', '<=', $request->input('to_date'));
-        }
+        $this->applyCustomFilters($query, $request);
 
         // Order by timestamp desc
         $query->orderBy('session_timestamp', 'desc');
@@ -280,6 +299,7 @@ class CallDetailRecordController extends AbstractApiCrudController
             // CSV Headers - using raw_cdr session data as requested
             fputcsv($handle, [
                 'Timestamp',
+                'Extension',
                 'From',
                 'To',
                 'Call Start Time',
@@ -312,6 +332,7 @@ class CallDetailRecordController extends AbstractApiCrudController
 
                     fputcsv($handle, [
                         $record->session_timestamp?->format('Y-m-d H:i:s'),
+                        $record->extension_number,
                         $record->from,
                         $record->to,
                         $callStartTime,
@@ -344,13 +365,15 @@ class CallDetailRecordController extends AbstractApiCrudController
         $fromDate = $request->input('from_date', now()->subDays(30)->toDateString());
         $toDate = $request->input('to_date', now()->toDateString());
 
+        $base = fn (): Builder => $this->buildStatisticsQuery($user, $fromDate, $toDate, $request);
+
         $stats = [
-            'total_calls' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->count(),
-            'total_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('duration'),
-            'total_billsec' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('billsec'),
-            'average_duration' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->where('duration', '>', 0)->avg('duration'),
-            'total_cost' => $this->buildStatisticsQuery($user, $fromDate, $toDate)->sum('sell_cost'),
-            'by_disposition' => $this->buildStatisticsQuery($user, $fromDate, $toDate)
+            'total_calls' => $base()->count(),
+            'total_duration' => $base()->sum('duration'),
+            'total_billsec' => $base()->sum('billsec'),
+            'average_duration' => $base()->where('duration', '>', 0)->avg('duration'),
+            'total_cost' => $base()->sum('sell_cost'),
+            'by_disposition' => $base()
                 ->selectRaw('disposition, COUNT(*) as count')
                 ->groupBy('disposition')
                 ->pluck('count', 'disposition'),
@@ -361,15 +384,16 @@ class CallDetailRecordController extends AbstractApiCrudController
 
     /**
      * Build the base CDR query for statistics, scoped to the organization,
-     * date range, and Supervisor-assigned resources.
+     * date range, the user's call-record scope (Supervisor / PBX User) and the Extension / Destination filters.
      */
-    private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate): Builder
+    private function buildStatisticsQuery(User|ApiKey $user, string $fromDate, string $toDate, Request $request): Builder
     {
-        $query = CallDetailRecord::forOrganization($user->organization_id)
+        $query = $this->getModelClass()::forOrganization($user->organization_id)
             ->whereDate('session_timestamp', '>=', $fromDate)
             ->whereDate('session_timestamp', '<=', $toDate);
 
-        $this->applySupervisorFilter($query, $user);
+        $this->applyCallRecordScope($query, $user);
+        $this->applyExtensionDestinationFilter($query, $request);
 
         return $query;
     }

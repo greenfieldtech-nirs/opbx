@@ -1,26 +1,77 @@
 type: object
-description: Recording
+description: Recording (uploaded audio file or remote URL)
 properties:
   id:
     type: integer
   organization_id:
     type: integer
-  call_log_id:
-    type: integer
-  filename:
+  name:
     type: string
-  duration:
-    type: integer
-    description: Duration in seconds
+  type:
+    type: string
+    enum: [upload, remote]
+  file_path:
+    type:
+      - string
+      - 'null'
+    description: Stored file name within the organization's recordings folder (uploads only)
+  remote_url:
+    type:
+      - string
+      - 'null'
+  original_filename:
+    type:
+      - string
+      - 'null'
   file_size:
-    type: integer
+    type:
+      - integer
+      - 'null'
     description: Size in bytes
-  storage_path:
+  formatted_file_size:
     type: string
+    description: Human-readable size (for example `1.2 MB`), or `Unknown`
+  mime_type:
+    type:
+      - string
+      - 'null'
+  duration_seconds:
+    type:
+      - integer
+      - 'null'
+  formatted_duration:
+    type: string
+    description: '`MM:SS`, or `Unknown` while the duration is not known'
+  status:
+    type: string
+    enum: [active, inactive]
+  is_moh:
+    type: boolean
+    description: Usable as music on hold
+  public_url:
+    type: string
+    description: Kept for backward compatibility. The remote URL for `remote` recordings, a storage URL for uploaded ones, or an empty string.
+  playback_url:
+    type: string
+    description: |
+      For `remote` recordings the remote URL. For uploaded recordings a
+      `GET /v1/recordings/download?token=...` URL on the organization's webhook base URL (or APP_URL),
+      with a fresh access token for the requesting user. Present in every response of the
+      recordings endpoints.
+  created_by:
+    type: string
+    description: Creator name, or `Unknown`
+  updated_by:
+    type: string
+    description: Last updater name, or `Unknown`
   created_at:
+    type: string
+    format: date-time
+  updated_at:
     type: string
     format: date-time
 required:
   - id
   - organization_id
-  - filename
+  - name
+  - type

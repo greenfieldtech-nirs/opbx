@@ -1,0 +1,79 @@
+type: object
+title: ListVersion
+description: A previous version of a distribution list, the destinations one re-upload replaced.
+  Kept until `expires_at`, then deleted by the daily `distribution-lists:prune-versions` job.
+properties:
+  id:
+    type: integer
+    example: 7
+  list_id:
+    type: integer
+    example: 1
+  version_number:
+    type: integer
+    description: The list's `version_number` while these destinations were current
+    example: 1
+  original_filename:
+    type:
+    - string
+    - 'null'
+    description: File the version came from, when known
+    example: leads.csv
+  uploaded_at:
+    type:
+    - string
+    - 'null'
+    description: When that file was uploaded (`Y-m-d H:i:s`), when known
+    example: '2026-10-01 09:15:00'
+  uploaded_by:
+    type:
+    - object
+    - 'null'
+    description: User who uploaded that file, when known
+    properties:
+      id:
+        type: integer
+        example: 3
+      name:
+        type: string
+        example: Dana Levi
+  replaced_at:
+    type: string
+    description: When a new upload replaced this version (`Y-m-d H:i:s`)
+    example: '2026-10-14 12:00:00'
+  expires_at:
+    type:
+    - string
+    - 'null'
+    description: When the version is deleted (`Y-m-d H:i:s`); `null` when retention is
+      disabled and it is kept until the list is deleted
+    example: '2026-11-13 12:00:00'
+  entries_count:
+    type: integer
+    description: Destinations kept in the version
+    example: 1200
+  total_rows:
+    type:
+    - integer
+    - 'null'
+    description: Rows in that version's CSV
+    example: 1250
+  valid_rows:
+    type:
+    - integer
+    - 'null'
+    description: Rows imported from it
+    example: 1200
+  invalid_rows:
+    type:
+    - integer
+    - 'null'
+    description: Rows rejected from it
+    example: 50
+required:
+- id
+- list_id
+- version_number
+- replaced_at
+- expires_at
+- entries_count

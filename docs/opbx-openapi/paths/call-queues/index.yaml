@@ -4,13 +4,43 @@ paths:
       tags:
         - Call Queues
       summary: List call queues
+      description: |
+        Paginated list of call queues. Any role can list; a Supervisor sees only the queues
+        assigned to them. Default order is `created_at` descending. Filters: `strategy`,
+        `status` (unknown values are ignored), `search` and `unprovisioned`. List items carry
+        `agents`, `agents_count`, `moh_recording` and the fallback target summaries.
       operationId: listCallQueues
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, strategy, status, created_at, updated_at]
+            default: created_at
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+          description: Sort direction. Defaults to `desc` on this endpoint.
+        - name: strategy
+          in: query
+          schema:
+            type: string
+            enum: [ring_all, round_robin, least_talk_time, fewest_calls]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: search
+          in: query
+          description: Substring match on name or description
+          schema:
+            type: string
+        - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
           description: List of call queues
@@ -32,34 +62,79 @@ paths:
       tags:
         - Call Queues
       summary: Create call queue
+      description: |
+        Create a call queue. Owner and PBX Admin only. Only `name` and `agents` are required;
+        the other settings take the defaults shown in the schema. Every agent must be an active
+        user of the organization with an extension. `moh_recording_id` must be a recording
+        tagged as hold music. The fallback target must belong to the organization and be active.
+        Only the fallback_*_id matching `fallback_action` is stored; the others are cleared.
+        With `fallback_action: call_queue`, `fallback_call_queue_id` names the queue overflow
+        callers join (as new callers, at the back of its line).
       operationId: createCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueue.yaml'
+              allOf:
+                - $ref: '../../components/schemas/CallQueueInput.yaml'
+                - required: [name, agents]
       responses:
         '201':
           description: Call queue created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Callqueue created successfully.
+                  data:
+                    $ref: '../../components/schemas/CallQueue.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
   /v1/call-queues/agents/me:
     get:
       tags:
         - Call Queues
       summary: List my queue agent memberships
+      description: Every queue the authenticated user is an agent of (active or inactive), with the user's current state from the queue engine.
       operationId: listMyQueueMemberships
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       responses:
         '200':
           description: Queues the authenticated user is an agent of, with current state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        state:
+                          type: string
+                          enum: [AVAILABLE, BUSY, WRAP_UP, LOGGED_OUT]
+                          description: Agent state from the queue engine (LOGGED_OUT when unknown)
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
@@ -68,10 +143,12 @@ paths:
       tags:
         - Call Queues
       summary: Get call queue
+      description: Queue details with `agents` and `moh_recording`. Any role in the organization can view; a Supervisor only the queues assigned to them (403 otherwise).
       operationId: getCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -90,6 +167,8 @@ paths:
                     $ref: '../../components/schemas/CallQueue.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -97,10 +176,25 @@ paths:
       tags:
         - Call Queues
       summary: Update call queue
+      description: &updDesc |
+        Owner and PBX Admin only. PUT and PATCH both update only the fields sent: every field
+        is optional, an omitted field keeps its stored value, and no create default is applied
+        (a body with just `name` renames the queue and changes nothing else). A field that is
+        sent is validated as on create, so `name`, `strategy`, `status` and the other required
+        settings cannot be blanked, and `agents`, when sent, replaces the whole agent list (at
+        least one agent). The fallback columns change only when `fallback_action` or a
+        `fallback_*_id` is sent; the rules then use the stored value of the half that is left
+        out: sending `fallback_action: extension` alone keeps the stored
+        `fallback_extension_id` (422 when none is stored), and sending a target id alone is
+        checked against the stored action. The target columns of the other actions are cleared.
+        `fallback_action: unavailable` is accepted on update. A
+        `fallback_call_queue_id` must not be this queue, and the chain of call queue fallbacks
+        must not lead back to it (422 "Fallback loop detected: ...").
       operationId: updateCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -112,23 +206,83 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '../../components/schemas/CallQueue.yaml'
+              $ref: '../../components/schemas/CallQueueInput.yaml'
       responses:
         '200':
           description: Call queue updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Callqueue updated successfully.
+                  data:
+                    $ref: '../../components/schemas/CallQueue.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+
+    patch:
+      tags:
+        - Call Queues
+      summary: Partially update call queue
+      description: *updDesc
+      operationId: patchCallQueue
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
+      parameters:
+        - name: call_queue
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '../../components/schemas/CallQueueInput.yaml'
+      responses:
+        '200':
+          description: Call queue updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Callqueue updated successfully.
+                  data:
+                    $ref: '../../components/schemas/CallQueue.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
     delete:
       tags:
         - Call Queues
       summary: Delete call queue
+      description: Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, or a ring group / AI load balancer / call queue fallback). The 409 body lists the references.
       operationId: deleteCallQueue
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -140,18 +294,27 @@ paths:
           description: Call queue deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'
 
   /v1/call-queues/{call_queue}/agents/me/state:
     post:
       tags:
         - Call Queues
       summary: Update my agent state in a queue
+      description: |
+        Set the caller's agent state in this queue. Allowed for agents of the queue, and for
+        Owner and PBX Admin (who may pass `user_id` to set another agent's state). Anyone else
+        gets 403. Returns 502 when the queue engine rejects the change.
       operationId: updateMyQueueAgentState
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:write
       parameters:
         - name: call_queue
           in: path
@@ -171,23 +334,45 @@ paths:
                   type: string
                   enum: [available, wrap_up, logged_out]
                   description: Agent presence state (wrap_up is sticky when toggled manually)
+                user_id:
+                  type: integer
+                  description: Owner/PBX Admin only - set the state of this agent instead of their own
       responses:
         '200':
           description: Agent state updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Agent state updated.
+                  state:
+                    type: string
+                    enum: [available, wrap_up, logged_out]
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
           $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
+        '502':
+          description: The queue engine did not accept the state change
 
   /v1/call-queues/{call_queue}/stats:
     get:
       tags:
         - Call Queues
       summary: Get call queue statistics
+      description: Statistics for calls that entered the queue between `from` and `to` (default the last 24 hours). Same access as `GET /v1/call-queues/{call_queue}`.
       operationId: getCallQueueStats
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -206,9 +391,11 @@ paths:
             format: date-time
       responses:
         '200':
-          description: Waiting/handling time aggregates (min/max/avg/stddev) and totals
+          $ref: '../public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1stats/get/responses/200'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -217,10 +404,12 @@ paths:
       tags:
         - Call Queues
       summary: Get live call queue snapshot
+      description: Live waiting calls and agent states. Same access as `GET /v1/call-queues/{call_queue}`.
       operationId: getCallQueueLive
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-queues:read
       parameters:
         - name: call_queue
           in: path
@@ -229,9 +418,11 @@ paths:
             type: integer
       responses:
         '200':
-          description: Waiting callers with positions, agent states, and rolling counts (15m/30m/1h/24h)
+          $ref: '../public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1live/get/responses/200'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -240,15 +431,21 @@ paths:
       tags:
         - Call Queues
       summary: List queue call report rows
+      description: |
+        One row per caller that entered a queue, newest `entered_at` first. Owner, PBX Admin,
+        Reporter and PBX User only (Supervisor gets 403). `from`/`to` filter on `entered_at`.
+        The `meta` object has no `from`/`to` keys.
       operationId: listQueueCalls
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: queue-calls:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
         - name: queue_id
           in: query
+          description: Call queue ID
           schema:
             type: integer
         - name: disposition
@@ -282,19 +479,30 @@ paths:
                     $ref: '../../components/schemas/PaginationMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
 
   /v1/queue-calls/export:
     get:
       tags:
         - Call Queues
       summary: Export queue calls (CSV)
+      description: |
+        Streams every matching row (no pagination) as `queue-calls-YYYY-MM-DD-HHMMSS.csv`, newest
+        first. Same filters and roles as `GET /v1/queue-calls`. Columns: Queue Call ID, Queue ID,
+        Call ID, From, To, Entered At, Answered At, Abandoned At, Ended At, Agent User ID,
+        Waiting Seconds, Handling Seconds, Disposition.
       operationId: exportQueueCalls
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: queue-calls:read
       parameters:
         - name: queue_id
           in: query
+          description: Call queue ID
           schema:
             type: integer
         - name: disposition
@@ -316,6 +524,12 @@ paths:
         '200':
           description: CSV export of queue call report rows
           content:
-            text/csv: {}
+            text/csv:
+              schema:
+                type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

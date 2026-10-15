@@ -13,19 +13,30 @@ paths:
       tags:
       - Distribution Lists
       summary: List destinations
-      description: 'Get a paginated list of destinations in a distribution list.
+      description: 'Get a paginated list of destinations in a distribution list, newest first
+
+        (by `created_at`).
 
 
-        Supports filtering by status and searching by phone number.
+        Roles: Owner, PBX Admin and Reporter.
 
         '
       operationId: listListDestinations
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
-      - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: per_page
+        in: query
+        required: false
+        description: Items per page (values outside 1-100 are clamped)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
       - name: status
         in: query
         required: false
@@ -34,15 +45,17 @@ paths:
           enum:
           - pending
           - dialing
-          - completed
+          - connected
           - failed
+          - completed
+          - invalid
         description: Filter by destination status
       - name: search
         in: query
         required: false
         schema:
           type: string
-        description: Search by phone number
+        description: Substring match on the phone number
       responses:
         '200':
           description: List of destinations
@@ -54,40 +67,7 @@ paths:
                   data:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        phone_number:
-                          type: string
-                          example: '+14155551212'
-                        description:
-                          type:
-                          - string
-                          - 'null'
-                          example: John Doe - Sales Lead
-                        status:
-                          type: string
-                          enum:
-                          - pending
-                          - dialing
-                          - completed
-                          - failed
-                          example: pending
-                        dial_attempts:
-                          type: integer
-                          example: 0
-                        last_dialed_at:
-                          type:
-                          - string
-                          - 'null'
-                          format: date-time
-                          example: null
-                        created_at:
-                          type: string
-                          format: date-time
-                          example: '2024-01-10 08:00:00'
+                      $ref: ../../components/schemas/ListDestination.yaml
                   meta:
                     $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
@@ -103,13 +83,23 @@ paths:
       description: 'Add a single destination to a distribution list.
 
 
-        The list must be in a status that allows uploads.
+        The list must be in ''draft'', ''pending'' or ''failed'' status (otherwise 403).
+
+        The number is validated with libphonenumber (default region US) and stored in
+
+        E.164; a number already in the list is rejected. Adding to a ''draft'' list
+
+        moves it to ''ready''.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: addListDestination
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -119,14 +109,15 @@ paths:
               properties:
                 phone_number:
                   type: string
-                  description: Phone number in E.164 format
+                  description: Phone number. E.164 is recommended; numbers without a country
+                    code are parsed as US numbers.
                   example: '+14155551212'
-                description:
+                name:
                   type:
                   - string
                   - 'null'
                   maxLength: 255
-                  description: Optional description
+                  description: Optional contact name
                   example: John Doe - Sales Lead
               required:
               - phone_number
@@ -142,26 +133,7 @@ paths:
                     type: string
                     example: Destination added successfully
                   data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        example: 1
-                      phone_number:
-                        type: string
-                        example: '+14155551212'
-                      description:
-                        type:
-                        - string
-                        - 'null'
-                        example: John Doe - Sales Lead
-                      status:
-                        type: string
-                        example: pending
-                      created_at:
-                        type: string
-                        format: date-time
-                        example: '2024-01-10 08:00:00'
+                    $ref: ../../components/schemas/ListDestination.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -169,7 +141,17 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, or the number is invalid or already in the list
+            (`{"error": "..."}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Phone number already exists in this list
   /v1/auto-dialer-campaigns/lists/{list}/destinations/batch:
     parameters:
     - name: list
@@ -187,15 +169,27 @@ paths:
       description: 'Add multiple destinations to a distribution list in batch.
 
 
-        Maximum 1000 destinations per request. The list must be
+        Maximum 1000 destinations per request, and the list may not grow beyond
 
-        in a status that allows uploads.
+        100,000 destinations. The list must be in ''draft'', ''pending'' or ''failed''
+
+        status (otherwise 403). Each number is validated like the single add; invalid
+
+        numbers and duplicates within the batch are reported in `errors`, numbers
+
+        already in the list are skipped. When at least one entry is valid the list
+
+        moves to ''ready''.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: addListDestinationsBatch
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -212,14 +206,14 @@ paths:
                     properties:
                       phone_number:
                         type: string
-                        description: Phone number in E.164 format
+                        description: Phone number (E.164 recommended; numbers without a country code are parsed as US numbers)
                         example: '+14155551212'
-                      description:
+                      name:
                         type:
                         - string
                         - 'null'
                         maxLength: 255
-                        description: Optional description
+                        description: Optional contact name
                         example: John Doe - Sales Lead
                     required:
                     - phone_number
@@ -239,32 +233,27 @@ paths:
                   data:
                     type: object
                     properties:
-                      total:
-                        type: integer
-                        description: Total destinations in batch
-                        example: 100
                       added:
                         type: integer
-                        description: Number of destinations added
-                        example: 98
-                      failed:
-                        type: integer
-                        description: Number of destinations that failed
-                        example: 2
+                        description: Number of destinations inserted
+                        example: 97
                       errors:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            index:
-                              type: integer
-                              example: 5
-                            phone_number:
-                              type: string
-                              example: invalid-number
-                      message:
-                        type: string
-                        example: Invalid phone number format
+                        description: >-
+                          Rejected entries keyed by their zero-based index in `destinations`
+                          (value: the reason). An empty JSON array `[]` when nothing was rejected.
+                        oneOf:
+                        - type: object
+                          additionalProperties:
+                            type: string
+                        - type: array
+                          maxItems: 0
+                        example:
+                          '5': Invalid phone number format
+                          '8': Duplicate phone number in batch
+                      duplicates_skipped:
+                        type: integer
+                        description: Valid numbers skipped because they are already in the list
+                        example: 1
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -272,7 +261,17 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, or the batch would exceed the 100,000-destination
+            list limit (`{"error": "..."}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Batch would exceed maximum list size of 100000
   /v1/auto-dialer-campaigns/lists/{list}/destinations/bulk-reset-dial-attempts:
     parameters:
     - name: list
@@ -290,13 +289,23 @@ paths:
       description: 'Reset dial attempts for multiple destinations in a list.
 
 
-        Accepts an array of destination IDs. All IDs must belong to the list.
+        Accepts an array of destination IDs; all IDs must belong to the list (otherwise
+
+        422). Each destination is set to pending with zero dial attempts, and
+
+        `last_disposition`, `last_dialed_at` and the next retry time are cleared.
+
+        Allowed in any list status, including assigned lists.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: bulkResetListDestinationDialAttempts
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -335,7 +344,17 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, or one or more IDs are not in this list
+            (`{"error": "One or more destinations not found in this list"}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+              example:
+                error: One or more destinations not found in this list
   /v1/auto-dialer-campaigns/lists/{list}/destinations/{destinationId}/reset-dial-attempts:
     parameters:
     - name: list
@@ -358,13 +377,25 @@ paths:
       tags:
       - Distribution Lists
       summary: Reset destination dial attempts
-      description: 'Reset dial attempts for a single destination in a list.
+      description: 'Reset dial attempts for a single destination in a list: the destination
+
+        is set to pending with zero dial attempts, and `last_disposition`, `last_dialed_at`
+
+        and the next retry time are cleared. Allowed in any list status, including
+
+        assigned lists. A destination that is not in this list returns 404
+
+        (`{"error": "Destination not found in this list"}`).
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: resetListDestinationDialAttempts
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: Dial attempts reset

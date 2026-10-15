@@ -17,19 +17,21 @@ The `EmailLog` model tracks all transactional email sends for audit and debuggin
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
 | `id` | bigint unsigned | No | Primary key |
-| `correlation_id` | string | Yes | Request correlation ID |
-| `provider` | string | Yes | Email provider (mailgun, mailjet, etc.) |
-| `driver` | string | Yes | Mail driver |
-| `from_email` | string | Yes | Sender address |
-| `to_email` | string | Yes | Recipient address |
-| `subject` | string | Yes | Email subject |
-| `status` | string | No | queued, sent, delivered, bounced, failed |
-| `provider_message_id` | string | Yes | Provider tracking ID |
+| `correlation_id` | varchar(255) | No | Request correlation ID (indexed) |
+| `provider` | varchar(255) | No | Email provider (mailgun, mailjet, etc.) |
+| `driver` | varchar(255) | No | Mail driver |
+| `from_email` | varchar(255) | No | Sender address |
+| `to_email` | varchar(255) | No | Recipient address |
+| `subject` | varchar(255) | No | Email subject |
+| `status` | enum | No | `queued` (default), `sent`, `delivered`, `bounced`, `failed` |
+| `provider_message_id` | varchar(255) | Yes | Provider tracking ID |
 | `error_message` | text | Yes | Failure reason |
-| `metadata` | JSON | Yes | Provider response metadata |
-| `sent_at` | datetime | Yes | When sent |
-| `created_at` | datetime | No | |
-| `updated_at` | datetime | No | |
+| `metadata` | json | Yes | Provider response metadata |
+| `sent_at` | timestamp | Yes | When sent |
+| `created_at` | timestamp | Yes | |
+| `updated_at` | timestamp | Yes | |
+
+Indexes: `email_logs_correlation_id_index` (`correlation_id`) and `email_logs_lookup_idx` (`provider`, `status`, `created_at`).
 
 ## Constants
 
@@ -44,19 +46,20 @@ EmailLog::STATUS_FAILED
 ## Scopes
 
 ```php
-EmailLog::successful()
+EmailLog::successful()               // status sent or delivered
 EmailLog::failed()
 EmailLog::forProvider($provider)
 EmailLog::forCorrelation($correlationId)
-EmailLog::recent($days = 7)
+EmailLog::recent($days = 7)          // created_at within the last $days days
 ```
 
 ## Usage Notes
 
 - Email logs are not scoped by organization; they are platform-wide.
 - Status updates are written by the transactional email service.
+- Rows older than `RETENTION_EMAIL_LOGS_DAYS` (default 90) are pruned daily by `model:prune` (`PrunesByRetention`).
 
 ## Related Documentation
 
-- [Transactional Email Memory](/.my_agent/memory/transactional-email.md)
-- [Configuration Reference](../configuration/index)
+- [Email Troubleshooting](https://github.com/greenfieldtech-nirs/opbx/blob/main/docs/EMAIL-TROUBLESHOOTING.md)
+- [Configuration Reference](/opbx/data-models/configuration/index)

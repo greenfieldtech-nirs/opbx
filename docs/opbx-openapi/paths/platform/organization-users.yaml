@@ -4,34 +4,198 @@ paths:
       tags:
         - Platform
       summary: List users by organization
+      description: |
+        Users of one organization. Platform managers only. `per_page` defaults to 25
+        (max 100). An unknown `sort_by` leaves the result unsorted; any `sort_direction`
+        other than `asc` sorts descending.
       operationId: listOrganizationUsers
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: organization
           in: path
           required: true
           schema:
             type: integer
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Substring match on name or email
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [owner, pbx_admin, pbx_user, reporter, supervisor]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, pending]
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [id, name, email, status, is_platform_manager, created_at]
+            default: created_at
+        - name: sort_direction
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
       responses:
         '200':
-          description: Users list
+          description: Users of the organization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: User (id, organization_id, name, email, role, status, is_platform_manager, created_at)
+                      properties:
+                        id:
+                          type: integer
+                        organization_id:
+                          type: integer
+                        name:
+                          type: string
+                        email:
+                          type: string
+                        role:
+                          type: string
+                        status:
+                          type: string
+                        is_platform_manager:
+                          type: boolean
+                        created_at:
+                          type: string
+                          format: date-time
+                  meta:
+                    allOf:
+                      - $ref: '../../components/schemas/PaginationMeta.yaml'
+                      - type: object
+                        properties:
+                          has_more:
+                            type: boolean
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
     
     post:
       tags:
         - Platform
       summary: Create user in organization
+      description: |
+        Creates a user directly in the organization (no invitation). Platform managers
+        only. `status` defaults to `active`. Writes a `user.created` audit log entry.
       operationId: createOrganizationUser
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: organization
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: 'Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."'
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [owner, pbx_admin, pbx_user, reporter, supervisor]
+                status:
+                  type:
+                    - string
+                    - 'null'
+                  enum: [active, inactive, pending, null]
+                  description: Defaults to `active`
+                phone:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 50
+                street_address:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                city:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 100
+                state_province:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 100
+                postal_code:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 20
+                country:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 100
+              required: [name, email, password, role]
       responses:
         '201':
           description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User created successfully.
+                  data:
+                    $ref: '../../components/schemas/User.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

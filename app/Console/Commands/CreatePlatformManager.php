@@ -129,7 +129,7 @@ class CreatePlatformManager extends Command
         $this->newLine();
 
         // Step 5: Create the user
-        $user = User::create([
+        $user = (new User)->forceFill([
             'organization_id' => $organization->id,
             'name' => $name,
             'email' => $email,
@@ -138,6 +138,7 @@ class CreatePlatformManager extends Command
             'status' => 'active',
             'is_platform_manager' => true,
         ]);
+        $user->save();
 
         $this->info("✓ User created (ID: {$user->id})");
         $this->info('✓ User is now a platform manager');

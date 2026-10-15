@@ -50,3 +50,14 @@ describe("identityHasAnyRole", () => {
     expect(identityHasAnyRole(key, ["owner"])).toBe(true);
   });
 });
+
+describe("RateLimiter per-credential and per-IP", () => {
+  it("API keys from different credentials do not share a bucket", () => {
+    const limiter = new RateLimiter(config);
+    const a: AuthenticatedIdentity = { principalType: "apikey", credentialKey: "aaaa" };
+    const b: AuthenticatedIdentity = { principalType: "apikey", credentialKey: "bbbb" };
+    for (let i = 0; i < 3; i++) limiter.check(a, "read", "t");
+    expect(() => limiter.check(a, "read", "t")).toThrow(RateLimitError);
+    expect(() => limiter.check(b, "read", "t")).not.toThrow();
+  });
+});

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Exceptions\OperateAsSelfMutationException;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,10 +43,7 @@ class User extends Authenticatable
     {
         static::saving(function (self $user): void {
             if ($user->isOperateAsEffective) {
-                throw new \RuntimeException(
-                    'Refusing to persist an operate-as effective user. The platform '.
-                    'owner cannot modify their own account while operating as an organization.'
-                );
+                throw new OperateAsSelfMutationException;
             }
         });
     }
@@ -77,7 +75,6 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
-        'is_platform_manager',
         'phone',
         'street_address',
         'city',

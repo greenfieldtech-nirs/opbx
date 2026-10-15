@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { autoDialerKeys } from '@/hooks/useAutoDialerCampaigns';
+import { monitorKeys } from '@/hooks/useAutoDialerMonitor';
 import {
   Plus,
   Search,
@@ -27,6 +29,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { autoDialerCampaignsApi } from '@/services/autoDialerCampaignsApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,14 +130,15 @@ export default function AutoDialerCampaigns() {
   // Default: show all except archived
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'paused' | 'completed' | 'archived' | 'not-archived'>('not-archived');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   const [selectedCampaign, setSelectedCampaign] = useState<AutoDialerCampaign | null>(null);
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Permission checks
-  const canManage = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canManage = can(currentUser?.role, 'autoDialer.manage');
+  const canDestroy = can(currentUser?.role, 'autoDialer.destroy');
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
 
   // Debounce search input
@@ -149,17 +153,19 @@ export default function AutoDialerCampaigns() {
 
   // Fetch campaigns
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['auto-dialer-campaigns', {
+    queryKey: [...autoDialerKeys.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch || undefined,
       status: statusFilter !== 'all' && statusFilter !== 'not-archived' ? statusFilter : undefined,
+      exclude_status: statusFilter === 'not-archived' ? 'archived' : undefined,
     }],
     queryFn: () => autoDialerCampaignsApi.getAll({
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch || undefined,
       status: statusFilter !== 'all' && statusFilter !== 'not-archived' ? statusFilter : undefined,
+      exclude_status: statusFilter === 'not-archived' ? 'archived' : undefined,
     }),
   });
 
@@ -179,7 +185,8 @@ export default function AutoDialerCampaigns() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign status updated');
     },
     onError: (error: any) => {
@@ -191,7 +198,8 @@ export default function AutoDialerCampaigns() {
   const archiveMutation = useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.archive(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign archived successfully');
     },
     onError: (error: any) => {
@@ -203,7 +211,8 @@ export default function AutoDialerCampaigns() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => autoDialerCampaignsApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['auto-dialer-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      void queryClient.invalidateQueries({ queryKey: monitorKeys.all });
       toast.success('Campaign deleted successfully');
       setIsDeleteDialogOpen(false);
     },
@@ -248,13 +257,9 @@ export default function AutoDialerCampaigns() {
     }
   };
 
-  // Filter campaigns client-side when excluding archived
-  const allCampaigns = data?.data || [];
-  const campaigns = statusFilter === 'not-archived'
-    ? allCampaigns.filter(c => c.status !== 'archived')
-    : allCampaigns;
-  const totalCampaigns = statusFilter === 'not-archived' ? campaigns.length : (data?.meta?.total || 0);
-  const totalPages = statusFilter === 'not-archived' ? 1 : (data?.meta?.last_page || 1);
+  const campaigns = data?.data || [];
+  const totalCampaigns = data?.meta?.total || 0;
+  const totalPages = data?.meta?.last_page || 1;
 
   // Check if filters are active
   const hasActiveFilters = searchQuery || statusFilter !== 'not-archived';
@@ -268,10 +273,8 @@ export default function AutoDialerCampaigns() {
 
   // Helper to check if campaign has Caller ID pool
   const hasCallerIdPool = (campaign: AutoDialerCampaign): boolean => {
-    return !!(
-      (campaign as any).caller_id_pool?.length > 0 ||
-      (campaign as any).caller_id_strategy
-    );
+    // caller_id_strategy always has a default, so it cannot signal a pool; a single-caller-ID campaign shows its number.
+    return (campaign as any).caller_id_pool?.length > 0;
   };
 
   // Get Caller ID pool count
@@ -289,12 +292,12 @@ export default function AutoDialerCampaigns() {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <div className="h-8 w-32 bg-gray-200 animate-pulse rounded" />
-          <div className="h-10 w-32 bg-gray-200 animate-pulse rounded" />
+          <div className="h-8 w-32 bg-gray-200 animate-pulse rounded-sm" />
+          <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-sm" />
         </div>
         <Card>
           <CardContent className="p-6">
-            <div className="h-64 w-full bg-gray-200 animate-pulse rounded" />
+            <div className="h-64 w-full bg-gray-200 animate-pulse rounded-sm" />
           </CardContent>
         </Card>
       </div>
@@ -568,23 +571,26 @@ export default function AutoDialerCampaigns() {
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(campaign);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {canDestroy && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-xs px-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(campaign);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     }
                     
                     // Completed campaigns can only be archived
                     if (campaign.status === 'completed') {
+                      if (!canDestroy) return <span className="text-xs text-muted-foreground">-</span>;
                       return (
                         <Button
                           variant="outline"
@@ -603,7 +609,7 @@ export default function AutoDialerCampaigns() {
                     
                     // Active/paused campaigns: show Edit (disabled when active)
                     const canEdit = campaign.status !== 'active';
-                    return (
+                    const editButton = (
                       <Button
                         variant="outline"
                         size="sm"
@@ -615,11 +621,20 @@ export default function AutoDialerCampaigns() {
                             navigate(`/ui/auto-dialer/campaigns/${campaign.id}/edit`);
                           }
                         }}
-                        title={!canEdit ? 'Pause the campaign to edit' : undefined}
                       >
                         <Edit className="h-3.5 w-3.5 mr-1" />
                         Edit
                       </Button>
+                    );
+                    if (canEdit) return editButton;
+                    // A disabled button gets no pointer events, so the span carries the tooltip
+                    return (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0} onClick={(e) => e.stopPropagation()}>{editButton}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Pause the campaign to edit it</TooltipContent>
+                      </Tooltip>
                     );
                   }
                 },
@@ -638,7 +653,7 @@ export default function AutoDialerCampaigns() {
             />
 
             {/* Pagination */}
-            {(statusFilter === 'not-archived' ? campaigns.length > perPage : totalPages > 1) && (
+            {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
                   Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, totalCampaigns)} of {totalCampaigns} campaigns

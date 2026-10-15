@@ -9,104 +9,61 @@
  * - Role-based UI
  */
 
-import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState,useMemo } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  Plus,
-  Search,
-  Filter,
-  X,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Users,
-  UserCheck,
-  Mail,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  KeyRound,
-  UserX,
-  UserCog,
-  Phone,
-  MapPin,
-  Calendar,
-  Shield,
-  Activity,
-  RefreshCw,
-  Code2,
+Plus,
+Search,
+Filter,
+X,Users,
+UserCheck,
+Mail,
+Copy,
+ChevronDown,
+ChevronUp,KeyRound,
+UserX,RefreshCw,
+Code2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTimeAgo, getRoleColor, getRoleDisplayName, getStatusColor } from '@/utils/formatters';
+import { canActOnRole, getRoleLabel } from '@/utils/roleHelpers';
+import { formatDate,getRoleColor,getRoleDisplayName,getStatusColor } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { useAuth } from '@/hooks/useAuth';
-import type { User, UserRole, UserStatus } from '@/types';
-import { usersService, ringGroupsService } from '@/services/createResourceService';
-import {
-  getSupervisorAssignments,
-  updateSupervisorAssignments,
-} from '@/services/supervisorAssignments.service';
+import { useConfig } from '@/context/ConfigContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { User,UserRole,UserStatus } from '@/types';
+import { usersService } from '@/services/createResourceService';
 import InviteUserDialog from '@/components/Users/InviteUserDialog';
 import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorAssignmentDialog';
 import { EmbeddedDialerDialog } from '@/components/Users/EmbeddedDialerDialog';
+import { UserDeleteDialog } from '@/components/Users/UserDeleteDialog';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -149,15 +106,16 @@ function UsersComplete() {
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const { auth0Config } = useConfig();
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [showUserDetail, setShowUserDetail] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [assignmentUserId, setAssignmentUserId] = useState<string | null>(null);
   const [embedUser, setEmbedUser] = useState<User | null>(null);
   const [showEmbedDialog, setShowEmbedDialog] = useState(false);
+  const [statusUser, setStatusUser] = useState<User | null>(null);
 
   // Password form state
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
@@ -184,7 +142,7 @@ function UsersComplete() {
 
   // Fetch users with React Query
   const { data: usersResponse, isLoading, isError, error, refetch, isRefetching } = useQuery({
-    queryKey: ['users', {
+    queryKey: [...queryKeys.users.all, {
       search: searchQuery || undefined,
       role: roleFilter !== 'all' ? roleFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -206,14 +164,13 @@ function UsersComplete() {
   });
 
   const users = usersResponse?.data || [];
-  const totalUsers = usersResponse?.meta?.total || 0;
   const totalPages = usersResponse?.meta?.last_page || 1;
 
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: usersService.create,
     onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowCreateDialog(false);
       resetForm();
       toast.success('User created successfully');
@@ -234,7 +191,7 @@ function UsersComplete() {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => usersService.update(id, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowEditDialog(false);
       const updatedUserId = selectedUser?.id;
       setSelectedUser(null);
@@ -257,7 +214,7 @@ function UsersComplete() {
   const deleteUserMutation = useMutation({
     mutationFn: usersService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       setShowDeleteDialog(false);
       setSelectedUser(null);
       toast.success('User deleted successfully');
@@ -385,7 +342,6 @@ function UsersComplete() {
       name: formData.name,
       email: formData.email,
       role: formData.role,
-      status: formData.status,
       phone: formData.phone || undefined,
       street_address: formData.street_address || undefined,
       city: formData.city || undefined,
@@ -408,14 +364,20 @@ function UsersComplete() {
     deleteUserMutation.mutate(selectedUser.id);
   };
 
-  // Handle toggle status
-  const handleToggleStatus = (user: User) => {
-    const newStatus: UserStatus = user.status === 'active' ? 'inactive' : 'active';
-    updateUserMutation.mutate({
-      id: user.id,
-      data: { status: newStatus },
-    });
-  };
+  // Toggle status directly (after confirmation), sending only the status field
+  const toggleStatusMutation = useMutation({
+    mutationFn: (u: User) =>
+      usersService.update(u.id, { status: u.status === 'active' ? 'inactive' : 'active' }),
+    onSuccess: () => {
+      void invalidateRoutingResources(queryClient);
+      toast.success('User status updated');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to update user status', {
+        description: error.response?.data?.message || error.message,
+      });
+    },
+  });
 
   // Reset form
   const resetForm = () => {
@@ -461,10 +423,6 @@ function UsersComplete() {
   };
 
   // Open user detail
-  const openUserDetail = (user: User) => {
-    setSelectedUser(user);
-    setShowUserDetail(true);
-  };
 
   // Copy to clipboard
   const copyToClipboard = (text: string, label: string) => {
@@ -509,7 +467,7 @@ function UsersComplete() {
               <p className="text-destructive font-medium mb-2">Failed to load users</p>
               <p className="text-muted-foreground text-sm">{error?.message || 'An error occurred'}</p>
               <Button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+                onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.users.all })}
                 className="mt-4"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -560,10 +518,26 @@ function UsersComplete() {
         <div className="flex items-center gap-2">
           {canCreateUsers && (
             <>
-              <Button variant="outline" onClick={() => setShowInviteDialog(true)}>
-                <Mail className="h-4 w-4 mr-2" />
-                Invite User
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* span so the tooltip still shows on a disabled button */}
+                  <span tabIndex={auth0Config.enabled ? undefined : 0}>
+                    <Button
+                      variant="outline"
+                      disabled={!auth0Config.enabled}
+                      onClick={() => setShowInviteDialog(true)}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Invite User
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!auth0Config.enabled && (
+                  <TooltipContent>
+                    <p>Invitations need Auth0, which is not configured on this server.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add User
@@ -582,7 +556,7 @@ function UsersComplete() {
             <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search users by name, email, or extension..."
+                placeholder="Search users by name or email..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -678,18 +652,19 @@ function UsersComplete() {
           <StandardDataTable<User>
             data={paginatedUsers}
             isLoading={isLoading}
-            onRowClick={openEditDialog}
+            onRowClick={(u) => canActOnRole(user?.role, u.role) && openEditDialog(u)}
             identityIcon={UserCheck}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(user) => user.name}
-            getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : 'PBX User'}
-            onIdentityClick={openEditDialog}
+            getIdentitySecondary={(user) => user.role === 'owner' ? 'Organization Owner' : getRoleLabel(user.role)}
+            onIdentityClick={(u) => canActOnRole(user?.role, u.role) && openEditDialog(u)}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
             canView={false}
             canEdit={false}
+            canDeleteItem={(u) => canActOnRole(user?.role, u.role)}
             onDelete={isReadOnly ? undefined : (user) => {
               setSelectedUser(user);
               setShowDeleteDialog(true);
@@ -726,7 +701,7 @@ function UsersComplete() {
               {
                 header: 'Extension',
                 cell: (user) => user.extension ? (
-                  <code className="px-2 py-1 bg-gray-100 rounded text-sm group-hover:bg-gray-200">
+                  <code className="px-2 py-1 bg-gray-100 rounded-sm text-sm group-hover:bg-gray-200">
                     {user.extension.extension_number}
                   </code>
                 ) : (
@@ -744,23 +719,38 @@ function UsersComplete() {
               },
               {
                 header: 'Status',
-                cell: (user) => (
-                  <Badge className={cn('text-xs', getStatusColor(user.status))}>
-                    {user.status}
-                  </Badge>
-                )
+                cell: (user) => {
+                  const badge = (
+                    <Badge className={cn('text-xs', getStatusColor(user.status))}>
+                      {user.status}
+                    </Badge>
+                  );
+                  if (isReadOnly || user.role === 'owner') return badge;
+                  return (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStatusUser(user);
+                      }}
+                      title={user.status === 'active' ? 'Deactivate user' : 'Activate user'}
+                      aria-label={`${user.status === 'active' ? 'Deactivate' : 'Activate'} ${user.name}`}
+                    >
+                      {badge}
+                    </button>
+                  );
+                }
               },
               ...(canCreateUsers ? [{
                 header: 'Embed',
-                cell: (user: User) => (
+                cell: (target: User) => !canActOnRole(user?.role, target.role) ? null : (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEmbedUser(user);
+                      setEmbedUser(target);
                       setShowEmbedDialog(true);
                     }}
                     title="Embedded dialer settings"
-                    aria-label={`Get embed code for ${user.name}`}
+                    aria-label={`Get embed code for ${target.name}`}
                   >
                     <Badge
                       variant="outline"
@@ -1064,28 +1054,6 @@ function UsersComplete() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Status Toggle at top */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <Label>Account Status</Label>
-                <p className="text-sm text-muted-foreground">
-                  {formData.status === 'active' ? 'User can access system' : 'User access disabled'}
-                </p>
-              </div>
-              <Switch
-                checked={formData.status === 'active'}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, status: checked ? 'active' : 'inactive' })
-                }
-                disabled={selectedUser?.role === 'owner'}
-              />
-            </div>
-            {selectedUser?.role === 'owner' && (
-              <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                Cannot change status of organization owner
-              </p>
-            )}
-
             {/* Same form fields as Create */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1228,32 +1196,29 @@ function UsersComplete() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <strong>{selectedUser?.name}</strong>? This action
-              cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setSelectedUser(null);
-              }}
-              disabled={deleteUserMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteUser} disabled={deleteUserMutation.isPending}>
-              {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={statusUser !== null}
+        onOpenChange={(open) => { if (!open) setStatusUser(null); }}
+        title={statusUser?.status === 'active' ? 'Deactivate User' : 'Activate User'}
+        description={`Are you sure you want to ${statusUser?.status === 'active' ? 'deactivate' : 'activate'} ${statusUser?.name ?? 'this user'}?`}
+        confirmLabel={statusUser?.status === 'active' ? 'Deactivate' : 'Activate'}
+        variant={statusUser?.status === 'active' ? 'danger' : 'default'}
+        onConfirm={() => statusUser ? toggleStatusMutation.mutateAsync(statusUser).catch(() => undefined) : undefined}
+      />
+
+      <UserDeleteDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          setShowDeleteDialog(open);
+          if (!open) setSelectedUser(null);
+        }}
+        scope="org"
+        userId={selectedUser?.id}
+        userName={selectedUser?.name}
+        loadImpact={usersService.deleteImpact}
+        onConfirm={handleDeleteUser}
+        isPending={deleteUserMutation.isPending}
+      />
 
       {/* Password Change Dialog */}
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
@@ -1301,200 +1266,6 @@ function UsersComplete() {
         </DialogContent>
       </Dialog>
 
-      {/* User Detail Sheet */}
-      <Sheet open={showUserDetail} onOpenChange={setShowUserDetail}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <UserCheck className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <div>{selectedUser?.name}</div>
-                <div className="text-sm font-normal text-muted-foreground">
-                  {selectedUser?.email}
-                </div>
-              </div>
-            </SheetTitle>
-            <SheetDescription>View and manage user details</SheetDescription>
-          </SheetHeader>
-
-          <div className="mt-6">
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger
-                  value="extension"
-                  disabled={selectedUser?.role === 'reporter'}
-                >
-                  Extension
-                </TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-6 mt-6">
-                {/* Quick Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (selectedUser) {
-                        setShowUserDetail(false);
-                        openEditDialog(selectedUser);
-                      }
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <KeyRound className="h-4 w-4 mr-2" />
-                    Reset Password
-                  </Button>
-                </div>
-
-                {/* User Information */}
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium mb-3">User Information</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-sm">
-                        <Shield className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground w-24">Role:</span>
-                        <Badge className={getRoleColor(selectedUser?.role || '')}>
-                          {getRoleDisplayName(selectedUser?.role || '')}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <Activity className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground w-24">Status:</span>
-                        <Badge className={getStatusColor(selectedUser?.status || 'active')}>
-                          {selectedUser?.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground w-24">Email:</span>
-                        <span>{selectedUser?.email}</span>
-                      </div>
-                      {selectedUser?.phone && (
-                        <div className="flex items-center gap-3 text-sm">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground w-24">Phone:</span>
-                          <span>{selectedUser.phone}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Address Information */}
-                  {(selectedUser?.street_address || selectedUser?.city) && (
-                    <div>
-                      <h3 className="text-sm font-medium mb-3">Address</h3>
-                      <div className="flex items-start gap-3 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <div>
-                          {selectedUser.street_address && (
-                            <div>{selectedUser.street_address}</div>
-                          )}
-                          {selectedUser.city && (
-                            <div>
-                              {selectedUser.city}
-                              {selectedUser.state_province && `, ${selectedUser.state_province}`}
-                              {selectedUser.postal_code && ` ${selectedUser.postal_code}`}
-                            </div>
-                          )}
-                          {selectedUser.country && <div>{selectedUser.country}</div>}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Account Details */}
-                  <div>
-                    <h3 className="text-sm font-medium mb-3">Account Details</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground w-24">Created:</span>
-                        <span>
-                          {formatDate(selectedUser?.created_at || '')} (
-                          {formatTimeAgo(selectedUser?.created_at || '')})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground w-24">Updated:</span>
-                        <span>{formatTimeAgo(selectedUser?.updated_at || '')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="extension" className="space-y-6 mt-6">
-                {selectedUser?.extension ? (
-                  <div>
-                    <h3 className="text-sm font-medium mb-4">Extension Details</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <div className="text-sm font-medium">Extension Number</div>
-                          <div className="text-2xl font-bold">
-                            {selectedUser.extension.extension_number}
-                          </div>
-                        </div>
-                        <Badge className={getStatusColor(selectedUser.extension.status)}>
-                          {selectedUser.extension.status}
-                        </Badge>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Type:</span>
-                          <span className="capitalize">{selectedUser.extension.type}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Voicemail:</span>
-                          <span>
-                            {selectedUser.extension.voicemail_enabled ? 'Enabled' : 'Disabled'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Created:</span>
-                          <span>{formatDate(selectedUser.extension?.created_at || '')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                    <h3 className="text-lg font-medium mb-2">No Extension</h3>
-                    <p className="text-muted-foreground mb-4">
-                      This user doesn't have an extension assigned yet.
-                    </p>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Assign Extension
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="activity" className="space-y-6 mt-6">
-                <div className="text-center py-8">
-                  <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                  <h3 className="text-lg font-medium mb-2">Activity Log</h3>
-                  <p className="text-muted-foreground">
-                    Activity tracking coming soon
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </SheetContent>
-      </Sheet>
 
       <SupervisorAssignmentDialog
         userId={assignmentUserId}
@@ -1512,7 +1283,7 @@ function UsersComplete() {
       <InviteUserDialog
         open={showInviteDialog}
         onOpenChange={setShowInviteDialog}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
+        onSuccess={() => void invalidateRoutingResources(queryClient)}
       />
     </div >
   );

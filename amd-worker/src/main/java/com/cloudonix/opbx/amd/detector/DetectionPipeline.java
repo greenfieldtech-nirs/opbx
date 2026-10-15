@@ -15,18 +15,21 @@ public class DetectionPipeline {
     private static final Logger logger = LoggerFactory.getLogger(DetectionPipeline.class);
 
     private final List<Detector> detectors = new ArrayList<>();
-    private final AtomicBoolean resolved = new AtomicBoolean(false);
+    /** Shared with the stream's timeout and stop: whoever CASes it first owns the single callback. */
+    private final AtomicBoolean resolved;
     private final int timeoutMs;
     private final Consumer<DetectionResult> onResult;
 
-    public DetectionPipeline(int timeoutMs, List<String> detectorNames, BeepMlDetector beepMl, Consumer<DetectionResult> onResult) {
+    public DetectionPipeline(int timeoutMs, List<String> detectorNames, BeepMlDetector beepMl, int minBeepStartMs,
+                             AtomicBoolean resolved, Consumer<DetectionResult> onResult) {
         this.timeoutMs = timeoutMs;
+        this.resolved = resolved;
         this.onResult = onResult;
         if (beepMl != null && detectorNames.contains("beep_ml")) {
             detectors.add(beepMl);
         }
         if (detectorNames.contains("tone_energy")) {
-            detectors.add(new ToneEnergyDetector());
+            detectors.add(new ToneEnergyDetector(minBeepStartMs));
         }
     }
 
@@ -52,6 +55,7 @@ public class DetectionPipeline {
         logger.debug("Running detector detector={} segment_duration_ms={} start_ms={}",
             detector.name(), (int) segment.durationMs, (int) segment.startTimestampMs);
         if (detector instanceof BeepMlDetector beepMl) {
+            // Unordered: streams' inferences are independent and must not queue behind each other.
             vertx.executeBlocking(() -> {
                 try {
                     return beepMl.processAsync(segment);
@@ -59,7 +63,7 @@ public class DetectionPipeline {
                     logger.warn("Beep ML detector failed: {}", e.getMessage(), e);
                     return null;
                 }
-            }).onComplete(ar -> {
+            }, false).onComplete(ar -> {
                 if (ar.succeeded() && ar.result() != null) {
                     logger.info("Detector positive detector={} result={} reason=\"{}\"",
                         detector.name(), ar.result().result, ar.result().reason);

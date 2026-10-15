@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\QueueCallDisposition;
+use App\Models\Concerns\PrunesByRetention;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +16,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ScopedBy([OrganizationScope::class])]
 class QueueCall extends Model
 {
-    use HasFactory;
+    use HasFactory, PrunesByRetention;
+
+    protected const RETENTION_KEY = 'queue_calls_days';
+
+    protected const RETENTION_COLUMN = 'created_at';
 
     protected $fillable = [
         'organization_id',

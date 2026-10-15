@@ -1,6 +1,10 @@
 type: object
 description: Call queue (ACD) with agent management and statistics
 properties:
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when any route of this resource is `unavailable` (the destination was deleted). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
   id:
     type: integer
     readOnly: true
@@ -36,8 +40,24 @@ properties:
     example: 300
   wrap_up_seconds:
     type: integer
-    description: Post-call agent pause (0 = disabled)
+    description: Post-call agent pause
     example: 15
+  announce_position:
+    type: boolean
+    description: Periodically announce the caller's queue position
+  announce_position_timeout:
+    type:
+      - integer
+      - 'null'
+    description: Seconds between position announcements
+  announce_position_language:
+    type:
+      - string
+      - 'null'
+  immediate_connect:
+    type: boolean
+  conference_ring_all:
+    type: boolean
   moh_recording_id:
     type:
       - integer
@@ -52,8 +72,11 @@ properties:
       - ivr_menu
       - ai_assistant
       - ai_load_balancer
+      - call_queue
       - hangup
+      - unavailable
     example: extension
+    description: Only the fallback_*_id matching this action is set; the others are null.
   fallback_extension_id:
     type:
       - integer
@@ -74,6 +97,11 @@ properties:
     type:
       - integer
       - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+    description: Target queue when fallback_action is `call_queue` (never this queue)
   status:
     type: string
     enum:
@@ -82,11 +110,13 @@ properties:
     example: active
   agents:
     type: array
+    description: Agent users. Not included in the toggle-status response.
     items:
       type: object
       properties:
         id:
           type: integer
+          description: User ID
         name:
           type: string
         extension_id:
@@ -99,10 +129,41 @@ properties:
             - 'null'
   agents_count:
     type: integer
+    description: List endpoint only
     example: 5
+  moh_recording:
+    $ref: '#/$defs/Ref'
+    description: Hold music recording summary (`id`, `name`); null when none. Not included in the toggle-status response.
+  fallback_extension:
+    $ref: '#/$defs/Ref'
+  fallback_ring_group:
+    $ref: '#/$defs/Ref'
+  fallback_ivr_menu:
+    $ref: '#/$defs/Ref'
+  fallback_ai_assistant:
+    $ref: '#/$defs/Ref'
+    description: |
+      List endpoint only (as are `fallback_extension`, `fallback_ring_group`,
+      `fallback_ivr_menu` and `fallback_call_queue`). Null when that target is not set. There is no
+      `fallback_ai_load_balancer` summary; use `fallback_ai_load_balancer_id`.
+  fallback_call_queue:
+    $ref: '#/$defs/Ref'
   created_at:
     type: string
     format: date-time
   updated_at:
     type: string
     format: date-time
+$defs:
+  Ref:
+    type:
+      - object
+      - 'null'
+    description: Related resource summary; `fallback_extension` carries `extension_number`, the others `name`
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      extension_number:
+        type: string

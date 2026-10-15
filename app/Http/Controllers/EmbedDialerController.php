@@ -24,10 +24,13 @@ final class EmbedDialerController extends Controller
         $embedToken = $this->tokens->resolve((string) $request->query('token'));
 
         if (! $embedToken) {
-            return response('<!doctype html><title>Forbidden</title>Invalid embed token.', 403)
-                ->header('Content-Type', 'text/html; charset=UTF-8')
-                ->header('X-Frame-Options', 'DENY')
-                ->header('Content-Security-Policy', "frame-ancestors 'none'");
+            return $this->forbidden('Invalid embed token.');
+        }
+
+        // Same rule as the API middleware (decision D4): inactive user or organisation gets no dialer.
+        $org = OrganizationScope::bypass(fn () => $embedToken->organization);
+        if (! $embedToken->user?->isActive() || ! $org?->isActive()) {
+            return $this->forbidden('Embed token is not active.');
         }
 
         $csp = $this->frameAncestors($embedToken);
@@ -36,6 +39,14 @@ final class EmbedDialerController extends Controller
         return response($html, 200)
             ->header('Content-Type', 'text/html; charset=UTF-8')
             ->header('Content-Security-Policy', $csp);
+    }
+
+    private function forbidden(string $message): Response
+    {
+        return response('<!doctype html><title>Forbidden</title>'.$message, 403)
+            ->header('Content-Type', 'text/html; charset=UTF-8')
+            ->header('X-Frame-Options', 'DENY')
+            ->header('Content-Security-Policy', "frame-ancestors 'none'");
     }
 
     /**

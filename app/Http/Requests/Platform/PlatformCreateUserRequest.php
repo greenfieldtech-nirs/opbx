@@ -31,7 +31,7 @@ class PlatformCreateUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', 'string', Rule::in(array_map(fn ($r) => $r->value, UserRole::cases()))],
             'status' => ['nullable', 'string', Rule::in(array_map(fn ($s) => $s->value, UserStatus::cases()))],

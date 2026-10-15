@@ -5,16 +5,15 @@ paths:
         - Web Phone
       summary: Get Web Phone recent calls
       description: |
-        Returns the 50 most recent calls placed from the authenticated user's
-        own `user`-type extension, most recent first. Coaching sentinel
-        destinations (spy/barge/whisper) are excluded.
+        Returns the 50 most recent CDRs whose caller (`from`) is the authenticated
+        user's own `user`-type extension number, most recent first. Coaching sentinel
+        destinations (`spy_*`, `barge_*`, `whisper_*`) are excluded.
 
-        Available to any authenticated role. The user must have a
+        Available to any authenticated role (not to API keys). The user must have a
         `user`-type extension assigned, otherwise `404` is returned.
       operationId: getWebPhoneCallsLog
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Recent calls for the authenticated user
@@ -32,7 +31,9 @@ paths:
                           type: string
                           example: '+14155551212'
                         session_timestamp:
-                          type: string
+                          type:
+                            - string
+                            - 'null'
                           format: date-time
                         duration:
                           type: integer
@@ -40,12 +41,22 @@ paths:
                           example: 125
                         duration_formatted:
                           type: string
+                          description: MM:SS (minutes are not wrapped into hours)
                           example: '02:05'
                         disposition:
-                          type: string
-                          example: answered
+                          type:
+                            - string
+                            - 'null'
+                          description: Cloudonix CDR disposition
+                          example: ANSWER
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: API keys are refused (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
         '404':
           description: No extension is assigned to this user
           content:

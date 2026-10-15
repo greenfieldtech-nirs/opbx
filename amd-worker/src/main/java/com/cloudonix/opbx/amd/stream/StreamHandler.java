@@ -8,16 +8,27 @@ import com.cloudonix.opbx.amd.metrics.MetricsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.core.http.PoolOptions;
+import io.vertx.core.http.RequestOptions;
 import io.vertx.core.http.ServerWebSocket;
+import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class StreamHandler {
     private static final Logger logger = LoggerFactory.getLogger(StreamHandler.class);
+    static final long START_TIMEOUT_MS = 5000;
+    private static final long SESSION_CHECK_TIMEOUT_MS = 2000;
+    private static final long CALLBACK_TIMEOUT_MS = 5000;
+    private static final long CALLBACK_RETRY_DELAY_MS = 1000;
 
     private final Vertx vertx;
     private final int maxConcurrentStreams;
@@ -30,16 +41,21 @@ public class StreamHandler {
     private final String dumpAudioPath;
     private final String apiToken;
     private final String actionCallbackUrl;
+    private final String sessionCheckUrl;
+    private final HttpClient httpClient;
     private final Map<String, StreamSession> activeStreams = new ConcurrentHashMap<>();
     private final Map<ServerWebSocket, String> wsToStreamSid = new ConcurrentHashMap<>();
-    private final ToneEnergyDetector toneEnergyDetector = new ToneEnergyDetector();
+    private final int minBeepStartMs;
+    private final ToneEnergyDetector toneEnergyDetector;
 
     public StreamHandler(Vertx vertx, int maxConcurrentStreams, int defaultTimeoutMs,
                          List<String> detectors, BeepMlDetector beepMlDetector,
                          MetricsService metrics, ObjectMapper mapper,
                          boolean dumpAudio, String dumpAudioPath, String apiToken,
-                         String actionCallbackUrl) {
+                         String actionCallbackUrl, String sessionCheckUrl, int minBeepStartMs) {
         this.vertx = vertx;
+        this.minBeepStartMs = minBeepStartMs;
+        this.toneEnergyDetector = new ToneEnergyDetector(minBeepStartMs);
         this.maxConcurrentStreams = maxConcurrentStreams;
         this.defaultTimeoutMs = defaultTimeoutMs;
         this.detectors = detectors;
@@ -50,6 +66,9 @@ public class StreamHandler {
         this.dumpAudioPath = dumpAudioPath;
         this.apiToken = apiToken;
         this.actionCallbackUrl = actionCallbackUrl;
+        this.sessionCheckUrl = sessionCheckUrl;
+        // One shared client for session checks and action callbacks (was one leaked client per callback).
+        this.httpClient = vertx.createHttpClient(new HttpClientOptions(), new PoolOptions().setHttp1MaxSize(20));
     }
 
     public void handleConnection(ServerWebSocket ws) {
@@ -57,13 +76,6 @@ public class StreamHandler {
             ws.close((short) 1000, "Not Found");
             return;
         }
-        // TODO: Re-enable auth check before production deployment
-        // if (!apiToken.isEmpty() && !isAuthorized(ws)) {
-        //     logger.warn("Unauthorized WebSocket connection from {} path={}", ws.remoteAddress(), ws.path());
-        //     ws.close((short) 1008, "Unauthorized");
-        //     metrics.incrementErrors();
-        //     return;
-        // }
         if (activeStreams.size() >= maxConcurrentStreams) {
             ws.close((short) 1013, "Max concurrent streams reached");
             metrics.incrementErrors();
@@ -76,7 +88,17 @@ public class StreamHandler {
             metrics.incrementErrors();
         });
 
+        // Cloudonix sends start right after connecting; idle sockets would hold stream slots.
+        long startTimer = vertx.setTimer(START_TIMEOUT_MS, id -> {
+            if (!wsToStreamSid.containsKey(ws) && !ws.isClosed()) {
+                logger.warn("No start event within {} ms, closing remote={}", START_TIMEOUT_MS, ws.remoteAddress());
+                metrics.incrementErrors();
+                ws.close((short) 1008, "No start event");
+            }
+        });
+
         ws.closeHandler(v -> {
+            vertx.cancelTimer(startTimer);
             String streamSid = wsToStreamSid.remove(ws);
             if (streamSid != null) {
                 cleanupSession(streamSid);
@@ -95,7 +117,10 @@ public class StreamHandler {
             }
             switch (msg.event) {
                 case "connected" -> handleConnected(msg);
-                case "start" -> handleStart(ws, msg);
+                case "start" -> {
+                    vertx.cancelTimer(startTimer);
+                    handleStart(ws, msg);
+                }
                 case "media" -> handleMedia(ws, msg);
                 case "stop" -> handleStop(ws, msg);
                 case "dtmf" -> handleDtmf(msg);
@@ -109,6 +134,12 @@ public class StreamHandler {
     }
 
     private void handleStart(ServerWebSocket ws, StreamMessage msg) {
+        if (msg.start == null || wsToStreamSid.containsKey(ws)) {
+            logger.warn("Invalid or repeated start event stream_sid={} remote={}", msg.streamSid, ws.remoteAddress());
+            metrics.incrementErrors();
+            ws.close((short) 1008, "Invalid start");
+            return;
+        }
         String streamSid = msg.streamSid;
         String callSid = msg.start.callSid;
         org.slf4j.MDC.put("session_token", msg.start.session);
@@ -119,6 +150,15 @@ public class StreamHandler {
                 msg.start.tracks, msg.start.customParameters);
         } finally {
             org.slf4j.MDC.clear();
+        }
+
+        // Only 8 kHz is supported; other rates make resampleLinear allocate huge arrays.
+        if (msg.start.mediaFormat != null && msg.start.mediaFormat.sampleRate != 8000) {
+            logger.warn("Unsupported sample rate, closing call_sid={} stream_sid={} sample_rate={}",
+                callSid, streamSid, msg.start.mediaFormat.sampleRate);
+            metrics.incrementErrors();
+            ws.close((short) 1003, "Unsupported sample rate");
+            return;
         }
 
         // Extract action options from customParameters
@@ -134,7 +174,7 @@ public class StreamHandler {
 
         StreamSession session = new StreamSession(
             vertx, callSid, streamSid, defaultTimeoutMs, detectors, beepMlDetector,
-            dumpAudio, dumpAudioPath, sessionToken, actionHuman, actionVoicemail, actionUnknown
+            dumpAudio, dumpAudioPath, minBeepStartMs, sessionToken, actionHuman, actionVoicemail, actionUnknown
         );
 
         // Atomically register this stream. If another connection already registered
@@ -168,9 +208,73 @@ public class StreamHandler {
 
         session.startTimeoutTimer(vertx);
         metrics.incrementActiveStreams();
+        verifySession(ws, session);
 
         logger.info("Stream started call_sid={} stream_sid={} timeout_ms={} detectors={} dump_audio={}",
             callSid, streamSid, defaultTimeoutMs, detectors, dumpAudio);
+    }
+
+    /**
+     * Ask Laravel whether start.session is an active OPBX call session. Audio keeps flowing while
+     * the check is in flight; sendActionCallback holds any result until it completes.
+     */
+    private void verifySession(ServerWebSocket ws, StreamSession session) {
+        checkSessionActive(session.sessionToken).onComplete(ar -> {
+            boolean active = ar.succeeded() && ar.result();
+            session.sessionVerified = active;
+            Runnable held = session.heldCallback;
+            session.heldCallback = null;
+            if (active) {
+                logger.info("Session verified call_sid={} stream_sid={}", session.callSid, session.streamSid);
+                if (held != null) {
+                    held.run();
+                }
+                return;
+            }
+            logger.warn("Rejecting stream: session not verified call_sid={} stream_sid={} session_prefix={} reason={} held_result_dropped={}",
+                session.callSid, session.streamSid, tokenPrefix(session.sessionToken),
+                ar.failed() ? ar.cause().getMessage() : "not an active session", held != null);
+            metrics.incrementErrors();
+            if (activeStreams.get(session.streamSid) == session) {
+                cleanupSession(session.streamSid);
+            }
+            wsToStreamSid.remove(ws);
+            if (!ws.isClosed()) {
+                ws.close((short) 1008, "Unknown session");
+            }
+        });
+    }
+
+    /** true = 200 {"active":true}, false = 404 or blank token; any other outcome fails. */
+    private Future<Boolean> checkSessionActive(String sessionToken) {
+        if (sessionToken == null || sessionToken.isBlank()) {
+            return Future.succeededFuture(false);
+        }
+        if (sessionCheckUrl == null || sessionCheckUrl.isEmpty()) {
+            return Future.failedFuture("session check URL not configured");
+        }
+        RequestOptions options = new RequestOptions()
+            .setMethod(HttpMethod.POST)
+            .setAbsoluteURI(sessionCheckUrl)
+            .setConnectTimeout(SESSION_CHECK_TIMEOUT_MS)
+            .setIdleTimeout(SESSION_CHECK_TIMEOUT_MS)
+            .putHeader("Content-Type", "application/json")
+            .putHeader("Accept", "application/json")
+            .putHeader("Authorization", "Bearer " + apiToken);
+        String body = new JsonObject().put("session", sessionToken).encode();
+        return httpClient.request(options)
+            .compose(req -> req.send(body))
+            .compose(resp -> resp.body().map(buf -> switch (resp.statusCode()) {
+                case 200 -> buf.toJsonObject().getBoolean("active", false);
+                case 404 -> false;
+                default -> throw new IllegalStateException("session check status " + resp.statusCode());
+            }))
+            .timeout(SESSION_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    private static String tokenPrefix(String token) {
+        if (token == null) return "";
+        return token.substring(0, Math.min(8, token.length()));
     }
 
     private void handleMedia(ServerWebSocket ws, StreamMessage msg) {
@@ -196,10 +300,10 @@ public class StreamHandler {
             session.dumper.append(float32_16k);
         }
 
-        // Run tone detector on rolling buffer to catch beeps that VAD may classify as silence.
-        // Only enable after ~11.5s since the real voicemail beep is always around 12-13s.
+        // Run tone detector on rolling buffer to catch beeps that VAD may classify as silence
+        // (the detector itself rejects tones starting before minBeepStartMs).
         if (!session.resolved.get()
-            && session.totalAudioMs >= 11500
+            && session.totalAudioMs >= minBeepStartMs
             && session.totalAudioMs - session.lastToneCheckMs >= 500) {
             session.lastToneCheckMs = session.totalAudioMs;
             double[] recentAudio = session.getRecentAudio(1500);
@@ -212,9 +316,8 @@ public class StreamHandler {
                 if (toneResult != null) {
                     logger.info("Tone detected in rolling buffer call_sid={} stream_sid={} start_ms={} reason=\"{}\"",
                         session.callSid, session.streamSid, (int) checkStartMs, toneResult.reason);
-                    if (session.pipeline.resolveWithResult(toneResult)) {
-                        logResultAndClose(ws, session, toneResult);
-                    }
+                    // resolveWithResult runs onResultLogged (logResultAndClose) itself, once.
+                    session.pipeline.resolveWithResult(toneResult);
                 }
             }
         }
@@ -286,10 +389,10 @@ public class StreamHandler {
     }
 
     private void handleTimeout(ServerWebSocket ws, StreamSession session) {
-        if (session.resolved.get()) {
+        // Same flag as the pipeline: a late detector result after this cannot send a second callback.
+        if (!session.resolved.compareAndSet(false, true)) {
             return;
         }
-        session.resolved.set(true);
         long elapsedMs = System.currentTimeMillis() - session.startTimeMs;
         metrics.recordDetection("unknown", elapsedMs);
         logger.info("DECISION: UNKNOWN (timeout) call_sid={} stream_sid={} elapsed_ms={} reason=\"No voicemail detected within timeout\"",
@@ -343,6 +446,17 @@ public class StreamHandler {
      */
     private void sendActionCallback(StreamSession session, String result, String reason,
                                      double confidence, long detectionTimeMs) {
+        if (session.sessionVerified == null) {
+            logger.info("Holding AMD result until session is verified call_sid={} stream_sid={} result={}",
+                session.callSid, session.streamSid, result);
+            session.heldCallback = () -> sendActionCallback(session, result, reason, confidence, detectionTimeMs);
+            return;
+        }
+        if (!session.sessionVerified) {
+            logger.warn("Dropping AMD result for unverified session call_sid={} stream_sid={} result={}",
+                session.callSid, session.streamSid, result);
+            return;
+        }
         if (actionCallbackUrl == null || actionCallbackUrl.isEmpty()) {
             logger.debug("No action callback URL configured, skipping callback");
             return;
@@ -353,45 +467,55 @@ public class StreamHandler {
 
         String json = buildCallbackPayload(session, result, action, reason, confidence, detectionTimeMs);
 
+        org.slf4j.MDC.put("session_token", session.sessionToken);
+        org.slf4j.MDC.put("call_id", session.callSid);
         try {
-            java.net.URI uri = new java.net.URI(actionCallbackUrl);
-            String host = uri.getHost();
-            int port = uri.getPort() != -1 ? uri.getPort() : ("https".equals(uri.getScheme()) ? 443 : 80);
-            String path = uri.getRawPath();
-            if (uri.getRawQuery() != null) {
-                path += "?" + uri.getRawQuery();
-            }
-
-            org.slf4j.MDC.put("session_token", session.sessionToken);
-            org.slf4j.MDC.put("call_id", session.callSid);
-            try {
-                logger.info("Sending AMD action callback to {}:{}{} call_sid={} result={} action={}",
-                    host, port, path, session.callSid, result, action);
-            } finally {
-                org.slf4j.MDC.clear();
-            }
-
-            vertx.createHttpClient()
-                .request(io.vertx.core.http.HttpMethod.POST, port, host, path)
-                .compose(req -> {
-                    req.putHeader("Content-Type", "application/json");
-                    req.putHeader("Authorization", "Bearer " + apiToken);
-                    return req.send(json);
-                })
-                .onComplete(ar -> {
-                    if (ar.succeeded()) {
-                        var response = ar.result();
-                        logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
-                            session.callSid, result, action, response.statusCode());
-                        response.body(); // consume body to avoid resource leak
-                    } else {
-                        logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
-                            session.callSid, result, action, ar.cause().getMessage());
-                    }
-                });
-        } catch (java.net.URISyntaxException e) {
-            logger.error("Invalid action callback URL: {} error={}", actionCallbackUrl, e.getMessage());
+            logger.info("Sending AMD action callback to {} call_sid={} result={} action={}",
+                actionCallbackUrl, session.callSid, result, action);
+        } finally {
+            org.slf4j.MDC.clear();
         }
+
+        postCallback(vertx, httpClient, actionCallbackUrl, apiToken, json).onComplete(ar -> {
+            if (ar.succeeded()) {
+                logger.info("AMD action callback sent call_sid={} result={} action={} status={}",
+                    session.callSid, result, action, ar.result());
+            } else {
+                logger.warn("AMD action callback failed call_sid={} result={} action={} error={}",
+                    session.callSid, result, action, ar.cause().getMessage());
+            }
+        });
+    }
+
+    /**
+     * POST the callback (SSL follows the URL scheme) with a 5 s timeout per attempt and one
+     * retry after 1 s on a connection error or 5xx. Completes with the final status code.
+     */
+    static Future<Integer> postCallback(Vertx vertx, HttpClient client, String url, String token, String json) {
+        return postOnce(client, url, token, json).transform(ar -> {
+            if (ar.succeeded() && ar.result() < 500) {
+                return Future.succeededFuture(ar.result());
+            }
+            return vertx.timer(CALLBACK_RETRY_DELAY_MS).compose(v -> postOnce(client, url, token, json));
+        });
+    }
+
+    private static Future<Integer> postOnce(HttpClient client, String url, String token, String json) {
+        RequestOptions options = new RequestOptions()
+            .setMethod(HttpMethod.POST)
+            .setAbsoluteURI(url)
+            .setConnectTimeout(CALLBACK_TIMEOUT_MS)
+            .setIdleTimeout(CALLBACK_TIMEOUT_MS)
+            .putHeader("Content-Type", "application/json")
+            .putHeader("Authorization", "Bearer " + token);
+        return client.request(options)
+            .compose(req -> req.send(json))
+            .compose(resp -> resp.body().map(body -> resp.statusCode())) // drain so the connection is reused
+            .timeout(CALLBACK_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    }
+
+    public Future<Void> close() {
+        return httpClient.close();
     }
 
     private String resolveAction(StreamSession session, String result) {
@@ -444,29 +568,5 @@ public class StreamHandler {
             session.dispose(vertx);
             metrics.decrementActiveStreams();
         }
-    }
-
-    private boolean isAuthorized(ServerWebSocket ws) {
-        String authHeader = ws.headers().get("Authorization");
-        if (authHeader == null || authHeader.isEmpty()) {
-            return false;
-        }
-        String expected = "Bearer " + apiToken;
-        // Use constant-time comparison to prevent timing attacks
-        return constantTimeEquals(authHeader, expected);
-    }
-
-    private static boolean constantTimeEquals(String a, String b) {
-        if (a == null || b == null) {
-            return a == b;
-        }
-        byte[] aBytes = a.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        byte[] bBytes = b.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        int diff = aBytes.length ^ bBytes.length;
-        int len = Math.min(aBytes.length, bBytes.length);
-        for (int i = 0; i < len; i++) {
-            diff |= aBytes[i] ^ bBytes[i];
-        }
-        return diff == 0;
     }
 }

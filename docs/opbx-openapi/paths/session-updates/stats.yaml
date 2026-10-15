@@ -4,10 +4,15 @@ paths:
       tags:
         - Session Updates
       summary: Get active calls statistics
+      description: |
+        Aggregates over the same active-call set as `GET /v1/session-updates/active` (same
+        30-minute window and Supervisor scope), without the 100-call cap or filters. Any role.
+        `total_active` also counts calls in `answer` status, which `by_status` does not list.
       operationId: getActiveSessionStats
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: session-updates:read
       responses:
         '200':
           description: Statistics retrieved
@@ -32,13 +37,18 @@ paths:
                             type: integer
                       by_direction:
                         type: object
-                        description: Currently always 0 for both directions.
                         properties:
                           incoming:
                             type: integer
                           outgoing:
                             type: integer
                       average_duration:
-                        type: number
+                        type: integer
+                        description: Average time since session start, in seconds (0 when there are no calls)
                       longest_call:
-                        type: number
+                        type: integer
+                        description: Longest time since session start, in seconds
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'

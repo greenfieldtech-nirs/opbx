@@ -34,19 +34,31 @@ class CallDetailRecordPolicy
             return false;
         }
 
-        // Supervisors can only view CDRs for their assigned resources
-        if ($user->isSupervisor()) {
-            $identifiers = app(SupervisorFilterService::class)->resourceIdentifiers($user);
+        // Supervisors only view CDRs of their assigned resources, PBX Users only CDRs of or to their own extension(s)
+        $scope = app(SupervisorFilterService::class);
+        $identifiers = $scope->callRecordScopeFor($user);
 
-            if (count($identifiers) === 0) {
-                return false;
-            }
-
-            return in_array((string) $callDetailRecord->from, $identifiers, true)
-                || in_array((string) $callDetailRecord->to, $identifiers, true);
+        if ($identifiers === null) {
+            return true;
         }
 
-        return true;
+        foreach ($scope->callRecordScopeColumns($user) as $column) {
+            if (in_array((string) $callDetailRecord->{$column}, $identifiers, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Playing a call's recording: Owner, PBX Admin, Reporter (D13) and Supervisors, always on top of view
+     * (a Supervisor only plays CDRs of their assigned users/groups).
+     */
+    public function playRecording(User $user, CallDetailRecord $callDetailRecord): bool
+    {
+        return ($user->isSupervisor() || app(RecordingPolicy::class)->viewAny($user))
+            && $this->view($user, $callDetailRecord);
     }
 
     /**

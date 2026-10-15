@@ -21,17 +21,20 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_filter([
-        env('FRONTEND_URL', 'http://localhost:3000'),
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'http://localhost',
-        'http://127.0.0.1',
-        'https://developers.cloudonix.com',
-        'https://developers.staging.cloudonix.com',
-        'https://cloudonix.cloud',
-        'https://opbx.cloudonix.cloud',
-    ]),
+    'allowed_origins' => array_values(array_filter(array_merge(
+        [
+            env('FRONTEND_URL', 'http://localhost:3000'),
+            'https://cloudonix.cloud',
+            'https://opbx.cloudonix.cloud',
+            // Cloudonix developer docs "try it out" calls the API cross-origin.
+            'https://developers.cloudonix.com',
+            'https://developers.staging.cloudonix.com',
+        ],
+        // Loopback origins carry credentials, so they are only allowed in local development.
+        env('APP_ENV', 'production') === 'local'
+            ? ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost', 'http://127.0.0.1']
+            : [],
+    ))),
 
     'allowed_origins_patterns' => [],
 

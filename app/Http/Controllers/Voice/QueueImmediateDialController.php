@@ -15,6 +15,7 @@ use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Proactive (immediate connect) dial endpoint.
@@ -88,7 +89,7 @@ class QueueImmediateDialController extends Controller
                 Log::info('QueueImmediateDialController: returning <Dial> for proactive connect', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $queueCall->call_id,
-                    'cxml' => \Illuminate\Support\Str::limit((string) $dialResponse->getContent(), 500),
+                    'cxml' => Str::limit((string) $dialResponse->getContent(), 500),
                 ]);
 
                 return $dialResponse;

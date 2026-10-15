@@ -5,11 +5,26 @@ paths:
         - Auto Dialer Webhooks
       summary: Auto-dialer call status
       description: |
-        Receives call status updates for auto-dialer calls from Cloudonix.
+        Call status update for an auto-dialer call. No payload validation. Finds the call
+        session by `session_token` and applies `status`:
+        `answered`/`connected` mark the session answered and the destination `connected`
+        (with `last_call_id` = `call_id`); `completed` marks it completed;
+        `failed`/`busy`/`no-answer` mark it failed. Any other status changes nothing but
+        still answers `ok`.
 
-        Updates the associated call session and destination based on the
-        reported status (`answered`, `connected`, `completed`, `failed`,
-        `busy`, `no-answer`).
+        Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+        `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+        and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+        `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+        is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+
+        Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+        else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+        else the route name), else a hash of the whole payload. A repeat within
+        `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+        repeat while the first is still running answers 409. A body `timestamp` older than
+        `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+        60 s in the future 400 `Invalid Timestamp`.
       operationId: autoDialerCallStatus
       security:
         - webhookBearer: []
@@ -20,18 +35,22 @@ paths:
             schema:
               type: object
               properties:
+                domain:
+                  type: string
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                  example: acme.cloudonix.net
                 session_token:
                   type: string
-                  description: Auto-dialer session token
-                  example: "sess-abc123"
+                  description: Auto-dialer session token (400 when missing)
+                  example: sess-abc123
                 call_id:
                   type: string
                   description: Cloudonix call ID
-                  example: "call-xyz789"
+                  example: call-xyz789
                 status:
                   type: string
-                  enum: [answered, connected, completed, failed, busy, no-answer]
-                  example: "completed"
+                  description: '`answered`, `connected`, `completed`, `failed`, `busy` or `no-answer` change the session; other values are ignored'
+                  example: completed
       responses:
         '200':
           description: Webhook processed
@@ -42,9 +61,9 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "ok"
+                    example: ok
         '400':
-          description: Bad request (missing session token)
+          description: Missing `session_token` (`{"status":"error"}`), missing `domain`, or an expired/future `timestamp`
           content:
             application/json:
               schema:
@@ -52,7 +71,19 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "error"
+                    example: error
+                  error:
+                    type: string
+        '401':
+          description: Unknown domain, or missing/invalid Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized - Invalid Bearer token
         '404':
           description: Session not found
           content:
@@ -62,4 +93,14 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "not_found"
+                    example: not_found
+        '409':
+          description: The same webhook is still being processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook is being processed

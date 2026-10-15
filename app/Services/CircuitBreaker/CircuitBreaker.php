@@ -19,31 +19,33 @@ use Illuminate\Support\Facades\Log;
 class CircuitBreaker
 {
     private const STATE_CLOSED = 'closed';
+
     private const STATE_OPEN = 'open';
+
     private const STATE_HALF_OPEN = 'half_open';
 
     /**
      * Create a new circuit breaker.
      *
-     * @param string $serviceName Unique identifier for this service
-     * @param int $failureThreshold Number of failures before opening circuit
-     * @param int $timeoutSeconds Timeout for individual requests
-     * @param int $retryAfterSeconds Seconds to wait before attempting reset
+     * @param  string  $serviceName  Unique identifier for this service
+     * @param  int  $failureThreshold  Number of failures before opening circuit
+     * @param  int  $timeoutSeconds  Timeout for individual requests
+     * @param  int  $retryAfterSeconds  Seconds to wait before attempting reset
      */
     public function __construct(
         private readonly string $serviceName,
         private readonly int $failureThreshold = 5,
         private readonly int $timeoutSeconds = 30,
         private readonly int $retryAfterSeconds = 60
-    ) {
-    }
+    ) {}
 
     /**
      * Execute a callback with circuit breaker protection.
      *
-     * @param callable $callback The operation to execute
-     * @param callable|null $fallback Optional fallback when circuit is open
+     * @param  callable  $callback  The operation to execute
+     * @param  callable|null  $fallback  Optional fallback when circuit is open
      * @return mixed Result from callback or fallback
+     *
      * @throws CircuitBreakerOpenException If circuit is open and no fallback
      * @throws \Exception If callback fails and circuit should remain closed
      */
@@ -70,7 +72,7 @@ class CircuitBreaker
                 }
 
                 throw new CircuitBreakerOpenException(
-                    "Circuit breaker is open for service: {$this->serviceName}. " .
+                    "Circuit breaker is open for service: {$this->serviceName}. ".
                     "Retry after {$this->retryAfterSeconds} seconds."
                 );
             }

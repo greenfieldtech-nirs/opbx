@@ -5,14 +5,35 @@ paths:
         - Voice Routing
       summary: Inbound call routing
       description: |
-        Main inbound call routing endpoint.
-        
-        Returns CXML (Cloudonix XML) document instructing the platform
-        how to route the call based on organizational configuration.
-        
-        Middleware: voice.webhook.auth, rate_limit_org:voice_routing
-        
-        Authentication: Bearer token (per-organization domain_requests_api_key)
+        Main call routing webhook, called by Cloudonix for every new call. Returns a CXML
+        document (`Content-Type: application/xml`) that tells Cloudonix how to route the call.
+
+        Authentication: `Authorization: Bearer <domain_requests_api_key>` of the organization
+        named by `Domain` (`voiceWebhookAuth`). The middleware runs before validation and
+        answers with CXML (`<Say>` + `<Hangup/>`): 401 for a missing or wrong token, an
+        unknown domain or an organization without a key; 400 when `Domain` or `To` is missing.
+        The middleware sets `_organization_id`; a value sent by the caller is overwritten.
+
+        Routing, in order:
+        - `To` is a supervisor coaching target (`spy_`, `barge_`, `whisper_<party>_` + token):
+          a `<Coach>` verb for the supervisor's Web Phone.
+        - `To` is `*45<queue id>`: call queue agent login/logout toggle for the calling
+          extension, answered with a spoken confirmation and `<Hangup/>`.
+        - `Direction` `subscriber` or `application`: extension, then DID, then outbound
+          (outbound whitelist) routing.
+        - `Direction` `outbound`: outbound whitelist routing only.
+        - `Direction` `inbound` (or missing/other): inbound blacklist check on the DID, then
+          the DID's configured destination (extension, ring group, IVR menu, business hours,
+          conference room, call queue, AI assistant, AI load balancer). A call
+          from one of the organization's own DIDs is routed like a subscriber call.
+
+        When nothing matches, the response is 200 CXML that says the reason (for example
+        `Extension not found`, `Outbound call not permitted`) and hangs up. Unexpected
+        exceptions also answer 200 CXML (`We are sorry, an error occurred...`). Not
+        rate-limited.
+
+        A validation failure (see the request schema) is not CXML: Laravel answers 422 JSON
+        when the request accepts JSON, otherwise a 302 redirect.
       operationId: voiceRoute
       security:
         - voiceWebhookAuth: []
@@ -23,22 +44,51 @@ paths:
             schema:
               type: object
               properties:
-                To:
-                  type: string
-                  description: Called number
-                  example: '+1987654321'
-                From:
-                  type: string
-                  description: Caller number
-                  example: '+1234567890'
-                Domain:
-                  type: string
-                  description: Cloudonix domain
-                  example: example.cloudonix.io
                 CallSid:
                   type: string
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9_-]+$'
                   description: Call SID
-                  example: CA550e8400e29b41d4a716446655440000
+                From:
+                  type: string
+                  maxLength: 16
+                  pattern: '^(\+?[1-9]\d{1,14}|\d{1,10})$'
+                  description: Caller number
+                To:
+                  type: string
+                  maxLength: 64
+                  pattern: '^(\+?[1-9]\d{1,14}|\*\d{1,10}|\d{1,10}|(spy|barge)_[0-9a-f]{16,}|whisper_(caller|callee|both)_[0-9a-f]{16,})$'
+                  description: Called number, a `*`-feature code, or a supervisor coaching target (spy_/barge_/whisper_<party>_ + hex token)
+                Domain:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 255
+                  pattern: '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                  description: >-
+                    Cloudonix domain **name** (for example `acme.cloudonix.net`). Optional for
+                    validation, but the authentication middleware answers 400 without it. Must be
+                    the name, not the domain UUID: the authentication middleware would match a UUID,
+                    but this request's validation rejects it with 422, by design.
+                CallStatus:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 20
+                  enum: [ringing, in-progress, answered, completed, failed, busy, no-answer, new, null]
+                  description: Call status
+                Direction:
+                  type:
+                  - string
+                  - 'null'
+                  enum: [subscriber, inbound, outbound, application, null]
+                _organization_id:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
+              required: [CallSid, From, To]
       responses:
         '200':
           description: CXML routing response
@@ -46,10 +96,17 @@ paths:
             application/xml:
               schema:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
-            text/xml:
+        '400':
+          description: '`Domain` or `To` missing (CXML `<Say>Bad request. ...</Say><Hangup/>`)'
+          content:
+            application/xml:
               schema:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
         '401':
-          description: Unauthorized - Invalid Bearer token
-        '429':
-          description: Rate limit exceeded
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML `<Say>Unauthorized. Authentication failed.</Say><Hangup/>`)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

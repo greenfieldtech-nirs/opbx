@@ -10,6 +10,7 @@ use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Destination Management Service
@@ -58,6 +59,9 @@ class DestinationManagementService
             return AutoDialerDestination::whereIn('list_id', $listIds)
                 ->where('status', DestinationStatus::PENDING)
                 ->where('dial_attempts', '<', $campaign->max_dial_attempts)
+                ->where(function ($query) {
+                    $query->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
+                })
                 ->orderBy('created_at', 'asc')
                 ->limit($limit)
                 ->get();
@@ -115,17 +119,62 @@ class DestinationManagementService
     }
 
     /**
-     * Update destination status to dialing.
+     * Atomically claim a pending destination for dialling.
+     *
+     * Returns false when another request already claimed it (or it is no longer
+     * pending), so a destination can never be dialled twice.
      */
-    public function markAsDialing(AutoDialerDestination $destination): void
+    public function claimForDialing(int $destinationId): bool
     {
-        OrganizationScope::bypass(function () use ($destination) {
+        return OrganizationScope::bypass(
+            fn () => AutoDialerDestination::whereKey($destinationId)
+                ->where('status', DestinationStatus::PENDING)
+                ->update([
+                    'status' => DestinationStatus::DIALING,
+                    'dial_attempts' => DB::raw('dial_attempts + 1'),
+                    'last_dialed_at' => now(),
+                ]) === 1
+        );
+    }
+
+    /** Consecutive initiate errors after which a destination is failed instead of retried. */
+    public const MAX_INITIATE_FAILURES = 3;
+
+    /**
+     * Undo a claim after a definite failure to place the call (the attempt stays counted).
+     *
+     * Schedules the next try with backoff (next_retry_at), or fails the destination after
+     * MAX_INITIATE_FAILURES consecutive errors. Returns true when it was failed.
+     */
+    public function releaseClaim(int $destinationId, string $error): bool
+    {
+        return OrganizationScope::bypass(function () use ($destinationId, $error) {
+            $destination = AutoDialerDestination::find($destinationId);
+            if (! $destination || $destination->status !== DestinationStatus::DIALING) {
+                return false;
+            }
+
+            $failures = $destination->consecutive_initiate_failures + 1;
+            $failed = $failures >= self::MAX_INITIATE_FAILURES;
+
             $destination->update([
-                'status' => DestinationStatus::DIALING,
-                'dial_attempts' => $destination->dial_attempts + 1,
-                'last_dialed_at' => now(),
+                'status' => $failed ? DestinationStatus::FAILED : DestinationStatus::PENDING,
+                'consecutive_initiate_failures' => $failures,
+                'next_retry_at' => $failed ? null : now()->addMinutes(2 ** ($failures - 1)),
+                'last_error' => mb_substr($error, 0, 250),
             ]);
+
+            return $failed;
         });
+    }
+
+    public function clearInitiateFailures(int $destinationId): void
+    {
+        OrganizationScope::bypass(
+            fn () => AutoDialerDestination::whereKey($destinationId)
+                ->where('consecutive_initiate_failures', '>', 0)
+                ->update(['consecutive_initiate_failures' => 0])
+        );
     }
 
     /**

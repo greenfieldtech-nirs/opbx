@@ -9,15 +9,18 @@ use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\OrganizationJoinRequest\StoreRequest;
-use App\Models\Organization;
 use App\Models\OrganizationJoinRequest;
 use App\Models\User;
 use App\Models\UserSocialIdentity;
+use App\Scopes\OrganizationScope;
+use App\Services\Auth0\Auth0AccountResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class OrganizationJoinRequestController extends Controller
 {
@@ -37,19 +40,19 @@ class OrganizationJoinRequestController extends Controller
     {
         $validated = $request->validated();
 
-        $organization = Organization::where('slug', $validated['organization_slug'])
-            ->where('status', 'active')
-            ->firstOrFail();
+        $key = 'auth0:onboarding:'.$validated['onboarding_id'];
+        $profile = Cache::get($key);
 
-        $joinRequest = OrganizationJoinRequest::create([
-            'organization_id' => $organization->id,
-            'email' => strtolower($validated['email']),
-            'name' => $validated['name'] ?? $validated['email'],
-            'provider' => $validated['provider'],
-            'provider_subject' => $validated['provider_subject'],
-            'status' => OrganizationJoinRequestStatus::PENDING,
-            'role' => 'pbx_user',
-        ]);
+        if (! is_array($profile)) {
+            return response()->json([
+                'error' => ['code' => 'ONBOARDING_EXPIRED', 'message' => 'Onboarding session is invalid or expired.'],
+            ], 422);
+        }
+
+        $this->ensureEmailIsFree((string) ($profile['email'] ?? ''));
+
+        $joinRequest = app(Auth0AccountResolver::class)->createJoinRequest($validated['organization_slug'], $profile);
+        Cache::forget($key); // single use
 
         return response()->json($joinRequest, 201);
     }
@@ -63,6 +66,8 @@ class OrganizationJoinRequestController extends Controller
                 'error' => ['code' => 'JOIN_REQUEST_NOT_PENDING', 'message' => 'Request is not pending.'],
             ], 422);
         }
+
+        $this->ensureEmailIsFree($joinRequest->email);
 
         $user = User::create([
             'organization_id' => $joinRequest->organization_id,
@@ -96,5 +101,15 @@ class OrganizationJoinRequestController extends Controller
         $joinRequest->update(['status' => OrganizationJoinRequestStatus::REJECTED]);
 
         return response()->json(['message' => 'Join request rejected.']);
+    }
+
+    /**
+     * Emails are globally unique: a user belongs to exactly one organization.
+     */
+    private function ensureEmailIsFree(string $email): void
+    {
+        if (User::withoutGlobalScope(OrganizationScope::class)->where('email', $email)->exists()) {
+            throw ValidationException::withMessages(['email' => 'The email has already been taken.']);
+        }
     }
 }

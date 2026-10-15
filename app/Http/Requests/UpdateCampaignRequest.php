@@ -9,6 +9,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\RoutingDestinationType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class UpdateCampaignRequest extends FormRequest
 {
@@ -29,11 +30,9 @@ class UpdateCampaignRequest extends FormRequest
     {
         $campaign = $this->route('campaign');
 
-        // Cannot update if campaign is active
+        // An active campaign is never edited: the controller answers 409 before anything is validated
         if ($campaign && $campaign->status === CampaignStatus::ACTIVE) {
-            return [
-                'name' => ['prohibited'],
-            ];
+            return [];
         }
 
         return [
@@ -47,6 +46,7 @@ class UpdateCampaignRequest extends FormRequest
                 'nullable',
                 'integer',
                 Rule::requiredIf(fn () => $this->input('routing_destination_type') !== 'hangup'),
+                $this->routingDestinationExists(),
             ],
 
             // Can only update if campaign is draft or paused
@@ -119,15 +119,33 @@ class UpdateCampaignRequest extends FormRequest
             'action_human' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
             'action_unknown' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
             'retry_on_voicemail' => ['sometimes', 'boolean'],
+            'retry_on_busy_no_answer' => ['sometimes', 'boolean'],
+            'retry_delay_minutes' => ['sometimes', 'integer', 'min:1', 'max:1440'],
 
             'auto_start' => ['sometimes', 'boolean'],
 
             // Caller ID Pooling - can only be modified when campaign is draft or paused
             'caller_id_pool' => ['sometimes', 'array', 'min:1', 'max:100'],
-            'caller_id_pool.*.did_id' => ['required', 'integer', 'exists:did_numbers,id'],
+            'caller_id_pool.*.did_id' => ['required', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
             'caller_id_pool.*.weight' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'caller_id_strategy' => ['sometimes', Rule::enum(CallerIdStrategy::class)],
         ];
+    }
+
+    /**
+     * The routing destination must exist in the caller's organization (table chosen by destination type).
+     */
+    private function routingDestinationExists(): \Closure|Exists
+    {
+        $table = match ($this->input('routing_destination_type') ?? $this->route('campaign')?->routing_destination_type?->value) {
+            'ai_assistant' => 'ai_assistants',
+            'ai_load_balancer' => 'ai_assistant_load_balancers',
+            default => null,
+        };
+
+        return $table === null
+            ? fn () => true
+            : Rule::exists($table, 'id')->where('organization_id', $this->user()?->organization_id);
     }
 
     /**

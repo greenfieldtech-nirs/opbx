@@ -1,0 +1,109 @@
+type: object
+description: |
+  Call queue create/update request. On create, `name` and `agents` are required and an omitted
+  field that has a default is set to that default. On update (PUT or PATCH) every field is
+  optional: only the fields sent are validated and saved, and the others keep their stored values.
+properties:
+  name:
+    type: string
+    minLength: 2
+    maxLength: 100
+    description: Unique within the organization
+  description:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  strategy:
+    type: string
+    enum: [ring_all, round_robin, least_talk_time, fewest_calls]
+    default: ring_all
+  agent_ring_timeout:
+    type: integer
+    minimum: 15
+    maximum: 60
+    default: 20
+  max_wait_seconds:
+    type: integer
+    minimum: 30
+    maximum: 300
+    default: 300
+  wrap_up_seconds:
+    type: integer
+    minimum: 15
+    maximum: 120
+    default: 15
+  announce_position:
+    type: boolean
+    default: false
+  immediate_connect:
+    type: boolean
+    default: false
+  conference_ring_all:
+    type: boolean
+    default: true
+    description: >-
+      Ring Agents in Separate Calls (used with the `ring_all` strategy). On create, defaults to
+      `true` when the strategy is `ring_all` (also when `strategy` is omitted, which means
+      `ring_all`) and to `false` otherwise. On update, the stored value is kept when omitted.
+      When `false`, a Ring All queue rings all agents in one call and the answering agent is not
+      recorded on the call log or CDR.
+  announce_position_timeout:
+    type:
+      - integer
+      - 'null'
+    minimum: 10
+    maximum: 600
+    default: 60
+    description: Required (non-null) when announce_position is true; null is stored as 60
+  announce_position_language:
+    type:
+      - string
+      - 'null'
+    maxLength: 20
+  moh_recording_id:
+    type:
+      - integer
+      - 'null'
+    description: Recording of the organization tagged as hold music
+  fallback_action:
+    type: string
+    enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
+    default: hangup
+    description: '`unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer and call_queue, and the target must belong to the organization and be active. A call_queue target must not be the queue itself, and the chain of call queue fallbacks must not lead back to it (422 "Fallback loop detected: ...").'
+  fallback_extension_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ring_group_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ivr_menu_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
+    type:
+      - integer
+      - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+    description: Target queue, required when fallback_action is `call_queue`. An active queue of the organization, not this queue.
+  status:
+    type: string
+    enum: [active, inactive]
+    default: active
+  agents:
+    type: array
+    minItems: 1
+    maxItems: 100
+    description: Agent user IDs (distinct). Each must be an active user of the organization with an extension. Replaces the whole agent list.
+    items:
+      type: integer

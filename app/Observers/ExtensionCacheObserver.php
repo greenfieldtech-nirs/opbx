@@ -17,19 +17,13 @@ class ExtensionCacheObserver
 {
     /**
      * Constructor
-     *
-     * @param VoiceRoutingCacheService $cache
      */
     public function __construct(
         private readonly VoiceRoutingCacheService $cache
-    ) {
-    }
+    ) {}
 
     /**
      * Handle the Extension "updated" event.
-     *
-     * @param Extension $extension
-     * @return void
      */
     public function updated(Extension $extension): void
     {
@@ -38,9 +32,6 @@ class ExtensionCacheObserver
 
     /**
      * Handle the Extension "deleted" event.
-     *
-     * @param Extension $extension
-     * @return void
      */
     public function deleted(Extension $extension): void
     {
@@ -49,15 +40,15 @@ class ExtensionCacheObserver
 
     /**
      * Invalidate cache for the extension
-     *
-     * @param Extension $extension
-     * @return void
      */
     private function invalidateExtensionCache(Extension $extension): void
     {
-        $this->cache->invalidateExtension(
-            $extension->organization_id,
-            $extension->extension_number
-        );
+        $this->cache->invalidateExtension($extension->organization_id, (string) $extension->extension_number);
+
+        // A rename leaves the entry under the old number stale (e.g. still routing to the extension).
+        $original = $extension->getOriginal('extension_number');
+        if ($original !== null && (string) $original !== (string) $extension->extension_number) {
+            $this->cache->invalidateExtension($extension->organization_id, (string) $original);
+        }
     }
 }

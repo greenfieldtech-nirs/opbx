@@ -1,13 +1,23 @@
 type: object
-description: Cloudonix CDR (Call Detail Record) webhook payload
+description: |
+  Cloudonix CDR (Call Detail Record) webhook payload, validated by `CdrRequest`. The whole
+  payload is passed to the CDR model, so other Cloudonix fields are kept as well. The
+  authentication middleware needs `domain` (or `owner.domain.name` / `owner.domain.uuid`).
 properties:
   timestamp:
     type: integer
+    minimum: 1000000000
     description: CDR timestamp (Unix)
     example: 1705312860
   session:
-    type: object
+    type:
+    - object
+    - 'null'
     properties:
+      profile:
+        type: object
+        description: Session profile; `amd.result` and `amd.confidence` are read for auto-dialer calls
+        additionalProperties: true
       token:
         type: string
       id:
@@ -22,54 +32,89 @@ properties:
         type: string
   from:
     type: string
+    maxLength: 100
     description: Caller number
     example: '+1234567890'
   to:
     type: string
+    maxLength: 100
     description: Called number
     example: '+1987654321'
   disposition:
     type: string
+    maxLength: 50
     description: Call disposition
     example: ANSWERED
   duration:
     type: integer
+    minimum: 0
     description: Call duration in seconds
     example: 120
   billsec:
     type: integer
+    minimum: 0
     description: Billable seconds
     example: 115
   call_id:
     type: string
+    maxLength: 255
     description: SIP Call-ID
     example: CA550e8400e29b41d4a716446655440000
   domain:
-    type: string
-    description: Cloudonix domain
-    example: example.cloudonix.io
+    type:
+    - string
+    - 'null'
+    maxLength: 255
+    description: Cloudonix domain name (required by the authentication middleware unless `owner.domain` is sent)
+    example: acme.cloudonix.net
   subscriber:
-    type: string
+    type:
+    - string
+    - 'null'
+    maxLength: 100
     description: Subscriber identifier
   cx_trunk_id:
-    type: integer
+    type:
+    - integer
+    - 'null'
     description: Trunk ID
   application:
-    type: string
+    type:
+    - string
+    - 'null'
+    maxLength: 255
   route:
-    type: string
+    type:
+    - string
+    - 'null'
+    maxLength: 255
   rated_cost:
-    type: number
+    type:
+    - number
+    - 'null'
+    minimum: 0
     description: Rated call cost
   approx_cost:
-    type: number
+    type:
+    - number
+    - 'null'
+    minimum: 0
   sell_cost:
-    type: number
+    type:
+    - number
+    - 'null'
+    minimum: 0
   vapp_server:
-    type: string
+    type:
+    - string
+    - 'null'
+    maxLength: 50
   recording_url:
-    type: string
+    type:
+    - string
+    - 'null'
     format: uri
+    maxLength: 500
     description: URL to call recording
 required:
   - timestamp

@@ -4,23 +4,89 @@ paths:
       tags:
         - Extensions
       summary: Compare sync status
+      description: >-
+        Compares the organization's local extensions with the Cloudonix subscribers of its
+        domain. Any role can call it.
       operationId: compareSyncStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: extensions:read
       responses:
         '200':
-          description: Sync comparison
+          description: Sync comparison (an `error` key is set when Cloudonix could not be queried)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  needs_sync:
+                    type: boolean
+                  local_only:
+                    type: integer
+                  cloudonix_only:
+                    type: integer
+                  synced:
+                    type: integer
+                  error:
+                    type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
 
   /v1/extensions/sync:
     post:
       tags:
         - Extensions
       summary: Sync extensions with Cloudonix
+      description: >-
+        Two-way sync, Owner and PBX Admin only. Local `user` extensions missing in Cloudonix are
+        created there; Cloudonix subscribers with no local extension (MSISDN of up to 5
+        characters) are imported as unassigned `user` extensions; local active/inactive status
+        is updated from Cloudonix. Returns 500 when Cloudonix settings are missing or Cloudonix
+        cannot be queried.
       operationId: syncExtensions
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       responses:
         '200':
           description: Sync completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  success:
+                    type: boolean
+                  to_cloudonix:
+                    type: object
+                    properties:
+                      created:
+                        type: integer
+                      failed:
+                        type: integer
+                  from_cloudonix:
+                    type: object
+                    properties:
+                      created:
+                        type: integer
+                      failed:
+                        type: integer
+                  status_sync:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                      failed:
+                        type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '500':
+          $ref: '../../components/responses/ServerError.yaml'

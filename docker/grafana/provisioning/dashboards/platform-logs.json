@@ -1,0 +1,57 @@
+{
+  "uid": "opbx-logs-platform",
+  "title": "OPBX Platform Logs",
+  "tags": [
+    "opbx",
+    "logs"
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "text_search",
+        "label": "Text search",
+        "type": "textbox",
+        "query": "",
+        "description": "Free-text filter applied to every log line"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Platform Logs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 24,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{log_type=\"platform\"} |~ \"$text_search\" | regexp \"(?P<raw>.*)\" | json |~ \"\" | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ .raw }}\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 7
+}

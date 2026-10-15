@@ -3,12 +3,15 @@
  * Live snapshot, agents, and history statistics for a single queue.
  */
 
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateQueueAgentState } from '@/lib/invalidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Clock, PhoneCall, Timer, Users } from 'lucide-react';
 
 import { callQueuesService, queueAgentService, queueStatsService, type QueueAgentState } from '@/services/callQueues.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const AGENT_STATE_LABELS: Record<QueueAgentState, string> = {
   AVAILABLE: 'Available',
@@ -41,7 +45,7 @@ export default function CallQueueDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'callQueues.manage');
   const queryClient = useQueryClient();
 
   const agentStateMutation = useMutation({
@@ -55,26 +59,26 @@ export default function CallQueueDetail() {
       userId: number;
     }) => queueAgentService.setState(queueId, state, userId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-queues', id, 'live'] });
+      void invalidateQueueAgentState(queryClient);
     },
     onError: () => toast.error('Failed to update agent state'),
   });
 
-  const { data: queueData } = useQuery({
-    queryKey: ['call-queues', id],
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: queueData } = useQuery({
+    queryKey: queryKeys.callQueues.detail(id),
     queryFn: () => callQueuesService.getById(id!),
     enabled: Boolean(id),
   });
 
   const { data: liveData } = useQuery({
-    queryKey: ['call-queues', id, 'live'],
+    queryKey: [...queryKeys.callQueues.detail(id), 'live'],
     queryFn: () => queueStatsService.live(id!),
     enabled: Boolean(id),
     refetchInterval: 5000,
   });
 
   const { data: statsData } = useQuery({
-    queryKey: ['call-queues', id, 'stats'],
+    queryKey: [...queryKeys.callQueues.detail(id), 'stats'],
     queryFn: () => queueStatsService.stats(id!),
     enabled: Boolean(id),
     refetchInterval: 30000,
@@ -93,6 +97,10 @@ export default function CallQueueDetail() {
         <EmptyState icon={Users} title="Queue not found" description="This call queue does not exist." />
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call queue" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

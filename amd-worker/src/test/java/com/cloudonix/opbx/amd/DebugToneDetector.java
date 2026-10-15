@@ -22,7 +22,7 @@ public class DebugToneDetector {
         System.out.println("VAD segments produced: " + segments.size());
         for (var seg : segments) {
             System.out.println("Segment: start=" + seg.startMs() + "ms, end=" + seg.endMs() + "ms, duration=" + (seg.endMs() - seg.startMs()) + "ms");
-            ToneEnergyDetector tone = new ToneEnergyDetector();
+            ToneEnergyDetector tone = new ToneEnergyDetector(0);
             var result = tone.process(new Detector.AudioSegment(seg.pcmData(), 16000, seg.endMs() - seg.startMs(), seg.startMs()));
             System.out.println("Tone detector result: " + result);
         }

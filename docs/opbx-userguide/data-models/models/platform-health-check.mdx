@@ -1,0 +1,43 @@
+---
+sidebar_position: 16
+slug: /data-models/models/platform-health-check
+sidebar_class_name: cxGuidesSidebar
+title: PlatformHealthCheck Model
+---
+
+# PlatformHealthCheck Model
+
+The `PlatformHealthCheck` model stores the history behind the Platform Status page. `php artisan platform:health-check` runs every minute from the scheduler, probes every component and stores one row per component.
+
+**Table:** `platform_health_checks`  
+**Model:** `App\Models\PlatformHealthCheck`
+
+## Database Schema
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | bigint unsigned | No | Primary key |
+| `component` | varchar(50) | No | Component key (see below) |
+| `status` | varchar(20) | No | `ok`, `degraded`, `down` or `unknown` (`PlatformHealthStatus`) |
+| `latency_ms` | int unsigned | Yes | Probe latency |
+| `detail` | json | Yes | Probe detail |
+| `checked_at` | timestamp | No | When the probe ran |
+| `created_at` / `updated_at` | timestamp | Yes | |
+
+Indexes: `checked_at`, and (`component`, `checked_at`).
+
+## Components
+
+`app`, `mysql`, `mysql_archive`, `redis`, `queue`, `scheduler`, `seaweedfs`, `soketi`, `acd_worker`, `amd_worker`, `dialer_worker`, `mcp_server`, `cloudonix`, and the optional `loki` and `grafana` (reported as `unknown`, not `down`, when the `logs` profile is not running).
+
+The public status page (`/status`) groups them: Web portal & API, Call routing, Call queues, Auto dialer & voicemail detection, Recordings & storage, and Real-time updates. The scheduler, Loki, Grafana and the MCP server are shown only to platform managers.
+
+## Usage Notes
+
+- Platform-wide, not tenant-scoped.
+- Rows whose `checked_at` is older than `PLATFORM_HEALTH_RETENTION_HOURS` (default 24, in **hours**) are pruned by the daily `model:prune` (03:00 UTC), so rows can live up to a day longer. An empty value keeps them.
+- Probe thresholds are set with the `PLATFORM_STATUS_*` variables. See [Configuration Reference](/opbx/data-models/configuration/index#platform-status).
+
+## Related Documentation
+
+- [Platform Management](/opbx/administration/platform-management#platform-status)

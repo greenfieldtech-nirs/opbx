@@ -12,5 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY --from=builder /build/target/amd-worker-1.0.0.jar ./app.jar
 COPY models ./models
+RUN useradd -r -u 10001 app && chown -R app /app
+USER app
 EXPOSE 8082 8083
-ENTRYPOINT ["java", "-Dorg.slf4j.simpleLogger.showDateTime=true", "-Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

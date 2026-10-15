@@ -8,6 +8,7 @@ use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\DidNumber;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
@@ -57,9 +58,9 @@ class StoreExtensionRequest extends FormRequest
             'user_id' => [
                 'nullable',
                 'integer',
-                'exists:users,id',
+                Rule::exists('users', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
-            'default_caller_id_did_id' => ['nullable', 'integer', 'exists:did_numbers,id'],
+            'default_caller_id_did_id' => ['nullable', 'integer', Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id)],
             'type' => [
                 'required',
                 new Enum(ExtensionType::class),
@@ -90,7 +91,7 @@ class StoreExtensionRequest extends FormRequest
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::QUEUE->value),
                 'nullable',
                 'integer',
-                'exists:call_queues,id',
+                Rule::exists('call_queues', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'configuration.ivr_id' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::IVR->value),
@@ -101,13 +102,13 @@ class StoreExtensionRequest extends FormRequest
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_ASSISTANT->value),
                 'nullable',
                 'integer',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'configuration.ai_load_balancer_id' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::AI_LOAD_BALANCER->value),
                 'nullable',
                 'integer',
-                'exists:ai_assistant_load_balancers,id',
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'configuration.container_application_name' => [
                 Rule::requiredIf(fn () => $this->input('type') === ExtensionType::CUSTOM_LOGIC->value),
@@ -272,7 +273,7 @@ class StoreExtensionRequest extends FormRequest
             if ($type === ExtensionType::QUEUE->value) {
                 $callQueueId = $this->input('configuration.call_queue_id');
                 if ($callQueueId) {
-                    $callQueue = \App\Models\CallQueue::find($callQueueId);
+                    $callQueue = CallQueue::find($callQueueId);
                     if (! $callQueue || $callQueue->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
                             'configuration.call_queue_id',

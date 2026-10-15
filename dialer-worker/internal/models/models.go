@@ -110,25 +110,6 @@ const (
 	DestinationStatusFailed    DestinationStatus = "failed"
 )
 
-// RetryableDispositions are dispositions that should trigger a retry
-// Per Laravel: busy, no-answer, cancelled
-var RetryableDispositions = map[string]bool{
-	"busy":      true,
-	"no-answer": true,
-	"cancelled": true,
-}
-
-// CDREvent represents a Call Detail Record from Cloudonix (via Laravel webhook)
-type CDREvent struct {
-	SessionID    string   `json:"session_id"`
-	Status       string   `json:"status"`      // Laravel's call status
-	Disposition  string   `json:"disposition"` // answered, busy, no-answer, failed, cancelled, congestion
-	Duration     int      `json:"duration"`
-	Billsec      int      `json:"billsec"`
-	RecordingURL string   `json:"recording_url,omitempty"`
-	CompletedAt  FlexTime `json:"completed_at,omitempty"`
-}
-
 // InitiateCallRequest represents a request to initiate a call (matches Laravel expectations)
 type InitiateCallRequest struct {
 	CampaignID    int64    `json:"campaign_id"`
@@ -145,34 +126,6 @@ type InitiateCallResponse struct {
 	SessionID   int64  `json:"session_id"`   // Internal session ID (Laravel returns as number)
 	CallID      int64  `json:"call_id"`      // Cloudonix call ID (Laravel returns as number)
 	CallbackURL string `json:"callback_url"` // Webhook URL for Cloudonix
-}
-
-// UpdateCallStatusRequest represents a call status update (matches Laravel expectations)
-type UpdateCallStatusRequest struct {
-	Status       string   `json:"status"`                // initiated, ringing, answered, completed
-	Disposition  string   `json:"disposition,omitempty"` // answered, busy, no-answer, failed, etc.
-	Duration     int      `json:"duration,omitempty"`
-	Billsec      int      `json:"billsec,omitempty"`
-	RecordingURL string   `json:"recording_url,omitempty"`
-	CompletedAt  FlexTime `json:"completed_at,omitempty"`
-}
-
-// SetDispositionRequest represents a disposition update (matches Laravel expectations)
-type SetDispositionRequest struct {
-	Disposition   string   `json:"disposition"`             // answered, completed, busy, no-answer, failed, cancelled, congestion
-	ShouldRetry   bool     `json:"should_retry"`            // Whether to retry this destination
-	AttemptNumber int      `json:"attempt_number"`          // Current attempt number
-	NextRetryAt   FlexTime `json:"next_retry_at,omitempty"` // When to retry (if should_retry is true)
-	Duration      int      `json:"duration,omitempty"`
-	Billsec       int      `json:"billsec,omitempty"`
-}
-
-// SetDispositionResponse represents the response from setting disposition
-type SetDispositionResponse struct {
-	SessionID         string `json:"session_id"`
-	Disposition       string `json:"disposition"`
-	DestinationStatus string `json:"destination_status"`
-	WillRetry         bool   `json:"will_retry"`
 }
 
 // HealthResponse represents the health check response

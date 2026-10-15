@@ -29,6 +29,7 @@ properties:
           - pbx_admin
           - pbx_user
           - reporter
+          - supervisor
         description: User's role within the organization
         example: owner
       status:
@@ -39,6 +40,28 @@ properties:
           - pending
         description: Account status
         example: active
+      is_platform_manager:
+        type: boolean
+        description: Whether the user is the platform owner
+        example: false
+      social_identities:
+        type: array
+        description: Social identities linked to the user
+        items:
+          type: object
+          properties:
+            provider:
+              type: string
+              enum:
+                - google
+                - github
+              example: google
+            provider_email:
+              type:
+                - string
+                - 'null'
+              format: email
+              example: john.doe@example.com
     required:
       - id
       - organization_id
@@ -46,6 +69,8 @@ properties:
       - email
       - role
       - status
+      - is_platform_manager
+      - social_identities
   organization:
     type: object
     description: Organization the user belongs to
@@ -66,8 +91,8 @@ properties:
         type: string
         enum:
           - active
-          - inactive
           - suspended
+          - deleted
         description: Organization status
         example: active
       timezone:

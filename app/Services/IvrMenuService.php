@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\IvrDestinationType;
+use App\Models\CallQueue;
+use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use App\Models\RingGroup;
-use App\Models\ConferenceRoom;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Service class for IVR menu business logic and validation.
@@ -22,10 +23,10 @@ class IvrMenuService
     /**
      * Validate IVR menu data including options.
      *
-     * @param array $data
-     * @param int|null $excludeMenuId Menu ID to exclude from unique validation
+     * @param  int|null  $excludeMenuId  Menu ID to exclude from unique validation
      * @return array Validated data
-     * @throws \Illuminate\Validation\ValidationException
+     *
+     * @throws ValidationException
      */
     public function validateIvrMenuData(array $data, ?int $excludeMenuId = null): array
     {
@@ -40,7 +41,7 @@ class IvrMenuService
                     return (isset($data['failover_destination_type']) ? $data['failover_destination_type'] : null) !== 'hangup';
                 }),
                 'nullable',
-                'string'
+                'string',
             ],
             'status' => 'required|string|in:active,inactive',
             'options' => 'required|array|min:1|max:20',
@@ -76,7 +77,7 @@ class IvrMenuService
     private function validateDestinations($validator, array $data): void
     {
         $organizationId = auth()->user() ? auth()->user()->organization_id : null;
-        if (!$organizationId) {
+        if (! $organizationId) {
             return;
         }
 
@@ -84,7 +85,7 @@ class IvrMenuService
             $destinationType = isset($option['destination_type']) ? $option['destination_type'] : null;
             $destinationId = isset($option['destination_id']) ? $option['destination_id'] : null;
 
-            if (!$destinationType || !$destinationId) {
+            if (! $destinationType || ! $destinationId) {
                 continue;
             }
 
@@ -103,7 +104,7 @@ class IvrMenuService
                     ->where('status', 'active')
                     ->where('id', $destinationId)
                     ->exists(),
-                'call_queue' => \App\Models\CallQueue::where('id', $destinationId)
+                'call_queue' => CallQueue::where('id', $destinationId)
                     ->where('organization_id', $organizationId)
                     ->exists(),
                 'ring_group' => RingGroup::where('id', $destinationId)
@@ -116,15 +117,15 @@ class IvrMenuService
                 'ivr_menu' => IvrMenu::where('id', $destinationId)
                     ->where('organization_id', $organizationId)
                     ->where('status', 'active')
-                    ->when(isset($data['id']), fn($q) => $q->where('id', '!=', $data['id']))
+                    ->when(isset($data['id']), fn ($q) => $q->where('id', '!=', $data['id']))
                     ->exists(),
                 default => false,
             };
 
-            if (!$exists) {
+            if (! $exists) {
                 $validator->errors()->add(
                     "options.{$index}.destination_id",
-                    "Selected destination does not exist or is not accessible."
+                    'Selected destination does not exist or is not accessible.'
                 );
             }
         }
@@ -160,12 +161,12 @@ class IvrMenuService
                     'ivr_menu' => IvrMenu::where('id', $failoverId)
                         ->where('organization_id', $organizationId)
                         ->where('status', 'active')
-                        ->when(isset($data['id']), fn($q) => $q->where('id', '!=', $data['id']))
+                        ->when(isset($data['id']), fn ($q) => $q->where('id', '!=', $data['id']))
                         ->exists(),
                     default => false,
                 };
 
-                if (!$exists) {
+                if (! $exists) {
                     $validator->errors()->add(
                         'failover_destination_id',
                         'Selected failover destination does not exist or is not accessible.'
@@ -205,7 +206,7 @@ class IvrMenuService
         $ttsText = isset($data['tts_text']) ? $data['tts_text'] : null;
 
         // If both are provided, it's an error
-        if (!empty($audioFilePath) && !empty($ttsText)) {
+        if (! empty($audioFilePath) && ! empty($ttsText)) {
             $validator->errors()->add(
                 'audio_configuration',
                 'An IVR menu can have either a static audio file OR Text-to-Speech text, not both. Please choose one audio method.'
@@ -271,6 +272,7 @@ class IvrMenuService
 
             if ((isset($option['input_digits']) ? $option['input_digits'] : '') === $digits) {
                 $fail("Input digits '{$digits}' are already used by another option in this menu.");
+
                 return;
             }
         }
@@ -289,10 +291,6 @@ class IvrMenuService
 
     /**
      * Create a new IVR menu with options.
-     *
-     * @param array $data
-     * @param int $organizationId
-     * @return IvrMenu
      */
     public function createIvrMenu(array $data, int $organizationId): IvrMenu
     {
@@ -313,10 +311,6 @@ class IvrMenuService
 
     /**
      * Update an existing IVR menu with options.
-     *
-     * @param IvrMenu $ivrMenu
-     * @param array $data
-     * @return IvrMenu
      */
     public function updateIvrMenu(IvrMenu $ivrMenu, array $data): IvrMenu
     {
@@ -338,9 +332,6 @@ class IvrMenuService
 
     /**
      * Check if an IVR menu can be safely deleted.
-     *
-     * @param IvrMenu $ivrMenu
-     * @return bool
      */
     public function canDeleteIvrMenu(IvrMenu $ivrMenu): bool
     {
@@ -359,14 +350,11 @@ class IvrMenuService
             ->where('routing_config->ivr_menu_id', $ivrMenu->id)
             ->exists();
 
-        return !$referencedByDid;
+        return ! $referencedByDid;
     }
 
     /**
      * Get available destination options for dropdowns.
-     *
-     * @param int $organizationId
-     * @return array
      */
     public function getAvailableDestinations(int $organizationId): array
     {
@@ -378,7 +366,7 @@ class IvrMenuService
                 ->map(function ($ext) {
                     return [
                         'id' => $ext->id,
-                        'label' => "Ext {$ext->extension_number} - " . ($ext->name ?: 'Unassigned'),
+                        'label' => "Ext {$ext->extension_number} - ".($ext->name ?: 'Unassigned'),
                     ];
                 }),
 
@@ -386,7 +374,7 @@ class IvrMenuService
                 ->where('status', 'active')
                 ->select('id', 'name')
                 ->get()
-                ->map(fn($rg) => [
+                ->map(fn ($rg) => [
                     'id' => $rg->id,
                     'label' => "Ring Group: {$rg->name}",
                 ]),
@@ -394,7 +382,7 @@ class IvrMenuService
             'conference_rooms' => ConferenceRoom::where('organization_id', $organizationId)
                 ->select('id', 'name')
                 ->get()
-                ->map(fn($cr) => [
+                ->map(fn ($cr) => [
                     'id' => $cr->id,
                     'label' => "Conference: {$cr->name}",
                 ]),
@@ -403,7 +391,7 @@ class IvrMenuService
                 ->where('status', 'active')
                 ->select('id', 'name')
                 ->get()
-                ->map(fn($menu) => [
+                ->map(fn ($menu) => [
                     'id' => $menu->id,
                     'label' => "IVR Menu: {$menu->name}",
                 ]),

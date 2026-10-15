@@ -58,7 +58,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 ### Real-Time Monitoring
 - **Live Call Dashboard**: Real-time call presence via WebSockets with automatic stale record cleanup
 - **Auto Dialer Monitor**: Real-time campaign monitoring with active calls, disposition pie charts, and KPI cards
-- **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export
+- **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export; older records move to a warm archive (6 to 12 months) and then to compressed cold files kept 7 years by default
 - **Call Statistics**: Volume, duration, and disposition metrics
 - **Call Notifications**: Webhook-based notifications for call events with SSRF protection and retry logic
 - **Centralized Logging**: Optional Loki + Grafana stack aggregating structured logs from all services, with per-call audit trails searchable by Cloudonix session token ([docs](docs/LOG-AGGREGATION.md))
@@ -69,7 +69,7 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Distributed Locking**: Prevents race conditions on concurrent calls
 - **Queue Workers**: Async job processing for non-blocking operations
 - **Service Architecture**: Modular voice routing with dedicated services for outbound, business hours, and IVR handling
-- **CAC Counter Reconciliation**: Self-healing Redis counters for the auto dialer worker
+- **CAC Counter Reconciliation**: Laravel reconciles the auto dialer's Redis CAC counters every minute, healing drift from missed or duplicate call records
 - **Circuit Breaker**: Fault tolerance for Cloudonix API calls with automatic fallback
 - **Resilient Cache**: Graceful degradation from Redis to database when Redis is unavailable
 
@@ -131,9 +131,9 @@ graph TB
     end
 
     subgraph "Data Layer"
-        MYSQL[(MySQL 8.0<br/>Port 3306)]
+        MYSQL[(MySQL 8.4 LTS<br/>Port 3306)]
         REDIS[(Redis 7<br/>Port 6379)]
-        MINIO[(MinIO S3<br/>Ports 9000/9001)]
+        SEAWEEDFS[(SeaweedFS S3<br/>Port 8333)]
     end
 
     subgraph "Real-Time"
@@ -156,7 +156,7 @@ graph TB
     VRM --> IVR
     APP --> MYSQL
     APP --> REDIS
-    APP --> MINIO
+    APP --> SEAWEEDFS
     APP --> SOKETI
     APP --> CX
     GOWORKER -->|Poll API| APP
@@ -242,7 +242,7 @@ sequenceDiagram
 | [PHP](https://php.net) | 8.4+ | Server-side language |
 | [Go](https://go.dev) | 1.21+ | Dialer worker microservice |
 | [Java](https://openjdk.org) | 21 | AMD & ACD (call queue) workers (Vert.x 5) |
-| [MySQL](https://mysql.com) | 8.0 | Relational database |
+| [MySQL](https://mysql.com) | 8.4 LTS | Relational database |
 | [Redis](https://redis.io) | 7 | Cache, queues, CAC counters |
 | [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
 
@@ -262,7 +262,7 @@ sequenceDiagram
 | [Docker](https://docker.com) | Containerization |
 | [nginx](https://nginx.org) | Web server / reverse proxy |
 | [Soketi](https://soketi.app) | WebSocket server (Laravel Echo compatible) |
-| [MinIO](https://min.io) | S3-compatible object storage for recordings |
+| [SeaweedFS](https://github.com/seaweedfs/seaweedfs) | S3-compatible object storage for recordings and the CDR archive |
 | [ngrok](https://ngrok.com) | Webhook tunneling for local development |
 | [Grafana Loki](https://grafana.com/oss/loki/) | Log aggregation store (optional, `logs` profile) |
 | [Grafana](https://grafana.com) | Log viewer at `/logs/` (optional, `logs` profile) |
@@ -286,26 +286,23 @@ sequenceDiagram
    cd opbx.cloudonix.com
    ```
 
-2. **Copy configuration files**
+2. **Prepare the configuration (before the first start)**
    ```bash
-   cp docker-compose.yml.example docker-compose.yml
-   cp .env.example .env
+   ./opbx_bootstrap.sh
    ```
-   > The `docker-compose.yml` file is ignored by git so you can customize it for your environment without affecting the repository.
+   The script creates `docker-compose.yml` (git-ignored, from `docker-compose.yml.example`) and `.env` (from `.env.example`),
+   generates `APP_KEY` and fills in the shared secrets (worker API tokens, Pusher/Soketi secret, Grafana, S3 keys) with
+   `docker/scripts/generate-secrets.sh`. The containers refuse to start with a missing `APP_KEY` or placeholder secrets.
 
-   Edit `.env` with your settings:
+   Then edit `.env` and set the values the script cannot choose for you. Use strong random passwords; `secret`,
+   `rootsecret`, `password`, `minioadmin` and `admin` are rejected at startup:
    ```env
-   # ngrok (for local development)
-   NGROK_AUTHTOKEN=your_ngrok_authtoken_here
-   
-   # Redis password (recommended for production)
-   REDIS_PASSWORD=your_redis_password
-   
-   # MySQL
-   DB_ROOT_PASSWORD=rootsecret
+   NGROK_AUTHTOKEN=your_ngrok_authtoken_here   # local development only
    DB_DATABASE=opbx
    DB_USERNAME=opbx
-   DB_PASSWORD=secret
+   DB_PASSWORD=...        # openssl rand -base64 32
+   DB_ROOT_PASSWORD=...   # openssl rand -base64 32
+   REDIS_PASSWORD=...     # openssl rand -base64 32
    ```
 
 3. **Start all services**
@@ -313,21 +310,20 @@ sequenceDiagram
    docker compose up -d
    ```
 
-4. **Initialize the application**
+4. **Initialize the database**
    ```bash
-   docker compose exec app php artisan key:generate
    docker compose exec app php artisan migrate --seed
    ```
 
 5. **Access the application**
    - **Frontend**: http://localhost:3000
    - **API**: http://localhost/api/v1
-   - **ngrok Dashboard**: http://localhost:4040
-   - **MinIO Console**: http://localhost:9001
+   - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
+   - **SeaweedFS master UI**: http://localhost:9333 (requires `-f docker-compose.ports.yml`)
 
 ### ⚠️ Database Persistence
 
-MySQL data is stored in a Docker named volume (`mysql_data`) that **survives container restarts and recreation**. However, it **will be deleted** if you run:
+MySQL data is stored in the host bind mount `./volumes/mysql` that **survives container restarts and recreation**. However, it **will be deleted** if you run:
 
 ```bash
 # NEVER run this unless you want to erase all data!
@@ -342,6 +338,25 @@ docker compose down -v
 # Restore from backup (if needed)
 ./scripts/restore-database.sh backups/opbx-daily.sql.gz
 ```
+
+### Database Backups
+
+`./scripts/backup-database.sh` dumps the MySQL database (via `mysqldump` inside the container) to `./backups/` on the **host** filesystem. Every backup is verified to contain a valid dump.
+
+```bash
+./scripts/backup-database.sh           # Timestamped backup (keeps last 10)
+./scripts/backup-database.sh daily     # Rotating daily backup (overwrites)
+./scripts/backup-database.sh weekly    # Rotating weekly backup (overwrites)
+./scripts/backup-database.sh pre-test  # Safety backup (runs automatically before ./run-tests.sh)
+```
+
+**Scheduling (production):** trigger backups from the **host**, not a container — a broken stack must not stop your backups. Example cron entry:
+
+```cron
+0 3 * * * cd /path/to/opbx && ./scripts/backup-database.sh daily >> /var/log/opbx-backup.log 2>&1
+```
+
+Backups in `./backups/` live on the same disk as the database — copy them off-box (rsync/rclone/S3) for real disaster protection.
 
 See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full details.
 
@@ -358,11 +373,11 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `amd-worker` | Java/Vert.x AMD worker | - |
 | `acd-worker` | Java/Vert.x call queue worker | 8084 |
 | `mcp-server` | MCP server for AI agents ([docs](mcp-server/README.md)) | 8080 |
-| `mysql` | MySQL 8.0 database | 3306 |
+| `mysql` | MySQL 8.4 LTS database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
-| `minio` | S3-compatible storage | 9000, 9001 |
+| `seaweedfs` | S3-compatible storage (SeaweedFS) | 8333, 9333 (loopback, opt-in) |
 | `soketi` | WebSocket server | 6001 |
-| `ngrok` | Webhook tunnel | 4040 |
+| `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |
 | `alloy` | Log collector — *profile `logs`* | - |
 | `grafana` | Log viewer via nginx at `/logs/` — *profile `logs`* | - |
@@ -391,6 +406,7 @@ See `.env.example` for all available configuration options. Key variables:
 | `NGROK_AUTHTOKEN` | ngrok authentication token |
 | `LOG_STACK_ENABLED` | Enable centralized logging (use with `--profile logs`) |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the log viewer |
+| `GRAFANA_ROOT_URL` | Public URL of the log viewer (`<APP_URL>/logs/`); must match or Grafana 403s queries |
 | `LOKI_RETENTION_HOURS` | Log retention (default 168 = 7 days) |
 
 ### Cloudonix Webhook Configuration
@@ -426,8 +442,10 @@ Webhooks are configured per-organization in **Settings → Cloudonix** in the ad
 
 **Health Check Endpoint:**
 ```bash
-curl http://localhost/health
+curl http://localhost/api/health
 ```
+
+**Platform Status:** platform managers see every component's health, with a 24-hour history, at `/ui/platform/status`. The public status page at `/status` shows coarse group health without login. See the [user guide](docs/opbx-userguide/administration/platform-management.mdx).
 
 **Application Logs:**
 ```bash
@@ -436,12 +454,15 @@ docker compose logs -f app
 
 **Centralized Logs (optional):**
 ```bash
-# .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>
+# .env: LOG_STACK_ENABLED=true, GRAFANA_ADMIN_PASSWORD=<password>, GRAFANA_ROOT_URL=<APP_URL>/logs/
 docker compose --profile logs up -d
-# Open http://localhost/logs/ — "OPBX Logs" dashboard has Platform and
-# Call Flow views; search a Cloudonix session token for a per-call audit trail.
+# Open http://localhost/logs/ — provisioned dashboards "OPBX Call Flow Logs"
+# (session-token audit trail) and "OPBX Platform Logs", both with text
+# search and click-to-inspect detail view.
 ```
-See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details.
+See [docs/LOG-AGGREGATION.md](docs/LOG-AGGREGATION.md) for details, or
+[SUBMITTING_LOGS.md](SUBMITTING_LOGS.md) for the end-user guide (setup,
+dashboards, session-token filtering, exporting logs for bug reports).
 
 **Queue Monitoring:**
 ```bash
@@ -718,7 +739,7 @@ We welcome contributions from the community! Here's how to get started:
 
 ### Pull Request Process
 
-1. Ensure all tests pass: `docker compose exec app php artisan test`
+1. Ensure all tests pass: `./run-tests.sh` (never run `php artisan test` directly in the container — it must go through `run-tests.sh`, which targets the `opbx_test` database and takes a pre-test backup)
 2. Run code quality checks: `vendor/bin/pint` and frontend linting
 3. Update `CHANGELOG.md` with your changes
 4. Open a PR with a clear description of changes

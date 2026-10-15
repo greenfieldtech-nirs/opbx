@@ -8,7 +8,7 @@ use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
 use App\Models\Extension;
 use App\Models\Organization;
-use Illuminate\Support\Facades\DB;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -26,9 +26,9 @@ class CloudonixSubscriberService
      * Creates a new subscriber if not already synced, or updates if already exists.
      * Only syncs USER type extensions.
      *
-     * @param Extension $extension The extension to sync
-     * @param bool $forceUpdate Force update even if already synced
-     * @return array{success: bool, error?: string, details?: array} Sync result with error details
+     * @param  Extension  $extension  The extension to sync
+     * @param  bool  $forceUpdate  Force update even if already synced
+     * @return array{success: bool, skipped?: bool, error?: string, details?: array} Sync result with error details
      */
     public function syncToCloudnonix(Extension $extension, bool $forceUpdate = false): array
     {
@@ -40,16 +40,16 @@ class CloudonixSubscriberService
                 'type' => $extension->type->value,
             ]);
 
-            return ['success' => true]; // Not an error, just not applicable
+            return ['success' => true, 'skipped' => true]; // Not an error, just not applicable
         }
 
         try {
             // Load organization with Cloudonix settings
             $organization = $extension->organization()->with('cloudonixSettings')->first();
 
-            if (!$organization || !$organization->cloudonixSettings) {
+            if (! $organization || ! $organization->cloudonixSettings) {
                 $error = 'Organization has no Cloudonix settings configured';
-                Log::warning('Cannot sync extension: ' . $error, [
+                Log::warning('Cannot sync extension: '.$error, [
                     'extension_id' => $extension->id,
                     'organization_id' => $extension->organization_id,
                 ]);
@@ -66,9 +66,9 @@ class CloudonixSubscriberService
 
             $settings = $organization->cloudonixSettings;
 
-            if (!$settings->isConfigured()) {
+            if (! $settings->isConfigured()) {
                 $error = 'Cloudonix settings are not fully configured (missing domain_uuid or domain_api_key)';
-                Log::warning('Cannot sync extension: ' . $error, [
+                Log::warning('Cannot sync extension: '.$error, [
                     'extension_id' => $extension->id,
                     'organization_id' => $extension->organization_id,
                 ]);
@@ -78,8 +78,8 @@ class CloudonixSubscriberService
                     'error' => $error,
                     'details' => [
                         'reason' => 'incomplete_settings',
-                        'has_domain_uuid' => !empty($settings->domain_uuid),
-                        'has_domain_api_key' => !empty($settings->domain_api_key),
+                        'has_domain_uuid' => ! empty($settings->domain_uuid),
+                        'has_domain_api_key' => ! empty($settings->domain_api_key),
                     ],
                 ];
             }
@@ -88,7 +88,7 @@ class CloudonixSubscriberService
             $client = new CloudonixClient($settings);
 
             // Determine if we're creating or updating
-            if (empty($extension->cloudonix_subscriber_id) || !$extension->cloudonix_synced) {
+            if (empty($extension->cloudonix_subscriber_id) || ! $extension->cloudonix_synced) {
                 // Create new subscriber
                 return $this->createSubscriber($client, $extension);
             } elseif ($forceUpdate) {
@@ -112,7 +112,7 @@ class CloudonixSubscriberService
 
             return [
                 'success' => false,
-                'error' => 'Exception occurred: ' . $e->getMessage(),
+                'error' => 'Exception occurred: '.$e->getMessage(),
                 'details' => [
                     'reason' => 'exception',
                     'exception_class' => get_class($e),
@@ -124,8 +124,6 @@ class CloudonixSubscriberService
     /**
      * Create a new subscriber in Cloudonix.
      *
-     * @param CloudonixClient $client
-     * @param Extension $extension
      * @return array{success: bool, error?: string, details?: array}
      */
     private function createSubscriber(CloudonixClient $client, Extension $extension): array
@@ -175,8 +173,6 @@ class CloudonixSubscriberService
     /**
      * Update an existing subscriber in Cloudonix.
      *
-     * @param CloudonixClient $client
-     * @param Extension $extension
      * @return array{success: bool, error?: string, details?: array}
      */
     private function updateSubscriber(CloudonixClient $client, Extension $extension): array
@@ -245,13 +241,13 @@ class CloudonixSubscriberService
      *
      * Deletes the subscriber from Cloudonix and clears sync data from the extension.
      *
-     * @param Extension $extension The extension to unsync
+     * @param  Extension  $extension  The extension to unsync
      * @return bool True on success, false on failure
      */
     public function unsyncFromCloudonix(Extension $extension): bool
     {
         // If not synced, nothing to do
-        if (empty($extension->cloudonix_subscriber_id) || !$extension->cloudonix_synced) {
+        if (empty($extension->cloudonix_subscriber_id) || ! $extension->cloudonix_synced) {
             Log::debug('Extension not synced to Cloudonix, nothing to unsync', [
                 'extension_id' => $extension->id,
             ]);
@@ -263,7 +259,7 @@ class CloudonixSubscriberService
             // Load organization with Cloudonix settings
             $organization = $extension->organization()->with('cloudonixSettings')->first();
 
-            if (!$organization || !$organization->cloudonixSettings) {
+            if (! $organization || ! $organization->cloudonixSettings) {
                 Log::warning('Cannot unsync extension: organization has no Cloudonix settings', [
                     'extension_id' => $extension->id,
                     'organization_id' => $extension->organization_id,
@@ -277,7 +273,7 @@ class CloudonixSubscriberService
 
             $settings = $organization->cloudonixSettings;
 
-            if (!$settings->isConfigured()) {
+            if (! $settings->isConfigured()) {
                 Log::warning('Cannot unsync extension: Cloudonix settings not configured', [
                     'extension_id' => $extension->id,
                     'organization_id' => $extension->organization_id,
@@ -295,7 +291,7 @@ class CloudonixSubscriberService
             // Delete subscriber from Cloudonix
             $success = $client->deleteSubscriber($extension->cloudonix_subscriber_id);
 
-            if (!$success) {
+            if (! $success) {
                 Log::error('Failed to delete Cloudonix subscriber', [
                     'extension_id' => $extension->id,
                     'subscriber_id' => $extension->cloudonix_subscriber_id,
@@ -331,9 +327,6 @@ class CloudonixSubscriberService
 
     /**
      * Clear Cloudonix sync data from an extension.
-     *
-     * @param Extension $extension
-     * @return void
      */
     private function clearSyncData(Extension $extension): void
     {
@@ -347,8 +340,7 @@ class CloudonixSubscriberService
     /**
      * Bulk sync multiple extensions to Cloudonix.
      *
-     * @param Organization $organization
-     * @param bool $forceUpdate Force update even if already synced
+     * @param  bool  $forceUpdate  Force update even if already synced
      * @return array{success: int, failed: int, skipped: int}
      */
     public function bulkSync(Organization $organization, bool $forceUpdate = false): array
@@ -363,19 +355,22 @@ class CloudonixSubscriberService
         $query = Extension::where('organization_id', $organization->id)
             ->where('type', ExtensionType::USER->value);
 
-        if (!$forceUpdate) {
+        if (! $forceUpdate) {
             // Only sync extensions that haven't been synced yet
             $query->where('cloudonix_synced', false);
         }
 
-        $extensions = $query->get();
+        // The org filter above is the tenant filter; the scope has no user in console.
+        $extensions = OrganizationScope::bypass(fn () => $query->get());
 
         foreach ($extensions as $extension) {
-            if ($this->syncToCloudnonix($extension, $forceUpdate)) {
-                $stats['success']++;
-            } else {
-                $stats['failed']++;
-            }
+            $result = $this->syncToCloudnonix($extension, $forceUpdate);
+
+            match (true) {
+                ! empty($result['skipped']) => $stats['skipped']++,
+                ! empty($result['success']) => $stats['success']++,
+                default => $stats['failed']++,
+            };
         }
 
         Log::info('Bulk sync completed', [
@@ -389,14 +384,13 @@ class CloudonixSubscriberService
     /**
      * Compare local extensions with Cloudonix subscribers.
      *
-     * @param Organization $organization
      * @return array{needs_sync: bool, local_only: int, cloudonix_only: int, synced: int}
      */
     public function compareWithCloudonix(Organization $organization): array
     {
         $settings = $organization->cloudonixSettings;
 
-        if (!$settings || !$settings->isConfigured()) {
+        if (! $settings || ! $settings->isConfigured()) {
             return [
                 'needs_sync' => false,
                 'local_only' => 0,
@@ -445,7 +439,7 @@ class CloudonixSubscriberService
 
             // Check local extensions not in Cloudonix
             foreach ($localByMsisdn as $msisdn => $ext) {
-                if (!isset($cloudonixByMsisdn[$msisdn])) {
+                if (! isset($cloudonixByMsisdn[$msisdn])) {
                     $localOnly++;
                 } else {
                     $synced++;
@@ -454,7 +448,7 @@ class CloudonixSubscriberService
 
             // Check Cloudonix subscribers not in local
             foreach ($cloudonixByMsisdn as $msisdn => $sub) {
-                if (!isset($localByMsisdn[$msisdn])) {
+                if (! isset($localByMsisdn[$msisdn])) {
                     $cloudonixOnly++;
                 }
             }
@@ -486,7 +480,7 @@ class CloudonixSubscriberService
                 'local_only' => 0,
                 'cloudonix_only' => 0,
                 'synced' => 0,
-                'error' => 'Exception: ' . $e->getMessage(),
+                'error' => 'Exception: '.$e->getMessage(),
             ];
         }
     }
@@ -496,14 +490,13 @@ class CloudonixSubscriberService
      *
      * First syncs local → Cloudonix, then Cloudonix → local.
      *
-     * @param Organization $organization
      * @return array{success: bool, to_cloudonix: array, from_cloudonix: array, error?: string}
      */
     public function bidirectionalSync(Organization $organization): array
     {
         $settings = $organization->cloudonixSettings;
 
-        if (!$settings || !$settings->isConfigured()) {
+        if (! $settings || ! $settings->isConfigured()) {
             return [
                 'success' => false,
                 'error' => 'Cloudonix settings not configured',
@@ -548,7 +541,7 @@ class CloudonixSubscriberService
             $toCloudonixFailed = 0;
 
             foreach ($localExtensions as $ext) {
-                if (!isset($cloudonixByMsisdn[$ext->extension_number])) {
+                if (! isset($cloudonixByMsisdn[$ext->extension_number])) {
                     // Extension exists locally but not in Cloudonix
                     $result = $this->syncToCloudnonix($ext);
 
@@ -565,7 +558,7 @@ class CloudonixSubscriberService
             $fromCloudonixFailed = 0;
 
             foreach ($cloudonixSubscribers as $subscriber) {
-                if (!isset($localByMsisdn[$subscriber['msisdn']])) {
+                if (! isset($localByMsisdn[$subscriber['msisdn']])) {
                     // Subscriber exists in Cloudonix but not locally
 
                     // Skip subscribers with MSISDN longer than 5 characters (phone numbers vs extensions)
@@ -576,6 +569,7 @@ class CloudonixSubscriberService
                             'subscriber_id' => $subscriber['id'],
                             'reason' => 'MSISDN exceeds 5 characters - appears to be a phone number, not an extension',
                         ]);
+
                         continue;
                     }
 
@@ -691,7 +685,7 @@ class CloudonixSubscriberService
 
             return [
                 'success' => false,
-                'error' => 'Exception: ' . $e->getMessage(),
+                'error' => 'Exception: '.$e->getMessage(),
                 'to_cloudonix' => ['created' => 0, 'failed' => 0],
                 'from_cloudonix' => ['created' => 0, 'failed' => 0],
             ];

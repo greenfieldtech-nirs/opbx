@@ -159,18 +159,15 @@ class RecordingsControllerTest extends TestCase
     }
 
     /**
-     * Test agents can view recordings (read-only).
+     * PBX users may not list recordings (D13: Owner, PBX Admin, Reporter only).
      */
-    public function test_agents_can_view_recordings(): void
+    public function test_pbx_users_cannot_view_recordings(): void
     {
         Sanctum::actingAs($this->agent);
 
         Recording::factory()->create(['organization_id' => $this->organization->id]);
 
-        $response = $this->getJson('/api/v1/recordings');
-
-        $response->assertStatus(200)
-            ->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/recordings')->assertStatus(403);
     }
 
     /**

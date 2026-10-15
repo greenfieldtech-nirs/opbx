@@ -365,4 +365,75 @@ class TrunkControllerTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('username');
     }
+
+    /**
+     * @return array<string, mixed> the data of the PUT sent to Cloudonix
+     */
+    private function sentPut(): array
+    {
+        $put = Http::recorded(fn (HttpClientRequest $request): bool => $request->method() === 'PUT')->first();
+        $this->assertNotNull($put, 'No PUT was sent to Cloudonix');
+
+        return $put[0]->data();
+    }
+
+    private function fakeUpdate(): void
+    {
+        Http::fake([
+            $this->trunksUrl.'/101' => Http::sequence()
+                ->push($this->trunkFixture())
+                ->push($this->trunkFixture()),
+        ]);
+    }
+
+    public function test_update_with_empty_prefix_clears_the_prefix(): void
+    {
+        $this->fakeUpdate();
+
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['prefix' => ''])->assertOk();
+
+        $data = $this->sentPut();
+        $this->assertArrayHasKey('prefix', $data);
+        $this->assertEmpty($data['prefix']);
+    }
+
+    public function test_update_without_prefix_key_leaves_prefix_untouched(): void
+    {
+        $this->fakeUpdate();
+
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['port' => 5080])->assertOk();
+
+        $this->assertArrayNotHasKey('prefix', $this->sentPut());
+    }
+
+    public function test_update_with_empty_username_clears_credentials(): void
+    {
+        $this->fakeUpdate();
+
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['username' => ''])->assertOk();
+
+        $auth = $this->sentPut()['profile']['authentication'] ?? null;
+        $this->assertSame(['username' => '', 'password' => ''], $auth);
+    }
+
+    public function test_update_without_username_key_leaves_credentials_untouched(): void
+    {
+        $this->fakeUpdate();
+
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['port' => 5080])->assertOk();
+
+        $this->assertArrayNotHasKey('profile', $this->sentPut());
+    }
+
+    public function test_update_with_empty_username_and_a_password_returns_422(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $this->putJson('/api/v1/trunks/101', ['username' => '', 'password' => 'secret'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('username');
+    }
 }

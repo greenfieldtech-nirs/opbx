@@ -5,13 +5,17 @@ paths:
         - Users
       summary: Invite a new user
       description: |
-        Invite a new user to the organization by email. An invitation email
-        is sent with a magic-link token. The invited user must authenticate
-        via Auth0 to activate their account.
+        Invite a new user to the organization by email. Owner and PBX Admin only. The
+        email is lower-cased. A `pending` PBX User named after the email's local part is
+        created and an invitation email with a magic-link token (valid 24 hours) is sent.
+        The invited user must authenticate via Auth0 to activate their account. Inviting an
+        email that already belongs to a `pending` user of the organization re-sends the
+        invitation with a new token. At most 10 invitations per organization per hour.
       operationId: inviteUser
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: users:write
       requestBody:
         required: true
         content:
@@ -38,11 +42,13 @@ paths:
                 data:
                   id: 124
                   organization_id: 1
-                  name: Jane Smith
+                  name: jane.smith
                   email: jane.smith@example.com
                   role: pbx_user
-                  status: inactive
+                  status: pending
+                  phone: null
                   is_platform_manager: false
+                  social_identities: []
                   created_at: '2024-01-15T10:30:00Z'
                   updated_at: '2024-01-15T10:30:00Z'
                 invite_sent: true
@@ -51,12 +57,15 @@ paths:
         '403':
           $ref: '../../components/responses/Forbidden.yaml'
         '422':
-          description: Validation error or user already exists
+          description: >-
+            Validation error, or a non-pending user with this email already exists in the
+            organization (`USER_ALREADY_EXISTS`). An email that belongs to a user of another
+            organization is a validation error on `email` ("The email has already been taken.")
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '../../components/responses/ValidationError.yaml'
+                anyOf:
+                  - $ref: '../../components/schemas/ValidationError.yaml'
                   - $ref: '../../components/schemas/Error.yaml'
               examples:
                 userAlreadyExists:
@@ -64,9 +73,9 @@ paths:
                   value:
                     error:
                       code: USER_ALREADY_EXISTS
-                      message: A user with this email already exists.
+                      message: A user with this email already exists in the organization.
         '429':
-          description: Invitation rate limited
+          description: More than 10 invitations from this organization in the last hour
           content:
             application/json:
               schema:
@@ -74,7 +83,7 @@ paths:
               example:
                 error:
                   code: INVITE_RATE_LIMITED
-                  message: Too many invitations sent to this email.
+                  message: Invitation rate limit exceeded for this organization.
         '503':
           description: Auth0 is not configured
           content:
@@ -92,7 +101,8 @@ paths:
       summary: Validate invitation token
       description: |
         Validate an invitation token without consuming it. Returns the email
-        and organization name associated with the invitation.
+        and organization name associated with the invitation. Public; rate limited to
+        5 requests per minute per IP.
       operationId: validateInvitationToken
       security: []
       parameters:
@@ -147,14 +157,25 @@ paths:
                 error:
                   code: INVITE_EXPIRED_OR_INVALID
                   message: Invitation is invalid or has expired.
+        '429':
+          description: Too many attempts (5 requests per minute per IP)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Too Many Requests
+                message: Too many login attempts. Please try again later.
+                retry_after: 60
   /v1/users/invite/accept:
     post:
       tags:
         - Users
       summary: Accept invitation and start Auth0 binding
       description: |
-        Consume an invitation token and return an Auth0 authorize URL for the
-        invited user to authenticate and bind their social identity.
+        Consume an invitation token (single use) and return an Auth0 authorize URL for the
+        invited user to authenticate and bind their social identity. Public; rate limited
+        to 5 requests per minute per IP.
       operationId: acceptInvitation
       security: []
       requestBody:
@@ -206,7 +227,7 @@ paths:
                   code: INVITE_EXPIRED_OR_INVALID
                   message: Invitation is invalid or has expired.
         '503':
-          description: Auth0 is not configured
+          description: Auth0 is not configured (or has no provider)
           content:
             application/json:
               schema:
@@ -215,3 +236,13 @@ paths:
                 error:
                   code: AUTH0_NOT_CONFIGURED
                   message: Auth0 is not enabled.
+        '429':
+          description: Too many attempts (5 requests per minute per IP)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Too Many Requests
+                message: Too many login attempts. Please try again later.
+                retry_after: 60

@@ -168,6 +168,7 @@ final class SupervisorDashboardTest extends TestCase
         CallDetailRecord::factory()->create([
             'organization_id' => $org->id,
             'session_id' => 800001,
+            'direction' => 'outgoing',
             'from' => '1006',
             'subscriber' => 'dash-recent-uuid',
         ]);

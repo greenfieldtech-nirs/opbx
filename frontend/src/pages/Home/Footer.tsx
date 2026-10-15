@@ -54,6 +54,11 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <Link to="/status" className="hover:text-foreground transition-colors">
+                  Platform Status
+                </Link>
+              </li>
+              <li>
                 <a
                   href="https://github.com/greenfieldtech-nirs/OPBX"
                   target="_blank"

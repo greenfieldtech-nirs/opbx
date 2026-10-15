@@ -260,7 +260,7 @@ final class WebPhoneConfigControllerTest extends TestCase
         $response->assertStatus(404);
     }
 
-    public function test_owner_without_cloudonix_settings_gets_404(): void
+    public function test_owner_without_cloudonix_settings_gets_409_cloudonix_not_configured(): void
     {
         $owner = $this->createUser(UserRole::OWNER);
         Extension::create([
@@ -272,13 +272,14 @@ final class WebPhoneConfigControllerTest extends TestCase
             'status' => 'active',
         ]);
 
-        CloudonixSettings::where('organization_id', $this->organization->id)->delete();
+        CloudonixSettings::withoutGlobalScopes()->where('organization_id', $this->organization->id)->delete();
 
         Sanctum::actingAs($owner);
 
         $response = $this->getJson('/api/v1/webphone/config');
 
-        $response->assertStatus(404)
+        $response->assertStatus(409)
+            ->assertJsonPath('error', 'cloudonix_not_configured')
             ->assertJsonPath('message', 'Cloudonix settings are not configured for this organization.');
     }
 }

@@ -52,7 +52,18 @@ fi
 REQUIRED_VARS=(
     "DB_PASSWORD"
     "APP_KEY"
+    "PUSHER_APP_SECRET"
+    "DIALER_WORKER_API_TOKEN"
+    "AMD_WORKER_API_TOKEN"
+    "ACD_WORKER_API_TOKEN"
 )
+
+# Grafana only runs with the optional `logs` compose profile: require its admin
+# password only when the log stack is in use (LOG_STACK_ENABLED=true in .env, or
+# "logs" in COMPOSE_PROFILES).
+if [[ "${LOG_STACK_ENABLED:-false}" == "true" ]] || [[ ",${COMPOSE_PROFILES:-}," == *",logs,"* ]]; then
+    REQUIRED_VARS+=("GRAFANA_ADMIN_PASSWORD")
+fi
 
 # Track validation status
 VALIDATION_FAILED=0
@@ -63,7 +74,7 @@ check_placeholder() {
     local var_value="${!var_name:-}"
 
     # Check for common placeholder values
-    local placeholders=("CHANGE_ME" "GENERATE_32_CHAR" "64_CHAR_SECRET" "default123" "password" "secret")
+    local placeholders=("CHANGE_ME" "GENERATE_32_CHAR" "64_CHAR_SECRET" "default123" "password" "secret" "change-in-production" "pbxappsecret")
 
     for placeholder in "${placeholders[@]}"; do
         if [[ "$var_value" == *"$placeholder"* ]]; then
@@ -73,6 +84,13 @@ check_placeholder() {
             return 1
         fi
     done
+
+    # Exact-match defaults (too short to substring-match safely)
+    if [[ "$var_value" == "admin" ]]; then
+        echo -e "${RED}✗ CRITICAL: ${var_name} is set to the default value 'admin'${NC}"
+        VALIDATION_FAILED=1
+        return 1
+    fi
 
     # Check for empty values
     if [[ -z "$var_value" ]]; then

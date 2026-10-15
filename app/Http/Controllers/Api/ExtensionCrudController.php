@@ -28,6 +28,8 @@ class ExtensionCrudController extends AbstractApiCrudController
 {
     use ApiRequestHandler, AppliesFilters;
 
+    private ?ExtensionType $typeBeforeUpdate = null;
+
     /**
      * Constructor.
      */
@@ -257,6 +259,9 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
+        // Remember the type before update() syncs it into getOriginal()
+        $this->typeBeforeUpdate = $extension->type;
+
         // Check if type is being changed
         if (isset($validated['type'])) {
             $newType = ExtensionType::from($validated['type']);
@@ -317,12 +322,11 @@ class ExtensionCrudController extends AbstractApiCrudController
         /** @var Extension $extension */
         $extension = $model;
 
-        // Get the original type before update
-        $originalType = $extension->getOriginal('type');
+        $originalType = $this->typeBeforeUpdate?->value;
         $currentType = $extension->type;
 
         // Type changed TO USER - sync to Cloudonix
-        if ($currentType === ExtensionType::USER && $originalType !== ExtensionType::USER->value) {
+        if ($currentType === ExtensionType::USER && $originalType !== null && $originalType !== ExtensionType::USER->value) {
             $syncResult = $this->subscriberService->syncToCloudnonix($extension);
 
             if ($syncResult['success']) {
@@ -397,6 +401,8 @@ class ExtensionCrudController extends AbstractApiCrudController
     {
         /** @var Extension $extension */
         $extension = $model;
+
+        $this->checkResourceReferencesBeforeDelete('extension', $extension->id, $extension->organization_id);
 
         // Unsync from Cloudonix if USER type extension
         if ($extension->type === ExtensionType::USER) {

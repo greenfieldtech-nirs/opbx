@@ -1,30 +1,73 @@
 type: object
-description: Inbound Blacklist entry
+description: Inbound Blacklist entry (serialized model)
 properties:
   id:
     type: integer
   organization_id:
     type: integer
-  phone_number:
-    type: string
-    example: '+1234567890'
   match_type:
     type: string
     enum:
     - exact
     - prefix
-    - pattern
+    - wildcard
     example: exact
+  caller_id_pattern:
+    type: string
+    example: '+1234567890'
   description:
     type:
     - string
     - 'null'
-    example: Spam caller
+    description: Not settable through the API
+  is_global:
+    type: boolean
+    description: Applies to all DIDs when true; otherwise only to `did_numbers`
+  rejection_strategy:
+    type: string
+    enum:
+    - drop
+    - reject
+    - torment
+  torment_room_prefix:
+    type:
+    - string
+    - 'null'
+    description: Random 16-character prefix generated when `rejection_strategy` is set to `torment`
+  torment_music_timeout:
+    type: integer
+    description: Seconds a tormented caller is held. 600 when set to `torment` through the API; database default 300.
   status:
     type: string
     enum:
     - active
     - inactive
+  expires_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: Not settable through the API
+  blocked_count:
+    type: integer
+    description: Number of calls this entry has blocked
+  did_numbers:
+    type: array
+    description: DIDs the entry applies to (DID-specific entries)
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        phone_number:
+          type: string
+        friendly_name:
+          type:
+          - string
+          - 'null'
+        pivot:
+          type: object
+          description: Join-table row (`inbound_blacklist_id`, `did_number_id`, `created_at`, `updated_at`)
   created_at:
     type: string
     format: date-time
@@ -34,6 +77,6 @@ properties:
 required:
 - id
 - organization_id
-- phone_number
+- caller_id_pattern
 - match_type
 - status

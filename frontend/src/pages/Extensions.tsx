@@ -9,107 +9,71 @@
  * - Role-based UI (Owner/PBX Admin/PBX User/Reporter)
  */
 
-import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { EXTENSION_BADGE_CONFIG, labelForRoutingType } from '@/components/destinations/utils/destination-config';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useState,useMemo,useEffect } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { extensionsService } from '@/services/extensions.service';
-import { usersService, conferenceRoomsService, ringGroupsService, ivrMenusService, aiAssistantLoadBalancersService, phoneNumbersService } from '@/services/createResourceService';
+import { conferenceRoomsService,ringGroupsService,ivrMenusService,phoneNumbersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
-import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
-import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  Plus,
-  Search,
-  X,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Phone,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  UserCheck,
-  UserX,
-  Users,
-  Menu,
-  Bot,
-  ArrowRight,
-  Check,
-  Activity,
-  RefreshCw,
-  Key,
-  Wifi,
-  Scale,
-  ListOrdered,
+Plus,
+KeyRound,
+Search,
+X,Phone,
+Copy,
+Eye,
+EyeOff,
+UserCheck,Users,
+Menu,
+Bot,
+ArrowRight,RefreshCw,Scale,
+ListOrdered
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { formatDate, formatTimeAgo, getStatusColor } from '@/utils/formatters';
+import { getStatusColor } from '@/utils/formatters';
 import logger from '@/utils/logger';
+import { canActOnRole } from '@/utils/roleHelpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,
+Column,
+EmptyState
 } from '@/components/design-system';
 import type {
-  Extension,
-  ExtensionType,
-  Status,
-  CreateExtensionRequest,
-  UpdateExtensionRequest,
-  RingGroupMember,
-  IvrMenuOption,
-  DIDNumber
+Extension,
+ExtensionType,
+Status,
+CreateExtensionRequest,
+UpdateExtensionRequest,DIDNumber
 } from '@/types';
-import type { ProviderDefinition } from '@/types/aiAssistant';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 // Sort direction type
 type SortDirection = 'asc' | 'desc' | null;
@@ -162,10 +126,10 @@ export default function ExtensionsComplete() {
   const [sortField, setSortField] = useState<SortField>('extension_number');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   // Sync state
-  const [syncComparison, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: Record<string, unknown>; from_cloudonix: Record<string, unknown> } | null>(null);
+  const [, setSyncComparison] = useState<{ needs_sync: boolean; to_cloudonix: Record<string, unknown>; from_cloudonix: Record<string, unknown> } | null>(null);
   const [isSyncNeeded, setIsSyncNeeded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -196,8 +160,8 @@ export default function ExtensionsComplete() {
   }, []);
 
   // Fetch extensions
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['extensions', {
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: [...queryKeys.extensions.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -221,20 +185,12 @@ export default function ExtensionsComplete() {
   const totalExtensions = data?.meta?.total || 0;
   const totalPages = data?.meta?.last_page || 1;
 
-  // Fetch users for assignment dropdown
-  const { data: usersData } = useQuery({
-    queryKey: ['users', { per_page: 100 }],
-    queryFn: () => usersService.getAll({ per_page: 100 }),
-  });
-
-  const users = usersData?.data || [];
 
   // Dialog state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
-  const [showExtensionDetail, setShowExtensionDetail] = useState(false);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
@@ -268,7 +224,7 @@ export default function ExtensionsComplete() {
 
   // Fetch conference rooms for table display
   const { data: conferenceRoomsData } = useQuery({
-    queryKey: ['conference-rooms', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.conferenceRooms.all, { per_page: 100, status: 'active' }],
     queryFn: () => conferenceRoomsService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -276,7 +232,7 @@ export default function ExtensionsComplete() {
 
   // Fetch call queues for table display
   const { data: callQueuesData } = useQuery({
-    queryKey: ['call-queues', { per_page: 100, status: 'active' }],
+    queryKey: queryKeys.callQueues.list({ per_page: 100, status: 'active' }),
     queryFn: () => callQueuesService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -284,7 +240,7 @@ export default function ExtensionsComplete() {
 
   // Fetch ring groups for table display
   const { data: ringGroupsData } = useQuery({
-    queryKey: ['ring-groups', { per_page: 100, status: 'active' }],
+    queryKey: [...queryKeys.ringGroups.all, { per_page: 100, status: 'active' }],
     queryFn: () => ringGroupsService.getAll({ per_page: 100, status: 'active' }),
   });
 
@@ -295,40 +251,19 @@ export default function ExtensionsComplete() {
 
   // Fetch IVR menus for table display
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { per_page: 100, status: 'active' }],
+    queryKey: queryKeys.ivrMenus.list({ per_page: 100, status: 'active' }),
     queryFn: () => ivrMenusService.getAll({ per_page: 100, status: 'active' }),
   });
 
   const ivrMenus = ivrMenusData?.data || [];
 
-  // Fetch AI Assistants for dropdown
-  const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { per_page: 100, status: 'active' }],
-    queryFn: () => aiAssistantsService.getAll({ page: 1, per_page: 100, status: 'active' }),
-  });
 
-  const aiAssistants = aiAssistantsData?.data || [];
 
-  // Fetch AI Load Balancers for dropdown
-  const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', { per_page: 100, status: 'active' }],
-    queryFn: () => aiAssistantLoadBalancersService.getAll({ per_page: 100, status: 'active' }),
-  });
-
-  const aiLoadBalancers = aiLoadBalancersData?.data || [];
-
-  // Fetch AI Assistant providers for detail view
-  const { data: aiProvidersData } = useQuery({
-    queryKey: ['aiAssistantProviders'],
-    queryFn: () => aiAssistantProvidersService.getAll(),
-  });
-
-  const aiProviders = aiProvidersData?.data?.providers || [];
 
   // Fetch active DIDs for Default Caller ID selector
   const { data: didsData } = useQuery({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
-    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids: DIDNumber[] = didsData?.data ?? [];
 
@@ -336,7 +271,7 @@ export default function ExtensionsComplete() {
   const createMutation = useMutation({
     mutationFn: (data: CreateExtensionRequest) => extensionsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension created successfully');
     },
     onError: (error: Error | unknown) => {
@@ -358,7 +293,7 @@ export default function ExtensionsComplete() {
     mutationFn: ({ id, data }: { id: string; data: UpdateExtensionRequest }) =>
       extensionsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension updated successfully');
     },
     onError: (error: Error | unknown) => {
@@ -376,15 +311,19 @@ export default function ExtensionsComplete() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => extensionsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Extension deleted successfully');
     },
     onError: (error: Error | unknown) => {
-      const err = error as { response?: { data?: { error?: { message?: string } } } };
-      const message = err.response?.data?.error?.message || 'Failed to delete extension';
+      if (showIfInUse(error)) return;
+      const err = error as { response?: { data?: { message?: string; error?: { message?: string } | string } } };
+      const data = err.response?.data;
+      const message = data?.message || (typeof data?.error === 'object' ? data.error?.message : undefined) || 'Failed to delete extension';
       toast.error(message);
     },
   });
@@ -393,7 +332,7 @@ export default function ExtensionsComplete() {
   const resetPasswordMutation = useMutation({
     mutationFn: (extensionId: string) => extensionsService.resetPassword(extensionId),
     onSuccess: (data, extensionId) => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.extensions.all });
 
       // Store the new password temporarily for display
       setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
@@ -442,7 +381,7 @@ export default function ExtensionsComplete() {
       toast.loading('Synchronizing extensions with Cloudonix...', { id: 'sync-extensions' });
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['extensions'] });
+      void invalidateRoutingResources(queryClient);
       setIsSyncNeeded(false);
       const toCreated = data.to_cloudonix?.created || 0;
       const fromCreated = data.from_cloudonix?.created || 0;
@@ -468,14 +407,12 @@ export default function ExtensionsComplete() {
 
   // Check user permissions
   const canCreate = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const canEdit = (extension: Extension) => {
-    if (['owner', 'pbx_admin'].includes(currentUser.role)) return true;
-    if (currentUser.role === 'pbx_user' && extension.user_id === currentUser.id) return true;
-    return false;
-  };
-  const canResetPassword = ['owner', 'pbx_admin'].includes(currentUser.role);
-  const canDelete = ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser.role);
+  // An Owner's extension (credentials included) can only be changed by an Owner
+  const canActOnExtension = (ext: Extension) => canActOnRole(currentUser.role, ext.user?.role);
+  // Owner/PBX Admin: any (within role reach); every other role: only their own extension.
+  const canSeePassword = (ext: Extension) =>
+    ext.type === 'user' && (canCreate ? canActOnExtension(ext) : ext.user_id === currentUser.id);
 
   // Client-side assignment filter (backend doesn't expose this yet)
   const displayedExtensions = useMemo(() => {
@@ -517,10 +454,6 @@ export default function ExtensionsComplete() {
   };
 
   // Get sort icon
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortDirection === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
-  };
 
   // Clear all filters
   const clearFilters = () => {
@@ -1003,6 +936,7 @@ export default function ExtensionsComplete() {
         setShowDeleteDialog(false);
         setSelectedExtension(null);
       },
+      onError: () => setShowDeleteDialog(false),
     });
   };
 
@@ -1116,7 +1050,7 @@ export default function ExtensionsComplete() {
     setSelectedExtension(extension);
 
     // Handle configuration parsing
-    let config = extension.configuration;
+    const config = extension.configuration;
     let ivrId: string | null = null;
     if (typeof config === 'object' && config) {
       // Configuration is an object
@@ -1188,7 +1122,7 @@ export default function ExtensionsComplete() {
               <p className="text-muted-foreground mb-4">
                 {error instanceof Error ? error.message : 'An error occurred while loading extensions'}
               </p>
-              <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['extensions'] })}>
+              <Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.extensions.all })}>
                 Try Again
               </Button>
             </div>
@@ -1198,8 +1132,13 @@ export default function ExtensionsComplete() {
     );
   }
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load extensions" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -1350,13 +1289,13 @@ export default function ExtensionsComplete() {
           <StandardDataTable<Extension>
             data={displayedExtensions}
             isLoading={isLoading}
-            onRowClick={canCreate ? openEditDialog : undefined}
+            onRowClick={canCreate ? (ext) => canActOnExtension(ext) && openEditDialog(ext) : undefined}
             identityIcon={Phone}
             identityIconBg="bg-blue-100"
             identityIconColor="text-blue-600"
             getIdentityPrimary={(extension) => extension.extension_number}
-            getIdentitySecondary={(extension) => `${extension.type.replace('_', ' ')} Extension`}
-            onIdentityClick={canCreate ? openEditDialog : undefined}
+            getIdentitySecondary={(extension) => `${EXTENSION_BADGE_CONFIG[extension.type as keyof typeof EXTENSION_BADGE_CONFIG]?.text ?? labelForRoutingType(extension.type)} Extension`}
+            onIdentityClick={canCreate ? (ext) => canActOnExtension(ext) && openEditDialog(ext) : undefined}
             sortField={sortField}
             sortDirection={sortDirection}
             onSort={handleSort}
@@ -1367,11 +1306,12 @@ export default function ExtensionsComplete() {
               setShowDeleteDialog(true);
             }) : undefined}
             canDelete={canCreate}
+            canDeleteItem={canActOnExtension}
             columns={[
-              ...(displayedExtensions.some(ext => ext.type === 'user') && !isReadOnly ? [{
+              ...(displayedExtensions.some(canSeePassword) ? [{
                 header: 'Password',
                 cell: (extension: Extension) => (
-                  extension.type === 'user' ? (
+                  canSeePassword(extension) ? (
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">
                         {visiblePasswords.has(extension.id)
@@ -1414,6 +1354,21 @@ export default function ExtensionsComplete() {
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
+                        {canCreate && canActOnExtension(extension) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedExtension(extension);
+                              setShowResetPasswordDialog(true);
+                            }}
+                            title="Reset password"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1451,7 +1406,7 @@ export default function ExtensionsComplete() {
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isReadOnly) {
+                      if (!isReadOnly && canActOnExtension(extension)) {
                         handleUpdateStatus(extension.id, extension.status === 'active' ? 'inactive' : 'active');
                       }
                     }}
@@ -1778,646 +1733,6 @@ export default function ExtensionsComplete() {
         </DialogContent>
       </Dialog >
 
-      {/* Extension Detail Slide-Over */}
-      < Sheet open={showExtensionDetail} onOpenChange={setShowExtensionDetail} >
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          {selectedExtension && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Phone className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="font-mono text-2xl">
-                      {selectedExtension.extension_number}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      {getTypeBadge(selectedExtension.type)}
-                      <Badge className={cn(getStatusColor(selectedExtension.status))}>
-                        {selectedExtension.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </SheetTitle>
-                <SheetDescription>
-                  Extension details and configuration
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6 mt-6">
-                {/* Assignment Information */}
-                {(selectedExtension.type === 'user' || selectedExtension.type === 'forward') && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Assignment</h3>
-                    {selectedExtension.user_id ? (
-                      <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <UserCheck className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium">
-                            {selectedExtension.user?.name || 'Unknown User'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedExtension.user?.email}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
-                          <UserX className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium">Unassigned</p>
-                          <p className="text-sm text-muted-foreground">
-                            No user assigned to this extension
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Extension Details */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground">Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Extension Number</p>
-                      <p className="font-mono font-semibold text-lg">{selectedExtension.extension_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Type</p>
-                      <div className="mt-1">{getTypeBadge(selectedExtension.type)}</div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Status</p>
-                      <div className="mt-1">
-                        <Badge className={cn(getStatusColor(selectedExtension.status))}>
-                          {selectedExtension.status}
-                        </Badge>
-                      </div>
-                    </div>
-                    {selectedExtension.type === 'user' && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Voicemail</p>
-                        <p className="mt-1">
-                          {selectedExtension.voicemail_enabled ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              <Check className="h-3 w-3 mr-1" />
-                              Enabled
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                              <X className="h-3 w-3 mr-1" />
-                              Disabled
-                            </Badge>
-                          )}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm text-muted-foreground">Created</p>
-                      <p className="text-sm">{formatDate(selectedExtension.created_at)}</p>
-                      <p className="text-xs text-muted-foreground">{formatTimeAgo(selectedExtension.created_at)}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Last Updated</p>
-                      <p className="text-sm">{formatDate(selectedExtension.updated_at)}</p>
-                      <p className="text-xs text-muted-foreground">{formatTimeAgo(selectedExtension.updated_at)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Type-specific configuration display */}
-                {selectedExtension.configuration && selectedExtension.type !== 'user' && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Configuration</h3>
-                    <div className="p-4 bg-muted rounded-lg space-y-2">
-                      {selectedExtension.type === 'conference' && (
-                        <>
-                          {(() => {
-                            const conferenceRoomId = selectedExtension.configuration?.conference_room_id;
-                            const conferenceRoom = conferenceRoomId ? conferenceRooms.find(room => room.id == conferenceRoomId) : null;
-
-                            if (!conferenceRoom) {
-                              return (
-                                <div className="text-sm text-muted-foreground">
-                                  Conference room not found or not configured
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Conference Room:</span>
-                                  <span className="text-sm font-medium">{conferenceRoom.name}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Max Participants:</span>
-                                  <span className="text-sm font-medium">{conferenceRoom.max_participants}</span>
-                                </div>
-                                {conferenceRoom.pin && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">PIN:</span>
-                                    <span className="text-sm font-medium font-mono">{conferenceRoom.pin}</span>
-                                  </div>
-                                )}
-                                {conferenceRoom.pin_required && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">PIN Required:</span>
-                                    <span className="text-sm font-medium">Yes</span>
-                                  </div>
-                                )}
-                                {conferenceRoom.host_pin && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Host PIN:</span>
-                                    <span className="text-sm font-medium font-mono">{conferenceRoom.host_pin}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Recording:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.recording_enabled ? 'Enabled' : 'Disabled'}
-                                  </span>
-                                </div>
-                                {conferenceRoom.recording_enabled && conferenceRoom.recording_auto_start && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Auto-Start Recording:</span>
-                                    <span className="text-sm font-medium">Yes</span>
-                                  </div>
-                                )}
-                                {conferenceRoom.recording_enabled && conferenceRoom.recording_webhook_url && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Recording Webhook:</span>
-                                    <span className="text-sm font-medium font-mono text-xs break-all">{conferenceRoom.recording_webhook_url}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Wait for Host:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.wait_for_host ? 'Yes' : 'No'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Mute on Entry:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.mute_on_entry ? 'Yes' : 'No'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Announce Join/Leave:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.announce_join_leave ? 'Yes' : 'No'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Music on Hold:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.music_on_hold ? 'Yes' : 'No'}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Talk Detection:</span>
-                                  <span className="text-sm font-medium">
-                                    {conferenceRoom.talk_detection_enabled ? 'Enabled' : 'Disabled'}
-                                  </span>
-                                </div>
-                                {conferenceRoom.talk_detection_enabled && conferenceRoom.talk_detection_webhook_url && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Talk Detection Webhook:</span>
-                                    <span className="text-sm font-medium font-mono text-xs break-all">{conferenceRoom.talk_detection_webhook_url}</span>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </>
-                      )}
-                      {selectedExtension.type === 'ring_group' && (
-                        <>
-                          {(() => {
-                            const ringGroupId = selectedExtension.configuration?.ring_group_id;
-                            const ringGroup = ringGroupId ? ringGroups.find(group => group.id == ringGroupId) : null;
-
-                            if (!ringGroup) {
-                              return (
-                                <div className="text-sm text-muted-foreground">
-                                  Ring group not found or not configured
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Ring Group:</span>
-                                  <span className="text-sm font-medium">{ringGroup.name}</span>
-                                </div>
-                                {ringGroup.description && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Description:</span>
-                                    <span className="text-sm font-medium">{ringGroup.description}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Strategy:</span>
-                                  <span className="text-sm font-medium">
-                                    {ringGroup.strategy?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Members:</span>
-                                  <span className="text-sm font-medium">{ringGroup.members?.length || 0}</span>
-                                </div>
-                                {ringGroup.members && ringGroup.members.length > 0 && (
-                                  <div className="space-y-1">
-                                    <span className="text-sm text-muted-foreground">Member Extensions:</span>
-                                    <div className="ml-4 space-y-1">
-                                      {ringGroup.members.map((member: RingGroupMember, index: number) => (
-                                        <div key={member.extension_id || index} className="flex justify-between text-xs">
-                                          <span>{member.extension_number || `Extension ${member.extension_id}`}</span>
-                                          <span className="text-muted-foreground">
-                                            Priority: {member.priority || index + 1}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Timeout:</span>
-                                  <span className="text-sm font-medium">{ringGroup.timeout}s</span>
-                                </div>
-                                {ringGroup.strategy === 'round_robin' && ringGroup.ring_turns && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Ring Turns:</span>
-                                    <span className="text-sm font-medium">{ringGroup.ring_turns}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Fallback Action:</span>
-                                  <span className="text-sm font-medium capitalize">
-                                    {ringGroup.fallback_action?.replace('_', ' ')}
-                                  </span>
-                                </div>
-
-                                {ringGroup.fallback_action === 'extension' && ringGroup.fallback_extension_id && (
-                                  <div className="flex items-center gap-1">
-                                    <ArrowRight className="h-3 w-3" />
-                                    <span>Ext: {ringGroup.fallback_extension_id}</span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Status:</span>
-                                  <Badge className={cn(
-                                    ringGroup.status === 'active'
-                                      ? 'bg-green-100 text-green-800 border-green-200'
-                                      : 'bg-gray-100 text-gray-800 border-gray-200'
-                                  )}>
-                                    {ringGroup.status}
-                                  </Badge>
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </>
-                      )}
-                      {selectedExtension.type === 'ai_assistant' && (() => {
-                        const config = selectedExtension.configuration;
-                        const provider = aiProviders.find((p: ProviderDefinition) => p.key === config?.provider);
-                        const protocol = provider?.protocol || 'sip';
-
-                        return (
-                          <>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">Provider:</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{provider?.name || config?.provider || 'Unknown'}</span>
-                                <Badge variant={protocol === 'websocket' ? 'default' : 'secondary'} className="text-xs">
-                                  {protocol === 'websocket' ? (
-                                    <>
-                                      <Wifi className="h-3 w-3 mr-1" />
-                                      WebSocket
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Phone className="h-3 w-3 mr-1" />
-                                      SIP
-                                    </>
-                                  )}
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {/* Show SIP phone number */}
-                            {config?.phone_number && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Phone Number:</span>
-                                <span className="text-sm font-medium font-mono">{config.phone_number}</span>
-                              </div>
-                            )}
-
-                            {/* Show WebSocket fields */}
-                            {config?.bot_id && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Bot ID:</span>
-                                <span className="text-sm font-medium font-mono">{config.bot_id}</span>
-                              </div>
-                            )}
-                            {config?.auth_token && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Auth Token:</span>
-                                <span className="text-sm font-medium font-mono">{'•'.repeat(12)}</span>
-                              </div>
-                            )}
-                            {config?.api_key && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">API Key:</span>
-                                <span className="text-sm font-medium font-mono">{'•'.repeat(12)}</span>
-                              </div>
-                            )}
-                            {config?.assistant_id && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Assistant ID:</span>
-                                <span className="text-sm font-medium font-mono">{config.assistant_id}</span>
-                              </div>
-                            )}
-                            {config?.session_id && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">Session ID:</span>
-                                <span className="text-sm font-medium font-mono">{config.session_id}</span>
-                              </div>
-                            )}
-
-                            {provider?.description && (
-                              <div className="pt-2 border-t">
-                                <p className="text-xs text-muted-foreground">{provider.description}</p>
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                      {selectedExtension.type === 'ai_load_balancer' && (
-                        <>
-                          {(() => {
-                            const loadBalancer = selectedExtension.ai_load_balancer;
-                            const config = selectedExtension.configuration;
-                            const loadBalancerId = config?.ai_load_balancer_id;
-
-                            if (!loadBalancer && !loadBalancerId) {
-                              return (
-                                <div className="text-sm text-muted-foreground">
-                                  AI Load Balancer not configured
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">AI Load Balancer:</span>
-                                  <span className="text-sm font-medium">{loadBalancer?.name || `ID: ${loadBalancerId}`}</span>
-                                </div>
-                                {loadBalancer && (
-                                  <>
-                                    <div className="flex justify-between">
-                                      <span className="text-sm text-muted-foreground">Strategy:</span>
-                                      <Badge variant="outline" className="text-xs capitalize">
-                                        {loadBalancer.strategy.replace('_', ' ')}
-                                      </Badge>
-                                    </div>
-                                    {loadBalancer.members && loadBalancer.members.length > 0 && (
-                                      <div className="mt-4 pt-4 border-t">
-                                        <span className="text-sm text-muted-foreground block mb-2">Members ({loadBalancer.members.length}):</span>
-                                        <div className="space-y-2">
-                                          {loadBalancer.members.map((member, index) => (
-                                            <div key={member.ai_assistant_id} className="flex items-center justify-between p-2 bg-muted rounded-md">
-                                              <div className="flex items-center gap-2">
-                                                <span className="text-xs text-muted-foreground">#{index + 1}</span>
-                                                <Bot className="h-4 w-4 text-cyan-500" />
-                                                <span className="text-sm font-medium">{member.ai_assistant_name}</span>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                {loadBalancer.strategy === 'percentage' && (
-                                                  <Badge variant="secondary" className="text-xs">{member.weight}%</Badge>
-                                                )}
-                                                {loadBalancer.strategy === 'priority' && (
-                                                  <Badge variant="secondary" className="text-xs">Priority: {member.priority}</Badge>
-                                                )}
-                                                <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                                                  {member.status}
-                                                </Badge>
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </>
-                      )}
-                      {selectedExtension.type === 'ivr' && (
-                        <>
-                          {(() => {
-                            // Handle configuration as object or direct value
-                            let ivrId: string | null = null;
-                            if (typeof selectedExtension.configuration === 'object' && selectedExtension.configuration) {
-                              ivrId = selectedExtension.configuration.ivr_id || selectedExtension.configuration.ivr_menu_id;
-                            } else {
-                              // Configuration might be just the IVR menu ID
-                              ivrId = String(selectedExtension.configuration);
-                            }
-                            const ivrMenu = ivrId ? ivrMenus.find(menu => menu.id == ivrId) : null;
-
-                            if (!ivrMenu) {
-                              return (
-                                <div className="text-sm text-muted-foreground">
-                                  IVR menu not found or not configured
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">IVR Menu:</span>
-                                  <span className="text-sm font-medium">{ivrMenu.name}</span>
-                                </div>
-                                {ivrMenu.description && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Description:</span>
-                                    <span className="text-sm font-medium">{ivrMenu.description}</span>
-                                  </div>
-                                )}
-                                <div className="space-y-2">
-                                  <span className="text-sm text-muted-foreground">Audio Configuration:</span>
-                                  <div className="ml-4 space-y-1">
-                                    {ivrMenu.audio_file_path && (
-                                      <div className="text-xs">
-                                        <span className="font-medium">File:</span> {ivrMenu.audio_file_path}
-                                      </div>
-                                    )}
-                                    {ivrMenu.tts_text && (
-                                      <div className="text-xs">
-                                        <span className="font-medium">TTS Text:</span> "{ivrMenu.tts_text}"
-                                      </div>
-                                    )}
-                                    {ivrMenu.tts_voice && (
-                                      <div className="text-xs">
-                                        <span className="font-medium">Voice:</span> {ivrMenu.tts_voice}
-                                      </div>
-                                    )}
-                                    {!ivrMenu.audio_file_path && !ivrMenu.tts_text && (
-                                      <div className="text-xs text-muted-foreground">No audio configured</div>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Max Timeout:</span>
-                                  <span className="text-sm font-medium">{ivrMenu.max_timeout}s</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Inter-digit Timeout:</span>
-                                  <span className="text-sm font-medium">{ivrMenu.inter_digit_timeout}s</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Max Turns:</span>
-                                  <span className="text-sm font-medium">{ivrMenu.max_turns}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Failover Action:</span>
-                                  <span className="text-sm font-medium capitalize">
-                                    {ivrMenu.failover_destination_type?.replace('_', ' ') || 'None'}
-                                  </span>
-                                </div>
-                                {ivrMenu.failover_destination_type && ivrMenu.failover_destination_id && (
-                                  <div className="flex justify-between">
-                                    <span className="text-sm text-muted-foreground">Failover Destination:</span>
-                                    <span className="text-sm font-medium">
-                                      {(() => {
-                                        switch (ivrMenu.failover_destination_type) {
-                                          case 'extension':
-                                            const ext = extensions?.find(e => e.id == ivrMenu.failover_destination_id);
-                                            return ext ? `Ext ${ext.extension_number}` : `Extension ${ivrMenu.failover_destination_id}`;
-                                          case 'ring_group':
-                                            const rg = ringGroups?.find(g => g.id == ivrMenu.failover_destination_id);
-                                            return rg ? rg.name : `Ring Group ${ivrMenu.failover_destination_id}`;
-                                          case 'conference_room':
-                                            const cr = conferenceRooms?.find(r => r.id == ivrMenu.failover_destination_id);
-                                            return cr ? cr.name : `Conference ${ivrMenu.failover_destination_id}`;
-                                          case 'ivr_menu':
-                                            const ivr = ivrMenus?.find(m => m.id == ivrMenu.failover_destination_id);
-                                            return ivr ? ivr.name : `IVR Menu ${ivrMenu.failover_destination_id}`;
-                                          default:
-                                            return ivrMenu.failover_destination_id;
-                                        }
-                                      })()}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex justify-between">
-                                  <span className="text-sm text-muted-foreground">Status:</span>
-                                  <Badge className={cn(
-                                    ivrMenu.status === 'active'
-                                      ? 'bg-green-100 text-green-800 border-green-200'
-                                      : 'bg-gray-100 text-gray-800 border-gray-200'
-                                  )}>
-                                    {ivrMenu.status}
-                                  </Badge>
-                                </div>
-                                {ivrMenu.options && ivrMenu.options.length > 0 && (
-                                  <div className="space-y-2">
-                                    <span className="text-sm text-muted-foreground">Menu Options:</span>
-                                    <div className="ml-4 space-y-1 max-h-32 overflow-y-auto">
-                                      {ivrMenu.options.map((option: IvrMenuOption, index: number) => (
-                                        <div key={option.id || index} className="text-xs border rounded p-2 bg-muted/50">
-                                          <div className="flex justify-between items-center mb-1">
-                                            <span className="font-medium">Press {option.input_digits}</span>
-                                            <span className="text-muted-foreground">Priority: {option.priority}</span>
-                                          </div>
-                                          {option.description && (
-                                            <div className="mb-1 text-muted-foreground">{option.description}</div>
-                                          )}
-                                          <div className="text-muted-foreground">
-                                            → {(() => {
-                                              switch (option.destination_type) {
-                                                case 'extension':
-                                                  const ext = extensions?.find(e => e.extension_number == option.destination_id);
-                                                  return ext ? `Ext ${ext.extension_number}` : `Extension ${option.destination_id}`;
-                                                case 'ring_group':
-                                                  const rg = ringGroups?.find(g => g.id == option.destination_id);
-                                                  return rg ? `Ring Group: ${rg.name}` : `Ring Group ${option.destination_id}`;
-                                                case 'conference_room':
-                                                  const cr = conferenceRooms?.find(r => r.id == option.destination_id);
-                                                  return cr ? `Conference: ${cr.name}` : `Conference ${option.destination_id}`;
-                                                case 'ivr_menu':
-                                                  const ivr = ivrMenus?.find(m => m.id == option.destination_id);
-                                                  return ivr ? `IVR Menu: ${ivr.name}` : `IVR Menu ${option.destination_id}`;
-                                                default:
-                                                  return `${option.destination_type}: ${option.destination_id}`;
-                                              }
-                                            })()}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </>
-                      )}
-                      {selectedExtension.type === 'forward' && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Forward To:</span>
-                          <span className="text-sm font-medium font-mono">{selectedExtension.configuration.forward_to}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                {!isReadOnly && canEdit(selectedExtension) && (
-                  <div className="space-y-3 pt-4 border-t">
-                    <h3 className="text-sm font-semibold text-muted-foreground">Actions</h3>
-                    <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => {
-                        setShowExtensionDetail(false);
-                        openEditDialog(selectedExtension);
-                      }}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Extension
-                      </Button>
-                      {canDelete && (
-                        <Button
-                          variant="destructive"
-                          onClick={() => {
-                            setShowExtensionDetail(false);
-                            setShowDeleteDialog(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Extension
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet >
     </div >
   );
 }

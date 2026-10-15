@@ -30,6 +30,7 @@ class CallTrackingCampaignResource extends JsonResource
             'medium' => $this->medium,
             'description' => $this->description,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'destination_type' => $this->destination_type->value,
             'destination_config' => $this->destination_config,
             'conversion_rule' => $this->conversion_rule,

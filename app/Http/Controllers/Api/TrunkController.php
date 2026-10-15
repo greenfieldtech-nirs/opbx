@@ -185,6 +185,12 @@ class TrunkController extends Controller
         }
 
         $auth = $this->authenticationPayload($validated);
+
+        // An emptied username (sent but blank) clears the stored credentials.
+        if ($auth === [] && array_key_exists('username', $validated) && empty($validated['username'])) {
+            $auth = ['username' => '', 'password' => ''];
+        }
+
         if ($auth !== []) {
             $payload['profile'] = ['authentication' => $auth];
         }

@@ -1,0 +1,88 @@
+{
+  "uid": "opbx-logs-call-flow",
+  "title": "OPBX Call Flow Logs",
+  "tags": [
+    "opbx",
+    "logs"
+  ],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "session_token",
+        "label": "Session token (audit trail)",
+        "type": "textbox",
+        "query": "",
+        "description": "Cloudonix session token - filters to a single call"
+      },
+      {
+        "name": "text_search",
+        "label": "Text search",
+        "type": "textbox",
+        "query": "",
+        "description": "Free-text filter applied to every log line"
+      },
+      {
+        "name": "sessions_only",
+        "label": "Display Sessions Only",
+        "type": "custom",
+        "query": "Enabled : | session_token != \"\", Disabled : |~ \"\"",
+        "options": [
+          {
+            "text": "Enabled",
+            "value": "| session_token != \"\"",
+            "selected": true
+          },
+          {
+            "text": "Disabled",
+            "value": "|~ \"\"",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "Enabled",
+          "value": "| session_token != \"\"",
+          "selected": true
+        },
+        "description": "When enabled, only log entries that carry a Cloudonix session token are shown"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Call Flow Logs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "gridPos": {
+        "h": 24,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{log_type=\"call_flow\"} |~ \"$session_token\" |~ \"$text_search\" | regexp \"(?P<raw>.*)\" | json $sessions_only | line_format \"{{ if .level }}[{{ .level }}] {{ end }}{{ if .session_token }}[{{ .session_token }}] {{ end }}{{ .raw }}\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 8
+}

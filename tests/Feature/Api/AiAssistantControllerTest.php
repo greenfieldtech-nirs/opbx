@@ -405,7 +405,7 @@ class AiAssistantControllerTest extends TestCase
             ->assertJsonFragment([
                 'name' => 'Retell Agent',
                 'provider' => 'retell',
-                'configuration' => ['phone_number' => '+12133287400'],
+                'configuration' => ['phone_number' => '+12133287400', 'enable_non_e164' => false],
             ]);
 
         $this->assertDatabaseHas('ai_assistants', [
@@ -455,7 +455,8 @@ class AiAssistantControllerTest extends TestCase
 
         $response = $this->deleteJson("/api/v1/ai-assistants/{$assistant->id}");
 
-        $response->assertStatus(422);
+        $response->assertStatus(409)
+            ->assertJsonFragment(['type' => 'extension', 'detail' => 'AI assistant extension']);
 
         $this->assertDatabaseHas('ai_assistants', [
             'id' => $assistant->id,
@@ -664,5 +665,74 @@ class AiAssistantControllerTest extends TestCase
                     ],
                 ],
             ]);
+    }
+
+    public function test_create_with_pending_status_returns_422(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/ai-assistants', [
+            'name' => 'Pending Assistant',
+            'status' => 'pending',
+            'provider' => 'dummy_ai',
+            'configuration' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors('status');
+    }
+
+    public function test_update_with_pending_status_returns_422(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $assistant = AiAssistant::factory()->create(['organization_id' => $this->organization->id]);
+
+        $this->putJson("/api/v1/ai-assistants/{$assistant->id}", ['status' => 'pending'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_update_with_inactive_status_succeeds(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $assistant = AiAssistant::factory()->create(['organization_id' => $this->organization->id]);
+
+        $this->putJson("/api/v1/ai-assistants/{$assistant->id}", ['status' => 'inactive'])
+            ->assertOk();
+
+        $this->assertSame('inactive', $assistant->fresh()->status->value);
+    }
+
+    public function test_create_with_null_status_defaults_to_active(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/ai-assistants', [
+            'name' => 'Null Status Assistant',
+            'status' => null,
+            'provider' => 'dummy_ai',
+            'configuration' => [],
+        ])->assertCreated()->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_usage_count_is_the_real_count_beyond_the_ten_listed_extensions(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $assistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+        ]);
+        Extension::factory()->count(12)->create([
+            'organization_id' => $this->organization->id,
+            'type' => 'ai_assistant',
+            'ai_assistant_id' => $assistant->id,
+        ]);
+
+        $this->getJson("/api/v1/ai-assistants/{$assistant->id}")
+            ->assertOk()
+            ->assertJsonPath('data.usage_count', 12)
+            ->assertJsonCount(10, 'data.used_by_extensions');
+
+        $this->getJson('/api/v1/ai-assistants')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $assistant->id)
+            ->assertJsonPath('data.0.usage_count', 12);
     }
 }

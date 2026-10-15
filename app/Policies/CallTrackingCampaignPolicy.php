@@ -13,7 +13,7 @@ use App\Models\User;
  * Authorization rules:
  * - Owner: Full access
  * - PBX Admin: Full access
- * - PBX User: Can view
+ * - PBX User / Supervisor: No access (owner decision 2026-10-14)
  * - Reporter: Can view (read-only)
  */
 class CallTrackingCampaignPolicy
@@ -23,7 +23,7 @@ class CallTrackingCampaignPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->isOwner() || $user->isPBXAdmin() || $user->isReporter();
     }
 
     /**
@@ -31,7 +31,8 @@ class CallTrackingCampaignPolicy
      */
     public function view(User $user, CallTrackingCampaign $campaign): bool
     {
-        return $user->organization_id === $campaign->organization_id;
+        return $user->organization_id === $campaign->organization_id
+            && $this->viewAny($user);
     }
 
     /**

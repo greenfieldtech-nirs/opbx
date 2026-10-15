@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Traits\AppliesFilters;
-use App\Http\Controllers\Traits\ValidatesTenantScope;
+use App\Http\Requests\User\CreateUserRequest;
+use App\Http\Requests\User\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Models\UserEmbedToken;
@@ -14,12 +16,14 @@ use App\Scopes\OrganizationScope;
 use App\Services\EmbedTokenService;
 use App\Services\Fallback\ResilientCacheService;
 use App\Services\Logging\AuditLogger;
+use App\Services\UserDeletionImpactService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Symfony\Component\HttpKernel\Exception\HttpResponseException;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Users management API controller.
@@ -30,7 +34,6 @@ use Symfony\Component\HttpKernel\Exception\HttpResponseException;
 class UsersController extends AbstractApiCrudController
 {
     use AppliesFilters;
-    use ValidatesTenantScope;
 
     /**
      * Lock key prefix for owner deletion protection.
@@ -71,6 +74,16 @@ class UsersController extends AbstractApiCrudController
         return UserResource::class;
     }
 
+    protected function getStoreRequestClass(): ?string
+    {
+        return CreateUserRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateUserRequest::class;
+    }
+
     /**
      * Get the allowed filter fields for the index method.
      *
@@ -79,6 +92,18 @@ class UsersController extends AbstractApiCrudController
     protected function getAllowedFilters(): array
     {
         return ['role', 'status', 'search'];
+    }
+
+    /**
+     * Apply the role, status and search (name or email) filters.
+     */
+    protected function applyCustomFilters(Builder $query, Request $request): void
+    {
+        $this->applyFilters($query, $request, [
+            'role' => ['type' => 'enum', 'enum' => UserRole::class, 'scope' => 'withRole'],
+            'status' => ['type' => 'enum', 'enum' => UserStatus::class, 'scope' => 'withStatus'],
+            'search' => ['type' => 'search', 'scope' => 'search'],
+        ]);
     }
 
     /**
@@ -156,6 +181,10 @@ class UsersController extends AbstractApiCrudController
         assert($model instanceof User);
         $currentUser = $this->getAuthenticatedUser();
 
+        // Keep the user's extensions (unassigned), drop their group/queue memberships and switch every
+        // route that pointed at them to 'unavailable'. Runs in the delete's transaction (a later failure rolls it back).
+        app(UserDeletionImpactService::class)->apply($model);
+
         // Business logic: Cannot delete last owner in organization
         if ($model->role === UserRole::OWNER) {
             $this->preventLastOwnerDeletion($model, $currentUser);
@@ -171,6 +200,20 @@ class UsersController extends AbstractApiCrudController
                 'error' => $auditException->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Preview what deleting this user changes (same code as the delete itself). Same authorization as delete.
+     */
+    public function deleteImpact(User $user): JsonResponse
+    {
+        $this->authorize($this->getDeleteAbility(), $user);
+
+        if ($user->organization_id !== $this->getAuthenticatedUser()->organization_id) {
+            return response()->json(['error' => 'Not Found', 'message' => 'User not found.'], 404);
+        }
+
+        return response()->json(['data' => app(UserDeletionImpactService::class)->preview($user)]);
     }
 
     /**

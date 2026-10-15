@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\CallTracking;
 
+use App\Models\CallTrackingCampaign;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 /**
  * Form request validator for call tracking session list queries.
@@ -16,7 +19,8 @@ class SessionIndexRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        // Same readers as the campaigns: Owner, PBX Admin, Reporter (API keys pass via Gate::before).
+        return Gate::allows('viewAny', CallTrackingCampaign::class);
     }
 
     /**
@@ -28,7 +32,7 @@ class SessionIndexRequest extends FormRequest
     {
         return [
             'campaign_ids' => ['nullable', 'array'],
-            'campaign_ids.*' => ['exists:call_tracking_campaigns,id'],
+            'campaign_ids.*' => [Rule::exists('call_tracking_campaigns', 'id')->where('organization_id', $this->user()?->organization_id)],
             'sources' => ['nullable', 'array'],
             'mediums' => ['nullable', 'array'],
             'start_date' => ['nullable', 'date'],

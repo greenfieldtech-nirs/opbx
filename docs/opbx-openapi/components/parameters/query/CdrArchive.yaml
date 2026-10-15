@@ -1,0 +1,11 @@
+name: archive
+in: query
+required: false
+schema:
+  type: boolean
+description: >-
+  Use the warm archive (CDRs older than 6 months and up to 12 months) instead of the live
+  table. Honoured only for requests authenticated with an organisation API key; ignored for
+  session (browser) users, including organisation owners. Archived rows have no extension
+  user. CDRs older than the warm period are stored as files and are not available through
+  the API.

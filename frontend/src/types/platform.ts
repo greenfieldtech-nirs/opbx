@@ -4,7 +4,7 @@
  * TypeScript types for the platform management functionality.
  */
 
-import type { User, Organization } from './api.types';
+import type { User } from './api.types';
 
 export type OrganizationStatus = 'active' | 'suspended' | 'deleted';
 
@@ -134,4 +134,28 @@ export interface UpdateOrganizationSettingsRequest {
 
 export interface SetPlatformManagerRequest {
   is_platform_manager: boolean;
+}
+
+/**
+ * Platform Status
+ */
+export type PlatformHealthStatus = 'ok' | 'degraded' | 'down' | 'unknown';
+
+export interface PlatformComponentStatus {
+  component: string;
+  label: string;
+  optional: boolean;
+  status: PlatformHealthStatus;
+  latency_ms: number | null;
+  detail: string;
+  checked_at: string | null;
+  /** Last 24h in 5-minute buckets, worst status per bucket. */
+  // checked_at = bucket start; check_at = time of the check that set the bucket's status.
+  history: { checked_at: string; status: PlatformHealthStatus; check_at?: string }[];
+}
+
+export interface PlatformStatusSnapshot {
+  checked_at: string | null;
+  summary: Record<PlatformHealthStatus, number>;
+  components: PlatformComponentStatus[];
 }

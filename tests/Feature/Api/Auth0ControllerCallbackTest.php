@@ -7,6 +7,7 @@ namespace Tests\Feature\Api;
 use App\Enums\SocialIdentityProvider;
 use App\Models\UserSocialIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -72,7 +73,7 @@ class Auth0ControllerCallbackTest extends TestCase
             'provider' => SocialIdentityProvider::GOOGLE,
             'provider_subject' => 'google-oauth2|123',
         ]);
-        $identity->user->update(['is_platform_manager' => true]);
+        $identity->user->forceFill(['is_platform_manager' => true])->save();
 
         $state = $this->fakeAuth0Responses($identity->provider_email);
 
@@ -96,6 +97,8 @@ class Auth0ControllerCallbackTest extends TestCase
 
         $response->assertStatus(409);
         $response->assertJsonPath('error.code', 'AUTH0_REGISTRATION_REQUIRED');
+        $response->assertJsonMissingPath('profile.subject');
+        $this->assertNotNull(Cache::get('auth0:onboarding:'.$response->json('profile.onboarding_id')));
     }
 
     public function test_callback_creates_organization_when_intent_is_register(): void

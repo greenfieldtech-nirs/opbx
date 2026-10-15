@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\BusinessHoursActionType;
+use App\Enums\ExtensionType;
 use App\Models\BusinessHoursSchedule;
+use App\Models\CallQueue;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\RingGroup;
@@ -32,9 +33,9 @@ class BusinessHoursRoutingService
     /**
      * Check business hours and route accordingly.
      *
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID for logging
-     * @param Request $request The incoming request
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID for logging
+     * @param  Request  $request  The incoming request
      * @return Response|null CXML response if business hours routing applies, null otherwise
      */
     public function checkBusinessHours(int $organizationId, string $callSid, Request $request): ?Response
@@ -63,10 +64,10 @@ class BusinessHoursRoutingService
     /**
      * Route to business hours action destination.
      *
-     * @param string|array $action The routing action (string for backward compatibility, array for new format)
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID
-     * @param Request $request The incoming request
+     * @param  string|array  $action  The routing action (string for backward compatibility, array for new format)
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID
+     * @param  Request  $request  The incoming request
      * @return Response CXML response
      */
     private function routeToBusinessHoursAction($action, int $organizationId, string $callSid, Request $request): Response
@@ -92,9 +93,9 @@ class BusinessHoursRoutingService
     /**
      * Route using array-format action configuration.
      *
-     * @param array $action The action configuration array
-     * @param int $organizationId The organization ID
-     * @param string $callSid The call SID
+     * @param  array  $action  The action configuration array
+     * @param  int  $organizationId  The organization ID
+     * @param  string  $callSid  The call SID
      * @return Response CXML response
      */
     private function routeArrayAction(array $action, int $organizationId, string $callSid, Request $request): Response
@@ -116,6 +117,7 @@ class BusinessHoursRoutingService
             'call_queue' => $this->routeToCallQueue($config['call_queue_id'] ?? null, $organizationId, $callSid, $request),
             'voicemail' => response(CxmlBuilder::sendToVoicemail(), 200, ['Content-Type' => 'application/xml']),
             'hangup' => response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']),
+            'unavailable' => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => response(
                 CxmlBuilder::unavailable('Business hours action not configured'),
                 200,
@@ -137,7 +139,7 @@ class BusinessHoursRoutingService
             );
         }
 
-        $callQueue = \App\Models\CallQueue::withoutGlobalScope(OrganizationScope::class)
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $callQueueId)
             ->where('organization_id', $organizationId)
             ->where('status', 'active')
@@ -151,8 +153,8 @@ class BusinessHoursRoutingService
             );
         }
 
-        return app(\App\Services\VoiceRouting\VoiceRoutingManager::class)
-            ->executeStrategy(\App\Enums\ExtensionType::QUEUE, $request, new DidNumber, ['call_queue' => $callQueue]);
+        return app(VoiceRoutingManager::class)
+            ->executeStrategy(ExtensionType::QUEUE, $request, new DidNumber, ['call_queue' => $callQueue]);
     }
 
     /**
@@ -238,24 +240,9 @@ class BusinessHoursRoutingService
             );
         }
 
-        $members = $ringGroup->getMembers()->filter(fn ($ext) => $ext->isActive());
-        $sipUris = $members->map(fn ($ext) => $ext->getSipUri())->filter()->values()->toArray();
-
-        if (empty($sipUris)) {
-            return response(
-                CxmlBuilder::unavailable('No active members in ring group'),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
-        }
-
-        $recording = $this->recordingDecision->resolve($organizationId, $request->input('_call_category', 'inbound'));
-
-        return response(
-            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout, null, $recording->record, $recording->recordingStatusCallback),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        // The group's own strategy and fallback, as on every other path to a ring group.
+        return app(VoiceRoutingManager::class)
+            ->executeStrategy(ExtensionType::RING_GROUP, $request, new DidNumber, ['ring_group' => $ringGroup]);
     }
 
     /**

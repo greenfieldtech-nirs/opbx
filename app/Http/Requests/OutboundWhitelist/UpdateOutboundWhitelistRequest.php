@@ -55,7 +55,7 @@ class UpdateOutboundWhitelistRequest extends FormRequest
             'default_caller_id_did_id' => [
                 'nullable',
                 'integer',
-                'exists:did_numbers,id',
+                Rule::exists('did_numbers', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
         ];
     }

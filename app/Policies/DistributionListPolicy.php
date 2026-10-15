@@ -14,8 +14,8 @@ class DistributionListPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Owner and PBX Admin can view all lists in their organization
-        return $user->isOwner() || $user->isPBXAdmin();
+        // Owner, PBX Admin and Reporter can view lists in their organization
+        return $user->role->canViewReports();
     }
 
     /**
@@ -23,8 +23,8 @@ class DistributionListPolicy
      */
     public function view(User $user, AutoDialerList $list): bool
     {
-        // Must be in same organization
-        return $user->organization_id === $list->organization_id;
+        // Must be in same organization; read access is Owner, PBX Admin and Reporter only
+        return $user->organization_id === $list->organization_id && $user->role->canViewReports();
     }
 
     /**

@@ -5,7 +5,7 @@
  * instead of crashing the whole application.
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,7 +82,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <summary className="cursor-pointer text-sm font-medium text-gray-700">
                     Error Details (Development Only)
                   </summary>
-                  <pre className="mt-2 whitespace-pre-wrap rounded bg-gray-100 p-2 text-xs text-red-800">
+                  <pre className="mt-2 whitespace-pre-wrap rounded-sm bg-gray-100 p-2 text-xs text-red-800">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
                   </pre>

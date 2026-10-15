@@ -8,14 +8,83 @@ properties:
   name:
     type: string
     example: Support Bot
-  provider:
-    type: string
-    example: openai
-  configuration:
-    type: object
+  description:
+    type:
+      - string
+      - 'null'
   status:
     type: string
     enum: [active, inactive]
+  provider:
+    type: string
+    description: Provider key from the provider registry
+    example: openai
+  protocol:
+    type:
+      - string
+      - 'null'
+    enum: [sip, websocket, dummy, null]
+    description: Derived from the provider
+  configuration:
+    type:
+      - object
+      - 'null'
+    description: >-
+      Provider-specific configuration. For a SIP assistant it also carries `enable_non_e164`,
+      derived from the stored `phone_number`.
+    properties:
+      phone_number:
+        type: string
+        description: SIP providers. The number dialled at the provider, exactly as stored.
+      enable_non_e164:
+        type: boolean
+        description: >-
+          SIP providers. `false` when `phone_number` is valid E.164 (`^\+[1-9]\d{1,14}$`), `true`
+          for any other (non-E.164) number.
+    additionalProperties: true
+  usage_count:
+    type: integer
+    description: Number of extensions that use the assistant (the true total, also when `used_by_extensions` lists only some of them).
+  used_by_extensions:
+    type: array
+    description: Show endpoint only, omitted when no extension uses the assistant. Lists up to 10 of the extensions; `usage_count` gives the total.
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        extension_number:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        user:
+          type: object
+          description: Omitted when the extension has no user
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+  created_by:
+    type: object
+    description: Create and update responses only (when the creator is known)
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+  updated_by:
+    type: object
+    description: Create and update responses only (when the updater is known)
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
   created_at:
     type: string
     format: date-time

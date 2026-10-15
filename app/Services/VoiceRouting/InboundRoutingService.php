@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting;
 
-use App\Enums\AiAssistantStatus;
-use App\Enums\AlbsStatus;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\ConferenceRoom;
 use App\Models\DidNumber;
 use App\Models\Extension;
@@ -116,6 +115,10 @@ class InboundRoutingService
 
         $destination = $this->resolveDidDestination($did);
 
+        if (isset($destination['unavailable'])) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         if (empty($destination)) {
             Log::warning('InboundRoutingService: No valid destination found for DID', [
                 'did_id' => $did->id,
@@ -159,6 +162,7 @@ class InboundRoutingService
             'ai_assistant' => $this->resolveAiAssistantDestination($did, $destination),
             'ai_load_balancer' => $this->resolveAiLoadBalancerDestination($did, $destination),
             'business_hours' => $this->resolveBusinessHoursDestination($did, $destination),
+            'unavailable' => $destination['unavailable'] = true,
             'call_tracking' => $destination['call_tracking_campaign_id'] = $did->routing_config['call_tracking_campaign_id'] ?? null,
             default => null,
         };
@@ -308,6 +312,8 @@ class InboundRoutingService
             BusinessHoursActionType::IVR_MENU => $this->resolveBusinessHoursIvrMenu($did, $targetId, $destination),
             BusinessHoursActionType::AI_ASSISTANT => $this->resolveBusinessHoursAiAssistant($did, $targetId, $destination),
             BusinessHoursActionType::AI_LOAD_BALANCER => $this->resolveBusinessHoursAiLoadBalancer($did, $targetId, $destination),
+            BusinessHoursActionType::CALL_QUEUE => $this->resolveBusinessHoursCallQueue($did, $targetId, $destination),
+            BusinessHoursActionType::UNAVAILABLE => $destination['unavailable'] = true,
             default => Log::warning('InboundRoutingService: Business Hours action type not handled', [
                 'did_id' => $did->id,
                 'action_type' => $actionType->value,
@@ -411,6 +417,26 @@ class InboundRoutingService
     }
 
     /**
+     * Resolve business hours call queue target.
+     */
+    private function resolveBusinessHoursCallQueue(DidNumber $did, ?string $targetId, array &$destination): void
+    {
+        $callQueueId = $targetId ? $this->parseTargetId($targetId, 'queue') : null;
+
+        if ($callQueueId) {
+            $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $callQueueId)
+                ->where('organization_id', $did->organization_id)
+                ->where('status', 'active')
+                ->first();
+
+            if ($callQueue) {
+                $destination['call_queue'] = $callQueue;
+            }
+        }
+    }
+
+    /**
      * Resolve business hours AI assistant target.
      */
     private function resolveBusinessHoursAiAssistant(DidNumber $did, ?string $targetId, array &$destination): void
@@ -428,7 +454,7 @@ class InboundRoutingService
             $aiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $aiAssistantId)
                 ->where('organization_id', $did->organization_id)
-                ->where('status', AiAssistantStatus::ACTIVE)
+                // No status filter: the AI assistant strategy ends the call for an inactive one.
                 ->first();
 
             if ($aiAssistant) {
@@ -455,7 +481,7 @@ class InboundRoutingService
             $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
                 ->where('id', $albsId)
                 ->where('organization_id', $did->organization_id)
-                ->where('status', AlbsStatus::ACTIVE)
+                // No status filter: the load balancer strategy ends the call for an inactive one.
                 ->first();
 
             if ($aiLoadBalancer) {

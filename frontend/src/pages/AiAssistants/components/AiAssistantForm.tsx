@@ -4,6 +4,7 @@
  * Shared form component for creating and editing AI Assistants
  */
 
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,12 +16,13 @@ import {
 } from '@/components/ui/select';
 import { Wifi, Phone, Bot } from 'lucide-react';
 import { useEffect } from 'react';
-import type { ProviderDefinition } from '@/types/aiAssistant';
+import type { ProviderConfigField, ProviderDefinition } from '@/types/aiAssistant';
 
 interface FormData {
   name: string;
   provider: string;
-  configuration: Record<string, string>;
+  // String field values, plus the boolean enable_non_e164 flag of a SIP number.
+  configuration: Record<string, string | boolean>;
 }
 
 interface AiAssistantFormProps {
@@ -54,7 +56,7 @@ export function AiAssistantForm({
     });
   };
 
-  const handleConfigChange = (fieldName: string, value: string) => {
+  const handleConfigChange = (fieldName: string, value: string | boolean) => {
     onChange({
       ...formData,
       configuration: {
@@ -180,12 +182,32 @@ export function AiAssistantForm({
               <Input
                 id={`${mode}-${field.name}`}
                 type={field.type === 'password' ? 'password' : 'text'}
-                value={formData.configuration[field.name] || ''}
+                value={(formData.configuration[field.name] as string) || ''}
                 onChange={(e) => handleConfigChange(field.name, e.target.value)}
                 placeholder={field.placeholder || ''}
                 disabled={disabled || field.read_only}
+                maxLength={maxLengthOf(field)}
               />
-              {field.description && (
+              {field.type === 'tel' && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`${mode}-enable_non_e164`}
+                    checked={formData.configuration.enable_non_e164 === true}
+                    onCheckedChange={(checked) => handleConfigChange('enable_non_e164', checked === true)}
+                    disabled={disabled}
+                  />
+                  <Label htmlFor={`${mode}-enable_non_e164`} className="text-sm font-normal cursor-pointer">
+                    Enable non-E.164 Phone Number
+                  </Label>
+                </div>
+              )}
+              {field.type === 'tel' ? (
+                <p className="text-xs text-muted-foreground">
+                  {formData.configuration.enable_non_e164 === true
+                    ? 'Enter the number using digits, +, and # characters'
+                    : 'Enter in E.164 format: +[country][number]'}
+                </p>
+              ) : field.description && (
                 <p className="text-xs text-muted-foreground">{field.description}</p>
               )}
             </div>
@@ -194,6 +216,12 @@ export function AiAssistantForm({
       )}
     </div>
   );
+}
+
+/** The provider field's `max:N` validation rule (enforced by the API) as an input maxLength. */
+function maxLengthOf(field: ProviderConfigField): number | undefined {
+  const rule = field.validation_rules?.find((r) => /^max:\d+$/.test(r));
+  return rule ? Number(rule.slice(4)) : undefined;
 }
 
 export default AiAssistantForm;

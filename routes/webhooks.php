@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Webhooks\AutoDialerWebhookController;
 use App\Http\Controllers\Webhooks\CloudonixWebhookController;
+use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -50,13 +51,16 @@ Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function 
 |
 */
 
+use App\Http\Controllers\Voice\AlbsFollowThroughController;
 use App\Http\Controllers\Voice\AmdActionController;
+use App\Http\Controllers\Voice\QueueConferenceController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
 use App\Http\Controllers\Voice\QueueImmediateDialController;
 use App\Http\Controllers\Voice\QueuePollController;
+use App\Http\Controllers\Voice\RingGroupConferenceController;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 
-Route::prefix('voice')->middleware('log.callflow')->group(function (): void {
+Route::prefix('voice')->middleware(['log.callflow', 'log.voice'])->group(function (): void {
     // Main inbound call routing endpoint
     Route::post('/route', [VoiceRoutingController::class, 'handleInbound'])
         ->middleware(['voice.webhook.auth'])
@@ -74,17 +78,26 @@ Route::prefix('voice')->middleware('log.callflow')->group(function (): void {
     // AMD action handler — receives detection results from AMD worker
     Route::post('/amd-action', [AmdActionController::class, 'handle'])
         ->name('voice.amd-action');
+
+    // AMD stream admission — worker checks the stream's session token on start
+    Route::post('/amd-session', [AmdActionController::class, 'session'])
+        ->name('voice.amd-session');
 });
 
 // Action-related callbacks
-Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void {
+Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(function (): void {
     // Ring group callback for sequential routing (round robin, priority, etc.)
     Route::post('/voice/ring-group-callback', [VoiceRoutingController::class, 'handleRingGroupCallback'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.ring-group-callback');
 
+    // Conference room PIN / host PIN digits
+    Route::post('/voice/conference-pin', [VoiceRoutingController::class, 'handleConferencePin'])
+        ->middleware(['voice.webhook.auth'])
+        ->name('voice.conference-pin');
+
     // ALB follow-through callback for failover routing
-    Route::post('/voice/albs-follow-through', [\App\Http\Controllers\Voice\AlbsFollowThroughController::class, 'handle'])
+    Route::post('/voice/albs-follow-through', [AlbsFollowThroughController::class, 'handle'])
         ->middleware(['voice.webhook.auth'])
         ->name('voice.albs-follow-through');
 
@@ -101,6 +114,20 @@ Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void 
     // Proactive (immediate connect) dial endpoint - HMAC-signed URL, no Bearer auth
     Route::any('/voice/queue-dial', [QueueImmediateDialController::class, 'handle'])
         ->name('voice.queue-dial');
+
+    // Conference-mediated ring-all (HMAC-signed URLs, no Bearer auth):
+    // originated agent legs claim the call; the caller joins the winner's room.
+    Route::any('/voice/queue-agent-connect', [QueueConferenceController::class, 'agentConnect'])
+        ->name('voice.queue-agent-connect');
+    Route::any('/voice/queue-conference-join', [QueueConferenceController::class, 'callerJoin'])
+        ->name('voice.queue-conference-join');
+
+    // Simultaneous ring groups (HMAC-signed URLs, no Bearer auth): a member's own session claims the
+    // call and joins the caller's room; the caller is switched to the fallback when nobody answers.
+    Route::any('/voice/ring-group-member-connect', [RingGroupConferenceController::class, 'memberConnect'])
+        ->name('voice.ring-group-member-connect');
+    Route::any('/voice/ring-group-fallback', [RingGroupConferenceController::class, 'fallback'])
+        ->name('voice.ring-group-fallback');
 });
 
 /*
@@ -111,8 +138,6 @@ Route::prefix('callbacks')->middleware('log.callflow')->group(function (): void 
 | These routes handle webhooks specific to auto-dialer campaigns.
 |
 */
-
-use App\Http\Controllers\Webhooks\DialerWebhookProxyController;
 
 Route::prefix('webhooks/auto-dialer')->group(function (): void {
     Route::post('/call-status', [AutoDialerWebhookController::class, 'callStatus'])
@@ -129,15 +154,3 @@ Route::prefix('webhooks/auto-dialer')->group(function (): void {
 Route::post('/webhooks/cloudonix/dialer', [DialerWebhookProxyController::class, 'handleCloudonixWebhook'])
     ->middleware(['webhook.signature', 'webhook.idempotency'])
     ->name('webhooks.cloudonix.dialer');
-
-// Health check endpoint
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'healthy',
-        'timestamp' => now()->toIso8601String(),
-        'services' => [
-            'database' => DB::connection()->getDatabaseName() ? 'connected' : 'disconnected',
-            'redis' => Cache::getStore() instanceof \Illuminate\Cache\RedisStore ? 'connected' : 'disconnected',
-        ],
-    ]);
-})->name('health');

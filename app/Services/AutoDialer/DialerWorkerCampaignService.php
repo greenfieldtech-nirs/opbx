@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
+use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCampaign;
 use App\Scopes\OrganizationScope;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -190,52 +192,55 @@ class DialerWorkerCampaignService
     }
 
     /**
-     * Calculate next retry time using exponential backoff.
+     * Normalise a Cloudonix / CDR disposition ("NO ANSWER", "ANSWER", "CANCEL"...) to our vocabulary.
+     */
+    public function normalizeDisposition(?string $disposition): string
+    {
+        $value = str_replace([' ', '_'], '-', strtolower(trim((string) $disposition)));
+
+        return match ($value) {
+            'answer' => 'answered',
+            'noanswer' => 'no-answer',
+            'cancel' => 'cancelled',
+            default => $value,
+        };
+    }
+
+    /**
+     * The ONE place that decides what happens to a destination after a call ends.
      *
-     * Formula: 5 * 2^(attempt-1) minutes, capped at 60 minutes.
-     */
-    public function calculateNextRetry(int $attemptNumber): string
-    {
-        $baseDelay = 5; // 5 minutes
-        $delay = $baseDelay * (2 ** ($attemptNumber - 1));
-
-        // Cap at 60 minutes
-        $delay = min($delay, 60);
-
-        return now()->addMinutes($delay)->toIso8601String();
-    }
-
-    /**
-     * Get retryable dispositions.
+     * answered/completed -> COMPLETED. busy/no-answer -> PENDING with next_retry_at when the
+     * campaign has "retry on busy / no-answer" on and attempts remain, otherwise FAILED.
+     * cancelled, failed, congestion and anything unknown -> FAILED (never retried).
+     * The gap grows: retry_delay_minutes x 2^(attempt-1), capped at 24 h.
      *
-     * @return array<string>
+     * @return array{status: DestinationStatus, next_retry_at: ?Carbon}
      */
-    public function getRetryableDispositions(): array
+    public function decideOutcome(AutoDialerCampaign $campaign, int $dialAttempts, ?string $disposition): array
     {
-        return ['busy', 'no-answer', 'cancelled'];
+        $disposition = $this->normalizeDisposition($disposition);
+
+        if (in_array($disposition, ['answered', 'completed'], true)) {
+            return ['status' => DestinationStatus::COMPLETED, 'next_retry_at' => null];
+        }
+
+        if ($campaign->retry_on_busy_no_answer
+            && in_array($disposition, ['busy', 'no-answer'], true)
+            && $dialAttempts < $campaign->max_dial_attempts) {
+            return [
+                'status' => DestinationStatus::PENDING,
+                'next_retry_at' => now()->addMinutes($this->retryDelayMinutes($campaign, $dialAttempts)),
+            ];
+        }
+
+        return ['status' => DestinationStatus::FAILED, 'next_retry_at' => null];
     }
 
-    /**
-     * Check if disposition is retryable.
-     */
-    public function isRetryableDisposition(string $disposition): bool
+    /** Busy / no-answer retry gap in minutes after the given attempt: base x 2^(attempt-1), max 1440. */
+    public function retryDelayMinutes(AutoDialerCampaign $campaign, int $dialAttempts): int
     {
-        return in_array($disposition, $this->getRetryableDispositions(), true);
-    }
+        $base = max(1, (int) $campaign->retry_delay_minutes);
 
-    /**
-     * Check if disposition represents a completed call.
-     */
-    public function isCompletedDisposition(string $disposition): bool
-    {
-        return in_array($disposition, ['answered', 'completed'], true);
-    }
-
-    /**
-     * Check if disposition represents a failed call.
-     */
-    public function isFailedDisposition(string $disposition): bool
-    {
-        return in_array($disposition, ['busy', 'no-answer', 'failed', 'cancelled', 'congestion'], true);
+        return (int) min(1440, $base * (2 ** min(max(1, $dialAttempts) - 1, 20)));
     }
 }

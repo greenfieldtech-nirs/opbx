@@ -4,22 +4,179 @@ paths:
       tags:
         - Settings
       summary: Get Cloudonix settings
+      description: |
+        The organization's Cloudonix settings with masked keys, the webhook URLs to give
+        Cloudonix, and where the webhook base URL comes from. Owner only. When no settings
+        exist yet, `settings` is null, the URLs are built from the app URL and
+        `webhook_url_details` is omitted.
       operationId: getCloudonixSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
-          description: Settings retrieved
+          description: Settings (settings is null when not configured yet)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    oneOf:
+                      - $ref: '../../components/schemas/CloudonixSettings.yaml'
+                      - type: 'null'
+                  callback_url:
+                    type: string
+                    format: uri
+                    description: Session-update webhook URL (`<effective base>/api/webhooks/cloudonix/session-update`)
+                  cdr_url:
+                    type: string
+                    format: uri
+                    description: CDR webhook URL (`<effective base>/api/webhooks/cloudonix/cdr`)
+                  webhook_url_details:
+                    type: object
+                    description: Present when settings exist
+                    properties:
+                      effective_url:
+                        type:
+                          - string
+                          - 'null'
+                      application_url:
+                        type:
+                          - string
+                          - 'null'
+                      organization_url:
+                        type:
+                          - string
+                          - 'null'
+                      is_overridden:
+                        type: boolean
+                      source:
+                        type: string
+                        enum: [application, organization]
+                        description: '`application` when an application-wide webhook base URL is configured (it overrides the organization URL)'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not the organization Owner (Cloudonix settings are Owner only), or an API key (no API-key grant covers these routes)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
     
     put:
       tags:
         - Settings
       summary: Update Cloudonix settings
+      description: |
+        Creates or updates the organization's Cloudonix settings. Owner only. Optional fields
+        that are omitted keep their stored value; a nullable field sent as null is cleared.
+        A key value containing `***` (a masked key sent back unchanged) is ignored and the
+        stored key is kept.
+
+        When a domain UUID and API key are available, the domain profile is read from
+        Cloudonix and its domain name is stored; the request is refused with 422 when that
+        domain is already registered to another organization. When the settings are
+        configured (UUID and API key set), they are pushed to the Cloudonix domain profile:
+        if no `domain_requests_api_key` is set, one is generated and pushed in the same step.
+        On a successful push the organization's Cloudonix voice application is created or
+        updated. A failed push or voice application setup does not fail the request: the
+        settings stay saved and `message` and `warning` carry the error.
       operationId: updateCloudonixSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                domain_uuid:
+                  type:
+                    - string
+                    - 'null'
+                  format: uuid
+                  description: Must not be used by another organization (validation), and its Cloudonix domain must not be registered to another organization
+                domain_api_key:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                  description: A value containing `***` keeps the stored key
+                domain_requests_api_key:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 255
+                  description: Bearer key Cloudonix sends on webhooks. A value containing `***` keeps the stored key.
+                webhook_base_url:
+                  type:
+                    - string
+                    - 'null'
+                  format: uri
+                  maxLength: 255
+                embed_allowed_domains:
+                  type: array
+                  description: Optional; omit to keep the stored list
+                  items:
+                    type: string
+                    description: Hostname, localhost or IPv4, with optional port (no scheme)
+                    example: crm.example.com
+                no_answer_timeout:
+                  type: integer
+                  minimum: 5
+                  maximum: 120
+                call_recording_mode:
+                  type: string
+                  enum: [disabled, inbound, outbound, internal, inbound_outbound, all]
+                recording_format:
+                  type: string
+                  enum: [wav, mp3]
+              required: [no_answer_timeout, call_recording_mode, recording_format]
       responses:
         '200':
-          description: Settings updated
+          description: Settings saved (and synced to Cloudonix when configured)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: '`Cloudonix settings updated successfully.`, or the sync / voice application error'
+                  warning:
+                    type: string
+                    description: Present only when the Cloudonix sync or voice application setup failed (same text as `message`)
+                  settings:
+                    description: Same as the GET settings, without `embed_allowed_domains` and `cloudonix_package`
+                    allOf:
+                      - $ref: '../../components/schemas/CloudonixSettings.yaml'
+                  callback_url:
+                    type: string
+                    format: uri
+                  cdr_url:
+                    type: string
+                    format: uri
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not the organization Owner (Cloudonix settings are Owner only), or an API key (no API-key grant covers these routes)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '422':
+          description: Validation failed, or the Cloudonix domain is already registered to another organization (reported on `domain_uuid`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'
+        '500':
+          description: Unexpected error while saving
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: Failed to update settings
+                message: An error occurred while updating Cloudonix settings.

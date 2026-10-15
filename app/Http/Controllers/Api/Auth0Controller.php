@@ -13,8 +13,11 @@ use App\Scopes\OrganizationScope;
 use App\Services\Auth0\Auth0AccountResolver;
 use App\Services\Auth0\Auth0Config;
 use App\Services\Auth0\Auth0Service;
+use App\Services\Cloudonix\CloudonixPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class Auth0Controller extends Controller
@@ -229,13 +232,18 @@ class Auth0Controller extends Controller
             return $this->buildAuthResponse($user);
         }
 
+        // Keep the verified profile server-side; the client only gets an opaque id
+        // (display fields are never trusted back by the join-request endpoint).
+        $onboardingId = Str::random(48);
+        Cache::put('auth0:onboarding:'.$onboardingId, $profile, now()->addMinutes(60));
+
         return response()->json([
             'error' => ['code' => 'AUTH0_REGISTRATION_REQUIRED', 'message' => 'Please complete onboarding.'],
             'profile' => [
+                'onboarding_id' => $onboardingId,
                 'email' => $profile['email'],
                 'name' => $profile['name'],
                 'provider' => $profile['provider'],
-                'subject' => $profile['subject'],
             ],
         ], Response::HTTP_CONFLICT);
     }
@@ -248,7 +256,10 @@ class Auth0Controller extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $token = $this->issueToken($user, 'auth0-token', $this->getTokenAbilities($user), self::TOKEN_EXPIRATION_MINUTES);
+        // Warm the Cloudonix package tier after the response is sent; never fails the login.
+        defer(fn () => rescue(fn () => app(CloudonixPackageService::class)->refresh((int) $user->organization_id)));
+
+        $token = $this->issueToken($user, 'auth0-token', $user->role->tokenAbilities((bool) $user->is_platform_manager), self::TOKEN_EXPIRATION_MINUTES);
 
         // Keep this user payload in parity with AuthController::formatUserResponse()
         // (used by password login and /me). Omitting fields such as
@@ -290,72 +301,5 @@ class Auth0Controller extends Controller
     private function issueToken(User $user, string $name, array $abilities, int $expiresMinutes): string
     {
         return $user->createToken($name, $abilities, now()->addMinutes($expiresMinutes))->plainTextToken;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function getTokenAbilities(User $user): array
-    {
-        $abilities = match ($user->role->value) {
-            'owner' => [
-                'extension:*',
-                'user:*',
-                'ring-group:*',
-                'did-number:*',
-                'recording:*',
-                'settings:*',
-                'business-hours:*',
-                'conference:*',
-                'ivr:*',
-                'voice-agent:*',
-                'call-log:*',
-                'outbound-whitelist:*',
-                'recording-download:*',
-            ],
-            'pbx_admin' => [
-                'extension:*',
-                'user:read',
-                'user:update',
-                'ring-group:*',
-                'did-number:*',
-                'recording:read',
-                'business-hours:*',
-                'conference:*',
-                'ivr:*',
-                'call-log:*',
-            ],
-            'pbx_user' => [
-                'extension:read',
-                'extension:update:own',
-                'user:read',
-                'ring-group:read',
-                'did-number:read',
-                'recording:read',
-                'call-log:read',
-            ],
-            'reporter' => [
-                'extension:read',
-                'user:read',
-                'ring-group:read',
-                'did-number:read',
-                'recording:read',
-                'call-log:read',
-                'business-hours:read',
-            ],
-            default => [],
-        };
-
-        if ($user->is_platform_manager) {
-            $abilities = array_merge($abilities, [
-                'platform:read',
-                'platform:write',
-                'platform:manage-users',
-                'platform:manage-organizations',
-                'platform:audit-logs',
-            ]);
-        }
-
-        return $abilities;
     }
 }

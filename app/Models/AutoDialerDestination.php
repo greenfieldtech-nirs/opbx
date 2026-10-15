@@ -30,6 +30,7 @@ class AutoDialerDestination extends Model
         'metadata',
         'status',
         'dial_attempts',
+        'consecutive_initiate_failures',
         'last_session_token',
         'last_call_id',
         'last_dialed_at',

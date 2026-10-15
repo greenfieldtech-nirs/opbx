@@ -704,6 +704,53 @@ _No arguments._
 |---|---|---|---|
 | `id` | integer | yes | ID of the call |
 
+## `get_call_queue`
+
+**Get call queue** — Get a call queue by ID, including its agents (users with extension numbers), agent selection strategy (ring_all/round_robin/least_talk_time/fewest_calls), max wait, wrap-up, MOH recording, and fallback destination.
+
+**Permission:** `call_queues.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/call-queues/{call_queue}` (`getCallQueue`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | integer | yes | ID of the call_queue |
+
+## `get_call_queue_live`
+
+**Get live call queue snapshot** — Live snapshot of a call queue: waiting callers with positions and wait times, agent states (AVAILABLE/BUSY/WRAP_UP/LOGGED_OUT), and rolling handled/abandoned counts for the last 15m, 30m, 60m, and 24h.
+
+**Permission:** `call_queues.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/call-queues/{call_queue}/live` (`getCallQueueLive`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `call_queue_id` | integer | yes | Call queue ID (from list_call_queues) |
+
+## `get_call_queue_stats`
+
+**Get call queue statistics** — History statistics for a call queue over a date range (default last 24h): waiting time and handling time min/max/avg/stddev (seconds), plus handled, abandoned, and overflowed totals.
+
+**Permission:** `call_queues.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/call-queues/{call_queue}/stats` (`getCallQueueStats`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `call_queue_id` | integer | yes | Call queue ID (from list_call_queues) |
+| `from` | string | no | Start of range (ISO 8601), default: 24h ago |
+| `to` | string | no | End of range (ISO 8601), default: now |
+
 ## `get_call_statistics`
 
 **Get call statistics** — Get aggregate call statistics for the organization (volumes, dispositions, durations). Supervisor-scoped for supervisor identities.
@@ -716,41 +763,6 @@ _No arguments._
 **OPBX operation:** `GET /v1/call-detail-records/statistics` (`getCdrStatistics`)
 
 _No arguments._
-
-## `get_call_tracking_analytics`
-
-**Get call tracking analytics** — Get call-tracking attribution analytics for a date range, optionally grouped by day/week/month and filtered by campaigns, sources, or mediums.
-
-**Permission:** `call_tracking.read` | **Roles:** any authenticated org role | **Risk:** low  
-**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
-
-**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
-
-**OPBX operation:** `GET /v1/call-tracking-analytics` (`getCallTrackingAnalytics`)
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `start_date` | string | yes | Start date (YYYY-MM-DD) |
-| `end_date` | string | yes | End date (YYYY-MM-DD) |
-| `campaign_ids` | array | no |  |
-| `sources` | array | no |  |
-| `mediums` | array | no |  |
-| `group_by` | enum(day\|week\|month) | no |  |
-
-## `get_call_tracking_campaign`
-
-**Get call tracking campaign** — Get a call-tracking campaign by ID, including its DNI pool configuration.
-
-**Permission:** `call_tracking.read` | **Roles:** any authenticated org role | **Risk:** low  
-**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
-
-**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
-
-**OPBX operation:** `GET /v1/call-tracking-campaigns/{call_tracking_campaign}` (`getCallTrackingCampaign`)
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `id` | integer | yes | ID of the call_tracking_campaign |
 
 ## `get_campaign`
 
@@ -1191,61 +1203,21 @@ _No arguments._
 | `page` | integer | yes | Page number (1-based) |
 | `per_page` | integer | yes | Items per page (max 100) |
 
-## `list_call_tracking_campaigns`
+## `list_call_queues`
 
-**List call tracking campaigns** — List call-tracking campaigns (marketing attribution) in the organization.
+**List call queues** — List call queues in the organization with strategy, timeouts, wrap-up, MOH recording, fallback action, and agent counts. Use get_call_queue for agents.
 
-**Permission:** `call_tracking.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Permission:** `call_queues.read` | **Roles:** any authenticated org role | **Risk:** low  
 **Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
 
 **MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
 
-**OPBX operation:** `GET /v1/call-tracking-campaigns` (`listCallTrackingCampaigns`)
+**OPBX operation:** `GET /v1/call-queues` (`listCallQueues`)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `page` | integer | yes | Page number (1-based) |
 | `per_page` | integer | yes | Items per page (max 100) |
-
-## `list_call_tracking_numbers`
-
-**List call tracking numbers** — List the tracking (DNI pool) numbers of a call-tracking campaign.
-
-**Permission:** `call_tracking.read` | **Roles:** any authenticated org role | **Risk:** low  
-**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
-
-**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
-
-**OPBX operation:** `GET /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers` (`listCallTrackingNumbers`)
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `page` | integer | yes | Page number (1-based) |
-| `per_page` | integer | yes | Items per page (max 100) |
-| `campaign_id` | integer | yes | Call-tracking campaign ID |
-
-## `list_call_tracking_sessions`
-
-**List call tracking sessions** — List per-visitor call-tracking sessions with attribution data, filterable by campaign, source/medium, date range, and conversion state.
-
-**Permission:** `call_tracking.read` | **Roles:** any authenticated org role | **Risk:** low  
-**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
-
-**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
-
-**OPBX operation:** `GET /v1/call-tracking-sessions` (`listCallTrackingSessions`)
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `page` | integer | yes | Page number (1-based) |
-| `per_page` | integer | yes | Items per page (max 100) |
-| `campaign_ids` | array | no |  |
-| `sources` | array | no |  |
-| `mediums` | array | no |  |
-| `start_date` | string | no |  |
-| `end_date` | string | no |  |
-| `is_converted` | boolean | no |  |
-| `search` | string | no |  |
 
 ## `list_campaign_destinations`
 
@@ -1435,6 +1407,26 @@ _No arguments._
 |---|---|---|---|
 | `page` | integer | yes | Page number (1-based) |
 | `per_page` | integer | yes | Items per page (max 100) |
+
+## `list_queue_calls`
+
+**List queue calls** — Queue call report rows (one per queued caller) with waiting/handling seconds, disposition (answered/abandoned/overflow), and agent. Filter by queue, disposition, and date range.
+
+**Permission:** `queue_calls.read` | **Roles:** any authenticated org role | **Risk:** low  
+**Destructive:** no | **Idempotent:** yes | **Confirmation:** none | **Rate class:** read
+
+**MCP annotations:** `readOnlyHint: true` `openWorldHint: true`
+
+**OPBX operation:** `GET /v1/queue-calls` (`listQueueCalls`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `page` | integer | yes | Page number (1-based) |
+| `per_page` | integer | yes | Items per page (max 100) |
+| `queue_id` | integer | no | Filter by call queue ID |
+| `disposition` | enum(answered\|abandoned\|overflow) | no |  |
+| `from` | string | no | Entered at/after (ISO 8601) |
+| `to` | string | no | Entered at/before (ISO 8601) |
 
 ## `list_recordings`
 

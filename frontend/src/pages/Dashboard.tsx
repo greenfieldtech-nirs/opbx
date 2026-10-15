@@ -4,7 +4,7 @@
  * Main dashboard with statistics and recent activity
  */
 
-import { useCallback } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { extensionsService } from '@/services/extensions.service';
@@ -19,6 +19,7 @@ import { formatPhoneNumber, formatTimeAgo, getDispositionColor } from '@/utils/f
 import { cn } from '@/lib/utils';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord } from '@/types/api.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -31,28 +32,27 @@ export default function Dashboard() {
     isLoading: supervisorLoading,
     isFetching: supervisorFetching,
   } = useQuery({
-    queryKey: ['dashboard', 'supervisor'],
+    queryKey: queryKeys.dashboard.supervisor(),
     queryFn: getSupervisorDashboard,
     refetchInterval: 30000,
     enabled: isSupervisor,
   });
 
-  // Fetch active calls count
-  const { data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching, refetch: refetchActiveCalls } = useQuery({
-    queryKey: ['active-calls-dashboard'],
-    queryFn: async () => {
-      return await sessionUpdatesService.getActiveCalls();
-    },
+  // Active calls: the Live Calls page's query (same key and request), so both count the same calls
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: activeCallsResponse, isLoading: activeCallsLoading, isFetching: activeCallsFetching } = useQuery({
+    queryKey: queryKeys.activeCalls.list('all'),
+    queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: false }),
     refetchInterval: 15000, // Refresh every 15 seconds for dashboard
     staleTime: 10000, // Consider data fresh for 10 seconds
     enabled: !isSupervisor,
   });
 
-  const activeCalls = activeCallsResponse?.meta.total_active_calls || 0;
+  // Count the rows: Live Calls writes { data: [] } (no meta) into this entry when it clears its calls
+  const activeCalls = activeCallsResponse?.data?.length ?? 0;
 
   // Fetch extensions count
-  const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching, refetch: refetchExtensions } = useQuery({
-    queryKey: ['extensions-count'],
+  const { data: extensionsCount, isLoading: extensionsLoading, isFetching: extensionsFetching } = useQuery({
+    queryKey: queryKeys.dashboard.extensionsCount(),
     queryFn: async () => {
       const response = await extensionsService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -63,8 +63,8 @@ export default function Dashboard() {
   });
 
   // Fetch conference rooms count
-  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching, refetch: refetchConferenceRooms } = useQuery({
-    queryKey: ['conference-rooms-count'],
+  const { data: conferenceRoomsCount, isLoading: conferenceRoomsLoading, isFetching: conferenceRoomsFetching } = useQuery({
+    queryKey: queryKeys.dashboard.conferenceRoomsCount(),
     queryFn: async () => {
       const response = await conferenceRoomsService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -75,8 +75,8 @@ export default function Dashboard() {
   });
 
   // Fetch phone numbers count
-  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching, refetch: refetchPhoneNumbers } = useQuery({
-    queryKey: ['phone-numbers-count'],
+  const { data: phoneNumbersCount, isLoading: phoneNumbersLoading, isFetching: phoneNumbersFetching } = useQuery({
+    queryKey: queryKeys.dashboard.phoneNumbersCount(),
     queryFn: async () => {
       const response = await phoneNumbersService.getAll({ per_page: 1 });
       return response.meta.total;
@@ -87,8 +87,8 @@ export default function Dashboard() {
   });
 
   // Fetch last 10 CDR records
-  const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching, refetch: refetchLastCalls } = useQuery({
-    queryKey: ['last-calls'],
+  const { data: lastCalls, isLoading: lastCallsLoading, isFetching: lastCallsFetching } = useQuery({
+    queryKey: queryKeys.dashboard.lastCalls(),
     queryFn: async () => {
       const response = await cdrService.getAll({ per_page: 10 });
       return response.data;
@@ -105,16 +105,6 @@ export default function Dashboard() {
     ? supervisorFetching
     : activeCallsFetching || extensionsFetching || conferenceRoomsFetching || phoneNumbersFetching || lastCallsFetching;
 
-  const handleRefresh = useCallback(() => {
-    if (isSupervisor) {
-      return;
-    }
-    refetchActiveCalls();
-    refetchExtensions();
-    refetchConferenceRooms();
-    refetchPhoneNumbers();
-    refetchLastCalls();
-  }, [isSupervisor, refetchActiveCalls, refetchExtensions, refetchConferenceRooms, refetchPhoneNumbers, refetchLastCalls]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(isSupervisor ? 30000 : 15000, isRefreshing);
@@ -200,17 +190,21 @@ export default function Dashboard() {
           {(isSupervisor ? [1, 2, 3] : [1, 2, 3, 4]).map((i) => (
             <Card key={i} className="animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 w-24 bg-gray-200 rounded" />
+                <div className="h-4 w-24 bg-gray-200 rounded-sm" />
                 <div className="h-10 w-10 bg-gray-200 rounded-lg" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 w-16 bg-gray-200 rounded" />
+                <div className="h-8 w-16 bg-gray-200 rounded-sm" />
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load dashboard data" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (
@@ -337,7 +331,7 @@ export default function Dashboard() {
                     {supervisorData.assigned_users.map((assignedUser) => (
                       <li
                         key={assignedUser.id}
-                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 -mx-2 rounded"
+                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 -mx-2 rounded-sm"
                       >
                         <span className="font-medium">{assignedUser.name}</span>
                         {assignedUser.extension_number && (
@@ -366,7 +360,7 @@ export default function Dashboard() {
                     {supervisorData.assigned_ring_groups.map((ringGroup) => (
                       <li
                         key={ringGroup.id}
-                        className="py-3 px-2 -mx-2 rounded hover:bg-gray-50 font-medium"
+                        className="py-3 px-2 -mx-2 rounded-sm hover:bg-gray-50 font-medium"
                       >
                         {ringGroup.name}
                       </li>

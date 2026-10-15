@@ -236,6 +236,47 @@ class CloudonixSettingsTest extends TestCase
         ]);
     }
 
+    public function test_saving_credentials_provisions_and_pushes_webhook_key_and_ignores_client_domain_name(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $uuid = '550e8400-e29b-41d4-a716-446655440000';
+        Http::fake([
+            '*' => Http::response(['domain' => 'real.cloudonix.net', 'profile' => []], 200),
+        ]);
+
+        $this->putJson('/api/v1/settings/cloudonix', [
+            'domain_uuid' => $uuid,
+            'domain_api_key' => 'test-api-key-12345678',
+            'domain_name' => 'evil.example.com',
+            'no_answer_timeout' => 60,
+            'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
+        ])->assertStatus(200);
+
+        $settings = CloudonixSettings::where('organization_id', $this->organization->id)->first();
+        $this->assertSame('real.cloudonix.net', $settings->domain_name);
+        $this->assertNotEmpty($settings->domain_requests_api_key);
+        Http::assertSent(fn ($r) => $r->method() === 'PUT'
+            && ($r['profile']['authorization-api-key'] ?? null) === $settings->domain_requests_api_key);
+    }
+
+    public function test_domain_name_owned_by_another_org_is_rejected(): void
+    {
+        Sanctum::actingAs($this->owner);
+        CloudonixSettings::factory()->create(['domain_name' => 'real.cloudonix.net']);
+        Http::fake(['*' => Http::response(['domain' => 'real.cloudonix.net'], 200)]);
+
+        $this->putJson('/api/v1/settings/cloudonix', [
+            'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
+            'domain_api_key' => 'test-api-key-12345678',
+            'no_answer_timeout' => 60,
+            'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
+        ])->assertStatus(422);
+
+        $this->assertDatabaseMissing('cloudonix_settings', ['organization_id' => $this->organization->id]);
+    }
+
     /**
      * Test owner can update existing settings.
      */

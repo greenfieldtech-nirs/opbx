@@ -10,11 +10,13 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\Recording;
 use App\Models\RingGroup;
 use App\Models\User;
+use App\Rules\RejectUnavailableOnCreate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -24,6 +26,20 @@ use Illuminate\Validation\Rules\Enum;
  */
 class StoreCallQueueRequest extends FormRequest
 {
+    /**
+     * Fallback action => [target column, target model].
+     *
+     * @var array<string, array{0: string, 1: class-string}>
+     */
+    protected const FALLBACK_TARGETS = [
+        'extension' => ['fallback_extension_id', Extension::class],
+        'ring_group' => ['fallback_ring_group_id', RingGroup::class],
+        'ivr_menu' => ['fallback_ivr_menu_id', IvrMenu::class],
+        'ai_assistant' => ['fallback_ai_assistant_id', AiAssistant::class],
+        'ai_load_balancer' => ['fallback_ai_load_balancer_id', AiAssistantLoadBalancer::class],
+        'call_queue' => ['fallback_call_queue_id', CallQueue::class],
+    ];
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -90,6 +106,10 @@ class StoreCallQueueRequest extends FormRequest
             'immediate_connect' => [
                 'boolean',
             ],
+            'conference_ring_all' => [
+                'sometimes',
+                'boolean',
+            ],
             'announce_position_timeout' => [
                 Rule::requiredIf(fn () => $this->boolean('announce_position')),
                 'nullable',
@@ -104,36 +124,42 @@ class StoreCallQueueRequest extends FormRequest
             ],
             'moh_recording_id' => [
                 'nullable',
-                'exists:recordings,id',
+                Rule::exists('recordings', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_action' => [
                 'required',
                 new Enum(RingGroupFallbackAction::class),
+                new RejectUnavailableOnCreate,
             ],
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ring_group_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
-                'exists:ring_groups,id',
+                Rule::exists('ring_groups', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ivr_menu_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
-                'exists:ivr_menus,id',
+                Rule::exists('ivr_menus', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'fallback_ai_load_balancer_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
                 'nullable',
-                'exists:ai_assistant_load_balancers,id',
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $this->user()?->organization_id),
+            ],
+            'fallback_call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
+                'nullable',
+                Rule::exists('call_queues', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
             'status' => [
                 'required',
@@ -148,7 +174,7 @@ class StoreCallQueueRequest extends FormRequest
             'agents.*' => [
                 'integer',
                 'distinct',
-                'exists:users,id',
+                Rule::exists('users', 'id')->where('organization_id', $this->user()?->organization_id),
             ],
         ];
     }
@@ -231,22 +257,14 @@ class StoreCallQueueRequest extends FormRequest
      */
     protected function validateFallbackTargets($validator, int $organizationId): void
     {
-        $fallbackAction = $this->input('fallback_action');
+        $fallbackAction = $this->fallbackValue('fallback_action');
 
-        $targets = [
-            RingGroupFallbackAction::EXTENSION->value => ['fallback_extension_id', Extension::class],
-            RingGroupFallbackAction::RING_GROUP->value => ['fallback_ring_group_id', RingGroup::class],
-            RingGroupFallbackAction::IVR_MENU->value => ['fallback_ivr_menu_id', IvrMenu::class],
-            RingGroupFallbackAction::AI_ASSISTANT->value => ['fallback_ai_assistant_id', AiAssistant::class],
-            RingGroupFallbackAction::AI_LOAD_BALANCER->value => ['fallback_ai_load_balancer_id', AiAssistantLoadBalancer::class],
-        ];
-
-        if (! isset($targets[$fallbackAction])) {
+        if (! isset(self::FALLBACK_TARGETS[$fallbackAction])) {
             return;
         }
 
-        [$field, $modelClass] = $targets[$fallbackAction];
-        $id = $this->input($field);
+        [$field, $modelClass] = self::FALLBACK_TARGETS[$fallbackAction];
+        $id = $this->fallbackValue($field);
 
         if (! $id) {
             return;
@@ -262,6 +280,65 @@ class StoreCallQueueRequest extends FormRequest
 
         if (method_exists($model, 'isActive') && ! $model->isActive()) {
             $validator->errors()->add($field, 'The selected fallback target must be active.');
+
+            return;
+        }
+
+        if ($model instanceof CallQueue) {
+            $this->validateFallbackQueueChain($validator, $model);
+        }
+    }
+
+    /**
+     * The value a fallback field will have once saved (on create: the request value).
+     */
+    protected function fallbackValue(string $field): mixed
+    {
+        return $this->input($field);
+    }
+
+    /**
+     * A queue must not fall back to itself, and following call_queue fallbacks must never come
+     * back to it (an overflowing caller would bounce between the queues forever).
+     */
+    protected function validateFallbackQueueChain($validator, CallQueue $target): void
+    {
+        $self = $this->route('call_queue');
+        $self = $self instanceof CallQueue ? $self : ($self ? CallQueue::find($self) : null);
+
+        if (! $self) {
+            return; // a new queue cannot be referenced yet, so no chain can return to it
+        }
+
+        if ((int) $target->id === (int) $self->id) {
+            $validator->errors()->add('fallback_call_queue_id', 'A call queue cannot fall back to itself.');
+
+            return;
+        }
+
+        $path = [$self->name, $target->name];
+        $seen = [(int) $target->id];
+        $next = $target;
+
+        while ($next->fallback_action === RingGroupFallbackAction::CALL_QUEUE && $next->fallback_call_queue_id) {
+            $nextId = (int) $next->fallback_call_queue_id;
+
+            if ($nextId === (int) $self->id) {
+                $path[] = $self->name;
+                $validator->errors()->add(
+                    'fallback_call_queue_id',
+                    'Fallback loop detected: '.implode(' -> ', $path).'. A call queue fallback chain must not return to itself.'
+                );
+
+                return;
+            }
+
+            if (in_array($nextId, $seen, true) || ! ($next = CallQueue::find($nextId))) {
+                return;
+            }
+
+            $seen[] = $nextId;
+            $path[] = $next->name;
         }
     }
 
@@ -280,6 +357,8 @@ class StoreCallQueueRequest extends FormRequest
             'announce_position_timeout' => 60,
             'immediate_connect' => false,
             'fallback_action' => RingGroupFallbackAction::HANGUP->value,
+            // Create only (updates keep the stored value): a new Ring All queue rings agents in separate calls.
+            'conference_ring_all' => ($this->input('strategy') ?? CallQueueStrategy::RING_ALL->value) === CallQueueStrategy::RING_ALL->value,
         ];
 
         foreach ($defaults as $key => $value) {

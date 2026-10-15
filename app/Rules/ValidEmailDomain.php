@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use App\Services\EmailValidation\Contracts\EmailValidatorInterface;
+use App\Services\EmailValidation\DTOs\EmailValidationResult;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Facades\Log;
@@ -66,7 +67,7 @@ class ValidEmailDomain implements ValidationRule
     /**
      * Get the error message based on the validation result.
      *
-     * @param  \App\Services\EmailValidation\DTOs\EmailValidationResult  $result
+     * @param  EmailValidationResult  $result
      */
     private function getErrorMessage($result): string
     {

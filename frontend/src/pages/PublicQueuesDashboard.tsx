@@ -6,7 +6,7 @@
  * 30-second cycling through all queues.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { Clock, PhoneCall, Timer, Users } from 'lucide-react';
@@ -74,6 +74,8 @@ export default function PublicQueuesDashboard() {
     setCycleTick(ROTATE_SECONDS);
 
     const timer = setInterval(() => {
+      // Rotating queues changes the polled queue; pause while the tab is hidden.
+      if (document.hidden) return;
       setCycleTick((tick) => {
         if (tick > 1) {
           return tick - 1;
@@ -87,7 +89,6 @@ export default function PublicQueuesDashboard() {
   }, [cycling, queues.length]);
 
   const minutes = TIMESPANS.find((t) => t.value === timespan)?.minutes ?? 60;
-  const fromIso = useMemo(() => new Date(Date.now() - minutes * 60000).toISOString(), [minutes]);
 
   const queueId = activeQueue?.id;
 
@@ -101,7 +102,7 @@ export default function PublicQueuesDashboard() {
 
   const { data: statsData } = useQuery({
     queryKey: ['public-queues', token, queueId, 'stats', timespan],
-    queryFn: () => publicQueuesService.stats(token!, queueId!, fromIso),
+    queryFn: () => publicQueuesService.stats(token!, queueId!, new Date(Date.now() - minutes * 60000).toISOString()),
     enabled: Boolean(token) && queueId !== undefined,
     refetchInterval: 30000,
     retry: false,

@@ -1,6 +1,8 @@
 export type CallTrackingCampaignStatus = 'active' | 'inactive';
 
 export interface CallTrackingCampaign {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: number;
   organization_id: number;
   name: string;

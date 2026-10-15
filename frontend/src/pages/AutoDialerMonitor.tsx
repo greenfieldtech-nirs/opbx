@@ -5,6 +5,7 @@
  * Features bird's-eye view with global summaries and drill-down campaign details.
  */
 
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -17,7 +18,6 @@ import {
   RefreshCw,
   Pause,
   Play,
-  AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,
@@ -36,6 +36,8 @@ import {
   useResumeCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
+import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,12 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import type { MonitorCampaign } from '@/services/autoDialerMonitorApi';
 
 // Constants
@@ -304,6 +301,8 @@ function CampaignActionButton({
       </Button>
     );
   }
+  // The server resumes only paused campaigns
+  if (campaign.status !== 'paused') return null;
   return (
     <Button
       size="default"
@@ -324,6 +323,9 @@ function CampaignActionButton({
 export default function AutoDialerMonitor() {
   const navigate = useNavigate();
   const refreshMonitor = useRefreshMonitor();
+  const { user } = useAuth();
+  // Pause/Resume need AutoDialerCampaignPolicy pause/resume (Owner, PBX Admin)
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   // State
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
@@ -331,7 +333,7 @@ export default function AutoDialerMonitor() {
     const saved = localStorage.getItem(REFRESH_INTERVAL_KEY);
     return saved ? parseInt(saved, 10) : 10000;
   });
-  const [previousSnapshot, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
+  const [, setPreviousSnapshot] = useState<Map<number, SnapshotData>>(new Map());
   const [callsPerMinute, setCallsPerMinute] = useState<Map<number, number | null>>(new Map());
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
@@ -450,16 +452,16 @@ export default function AutoDialerMonitor() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div className="space-y-2">
-            <div className="h-8 w-64 bg-gray-200 animate-pulse rounded" />
-            <div className="h-4 w-48 bg-gray-200 animate-pulse rounded" />
+            <div className="h-8 w-64 bg-gray-200 animate-pulse rounded-sm" />
+            <div className="h-4 w-48 bg-gray-200 animate-pulse rounded-sm" />
           </div>
-          <div className="h-10 w-32 bg-gray-200 animate-pulse rounded" />
+          <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-sm" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-6">
-                <div className="h-20 bg-gray-200 animate-pulse rounded" />
+                <div className="h-20 bg-gray-200 animate-pulse rounded-sm" />
               </CardContent>
             </Card>
           ))}
@@ -624,14 +626,16 @@ export default function AutoDialerMonitor() {
                         </Badge>
                         <span className="text-xs text-muted-foreground">{campaign.routing_destination_label}</span>
                       </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <CampaignActionButton
-                          campaign={campaign}
-                          onPause={handlePause}
-                          onResume={handleResume}
-                          isLoading={isActionLoading}
-                        />
-                      </div>
+                      {canManage && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <CampaignActionButton
+                            campaign={campaign}
+                            onPause={handlePause}
+                            onResume={handleResume}
+                            isLoading={isActionLoading}
+                          />
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
 
@@ -670,31 +674,13 @@ export default function AutoDialerMonitor() {
                       </div>
                     </div>
 
-                    {/* Progress Bar + Rate Limit */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 flex items-center gap-3">
-                        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Progress</span>
-                        <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${campaign.progress_percentage}%` }} />
-                        </div>
-                        <span className="text-sm font-semibold w-12 text-right">{campaign.progress_percentage}%</span>
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Progress</span>
+                      <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary transition-all rounded-full" style={{ width: `${campaign.progress_percentage}%` }} />
                       </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-xs text-muted-foreground">Rate:</span>
-                            <div className={cn('h-2.5 w-2.5 rounded-full', campaign.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
-                            <span className="text-xs font-medium">{campaign.rate_limit_status.is_rate_limited ? 'Limited' : 'OK'}</span>
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {campaign.rate_limit_status.is_rate_limited
-                            ? campaign.rate_limit_status.resumes_at
-                              ? `Resumes at ${new Date(campaign.rate_limit_status.resumes_at).toLocaleTimeString()}`
-                              : 'Currently rate limited'
-                            : 'No rate limiting'}
-                        </TooltipContent>
-                      </Tooltip>
+                      <span className="text-sm font-semibold w-12 text-right">{campaign.progress_percentage}%</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -738,7 +724,7 @@ export default function AutoDialerMonitor() {
               onManualRefresh={handleManualRefresh}
               isRefreshing={isManualRefreshing}
             />
-            {selectedCampaign && (
+            {canManage && selectedCampaign && (
               <CampaignActionButton
                 campaign={selectedCampaign}
                 onPause={handlePause}
@@ -749,12 +735,14 @@ export default function AutoDialerMonitor() {
           </div>
         </div>
 
-        {isLoadingDetail || !detail ? (
+        {detailQuery.isError && !detail ? (
+          <QueryErrorState title="Failed to load campaign" error={detailQuery.error} onRetry={() => detailQuery.refetch()} />
+        ) : isLoadingDetail || !detail ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
                 <CardContent className="p-6">
-                  <div className="h-24 bg-gray-200 animate-pulse rounded" />
+                  <div className="h-24 bg-gray-200 animate-pulse rounded-sm" />
                 </CardContent>
               </Card>
             ))}
@@ -893,27 +881,6 @@ export default function AutoDialerMonitor() {
                     </div>
                     <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
                       <Clock className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Rate Limit</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={cn('h-3 w-3 rounded-full', detail.rate_limit_status.is_rate_limited ? 'bg-red-500' : 'bg-green-500')} />
-                        <p className="text-2xl font-bold">{detail.rate_limit_status.is_rate_limited ? 'Throttled' : 'OK'}</p>
-                      </div>
-                      {detail.rate_limit_status.resumes_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Resumes at {new Date(detail.rate_limit_status.resumes_at).toLocaleTimeString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-                      <Activity className="h-6 w-6 text-red-600" />
                     </div>
                   </div>
                 </CardContent>

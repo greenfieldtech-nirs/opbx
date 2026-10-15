@@ -42,7 +42,7 @@ docker compose up -d --build mcp-server
 curl http://localhost:8080/health
 ```
 
-MCP endpoint: `http://localhost:8080/mcp` (host port via `MCP_PORT`).
+MCP endpoint: `http://localhost:8080/mcp` (host port via `MCP_PORT`; requires `-f docker-compose.ports.yml`, loopback only).
 
 Standalone (without the OPBX compose stack):
 
@@ -59,7 +59,7 @@ never issues or stores credentials:
 
 | Credential | Format | Notes |
 |---|---|---|
-| OPBX Personal Access Token | Sanctum `id\|token` | Identity resolved via `GET /api/v1/auth/me` (cached 5 min). Expires after 24h and is revoked on any login/refresh/password change upstream — fine for interactive/dev use. |
+| OPBX Personal Access Token | Sanctum `id\|token` | Identity resolved via `GET /api/v1/auth/me` (cached 30 s; rejections cached 30 s). Expires after 24h and is revoked on any login/refresh/password change upstream — fine for interactive/dev use. |
 | Scoped API key | `opbxk_…` | The durable machine credential (never expires; per-resource read/write grants, deny-by-default). Created by an org owner in OPBX Settings → API Keys. Covers all business resources, including campaigns and live calls. |
 
 The organization is **always derived from the credential** — `organization_id` arguments are

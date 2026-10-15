@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\CallQueue;
 
 use App\Models\CallQueue;
+use App\Models\CloudonixSettings;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
 use App\Services\CloudonixClient\CloudonixCallsClient;
@@ -41,17 +42,19 @@ class ImmediateConnectService
         $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
 
         // Reap ghost entries (calls that ended without the worker being told)
-        // so a stale head cannot block immediate connect.
-        app(QueueCallLifecycleService::class)->reconcileStaleCalls(
+        // so a stale head cannot block immediate connect; the snapshot is
+        // filtered instead of fetched again.
+        $ghosts = app(QueueCallLifecycleService::class)->reconcileStaleCalls(
             $callQueue,
             collect($live['waiting'] ?? [])->pluck('callId')->all()
         );
 
-        $live = $this->worker->live($callQueue->organization_id, $callQueue->id, $roster);
-
         // FIFO: only the head caller can be offered (worker semantics serialize
         // offers naturally — subsequent polls return wait for non-head calls).
-        $head = collect($live['waiting'] ?? [])->sortBy('position')->first();
+        $head = collect($live['waiting'] ?? [])
+            ->reject(fn (array $call) => in_array($call['callId'], $ghosts, true))
+            ->sortBy('position')
+            ->first();
         if (! $head) {
             return;
         }
@@ -90,6 +93,16 @@ class ImmediateConnectService
             return;
         }
 
+        // Conference-mediated ring-all rings the agents in their own sessions:
+        // the caller keeps holding, so no application switch (and no stale
+        // hold document) is needed.
+        $conferenceOffers = app(ConferenceOfferService::class);
+        if ($conferenceOffers->isEnabledFor($callQueue)) {
+            $conferenceOffers->offer($callQueue, $queueCall, $result['agents'] ?? []);
+
+            return;
+        }
+
         $this->switchApplication($callQueue, $queueCall);
     }
 
@@ -97,7 +110,7 @@ class ImmediateConnectService
     {
         $dialUrl = $this->signedDialUrl($callQueue, $queueCall);
 
-        $settings = \App\Models\CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($callQueue->organization_id);
         $client = new CloudonixCallsClient($settings);
 
         if ($client->switchVoiceApplication($queueCall->session_token, $dialUrl)) {
@@ -129,7 +142,7 @@ class ImmediateConnectService
             'exp' => now()->addSeconds(self::SIGNATURE_TTL_SECONDS)->getTimestamp(),
         ]);
 
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $callQueue->organization_id)->first();
+        $cloudonixSettings = CloudonixSettings::forOrganization($callQueue->organization_id);
         $baseUrl = rtrim($cloudonixSettings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return $baseUrl.route('voice.queue-dial', [

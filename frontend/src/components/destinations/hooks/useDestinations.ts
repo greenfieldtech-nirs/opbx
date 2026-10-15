@@ -37,10 +37,6 @@ const businessHoursService = createResourceService('business-hours');
 const aiLoadBalancersService = createResourceService('ai-assistant-load-balancers');
 const callQueuesResourceService = createResourceService('call-queues');
 
-/**
- * Default extension types to fetch
- */
-const DEFAULT_EXTENSION_TYPES = ['user', 'forward', 'ai_assistant'];
 
 /**
  * Query keys for destination caching

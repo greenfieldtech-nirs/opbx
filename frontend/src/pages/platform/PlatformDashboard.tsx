@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +14,6 @@ import {
   Users,
   Phone,
   Globe,
-  TrendingUp,
   Activity,
   ScrollText,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ import { usePlatformDashboard } from '@/hooks/platform';
 import { OrganizationStatusBadge } from '@/components/platform';
 import { AuditLogEntry } from '@/components/platform';
 import type { PlatformOrganization } from '@/types/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function StatCard({
   title,
@@ -71,12 +72,12 @@ export default function PlatformDashboard() {
     hasRefreshed.current = true;
 
     // Clear platform-related queries to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     // Refresh user data from server
     refreshUser();
   }, [queryClient, refreshUser]);
 
-  const { data, isLoading, error } = usePlatformDashboard();
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, error } = usePlatformDashboard();
 
   if (isLoading) {
     return (
@@ -98,6 +99,10 @@ export default function PlatformDashboard() {
         </div>
       </PlatformLayout>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load platform dashboard" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (

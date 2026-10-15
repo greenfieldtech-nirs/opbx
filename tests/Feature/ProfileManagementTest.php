@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\ExtensionType;
 use App\Enums\UserRole;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +60,20 @@ class ProfileManagementTest extends TestCase
             'name' => 'Agent User',
             'email' => 'agent@example.com',
         ]);
+    }
+
+    /** @test */
+    public function profile_includes_the_users_extension_number(): void
+    {
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'user_id' => $this->owner->id,
+            'extension_number' => '1042',
+            'type' => ExtensionType::USER,
+        ]);
+
+        $this->actingAs($this->owner)->getJson('/api/v1/profile')
+            ->assertOk()->assertJsonPath('user.extension.extension_number', '1042');
     }
 
     /** @test */

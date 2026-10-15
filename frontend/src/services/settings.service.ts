@@ -46,6 +46,7 @@ export const settingsService = {
             domain_requests_api_key: null,
             embed_allowed_domains: [],
             no_answer_timeout: 60,
+            call_recording_mode: 'disabled',
             recording_format: 'mp3',
             callback_url: res.data.callback_url,
             cdr_url: res.data.cdr_url,
@@ -85,9 +86,10 @@ export const settingsService = {
    * PUT /settings/cloudonix
    */
   updateCloudonixSettings: (data: UpdateCloudonixSettingsRequest): Promise<CloudonixSettings> => {
-    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string; webhook_url_details?: WebhookUrlDetails }>('/settings/cloudonix', data)
+    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string; warning?: string; webhook_url_details?: WebhookUrlDetails }>('/settings/cloudonix', data)
       .then(res => ({
         ...res.data.settings,
+        warning: res.data.warning,
         callback_url: res.data.callback_url,
         cdr_url: res.data.cdr_url,
         webhook_url_details: res.data.webhook_url_details,

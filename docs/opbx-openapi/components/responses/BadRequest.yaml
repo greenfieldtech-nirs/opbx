@@ -4,6 +4,7 @@ content:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: BAD_REQUEST
-      message: Invalid request parameters
-      code: INVALID_PARAMS
+      error:
+        code: BAD_REQUEST
+        message: Invalid request parameters
+        details: null

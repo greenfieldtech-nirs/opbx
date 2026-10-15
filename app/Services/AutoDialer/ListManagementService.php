@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\AutoDialer;
 
-use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Events\AutoDialer\ListAssignedToCampaign;
@@ -13,6 +12,8 @@ use App\Jobs\ProcessListUploadJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\AutoDialerListVersion;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -99,10 +100,18 @@ class ListManagementService
             now()->addHours(2)
         );
 
+        // Mark the list before dispatching: a worker can finish the job before this request
+        // returns, and a later PROCESSING write would overwrite its READY/FAILED result.
+        $list->update([
+            'original_filename' => $file->getClientOriginalName(),
+            'uploaded_by' => Auth::id(),
+            'uploaded_at' => now(),
+            'status' => ListStatus::PROCESSING,
+        ]);
+
         if ($isLargeFile) {
             // Dispatch large file job
-            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping)
-                ->onQueue('auto-dialer');
+            ProcessLargeListJob::dispatch($list->id, $fullPath, $jobId, $rowCount, $mapping);
 
             Log::info('ListManagementService: Dispatched large file processing', [
                 'list_id' => $listId,
@@ -111,8 +120,7 @@ class ListManagementService
             ]);
         } else {
             // Dispatch regular upload job
-            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId, false, $mapping)
-                ->onQueue('auto-dialer');
+            ProcessListUploadJob::dispatch($list->id, $fullPath, $jobId, false, $mapping);
 
             Log::info('ListManagementService: Dispatched upload processing', [
                 'list_id' => $listId,
@@ -120,12 +128,6 @@ class ListManagementService
                 'row_count' => $rowCount,
             ]);
         }
-
-        // Update list status
-        $list->update([
-            'original_filename' => $file->getClientOriginalName(),
-            'status' => ListStatus::PROCESSING,
-        ]);
 
         return [
             'job_id' => $jobId,
@@ -345,31 +347,11 @@ class ListManagementService
     }
 
     /**
-     * Create a new version of a list.
-     */
-    public function createNewVersion(
-        int $listId,
-        UploadedFile $file,
-    ): array {
-        $list = AutoDialerList::findOrFail($listId);
-
-        // Check if version can be created
-        if (! $list->status->canCreateVersion()) {
-            throw new \InvalidArgumentException('Cannot create version from list in status: '.$list->status->label());
-        }
-
-        // Create new version
-        $newVersion = $list->createNewVersion($list->name);
-
-        // Upload file to new version
-        return $this->uploadCsv($newVersion->id, $file);
-    }
-
-    /**
-     * Update list with new CSV - backup old destinations first.
+     * Replace a list's entries with a new CSV. The entries being replaced are kept as a
+     * previous version (see snapshotVersion()) before they are deleted.
      *
      * @param  array<string, mixed>  $mapping
-     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int, backup_path: string}
+     * @return array{job_id: string, list_id: int, is_large_file: bool, total_rows: int, version_number: int}
      */
     public function updateListWithBackup(int $listId, UploadedFile $file, array $mapping = []): array
     {
@@ -380,25 +362,25 @@ class ListManagementService
             throw new \InvalidArgumentException('Cannot update list in status: '.$list->status->label());
         }
 
-        // Backup old destinations to JSON file
-        $backupPath = $this->backupDestinations($list);
+        $version = DB::transaction(function () use ($list): AutoDialerListVersion {
+            $version = $this->snapshotVersion($list);
 
-        // Delete old destinations
-        $deletedCount = $list->destinations()->delete();
+            $list->destinations()->delete();
+            $list->update([
+                'total_rows' => 0,
+                'valid_rows' => 0,
+                'invalid_rows' => 0,
+                'status' => ListStatus::PENDING,
+                'version_number' => $list->version_number + 1,
+            ]);
 
-        // Reset list statistics
-        $list->update([
-            'total_rows' => 0,
-            'valid_rows' => 0,
-            'invalid_rows' => 0,
-            'status' => ListStatus::PENDING,
-            'version_number' => $list->version_number + 1,
-        ]);
+            return $version;
+        });
 
-        Log::info('ListManagementService: Backed up and cleared old destinations', [
+        Log::info('ListManagementService: Kept previous version and cleared old destinations', [
             'list_id' => $listId,
-            'backup_path' => $backupPath,
-            'deleted_count' => $deletedCount,
+            'version_id' => $version->id,
+            'entries' => $version->entries_count,
             'new_version' => $list->version_number,
         ]);
 
@@ -408,47 +390,97 @@ class ListManagementService
         return [
             ...$result,
             'version_number' => $list->version_number,
-            'backup_path' => $backupPath,
         ];
     }
 
     /**
-     * Backup destinations to a JSON file.
+     * Copy the list's current entries, as they are now, into a new previous-version record.
      */
-    private function backupDestinations(AutoDialerList $list): string
+    private function snapshotVersion(AutoDialerList $list): AutoDialerListVersion
     {
-        $backupDir = storage_path('app/backups/lists');
-        if (! is_dir($backupDir)) {
-            mkdir($backupDir, 0755, true);
+        $days = config('retention.auto_dialer_list_versions_days');
+        $source = fn () => DB::table('auto_dialer_destinations')->where('list_id', $list->id);
+        $bounds = $source()->selectRaw('COUNT(*) AS total, MIN(id) AS lo, MAX(id) AS hi')->first();
+
+        $version = $list->versions()->create([
+            'organization_id' => $list->organization_id,
+            'version_number' => $list->version_number,
+            'original_filename' => $list->original_filename,
+            'uploaded_by' => $list->uploaded_by,
+            // Lists uploaded before uploads were recorded: processing finished shortly after the upload.
+            'uploaded_at' => $list->uploaded_at ?? $list->processed_at,
+            'replaced_at' => now(),
+            'expires_at' => $days === null ? null : now()->addDays((int) $days),
+            'entries_count' => (int) $bounds->total,
+            'total_rows' => $list->total_rows,
+            'valid_rows' => $list->valid_rows,
+            'invalid_rows' => $list->invalid_rows,
+        ]);
+
+        $columns = ['phone_number', 'name', 'batch_identifier', 'metadata', 'status', 'dial_attempts',
+            'last_dialed_at', 'last_disposition', 'duration', 'created_at', 'updated_at'];
+        $chunk = 10000;
+        for ($from = (int) $bounds->lo; $bounds->lo !== null && $from <= (int) $bounds->hi; $from += $chunk) {
+            DB::table('auto_dialer_list_version_destinations')->insertUsing(
+                ['version_id', 'organization_id', ...$columns],
+                $source()->whereBetween('id', [$from, $from + $chunk - 1])->orderBy('id')
+                    ->select([DB::raw((int) $version->id), 'organization_id', ...$columns]),
+            );
         }
 
-        $filename = "list_{$list->id}_v{$list->version_number}_".now()->format('Y-m-d_His').'.json';
-        $filepath = $backupDir.'/'.$filename;
+        return $version;
+    }
 
-        $destinations = $list->destinations()->get()->map(function ($dest) {
-            return [
-                'phone_number' => $dest->phone_number,
-                'name' => $dest->name,
-                'batch_identifier' => $dest->batch_identifier,
-                'metadata' => $dest->metadata,
-                'status' => $dest->status->value,
-                'dial_attempts' => $dest->dial_attempts,
-                'duration' => $dest->duration,
-                'last_dialed_at' => $dest->last_dialed_at?->toIso8601String(),
-                'last_disposition' => $dest->last_disposition,
-                'created_at' => $dest->created_at->toIso8601String(),
-            ];
+    /**
+     * Write a previous version's entries as CSV to the output stream.
+     */
+    public function writeVersionCsv(AutoDialerListVersion $version): void
+    {
+        $handle = fopen('php://output', 'w');
+        fputcsv($handle, ['phone_number', 'name', 'batch_identifier', 'metadata', 'status', 'dial_attempts', 'last_disposition', 'last_dialed_at']);
+
+        $version->destinations()->chunkById(1000, function ($destinations) use ($handle): void {
+            foreach ($destinations as $destination) {
+                fputcsv($handle, [
+                    $destination->phone_number,
+                    $destination->name,
+                    $destination->batch_identifier,
+                    $destination->metadata ? json_encode($destination->metadata) : null,
+                    $destination->status->value,
+                    $destination->dial_attempts,
+                    $destination->last_disposition,
+                    $destination->last_dialed_at?->format('Y-m-d H:i:s'),
+                ]);
+            }
         });
 
-        file_put_contents($filepath, json_encode([
-            'list_id' => $list->id,
-            'list_name' => $list->name,
-            'version_number' => $list->version_number,
-            'backed_up_at' => now()->toIso8601String(),
-            'destinations' => $destinations,
-        ], JSON_PRETTY_PRINT));
+        fclose($handle);
+    }
 
-        return $filepath;
+    /**
+     * Delete a list completely: its entries (and, by cascade, their dial sessions and its
+     * previous versions), the list row itself, and any JSON backup files left from re-uploads
+     * made before previous versions were kept in the database.
+     */
+    public function deleteList(AutoDialerList $list): void
+    {
+        $lists = collect([$list, ...$list->allParts()]);
+
+        DB::transaction(function () use ($lists): void {
+            foreach ($lists as $each) {
+                $each->destinations()->delete();
+                $each->delete();
+            }
+        });
+
+        $prefixes = $lists->map(fn (AutoDialerList $each): string => "list_{$each->id}_v")->all();
+        $disk = Storage::disk('list_backups');
+        $disk->delete(array_values(array_filter(
+            $disk->files(),
+            fn (string $file): bool => Str::startsWith($file, $prefixes)
+        )));
+
+        Log::info('ListManagementService: Deleted list', ['list_id' => $list->id, 'part_ids' => $lists->skip(1)->pluck('id')->values()->all()]);
     }
 
     /**
@@ -460,6 +492,14 @@ class ListManagementService
 
         if (! $list->canBeArchived()) {
             throw new \InvalidArgumentException('List cannot be archived in status: '.$list->status->label());
+        }
+
+        if ($list->isAssigned()) {
+            throw new \InvalidArgumentException(sprintf(
+                'Cannot archive list "%s": it is assigned to campaign "%s". Unassign it first.',
+                $list->name,
+                $list->campaign?->name ?? '#'.$list->campaign_id
+            ));
         }
 
         $list->archive();
@@ -562,18 +602,46 @@ class ListManagementService
             'used_at' => now(),
         ]);
 
-        // Update campaign status if it's in draft
-        if ($campaign->status === CampaignStatus::DRAFT) {
-            $campaign->update([
-                'status' => CampaignStatus::ACTIVE,
-            ]);
-        }
-
         // Dispatch event
         event(new ListAssignedToCampaign($list, $campaign, Auth::id()));
 
         Log::info('ListManagementService: Assigned list to campaign', [
             'list_id' => $listId,
+            'campaign_id' => $campaignId,
+        ]);
+    }
+
+    /**
+     * Unassign a list from its campaign, keeping the list and its entries.
+     *
+     * Both unassign endpoints (campaign and distribution list) go through here.
+     *
+     * @throws AuthorizationException while the list's campaign is active (403)
+     * @throws \InvalidArgumentException when the list is not assigned or its entries have started processing
+     */
+    public function unassignList(AutoDialerList $list): void
+    {
+        $refusal = $list->unassignRefusal();
+
+        if ($refusal === AutoDialerList::CAMPAIGN_ACTIVE_MESSAGE) {
+            throw new AuthorizationException($refusal);
+        }
+
+        if ($refusal !== null) {
+            throw new \InvalidArgumentException($refusal);
+        }
+
+        $campaignId = $list->campaign_id;
+
+        $list->update([
+            'campaign_id' => null,
+            'status' => ListStatus::READY,
+            'used_by_campaign_id' => null,
+            'used_at' => null,
+        ]);
+
+        Log::info('ListManagementService: Unassigned list from campaign', [
+            'list_id' => $list->id,
             'campaign_id' => $campaignId,
         ]);
     }

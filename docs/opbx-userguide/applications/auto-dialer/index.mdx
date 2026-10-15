@@ -3,113 +3,102 @@ sidebar_position: 1
 slug: /applications/auto-dialer
 sidebar_class_name: cxGuidesSidebar
 title: Auto Dialer Overview
-description: Outbound campaign dialing system
+description: Outbound campaigns that dial a distribution list on a schedule and connect answered calls to an AI assistant
 ---
 
 # Auto Dialer Overview
 
-The Auto Dialer is an automated outbound calling system that dials phone numbers from distribution lists. It enables you to run scheduled campaigns with controlled dialing rates, answering machine detection, and real-time monitoring.
+The Auto Dialer places outbound calls for you. A **campaign** dials every number on a **distribution list**, inside a weekly schedule, at a rate you control, and connects each answered call to an **AI assistant** or an **AI load balancer** (or hangs up, for testing). Optional answering machine detection hangs up on, or keeps, calls that reach a voicemail.
 
-## Key Capabilities
+## Purpose
 
-- **Scheduled Campaigns**: Configure campaigns to run during specific time windows with timezone support
-- **Rate-Limited Dialing**: Control concurrent calls (CAC) and call initiation speed (CPS)
-- **Answering Machine Detection (AMD)**: Automatically detect and handle voicemail systems
-- **Real-Time Monitoring**: Track campaign progress, active calls, and performance metrics
-- **Retry Logic**: Automatically retry failed destinations with configurable attempt limits
+Use the Auto Dialer for outbound work such as webinar follow-ups, appointment reminders, surveys and lead qualification, where an AI assistant holds the conversation.
 
-## Who Can Use It
+## Prerequisites
 
-Only users with the following roles can access the Auto Dialer:
+1. **Role.** You are the **Owner** or a **PBX Admin**. A **Reporter** sees the three Auto Dialer pages read-only; PBX Users and Supervisors do not see them.
+2. **A routing destination.** An [AI assistant](/opbx/modules/ai-assistants) or an [AI load balancer](/opbx/modules/ai-load-balancers). See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations).
+3. **At least one caller ID.** An **active** phone number of your organization, used as the caller ID. See [Phone Numbers](/opbx/modules/phone-numbers).
+4. **The dialer worker is running.** The Go dialer worker places the calls. It runs as a single replica. See [Dialer Worker](/opbx/workers/dialer-worker).
+5. **For voicemail detection:** the AMD worker is running. See [AMD Worker](/opbx/workers/amd-worker).
 
-- **Owner**: Full access to create, manage, and monitor all campaigns
-- **PBX Admin**: Full access to create, manage, and monitor all campaigns
+## The three pages
 
-:::note
-Users with lower permission levels cannot access the Auto Dialer features.
-:::
+The sidebar section **Auto Dialer** has three entries:
 
-## System Architecture
+| Page | What you do there | Guide |
+|------|-------------------|-------|
+| **Campaign Manager** | Create, edit, start, pause, resume, archive and delete campaigns | [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) |
+| **Distribution Lists** | Create lists, upload CSV files, assign a list to a campaign, reset dial attempts, copy, download, archive and delete lists | [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) |
+| **Real Time Monitor** | Watch active and paused campaigns, live calls and dispositions; pause and resume | [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) |
 
-The Auto Dialer operates as a three-tier system:
+![Sidebar with the Auto Dialer section: Campaign Manager, Distribution Lists, Real Time Monitor](../../img/screens/auto-dialer-campaign-list.jpg)
+
+## How a call is placed
 
 ```mermaid
 graph LR
-    UI[React UI] --> API[Laravel API]
-    API --> DB[(MySQL)]
-    API --> Cache[(Redis)]
-    API --> CX[Cloudonix API]
-    Worker[Go Dialer Worker] --> |Poll every 10s| API
-    Worker --> Cache
-    CX --> |CDR Webhooks| API
-    CX --> |Execute Calls| PSTN[Phone Network]
+    UI[OPBX web app] --> API[OPBX API]
+    Worker[Dialer worker] -->|polls every 10 s| API
+    API -->|create call| CX[Cloudonix]
+    CX -->|dials| Callee[Callee phone]
+    CX -->|connects answered call| AI[AI assistant]
+    CX -->|status and CDR webhooks| API
+    CX -.->|audio stream when AMD is on| AMD[AMD worker]
+    AMD -.->|verdict| API
 ```
 
-**Components:**
+1. Every poll (10 seconds by default), the dialer worker asks OPBX for campaigns that are **Active and inside their schedule**.
+2. For each one it fetches a batch of pending numbers, picks a caller ID from the campaign's pool and asks OPBX to place each call, paced by the campaign's rate limits.
+3. OPBX claims the number, builds the call instructions for the routing destination and asks Cloudonix to dial.
+4. When the callee answers, Cloudonix connects the call to the AI assistant.
+5. Cloudonix reports the outcome to OPBX, which updates the number's status and the campaign counters.
 
-| Component | Technology | Responsibility |
-|-----------|------------|----------------|
-| Web UI | React 18 + TypeScript | Campaign configuration and monitoring |
-| API Backend | Laravel 12 (PHP 8.4) | Campaign CRUD, Cloudonix integration, webhook processing |
-| Dialer Worker | Go | Polls for work, rate-limited call initiation |
-| Call Execution | Cloudonix CPaaS | Actual VoIP call execution and CDR delivery |
-| State Storage | Redis | Concurrent call counters, session tracking |
-| Persistent Storage | MySQL | Campaigns, distribution lists, call records |
+The dialer worker has no schedule logic of its own: OPBX decides which campaigns may dial right now.
 
-## Campaign Lifecycle
-
-Campaigns progress through a defined set of states:
+## Campaign lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> Active: Start (requires list)
+    Draft --> Active: Start (needs a list)
     Active --> Paused: Pause
     Paused --> Active: Resume
-    Active --> Completed: All destinations dialed
-    Paused --> Archived: Archive
+    Active --> Completed: every number finished
+    Draft --> Archived: Archive (detail page)
     Active --> Archived: Archive (pauses first)
+    Paused --> Archived: Archive
     Completed --> Archived: Archive
 ```
 
-**State Descriptions:**
+| Status | The list shows | Meaning | Editable |
+|--------|----------------|---------|----------|
+| Draft | Draft | New campaign. Can be deleted | Yes |
+| Active | Running (Active on the detail page) | Dials whenever the schedule allows | No. Pause first |
+| Paused | Paused | No new calls | Yes |
+| Completed | Completed | Every number reached a final state (set automatically within a minute of the last number finishing; see [Managing Campaigns](/opbx/applications/auto-dialer/campaigns#start-pause-resume)) | No |
+| Archived | Archived | Kept for history, hidden by the default filter | No |
 
-| State | Description | Editable |
-|-------|-------------|----------|
-| **Draft** | Initial state. Configure all settings. Must assign a distribution list before starting. | Yes |
-| **Active** | Campaign is dialing. The Go worker polls every 10 seconds to initiate calls. | No (pause first) |
-| **Paused** | No new calls initiated. Active calls continue until they complete. | Yes |
-| **Completed** | All destinations have been processed. Terminal state. | No |
-| **Archived** | Soft-deleted. Terminal state. Hidden from default views. | No |
-
-:::tip
-You can pause an Active campaign at any time to modify its settings. Active calls continue but no new calls are initiated.
+:::note Assigning a list does not start the campaign
+Assigning a distribution list leaves a **Draft** campaign in Draft. Start it when the settings are final.
 :::
 
-## Quick Start
+## Quick start
 
-Get your first campaign running in 5 steps:
+1. **Create the campaign.** **Campaign Manager**, then **Create Campaign**. Choose the routing destination and at least one caller ID, set the schedule, rate limits and (optionally) voicemail detection. The campaign is saved as **Draft**.
+2. **Create the list.** **Distribution Lists**, then **Create List**, then **Upload** on the new list's detail page with a CSV file. Wait until the list shows **Ready**.
+3. **Assign the list and start.** On the list row, click **Assign Campaign** and choose your campaign, then press **Start** on the campaign. It becomes **Active**.
+4. **Watch it.** Open **Real Time Monitor**.
 
-1. **Create a Campaign**: Go to Auto Dialer > Campaign Manager and click Create Campaign. Configure the name, routing destination, caller ID, and rate limits.
+![Campaign Manager with the paused campaign Fall Webinar Follow-up routed to an AI assistant](../../img/screens/auto-dialer-campaign-list.jpg)
 
-2. **Upload a Distribution List**: Go to Auto Dialer > Distribution Lists and click Create List. Upload a CSV file containing phone numbers.
+## Related pages
 
-3. **Assign the List**: Return to Campaign Manager, click your campaign, and assign the distribution list.
-
-4. **Start the Campaign**: Click the status badge or Start button to begin dialing.
-
-5. **Monitor Progress**: Open the Real-Time Monitor to watch calls in progress and track performance.
-
-:::warning
-A campaign requires at least one distribution list assigned before it can be started. You will receive an error if you attempt to start without a list.
-:::
-
-## Next Steps
-
-- Learn about [Managing Campaigns](/applications/auto-dialer/campaigns)
-- Understand [Distribution Lists](/applications/auto-dialer/distribution-lists)
-- Configure [Rate Limiting](/applications/auto-dialer/rate-limiting)
-- Set up [Campaign Scheduling](/applications/auto-dialer/scheduling)
-- Enable [Answering Machine Detection](./answering-machine-detection)
-- Monitor with the [Real-Time Monitor](/applications/auto-dialer/real-time-monitor)
-- Configure [Routing Destinations](/applications/auto-dialer/routing-destinations)
+- [Managing Campaigns](/opbx/applications/auto-dialer/campaigns) — full campaign walk-through
+- [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) — CSV format, statuses and assignment
+- [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling) — timezone, dates and weekly hours
+- [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting) — CAC, CPS, attempts and retries
+- [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) — voicemail handling
+- [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) — where answered calls go
+- [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor) — live view
+- [Auto Dialer Campaigns module](/opbx/modules/auto-dialer-campaigns) and [Distribution Lists module](/opbx/modules/distribution-lists) — field and API reference

@@ -18,10 +18,8 @@ export default function Auth0Onboarding() {
   const [slug, setSlug] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const email = searchParams.get('email') || '';
   const provider = searchParams.get('provider') || '';
-  const subject = searchParams.get('subject') || '';
-  const name = searchParams.get('name') || '';
+  const onboardingId = searchParams.get('onboarding_id') || '';
 
   const createOrganization = async () => {
     setIsSubmitting(true);
@@ -41,15 +39,19 @@ export default function Auth0Onboarding() {
     try {
       await auth0Service.submitJoinRequest({
         organization_slug: slug,
-        provider,
-        provider_subject: subject,
-        email,
-        name,
+        onboarding_id: onboardingId,
       });
       toast.success('Join request submitted. Please wait for approval.');
       navigate('/ui/login');
-    } catch {
-      toast.error('Failed to submit join request.');
+    } catch (error: any) {
+      const emailError = error?.response?.data?.errors?.email?.[0];
+      toast.error(
+        emailError
+          ? emailError
+          : error?.response?.status === 422
+            ? 'Your sign-in session expired. Please sign in again.'
+            : 'Failed to submit join request.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -73,7 +75,7 @@ export default function Auth0Onboarding() {
             <Label htmlFor="slug">Organization slug</Label>
             <Input id="slug" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="acme-corp" />
           </div>
-          <Button onClick={requestJoin} disabled={isSubmitting || !slug} variant="outline" className="w-full">
+          <Button onClick={requestJoin} disabled={isSubmitting || !slug || !onboardingId} variant="outline" className="w-full">
             Request to join organization
           </Button>
         </div>

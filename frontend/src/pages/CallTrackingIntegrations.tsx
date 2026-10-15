@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { useCallTrackingIntegrations, useUpdateCallTrackingIntegrations } from '@/hooks/useCallTrackingIntegrations';
 import type { AdPlatformIntegrationFormData } from '@/services/callTrackingIntegrationsApi';
 
@@ -86,7 +87,7 @@ function FieldError({ message }: { message?: string }) {
 
 export default function CallTrackingIntegrations() {
   const { user } = useAuth();
-  const isReadOnly = ['reporter', 'pbx_user'].includes(user?.role || '');
+  const isReadOnly = !can(user?.role, 'callTracking.integrations');
 
   const { data, isLoading, isError, error } = useCallTrackingIntegrations();
   const updateMutation = useUpdateCallTrackingIntegrations();

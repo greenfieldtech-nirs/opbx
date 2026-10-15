@@ -1,25 +1,45 @@
 type: object
-description: Call Notifications Settings
+description: Call Notifications Settings (organization webhook for call status events)
 properties:
   id:
     type: integer
   organization_id:
     type: integer
   webhook_url:
+    type: string
+    format: uri
+  auth_method:
+    type: string
+    enum: [bearer_token, basic_auth, none]
+  auth_username:
     type:
     - string
     - 'null'
-    format: uri
-  events:
+  has_auth_secret:
+    type: boolean
+    description: Whether a secret is stored (the secret itself is never returned)
+  retry_attempts:
+    type:
+    - integer
+    - 'null'
+  retry_backoff_seconds:
+    type:
+    - integer
+    - 'null'
+  request_timeout_seconds:
+    type:
+    - integer
+    - 'null'
+  enabled_events:
     type: array
     items:
       type: string
-      enum:
-      - call.initiated
-      - call.answered
-      - call.completed
-      - call.missed
-  enabled:
+      enum: [new, ringing, connected, answered, busy, cancel, failed, congestion]
+  rate_limit_per_minute:
+    type:
+    - integer
+    - 'null'
+  is_active:
     type: boolean
   created_at:
     type: string
@@ -30,4 +50,3 @@ properties:
 required:
 - id
 - organization_id
-- enabled

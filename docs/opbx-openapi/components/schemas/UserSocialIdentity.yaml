@@ -1,5 +1,8 @@
 type: object
-description: Social identity linked to a user account
+description: >-
+  Social identity linked to a user account (database model; the API exposes only `provider`
+  and `provider_email`, in `User.social_identities`). A user has at most one identity per
+  provider.
 properties:
   id:
     type: integer
@@ -14,10 +17,7 @@ properties:
     type: string
     enum:
       - google
-      - facebook
-      - microsoft
       - github
-      - x
     description: Social identity provider
     example: google
   provider_subject:
@@ -25,12 +25,16 @@ properties:
     description: Provider-specific subject identifier
     example: '112233445566778899001'
   provider_email:
-    type: string
+    type:
+    - string
+    - 'null'
     format: email
     description: Email address returned by the provider
     example: john.doe@gmail.com
   provider_data:
-    type: object
+    type:
+    - object
+    - 'null'
     description: Raw provider metadata
     additionalProperties: true
     example:
@@ -53,4 +57,3 @@ required:
   - user_id
   - provider
   - provider_subject
-  - provider_email

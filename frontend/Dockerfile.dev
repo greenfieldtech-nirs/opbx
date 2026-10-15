@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/

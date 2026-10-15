@@ -1,0 +1,61 @@
+type: object
+description: One call-notification webhook delivery attempt
+properties:
+  id:
+    type: integer
+  call_session_token:
+    type: string
+  event_id:
+    type: string
+  event_type:
+    type: string
+  status:
+    type:
+    - string
+    - 'null'
+    description: Call status carried by the event
+  webhook_url:
+    type: string
+  request_payload:
+    type:
+    - object
+    - 'null'
+    additionalProperties: true
+  request_headers:
+    type:
+    - object
+    - 'null'
+    description: Request headers with credentials redacted
+    additionalProperties: true
+  request_body:
+    type:
+    - string
+    - 'null'
+  response_status_code:
+    type:
+    - integer
+    - 'null'
+  response_body:
+    type:
+    - string
+    - 'null'
+  response_headers:
+    type:
+    - object
+    - 'null'
+    additionalProperties: true
+  response_time_ms:
+    type:
+    - integer
+    - 'null'
+  attempt_number:
+    type: integer
+  is_success:
+    type: boolean
+  error_message:
+    type:
+    - string
+    - 'null'
+  created_at:
+    type: string
+    format: date-time

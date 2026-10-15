@@ -123,11 +123,8 @@ class IvrMenuControllerTest extends TestCase
         $response = $this->actingAs($this->owner)
             ->postJson('/api/v1/ivr-menus', $data);
 
-        $response->assertCreated();
-        $this->assertDatabaseHas('ivr_menus', [
-            'name' => 'Test Menu',
-            'organization_id' => $this->organization->id,
-        ]);
+        $response->assertUnprocessable()->assertJsonValidationErrors(['options.0.destination_id']);
+        $this->assertDatabaseMissing('ivr_menus', ['name' => 'Test Menu']);
     }
 
     /** @test */
@@ -169,7 +166,7 @@ class IvrMenuControllerTest extends TestCase
     }
 
     /** @test */
-    public function it_allows_self_referencing_ivr_menu(): void
+    public function it_allows_self_referencing_failover_and_options(): void
     {
         $ivrMenu = IvrMenu::factory()->create([
             'organization_id' => $this->organization->id,
@@ -191,6 +188,12 @@ class IvrMenuControllerTest extends TestCase
                     'destination_id' => $this->extension->id,
                     'priority' => 1,
                 ],
+                [
+                    'input_digits' => '9', // repeat this menu
+                    'destination_type' => 'ivr_menu',
+                    'destination_id' => $ivrMenu->id,
+                    'priority' => 2,
+                ],
             ],
         ];
 
@@ -198,11 +201,7 @@ class IvrMenuControllerTest extends TestCase
             ->putJson("/api/v1/ivr-menus/{$ivrMenu->id}", $data);
 
         $response->assertOk();
-        $this->assertDatabaseHas('ivr_menus', [
-            'id' => $ivrMenu->id,
-            'failover_destination_type' => 'ivr_menu',
-            'failover_destination_id' => $ivrMenu->id,
-        ]);
+        $this->assertDatabaseHas('ivr_menus', ['id' => $ivrMenu->id, 'failover_destination_id' => $ivrMenu->id]);
     }
 
     /** @test */
@@ -215,7 +214,7 @@ class IvrMenuControllerTest extends TestCase
         $response = $this->actingAs($this->owner)
             ->deleteJson("/api/v1/ivr-menus/{$ivrMenu->id}");
 
-        $response->assertOk();
+        $response->assertNoContent();
         $this->assertDatabaseMissing('ivr_menus', ['id' => $ivrMenu->id]);
     }
 
@@ -250,7 +249,7 @@ class IvrMenuControllerTest extends TestCase
             ->assertJsonStructure([
                 'error',
                 'message',
-                'references' => ['ivr_menus'],
+                'references' => [['type', 'id', 'name', 'detail']],
             ]);
 
         $this->assertDatabaseHas('ivr_menus', ['id' => $referencedMenu->id]);
@@ -283,5 +282,134 @@ class IvrMenuControllerTest extends TestCase
             ->getJson("/api/v1/ivr-menus/{$ivrMenu->id}");
 
         $response->assertNotFound();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validPayload(?int $destinationId = null, string $type = 'extension'): array
+    {
+        return [
+            'name' => 'Menu',
+            'tts_text' => 'Hello',
+            'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
+            'failover_destination_type' => 'hangup',
+            'status' => 'active',
+            'options' => [[
+                'input_digits' => '1',
+                'destination_type' => $type,
+                'destination_id' => (string) ($destinationId ?? $this->extension->id),
+                'priority' => 1,
+            ]],
+        ];
+    }
+
+    /** @test */
+    public function it_forbids_non_admin_roles_from_writing(): void
+    {
+        $menu = IvrMenu::factory()->create(['organization_id' => $this->organization->id]);
+
+        foreach ([UserRole::REPORTER, UserRole::PBX_USER] as $role) {
+            $user = User::factory()->create(['organization_id' => $this->organization->id, 'role' => $role]);
+
+            $this->actingAs($user)->postJson('/api/v1/ivr-menus', $this->validPayload())->assertForbidden();
+            $this->actingAs($user)->putJson("/api/v1/ivr-menus/{$menu->id}", $this->validPayload())->assertForbidden();
+            $this->actingAs($user)->deleteJson("/api/v1/ivr-menus/{$menu->id}")->assertForbidden();
+            $this->actingAs($user)->patchJson("/api/v1/ivr-menus/{$menu->id}/toggle-status", ['status' => 'inactive'])->assertForbidden();
+            $this->actingAs($user)->getJson('/api/v1/ivr-menus')->assertOk();
+        }
+
+        $this->assertDatabaseHas('ivr_menus', ['id' => $menu->id, 'status' => $menu->status->value ?? $menu->status]);
+    }
+
+    /** @test */
+    public function it_filters_the_index_by_status(): void
+    {
+        $active = IvrMenu::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $inactive = IvrMenu::factory()->create(['organization_id' => $this->organization->id, 'status' => 'inactive']);
+
+        $ids = $this->actingAs($this->owner)->getJson('/api/v1/ivr-menus?status=inactive')
+            ->assertOk()->json('data.*.id');
+
+        $this->assertSame([$inactive->id], $ids);
+        $this->assertNotContains($active->id, $ids);
+    }
+
+    /** @test */
+    public function it_ignores_organization_id_on_update(): void
+    {
+        $other = Organization::factory()->create();
+        $menu = IvrMenu::factory()->create(['organization_id' => $this->organization->id]);
+
+        $this->actingAs($this->owner)
+            ->putJson("/api/v1/ivr-menus/{$menu->id}", $this->validPayload() + ['organization_id' => $other->id])
+            ->assertOk();
+
+        $this->assertSame($this->organization->id, $menu->fresh()->organization_id);
+    }
+
+    /** @test */
+    public function it_rejects_cross_tenant_destinations(): void
+    {
+        $other = Organization::factory()->create();
+        $foreign = Extension::factory()->create(['organization_id' => $other->id, 'extension_number' => '2001']);
+
+        $this->actingAs($this->owner)
+            ->postJson('/api/v1/ivr-menus', $this->validPayload($foreign->id))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['options.0.destination_id']);
+    }
+
+    /** @test */
+    public function admin_can_create_update_and_toggle(): void
+    {
+        $admin = User::factory()->create(['organization_id' => $this->organization->id, 'role' => UserRole::PBX_ADMIN]);
+
+        $id = $this->actingAs($admin)->postJson('/api/v1/ivr-menus', $this->validPayload())
+            ->assertCreated()->json('data.id');
+
+        $this->actingAs($admin)->putJson("/api/v1/ivr-menus/{$id}", $this->validPayload())->assertOk();
+        $this->actingAs($admin)->patchJson("/api/v1/ivr-menus/{$id}/toggle-status", ['status' => 'inactive'])->assertOk();
+        $this->assertDatabaseHas('ivr_menus', ['id' => $id, 'status' => 'inactive']);
+    }
+
+    /** @return array<string, mixed> */
+    private function menuWithDigits(string ...$digits): array
+    {
+        return [
+            'name' => 'Dup Menu',
+            'tts_text' => 'Hello',
+            'max_turns' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
+            'failover_destination_type' => 'hangup',
+            'status' => 'active',
+            'options' => array_map(fn (string $d, int $i) => [
+                'input_digits' => $d,
+                'destination_type' => 'extension',
+                'destination_id' => $this->extension->id,
+                'priority' => $i + 1,
+            ], $digits, array_keys($digits)),
+        ];
+    }
+
+    public function test_duplicate_option_digits_are_a_validation_error_on_create(): void
+    {
+        $response = $this->actingAs($this->owner)->postJson('/api/v1/ivr-menus', $this->menuWithDigits('1', '2', '1'));
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['options.2.input_digits']);
+        $this->assertSame('Each menu option must use a different key.', $response->json('errors')['options.2.input_digits'][0]);
+        $this->assertDatabaseMissing('ivr_menus', ['name' => 'Dup Menu']);
+    }
+
+    public function test_duplicate_option_digits_are_a_validation_error_on_update(): void
+    {
+        $menu = $this->actingAs($this->owner)->postJson('/api/v1/ivr-menus', $this->menuWithDigits('1', '2'))->assertCreated()->json('data.id');
+
+        $this->actingAs($this->owner)->putJson("/api/v1/ivr-menus/{$menu}", $this->menuWithDigits('3', '3'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['options.1.input_digits']);
     }
 }

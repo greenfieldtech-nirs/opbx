@@ -8,6 +8,12 @@ paths:
         Start the Auth0 Universal Login / social-provider OAuth flow.
         Returns the Auth0 authorize URL and a state token the client should
         use when handling the callback.
+
+        Only `google` and `github` are supported; any other `provider` (for example
+        `facebook`, `microsoft` or `x`) fails validation with 422. A supported provider
+        that is not in `AUTH0_PROVIDERS` returns 400 `AUTH0_INVALID_PROVIDER`.
+
+        Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
       operationId: auth0Redirect
       security: []
       requestBody:
@@ -37,7 +43,7 @@ paths:
                   - redirect_url
                   - state
         '400':
-          description: Invalid provider
+          description: Provider is supported but not enabled in `AUTH0_PROVIDERS`
           content:
             application/json:
               schema:
@@ -45,7 +51,7 @@ paths:
               example:
                 error:
                   code: AUTH0_INVALID_PROVIDER
-                  message: Invalid provider selected.
+                  message: 'Unsupported or disabled provider: github'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
         '429':
@@ -69,6 +75,15 @@ paths:
         Callback endpoint invoked by the browser after Auth0 authentication.
         Exchanges the authorization `code` and `state` for a user profile and
         completes login, registration, account linking, or invitation acceptance.
+
+        - Login / register / invitation: returns a bearer token (24 hours).
+          With intent `register` and no existing account, a new organization and
+          owner are created. With intent `login` and no existing account, the
+          response is `409 AUTH0_REGISTRATION_REQUIRED` with an `onboarding_id`
+          (the verified profile is kept server-side for 60 minutes).
+        - Link: returns `{"message": "Identity linked successfully."}`.
+
+        Rate limited to 5 requests per minute per IP (`RATE_LIMIT_AUTH`).
       operationId: auth0Callback
       security: []
       parameters:
@@ -101,6 +116,16 @@ paths:
                         example: Identity linked successfully.
                     required:
                       - message
+        '403':
+          description: Resolved user account is not active
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                error:
+                  code: ACCOUNT_INACTIVE
+                  message: Account is not active.
         '400':
           description: Invalid callback parameters or state
           content:
@@ -119,64 +144,79 @@ paths:
                   value:
                     error:
                       code: AUTH0_INVALID_STATE
-                      message: State validation failed.
+                      message: Invalid provider in state.
         '409':
-          description: Account conflict or registration required
+          description: Account conflict, identity already linked, or registration required
           content:
             application/json:
               schema:
-                oneOf:
-                  - title: Account Exists
+                type: object
+                properties:
+                  error:
                     type: object
                     properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            type: string
-                            example: AUTH0_ACCOUNT_EXISTS
-                          message:
-                            type: string
-                            example: An account with this email already exists. Please log in with your password and link this account in Profile settings.
-                        required:
-                          - code
-                          - message
-                  - title: Registration Required
+                      code:
+                        type: string
+                        enum:
+                          - AUTH0_ACCOUNT_EXISTS
+                          - AUTH0_LINK_ALREADY_LINKED
+                          - AUTH0_REGISTRATION_REQUIRED
+                      message:
+                        type: string
+                    required:
+                      - code
+                      - message
+                  profile:
                     type: object
+                    description: Only with `AUTH0_REGISTRATION_REQUIRED`
                     properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            type: string
-                            example: AUTH0_REGISTRATION_REQUIRED
-                          message:
-                            type: string
-                            example: Please complete onboarding.
-                        required:
-                          - code
-                          - message
-                      profile:
-                        type: object
-                        properties:
-                          email:
-                            type: string
-                            format: email
-                            example: john.doe@example.com
-                          name:
-                            type: string
-                            example: John Doe
-                          provider:
-                            type: string
-                            example: google
-                          subject:
-                            type: string
-                            example: '112233445566778899001'
-                        required:
-                          - email
-                          - name
-                          - provider
-                          - subject
+                      onboarding_id:
+                        type: string
+                        description: >-
+                          Opaque 48-character id of the verified profile, cached
+                          server-side for 60 minutes; pass it to the organization
+                          join-request flow.
+                      email:
+                        type: string
+                        format: email
+                        example: john.doe@example.com
+                      name:
+                        type: string
+                        example: John Doe
+                      provider:
+                        type: string
+                        example: google
+                    required:
+                      - onboarding_id
+                      - email
+                      - name
+                      - provider
+                required:
+                  - error
+              examples:
+                accountExists:
+                  summary: Account with this email already exists
+                  value:
+                    error:
+                      code: AUTH0_ACCOUNT_EXISTS
+                      message: An account with this email already exists. Please log in with your password and link this account in Profile settings.
+                alreadyLinked:
+                  summary: Identity already linked (link intent)
+                  value:
+                    error:
+                      code: AUTH0_LINK_ALREADY_LINKED
+                      message: This account is already linked to another user.
+                registrationRequired:
+                  summary: No account; onboarding required (login intent)
+                  value:
+                    error:
+                      code: AUTH0_REGISTRATION_REQUIRED
+                      message: Please complete onboarding.
+                    profile:
+                      onboarding_id: 3fJk9qLm2NpR7sTv4WxY8zAb1CdE5fGh6IjK0lMn3OpQ7rSt
+                      email: john.doe@example.com
+                      name: John Doe
+                      provider: google
         '410':
           description: Invitation user is invalid or already activated
           content:
@@ -205,7 +245,13 @@ paths:
                   value:
                     error:
                       code: INVITE_EMAIL_MISMATCH
-                      message: Auth0 email does not match the invitation email.
+                      message: Email does not match invitation.
+                linkEmailMismatch:
+                  summary: Linked identity email differs from the account email
+                  value:
+                    error:
+                      code: AUTH0_LINK_EMAIL_MISMATCH
+                      message: Auth0 email does not match your account email.
         '429':
           $ref: '../../components/responses/TooManyRequests.yaml'
         '500':
@@ -240,7 +286,6 @@ paths:
       operationId: auth0Link
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -252,10 +297,7 @@ paths:
                   type: string
                   enum:
                     - google
-                    - facebook
-                    - microsoft
                     - github
-                    - x
                   description: Social identity provider to link
                   example: google
               required:
@@ -284,8 +326,6 @@ paths:
           $ref: '../../components/responses/Unauthorized.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
-        '429':
-          $ref: '../../components/responses/TooManyRequests.yaml'
         '503':
           description: Auth0 is not configured
           content:
@@ -305,7 +345,6 @@ paths:
       operationId: auth0Unlink
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -317,10 +356,7 @@ paths:
                   type: string
                   enum:
                     - google
-                    - facebook
-                    - microsoft
                     - github
-                    - x
                   description: Social identity provider to unlink
                   example: google
               required:

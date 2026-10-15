@@ -4,11 +4,14 @@ paths:
       tags:
       - Extensions
       summary: List extensions
-      description: Get paginated list of extensions in the organization
+      description: >-
+        Paginated list of the organization's extensions. Every role can list all extensions of
+        the organization. Unknown `sort_by`, `type` or `status` values are ignored.
       operationId: listExtensions
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
@@ -18,10 +21,10 @@ paths:
           type: string
           enum:
           - extension_number
-          - name
           - type
           - status
           - created_at
+          - updated_at
           default: extension_number
       - $ref: ../../components/parameters/query/SortOrder.yaml
       - name: type
@@ -34,7 +37,9 @@ paths:
           - ring_group
           - ivr
           - ai_assistant
+          - custom_logic
           - forward
+          - queue
           - ai_load_balancer
       - name: status
         in: query
@@ -43,11 +48,17 @@ paths:
           enum:
           - active
           - inactive
+          - pending
+      - name: user_id
+        in: query
+        schema:
+          type: integer
+        description: Only extensions assigned to this user
       - name: search
         in: query
         schema:
           type: string
-        description: Search in extension number or name
+        description: Substring match on the extension number
       responses:
         '200':
           description: List of extensions
@@ -64,15 +75,21 @@ paths:
                     $ref: ../../components/schemas/PaginationMeta.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
     post:
       tags:
       - Extensions
       summary: Create extension
-      description: Create a new extension
+      description: >-
+        Create a new extension. Owner and PBX Admin only. A `user` extension gets a generated
+        SIP password and is pushed to Cloudonix as a subscriber; a failed Cloudonix push does
+        not fail the request.
       operationId: createExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       requestBody:
         required: true
         content:
@@ -82,13 +99,14 @@ paths:
               properties:
                 extension_number:
                   type: string
-                  description: Extension number (must be unique in organization)
+                  pattern: ^\d{3,5}$
+                  description: 3-5 digits, unique in the organization
                   example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
-                  description: User ID (required for USER type)
+                  description: Assigned user ID (a user of the organization). Only allowed on `user` extensions.
                 type:
                   type: string
                   enum:
@@ -99,6 +117,7 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
                   example: user
                 status:
@@ -106,22 +125,73 @@ paths:
                   enum:
                   - active
                   - inactive
+                  - pending
                   default: active
+                  example: active
                 voicemail_enabled:
                   type: boolean
-                  default: true
+                  default: false
+                  description: Can be true only on `user` extensions.
                 configuration:
                   type: object
+                  description: Type-specific settings. The key for the extension's type is required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`. Must be an active call queue of the organization.
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`.
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`. Must be an AI load balancer of the organization.
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
                   additionalProperties: true
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
                 default_caller_id_did_id:
                   type:
                   - integer
                   - 'null'
-                  description: Must reference an active DID owned by the authenticated organization.
+                  description: >-
+                    A phone number (DID) of the organization. Used as the outbound caller ID only
+                    while that DID is active.
               required:
               - extension_number
               - type
@@ -139,6 +209,8 @@ paths:
                     $ref: ../../components/schemas/Extension.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '422':
           $ref: ../../components/responses/ValidationError.yaml
   /v1/extensions/{extension}:
@@ -146,10 +218,14 @@ paths:
       tags:
       - Extensions
       summary: Get extension
+      description: >-
+        Owner, PBX Admin, PBX User and Reporter can read any extension of the organization; a
+        Supervisor only the extensions of the users assigned to them.
       operationId: getExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:read
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       responses:
@@ -164,16 +240,25 @@ paths:
                     $ref: ../../components/schemas/Extension.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
     put:
       tags:
       - Extensions
       summary: Update extension
+      description: >-
+        All fields are optional. Owner and PBX Admin can update any extension, except that only
+        an Owner can update an extension assigned to an Owner. A PBX User can update only their
+        own extension and cannot change `type`, `user_id` or `status`. Supervisor and Reporter
+        get 403. Changing `type` to or from `user` creates or removes the Cloudonix subscriber
+        and the SIP password.
       operationId: updateExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       requestBody:
@@ -185,10 +270,14 @@ paths:
               properties:
                 extension_number:
                   type: string
+                  pattern: ^\d{3,5}$
+                  description: Cannot be changed after creation; only the current value is accepted.
+                  example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
+                  description: Assigned user ID (a user of the organization). Only allowed on `user` extensions.
                 type:
                   type: string
                   enum:
@@ -199,25 +288,81 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
+                  example: user
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
+                  example: active
                 voicemail_enabled:
                   type: boolean
+                  description: Can be true only on `user` extensions.
                 configuration:
                   type: object
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
+                  description: >-
+                    Type-specific settings. When `type` is sent, the key for that type is
+                    required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`. Must be an active call queue of the organization.
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`.
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`. Must be an AI load balancer of the organization.
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
+                  additionalProperties: true
                 default_caller_id_did_id:
                   type:
                   - integer
                   - 'null'
-                  description: Must reference an active DID owned by the authenticated organization.
+                  description: >-
+                    A phone number (DID) of the organization. Used as the outbound caller ID only
+                    while that DID is active.
       responses:
         '200':
           description: Extension updated
@@ -232,6 +377,8 @@ paths:
                     $ref: ../../components/schemas/Extension.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
@@ -240,10 +387,12 @@ paths:
       tags:
       - Extensions
       summary: Partially update extension
+      description: Same as `PUT`.
       operationId: patchExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       requestBody:
@@ -255,10 +404,14 @@ paths:
               properties:
                 extension_number:
                   type: string
+                  pattern: ^\d{3,5}$
+                  description: Cannot be changed after creation; only the current value is accepted.
+                  example: '1001'
                 user_id:
                   type:
                   - integer
                   - 'null'
+                  description: Assigned user ID (a user of the organization). Only allowed on `user` extensions.
                 type:
                   type: string
                   enum:
@@ -269,25 +422,81 @@ paths:
                   - ai_assistant
                   - custom_logic
                   - forward
+                  - queue
                   - ai_load_balancer
+                  example: user
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
+                  example: active
                 voicemail_enabled:
                   type: boolean
+                  description: Can be true only on `user` extensions.
                 configuration:
                   type: object
-                ai_assistant_id:
-                  type:
-                  - integer
-                  - 'null'
+                  description: >-
+                    Type-specific settings. When `type` is sent, the key for that type is
+                    required.
+                  properties:
+                    conference_room_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `conference`
+                    ring_group_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ring_group`
+                    call_queue_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `queue`. Must be an active call queue of the organization.
+                    ivr_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ivr`
+                    ai_assistant_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_assistant`. Must be an AI assistant of the organization; also stored as the extension's `ai_assistant_id`.
+                    ai_load_balancer_id:
+                      type:
+                      - integer
+                      - 'null'
+                      description: Required for `ai_load_balancer`. Must be an AI load balancer of the organization.
+                    container_application_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    container_block_name:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 255
+                      description: Required for `custom_logic`
+                    forward_to:
+                      type:
+                      - string
+                      - 'null'
+                      maxLength: 50
+                      description: Required for `forward`
+                  additionalProperties: true
                 default_caller_id_did_id:
                   type:
                   - integer
                   - 'null'
-                  description: Must reference an active DID owned by the authenticated organization.
+                  description: >-
+                    A phone number (DID) of the organization. Used as the outbound caller ID only
+                    while that DID is active.
       responses:
         '200':
           description: Extension updated
@@ -302,6 +511,8 @@ paths:
                     $ref: ../../components/schemas/Extension.yaml
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
@@ -310,10 +521,16 @@ paths:
       tags:
       - Extensions
       summary: Delete extension
+      description: >-
+        Owner and PBX Admin only (only an Owner can delete an extension assigned to an Owner).
+        Refused with 409 when the extension is still referenced (for example by a ring group
+        member, a queue membership, or a blacklist entry); the 409 body lists
+        the references. A `user` extension is removed from Cloudonix first.
       operationId: deleteExtension
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: extensions:write
       parameters:
       - $ref: ../../components/parameters/path/ExtensionId.yaml
       responses:
@@ -321,5 +538,9 @@ paths:
           description: Extension deleted
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
+        '403':
+          $ref: ../../components/responses/Forbidden.yaml
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '409':
+          $ref: ../../components/responses/ResourceInUse.yaml

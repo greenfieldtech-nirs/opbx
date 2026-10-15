@@ -1,0 +1,8 @@
+name: unprovisioned
+in: query
+required: false
+description: >-
+  When 1/true, return only unprovisioned resources, i.e. those that hold at least one
+  route of type `unavailable` (saved for future use, see `is_unprovisioned`).
+schema:
+  type: boolean

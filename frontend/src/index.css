@@ -1,6 +1,32 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
 
 @layer base {
   :root {
@@ -52,6 +78,11 @@
 @layer base {
   * {
     @apply border-border;
+  }
+  /* Tailwind 4 buttons default to cursor: default; keep the v3 pointer. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
   body {
     @apply bg-background text-foreground;
@@ -391,5 +422,48 @@
   to {
     transform: rotateY(0deg);
     opacity: 1;
+  }
+}
+
+/* Global page loading indicator (see components/Layout/PageLoadingIndicator) */
+.page-loader {
+  animation: page-loader-fade-in 150ms ease-out both;
+}
+
+.page-loader-bar {
+  animation: page-loader-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes page-loader-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-loader-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Users who ask for less motion still get the overlay, just without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .page-loader {
+    animation: none;
+  }
+
+  .page-loader-bar {
+    animation: none;
+    width: 100%;
+  }
+
+  .page-loader-spinner {
+    animation: none;
   }
 }

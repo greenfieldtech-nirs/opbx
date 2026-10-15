@@ -7,7 +7,50 @@ paths:
       operationId: getBlacklistStatistics
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:read
       responses:
         '200':
-          description: Statistics retrieved
+          description: Statistics (cached for 5 minutes)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_entries:
+                        type: integer
+                      active_entries:
+                        type: integer
+                      global_entries:
+                        type: integer
+                      by_strategy:
+                        type: object
+                        properties:
+                          drop:
+                            type: integer
+                          reject:
+                            type: integer
+                          torment:
+                            type: integer
+                      by_match_type:
+                        type: object
+                        properties:
+                          exact:
+                            type: integer
+                          prefix:
+                            type: integer
+                          wildcard:
+                            type: integer
+                      total_blocked_calls:
+                        type: integer
+                      blocked_calls_today:
+                        type: integer
+                      blocked_calls_this_week:
+                        type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

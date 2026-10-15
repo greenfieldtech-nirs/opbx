@@ -8,8 +8,6 @@ import api from './api';
 import { outboundWhitelistService as baseOutboundWhitelistService } from './createResourceService';
 import type {
   OutboundWhitelist,
-  CreateOutboundWhitelistRequest,
-  UpdateOutboundWhitelistRequest,
 } from '@/types';
 
 export const outboundWhitelistService = {

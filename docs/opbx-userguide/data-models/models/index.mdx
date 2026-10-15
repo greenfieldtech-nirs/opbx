@@ -13,75 +13,95 @@ OPBX uses Laravel Eloquent models. Most models are scoped by `organization_id` t
 
 ### Auto Dialer
 
-- [AutoDialerCampaign](./auto-dialer-campaign) — Campaign configuration
-- [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id) — Caller ID pool pivot
-- [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat) — Per-Caller ID statistics
-- `App\Models\AutoDialerList` — Distribution lists (`auto_dialer_lists`)
-- `App\Models\AutoDialerDestination` — List destinations (`auto_dialer_destinations`)
-- `App\Models\AutoDialerCallSession` — Campaign call sessions (`auto_dialer_call_sessions`)
+- [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign) — Campaign configuration
+- [AutoDialerCampaignCallerId](/opbx/data-models/models/auto-dialer-campaign-caller-id) — Caller ID pool pivot
+- [AutoDialerCallerIdStat](/opbx/data-models/models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
+- [AutoDialerList](/opbx/data-models/models/auto-dialer-lists#autodialerlist) — Distribution lists (`auto_dialer_lists`)
+- [AutoDialerDestination](/opbx/data-models/models/auto-dialer-lists#autodialerdestination) — List destinations (`auto_dialer_destinations`)
+- [AutoDialerListVersion](/opbx/data-models/models/auto-dialer-lists#autodialerlistversion) — Previous versions of a list (`auto_dialer_list_versions`)
+- [AutoDialerListVersionDestination](/opbx/data-models/models/auto-dialer-lists#autodialerlistversiondestination) — Numbers of a previous version (`auto_dialer_list_version_destinations`)
+- [AutoDialerCallSession](/opbx/data-models/models/auto-dialer-lists#autodialercallsession) — Campaign call sessions (`auto_dialer_call_sessions`)
 
 ### Call & Logging
 
-- `App\Models\CallDetailRecord` — CDR from Cloudonix (`call_detail_records`)
-- [SessionUpdate](./session-updates) — Real-time session events (`session_updates`)
-- [CallNotificationsSettings](./call-notifications-settings) — Webhook notification config (`call_notifications_settings`)
-- `App\Models\CallNotificationLog` — Notification delivery log (`call_notification_logs`)
-- [EmailLog](./email-logs) — Transactional email log (`email_logs`)
-- [PlatformAuditLog](./platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
-
-### Call Tracking
-
-- [CallTrackingCampaign](./call-tracking-campaign) — Marketing campaign attribution (`call_tracking_campaigns`)
-- [CallTrackingNumber](./call-tracking-number) — DID-to-campaign assignment (`call_tracking_numbers`)
-- [CallTrackingSession](./call-tracking-session) — Attributed call session (`call_tracking_sessions`)
-- [CallTrackingNotificationSettings](./call-tracking-notification-settings) — Per-campaign webhook settings (`call_tracking_notification_settings`)
-- `App\Models\CallTrackingNotificationLog` — Notification delivery log (`call_tracking_notification_logs`)
-- `App\Models\CallTrackingAdPlatformIntegration` — Google Ads / Meta settings (`call_tracking_ad_platform_integrations`)
+- [CallDetailRecord](/opbx/data-models/models/call-detail-record) — CDR from Cloudonix (`call_detail_records`), with the warm-tier `ArchivedCallDetailRecord` (`archived_call_detail_records`)
+- [CallLog](/opbx/data-models/models/logs-and-integrations#calllog) — Legacy call log, created by the `call-initiated` webhook (`call_logs`)
+- [SessionUpdate](/opbx/data-models/models/session-updates) — Real-time session events (`session_updates`)
+- [CallNotificationsSettings](/opbx/data-models/models/call-notifications-settings) — Webhook notification config (`call_notifications_settings`)
+- [CallNotificationLog](/opbx/data-models/models/logs-and-integrations#callnotificationlog) — Notification delivery log (`call_notification_logs`)
+- [EmailLog](/opbx/data-models/models/email-logs) — Transactional email log (`email_logs`)
+- [PlatformAuditLog](/opbx/data-models/models/platform-audit-logs) — Cross-tenant audit trail (`platform_audit_logs`)
+- [PlatformHealthCheck](/opbx/data-models/models/platform-health-check) — Platform Status history (`platform_health_checks`)
 
 ### Core PBX
 
-- `App\Models\Extension` — PBX extensions (`extensions`)
-- `App\Models\DidNumber` — Phone numbers (`did_numbers`)
-- `App\Models\RingGroup` — Ring groups (`ring_groups`)
-- `App\Models\RingGroupMember` — Ring group members (`ring_group_members`)
-- `App\Models\IvrMenu` — IVR menus (`ivr_menus`)
-- `App\Models\IvrMenuOption` — IVR options (`ivr_menu_options`)
-- `App\Models\BusinessHoursSchedule` — Business hours (`business_hours_schedules`)
-- `App\Models\BusinessHoursScheduleDay` — Schedule days (`business_hours_schedule_days`)
-- `App\Models\BusinessHoursTimeRange` — Time ranges (`business_hours_time_ranges`)
-- `App\Models\BusinessHoursException` — Exceptions (`business_hours_exceptions`)
-- `App\Models\ConferenceRoom` — Conference rooms (`conference_rooms`)
+- [Extension](/opbx/data-models/models/extensions-and-numbers#extension) — PBX extensions (`extensions`)
+- [DidNumber](/opbx/data-models/models/extensions-and-numbers#didnumber) — Phone numbers (`did_numbers`)
+- [RingGroup](/opbx/data-models/models/ring-groups#ringgroup) — Ring groups (`ring_groups`)
+- [RingGroupMember](/opbx/data-models/models/ring-groups#ringgroupmember) — Ring group members (`ring_group_members`)
+- [IvrMenu](/opbx/data-models/models/ivr-menus#ivrmenu) — IVR menus (`ivr_menus`)
+- [IvrMenuOption](/opbx/data-models/models/ivr-menus#ivrmenuoption) — IVR options (`ivr_menu_options`)
+- [BusinessHoursSchedule](/opbx/data-models/models/business-hours#businesshoursschedule) — Business hours (`business_hours_schedules`)
+- [BusinessHoursScheduleDay](/opbx/data-models/models/business-hours#businesshoursscheduleday) — Schedule days (`business_hours_schedule_days`)
+- [BusinessHoursTimeRange](/opbx/data-models/models/business-hours#businesshourstimerange) — Time ranges (`business_hours_time_ranges`)
+- [BusinessHoursException](/opbx/data-models/models/business-hours#businesshoursexception) — Exceptions (`business_hours_exceptions`)
+- [BusinessHoursExceptionTimeRange](/opbx/data-models/models/business-hours#businesshoursexceptiontimerange) — Exception time ranges (`business_hours_exception_time_ranges`)
+- [BusinessHours](/opbx/data-models/models/business-hours#businesshours-legacy) — Legacy model on `business_hours_schedules`; use `BusinessHoursSchedule`
+- [ConferenceRoom](/opbx/data-models/models/extensions-and-numbers#conferenceroom) — Conference rooms (`conference_rooms`)
+
+### Call Queues
+
+- [CallQueue](/opbx/data-models/models/call-queues#callqueue) — Call queues (`call_queues`)
+- [CallQueueAgent](/opbx/data-models/models/call-queues#callqueueagent) — Queue agent membership (`call_queue_agents`)
+- [QueueCall](/opbx/data-models/models/call-queues#queuecall) — One row per queued call, for reports (`queue_calls`)
+
+Live queue state (positions, agent states) is not in MySQL; the [ACD worker](/opbx/workers/acd-worker) keeps it in Redis.
 
 ### AI Integration
 
-- `App\Models\AiAssistant` — AI assistants (`ai_assistants`)
-- `App\Models\AiAssistantLoadBalancer` — Load balancers (`ai_assistant_load_balancers`)
-- `App\Models\AiAssistantLoadBalancerMember` — Load balancer members (`ai_assistant_load_balancer_members`)
+- [AiAssistant](/opbx/data-models/models/ai-assistants#aiassistant) — AI assistants (`ai_assistants`)
+- [AiAssistantLoadBalancer](/opbx/data-models/models/ai-assistants#aiassistantloadbalancer) — Load balancers (`ai_assistant_load_balancers`)
+- [AiAssistantLoadBalancerMember](/opbx/data-models/models/ai-assistants#aiassistantloadbalancermember) — Load balancer members (`ai_assistant_load_balancer_members`)
 
 ### Recordings
 
-- `App\Models\Recording` — Audio files (`recordings`)
+- [Recording](/opbx/data-models/models/recordings#recording) — Audio files (`recordings`)
 
 ### Security
 
-- `App\Models\InboundBlacklist` — Blocked caller patterns (`inbound_blacklists`)
-- `App\Models\OutboundWhitelist` — Outbound routing rules (`outbound_whitelists`)
-- `App\Models\BlockedCallLog` — Log of blocked calls (`blocked_call_logs`)
+- [InboundBlacklist](/opbx/data-models/models/security#inboundblacklist) — Blocked caller patterns (`inbound_blacklists`), linked to numbers through `inbound_blacklist_did_number`
+- [OutboundWhitelist](/opbx/data-models/models/security#outboundwhitelist) — Outbound routing rules (`outbound_whitelists`)
+- [BlockedCallLog](/opbx/data-models/models/security#blockedcalllog) — Log of blocked calls (`blocked_call_logs`)
 
 ### Users & Organizations
 
-- `App\Models\User` — User accounts (`users`)
-- `App\Models\Organization` — Multi-tenant organizations (`organizations`)
-- [CloudonixSettings](./cloudonix-settings) — Cloudonix credentials per org (`cloudonix_settings`)
+- [User](/opbx/data-models/models/users-and-organizations#user) — User accounts (`users`)
+- [Organization](/opbx/data-models/models/users-and-organizations#organization) — Multi-tenant organizations (`organizations`)
+- [CloudonixSettings](/opbx/data-models/models/cloudonix-settings) — Cloudonix credentials per org (`cloudonix_settings`)
+- [OrganizationJoinRequest](/opbx/data-models/models/users-and-organizations#organizationjoinrequest) — Requests to join an organization (`organization_join_requests`)
+- [UserSocialIdentity](/opbx/data-models/models/users-and-organizations#usersocialidentity) — Linked Auth0 social identities (`user_social_identities`)
+- [UserEmbedToken](/opbx/data-models/models/users-and-organizations#userembedtoken) — Embeddable dialer tokens (`user_embed_tokens`)
+- Supervisor assignments (`supervisor_user_assignments`, `supervisor_ring_group_assignments`) — pivot tables without a model, see [Users and Organizations](/opbx/data-models/models/users-and-organizations#supervisor_user_assignments)
+
+### API Access
+
+- [PersonalAccessToken](/opbx/data-models/models/api-access#personalaccesstoken) — Sanctum tokens (`personal_access_tokens`)
+- [ApiKey](/opbx/data-models/models/api-access#apikey) — Organization API keys, `opbxk_` prefix (`api_keys`)
+- [ApiKeyPermission](/opbx/data-models/models/api-access#apikeypermission) — Per-resource API key permissions (`api_key_permissions`)
+
+### Framework Tables
+
+These tables belong to Laravel and have no OPBX model: `migrations`, `sessions`, `password_reset_tokens`, `cache`, `cache_locks`, `jobs`, `job_batches` and `failed_jobs`. `locks` is used by `App\Services\Fallback\DatabaseLockService`, a database lock with an `expires_at` column.
 
 ## Tenancy Notes
 
 - Models with `#[ScopedBy([OrganizationScope::class])]` are automatically filtered by the authenticated user's organization.
 - Webhook handlers and platform admin operations must use `OrganizationScope::bypass()` when querying tenant-scoped models.
-- `PlatformAuditLog` and `EmailLog` are not tenant-scoped.
+- Not tenant-scoped: `Organization`, `PlatformAuditLog`, `PlatformHealthCheck`, `EmailLog`, `ApiKey`, `ApiKeyPermission`, `PersonalAccessToken`, `UserSocialIdentity` and the child tables reached through a scoped parent (`RingGroupMember`, `IvrMenuOption`, `AiAssistantLoadBalancerMember`, the business-hours days, ranges and exceptions, `AutoDialerCampaignCallerId`, `AutoDialerCallerIdStat`).
+- Rows of several tables are pruned daily by retention settings; call records are tiered instead. See [Data Retention](/opbx/data-models/configuration/index#data-retention).
 
 ## Related Documentation
 
-- [Enumerations](../enums/index)
-- [Configuration Reference](../configuration/index)
-- [Data Models Overview](../../data-models)
+- [Enumerations](/opbx/data-models/enums/index)
+- [Configuration Reference](/opbx/data-models/configuration/index)
+- [Data Models Overview](/opbx/data-models)

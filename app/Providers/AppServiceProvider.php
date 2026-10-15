@@ -16,6 +16,7 @@ use App\Models\BusinessHoursSchedule;
 use App\Models\BusinessHoursScheduleDay;
 use App\Models\BusinessHoursTimeRange;
 use App\Models\CallDetailRecord;
+use App\Models\CallNotificationsSettings;
 use App\Models\CallTrackingAdPlatformIntegration;
 use App\Models\CallTrackingCampaign;
 use App\Models\CallTrackingNotificationSettings;
@@ -24,6 +25,7 @@ use App\Models\CloudonixSettings;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\InboundBlacklist;
+use App\Models\IvrMenu;
 use App\Models\Organization;
 use App\Models\OrganizationJoinRequest;
 use App\Models\PersonalAccessToken;
@@ -31,11 +33,13 @@ use App\Models\Recording;
 use App\Models\User;
 use App\Observers\BusinessHoursCacheObserver;
 use App\Observers\ExtensionCacheObserver;
+use App\Observers\ExtensionRelatedCacheObserver;
 use App\Policies\AiAssistantLoadBalancerPolicy;
 use App\Policies\AiAssistantPolicy;
 use App\Policies\ApiKeyPolicy;
 use App\Policies\AutoDialerCampaignPolicy;
 use App\Policies\CallDetailRecordPolicy;
+use App\Policies\CallNotificationsSettingsPolicy;
 use App\Policies\CallTrackingAdPlatformIntegrationPolicy;
 use App\Policies\CallTrackingCampaignPolicy;
 use App\Policies\CallTrackingNotificationSettingsPolicy;
@@ -45,6 +49,7 @@ use App\Policies\ConferenceRoomPolicy;
 use App\Policies\DistributionListPolicy;
 use App\Policies\ExtensionPolicy;
 use App\Policies\InboundBlacklistPolicy;
+use App\Policies\IvrMenuPolicy;
 use App\Policies\OrganizationJoinRequestPolicy;
 use App\Policies\RecordingPolicy;
 use App\Policies\UserPolicy;
@@ -54,11 +59,10 @@ use App\Services\Auth0\Auth0ProfileNormalizer;
 use App\Services\Auth0\Auth0Service;
 use App\Services\Auth0\Auth0StateStore;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
-use App\Services\CallRouting\CallRoutingService;
-use App\Services\CallStateManager\CallStateManager;
 use App\Services\CallTracking\CallTrackingDestinationResolver;
 use App\Services\Cloudonix\CloudonixVoiceService;
 use App\Services\CloudonixClient\CloudonixClient;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\EmailValidation\Contracts\EmailValidatorInterface;
 use App\Services\EmailValidation\UserCheckEmailValidator;
 use App\Services\InboundBlacklist\InboundBlacklistService;
@@ -101,6 +105,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(CloudonixSettingsResolver::class);
+
         // Register service singletons
         $this->app->singleton(
             CloudonixClient::class,
@@ -111,14 +117,6 @@ class AppServiceProvider extends ServiceProvider
                     requireCredentials: false
                 );
             }
-        );
-
-        $this->app->singleton(
-            CallStateManager::class
-        );
-
-        $this->app->singleton(
-            CallRoutingService::class
         );
 
         $this->app->singleton(
@@ -254,6 +252,12 @@ class AppServiceProvider extends ServiceProvider
 
             // Also validate other critical security settings
             $this->validateSecurityConfiguration();
+
+            // Not in console: `composer dump-autoload` runs package:discover during the image
+            // build with no .env. Containers are covered by validate-env.sh at entrypoint.
+            if (! $this->app->runningInConsole()) {
+                $this->assertNoDefaultSecrets();
+            }
         }
 
         // API keys are authorized solely by their per-resource permissions
@@ -283,6 +287,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ConferenceRoom::class, ConferenceRoomPolicy::class);
         Gate::policy(CloudonixSettings::class, CloudonixSettingsPolicy::class);
         Gate::policy(Recording::class, RecordingPolicy::class);
+        Gate::policy(CallNotificationsSettings::class, CallNotificationsSettingsPolicy::class);
         Gate::policy(CallDetailRecord::class, CallDetailRecordPolicy::class);
         Gate::policy(CallTrackingCampaign::class, CallTrackingCampaignPolicy::class);
         Gate::policy(CallTrackingAdPlatformIntegration::class, CallTrackingAdPlatformIntegrationPolicy::class);
@@ -295,6 +300,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(AutoDialerCampaign::class, AutoDialerCampaignPolicy::class);
         Gate::policy(AutoDialerList::class, DistributionListPolicy::class);
         Gate::policy(ApiKey::class, ApiKeyPolicy::class);
+        Gate::policy(IvrMenu::class, IvrMenuPolicy::class);
 
         // Platform Manager: Route model binding override for platform routes
         // This bypasses OrganizationScope when resolving organization models in platform routes
@@ -323,6 +329,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers for cache invalidation (Phase 1 Step 8)
         Extension::observe(ExtensionCacheObserver::class);
+        User::observe(ExtensionRelatedCacheObserver::class);
+        AiAssistant::observe(ExtensionRelatedCacheObserver::class);
 
         // Register consolidated business hours cache observer for all related models
         $businessHoursObserver = app(BusinessHoursCacheObserver::class);
@@ -334,6 +342,26 @@ class AppServiceProvider extends ServiceProvider
         // Disable model events for CLI commands if needed
         if ($this->app->runningInConsole()) {
             // Add any console-specific bootstrapping here
+        }
+    }
+
+    /**
+     * Refuse to boot in production with empty or shipped-default worker/Soketi secrets.
+     */
+    public function assertNoDefaultSecrets(): void
+    {
+        $secrets = [
+            'DIALER_WORKER_API_TOKEN' => config('services.dialer_worker.token'),
+            'AMD_WORKER_API_TOKEN' => config('services.amd_worker.api_token'),
+            'ACD_WORKER_API_TOKEN' => config('services.acd_worker.api_token'),
+            'PUSHER_APP_SECRET' => config('broadcasting.connections.pusher.secret'),
+        ];
+
+        foreach ($secrets as $name => $value) {
+            $value = (string) $value;
+            if ($value === '' || str_contains($value, 'change-in-production') || $value === 'pbxappsecret') {
+                throw new \RuntimeException("{$name} is empty or a shipped default; set a real secret (openssl rand -hex 32).");
+            }
         }
     }
 
@@ -399,36 +427,7 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by(((string) $request->bearerToken()).'|'.$request->ip());
         });
 
-        // Webhook routes - 100 requests per minute per IP
-        RateLimiter::for('webhooks', function (Request $request) {
-            return Limit::perMinute(config('rate_limiting.webhooks', 100))
-                ->by($request->ip())
-                ->response(function (Request $request, array $headers) {
-                    return response()->json([
-                        'error' => 'Too Many Requests',
-                        'message' => 'Webhook rate limit exceeded.',
-                        'retry_after' => $headers['Retry-After'] ?? null,
-                    ], 429, $headers);
-                });
-        });
-
-        // Voice routing routes - 1000 requests per minute per IP (high traffic)
-        RateLimiter::for('voice', function (Request $request) {
-            return Limit::perMinute(config('rate_limiting.voice', 1000))
-                ->by($request->ip())
-                ->response(function (Request $request, array $headers) {
-                    // Return CXML format for voice routing endpoints
-                    $cxml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".
-                        '<Response>'."\n".
-                        '  <Say language="en-US">Service temporarily unavailable. Rate limit exceeded.</Say>'."\n".
-                        '  <Hangup/>'."\n".
-                        '</Response>';
-
-                    return response($cxml, 429, array_merge($headers, [
-                        'Content-Type' => 'application/xml',
-                    ]));
-                });
-        });
+        // Cloudonix webhook and voice routes are intentionally NOT rate-limited (see config/rate_limiting.php).
 
         // Sensitive operations - 10 requests per minute per user
         RateLimiter::for('sensitive', function (Request $request) {

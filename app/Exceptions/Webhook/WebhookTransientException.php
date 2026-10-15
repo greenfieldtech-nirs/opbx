@@ -27,8 +27,8 @@ class WebhookTransientException extends WebhookException
     /**
      * Create a new transient exception.
      *
-     * @param string $message Human-readable error message
-     * @param int $retryAfter Seconds to wait before retry (default: 30)
+     * @param  string  $message  Human-readable error message
+     * @param  int  $retryAfter  Seconds to wait before retry (default: 30)
      */
     public function __construct(string $message = 'Service temporarily unavailable', int $retryAfter = 30)
     {

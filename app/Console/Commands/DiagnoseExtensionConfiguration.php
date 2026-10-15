@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Extension;
+use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Console\Command;
 
@@ -38,6 +40,12 @@ class DiagnoseExtensionConfiguration extends Command
      */
     public function handle()
     {
+        // Console has no authenticated user, so the tenant scope would match zero rows.
+        OrganizationScope::bypass(fn () => $this->diagnose());
+    }
+
+    private function diagnose(): void
+    {
         $organizationId = $this->option('organization-id');
         $extensionNumber = $this->option('extension-number');
         $shouldFix = $this->option('fix');
@@ -56,6 +64,7 @@ class DiagnoseExtensionConfiguration extends Command
 
         if ($extensions->isEmpty()) {
             $this->info('No extensions found matching the criteria.');
+
             return;
         }
 
@@ -76,7 +85,7 @@ class DiagnoseExtensionConfiguration extends Command
                     $this->line("   - {$issue}");
                 }
 
-                if (!empty($result['suggestions'])) {
+                if (! empty($result['suggestions'])) {
                     $this->line('   Suggestions:');
                     foreach ($result['suggestions'] as $suggestion) {
                         $this->line("   → {$suggestion}");
@@ -103,7 +112,7 @@ class DiagnoseExtensionConfiguration extends Command
     {
         if ($extension->type->value === 'ring_group' && empty($extension->configuration['ring_group_id'])) {
             // Try to find a ring group with matching name
-            $ringGroup = \App\Models\RingGroup::where('name', $extension->extension_number)
+            $ringGroup = RingGroup::where('name', $extension->extension_number)
                 ->where('organization_id', $extension->organization_id)
                 ->first();
 
@@ -114,6 +123,7 @@ class DiagnoseExtensionConfiguration extends Command
                 $extension->save();
 
                 $this->line("   → Set ring_group_id to {$ringGroup->id} for ring group '{$ringGroup->name}'");
+
                 return true;
             }
         }

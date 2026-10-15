@@ -3,18 +3,37 @@ paths:
     get:
       tags:
         - Recordings
-      summary: List Recordings
-      description: Get paginated list of Recordings
+      summary: List recordings
       operationId: listRecordings
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
+      description: |
+        Paginated list, 20 per page (`per_page` is not accepted), in database order (no explicit
+        sort). Returned as a Laravel resource collection (top-level `links`). Owner, PBX Admin and
+        Reporter only.
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          description: Other values are ignored
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: moh
+          in: query
+          schema:
+            type: boolean
+          description: When true (`1`, `true`, `on`, `yes`), only recordings with `is_moh` true
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Partial name match
       responses:
         '200':
-          description: List of Recordings
+          description: List of recordings
           content:
             application/json:
               schema:
@@ -24,35 +43,76 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/Recording.yaml'
+                  links:
+                    $ref: '../../components/schemas/PaginationLinks.yaml'
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: '../../components/schemas/ResourceCollectionMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
 
     post:
       tags:
         - Recordings
-      summary: Create Recording
+      summary: Create recording
       operationId: createRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
+      description: |
+        Owner and PBX Admin only. Requires a user token; API keys get 403. New recordings are
+        `active` with `is_moh` false. An uploaded file is processed in the background (metadata
+        such as duration is filled in later). A `remote` URL must also pass the server's URL check
+        (valid http(s) URL on an allowed domain when a domain allowlist is configured); a failure
+        returns 422 with `error: Invalid remote URL`.
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
               properties:
                 name:
                   type: string
+                  maxLength: 255
+                type:
+                  type: string
+                  enum: [upload, remote]
+                file:
+                  type: string
+                  format: binary
+                  description: Required when type is `upload`. mp3 or wav, max 5 MB.
+                remote_url:
+                  type: string
+                  format: uri
+                  description: Required when type is `remote`. http(s) URL.
+              required: [name, type]
       responses:
         '201':
           description: Recording created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
-          $ref: '../../components/responses/ValidationError.yaml'
+          description: Validation failed, or the remote URL was refused (`{error, message}`)
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '../../components/schemas/ValidationError.yaml'
+                  - $ref: '../../components/schemas/Error.yaml'
 
   /v1/recordings/{recording}:
     parameters:
@@ -65,38 +125,74 @@ paths:
     get:
       tags:
         - Recordings
-      summary: Get Recording
+      summary: Get recording
+      description: Owner, PBX Admin and Reporter only.
       operationId: getRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
       responses:
         '200':
           description: Recording details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
     put:
       tags:
         - Recordings
-      summary: Update Recording
+      summary: Update recording
+      description: >-
+        Owner and PBX Admin only. Every field is optional. Requires a user token; API keys
+        get 403 ("Updating recordings requires a user token; API keys cannot update
+        recordings."), because `updated_by` records the user.
       operationId: updateRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                status:
+                  type: string
+                  enum: [active, inactive]
+                is_moh:
+                  type: boolean
       responses:
         '200':
           description: Recording updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -104,22 +200,44 @@ paths:
     patch:
       tags:
         - Recordings
-      summary: Partially update Recording
+      summary: Partially update recording
+      description: Owner and PBX Admin only. Every field is optional.
       operationId: patchRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                status:
+                  type: string
+                  enum: [active, inactive]
+                is_moh:
+                  type: boolean
       responses:
         '200':
           description: Recording updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/Recording.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -128,15 +246,30 @@ paths:
     delete:
       tags:
         - Recordings
-      summary: Delete Recording
+      summary: Delete recording
+      description: |
+        Owner and PBX Admin only. Refused with 409 while an IVR menu greeting or a call queue's
+        hold music still uses the recording. Deletes the stored file of an uploaded recording.
       operationId: deleteRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:write
       responses:
-        '204':
+        '200':
           description: Recording deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

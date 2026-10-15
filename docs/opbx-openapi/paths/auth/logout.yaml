@@ -5,15 +5,11 @@ paths:
         - Authentication
       summary: User logout
       description: |
-        Logout user and revoke authentication.
-        
-        Supports both authentication modes:
-        - Cookie-based: Logs out of session, clears httpOnly cookie
-        - Token-based: Deletes current access token
+        Logout user: deletes the current Bearer access token only (the user's other
+        tokens stay valid).
       operationId: logout
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Successfully logged out

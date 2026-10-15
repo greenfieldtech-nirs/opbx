@@ -4,16 +4,95 @@ paths:
       tags:
         - Platform
       summary: Update organization status
+      description: |
+        Changes the organization status. Platform managers only. Allowed transitions:
+        `active` to `suspended` or `deleted`, `suspended` to `active` or `deleted`.
+
+        `deleted` is a **hard delete** and cannot be undone: inside one transaction it
+        revokes the users' API tokens, deletes the organization's extensions, ring groups,
+        business hours schedules, DIDs, call logs and users, then force-deletes the
+        organization. It is refused while any user of the organization is a platform
+        manager. Writes an `organization.status.updated` (or `organization.deleted`)
+        audit log entry carrying `reason`.
       operationId: updateOrganizationStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: organization
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, suspended, deleted]
+                reason:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 500
+              required: [status]
       responses:
         '200':
-          description: Status updated
+          description: Status changed (for `deleted`, the organization no longer exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Organization status updated successfully.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                        enum: [active, suspended, deleted]
+                      previous_status:
+                        type: string
+                        enum: [active, suspended]
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: |
+            Validation failed (standard validation body), the transition is not allowed
+            (including to the current status), or the organization still has platform
+            managers (on `deleted`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  allowed_transitions:
+                    type: array
+                    description: Present only when the transition is not allowed
+                    items:
+                      type: string
+                  errors:
+                    type: object
+                    description: Present only on validation failures
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: string
+              example:
+                message: Cannot transition from active to active.
+                allowed_transitions:
+                  - suspended
+                  - deleted

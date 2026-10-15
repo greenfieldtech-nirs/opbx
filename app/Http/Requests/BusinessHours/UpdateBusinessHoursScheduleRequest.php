@@ -7,13 +7,18 @@ namespace App\Http\Requests\BusinessHours;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursExceptionType;
 use App\Enums\BusinessHoursStatus;
+use App\Rules\TimeRangeEnd;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating a business hours schedule.
+ *
+ * PUT and PATCH are partial: only the fields sent are validated and saved. A sent `schedule`
+ * replaces the days it names; a sent `exceptions` replaces every exception.
  */
 class UpdateBusinessHoursScheduleRequest extends FormRequest
 {
@@ -45,6 +50,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
         return [
             // Basic schedule info
             'name' => [
+                'sometimes',
                 'required',
                 'string',
                 'min:2',
@@ -58,55 +64,60 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                     ->ignore($scheduleId),
             ],
             'status' => [
+                'sometimes',
                 'required',
                 new Enum(BusinessHoursStatus::class),
             ],
             'timezone' => [
+                'sometimes',
                 'required',
                 'string',
                 'timezone:all',
             ],
             'open_hours_action' => [
+                'sometimes',
                 'required',
                 'array',
             ],
             'open_hours_action.type' => [
-                'required',
+                'required_with:open_hours_action',
                 'string',
                 new Enum(BusinessHoursActionType::class),
             ],
             'open_hours_action.target_id' => [
-                'required',
+                'required_with:open_hours_action',
                 'string',
                 'max:255',
             ],
             'closed_hours_action' => [
+                'sometimes',
                 'required',
                 'array',
             ],
             'closed_hours_action.type' => [
-                'required',
+                'required_with:closed_hours_action',
                 'string',
                 new Enum(BusinessHoursActionType::class),
             ],
             'closed_hours_action.target_id' => [
-                'required',
+                'required_with:closed_hours_action',
                 'string',
                 'max:255',
             ],
 
-            // Weekly schedule (must have all 7 days)
+            // Weekly schedule: the days sent replace those days; days left out keep their hours
             'schedule' => [
+                'sometimes',
                 'required',
                 'array',
             ],
-            'schedule.monday' => ['required', 'array'],
-            'schedule.tuesday' => ['required', 'array'],
-            'schedule.wednesday' => ['required', 'array'],
-            'schedule.thursday' => ['required', 'array'],
-            'schedule.friday' => ['required', 'array'],
-            'schedule.saturday' => ['required', 'array'],
-            'schedule.sunday' => ['required', 'array'],
+            'schedule.monday' => ['sometimes', 'array'],
+            'schedule.tuesday' => ['sometimes', 'array'],
+            'schedule.wednesday' => ['sometimes', 'array'],
+            'schedule.thursday' => ['sometimes', 'array'],
+            'schedule.friday' => ['sometimes', 'array'],
+            'schedule.saturday' => ['sometimes', 'array'],
+            'schedule.sunday' => ['sometimes', 'array'],
 
             // Day schedule fields
             'schedule.*.enabled' => [
@@ -123,8 +134,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             ],
             'schedule.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:schedule.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
 
             // Exceptions (optional)
@@ -158,8 +168,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             ],
             'exceptions.*.time_ranges.*.end_time' => [
                 'required',
-                'date_format:H:i',
-                'after:exceptions.*.time_ranges.*.start_time',
+                new TimeRangeEnd,
             ],
         ];
     }
@@ -194,8 +203,6 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             'schedule.*.time_ranges.*.start_time.required' => 'Start time is required for time ranges.',
             'schedule.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'schedule.*.time_ranges.*.end_time.required' => 'End time is required for time ranges.',
-            'schedule.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'schedule.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
             'exceptions.max' => 'Maximum 100 exceptions allowed per schedule.',
             'exceptions.*.date.required' => 'Exception date is required.',
             'exceptions.*.date.date_format' => 'Exception date must be in YYYY-MM-DD format.',
@@ -204,8 +211,6 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
             'exceptions.*.time_ranges.*.start_time.required' => 'Start time is required for special hours.',
             'exceptions.*.time_ranges.*.start_time.date_format' => 'Start time must be in HH:mm format.',
             'exceptions.*.time_ranges.*.end_time.required' => 'End time is required for special hours.',
-            'exceptions.*.time_ranges.*.end_time.date_format' => 'End time must be in HH:mm format.',
-            'exceptions.*.time_ranges.*.end_time.after' => 'End time must be after start time.',
         ];
     }
 
@@ -214,22 +219,7 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Ensure all 7 days are present in schedule
-        $schedule = $this->input('schedule', []);
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-        foreach ($days as $day) {
-            if (! isset($schedule[$day])) {
-                $schedule[$day] = [
-                    'enabled' => false,
-                    'time_ranges' => [],
-                ];
-            }
-        }
-
-        if (! empty($schedule)) {
-            $this->merge(['schedule' => $schedule]);
-        }
+        // No missing-day defaults: an update leaves the days it does not send untouched.
 
         // Deduplicate exception dates (silently use first occurrence)
         $exceptions = $this->input('exceptions', []);
@@ -355,6 +345,23 @@ class UpdateBusinessHoursScheduleRequest extends FormRequest
                         'IVR menu target ID must be in format: ivr-{identifier}'
                     );
                 }
+            }
+            // The prefixed target must exist in the caller's organization.
+            $tables = [
+                BusinessHoursActionType::EXTENSION->value => ['ext', 'extensions'],
+                BusinessHoursActionType::RING_GROUP->value => ['rg', 'ring_groups'],
+                BusinessHoursActionType::CALL_QUEUE->value => ['queue', 'call_queues'],
+                BusinessHoursActionType::IVR_MENU->value => ['ivr', 'ivr_menus'],
+                BusinessHoursActionType::CONFERENCE_ROOM->value => ['conf', 'conference_rooms'],
+            ];
+
+            if (isset($tables[$type])
+                && preg_match('/^'.$tables[$type][0].'-(\d+)$/', (string) $targetId, $matches) === 1
+                && ! DB::table($tables[$type][1])
+                    ->where('id', (int) $matches[1])
+                    ->where('organization_id', $this->user()?->organization_id)
+                    ->exists()) {
+                $validator->errors()->add($field.'.target_id', 'The selected target does not exist in your organization.');
             }
         }
     }

@@ -14,9 +14,11 @@ export function DestinationTypeAndSelector({
   disabled = false,
   allowedTypes,
   includeHangup = false,
+  allowDisconnect = false,
   layout = 'grid',
   gridColumns = { type: 3, destination: 8 },
   extensionTypes,
+  excludeIds,
   showDescriptions = false,
   showSubLabel = true,
   className,
@@ -29,7 +31,7 @@ export function DestinationTypeAndSelector({
     }
   };
 
-  const handleDestinationChange = (newDestination: string, option?: any) => {
+  const handleDestinationChange = (newDestination: string, _option?: any) => {
     if (typeValue) {
       onChange(typeValue, newDestination);
     }
@@ -53,6 +55,7 @@ export function DestinationTypeAndSelector({
           disabled={disabled}
           allowedTypes={allowedTypes}
           includeHangup={includeHangup}
+          allowDisconnect={allowDisconnect}
           showDescriptions={showDescriptions}
         />
       </div>
@@ -67,14 +70,24 @@ export function DestinationTypeAndSelector({
             label={destinationLabel}
             disabled={disabled}
             extensionTypes={extensionTypes}
+            excludeIds={excludeIds}
             showBadges
           />
         </div>
       )}
 
+      {typeValue === 'unavailable' && (
+        <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
+          {destinationLabel && <Label className="mb-2 block">{destinationLabel}</Label>}
+          <div className="h-10 flex items-center px-3 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+            No destination (unprovisioned). Callers hear "Destination doesn't exist". Choose a type to provision this route.
+          </div>
+        </div>
+      )}
+
       {typeValue === 'hangup' && (
         <div className={layout === 'grid' ? `col-span-${gridColumns.destination}` : 'flex-[3]'}>
-          <Label className="mb-2 block">{destinationLabel}</Label>
+          {destinationLabel && <Label className="mb-2 block">{destinationLabel}</Label>}
           <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted/50 text-muted-foreground text-sm">
             Call will end
           </div>

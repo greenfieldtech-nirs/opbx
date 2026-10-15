@@ -1,0 +1,98 @@
+---
+sidebar_position: 20
+slug: /data-models/models/ivr-menus
+sidebar_class_name: cxGuidesSidebar
+title: "IVR Menus"
+---
+
+# IVR Menus
+
+IVR menus and their options.
+
+## IvrMenu
+
+An IVR menu: a prompt and the digits a caller can press.
+
+**Table:** `ivr_menus`  
+**Model:** `App\Models\IvrMenu`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant |
+| `name` | varchar(255) | No | - | Menu name |
+| `description` | text | Yes | null | Description |
+| `audio_file_path` | varchar(500) | Yes | null | Prompt audio path or URL |
+| `recording_id` | bigint unsigned | Yes | null | Prompt recording. Foreign key to `recordings`, on delete set null |
+| `tts_text` | text | Yes | null | Text-to-speech prompt |
+| `tts_voice` | varchar(50) | Yes | null | Text-to-speech voice |
+| `max_timeout` | tinyint unsigned | No | `3` | Seconds to wait for the first digit |
+| `inter_digit_timeout` | tinyint unsigned | No | `2` | Seconds to wait between digits |
+| `max_turns` | tinyint unsigned | No | `3` | Times the prompt repeats before the failover |
+| `failover_destination_type` | enum | No | `hangup` | Where the call goes after `max_turns` without a valid choice. Values: `extension`, `ring_group`, `conference_room`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `call_queue`, `unavailable` (cast to `IvrDestinationType`) |
+| `failover_destination_id` | bigint unsigned | Yes | null | Failover target ID (no foreign key) |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `IvrMenuStatus`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `idx_ivr_menus_org_name`: `organization_id`, `name`
+- `idx_ivr_menus_org_status`: `organization_id`, `status`
+- `ivr_menus_recording_id_foreign`: `recording_id`
+
+
+**Relationships**
+
+```php
+$ivrMenu->organization() → Organization (organization_id) [BelongsTo]
+$ivrMenu->options() → IvrMenuOption (ivr_menu_id) [HasMany]
+```
+
+**Scopes:** `active()`, `withStatus()`, `forOrganization()`, `search()`, `unprovisioned()`  
+**Methods:** `getFallbackDestination()`, `isActive()`, `isInactive()`, `getActiveOptions()`, `findOptionByDigits()`  
+
+`unprovisioned()` and `is_unprovisioned` are true when `failover_destination_type` is `unavailable` or any option's `destination_type` is `unavailable`. `getFallbackDestination()` loads the failover target; `findOptionByDigits()` and `getActiveOptions()` read the options.
+
+## IvrMenuOption
+
+A digit choice in an IVR menu.
+
+**Table:** `ivr_menu_options`  
+**Model:** `App\Models\IvrMenuOption`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `ivr_menu_id` | bigint unsigned | No | - | Menu. Foreign key to `ivr_menus`, on delete cascade |
+| `input_digits` | varchar(10) | No | - | Digits the caller presses |
+| `description` | varchar(255) | Yes | null | Label |
+| `destination_type` | enum | No | - | Destination kind. Values: `extension`, `ring_group`, `conference_room`, `ivr_menu`, `business_hours`, `ai_assistant`, `ai_load_balancer`, `call_queue`, `unavailable` (cast to `IvrDestinationType`) |
+| `destination_id` | bigint unsigned | No | - | Destination ID (no foreign key) |
+| `priority` | tinyint unsigned | No | `1` | Sort order |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `idx_ivr_menu_options_menu_priority`: `ivr_menu_id`, `priority`
+- `unique_menu_digits` (unique): `ivr_menu_id`, `input_digits`
+
+
+**Relationships**
+
+```php
+$ivrMenuOption->ivrMenu() → IvrMenu (ivr_menu_id) [BelongsTo]
+```
+
+**Methods:** `destination()`, `getDestinationWithFallback()`, `getDestinationName()`, `isValidDestination()`, `getValidatedDestination()`  
+
+`destination()` loads the target by `destination_type`. The IVR request validates a `business_hours` destination against the `business_hours_schedules` table.
+
+## Related Documentation
+
+- [IVR Menus](/opbx/modules/ivr-menus)
+- [Enumerations](/opbx/data-models/enums/index#ivrdestinationtype)

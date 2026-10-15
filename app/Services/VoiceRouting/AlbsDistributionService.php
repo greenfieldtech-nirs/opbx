@@ -8,6 +8,7 @@ use App\Enums\AlbsStrategy;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -38,9 +39,10 @@ class AlbsDistributionService
      * Select an AI Assistant using the load balancer's configured strategy
      *
      * @param  AiAssistantLoadBalancer  $albs  The load balancer configuration
+     * @param  array<int, int>  $excludeAssistantIds  Assistants already tried for this call (follow-through)
      * @return AiAssistant|null The selected AI assistant, or null if none available
      */
-    public function selectAssistant(AiAssistantLoadBalancer $albs): ?AiAssistant
+    public function selectAssistant(AiAssistantLoadBalancer $albs, array $excludeAssistantIds = []): ?AiAssistant
     {
         $strategy = $albs->strategy;
 
@@ -50,9 +52,9 @@ class AlbsDistributionService
         ]);
 
         return match ($strategy) {
-            AlbsStrategy::ROUND_ROBIN => $this->selectUsingRoundRobin($albs),
-            AlbsStrategy::PRIORITY => $this->selectUsingPriority($albs),
-            AlbsStrategy::PERCENTAGE => $this->selectUsingPercentage($albs),
+            AlbsStrategy::ROUND_ROBIN => $this->selectUsingRoundRobin($albs, $excludeAssistantIds),
+            AlbsStrategy::PRIORITY => $this->selectUsingPriority($albs, $excludeAssistantIds),
+            AlbsStrategy::PERCENTAGE => $this->selectUsingPercentage($albs, $excludeAssistantIds),
         };
     }
 
@@ -68,10 +70,11 @@ class AlbsDistributionService
      * 3. Use modulo operation to select member (counter % member_count)
      * 4. Return selected AI assistant
      */
-    public function selectUsingRoundRobin(AiAssistantLoadBalancer $albs): ?AiAssistant
+    /** @param array<int, int> $excludeAssistantIds */
+    public function selectUsingRoundRobin(AiAssistantLoadBalancer $albs, array $excludeAssistantIds = []): ?AiAssistant
     {
         // Get active members ordered by position
-        $members = $this->getActiveMembersOrdered($albs, 'position');
+        $members = $this->getActiveMembersOrdered($albs, 'position', 'asc', $excludeAssistantIds);
 
         if ($members->isEmpty()) {
             Log::warning('ALBS Round Robin: No active members available', [
@@ -84,14 +87,7 @@ class AlbsDistributionService
         $memberCount = $members->count();
 
         try {
-            // Use Redis for atomic counter increment
-            $key = $this->getRoundRobinKey($albs->id);
-            $counter = Redis::incr($key);
-
-            // Set expiry on first increment to auto-reset after 24 hours
-            if ($counter === 1) {
-                Redis::expire($key, self::ROUND_ROBIN_TTL);
-            }
+            $counter = $this->nextCounter($this->getRoundRobinKey($albs->id));
 
             // Calculate index using modulo (counter - 1 to make it 0-indexed)
             $index = ($counter - 1) % $memberCount;
@@ -129,10 +125,11 @@ class AlbsDistributionService
      * 1. Get active members ordered by priority ascending
      * 2. Return the first member (highest priority)
      */
-    public function selectUsingPriority(AiAssistantLoadBalancer $albs): ?AiAssistant
+    /** @param array<int, int> $excludeAssistantIds */
+    public function selectUsingPriority(AiAssistantLoadBalancer $albs, array $excludeAssistantIds = []): ?AiAssistant
     {
         // Get active members ordered by priority (ascending - 0 is highest)
-        $members = $this->getActiveMembersOrdered($albs, 'priority');
+        $members = $this->getActiveMembersOrdered($albs, 'priority', 'asc', $excludeAssistantIds);
 
         if ($members->isEmpty()) {
             Log::warning('ALBS Priority: No active members available', [
@@ -171,10 +168,11 @@ class AlbsDistributionService
      * - Random 1-60 → selects first (60% probability)
      * - Random 61-100 → selects second (40% probability)
      */
-    public function selectUsingPercentage(AiAssistantLoadBalancer $albs): ?AiAssistant
+    /** @param array<int, int> $excludeAssistantIds */
+    public function selectUsingPercentage(AiAssistantLoadBalancer $albs, array $excludeAssistantIds = []): ?AiAssistant
     {
         // Get active members
-        $members = $this->getActiveMembers($albs);
+        $members = $this->getActiveMembers($albs, $excludeAssistantIds);
 
         if ($members->isEmpty()) {
             Log::warning('ALBS Percentage: No active members available', [
@@ -234,16 +232,17 @@ class AlbsDistributionService
      * - Status is 'active'
      * - Have an active AI assistant
      */
-    public function getActiveMembers(AiAssistantLoadBalancer $albs): Collection
+    public function getActiveMembers(AiAssistantLoadBalancer $albs, array $excludeAssistantIds = []): Collection
     {
         return $albs->members()
             ->where('status', 'active')
+            ->when($excludeAssistantIds !== [], fn ($q) => $q->whereNotIn('ai_assistant_id', $excludeAssistantIds))
             ->whereHas('aiAssistant', function ($query) {
-                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                $query->withoutGlobalScope(OrganizationScope::class)
                     ->where('status', UserStatus::ACTIVE->value);
             })
             ->with(['aiAssistant' => function ($query) {
-                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+                $query->withoutGlobalScope(OrganizationScope::class);
             }])
             ->get();
     }
@@ -257,16 +256,18 @@ class AlbsDistributionService
     public function getActiveMembersOrdered(
         AiAssistantLoadBalancer $albs,
         string $orderBy = 'position',
-        string $direction = 'asc'
+        string $direction = 'asc',
+        array $excludeAssistantIds = []
     ): Collection {
         return $albs->members()
             ->where('status', 'active')
+            ->when($excludeAssistantIds !== [], fn ($q) => $q->whereNotIn('ai_assistant_id', $excludeAssistantIds))
             ->whereHas('aiAssistant', function ($query) {
-                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                $query->withoutGlobalScope(OrganizationScope::class)
                     ->where('status', UserStatus::ACTIVE->value);
             })
             ->with(['aiAssistant' => function ($query) {
-                $query->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+                $query->withoutGlobalScope(OrganizationScope::class);
             }])
             ->orderBy($orderBy, $direction)
             ->get();
@@ -332,6 +333,20 @@ class AlbsDistributionService
 
             return 0;
         }
+    }
+
+    /**
+     * Atomic INCR that also (re)sets the TTL whenever the key has none, so a crash between
+     * INCR and EXPIRE can never leave an immortal counter. Shared by every round-robin user.
+     */
+    public function nextCounter(string $key): int
+    {
+        return (int) Redis::eval(
+            "local n = redis.call('INCR', KEYS[1]); if redis.call('TTL', KEYS[1]) < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return n",
+            1,
+            $key,
+            self::ROUND_ROBIN_TTL
+        );
     }
 
     /**

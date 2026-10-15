@@ -5,7 +5,6 @@
  * Features multiple layered waves with smooth CSS animations
  */
 
-import React from 'react';
 
 interface AnimatedWavesProps {
   className?: string;

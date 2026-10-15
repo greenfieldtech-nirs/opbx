@@ -76,7 +76,9 @@ export default function InviteUserDialog({ open, onOpenChange, onSuccess }: Invi
           return;
         }
 
-        setApiError(axiosError.response?.data?.error?.message || 'An unexpected error occurred.');
+        // Laravel validation errors (e.g. an email already used in another organization)
+        const validationMessage = (axiosError.response?.data as { errors?: Record<string, string[]> } | undefined)?.errors?.email?.[0];
+        setApiError(validationMessage || axiosError.response?.data?.error?.message || 'An unexpected error occurred.');
         return;
       }
 

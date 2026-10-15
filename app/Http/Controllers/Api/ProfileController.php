@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ExtensionType;
+use App\Exceptions\OperateAsSelfMutationException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Profile\UpdateOrganizationRequest;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
+use App\Models\Extension;
+use App\Models\User;
 use App\Services\Logging\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -58,6 +62,7 @@ class ProfileController extends Controller
                 'created_at' => $user->created_at?->toIso8601String(),
                 'updated_at' => $user->updated_at?->toIso8601String(),
                 'is_platform_manager' => $user->is_platform_manager,
+                'extension' => $this->extensionSummary($user),
                 'social_identities' => $user->socialIdentities->map(fn ($identity) => [
                     'provider' => $identity->provider->value,
                     'provider_email' => $identity->provider_email,
@@ -189,12 +194,15 @@ class ProfileController extends Controller
                     'postal_code' => $user->postal_code,
                     'country' => $user->country,
                     'updated_at' => $user->updated_at?->toIso8601String(),
+                    'extension' => $this->extensionSummary($user),
                     'social_identities' => $user->socialIdentities->map(fn ($identity) => [
                         'provider' => $identity->provider->value,
                         'provider_email' => $identity->provider_email,
                     ])->all(),
                 ],
             ]);
+        } catch (OperateAsSelfMutationException $e) {
+            throw $e; // rendered as 403 by bootstrap/app.php
         } catch (\Exception $e) {
             Log::error('Profile update failed', [
                 'request_id' => $requestId,
@@ -351,6 +359,8 @@ class ProfileController extends Controller
             return response()->json([
                 'message' => 'Password updated successfully. Please log in again with your new password.',
             ]);
+        } catch (OperateAsSelfMutationException $e) {
+            throw $e; // rendered as 403 by bootstrap/app.php
         } catch (\Exception $e) {
             Log::error('Password change failed', [
                 'request_id' => $requestId,
@@ -367,5 +377,17 @@ class ProfileController extends Controller
                 $requestId
             );
         }
+    }
+
+    /**
+     * The user's own PBX extension (shown on the profile page), or null when none is assigned.
+     *
+     * @return array{id: int, extension_number: string}|null
+     */
+    private function extensionSummary(User $user): ?array
+    {
+        $extension = Extension::where('user_id', $user->id)->where('type', ExtensionType::USER)->first(['id', 'extension_number']);
+
+        return $extension ? ['id' => $extension->id, 'extension_number' => (string) $extension->extension_number] : null;
     }
 }

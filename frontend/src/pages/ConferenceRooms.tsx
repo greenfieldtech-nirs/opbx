@@ -1,90 +1,56 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState,useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Users,
-  Lock,
-  Mic,
-  Video,
-  ChevronDown,
-  RefreshCw,
-  Eye,
+Plus,
+Search,
+Filter,Users,
+Lock,
+Mic,
+Video,
+ChevronDown,
+RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+Card,
+CardContent
 } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
+Collapsible,
+CollapsibleContent,
+CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { toast } from 'sonner';
 import { conferenceRoomsService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
-import type { ConferenceRoom, CreateConferenceRoomRequest, UpdateConferenceRoomRequest, Status } from '@/types';
+import type { ConferenceRoom,CreateConferenceRoomRequest,UpdateConferenceRoomRequest,Status } from '@/types';
 import { cn } from '@/lib/utils';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type RoomFormData = {
   name: string;
@@ -135,13 +101,12 @@ export default function ConferenceRooms() {
   const [sortField, setSortField] = useState<'name' | 'max_participants' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<ConferenceRoom | null>(null);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   const [formData, setFormData] = useState<RoomFormData>(emptyFormData);
   const [isSecurityOpen, setIsSecurityOpen] = useState(false);
@@ -161,8 +126,8 @@ export default function ConferenceRooms() {
   }, [searchQuery]);
 
   // Fetch conference rooms
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['conference-rooms', {
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: [...queryKeys.conferenceRooms.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -188,7 +153,7 @@ export default function ConferenceRooms() {
   const createMutation = useMutation({
     mutationFn: (data: CreateConferenceRoomRequest) => conferenceRoomsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('Conference room created successfully');
@@ -204,7 +169,7 @@ export default function ConferenceRooms() {
     mutationFn: ({ id, data }: { id: string; data: UpdateConferenceRoomRequest }) =>
       conferenceRoomsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedRoom(null);
       setFormData(emptyFormData);
@@ -217,15 +182,21 @@ export default function ConferenceRooms() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => conferenceRoomsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conference-rooms'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedRoom(null);
       toast.success('Conference room deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete conference room';
       toast.error(message);
     },
@@ -255,6 +226,12 @@ export default function ConferenceRooms() {
     // Validate PIN if required
     if (formData.pin_required && !formData.pin.trim()) {
       toast.error('PIN is required when PIN protection is enabled');
+      return;
+    }
+
+    // Waiting for a host needs a host PIN
+    if (formData.wait_for_host && !formData.host_pin.trim()) {
+      toast.error('A host PIN is required when Wait for Host is enabled');
       return;
     }
 
@@ -303,6 +280,12 @@ export default function ConferenceRooms() {
     // Validate PIN if required
     if (formData.pin_required && !formData.pin.trim()) {
       toast.error('PIN is required when PIN protection is enabled');
+      return;
+    }
+
+    // Waiting for a host needs a host PIN
+    if (formData.wait_for_host && !formData.host_pin.trim()) {
+      toast.error('A host PIN is required when Wait for Host is enabled');
       return;
     }
 
@@ -380,15 +363,7 @@ export default function ConferenceRooms() {
     setIsEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (room: ConferenceRoom) => {
-    setSelectedRoom(room);
-    setIsDeleteDialogOpen(true);
-  };
 
-  const openDetailSheet = (room: ConferenceRoom) => {
-    setSelectedRoom(room);
-    setIsDetailSheetOpen(true);
-  };
 
   const renderRoomForm = () => (
     <div className="space-y-4">
@@ -464,7 +439,7 @@ export default function ConferenceRooms() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="host_pin">Host PIN (Optional)</Label>
+                <Label htmlFor="host_pin">Host PIN{formData.wait_for_host ? ' (Required)' : ' (Optional)'}</Label>
                 <Input
                   id="host_pin"
                   type="text"
@@ -473,7 +448,7 @@ export default function ConferenceRooms() {
                   onChange={(e) => setFormData({ ...formData, host_pin: e.target.value })}
                 />
                 <p className="text-sm text-muted-foreground">
-                  Separate PIN for hosts with additional controls
+                  Hosts identify themselves with this PIN. The room ends when the host leaves.
                 </p>
               </div>
 
@@ -481,12 +456,13 @@ export default function ConferenceRooms() {
                 <div className="space-y-0.5">
                   <Label htmlFor="wait_for_host">Wait for Host</Label>
                   <p className="text-sm text-muted-foreground">
-                    Conference starts only after host joins
+                    Conference starts only after host joins (requires a host PIN)
                   </p>
                 </div>
                 <Switch
                   id="wait_for_host"
                   checked={formData.wait_for_host}
+                  disabled={!formData.wait_for_host && !formData.host_pin.trim()}
                   onCheckedChange={(checked) =>
                     setFormData({ ...formData, wait_for_host: checked })
                   }
@@ -585,22 +561,6 @@ export default function ConferenceRooms() {
 
               {formData.recording_enabled && (
                 <div className="space-y-4 pl-4 border-l-2 border-muted ml-1">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="recording_auto_start">Auto-Start Recording</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Begin recording automatically when conference starts
-                      </p>
-                    </div>
-                    <Switch
-                      id="recording_auto_start"
-                      checked={formData.recording_auto_start}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, recording_auto_start: checked })
-                      }
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="recording_webhook_url">Recording Webhook URL (Optional)</Label>
                     <Input
@@ -665,8 +625,13 @@ export default function ConferenceRooms() {
     </div>
   );
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load conference rooms" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      {inUseDialog}
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
@@ -984,191 +949,6 @@ export default function ConferenceRooms() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
-          {selectedRoom && (
-            <>
-              <SheetHeader>
-                <div className="flex items-center justify-between">
-                  <SheetTitle>{selectedRoom.name}</SheetTitle>
-                  <Badge variant={selectedRoom.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedRoom.status === 'active' ? 'Active' : 'Inactive'}
-                  </Badge>
-                </div>
-                {selectedRoom.description && (
-                  <SheetDescription>{selectedRoom.description}</SheetDescription>
-                )}
-              </SheetHeader>
-
-              <div className="mt-6 space-y-6">
-                {/* Basic Info */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Basic Information</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Maximum Participants</span>
-                      <p className="font-medium flex items-center gap-2 mt-1">
-                        <Users className="h-4 w-4" />
-                        {selectedRoom.max_participants}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Status</span>
-                      <p className="font-medium mt-1">
-                        {selectedRoom.status === 'active' ? 'Active' : 'Inactive'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Conference Room Capacity */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Capacity
-                  </h3>
-                  <div className="p-3 rounded-md bg-muted">
-                    <p className="text-sm">
-                      Maximum <span className="font-semibold">{selectedRoom.max_participants}</span> participants
-                    </p>
-                  </div>
-                </div>
-
-                {/* Security Settings */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Lock className="h-4 w-4" />
-                    Security & Access
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>PIN Protection</span>
-                      <Badge variant={selectedRoom.pin_required ? 'default' : 'secondary'}>
-                        {selectedRoom.pin_required ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                    {selectedRoom.pin_required && selectedRoom.pin && (
-                      <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                        <span>Participant PIN</span>
-                        <code className="font-mono">{selectedRoom.pin}</code>
-                      </div>
-                    )}
-                    {selectedRoom.host_pin && (
-                      <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                        <span>Host PIN</span>
-                        <code className="font-mono">{selectedRoom.host_pin}</code>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Wait for Host</span>
-                      <Badge variant={selectedRoom.wait_for_host ? 'default' : 'secondary'}>
-                        {selectedRoom.wait_for_host ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Audio Settings */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Mic className="h-4 w-4" />
-                    Audio Settings
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Mute on Entry</span>
-                      <Badge variant={selectedRoom.mute_on_entry ? 'default' : 'secondary'}>
-                        {selectedRoom.mute_on_entry ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Announce Join/Leave</span>
-                      <Badge variant={selectedRoom.announce_join_leave ? 'default' : 'secondary'}>
-                        {selectedRoom.announce_join_leave ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Music on Hold</span>
-                      <Badge variant={selectedRoom.music_on_hold ? 'default' : 'secondary'}>
-                        {selectedRoom.music_on_hold ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Recording Settings */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Video className="h-4 w-4" />
-                    Recording
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Recording</span>
-                      <Badge variant={selectedRoom.recording_enabled ? 'default' : 'secondary'}>
-                        {selectedRoom.recording_enabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                    {selectedRoom.recording_enabled && (
-                      <>
-                        <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                          <span>Auto-Start Recording</span>
-                          <Badge
-                            variant={selectedRoom.recording_auto_start ? 'default' : 'secondary'}
-                          >
-                            {selectedRoom.recording_auto_start ? 'Enabled' : 'Disabled'}
-                          </Badge>
-                        </div>
-                        {selectedRoom.recording_webhook_url && (
-                          <div className="flex flex-col gap-1 p-2 rounded-md bg-muted">
-                            <span className="font-medium">Recording Webhook URL</span>
-                            <code className="text-xs break-all">{selectedRoom.recording_webhook_url}</code>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Talk Detection */}
-                <div className="space-y-3">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Mic className="h-4 w-4" />
-                    Talk Detection
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center p-2 rounded-md bg-muted">
-                      <span>Talk Detection</span>
-                      <Badge variant={selectedRoom.talk_detection_enabled ? 'default' : 'secondary'}>
-                        {selectedRoom.talk_detection_enabled ? 'Enabled' : 'Disabled'}
-                      </Badge>
-                    </div>
-                    {selectedRoom.talk_detection_enabled && selectedRoom.talk_detection_webhook_url && (
-                      <div className="flex flex-col gap-1 p-2 rounded-md bg-muted">
-                        <span className="font-medium">Webhook URL</span>
-                        <code className="text-xs break-all">{selectedRoom.talk_detection_webhook_url}</code>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Timestamps */}
-                <div className="space-y-2 pt-4 border-t text-xs text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Created</span>
-                    <span>{new Date(selectedRoom.created_at).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Last Updated</span>
-                    <span>{new Date(selectedRoom.updated_at).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div >
   );
 }

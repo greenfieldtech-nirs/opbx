@@ -5,36 +5,170 @@ properties:
     type: integer
   organization_id:
     type: integer
-  call_id:
-    type: string
-  from_number:
-    type: string
-  to_number:
-    type: string
+  session_timestamp:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  session_token:
+    type:
+    - string
+    - 'null'
+  session_id:
+    type:
+    - string
+    - 'null'
+  extension_number:
+    type:
+    - string
+    - 'null'
+    description: >-
+      The organization's extension the call belongs to: the extension that placed it, an extension
+      number used as the caller ID (API-initiated calls), the extension its DID routes to directly
+      (inbound), or else the extension that took the call while OPBX routed it (an IVR or business
+      hours target, the answering member of a Sequential or Round Robin ring group, the answering
+      queue agent). Null when none applies, for example an unanswered call or a Simultaneous ring group.
+  from:
+    type:
+    - string
+    - 'null'
+    description: Caller ID the call presented (for an outbound call this can be a DID). Display only, not a filter
+  to:
+    type:
+    - string
+    - 'null'
+    description: Called number (destination)
+  direction:
+    type:
+    - string
+    - 'null'
+    description: incoming, outgoing, internal or application
   disposition:
-    type: string
-    example: ANSWERED
+    type:
+    - string
+    - 'null'
+    example: ANSWER
   duration:
-    type: integer
+    type:
+    - integer
+    - 'null'
     description: Duration in seconds
+  duration_formatted:
+    type:
+    - string
+    - 'null'
   billsec:
-    type: integer
+    type:
+    - integer
+    - 'null'
     description: Billable seconds
+  billsec_formatted:
+    type:
+    - string
+    - 'null'
+  call_id:
+    type:
+    - string
+    - 'null'
+  call_start_time:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  call_end_time:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  call_answer_time:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  status:
+    type:
+    - string
+    - 'null'
+  domain:
+    type:
+    - string
+    - 'null'
+  subscriber:
+    type:
+    - string
+    - 'null'
+  user_full_name:
+    type: string
+    description: Name of the user of the extension matched by `subscriber`, or `Unassigned User` (always for archived rows)
+  cx_trunk_id:
+    type:
+    - string
+    - integer
+    - 'null'
+  application:
+    type:
+    - string
+    - 'null'
+  route:
+    type:
+    - string
+    - 'null'
+  vapp_server:
+    type:
+    - string
+    - 'null'
   rated_cost:
     type:
     - number
     - 'null'
-  recording_url:
+    description: Null when zero or unset (as are `approx_cost`, `sell_cost` and `amd_confidence`)
+  approx_cost:
+    type:
+    - number
+    - 'null'
+  sell_cost:
+    type:
+    - number
+    - 'null'
+  amd_status:
     type:
     - string
     - 'null'
-    format: uri
+  amd_result:
+    type:
+    - string
+    - 'null'
+  amd_confidence:
+    type:
+    - number
+    - 'null'
+  recording_status:
+    type:
+    - string
+    - 'null'
+  recording_duration:
+    type:
+    - integer
+    - 'null'
+  has_recording:
+    type: boolean
+    description: True when `recording_status` is `available` and the caller may play it (`GET .../recording`)
+  raw_cdr:
+    type:
+    - object
+    - 'null'
+    description: Complete raw CDR; only with `include=raw_cdr`
+    additionalProperties: true
   created_at:
-    type: string
+    type:
+    - string
+    - 'null'
+    format: date-time
+  updated_at:
+    type:
+    - string
+    - 'null'
     format: date-time
 required:
 - id
 - organization_id
-- call_id
-- disposition
-- duration

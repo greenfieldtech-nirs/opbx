@@ -7,7 +7,80 @@ paths:
       operationId: getIvrVoices
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:read
+      description: |
+        TTS voices available from Cloudonix for the organization's domain (any role).
+        The response also carries the organization's Cloudonix package tier, which the IVR
+        voice picker uses to limit premium voices. Errors carry `error` and a `troubleshooting` list.
       responses:
         '200':
           description: Voices retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  filters:
+                    type: object
+                    description: Filter options derived from the voice list
+                    additionalProperties: true
+                  cloudonix_package:
+                    type:
+                      - string
+                      - 'null'
+                    description: >-
+                      Cloudonix package tier of the organization's domain (domain profile
+                      `tenant.billingPlan.package.name`), read live from Cloudonix and cached per
+                      organization for one hour. Never stored in the database. Null when unknown
+                      (Cloudonix unreachable or no package in the profile); the IVR voice picker
+                      then offers standard voices only, as it does for `Free Tier`.
+                    example: Business
+        '401':
+          description: |
+            Not authenticated, or Cloudonix rejected the organization's domain API key
+            (`error: Authentication failed with Cloudonix API.` plus `troubleshooting`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  message:
+                    type: string
+                  troubleshooting:
+                    type: array
+                    items:
+                      type: string
+        '502':
+          description: Cloudonix API unreachable or returned an error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  troubleshooting:
+                    type: array
+                    items:
+                      type: string
+        '503':
+          description: Cloudonix settings missing, or the domain UUID or domain API key is not set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  troubleshooting:
+                    type: array
+                    items:
+                      type: string

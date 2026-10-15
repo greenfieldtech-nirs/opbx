@@ -1,9 +1,8 @@
-description: Forbidden - Insufficient permissions
+description: Forbidden - Insufficient permissions (role/policy denial, an API key without the required grant, or a suspended or inactive organization)
 content:
   application/json:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: FORBIDDEN
-      message: You do not have permission to access this resource
-      code: INSUFFICIENT_PERMISSIONS
+      error: Forbidden
+      message: This action is unauthorized.

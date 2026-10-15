@@ -6,11 +6,11 @@ paths:
       summary: List pending organization join requests
       description: |
         Returns all pending join requests for the authenticated user's
-        organization. Requires appropriate authorization.
+        organization, newest first, as a plain JSON array. Owner and PBX Admin only.
+        Not available to API keys.
       operationId: listOrganizationJoinRequests
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: List of pending join requests
@@ -29,9 +29,14 @@ paths:
         - Organizations
       summary: Create organization join request
       description: |
-        Submit a request to join an organization using a social identity.
-        The request must be approved by an organization administrator before
-        the user is created.
+        Submit a request to join an organization using the social identity captured
+        during Auth0 onboarding (422 `ONBOARDING_EXPIRED` when the onboarding ID is
+        unknown or already used).
+        The request must be approved by an Owner or PBX Admin of the organization before
+        the user is created. Public; rate limited to 5 requests per minute per IP. An
+        unknown `organization_slug` fails validation (422); an organization that exists but
+        is not active returns 404. When the onboarding email already belongs to a user of any
+        organization, the request is refused with 422 on `email` ("The email has already been taken.").
       operationId: createOrganizationJoinRequest
       security: []
       requestBody:
@@ -43,41 +48,17 @@ paths:
               properties:
                 organization_slug:
                   type: string
-                  description: Slug of the organization to join
+                  description: Slug of an existing, active organization to join
                   example: acme-corporation
-                provider:
+                onboarding_id:
                   type: string
-                  enum:
-                    - google
-                    - facebook
-                    - microsoft
-                    - github
-                    - x
-                  description: Social identity provider
-                  example: google
-                provider_subject:
-                  type: string
-                  maxLength: 255
-                  description: Provider-specific subject identifier
-                  example: '112233445566778899001'
-                email:
-                  type: string
-                  format: email
-                  maxLength: 255
-                  description: Email address of the requester
-                  example: jane.smith@example.com
-                name:
-                  type:
-                    - string
-                    - 'null'
-                  maxLength: 255
-                  description: Display name of the requester
-                  example: Jane Smith
+                  maxLength: 128
+                  description: >-
+                    Single-use onboarding ID issued by the Auth0 callback for an unknown social
+                    identity. The provider, subject, email and name come from that cached profile.
               required:
                 - organization_slug
-                - provider
-                - provider_subject
-                - email
+                - onboarding_id
       responses:
         '201':
           description: Join request created
@@ -85,34 +66,49 @@ paths:
             application/json:
               schema:
                 $ref: '../../components/schemas/OrganizationJoinRequest.yaml'
-        '400':
-          $ref: '../../components/responses/BadRequest.yaml'
         '404':
-          description: Organization not found or inactive
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: >-
+            Validation error (for example an unknown `organization_slug`), or the onboarding ID
+            is unknown, expired or already used (`ONBOARDING_EXPIRED`)
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '../../components/schemas/ValidationError.yaml'
+                  - $ref: '../../components/schemas/Error.yaml'
+              examples:
+                onboardingExpired:
+                  summary: Onboarding ID invalid or used
+                  value:
+                    error:
+                      code: ONBOARDING_EXPIRED
+                      message: Onboarding session is invalid or expired.
+        '429':
+          description: Too many attempts (5 requests per minute per IP)
           content:
             application/json:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
               example:
-                error:
-                  code: ORGANIZATION_NOT_FOUND
-                  message: Organization not found.
-        '422':
-          $ref: '../../components/responses/ValidationError.yaml'
-        '429':
-          $ref: '../../components/responses/TooManyRequests.yaml'
+                error: Too Many Requests
+                message: Too many login attempts. Please try again later.
+                retry_after: 60
   /v1/organizations/join-requests/{joinRequest}/approve:
     post:
       tags:
         - Organizations
       summary: Approve organization join request
       description: |
-        Approve a pending join request. Creates a new user in the organization
-        with the `pbx_user` role and links the social identity.
+        Approve a pending join request. Owner and PBX Admin of the request's organization
+        only; not available to API keys. Creates an `active` user in the organization with
+        the `pbx_user` role and a random password, links the social identity, and marks the
+        request `approved`. `user` is the newly created user record (not the `User`
+        resource shape).
       operationId: approveOrganizationJoinRequest
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: joinRequest
           in: path
@@ -132,7 +128,29 @@ paths:
                     type: string
                     example: Join request approved.
                   user:
-                    $ref: '../../components/schemas/User.yaml'
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      organization_id:
+                        type: integer
+                      name:
+                        type: string
+                      email:
+                        type: string
+                        format: email
+                      role:
+                        type: string
+                        example: pbx_user
+                      status:
+                        type: string
+                        example: active
+                      created_at:
+                        type: string
+                        format: date-time
+                      updated_at:
+                        type: string
+                        format: date-time
                 required:
                   - message
                   - user
@@ -143,11 +161,16 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
-          description: Request is not pending
+          description: >-
+            Request is not pending (`JOIN_REQUEST_NOT_PENDING`), or its email meanwhile belongs to a
+            user of any organization (validation error on `email`, "The email has already been taken.";
+            the request stays pending)
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/Error.yaml'
+                anyOf:
+                  - $ref: '../../components/schemas/Error.yaml'
+                  - $ref: '../../components/schemas/ValidationError.yaml'
               example:
                 error:
                   code: JOIN_REQUEST_NOT_PENDING
@@ -157,11 +180,12 @@ paths:
       tags:
         - Organizations
       summary: Reject organization join request
-      description: Reject a pending organization join request.
+      description: >-
+        Mark a join request `rejected`. Owner and PBX Admin of the request's organization
+        only; not available to API keys. The request's current status is not checked.
       operationId: rejectOrganizationJoinRequest
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: joinRequest
           in: path

@@ -7,7 +7,7 @@ paths:
       description: |
         Async email validation during registration.
         Uses UserCheck.com API for disposable/blocklisted email detection.
-        Rate limited to 10 requests per minute.
+        Rate limited to 10 requests per minute per IP.
       operationId: validateEmail
       security: []
       parameters:
@@ -21,7 +21,12 @@ paths:
           example: user@example.com
       responses:
         '200':
-          description: Email validation result
+          description: |
+            Email validation result. An address that fails the basic format
+            check returns only `valid: false` and `message`. Otherwise the
+            UserCheck flags are returned; `message` is present only when
+            `valid` is false and `suggestion` only when UserCheck suggests a
+            correction.
           content:
             application/json:
               schema:
@@ -32,40 +37,79 @@ paths:
                     description: Whether the email is valid and allowed
                   message:
                     type: string
-                    description: Human-readable validation message
-                  checks:
-                    type: object
-                    properties:
-                      disposable:
-                        type: boolean
-                      blocklisted:
-                        type: boolean
-                      spam:
-                        type: boolean
-                      role_account:
-                        type: boolean
+                    description: Reason the address is not allowed (only when `valid` is false)
+                  disposable:
+                    type: boolean
+                  blocklisted:
+                    type: boolean
+                  spam:
+                    type: boolean
+                  role_account:
+                    type: boolean
+                  relay_domain:
+                    type: boolean
+                  public_domain:
+                    type: boolean
+                  suggestion:
+                    type: string
+                    format: email
+                    description: Suggested corrected address (only when available)
+                required:
+                  - valid
               examples:
                 valid:
                   summary: Valid email
                   value:
                     valid: true
-                    message: Email is valid
-                    checks:
-                      disposable: false
-                      blocklisted: false
-                      spam: false
-                      role_account: false
+                    disposable: false
+                    blocklisted: false
+                    spam: false
+                    role_account: false
+                    relay_domain: false
+                    public_domain: false
                 disposable:
                   summary: Disposable email
                   value:
                     valid: false
-                    message: Disposable email addresses are not allowed
-                    checks:
-                      disposable: true
-                      blocklisted: false
-                      spam: false
-                      role_account: false
+                    disposable: true
+                    blocklisted: false
+                    spam: false
+                    role_account: false
+                    relay_domain: false
+                    public_domain: false
+                    message: Disposable email addresses are not allowed.
+                badFormat:
+                  summary: Invalid format
+                  value:
+                    valid: false
+                    message: Please enter a valid email address.
         '400':
-          $ref: '../../components/responses/BadRequest.yaml'
+          description: The `email` parameter is missing or not a string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  message:
+                    type: string
+              example:
+                valid: false
+                message: Email address is required.
         '429':
           $ref: '../../components/responses/TooManyRequests.yaml'
+        '503':
+          description: The validation service failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  message:
+                    type: string
+              example:
+                valid: false
+                message: Unable to validate email. Please try again later.

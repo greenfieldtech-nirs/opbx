@@ -57,8 +57,13 @@ public class AmdWorkerVerticle extends AbstractVerticle {
             config.dumpAudio,
             config.dumpAudioPath,
             config.apiToken,
-            config.actionCallbackUrl
+            config.actionCallbackUrl,
+            config.sessionCheckUrl,
+            config.minBeepStartMs
         );
+        if (config.sessionCheckUrl.isEmpty()) {
+            logger.error("No AMD session check URL (set AMD_SESSION_CHECK_URL or an AMD_ACTION_CALLBACK_URL ending in /amd-action); every stream will be rejected");
+        }
 
         wsServer = vertx.createHttpServer(new HttpServerOptions().setPort(config.websocketPort));
         wsServer.webSocketHandler(streamHandler::handleConnection);
@@ -91,9 +96,9 @@ public class AmdWorkerVerticle extends AbstractVerticle {
 
         Future.all(wsFuture, httpFuture).onComplete(ar -> {
             if (ar.succeeded()) {
-                logger.info("AMD Worker started websocket_port={} http_port={} max_streams={} timeout_seconds={} detectors={}",
+                logger.info("AMD Worker started websocket_port={} http_port={} max_streams={} timeout_seconds={} detectors={} min_beep_start_ms={}",
                     config.websocketPort, config.httpPort, config.maxConcurrentStreams,
-                    config.defaultTimeoutSeconds, config.detectors);
+                    config.defaultTimeoutSeconds, config.detectors, config.minBeepStartMs);
                 startPromise.complete();
             } else {
                 startPromise.fail(ar.cause());
@@ -105,7 +110,8 @@ public class AmdWorkerVerticle extends AbstractVerticle {
     public void stop(Promise<Void> stopPromise) {
         Future<? > wsClose = wsServer != null ? wsServer.close() : Future.succeededFuture();
         Future<? > httpClose = httpServer != null ? httpServer.close() : Future.succeededFuture();
-        Future.all(wsClose, httpClose).onComplete(ar -> {
+        Future<Void> clientClose = streamHandler != null ? streamHandler.close() : Future.succeededFuture();
+        Future.all(wsClose, httpClose, clientClose).onComplete(ar -> {
             if (onnxModel != null) {
                 onnxModel.close();
             }

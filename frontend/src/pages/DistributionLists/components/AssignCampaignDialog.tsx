@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { getApiErrorMessage } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -23,7 +24,7 @@ interface AssignCampaignDialogProps {
   list: AutoDialerList;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  campaigns: Array<{ id: string; name: string; status: string; start_date?: string }>;
+  campaigns: Array<{ id: string; name: string; status: string; start_date?: string; timezone?: string | null }>;
 }
 
 export function AssignCampaignDialog({
@@ -47,7 +48,7 @@ export function AssignCampaignDialog({
       setSelectedCampaignId('');
       onOpenChange(false);
     } catch (err: any) {
-      const message = err?.response?.data?.error || 'Failed to assign list to campaign';
+      const message = getApiErrorMessage(err);
       toast.error('Assignment failed', { description: message });
     }
   };
@@ -57,9 +58,9 @@ export function AssignCampaignDialog({
     onOpenChange(false);
   };
 
-  // Filter campaigns based on assignment rules:
-  // - Campaign is not currently running (draft or paused), OR
-  // - Campaign schedule hasn't been reached yet (start_date is in the future)
+  // Filter campaigns with the server's rule (AutoDialerCampaign::listAssignmentRefusal):
+  // - Draft or Paused, OR
+  // - Active with a start_date (YYYY-MM-DD) after today in the campaign's timezone
   const availableCampaigns = campaigns.filter((campaign) => {
     // Draft campaigns are always available
     if (campaign.status === 'draft') return true;
@@ -69,12 +70,15 @@ export function AssignCampaignDialog({
 
     // Active campaigns: only available if schedule hasn't started yet
     if (campaign.status === 'active') {
-      const startDate = campaign.start_date ? new Date(campaign.start_date) : null;
-      const now = new Date();
-      // Allow if start_date is in the future
-      if (startDate && startDate > now) return true;
-      // If no start_date or start_date has passed, campaign is running - don't allow
-      return false;
+      if (!campaign.start_date) return false;
+      // en-CA formats as YYYY-MM-DD, so the dates compare as strings.
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: campaign.timezone || 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+      return campaign.start_date.slice(0, 10) > today;
     }
 
     // Completed or archived campaigns cannot accept lists

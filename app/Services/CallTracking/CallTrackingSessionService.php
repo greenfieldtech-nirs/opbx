@@ -24,6 +24,15 @@ class CallTrackingSessionService
      */
     public function createFromCDR(CallDetailRecord $cdr, int $organizationId): ?CallTrackingSession
     {
+        // Idempotent: a replayed CDR must not create a second session or re-send conversions.
+        $alreadyTracked = CallTrackingSession::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('call_id', $cdr->call_id)
+            ->exists();
+        if ($alreadyTracked) {
+            return null;
+        }
+
         Log::debug('CallTrackingSessionService: Looking up tracking number', [
             'call_id' => $cdr->call_id,
             'organization_id' => $organizationId,

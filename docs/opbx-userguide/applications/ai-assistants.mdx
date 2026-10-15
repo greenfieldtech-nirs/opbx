@@ -3,133 +3,86 @@ sidebar_position: 2
 slug: /applications/ai-assistants
 sidebar_class_name: cxGuidesSidebar
 title: AI Assistants
-description: Integrating AI voice agents with your PBX
+description: How OPBX hands calls to AI voice agents over SIP or WebSocket, and where to use them
 ---
 
 # AI Assistants
 
-AI Assistants let you connect answered calls to AI-powered voice agents that can handle conversations, gather information, and route calls intelligently. OPBX supports two connection protocols: SIP and WebSocket.
+An AI assistant connects callers to an AI voice agent run by a provider. OPBX does not run the agent itself: it routes the call, then hands the audio to the provider. Once an assistant exists, any routing in OPBX can send callers to it.
 
-## Supported Providers
+This page explains how the connection works and the common designs. For the screens, fields, limits and error messages, see the module walk-through: [AI Assistants](/opbx/modules/ai-assistants).
 
-OPBX integrates with multiple AI voice providers across two protocols.
+## How the call reaches the agent
 
-### SIP Providers (16)
+The provider you choose decides the protocol. OPBX sets it automatically.
 
-SIP providers connect using a phone number configuration field.
+| Protocol | Providers | What OPBX does |
+|----------|-----------|----------------|
+| **SIP** | 42 providers, for example Retell, VAPI, ElevenLabs, Ultravox, Synthflow, Telnyx and OpenAI. Several have UDP, TCP or TLS variants | Dials the provider's service with the agent's phone number |
+| **WebSocket** | DeepDub, Dograh Cloud, Dograh OSS, AssemblyAI and Cloudonix | Streams the call audio to the provider's WebSocket address |
+| **Dummy** | Dummy Test | Plays a short test message and hangs up. Nothing leaves OPBX |
 
-| Provider | Protocol | Configuration |
-|----------|----------|---------------|
-| synthflow | SIP | phone_number |
-| dasha | SIP | phone_number |
-| superdash.ai | SIP | phone_number |
-| ultravox | SIP | phone_number |
-| elevenlabs | SIP | phone_number |
-| deepvox | SIP | phone_number |
-| relayhawk | SIP | phone_number |
-| voicehub | SIP | phone_number |
-| retell | SIP | phone_number |
-| vapi | SIP | phone_number |
-| fonio | SIP | phone_number |
-| sigmamind | SIP | phone_number |
-| modon | SIP | phone_number |
-| puretalk | SIP | phone_number |
-| millis-us | SIP | phone_number |
-| millis-eu | SIP | phone_number |
+### SIP
 
-### WebSocket Provider (1)
-
-WebSocket providers use a real-time streaming connection.
-
-| Provider | Protocol | Configuration |
-|----------|----------|---------------|
-| deepdub | WebSocket | bot_id, auth_token |
-
-:::tip
-Providers are automatically grouped by protocol in the selection dropdown, making it easy to choose the right integration type.
-:::
-
-## How Routing Works
-
-### SIP Routing
-
-When a call routes to a SIP-based AI Assistant, OPBX generates CXML that dials the provider's service number:
+The only setting is the agent's phone number at the provider, in E.164 form. The call is sent to Cloudonix as a dial to that provider's service, for example:
 
 ```xml
 <Dial>
-  <Service provider="retell">+14155551234</Service>
+  <Service provider="vapi">+12025550170</Service>
 </Dial>
 ```
 
-The `provider` attribute identifies which AI service handles the call.
+### WebSocket
 
-### WebSocket Routing
+The call audio is streamed to an address built from the provider's settings:
 
-When a call routes to a WebSocket-based AI Assistant, OPBX generates CXML that opens a streaming connection:
+| Provider | Address |
+|----------|---------|
+| DeepDub | `wss://bot.deepdub.dev/ws/{bot_id}/{auth_token}?session={session}&from={from}&to={to}`, filled with your Bot ID and Authentication Token and the call's session, caller and called number |
+| Dograh Cloud, AssemblyAI, Cloudonix | The provider's fixed endpoint followed by `/{agent UUID}` |
+| Dograh OSS | Your own endpoint followed by `/{agent UUID}` |
 
-```xml
-<Connect>
-  <Stream url="wss://bot.deepdub.dev/ws/{bot_id}/{auth_token}?session={session}&from={from}&to={to}"/>
-</Connect>
-```
+## Where to use an assistant
 
-The URL template includes:
+| Place | Typical design |
+|-------|----------------|
+| [Phone number](/opbx/modules/phone-numbers) | A dedicated AI line, for example a 24-hour receptionist |
+| [IVR option](/opbx/modules/ivr-menus) | "Press 2 to talk to our assistant" |
+| [Business hours](/opbx/modules/business-hours) | The assistant answers when the office is closed |
+| [Call queue](/opbx/modules/call-queues) fallback | Callers who wait too long are offered the assistant |
+| [AI load balancer](/opbx/applications/ai-load-balancers) | Several assistants behind one destination, with failover |
+| [Extension](/opbx/modules/extensions) of type AI Assistant | Staff can dial or transfer to the assistant |
+| [Ring group](/opbx/modules/ring-groups) fallback | Unanswered ring-group calls go to the assistant |
+| [Auto dialer campaign](/opbx/applications/auto-dialer) | Answered outbound calls go to the assistant |
 
-| Parameter | Description |
-|-----------|-------------|
-| bot_id | Your DeepDub bot identifier |
-| auth_token | Authentication token for the connection |
-| session | Unique session ID for this call |
-| from | Caller ID of the incoming call |
-| to | Destination number being called |
+## Example: Acme Corp
 
-## Creating an AI Assistant
+The demo organization has two SIP assistants: **Aria - Front Desk Receptionist** (VAPI) and **Max - Support Triage** (Retell). Aria answers the number +1 202 555 0104, is option 2 of the After Hours Menu, is reachable on extension 1013, is a member of the **Front Desk AI Pool** load balancer, and takes the answered calls of the **Fall Webinar Follow-up** campaign.
 
-1. Navigate to **AI Assistants** in the sidebar
-2. Click **Create**
-3. Enter a descriptive name
-4. Select a provider from the dropdown
-5. Fill in the provider-specific configuration fields
-6. Set the status to **Active**
-7. Click **Save**
+![AI Assistants list in Acme Corp (Demo) with Aria (VAPI) and Max (Retell), both SIP and Active](../img/screens/ai-assistants-list.jpg)
 
-:::note
-The configuration fields change based on your selected provider. SIP providers require a phone number, while WebSocket providers require bot credentials.
-:::
+## Status
 
-## Using AI Assistants
+| Status | Behaviour |
+|--------|-----------|
+| Active | Used for calls |
+| Inactive | Not used. Every call sent to it (phone number, extension, IVR, business hours or a fallback) is disconnected with a spoken message. Load balancers skip it, and it cannot be added to a load balancer |
 
-Once created, you can route calls to AI Assistants from multiple locations:
+Changing the status does not affect calls already connected.
 
-| Feature | How to Use |
-|---------|------------|
-| DID Routing | Set the AI Assistant as the destination for incoming calls |
-| Ring Group Fallback | Use as a fallback when no agents answer |
-| IVR Options | Route menu selections to an AI Assistant |
-| Business Hours | Route after-hours calls to an AI Assistant |
-| Auto Dialer | Connect campaign calls to an AI Assistant |
+## Delete protection
 
-## Status Management
+An assistant that any routing still points at cannot be deleted. The delete is refused, and the **Cannot delete: still in use** dialog lists each reference: extensions, phone numbers, IVR options and failovers, business-hours actions, queue fallbacks, load balancers (members and fallbacks) and auto-dialer campaigns. Change those, then delete again.
 
-AI Assistants have two status states:
+## Testing a new route
 
-| Status | Behavior |
-|--------|----------|
-| Active | Available for call routing |
-| Inactive | Ignored by the routing system |
+1. Create an assistant with the **Dummy Test** provider.
+2. Point the route (for example a phone number) at it.
+3. Call the number. You should hear the test message.
+4. Edit the assistant and change the provider to the real one. The route keeps working, now with the real agent.
 
-:::warning
-Changing an AI Assistant to Inactive does not disconnect ongoing calls. It only prevents new calls from routing to it.
-:::
+## Related pages
 
-## Delete Protection
-
-You cannot delete an AI Assistant if it is referenced by any extensions. Before deleting, you must:
-
-1. Remove the AI Assistant from all DIDs
-2. Remove it from Ring Group fallbacks
-3. Remove it from IVR menu options
-4. Remove it from Business Hours actions
-5. Remove it from Auto Dialer campaigns
-
-The system displays a list of references when you attempt to delete a connected AI Assistant.
+- [AI Assistants (module walk-through)](/opbx/modules/ai-assistants)
+- [AI Load Balancers](/opbx/applications/ai-load-balancers)
+- [Extensions](/opbx/modules/extensions)

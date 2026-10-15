@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import {
   useCallTrackingCampaign,
   useCreateCallTrackingCampaign,
@@ -29,7 +28,7 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   source: z.string().optional(),
   medium: z.string().optional(),
-  destination_type: z.enum(['forward', 'extension', 'ring_group']),
+  destination_type: z.enum(['forward', 'extension', 'ring_group', 'unavailable']),
   destination_config: z.object({
     forward_to: z.string().optional(),
     extension_id: z.number().optional(),
@@ -61,12 +60,13 @@ const DEFAULT_VALUES: FormData = {
   meta_upload_enabled: false,
 };
 
-const toPayload = (data: FormData): CampaignFormData => ({
+// On edit, keep the campaign's stored description and status (the form has no fields for them).
+const toPayload = (data: FormData, existing?: { description?: string | null; status?: string }): CampaignFormData => ({
   name: data.name,
   source: data.source || null,
   medium: data.medium || null,
-  description: null,
-  status: 'active',
+  description: existing?.description ?? null,
+  status: (existing?.status ?? 'active') as CampaignFormData['status'],
   destination_type: data.destination_type,
   destination_config: data.destination_config,
   conversion_rule: {
@@ -117,7 +117,7 @@ export default function CallTrackingCampaignForm() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      const payload = toPayload(data);
+      const payload = toPayload(data, isEdit ? campaign : undefined);
 
       if (isEdit) {
         await updateMutation.mutateAsync({ id: id!, data: payload });
@@ -236,6 +236,11 @@ export default function CallTrackingCampaignForm() {
                         <SelectItem value="forward">Forward to Number</SelectItem>
                         <SelectItem value="extension">Extension</SelectItem>
                         <SelectItem value="ring_group">Ring Group</SelectItem>
+                        {(field.value as string) === 'unavailable' ? (
+                          <SelectItem value="unavailable" disabled>Destination unavailable</SelectItem>
+                        ) : isEdit && (
+                          <SelectItem value="unavailable">Disconnect</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   )}

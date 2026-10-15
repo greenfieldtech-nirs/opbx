@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CallNotifications\StoreSettingsRequest;
 use App\Http\Requests\CallNotifications\UpdateSettingsRequest;
+use App\Http\Resources\CallNotificationLogResource;
 use App\Http\Resources\CallNotificationsSettingsResource;
 use App\Models\CallNotificationLog;
 use App\Models\CallNotificationsSettings;
@@ -31,6 +32,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallNotificationsSettings::class);
+
         $user = $request->user();
         $settings = CallNotificationsSettings::forOrganization($user->organization_id)->first();
 
@@ -51,6 +54,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function store(StoreSettingsRequest $request): JsonResponse
     {
+        $this->authorize('create', CallNotificationsSettings::class);
+
         $user = $request->user();
 
         // Check if settings already exist
@@ -82,6 +87,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function update(UpdateSettingsRequest $request): JsonResponse
     {
+        $this->authorize('update', CallNotificationsSettings::class);
+
         $user = $request->user();
         $settings = CallNotificationsSettings::forOrganization($user->organization_id)->first();
 
@@ -109,6 +116,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function destroy(Request $request): JsonResponse
     {
+        $this->authorize('delete', CallNotificationsSettings::class);
+
         $user = $request->user();
         $settings = CallNotificationsSettings::forOrganization($user->organization_id)->first();
 
@@ -134,6 +143,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function test(Request $request): JsonResponse
     {
+        $this->authorize('update', CallNotificationsSettings::class);
+
         $user = $request->user();
         $settings = CallNotificationsSettings::forOrganization($user->organization_id)->first();
 
@@ -207,6 +218,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function logs(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallNotificationsSettings::class);
+
         $user = $request->user();
         $showAll = $request->boolean('show_all', false);
 
@@ -236,10 +249,10 @@ class CallNotificationsSettingsController extends Controller
                 $query->where('created_at', '<=', $request->input('to'));
             }
 
-            $logs = $query->paginate($request->input('per_page', 50));
+            $logs = $query->paginate($this->perPage($request, 50));
 
             return response()->json([
-                'data' => $logs->items(),
+                'data' => CallNotificationLogResource::collection($logs->items()),
                 'meta' => [
                     'current_page' => $logs->currentPage(),
                     'last_page' => $logs->lastPage(),
@@ -255,33 +268,18 @@ class CallNotificationsSettingsController extends Controller
             ->selectRaw('MAX(id) as latest_id')
             ->groupBy('call_session_token');
 
-        $latestLogs = CallNotificationLog::forOrganization($user->organization_id)
+        $query = CallNotificationLog::forOrganization($user->organization_id)
             ->whereIn('id', $subquery)
-            ->orderBy('created_at', 'desc')
-            ->paginate($request->input('per_page', 50));
+            ->orderBy('created_at', 'desc');
 
-        // Apply filters if provided
         if ($request->has('status')) {
-            // For filtered view, we need to refetch with the filter
-            $filteredLogs = CallNotificationLog::forOrganization($user->organization_id)
-                ->whereIn('id', $subquery)
-                ->where('status', $request->input('status'))
-                ->orderBy('created_at', 'desc')
-                ->paginate($request->input('per_page', 50));
-
-            return response()->json([
-                'data' => $filteredLogs->items(),
-                'meta' => [
-                    'current_page' => $filteredLogs->currentPage(),
-                    'last_page' => $filteredLogs->lastPage(),
-                    'per_page' => $filteredLogs->perPage(),
-                    'total' => $filteredLogs->total(),
-                ],
-            ]);
+            $query->where('status', $request->input('status'));
         }
 
+        $latestLogs = $query->paginate($this->perPage($request, 50));
+
         return response()->json([
-            'data' => $latestLogs->items(),
+            'data' => CallNotificationLogResource::collection($latestLogs->items()),
             'meta' => [
                 'current_page' => $latestLogs->currentPage(),
                 'last_page' => $latestLogs->lastPage(),
@@ -296,6 +294,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function sessionLogs(Request $request, string $sessionToken): JsonResponse
     {
+        $this->authorize('viewAny', CallNotificationsSettings::class);
+
         $user = $request->user();
 
         $logs = CallNotificationLog::forOrganization($user->organization_id)
@@ -304,7 +304,7 @@ class CallNotificationsSettingsController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $logs,
+            'data' => CallNotificationLogResource::collection($logs),
         ]);
     }
 
@@ -313,6 +313,8 @@ class CallNotificationsSettingsController extends Controller
      */
     public function rateLimit(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', CallNotificationsSettings::class);
+
         $user = $request->user();
         $status = $this->webhookDispatcher->getRateLimitStatus($user->organization_id);
 

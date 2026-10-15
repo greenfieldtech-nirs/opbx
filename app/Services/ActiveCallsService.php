@@ -28,14 +28,14 @@ class ActiveCallsService
      * assigned extension numbers/user IDs).
      *
      * @param  array<int, string>|null  $identifiers  Pass null for no restriction
-     *                                                 (e.g. an owner/admin view). Pass
-     *                                                 an array to restrict to sessions
-     *                                                 whose caller_id or destination
-     *                                                 matches one of these values - an
-     *                                                 empty array means "restricted to
-     *                                                 nothing", not "unrestricted"
-     *                                                 (e.g. a supervisor with no
-     *                                                 assigned resources sees no calls).
+     *                                                (e.g. an owner/admin view). Pass
+     *                                                an array to restrict to sessions
+     *                                                whose caller_id or destination
+     *                                                matches one of these values - an
+     *                                                empty array means "restricted to
+     *                                                nothing", not "unrestricted"
+     *                                                (e.g. a supervisor with no
+     *                                                assigned resources sees no calls).
      * @return Collection<int, object> Raw session_updates rows (one per active session).
      */
     public function forOrganization(int $organizationId, ?array $identifiers = null): Collection

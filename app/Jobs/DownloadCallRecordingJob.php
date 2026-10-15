@@ -22,6 +22,11 @@ class DownloadCallRecordingJob implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 90;
+
+    /** @var array<int, int> */
+    public array $backoff = [30, 120, 600];
+
     public int $tries = 3;
 
     public int $maxExceptions = 3;
@@ -59,11 +64,28 @@ class DownloadCallRecordingJob implements ShouldQueue
             return;
         }
 
+        $maxBytes = (int) config('recordings.max_download_bytes', 209715200);
+        $tmpFile = tempnam(sys_get_temp_dir(), 'cdr-rec-');
+
         try {
-            $response = Http::timeout(60)->get($this->sourceUrl);
+            // No redirects: the host allowlist below would not apply to the redirect target.
+            // Stream to a temp file (not memory) and abort once the body exceeds the cap.
+            $response = Http::timeout(60)
+                ->withoutRedirecting()
+                ->sink($tmpFile)
+                ->withOptions(['progress' => function ($downloadTotal, $downloaded) use ($maxBytes): void {
+                    if ($downloaded > $maxBytes) {
+                        throw new \RuntimeException("Recording exceeds the {$maxBytes} byte limit");
+                    }
+                }])
+                ->get($this->sourceUrl);
 
             if (! $response->successful()) {
                 throw new \RuntimeException("Failed to download recording: HTTP {$response->status()}");
+            }
+
+            if (filesize($tmpFile) > $maxBytes) {
+                throw new \RuntimeException("Recording exceeds the {$maxBytes} byte limit");
             }
 
             $contentType = $response->header('Content-Type') ?: 'audio/mpeg';
@@ -73,10 +95,16 @@ class DownloadCallRecordingJob implements ShouldQueue
                 default => 'mp3',
             };
 
-            $relativePath = "call-recordings/{$cdr->call_id}.{$extension}";
+            // Keyed by the CDR id: call_id comes from the webhook payload and could carry "../".
+            $relativePath = "call-recordings/{$cdr->id}.{$extension}";
             $storagePath = "{$cdr->organization_id}/{$relativePath}";
 
-            Storage::disk('recordings')->put($storagePath, $response->body());
+            $stream = fopen($tmpFile, 'rb');
+            try {
+                Storage::disk('recordings')->put($storagePath, $stream);
+            } finally {
+                fclose($stream);
+            }
 
             $cdr->update([
                 'recording_status' => 'available',
@@ -95,18 +123,16 @@ class DownloadCallRecordingJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            $cdr->update(['recording_status' => 'failed']);
-
+            // Status stays as-is while retries remain; failed() marks it failed for good.
             throw $e;
+        } finally {
+            @unlink($tmpFile);
         }
     }
 
     /**
-     * The recordingStatusCallback webhook that supplies $this->sourceUrl has no
-     * strong authentication (see CloudonixWebhookController::recordingStatus()),
-     * so this job must not blindly fetch whatever URL it's given - that would
-     * let anyone who can reach the webhook make this server issue arbitrary
-     * outbound requests (SSRF). Only fetch from Cloudonix's own domains.
+     * Defence in depth against SSRF: even an authenticated recordingStatus
+     * webhook only ever points at Cloudonix's own domains, so refuse anything else.
      */
     private function isAllowedRecordingHost(string $url): bool
     {

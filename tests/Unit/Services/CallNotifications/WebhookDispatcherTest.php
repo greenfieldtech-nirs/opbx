@@ -39,18 +39,14 @@ class WebhookDispatcherTest extends TestCase
 
     private function mockRedisForSuccessfulDispatch(): void
     {
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
     }
 
     protected function tearDown(): void
     {
         parent::tearDown();
-        \Mockery::close();
+        Mockery::close();
     }
 
     public function test_dispatch_returns_true_on_successful_delivery(): void
@@ -60,12 +56,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null); // First request, no rate limit
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -85,17 +77,31 @@ class WebhookDispatcherTest extends TestCase
         $this->assertTrue($result);
 
         // Verify log was created
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertTrue($log->is_success);
         $this->assertEquals(200, $log->response_status_code);
     }
 
+    public function test_delivery_log_never_stores_the_auth_secret(): void
+    {
+        Http::fake(['example.com/webhook' => Http::response(['success' => true], 200)]);
+        $this->mockRedisForSuccessfulDispatch();
+        $this->settings->update(['auth_method' => 'bearer_token', 'auth_secret' => 'super-secret-value']);
+
+        $this->dispatcher->dispatch($this->settings->fresh(), ['event_type' => 'call.status_update'], 'event-redact', 'tok');
+
+        Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer super-secret-value'));
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-redact')->first();
+        $this->assertSame('[redacted]', $log->request_headers['Authorization']);
+        $this->assertStringNotContainsString('super-secret-value', json_encode($log->getAttributes()));
+    }
+
     public function test_dispatch_returns_false_on_rate_limit_exceeded(): void
     {
         // Simulate rate limit exceeded
-        Redis::shouldReceive('get')
-            ->andReturn('500'); // At limit
+        Redis::shouldReceive('incr')
+            ->andReturn(501); // Over the limit
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -115,7 +121,7 @@ class WebhookDispatcherTest extends TestCase
         $this->assertFalse($result);
 
         // Verify no log was created when rate limited
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNull($log);
     }
 
@@ -126,12 +132,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -150,7 +152,7 @@ class WebhookDispatcherTest extends TestCase
 
         $this->assertFalse($result);
 
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertFalse($log->is_success);
         $this->assertEquals(500, $log->response_status_code);
@@ -192,12 +194,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -217,7 +215,7 @@ class WebhookDispatcherTest extends TestCase
         $this->assertFalse($result);
 
         // Only one attempt should be made for 4xx errors
-        $log = CallNotificationLog::where('event_id', 'event-123')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'event-123')->first();
         $this->assertNotNull($log);
         $this->assertEquals(1, $log->attempt_number);
     }
@@ -255,12 +253,8 @@ class WebhookDispatcherTest extends TestCase
         ]);
 
         // Mock Redis for rate limiting
-        Redis::shouldReceive('get')
-            ->andReturn(null);
-        Redis::shouldReceive('setex')
-            ->andReturn(true);
-        Redis::shouldReceive('incr')
-            ->andReturn(1);
+        Redis::shouldReceive('incr')->andReturn(1);
+        Redis::shouldReceive('expire')->andReturn(true);
 
         $payload = [
             'event_type' => 'call.status_update',
@@ -279,7 +273,7 @@ class WebhookDispatcherTest extends TestCase
             'session-token-abc'
         );
 
-        $log = CallNotificationLog::where('event_id', 'unique-event-id')->first();
+        $log = CallNotificationLog::withoutGlobalScopes()->where('event_id', 'unique-event-id')->first();
 
         $this->assertNotNull($log);
         $this->assertEquals($this->organization->id, $log->organization_id);

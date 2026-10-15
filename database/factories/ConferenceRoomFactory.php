@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\UserStatus;
+use App\Models\ConferenceRoom;
 use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * Factory for Conference Room model.
  *
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ConferenceRoom>
+ * @extends Factory<ConferenceRoom>
  */
 class ConferenceRoomFactory extends Factory
 {

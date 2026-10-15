@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -22,6 +24,9 @@ return [
 
     'allowed_extensions' => ['mp3', 'wav'],
 
+    // Largest call recording DownloadCallRecordingJob will fetch (bytes). Default 200 MB (owner, 2026-10-11).
+    'max_download_bytes' => (int) env('RECORDINGS_MAX_DOWNLOAD_BYTES', 209715200),
+
     /*
     |--------------------------------------------------------------------------
     | Storage Configuration
@@ -41,7 +46,7 @@ return [
     'url_timeout' => env('RECORDINGS_URL_TIMEOUT', 10), // seconds
 
     'allowed_domains' => env('RECORDINGS_ALLOWED_DOMAINS')
-        ? explode(',', env('RECORDINGS_ALLOWED_DOMAINS'))
+        ? explode(',', (string) env('RECORDINGS_ALLOWED_DOMAINS'))
         : [], // Empty array means allow all domains
 
     /*

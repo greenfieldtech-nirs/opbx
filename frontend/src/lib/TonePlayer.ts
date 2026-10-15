@@ -2,6 +2,15 @@ import { DEFAULT_COUNTRY, getToneSequence, ToneElement, ToneName } from './tone-
 
 const CONTINUOUS_MS = 30_000; // How long to schedule a continuous (duration=0) tone.
 const GAIN_RAMP_SECONDS = 0.01;
+const DTMF_FEEDBACK_MS = 150;
+
+// ITU-T Q.23 keypad frequencies: [low group, high group] in Hz.
+const DTMF_FREQS: Record<string, number[]> = {
+  '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+  '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+  '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+  '*': [941, 1209], '0': [941, 1336], '#': [941, 1477],
+};
 
 export class TonePlayer {
   private audioCtx: AudioContext | null = null;
@@ -16,6 +25,21 @@ export class TonePlayer {
       return;
     }
 
+    this.start(sequence);
+  }
+
+  // Local feedback for a keypad press during a call; the far end gets the digit as DTMF, not this audio.
+  playDtmf(key: string): void {
+    const freqs = DTMF_FREQS[key];
+    if (!freqs) {
+      return;
+    }
+
+    this.stop();
+    this.start([{ freqs, durationMs: DTMF_FEEDBACK_MS, once: true }]);
+  }
+
+  private start(sequence: ToneElement[]): void {
     try {
       this.ensureAudioContext();
       if (!this.audioCtx) {

@@ -48,9 +48,10 @@
 | `get_ai_provider` | `getAiAssistantProvider` | `GET /v1/ai-assistant/providers/{provider}` | `ai_assistants.read` | low | none |
 | `get_business_hours` | `getBusinessHoursSchedule` | `GET /v1/business-hours/{business_hour}` | `business_hours.read` | low | none |
 | `get_call_details` | `getCallDetailRecord` | `GET /v1/call-detail-records/{call_detail_record}` | `calls.read` | low | none |
+| `get_call_queue` | `getCallQueue` | `GET /v1/call-queues/{call_queue}` | `call_queues.read` | low | none |
+| `get_call_queue_live` | `getCallQueueLive` | `GET /v1/call-queues/{call_queue}/live` | `call_queues.read` | low | none |
+| `get_call_queue_stats` | `getCallQueueStats` | `GET /v1/call-queues/{call_queue}/stats` | `call_queues.read` | low | none |
 | `get_call_statistics` | `getCdrStatistics` | `GET /v1/call-detail-records/statistics` | `calls.read` | low | none |
-| `get_call_tracking_analytics` | `getCallTrackingAnalytics` | `GET /v1/call-tracking-analytics` | `call_tracking.read` | low | none |
-| `get_call_tracking_campaign` | `getCallTrackingCampaign` | `GET /v1/call-tracking-campaigns/{call_tracking_campaign}` | `call_tracking.read` | low | none |
 | `get_campaign` | `getAutoDialerCampaign` | `GET /v1/auto-dialer-campaigns/{campaign}` | `campaigns.read` | low | none |
 | `get_campaign_caller_id_stats` | `getCampaignCallerIdStats` | `GET /v1/auto-dialer-campaigns/{campaign}/caller-id-stats` | `campaigns.read` | low | none |
 | `get_campaign_list` | `getCampaignList` | `GET /v1/auto-dialer-campaigns/{campaign}/list` | `campaigns.read` | low | none |
@@ -80,9 +81,7 @@
 | `list_available_caller_ids` | `getAvailableCallerIds` | `GET /v1/auto-dialer-campaigns/available-caller-ids` | `campaigns.read` | low | none |
 | `list_blocked_calls` | `getBlockedCallLogs` | `GET /v1/inbound-blacklist/blocked-logs` | `inbound_blacklist.read` | low | none |
 | `list_business_hours` | `listBusinessHoursSchedules` | `GET /v1/business-hours` | `business_hours.read` | low | none |
-| `list_call_tracking_campaigns` | `listCallTrackingCampaigns` | `GET /v1/call-tracking-campaigns` | `call_tracking.read` | low | none |
-| `list_call_tracking_numbers` | `listCallTrackingNumbers` | `GET /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers` | `call_tracking.read` | low | none |
-| `list_call_tracking_sessions` | `listCallTrackingSessions` | `GET /v1/call-tracking-sessions` | `call_tracking.read` | low | none |
+| `list_call_queues` | `listCallQueues` | `GET /v1/call-queues` | `call_queues.read` | low | none |
 | `list_campaign_destinations` | `listCampaignDestinations` | `GET /v1/auto-dialer-campaigns/{campaign}/destinations` | `campaigns.read` | low | none |
 | `list_campaigns` | `listAutoDialerCampaigns` | `GET /v1/auto-dialer-campaigns` | `campaigns.read` | low | none |
 | `list_conference_rooms` | `listConferenceRooms` | `GET /v1/conference-rooms` | `conference_rooms.read` | low | none |
@@ -94,6 +93,7 @@
 | `list_ivr_voices` | `getIvrVoices` | `GET /v1/ivr-menus/voices` | `ivr.read` | low | none |
 | `list_outbound_whitelist` | `listOutboundWhitelistEntrys` | `GET /v1/outbound-whitelist` | `outbound_whitelist.read` | low | none |
 | `list_phone_numbers` | `listPhoneNumbers` | `GET /v1/phone-numbers` | `phone_numbers.read` | low | none |
+| `list_queue_calls` | `listQueueCalls` | `GET /v1/queue-calls` | `queue_calls.read` | low | none |
 | `list_recordings` | `listRecordings` | `GET /v1/recordings` | `recordings.read` | low | none |
 | `list_ring_groups` | `listRingGroups` | `GET /v1/ring-groups` | `ring_groups.read` | low | none |
 | `list_trunks` | `listTrunks` | `GET /v1/trunks` | `trunks.read` | low | none |

@@ -383,6 +383,104 @@ class DialerWorkerApiTest extends TestCase
         $this->assertEquals('worker-001', $session->worker_id);
     }
 
+    /** @return array{0: AutoDialerCampaign, 1: AutoDialerDestination} */
+    private function initiateFixture(): array
+    {
+        [$campaign, , $destinations] = $this->createCampaignWithDestinations([
+            'status' => CampaignStatus::ACTIVE,
+            'caller_id' => '+15551234567',
+            'routing_destination_type' => 'ai_assistant',
+            'routing_destination_id' => 1,
+        ], 1, ['status' => DestinationStatus::PENDING, 'phone_number' => '+1234567890']);
+
+        CloudonixSettings::factory()->create(['organization_id' => $this->organization->id]);
+        config(['cloudonix.api.base_url' => 'https://api.cloudonix.io']);
+
+        return [$campaign, $destinations[0]];
+    }
+
+    private function initiatePayload(AutoDialerCampaign $campaign, AutoDialerDestination $destination): array
+    {
+        return [
+            'destination_id' => $destination->id,
+            'campaign_id' => $campaign->id,
+            'phone_number' => $destination->phone_number,
+            'worker_id' => 'worker-001',
+            'initiated_at' => now()->toIso8601String(),
+        ];
+    }
+
+    public function test_second_initiate_for_same_destination_gets_409_and_cloudonix_is_called_once(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['id' => 'call-1', 'token' => 'sess-1'], 200)]);
+
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertCreated();
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(409);
+
+        Http::assertSentCount(1);
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(1, $fresh->dial_attempts);
+    }
+
+    public function test_failed_cloudonix_call_reverts_destination_to_pending_with_attempt_counted(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['error' => 'boom'], 500)]);
+
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(500);
+
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(DestinationStatus::PENDING, $fresh->status);
+        $this->assertSame(1, $fresh->dial_attempts);
+        $this->assertNotNull($fresh->last_error);
+    }
+
+    public function test_destination_fails_after_consecutive_initiate_errors_and_is_excluded(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['error' => 'boom'], 500)]);
+
+        foreach (range(1, 3) as $i) {
+            $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(500);
+            // Skip the backoff wait between attempts.
+            OrganizationScope::bypass(fn () => AutoDialerDestination::whereKey($destination->id)->update(['next_retry_at' => null]));
+        }
+
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(DestinationStatus::FAILED, $fresh->status);
+        $this->assertSame(3, $fresh->consecutive_initiate_failures);
+        $this->workerRequest('GET', "/campaigns/{$campaign->id}/destinations/pending")->assertJsonCount(0, 'data');
+    }
+
+    public function test_failed_initiate_backs_off_so_the_destination_is_not_pending_yet(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['error' => 'boom'], 500)]);
+
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertStatus(500);
+
+        $fresh = OrganizationScope::bypass(fn () => AutoDialerDestination::find($destination->id));
+        $this->assertSame(DestinationStatus::PENDING, $fresh->status);
+        $this->assertTrue($fresh->next_retry_at->isFuture());
+        $this->workerRequest('GET', "/campaigns/{$campaign->id}/destinations/pending")->assertJsonCount(0, 'data');
+    }
+
+    public function test_replayed_idempotency_key_returns_original_response_without_dialling_again(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        Http::fake(['api.cloudonix.io/*' => Http::response(['id' => 'call-1', 'token' => 'sess-1'], 200)]);
+        $headers = ['Idempotency-Key' => 'abc-123'];
+
+        $first = $this->withHeaders($headers)->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination));
+        $second = $this->withHeaders($headers)->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination));
+
+        $first->assertCreated();
+        $second->assertCreated();
+        $this->assertSame($first->json('data.session_id'), $second->json('data.session_id'));
+        Http::assertSentCount(1);
+    }
+
     public function test_initiate_call_returns_404_for_invalid_destination(): void
     {
         [$campaign] = $this->createCampaignWithDestinations([
@@ -464,6 +562,7 @@ class DialerWorkerApiTest extends TestCase
         [$campaign] = $this->createCampaignWithDestinations([
             'status' => CampaignStatus::ACTIVE,
             'max_dial_attempts' => 3,
+            'retry_on_busy_no_answer' => true,
         ], 1, [
             'status' => DestinationStatus::DIALING,
             'dial_attempts' => 1,
@@ -704,5 +803,41 @@ class DialerWorkerApiTest extends TestCase
         ])->getJson('/api/v1/dialer/worker/health');
 
         $response->assertOk();
+    }
+
+    public function test_update_call_status_without_disposition(): void
+    {
+        [$campaign] = $this->createCampaignWithDestinations([
+            'status' => CampaignStatus::ACTIVE,
+        ], 1, [
+            'status' => DestinationStatus::DIALING,
+        ]);
+
+        $destinationId = OrganizationScope::bypass(
+            fn () => AutoDialerDestination::where('status', DestinationStatus::DIALING)->first()?->id
+        );
+
+        $session = AutoDialerCallSession::factory()->create([
+            'organization_id' => $this->organization->id,
+            'campaign_id' => $campaign->id,
+            'destination_id' => $destinationId,
+            'status' => 'initiated',
+            'disposition' => 'answered',
+        ]);
+
+        $this->workerRequest('PATCH', "/calls/{$session->id}/status", ['status' => 'ringing'])
+            ->assertOk()
+            ->assertJsonPath('data.destination_status', DestinationStatus::PENDING->value);
+
+        $fresh = OrganizationScope::bypass(fn () => $session->fresh());
+        $this->assertSame('ringing', $fresh->status);
+        // An update without a disposition leaves the stored one alone.
+        $this->assertSame('answered', $fresh->disposition);
+
+        // ...and does not touch the destination.
+        $this->assertEquals(
+            DestinationStatus::DIALING,
+            OrganizationScope::bypass(fn () => AutoDialerDestination::find($destinationId)?->status)
+        );
     }
 }

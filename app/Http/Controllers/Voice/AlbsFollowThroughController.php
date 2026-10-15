@@ -10,21 +10,22 @@ use App\Enums\RingGroupFallbackAction;
 use App\Http\Controllers\Controller;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
-use App\Models\AiAssistantLoadBalancerMember;
 use App\Models\AutoDialerCallSession;
-use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
-use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
 use App\Services\AutoDialer\MetadataHelper;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use App\Services\VoiceRouting\AlbsDistributionService;
+use App\Services\VoiceRouting\Strategies\AiLoadBalancerRoutingStrategy;
 use App\Services\VoiceRouting\Strategies\IvrRoutingStrategy;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -43,7 +44,8 @@ class AlbsFollowThroughController extends Controller
 
     public function __construct(
         private readonly ProviderRegistry $providerRegistry,
-        private readonly WebSocketUrlBuilder $urlBuilder
+        private readonly WebSocketUrlBuilder $urlBuilder,
+        private readonly AlbsDistributionService $distribution
     ) {}
 
     /**
@@ -69,8 +71,9 @@ class AlbsFollowThroughController extends Controller
             ],
         ]);
 
-        // Merge query string parameters into request for easier access
-        $queryParams = $request->query();
+        // Merge query string parameters into request for easier access. Never let the query
+        // string override the organization the auth middleware resolved.
+        $queryParams = Arr::except($request->query(), ['_organization_id']);
         if (! empty($queryParams)) {
             $request->merge($queryParams);
         }
@@ -121,7 +124,7 @@ class AlbsFollowThroughController extends Controller
                 'current_assistant_id' => $failedAssistantId,
             ]);
 
-            return $this->errorResponse('Missing required parameters');
+            return $this->cxmlErrorResponse('Missing required parameters');
         }
 
         // Check if this status should trigger follow-through
@@ -161,6 +164,7 @@ class AlbsFollowThroughController extends Controller
                     }]);
             }])
             ->where('id', $albsId)
+            ->where('organization_id', (int) $request->input('_organization_id'))
             ->first();
 
         if (! $albs || $albs->status->value !== AlbsStatus::ACTIVE->value) {
@@ -171,7 +175,7 @@ class AlbsFollowThroughController extends Controller
                 'albs_status' => $albs?->status?->value,
             ]);
 
-            return $this->errorResponse('Load balancer not available');
+            return $this->cxmlErrorResponse('Load balancer not available');
         }
 
         // Check if follow_through is enabled on the ALB
@@ -217,7 +221,7 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Select next assistant
-        $nextAssistant = $this->selectNextAssistant($albs, $triedAssistantIds);
+        $nextAssistant = $this->distribution->selectAssistant($albs, $triedAssistantIds);
 
         if (! $nextAssistant) {
             Log::info('ALBS Follow Through: No more assistants to try', [
@@ -305,77 +309,6 @@ class AlbsFollowThroughController extends Controller
     }
 
     /**
-     * Select the next available AI Assistant based on strategy.
-     */
-    private function selectNextAssistant(AiAssistantLoadBalancer $albs, array $triedIds): ?AiAssistant
-    {
-        $availableMembers = $albs->members->reject(function (AiAssistantLoadBalancerMember $member) use ($triedIds) {
-            return in_array($member->ai_assistant_id, $triedIds);
-        });
-
-        if ($availableMembers->isEmpty()) {
-            return null;
-        }
-
-        return match ($albs->strategy->value) {
-            'priority' => $this->selectByPriority($availableMembers),
-            'percentage' => $this->selectByPercentage($availableMembers),
-            'round_robin' => $this->selectByRoundRobin($availableMembers, $albs->id),
-            default => $this->selectByPriority($availableMembers),
-        };
-    }
-
-    /**
-     * Select assistant with highest priority (lowest number).
-     */
-    private function selectByPriority($members): ?AiAssistant
-    {
-        $selected = $members->sortBy('priority')->first();
-
-        return $selected?->aiAssistant;
-    }
-
-    /**
-     * Select assistant based on percentage weights.
-     */
-    private function selectByPercentage($members): ?AiAssistant
-    {
-        $totalWeight = $members->sum('weight');
-
-        if ($totalWeight <= 0) {
-            return $members->first()?->aiAssistant;
-        }
-
-        $random = mt_rand(1, $totalWeight);
-        $cumulative = 0;
-
-        foreach ($members->sortBy('position') as $member) {
-            $cumulative += $member->weight;
-
-            if ($random <= $cumulative) {
-                return $member->aiAssistant;
-            }
-        }
-
-        return $members->first()?->aiAssistant;
-    }
-
-    /**
-     * Select assistant using round robin across available members.
-     */
-    private function selectByRoundRobin($members, int $albsId): ?AiAssistant
-    {
-        $key = 'albs:rr:'.$albsId;
-        $counter = Cache::increment($key);
-        $index = ($counter - 1) % $members->count();
-
-        $sorted = $members->sortBy('position');
-        $member = $sorted->values()->get($index);
-
-        return $member?->aiAssistant;
-    }
-
-    /**
      * Generate CXML to route to an AI Assistant.
      */
     private function routeToAssistant(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request, array $metadata = []): Response
@@ -413,13 +346,7 @@ class AlbsFollowThroughController extends Controller
         // Get organization ID from request (set by middleware)
         $organizationId = $request->input('_organization_id');
 
-        // Look up organization's Cloudonix settings
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
-
-        // Use configured webhook base URL, or fall back to app URL
-        $baseUrl = $cloudonixSettings
-            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
-            : rtrim(config('app.url'), '/');
+        $baseUrl = app(CloudonixSettingsResolver::class)->webhookBaseUrl((int) $organizationId);
 
         // Build the relative URL using the named route
         $relativeUrl = route('voice.albs-follow-through', [
@@ -440,7 +367,7 @@ class AlbsFollowThroughController extends Controller
                 'ai_assistant_id' => $aiAssistant->id,
             ]);
 
-            return $this->errorResponse('AI Assistant provider not configured');
+            return $this->cxmlErrorResponse('AI Assistant provider not configured');
         }
 
         $providerDef = $this->providerRegistry->getProvider($provider);
@@ -451,7 +378,7 @@ class AlbsFollowThroughController extends Controller
                 'provider' => $provider,
             ]);
 
-            return $this->errorResponse('Invalid AI Assistant provider configuration');
+            return $this->cxmlErrorResponse('Invalid AI Assistant provider configuration');
         }
 
         $cloudonixParams = [
@@ -484,7 +411,7 @@ class AlbsFollowThroughController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->errorResponse('AI Assistant configuration error');
+            return $this->cxmlErrorResponse('AI Assistant configuration error');
         }
     }
 
@@ -500,7 +427,7 @@ class AlbsFollowThroughController extends Controller
                 'ai_assistant_id' => $aiAssistant->id,
             ]);
 
-            return $this->errorResponse('AI Assistant configuration incomplete');
+            return $this->cxmlErrorResponse('AI Assistant configuration incomplete');
         }
 
         Log::info('ALBS Follow Through: Routing to SIP assistant', [
@@ -529,10 +456,13 @@ class AlbsFollowThroughController extends Controller
 
         return match ($fallbackAction) {
             RingGroupFallbackAction::HANGUP => $this->hangupResponse(),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             RingGroupFallbackAction::EXTENSION => $this->routeToExtension($albs, $request),
-            RingGroupFallbackAction::RING_GROUP => $this->routeToRingGroup($albs, $request),
+            RingGroupFallbackAction::RING_GROUP => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackRingGroup($albs, $request),
             RingGroupFallbackAction::IVR_MENU => $this->routeToIvrMenu($albs, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->routeToAiAssistant($albs, $request, $metadata),
+            RingGroupFallbackAction::CALL_QUEUE => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackCallQueue($albs, $request),
+            RingGroupFallbackAction::AI_LOAD_BALANCER => app(AiLoadBalancerRoutingStrategy::class)->handleFallbackAiLoadBalancer($albs, $request),
             default => $this->hangupResponse(),
         };
     }
@@ -598,61 +528,6 @@ class AlbsFollowThroughController extends Controller
 
         return response(
             CxmlBuilder::simpleDial($sipUri),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
-    }
-
-    /**
-     * Route to fallback ring group.
-     */
-    private function routeToRingGroup(AiAssistantLoadBalancer $albs, Request $request): Response
-    {
-        $ringGroupId = $albs->fallback_ring_group_id;
-
-        if (! $ringGroupId) {
-            Log::warning('ALBS Follow Through: No fallback ring group configured', [
-                'albs_id' => $albs->id,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $ringGroupId)
-            ->where('organization_id', $albs->organization_id)
-            ->where('status', 'active')
-            ->first();
-
-        if (! $ringGroup) {
-            Log::warning('ALBS Follow Through: Fallback ring group not found or inactive', [
-                'albs_id' => $albs->id,
-                'ring_group_id' => $ringGroupId,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        $members = $ringGroup->getMembers()->filter(fn (Extension $ext) => $ext->isActive());
-        $sipUris = $members->map(fn (Extension $ext) => $ext->getSipUri())->filter()->values()->toArray();
-
-        if (empty($sipUris)) {
-            Log::warning('ALBS Follow Through: Fallback ring group has no active members', [
-                'albs_id' => $albs->id,
-                'ring_group_id' => $ringGroupId,
-            ]);
-
-            return $this->hangupResponse();
-        }
-
-        Log::info('ALBS Follow Through: Routing to fallback ring group', [
-            'albs_id' => $albs->id,
-            'ring_group_id' => $ringGroupId,
-            'member_count' => count($sipUris),
-        ]);
-
-        return response(
-            CxmlBuilder::dialRingGroup($sipUris, $ringGroup->timeout),
             200,
             ['Content-Type' => 'application/xml']
         );
@@ -776,13 +651,13 @@ class AlbsFollowThroughController extends Controller
 
         if ($protocol === 'websocket') {
             if (! $provider) {
-                return $this->errorResponse('Fallback AI Assistant provider not configured');
+                return $this->cxmlErrorResponse('Fallback AI Assistant provider not configured');
             }
 
             $providerDef = $this->providerRegistry->getProvider($provider);
 
             if (! $providerDef || ! $providerDef->isWebSocketProvider()) {
-                return $this->errorResponse('Invalid fallback AI Assistant provider');
+                return $this->cxmlErrorResponse('Invalid fallback AI Assistant provider');
             }
 
             $cloudonixParams = [
@@ -809,7 +684,7 @@ class AlbsFollowThroughController extends Controller
                     'error' => $e->getMessage(),
                 ]);
 
-                return $this->errorResponse('Fallback AI Assistant configuration error');
+                return $this->cxmlErrorResponse('Fallback AI Assistant configuration error');
             }
         }
 
@@ -821,7 +696,7 @@ class AlbsFollowThroughController extends Controller
         $phoneNumber = $config['phone_number'] ?? null;
 
         if (! $provider || ! $phoneNumber) {
-            return $this->errorResponse('Fallback AI Assistant configuration incomplete');
+            return $this->cxmlErrorResponse('Fallback AI Assistant configuration incomplete');
         }
 
         $headers = MetadataHelper::toSipHeaders($metadata);
@@ -836,7 +711,7 @@ class AlbsFollowThroughController extends Controller
     /**
      * Return error CXML response.
      */
-    private function errorResponse(string $message): Response
+    private function cxmlErrorResponse(string $message): Response
     {
         return response(
             CxmlBuilder::unavailable($message),

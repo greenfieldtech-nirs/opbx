@@ -172,6 +172,8 @@ class CampaignLifecycleService
             'status' => CampaignStatus::ARCHIVED,
         ]);
 
+        $campaign->clearRedisKeys();
+
         Log::info('Campaign archived', [
             'campaign_id' => $campaign->id,
             'organization_id' => $campaign->organization_id,

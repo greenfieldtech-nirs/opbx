@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
-use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -60,9 +60,8 @@ class CampaignMonitorService
     public function getConcurrencyStatus(AutoDialerCampaign $campaign): array
     {
         $cac = $campaign->concurrent_active_calls;
-        $activeCount = $this->getActiveCallCount($campaign->id);
-        $sessionTokens = Redis::smembers("campaign:{$campaign->id}:active_sessions") ?? [];
-        $activeSessions = $this->getActiveSessionDetails($campaign->id, $sessionTokens);
+        // Same live sources as the monitor detail: the worker's CAC counter and the call-session rows
+        $activeCount = $campaign->status === CampaignStatus::PAUSED ? 0 : $this->getWorkerActiveCalls($campaign->id);
 
         return [
             'cac_limit' => $cac,
@@ -70,8 +69,7 @@ class CampaignMonitorService
             'available_slots' => max(0, $cac - $activeCount),
             'utilization_percentage' => $this->calculateUtilization($activeCount, $cac),
             'api_interval_seconds' => $campaign->getApiIntervalMilliseconds() / 1000,
-            'active_sessions' => $activeSessions,
-            'rate_limit_status' => $this->getRateLimitStatus($campaign),
+            'active_sessions' => $this->getActiveSessions($campaign),
         ];
     }
 
@@ -83,7 +81,7 @@ class CampaignMonitorService
      */
     public function getMonitorSummary(int $organizationId): array
     {
-        $cacheKey = "monitor:summary:org:{$organizationId}";
+        $cacheKey = self::summaryCacheKey($organizationId);
 
         return Cache::remember($cacheKey, self::SUMMARY_CACHE_TTL, function () use ($organizationId): array {
             $campaigns = AutoDialerCampaign::forOrganization($organizationId)
@@ -138,14 +136,13 @@ class CampaignMonitorService
      */
     public function getMonitorDetail(AutoDialerCampaign $campaign): array
     {
-        $cacheKey = "monitor:detail:campaign:{$campaign->id}";
+        $cacheKey = self::detailCacheKey($campaign->id);
 
         $data = Cache::remember($cacheKey, self::DETAIL_CACHE_TTL, function () use ($campaign): array {
             $activeCalls = $this->getWorkerActiveCalls($campaign->id);
 
-            // Force 0 active calls for paused campaigns
-            if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-                $this->setWorkerActiveCalls($campaign->id, 0);
+            // Paused campaigns show 0 active calls (display only; pausing resets the real counter)
+            if ($campaign->status === CampaignStatus::PAUSED) {
                 $activeCalls = 0;
             }
 
@@ -176,7 +173,6 @@ class CampaignMonitorService
                     'avg_billsec_seconds' => $this->getAverageBillsec($campaign->id),
                 ],
                 'dispositions' => $this->getDispositions($campaign->id),
-                'rate_limit_status' => $this->getRateLimitStatus($campaign),
             ];
         });
 
@@ -194,20 +190,18 @@ class CampaignMonitorService
      */
     public function bustMonitorCache(int $organizationId, int $campaignId): void
     {
-        Cache::forget("monitor:summary:{$organizationId}");
-        Cache::forget("monitor:detail:{$campaignId}");
+        Cache::forget(self::summaryCacheKey($organizationId));
+        Cache::forget(self::detailCacheKey($campaignId));
     }
 
-    /**
-     * Get the active call count from Redis.
-     *
-     * @param  int  $campaignId  The campaign ID
-     */
-    private function getActiveCallCount(int $campaignId): int
+    private static function summaryCacheKey(int $organizationId): string
     {
-        $count = (int) Redis::get("campaign:{$campaignId}:concurrency_counter");
+        return "monitor:summary:org:{$organizationId}";
+    }
 
-        return max(0, $count);
+    private static function detailCacheKey(int $campaignId): string
+    {
+        return "monitor:detail:campaign:{$campaignId}";
     }
 
     /**
@@ -232,54 +226,6 @@ class CampaignMonitorService
     }
 
     /**
-     * Set worker active calls in Redis.
-     *
-     * @param  int  $campaignId  The campaign ID
-     * @param  int  $value  The value to set
-     */
-    private function setWorkerActiveCalls(int $campaignId, int $value): void
-    {
-        try {
-            $dialerRedis = Redis::connection('dialer');
-            $dialerRedis->set("dialer:cac:{$campaignId}:active", $value);
-        } catch (\Exception $e) {
-            Log::error('Failed to set worker active calls in Redis', [
-                'campaign_id' => $campaignId,
-                'value' => $value,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Get active session details from the database.
-     *
-     * @param  int  $campaignId  The campaign ID
-     * @param  array<int, string>  $sessionTokens  The session tokens to look up
-     * @return array<int, array<string, mixed>>
-     */
-    private function getActiveSessionDetails(int $campaignId, array $sessionTokens): array
-    {
-        if (empty($sessionTokens)) {
-            return [];
-        }
-
-        $sessions = AutoDialerCallSession::whereIn('session_token', $sessionTokens)
-            ->with('destination')
-            ->where('campaign_id', $campaignId)
-            ->get();
-
-        return $sessions->map(fn ($session) => [
-            'session_id' => $session->id,
-            'session_token' => $session->session_token,
-            'destination_id' => $session->destination_id,
-            'phone_number' => $session->destination?->phone_number ?? 'unknown',
-            'started_at' => $session->started_at?->toIso8601String(),
-            'duration_seconds' => $session->started_at ? now()->diffInSeconds($session->started_at) : 0,
-        ])->toArray();
-    }
-
-    /**
      * Build monitor info for a single campaign.
      *
      * @param  AutoDialerCampaign  $campaign  The campaign to build info for
@@ -289,9 +235,8 @@ class CampaignMonitorService
     {
         $activeCalls = $this->getWorkerActiveCalls($campaign->id);
 
-        // Force 0 for paused campaigns
-        if ($campaign->status === CampaignStatus::PAUSED && $activeCalls > 0) {
-            $this->setWorkerActiveCalls($campaign->id, 0);
+        // Paused campaigns show 0 active calls (display only; pausing resets the real counter)
+        if ($campaign->status === CampaignStatus::PAUSED) {
             $activeCalls = 0;
         }
 
@@ -315,12 +260,6 @@ class CampaignMonitorService
             'concurrent_active_calls' => $cac,
             'active_calls' => $activeCalls,
             'cac_utilization' => $this->calculateUtilization($activeCalls, $cac),
-            'rate_limit_status' => [
-                'is_rate_limited' => $campaign->status === CampaignStatus::PAUSED &&
-                    $campaign->pause_reason === 'cloudonix_rate_limit',
-                'pause_reason' => $campaign->pause_reason,
-                'resumes_at' => $campaign->resume_at?->toIso8601String(),
-            ],
             'caller_id' => $campaign->caller_id,
             'routing_destination_type' => $campaign->routing_destination_type->value,
             'routing_destination_label' => $campaign->getRoutingDestinationLabel(),
@@ -344,12 +283,6 @@ class CampaignMonitorService
                 return ['total' => 0, 'completed' => 0, 'failed' => 0, 'pending' => 0, 'dialing' => 0];
             }
 
-            // Clean up stale dialing records
-            $this->cleanupStaleDialing($campaign, $listIds);
-
-            // Clean up stale pending records that have exhausted max attempts
-            $this->cleanupStalePending($campaign, $listIds);
-
             $counts = AutoDialerDestination::whereIn('list_id', $listIds)
                 ->selectRaw("COUNT(*) as total,
                     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -366,58 +299,6 @@ class CampaignMonitorService
                 'dialing' => (int) $counts->dialing,
             ];
         });
-    }
-
-    /**
-     * Clean up stale dialing destinations.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  \Illuminate\Support\Collection  $listIds  The list IDs
-     */
-    private function cleanupStaleDialing(AutoDialerCampaign $campaign, $listIds): void
-    {
-        $buildQuery = function () use ($campaign, $listIds) {
-            $query = AutoDialerDestination::whereIn('list_id', $listIds)
-                ->where('status', DestinationStatus::DIALING);
-
-            // For active campaigns, only clean up records stuck for > 5 minutes
-            if ($campaign->status !== CampaignStatus::PAUSED) {
-                $query->where('last_dialed_at', '<', now()->subMinutes(5));
-            }
-
-            return $query;
-        };
-
-        // Mark as failed if max dial attempts have been reached
-        $buildQuery()
-            ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::FAILED]);
-
-        // Reset remaining stale destinations to pending for retry
-        $buildQuery()
-            ->where('dial_attempts', '<', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::PENDING]);
-    }
-
-    /**
-     * Clean up stale pending destinations that have exhausted retry attempts.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @param  \Illuminate\Support\Collection  $listIds  The list IDs
-     */
-    private function cleanupStalePending(AutoDialerCampaign $campaign, $listIds): void
-    {
-        $updated = AutoDialerDestination::whereIn('list_id', $listIds)
-            ->where('status', DestinationStatus::PENDING)
-            ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
-            ->update(['status' => DestinationStatus::FAILED]);
-
-        if ($updated > 0) {
-            Log::info('Cleaned up stale pending destinations', [
-                'campaign_id' => $campaign->id,
-                'count' => $updated,
-            ]);
-        }
     }
 
     /**
@@ -491,10 +372,8 @@ class CampaignMonitorService
      */
     private function getActiveSessions(AutoDialerCampaign $campaign): array
     {
-        // Paused campaigns have no active calls - clean up stale sessions
+        // Paused campaigns have no active calls (pausing already fails the in-flight sessions)
         if ($campaign->status === CampaignStatus::PAUSED) {
-            $this->cleanupStaleSessions($campaign->id);
-
             return [];
         }
 
@@ -517,24 +396,6 @@ class CampaignMonitorService
     }
 
     /**
-     * Clean up stale active sessions for a campaign.
-     *
-     * @param  int  $campaignId  The campaign ID
-     */
-    private function cleanupStaleSessions(int $campaignId): void
-    {
-        OrganizationScope::bypass(function () use ($campaignId): void {
-            AutoDialerCallSession::where('campaign_id', $campaignId)
-                ->whereIn('status', ['initiated', 'ringing', 'answered'])
-                ->update([
-                    'status' => 'failed',
-                    'disposition' => 'cancelled',
-                    'completed_at' => now(),
-                ]);
-        });
-    }
-
-    /**
      * Calculate utilization percentage.
      *
      * @param  int  $active  Active count
@@ -543,25 +404,6 @@ class CampaignMonitorService
     private function calculateUtilization(int $active, int $limit): float
     {
         return $limit > 0 ? round(($active / $limit) * 100, 1) : 0;
-    }
-
-    /**
-     * Get rate limit status for a campaign.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @return array<string, mixed>
-     */
-    private function getRateLimitStatus(AutoDialerCampaign $campaign): array
-    {
-        $isRateLimited = $campaign->status === CampaignStatus::PAUSED &&
-            $campaign->pause_reason === 'cloudonix_rate_limit';
-
-        return [
-            'is_rate_limited' => $isRateLimited,
-            'pause_reason' => $campaign->pause_reason,
-            'resumes_at' => $campaign->resume_at?->toIso8601String(),
-            'can_resume_now' => $campaign->resume_at ? now()->gte($campaign->resume_at) : true,
-        ];
     }
 
     /**
@@ -583,7 +425,7 @@ class CampaignMonitorService
         }
 
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
+            /** @var Response $response */
             $response = Http::timeout(5)->get($healthUrl);
 
             if ($response->ok()) {

@@ -149,13 +149,13 @@ export function BlacklistForm({
                 phoneNumbers.map((did: DIDNumber) => (
                   <label
                     key={did.id}
-                    className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                    className="flex items-center gap-2 p-2 hover:bg-muted rounded-sm cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={formData.did_number_ids.includes(did.id)}
                       onChange={() => onToggleDid(did.id)}
-                      className="rounded border-gray-300"
+                      className="rounded-sm border-gray-300"
                     />
                     <span className="text-sm">
                       {did.friendly_name || did.phone_number}

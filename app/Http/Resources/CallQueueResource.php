@@ -32,6 +32,7 @@ class CallQueueResource extends JsonResource
             'announce_position_timeout' => $this->announce_position_timeout,
             'announce_position_language' => $this->announce_position_language,
             'immediate_connect' => $this->immediate_connect,
+            'conference_ring_all' => $this->conference_ring_all,
             'moh_recording_id' => $this->moh_recording_id,
             'fallback_action' => $this->fallback_action->value,
             'fallback_extension_id' => $this->fallback_extension_id,
@@ -39,7 +40,9 @@ class CallQueueResource extends JsonResource
             'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
             'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
+            'fallback_call_queue_id' => $this->fallback_call_queue_id,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'agents' => $this->whenLoaded('agents', function () {
                 return $this->agents->map(function ($agent) {
                     return [
@@ -79,6 +82,12 @@ class CallQueueResource extends JsonResource
                 return [
                     'id' => $this->fallbackAiAssistant->id,
                     'name' => $this->fallbackAiAssistant->name,
+                ];
+            }),
+            'fallback_call_queue' => $this->whenLoaded('fallbackCallQueue', function () {
+                return [
+                    'id' => $this->fallbackCallQueue->id,
+                    'name' => $this->fallbackCallQueue->name,
                 ];
             }),
             'created_at' => $this->created_at?->toIso8601String(),

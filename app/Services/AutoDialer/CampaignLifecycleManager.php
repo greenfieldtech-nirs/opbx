@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
-use App\Jobs\ProcessAutoDialerCampaignJob;
+use App\Enums\DestinationStatus;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerDestination;
+use App\Models\AutoDialerList;
+use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -40,9 +43,7 @@ class CampaignLifecycleManager
             'started_at' => now(),
         ]);
 
-        // Dispatch processing job
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
-            ->onQueue('auto-dialer');
+        // No Laravel dialing job: the Go dialer picks up every Active campaign (single dialer path).
 
         Log::info('Campaign started', [
             'campaign_id' => $campaign->id,
@@ -94,10 +95,6 @@ class CampaignLifecycleManager
             'status' => CampaignStatus::ACTIVE,
         ]);
 
-        // Resume processing
-        ProcessAutoDialerCampaignJob::dispatch($campaign->id)
-            ->onQueue('auto-dialer');
-
         Log::info('Campaign resumed', [
             'campaign_id' => $campaign->id,
         ]);
@@ -114,6 +111,8 @@ class CampaignLifecycleManager
             'status' => CampaignStatus::COMPLETED,
             'completed_at' => now(),
         ]);
+
+        $campaign->clearRedisKeys();
 
         Log::info('Campaign completed', [
             'campaign_id' => $campaign->id,
@@ -134,9 +133,78 @@ class CampaignLifecycleManager
             'status' => CampaignStatus::ARCHIVED,
         ]);
 
+        $campaign->clearRedisKeys();
+
         Log::info('Campaign archived', [
             'campaign_id' => $campaign->id,
         ]);
+    }
+
+    /**
+     * Complete every Active campaign whose destinations have all reached a final state.
+     *
+     * The Go dialer never completes campaigns, so this runs from the scheduled check command.
+     * Work remaining = a destination being dialled/connected, or pending with attempts left.
+     */
+    public function completeFinishedCampaigns(): int
+    {
+        return OrganizationScope::bypass(function (): int {
+            $completed = 0;
+
+            foreach (AutoDialerCampaign::where('status', CampaignStatus::ACTIVE)->get() as $campaign) {
+                $destinations = $campaign->destinations();
+                if (! (clone $destinations)->exists()) {
+                    continue;
+                }
+
+                $remaining = (clone $destinations)->where(function ($q) use ($campaign) {
+                    $q->whereIn('auto_dialer_destinations.status', [DestinationStatus::DIALING, DestinationStatus::CONNECTED])
+                        ->orWhere(function ($q) use ($campaign) {
+                            $q->where('auto_dialer_destinations.status', DestinationStatus::PENDING)
+                                ->where('auto_dialer_destinations.dial_attempts', '<', $campaign->max_dial_attempts);
+                        });
+                })->exists();
+
+                if (! $remaining) {
+                    $this->complete($campaign);
+                    $completed++;
+                }
+            }
+
+            return $completed;
+        });
+    }
+
+    /**
+     * Repair destinations left behind by lost callbacks (formerly done as a side effect of the monitor GET).
+     *
+     * Dialing records stuck > 5 minutes (any age while paused) go back to pending, or fail when attempts
+     * are used up; pending records with no attempts left fail. Runs from the scheduled check command.
+     */
+    public function reconcileStaleDestinations(): void
+    {
+        OrganizationScope::bypass(function (): void {
+            $campaigns = AutoDialerCampaign::whereIn('status', [CampaignStatus::ACTIVE, CampaignStatus::PAUSED])->get();
+
+            foreach ($campaigns as $campaign) {
+                $listIds = AutoDialerList::where('campaign_id', $campaign->id)->pluck('id');
+                if ($listIds->isEmpty()) {
+                    continue;
+                }
+
+                $stuck = fn () => AutoDialerDestination::whereIn('list_id', $listIds)
+                    ->where('status', DestinationStatus::DIALING)
+                    ->when($campaign->status !== CampaignStatus::PAUSED, fn ($q) => $q->where('last_dialed_at', '<', now()->subMinutes(5)));
+
+                $stuck()->where('dial_attempts', '>=', $campaign->max_dial_attempts)->update(['status' => DestinationStatus::FAILED]);
+                $stuck()->where('dial_attempts', '<', $campaign->max_dial_attempts)->update(['status' => DestinationStatus::PENDING]);
+
+                AutoDialerDestination::whereIn('list_id', $listIds)
+                    ->where('status', DestinationStatus::PENDING)
+                    ->where('dial_attempts', '>=', $campaign->max_dial_attempts)
+                    ->update(['status' => DestinationStatus::FAILED]);
+            }
+        });
     }
 
     /**
@@ -146,19 +214,21 @@ class CampaignLifecycleManager
      */
     public function checkAndAutoStart(): void
     {
-        // Find auto-start campaigns that are ready
-        $campaigns = AutoDialerCampaign::where('auto_start', true)
-            ->where('status', CampaignStatus::DRAFT)
-            ->whereHas('list', function ($query) {
-                $query->where('status', 'ready');
-            })
-            ->get();
+        // Console run: there is no tenant, so bypass the organisation scope.
+        OrganizationScope::bypass(function (): void {
+            $campaigns = AutoDialerCampaign::where('auto_start', true)
+                ->where('status', CampaignStatus::DRAFT)
+                ->whereHas('lists', function ($query) {
+                    $query->whereIn('status', ['ready', 'in_use']);
+                })
+                ->get();
 
-        foreach ($campaigns as $campaign) {
-            if ($this->shouldAutoStart($campaign)) {
-                $this->start($campaign);
+            foreach ($campaigns as $campaign) {
+                if ($this->shouldAutoStart($campaign)) {
+                    $this->start($campaign);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -166,13 +236,7 @@ class CampaignLifecycleManager
      */
     private function shouldAutoStart(AutoDialerCampaign $campaign): bool
     {
-        // Check if within date range
-        $now = now($campaign->timezone);
-        if ($now->lt($campaign->start_date) || $now->gt($campaign->end_date)) {
-            return false;
-        }
-
-        // Check if within schedule
+        // isWithinSchedule covers the date range (end date inclusive), weekday and hours
         return $this->scheduler->isWithinSchedule($campaign);
     }
 

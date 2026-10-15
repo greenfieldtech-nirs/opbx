@@ -35,8 +35,9 @@ class ConfigurationController extends Controller
      * organization's configured Webhook Base URL (same public origin webhooks
      * use, so it is reachable from the internet); falls back to the
      * X-Forwarded-Host/Proto headers set by the reverse proxy / dev proxy,
-     * then to the request's own host. MCP port from MCP_PORT config (only
-     * used in the header-based fallback, where no proxy path exists).
+     * then to the request's own host. MCP is always proxied at /mcp on that
+     * origin; mcp_port is informational (loopback-only publish, see
+     * docker-compose.ports.yml).
      *
      * @return array{api_base_url: string, mcp_url: string, mcp_port: int}
      */
@@ -62,13 +63,12 @@ class ConfigurationController extends Controller
         // Public origin as seen by the browser (forwarded by nginx/vite proxy).
         $hostWithPort = $request->header('X-Forwarded-Host') ?: $request->getHttpHost();
         $scheme = $request->header('X-Forwarded-Proto') ?: $request->getScheme();
-        $hostOnly = preg_replace('/:\d+$/', '', $hostWithPort) ?? $hostWithPort;
 
         return [
             // The REST API is same-origin with the caller (proxy routes /api).
             'api_base_url' => $scheme.'://'.$hostWithPort.'/api/v1',
-            // MCP runs on its own port on the same host (the UI port does not apply).
-            'mcp_url' => $scheme.'://'.$hostOnly.':'.$mcpPort.'/mcp',
+            // MCP is proxied by nginx at /mcp on the same origin (its port is not published).
+            'mcp_url' => $scheme.'://'.$hostWithPort.'/mcp',
             'mcp_port' => $mcpPort,
         ];
     }

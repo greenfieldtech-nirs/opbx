@@ -1,46 +1,4 @@
 paths:
-  /v1/auto-dialer-campaigns/lists/{list}/versions:
-    parameters:
-    - name: list
-      in: path
-      required: true
-      description: Distribution List ID
-      schema:
-        type: integer
-        minimum: 1
-      example: 1
-    get:
-      tags:
-      - Distribution Lists
-      summary: List versions
-      description: 'Get version history for a distribution list.
-
-
-        Returns all versions of the list, ordered by version number.
-
-        '
-      operationId: listListVersions
-      security:
-      - bearerAuth: []
-      - cookieAuth: []
-      responses:
-        '200':
-          description: List of versions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: ../../components/schemas/DistributionList.yaml
-        '401':
-          $ref: ../../components/responses/Unauthorized.yaml
-        '403':
-          $ref: ../../components/responses/Forbidden.yaml
-        '404':
-          $ref: ../../components/responses/NotFound.yaml
   /v1/auto-dialer-campaigns/lists/{list}/copy:
     parameters:
     - name: list
@@ -58,15 +16,23 @@ paths:
       description: 'Create a copy of a distribution list.
 
 
-        The new list will have the same destinations as the original
+        The new list is an independent list (version 1) in ''ready'' status and
 
-        but will be in ''draft'' status and unassigned.
+        unassigned. Every destination is copied (phone number, name, batch identifier,
+
+        metadata) and reset to pending with zero dial attempts; `total_rows` and
+
+        `valid_rows` are copied and `invalid_rows` is 0.
+
+
+        Roles: Owner and PBX Admin. The source may be in any status.
 
         '
       operationId: copyDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -101,7 +67,17 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, or a non-archived list with the same name already
+            exists in the organization (`{"error": "A list with this name already exists"}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+              example:
+                error: A list with this name already exists
   /v1/auto-dialer-campaigns/lists/{list}/archive:
     parameters:
     - name: list
@@ -119,15 +95,26 @@ paths:
       description: 'Archive a distribution list.
 
 
-        Archived lists cannot be assigned to campaigns or modified.
+        Sets the status to ''archived'', stamps `archived_at` and clears
 
-        Only lists in ''ready'' or ''used'' status can be archived.
+        `is_latest_version`. Archived lists cannot be assigned, uploaded to or
+
+        archived again; they can still be copied.
+
+
+        Only lists in ''ready'', ''failed'' or ''used'' status can be archived (other
+
+        statuses return 403). A list that is assigned to a campaign returns 422.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: archiveDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: List archived successfully
@@ -152,9 +139,7 @@ paths:
               schema:
                 $ref: ../../components/schemas/Error.yaml
               example:
-                error: ARCHIVE_FAILED
-                message: List cannot be archived in its current status
-                code: INVALID_STATUS
+                error: 'Cannot archive list "Sales Leads Q1": it is assigned to campaign "Q1 Sales Campaign". Unassign it first.'
   /v1/auto-dialer-campaigns/lists/{list}/download:
     parameters:
     - name: list
@@ -169,18 +154,24 @@ paths:
       tags:
       - Distribution Lists
       summary: Download list as CSV
-      description: 'Download a distribution list as a CSV file.
+      description: 'Download a distribution list as a CSV file named `<list name>.csv`.
 
 
-        The file includes all destinations with their phone numbers
+        The file has a header row and one row per destination with the columns
 
-        and descriptions.
+        `phone_number`, `name`, `batch_identifier`, `metadata` (JSON), `status`
+
+        and `dial_attempts`.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: downloadDistributionList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: CSV file download
@@ -214,16 +205,24 @@ paths:
       tags:
       - Distribution Lists
       summary: Get validation errors
-      description: 'Get validation errors for a failed list upload.
+      description: 'Get the stored validation errors of a failed list upload.
 
 
-        Only available for lists in ''failed'' status.
+        Only available for lists in ''failed'' status. Each entry is either an
+
+        invalid row (`row`, `phone_number`, `error`) or a list-level failure with
+
+        only `error`.
+
+
+        Roles: Owner, PBX Admin and Reporter.
 
         '
       operationId: getListValidationErrors
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Validation errors
@@ -239,16 +238,17 @@ paths:
                       properties:
                         row:
                           type: integer
+                          description: Row number in the file (invalid-row entries only)
                           example: 15
-                        column:
+                        phone_number:
                           type: string
-                          example: phone_number
-                        value:
-                          type: string
-                          example: invalid
-                        message:
+                          description: Raw value from the phone column (invalid-row entries only)
+                          example: '12345'
+                        error:
                           type: string
                           example: Invalid phone number format
+                      required:
+                      - error
         '400':
           description: List is not in failed status
           content:
@@ -256,9 +256,7 @@ paths:
               schema:
                 $ref: ../../components/schemas/Error.yaml
               example:
-                error: BAD_REQUEST
-                message: Validation errors only available for failed lists
-                code: NOT_FAILED
+                error: Validation errors only available for failed lists
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -282,15 +280,25 @@ paths:
       description: 'Assign a distribution list to an auto-dialer campaign.
 
 
-        The list must be in ''ready'' status and the campaign must
+        The list must be in ''ready'' status (otherwise 403). The campaign must be
 
-        be able to accept a list assignment.
+        Draft, Paused, or Active with a start date still in the future in the campaign''s
+
+        timezone (otherwise 422; an Active campaign that has started must be paused first). On success the list moves to ''in_use'' and `campaign_id`,
+
+        `used_by_campaign_id` and `used_at` are set. A campaign can hold several
+
+        lists: assigning another list adds it next to the lists already assigned.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: assignListToCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -300,7 +308,8 @@ paths:
               properties:
                 campaign_id:
                   type: integer
-                  description: ID of the campaign to assign the list to
+                  description: ID of the campaign to assign the list to (must exist; a campaign
+                    of another organization returns 404)
                   example: 5
               required:
               - campaign_id
@@ -334,15 +343,25 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          description: Cannot assign list
+          description: >-
+            Request validation failed, or the campaign cannot take a list now
+            (`{"error": "..."}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+              example:
+                error: Cannot assign list to "Q1 Sales Campaign" because it has already started. Pause the campaign first, then assign the list.
+        '500':
+          description: Assignment failed
           content:
             application/json:
               schema:
                 $ref: ../../components/schemas/Error.yaml
               example:
-                error: ASSIGN_FAILED
-                message: List is not ready for assignment
-                code: LIST_NOT_READY
+                error: 'Failed to assign list to campaign: ...'
   /v1/auto-dialer-campaigns/lists/{list}/unassign:
     parameters:
     - name: list
@@ -357,18 +376,24 @@ paths:
       tags:
       - Distribution Lists
       summary: Unassign list from campaign
-      description: 'Unassign a distribution list from its campaign.
+      description: |
+        Unassign a distribution list from its campaign. Same rules, status codes and
+        messages as `DELETE /v1/auto-dialer-campaigns/{campaign}/list/{list}`.
 
+        The list must be assigned to a campaign (otherwise 403). While the list's campaign
+        is `active` the unassign is refused with 403 ("Cannot unassign list: its campaign
+        is active. Pause the campaign first."). Once the campaign has started processing the
+        list's entries (any destination dialed or no longer pending), the list can no longer
+        be unassigned (422). After unassignment the list returns to 'ready' status and
+        `campaign_id`, `used_by_campaign_id` and `used_at` are cleared; the campaign's other
+        lists are not affected.
 
-        The list must be currently assigned to a campaign.
-
-        After unassignment, the list returns to ''ready'' status.
-
-        '
+        Roles: Owner and PBX Admin.
       operationId: unassignListFromCampaign
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: List unassigned successfully
@@ -394,7 +419,22 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          description: Not allowed, or the list's campaign is active
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              examples:
+                campaignActive:
+                  summary: The list's campaign is active
+                  value:
+                    error: Forbidden
+                    message: 'Cannot unassign list: its campaign is active. Pause the campaign first.'
+                notAllowed:
+                  summary: Role or policy denial
+                  value:
+                    error: Forbidden
+                    message: This action is unauthorized.
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
@@ -404,9 +444,7 @@ paths:
               schema:
                 $ref: ../../components/schemas/Error.yaml
               example:
-                error: UNASSIGN_FAILED
-                message: List is not assigned to any campaign
-                code: NOT_ASSIGNED
+                error: 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).'
   /v1/auto-dialer-campaigns/lists/{list}/reset-pending-destinations:
     parameters:
     - name: list
@@ -424,13 +462,21 @@ paths:
       description: 'Reset all pending destinations in a list to zero dial attempts.
 
 
-        Only destinations in pending status are affected.
+        Only destinations in pending status are affected; `last_disposition`,
+
+        `last_dialed_at` and the next retry time are cleared. Allowed in any list
+
+        status, including assigned lists.
+
+
+        Roles: Owner and PBX Admin.
 
         '
       operationId: resetListPendingDestinations
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       responses:
         '200':
           description: Pending destinations reset

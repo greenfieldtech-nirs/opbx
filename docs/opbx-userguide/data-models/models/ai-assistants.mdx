@@ -1,0 +1,167 @@
+---
+sidebar_position: 23
+slug: /data-models/models/ai-assistants
+sidebar_class_name: cxGuidesSidebar
+title: "AI Assistants and Load Balancers"
+---
+
+# AI Assistants and Load Balancers
+
+AI assistant connections and load balancers.
+
+## AiAssistant
+
+A connection to an external AI voice assistant.
+
+**Table:** `ai_assistants`  
+**Model:** `App\Models\AiAssistant`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `SoftDeletes`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Assistant name |
+| `description` | text | Yes | null | Description |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `AiAssistantStatus`) |
+| `provider` | varchar(100) | No | - | Provider key from `config/ai-providers.php` |
+| `protocol` | enum | No | - | Connection protocol. Values: `sip`, `websocket`, `dummy` |
+| `configuration` | json | No | - | Provider settings (for example SIP URI or WebSocket fields) |
+| `created_by` | bigint unsigned | Yes | null | User who created it. Foreign key to `users`, on delete set null |
+| `updated_by` | bigint unsigned | Yes | null | User who last changed it. Foreign key to `users`, on delete set null |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `deleted_at` | timestamp | Yes | null | Soft-delete timestamp |
+
+**Indexes**
+
+- `ai_assistants_created_by_foreign`: `created_by`
+- `ai_assistants_deleted_at_index`: `deleted_at`
+- `ai_assistants_organization_id_protocol_index`: `organization_id`, `protocol`
+- `ai_assistants_organization_id_provider_index`: `organization_id`, `provider`
+- `ai_assistants_organization_id_status_index`: `organization_id`, `status`
+- `ai_assistants_updated_by_foreign`: `updated_by`
+
+**Casts:** `configuration` (array)  
+
+**Relationships**
+
+```php
+$aiAssistant->organization() → Organization (organization_id) [BelongsTo]
+$aiAssistant->creator() → User (created_by) [BelongsTo]
+$aiAssistant->updater() → User (updated_by) [BelongsTo]
+$aiAssistant->extensions() → Extension (ai_assistant_id) [HasMany]
+```
+
+**Scopes:** `forOrganization()`, `active()`, `inactive()`, `byProtocol()`, `byProvider()`, `search()`, `withStatus()`  
+**Methods:** `isActive()`, `getProviderDefinition()`, `isWebSocket()`, `isSip()`, `isDummy()`, `getUsageCountAttribute()`, `isInUse()`  
+
+`usage_count` counts the extensions whose `ai_assistant_id` is this assistant; `isInUse()` is true when it is above 0. `getProviderDefinition()` looks the provider up in the provider registry. Scopes: `active()`, `inactive()`, `byProtocol()`, `byProvider()`, `search()`, `withStatus()`.
+
+## AiAssistantLoadBalancer
+
+Distributes calls across several AI assistants.
+
+**Table:** `ai_assistant_load_balancers`  
+**Model:** `App\Models\AiAssistantLoadBalancer`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`, `SoftDeletes`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Load balancer name |
+| `description` | text | Yes | null | Description |
+| `strategy` | enum | No | `round_robin` | Distribution strategy. Values: `round_robin`, `priority`, `percentage` (cast to `AlbsStrategy`) |
+| `follow_through` | boolean | No | `false` | When the call to an assistant fails (busy, no answer), redirect it to the next available assistant |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `AlbsStatus`) |
+| `fallback_action` | enum | No | `hangup` | Where the call goes when no member can take it. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `hangup`, `unavailable`, `ai_load_balancer`, `call_queue` (cast to `RingGroupFallbackAction`) |
+| `fallback_extension_id` | bigint unsigned | Yes | null | Fallback extension. Foreign key to `extensions`, on delete set null |
+| `fallback_ring_group_id` | bigint unsigned | Yes | null | Fallback ring group. Foreign key to `ring_groups`, on delete set null |
+| `fallback_ivr_menu_id` | bigint unsigned | Yes | null | Fallback IVR menu. Foreign key to `ivr_menus`, on delete set null |
+| `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant. Foreign key to `ai_assistants`, on delete set null |
+| `fallback_ai_load_balancer_id` | bigint unsigned | Yes | null | Fallback AI load balancer. Foreign key to `ai_assistant_load_balancers`, on delete set null |
+| `fallback_call_queue_id` | bigint unsigned | Yes | null | Fallback call queue. Foreign key to `call_queues`, on delete set null |
+| `created_by` | bigint unsigned | Yes | null | User who created it. Foreign key to `users`, on delete set null |
+| `updated_by` | bigint unsigned | Yes | null | User who last changed it. Foreign key to `users`, on delete set null |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `deleted_at` | timestamp | Yes | null | Soft-delete timestamp |
+
+**Indexes**
+
+- `ai_assistant_load_balancers_created_by_foreign`: `created_by`
+- `ai_assistant_load_balancers_fallback_ai_assistant_id_foreign`: `fallback_ai_assistant_id`
+- `ai_assistant_load_balancers_fallback_ai_load_balancer_id_foreign`: `fallback_ai_load_balancer_id`
+- `ai_assistant_load_balancers_fallback_call_queue_id_foreign`: `fallback_call_queue_id`
+- `ai_assistant_load_balancers_fallback_extension_id_foreign`: `fallback_extension_id`
+- `ai_assistant_load_balancers_fallback_ivr_menu_id_foreign`: `fallback_ivr_menu_id`
+- `ai_assistant_load_balancers_fallback_ring_group_id_foreign`: `fallback_ring_group_id`
+- `ai_assistant_load_balancers_organization_id_name_unique` (unique): `organization_id`, `name`
+- `ai_assistant_load_balancers_organization_id_status_index`: `organization_id`, `status`
+- `ai_assistant_load_balancers_organization_id_strategy_index`: `organization_id`, `strategy`
+- `ai_assistant_load_balancers_updated_by_foreign`: `updated_by`
+
+
+**Relationships**
+
+```php
+$aiAssistantLoadBalancer->organization() → Organization (organization_id) [BelongsTo]
+$aiAssistantLoadBalancer->members() → AiAssistantLoadBalancerMember (load_balancer_id) [HasMany]
+$aiAssistantLoadBalancer->fallbackExtension() → Extension (fallback_extension_id) [BelongsTo]
+$aiAssistantLoadBalancer->fallbackRingGroup() → RingGroup (fallback_ring_group_id) [BelongsTo]
+$aiAssistantLoadBalancer->fallbackIvrMenu() → IvrMenu (fallback_ivr_menu_id) [BelongsTo]
+$aiAssistantLoadBalancer->fallbackAiAssistant() → AiAssistant (fallback_ai_assistant_id) [BelongsTo]
+$aiAssistantLoadBalancer->fallbackCallQueue() → CallQueue (fallback_call_queue_id) [BelongsTo]
+$aiAssistantLoadBalancer->fallbackAiLoadBalancer() → AiAssistantLoadBalancer (fallback_ai_load_balancer_id) [BelongsTo]
+$aiAssistantLoadBalancer->creator() → User (created_by) [BelongsTo]
+$aiAssistantLoadBalancer->updater() → User (updated_by) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `withStrategy()`, `withStatus()`, `search()`, `active()`, `unprovisioned()`  
+**Methods:** `isActive()`, `isInactive()`, `getActiveMembers()`, `getActiveMemberCount()`  
+
+`getActiveMembers()` returns active members whose assistant is active, ordered by `position`. `unprovisioned()` is true when `fallback_action` is `unavailable`.
+
+## AiAssistantLoadBalancerMember
+
+An AI assistant in a load balancer.
+
+**Table:** `ai_assistant_load_balancer_members`  
+**Model:** `App\Models\AiAssistantLoadBalancerMember`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `load_balancer_id` | bigint unsigned | No | - | Load balancer. Foreign key to `ai_assistant_load_balancers`, on delete cascade |
+| `ai_assistant_id` | bigint unsigned | No | - | Assistant. Foreign key to `ai_assistants`, on delete cascade |
+| `priority` | int | No | `0` | Priority for the `priority` strategy (lowest number first) |
+| `weight` | int | No | `100` | Weight for the `percentage` strategy |
+| `position` | int | No | `0` | Order in the list |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `ai_assistant_load_balancer_members_ai_assistant_id_foreign`: `ai_assistant_id`
+- `albs_members_lb_position_idx`: `load_balancer_id`, `position`
+- `albs_members_lb_priority_idx`: `load_balancer_id`, `priority`
+- `albs_members_lb_status_idx`: `load_balancer_id`, `status`
+- `albs_members_unique` (unique): `load_balancer_id`, `ai_assistant_id`
+
+
+**Relationships**
+
+```php
+$aiAssistantLoadBalancerMember->loadBalancer() → AiAssistantLoadBalancer (load_balancer_id) [BelongsTo]
+$aiAssistantLoadBalancerMember->aiAssistant() → AiAssistant (ai_assistant_id) [BelongsTo]
+```
+
+## Related Documentation
+
+- [AI Assistants](/opbx/modules/ai-assistants)
+- [AI Load Balancers](/opbx/modules/ai-load-balancers)

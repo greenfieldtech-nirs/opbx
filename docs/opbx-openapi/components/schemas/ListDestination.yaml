@@ -1,0 +1,67 @@
+type: object
+description: Destination (phone number) in a distribution list
+properties:
+  id:
+    type: integer
+  phone_number:
+    type: string
+    description: E.164 number
+    example: '+14155551212'
+  name:
+    type:
+    - string
+    - 'null'
+  batch_identifier:
+    type:
+    - string
+    - 'null'
+  metadata:
+    type:
+    - object
+    - 'null'
+    additionalProperties: true
+    description: Values of the CSV columns mapped with `mapping[metadata]`
+  status:
+    type: string
+    enum: [pending, dialing, connected, failed, completed, invalid]
+  status_label:
+    type: string
+  priority:
+    type: integer
+    description: Dialing priority (1 when unset)
+  dial_attempts:
+    type: integer
+    description: Calls placed to this destination so far
+  last_dialed_at:
+    type:
+    - string
+    - 'null'
+    description: Y-m-d H:i:s
+    example: '2024-01-10 08:00:00'
+  last_disposition:
+    type:
+    - string
+    - 'null'
+  duration:
+    type:
+    - integer
+    - 'null'
+    description: Duration of the last call in seconds
+  billsec:
+    type:
+    - integer
+    - 'null'
+    description: Billable seconds of the last call
+  last_error:
+    type:
+    - string
+    - 'null'
+  is_invalid:
+    type: boolean
+    description: True when status is `invalid`
+  created_at:
+    type: string
+    description: Y-m-d H:i:s
+  updated_at:
+    type: string
+    description: Y-m-d H:i:s

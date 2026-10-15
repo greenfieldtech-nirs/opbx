@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\InboundBlacklistRejectionStrategy;
+use App\Models\Concerns\PrunesByRetention;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[ScopedBy([OrganizationScope::class])]
 class BlockedCallLog extends Model
 {
-    use HasFactory;
+    use HasFactory, PrunesByRetention;
+
+    protected const RETENTION_KEY = 'blocked_call_logs_days';
+
+    protected const RETENTION_COLUMN = 'blocked_at';
 
     public $timestamps = false;
 

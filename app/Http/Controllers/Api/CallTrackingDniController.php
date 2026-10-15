@@ -80,11 +80,12 @@ class CallTrackingDniController extends Controller
             $query = CallTrackingCampaign::query()
                 ->forOrganization($organizationId)
                 ->where('status', CallTrackingCampaignStatus::ACTIVE)
-                ->whereRaw('LOWER(source) = LOWER(?)', [$utmSource])
-                ->whereRaw('LOWER(medium) = LOWER(?)', [$utmMedium]);
+                // The columns use a case-insensitive collation, so plain comparisons match any case.
+                ->where('source', $utmSource)
+                ->where('medium', $utmMedium);
 
             if (is_string($utmCampaign)) {
-                $query->whereRaw('LOWER(name) LIKE LOWER(?)', ['%'.$utmCampaign.'%']);
+                $query->where('name', 'like', '%'.addcslashes($utmCampaign, '%_\\').'%');
             }
 
             return $query->first();

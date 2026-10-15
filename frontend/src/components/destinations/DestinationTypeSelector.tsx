@@ -16,6 +16,7 @@ import {
 import type { DestinationTypeSelectorProps } from './types/destination.types';
 import {
   getAllDestinationTypeConfigs,
+  getDestinationTypeConfig,
   sortDestinationTypes,
 } from './utils/destination-config';
 
@@ -46,6 +47,7 @@ export function DestinationTypeSelector({
   disabled = false,
   allowedTypes,
   includeHangup = false,
+  allowDisconnect = false,
   showDescriptions = false,
   className,
 }: DestinationTypeSelectorProps) {
@@ -53,6 +55,13 @@ export function DestinationTypeSelector({
   const typeConfigs = sortDestinationTypes(
     getAllDestinationTypeConfigs(allowedTypes, includeHangup)
   );
+  // The server can set 'unavailable' (deleted user's extension): show it as the current value so admins can find and fix it
+  if (value === 'unavailable') {
+    typeConfigs.push(getDestinationTypeConfig('unavailable'));
+  } else if (allowDisconnect) {
+    // Edit forms only: lets the admin deliberately disconnect a route
+    typeConfigs.push({ ...getDestinationTypeConfig('unavailable'), label: 'Disconnect' });
+  }
 
   // Handle selection change
   const handleChange = (selectedValue: string) => {
@@ -80,6 +89,8 @@ export function DestinationTypeSelector({
               <SelectItem
                 key={config.value}
                 value={config.value}
+                // Destination unavailable is only ever set by the server: shown as the current value, never chosen.
+                disabled={config.value === 'unavailable' && value === 'unavailable'}
                 className="cursor-pointer"
               >
                 <div className="flex items-start gap-3 py-1">

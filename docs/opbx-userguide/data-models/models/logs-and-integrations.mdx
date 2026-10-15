@@ -1,0 +1,118 @@
+---
+sidebar_position: 28
+slug: /data-models/models/logs-and-integrations
+sidebar_class_name: cxGuidesSidebar
+title: "Call Logs and Delivery Logs"
+---
+
+# Call Logs and Delivery Logs
+
+Legacy call logs and webhook delivery logs.
+
+## CallLog
+
+Legacy per-call log. The `call-initiated` webhook dispatches `ProcessInboundCallJob`, which creates the row (`firstOrCreate` by `call_id`); the `call-status` and CDR webhooks update it if it exists. Call history in the UI comes from [call detail records](/opbx/data-models/models/call-detail-record).
+
+**Table:** `call_logs`  
+**Model:** `App\Models\CallLog`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `call_id` | varchar(255) | No | - | Cloudonix call ID |
+| `direction` | enum | No | `inbound` | Inbound or outbound. Values: `inbound`, `outbound` |
+| `from_number` | varchar(20) | No | - | Caller |
+| `to_number` | varchar(20) | No | - | Called number |
+| `did_id` | bigint unsigned | Yes | null | Number called. Foreign key to `did_numbers`, on delete set null |
+| `extension_id` | bigint unsigned | Yes | null | Extension. Foreign key to `extensions`, on delete set null |
+| `ring_group_id` | bigint unsigned | Yes | null | Ring group. Foreign key to `ring_groups`, on delete set null |
+| `status` | enum | No | `initiated` | Call state. Values: `initiated`, `ringing`, `answered`, `completed`, `busy`, `no_answer`, `failed` (cast to `CallStatus`) |
+| `initiated_at` | timestamp | Yes | null | Start |
+| `answered_at` | timestamp | Yes | null | Answer |
+| `ended_at` | timestamp | Yes | null | End |
+| `duration` | int | Yes | null | Seconds |
+| `recording_url` | varchar(255) | Yes | null | Recording URL |
+| `cloudonix_cdr` | json | Yes | null | CDR payload |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `call_logs_call_id_index`: `call_id`
+- `call_logs_call_id_unique` (unique): `call_id`
+- `call_logs_did_id_foreign`: `did_id`
+- `call_logs_extension_id_foreign`: `extension_id`
+- `call_logs_from_number_created_at_index`: `from_number`, `created_at`
+- `call_logs_organization_id_created_at_index`: `organization_id`, `created_at`
+- `call_logs_ring_group_id_foreign`: `ring_group_id`
+- `call_logs_status_index`: `status`
+- `call_logs_to_number_created_at_index`: `to_number`, `created_at`
+
+**Casts:** `cloudonix_cdr` (array)  
+
+**Relationships**
+
+```php
+$callLog->organization() → Organization (organization_id) [BelongsTo]
+$callLog->didNumber() → DidNumber (did_id) [BelongsTo]
+$callLog->extension() → Extension (extension_id) [BelongsTo]
+$callLog->ringGroup() → RingGroup (ring_group_id) [BelongsTo]
+```
+
+**Methods:** `isActive()`, `isCompleted()`  
+
+## CallNotificationLog
+
+One delivery attempt of a [call notification](/opbx/data-models/models/call-notifications-settings) webhook.
+
+**Table:** `call_notification_logs`  
+**Model:** `App\Models\CallNotificationLog`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `PrunesByRetention`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `call_session_token` | varchar(255) | No | - | Cloudonix session token |
+| `event_id` | char(36) | No | - | Event UUID |
+| `event_type` | varchar(50) | No | - | Event (`new`, `ringing`, ...) |
+| `status` | varchar(50) | No | - | Call status in the event |
+| `webhook_url` | varchar(2048) | No | - | Destination URL |
+| `request_payload` | json | No | - | JSON sent |
+| `request_headers` | json | Yes | null | Headers sent |
+| `request_body` | text | Yes | null | Body sent |
+| `response_status_code` | smallint unsigned | Yes | null | HTTP status |
+| `response_body` | text | Yes | null | Response body |
+| `response_headers` | json | Yes | null | Response headers |
+| `response_time_ms` | int unsigned | Yes | null | Response time |
+| `attempt_number` | tinyint unsigned | No | `1` | Attempt number |
+| `is_success` | boolean | No | `false` | 2xx response |
+| `error_message` | text | Yes | null | Error |
+| `created_at` | timestamp | No | - |  |
+
+**Indexes**
+
+- `call_notification_logs_call_session_token_index`: `call_session_token`
+- `call_notification_logs_event_id_index`: `event_id`
+- `call_notification_logs_organization_id_created_at_index`: `organization_id`, `created_at`
+
+**Casts:** `request_payload` (array), `request_headers` (array), `response_headers` (array)  
+
+**Relationships**
+
+```php
+$callNotificationLog->organization() → Organization (organization_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `forSession()`, `successful()`, `failed()`, `recent()`  
+**Methods:** `markAsSuccess()`, `markAsFailed()`  
+
+Rows whose `created_at` is older than `RETENTION_CALL_NOTIFICATION_LOGS_DAYS` (default 90) are deleted daily by `model:prune`.
+
+## Related Documentation
+
+- [Call Notifications](/opbx/modules/call-notifications)
+- [Data Retention](/opbx/data-models/configuration/index#data-retention)

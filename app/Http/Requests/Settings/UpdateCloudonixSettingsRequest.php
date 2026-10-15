@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Settings;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Form request for updating Cloudonix integration settings.
@@ -29,8 +30,7 @@ class UpdateCloudonixSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'domain_uuid' => ['nullable', 'string', 'uuid'],
-            'domain_name' => ['nullable', 'string', 'max:255'],
+            'domain_uuid' => ['nullable', 'string', 'uuid', Rule::unique('cloudonix_settings', 'domain_uuid')->ignore($this->user()?->organization_id, 'organization_id')],
             'domain_api_key' => ['nullable', 'string', 'max:255'],
             'domain_requests_api_key' => ['nullable', 'string', 'max:255'],
             'webhook_base_url' => ['nullable', 'string', 'url', 'max:255'],
@@ -42,7 +42,6 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'no_answer_timeout' => ['required', 'integer', 'min:5', 'max:120'],
             'call_recording_mode' => ['required', 'string', 'in:disabled,inbound,outbound,internal,inbound_outbound,all'],
             'recording_format' => ['required', 'string', 'in:wav,mp3'],
-            'cloudonix_package' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -55,7 +54,6 @@ class UpdateCloudonixSettingsRequest extends FormRequest
     {
         return [
             'domain_uuid' => 'domain UUID',
-            'domain_name' => 'domain name',
             'domain_api_key' => 'domain API key',
             'domain_requests_api_key' => 'webhook API key',
             'webhook_base_url' => 'webhook base URL',
@@ -63,7 +61,6 @@ class UpdateCloudonixSettingsRequest extends FormRequest
             'no_answer_timeout' => 'no answer timeout',
             'call_recording_mode' => 'call recording',
             'recording_format' => 'recording format',
-            'cloudonix_package' => 'Cloudonix package',
         ];
     }
 

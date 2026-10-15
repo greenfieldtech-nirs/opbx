@@ -5,36 +5,32 @@
  * Design aligned with Extensions page.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useOperateAs } from '@/context/OperateAsContext';
 import {
   Building2,
-  Plus,
   Search,
   X,
   RefreshCw,
-  MoreVertical,
-  Edit,
-  Trash2,
   PauseCircle,
   Play,
   Users,
   Phone,
   Globe,
-  ChevronDown,
-  ChevronUp,
   LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/services/api';
 import { cn } from '@/lib/utils';
-import { formatDate, getStatusColor } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -50,14 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { PlatformLayout } from '@/components/platform';
+import { PlatformLayout, DeleteOrganizationDialog } from '@/components/platform';
 import {
   StandardDataTable,
   Column,
@@ -69,6 +58,7 @@ import {
   useUpdateOrganizationSettings,
 } from '@/hooks/platform';
 import type { PlatformOrganization, OrganizationStatus } from '@/types/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type SortField = 'id' | 'name' | 'status' | 'created_at' | 'users_count' | 'extensions_count' | 'dids_count';
 type SortDirection = 'asc' | 'desc' | null;
@@ -86,7 +76,7 @@ export default function PlatformOrganizations() {
     hasRefreshed.current = true;
     
     // Clear platform-related queries to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     // Refresh user data from server
     refreshUser();
   }, [queryClient, refreshUser]);
@@ -109,7 +99,7 @@ export default function PlatformOrganizations() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformOrganizations({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformOrganizations({
     page: currentPage,
     per_page: perPage,
     search: debouncedSearch || undefined,
@@ -150,13 +140,19 @@ export default function PlatformOrganizations() {
 
   const handleStatusChange = async (org: PlatformOrganization, newStatus: OrganizationStatus) => {
     try {
-      await updateStatusMutation.mutateAsync({
+      const result = await updateStatusMutation.mutateAsync({
         id: org.id,
         data: { status: newStatus },
       });
+      // The edit dialog holds a snapshot of the org; reflect the new status there too
+      setSelectedOrg((prev) =>
+        prev && prev.id === org.id ? { ...prev, status: result.status as OrganizationStatus } : prev
+      );
       toast.success(`Organization ${newStatus === 'active' ? 'activated' : newStatus === 'suspended' ? 'suspended' : 'deleted'}`);
-    } catch {
-      toast.error('Failed to update status');
+      return true;
+    } catch (error) {
+      toast.error('Failed to update status', { description: getApiErrorMessage(error) });
+      return false;
     }
   };
 
@@ -184,8 +180,8 @@ export default function PlatformOrganizations() {
       });
       toast.success('Organization updated');
       setShowEditDialog(false);
-    } catch {
-      toast.error('Failed to update organization');
+    } catch (error) {
+      toast.error('Failed to update organization', { description: getApiErrorMessage(error) });
     }
   };
 
@@ -215,7 +211,7 @@ export default function PlatformOrganizations() {
       sortKey: 'name',
       cell: (org) => (
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 bg-blue-100">
+          <div className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 bg-blue-100">
             <Building2 className="h-5 w-5 text-blue-600" />
           </div>
           <div>
@@ -283,6 +279,10 @@ export default function PlatformOrganizations() {
       ),
     },
   ];
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load organizations" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <PlatformLayout>
@@ -376,6 +376,7 @@ export default function PlatformOrganizations() {
               canView={false}
               canEdit={false}
               canDelete={true}
+              canDeleteItem={(org) => org.status !== 'deleted'}
               onDelete={(org) => {
                 setSelectedOrg(org);
                 setShowDeleteDialog(true);
@@ -508,29 +509,15 @@ export default function PlatformOrganizations() {
         </Dialog>
 
         {/* Delete Confirmation */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete Organization</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedOrg?.name}? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => selectedOrg && handleStatusChange(selectedOrg, 'deleted')}
-                disabled={updateStatusMutation.isPending}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <DeleteOrganizationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          organizationName={selectedOrg?.name}
+          onConfirm={async () => {
+            if (selectedOrg && (await handleStatusChange(selectedOrg, 'deleted'))) setShowDeleteDialog(false);
+          }}
+          isPending={updateStatusMutation.isPending}
+        />
       </div>
     </PlatformLayout>
   );

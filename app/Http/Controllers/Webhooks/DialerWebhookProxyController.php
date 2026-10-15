@@ -8,10 +8,11 @@ use App\Enums\DestinationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AutoDialerCallSession;
 use App\Scopes\OrganizationScope;
+use App\Services\AutoDialer\CDRPublisher;
+use App\Services\AutoDialer\DialerWorkerCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 
 /**
  * Dialer Webhook Proxy Controller
@@ -60,7 +61,7 @@ class DialerWebhookProxyController extends Controller
         $workerId = $customData['worker_id'] ?? null;
 
         // Find the session - either by session_token or by call_id
-        $session = $this->findSession($sessionToken, $callId);
+        $session = $this->findSession((int) $request->input('_organization_id'), $sessionToken, $callId);
 
         Log::debug('Dialer webhook session lookup', [
             'session_token' => $sessionToken,
@@ -183,7 +184,7 @@ class DialerWebhookProxyController extends Controller
         $this->updateDestinationFromDisposition($session, $disposition, $duration, $billsec);
 
         // Decrement the CAC counter in Redis so the worker knows a slot freed up
-        $this->decrementCacCounter($session->campaign_id, $session->session_token);
+        app(CDRPublisher::class)->decrementCacCounter($session->campaign_id, $session->session_token);
 
         Log::info('Dialer call completed', [
             'session_id' => $session->id,
@@ -220,7 +221,7 @@ class DialerWebhookProxyController extends Controller
         $this->updateDestinationFromDisposition($session, $disposition, 0, 0);
 
         // Decrement the CAC counter in Redis so the worker knows a slot freed up
-        $this->decrementCacCounter($session->campaign_id, $session->session_token);
+        app(CDRPublisher::class)->decrementCacCounter($session->campaign_id, $session->session_token);
 
         Log::info('Dialer call failed', [
             'session_id' => $session->id,
@@ -248,27 +249,20 @@ class DialerWebhookProxyController extends Controller
     }
 
     /**
-     * Find session by token or call ID.
-     *
-     * Bypasses organization scope since webhooks don't have authenticated users.
+     * Find session by token or call ID, within the organization authenticated
+     * by VerifyCloudonixSignature (webhooks have no user, so the scope is bypassed).
      */
-    private function findSession(?string $sessionToken, ?string $callId): ?AutoDialerCallSession
+    private function findSession(int $organizationId, ?string $sessionToken, ?string $callId): ?AutoDialerCallSession
     {
-        return OrganizationScope::bypass(function () use ($sessionToken, $callId): ?AutoDialerCallSession {
-            $query = AutoDialerCallSession::with(['destination', 'campaign']);
+        return OrganizationScope::bypass(function () use ($organizationId, $sessionToken, $callId): ?AutoDialerCallSession {
+            $query = fn () => AutoDialerCallSession::with(['destination', 'campaign'])
+                ->where('organization_id', $organizationId);
 
-            if ($sessionToken) {
-                $session = $query->where('session_token', $sessionToken)->first();
-                if ($session) {
-                    return $session;
-                }
+            if ($sessionToken && ($session = $query()->where('session_token', $sessionToken)->first())) {
+                return $session;
             }
 
-            if ($callId) {
-                return $query->where('call_id', $callId)->first();
-            }
-
-            return null;
+            return $callId ? $query()->where('call_id', $callId)->first() : null;
         });
     }
 
@@ -314,105 +308,22 @@ class DialerWebhookProxyController extends Controller
             'last_call_id' => $session->call_id,
         ];
 
-        // Map disposition to status
-        $completedDispositions = ['answered', 'completed'];
-        $failedDispositions = ['busy', 'no-answer', 'failed', 'cancelled', 'congestion'];
+        $outcome = app(DialerWorkerCampaignService::class)
+            ->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destinationData['status'] = $outcome['status'];
 
-        if (in_array($disposition, $completedDispositions, true)) {
-            $destinationData['status'] = DestinationStatus::COMPLETED;
-        } elseif (in_array($disposition, $failedDispositions, true)) {
-            // Check if should retry
-            $retryableDispositions = ['busy', 'no-answer', 'cancelled'];
+        if ($outcome['status'] === DestinationStatus::PENDING) {
+            $destinationData['next_retry_at'] = $outcome['next_retry_at'];
 
-            if (in_array($disposition, $retryableDispositions, true) &&
-                $destination->dial_attempts < $campaign->max_dial_attempts) {
-                // Calculate next retry time (exponential backoff)
-                $nextRetry = $this->calculateNextRetry($destination->dial_attempts);
-                $destinationData['next_retry_at'] = $nextRetry;
-                $destinationData['status'] = DestinationStatus::PENDING;
-
-                Log::info('Dialer destination scheduled for retry', [
-                    'destination_id' => $destination->id,
-                    'attempts' => $destination->dial_attempts,
-                    'next_retry_at' => $nextRetry,
-                ]);
-            } else {
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $campaign->increment('failed_calls');
-            }
+            Log::info('Dialer destination scheduled for retry', [
+                'destination_id' => $destination->id,
+                'attempts' => $destination->dial_attempts,
+                'next_retry_at' => $outcome['next_retry_at'],
+            ]);
+        } elseif ($outcome['status'] === DestinationStatus::FAILED) {
+            $campaign->increment('failed_calls');
         }
 
         $destination->update($destinationData);
-    }
-
-    /**
-     * Calculate next retry time using exponential backoff.
-     *
-     * Schedule:
-     * - Attempt 1: 5 minutes
-     * - Attempt 2: 10 minutes
-     * - Attempt 3: 20 minutes
-     * - Attempt 4: 40 minutes
-     * - Attempt 5+: 60 minutes (cap)
-     */
-    private function calculateNextRetry(int $attemptNumber): string
-    {
-        $baseDelay = 5; // 5 minutes
-        $delay = $baseDelay * (2 ** ($attemptNumber - 1));
-
-        // Cap at 60 minutes
-        if ($delay > 60) {
-            $delay = 60;
-        }
-
-        return now()->addMinutes($delay)->toIso8601String();
-    }
-
-    /**
-     * Decrement the CAC (Concurrent Active Calls) counter in Redis.
-     *
-     * Uses the 'dialer' connection (no key prefix) because the Go worker
-     * writes raw keys like dialer:cac:{id}:active without any prefix.
-     * Idempotency is enforced per session token so a completed call only
-     * decrements the counter once, even if multiple webhooks arrive.
-     */
-    private function decrementCacCounter(int $campaignId, string $sessionToken): void
-    {
-        try {
-            $redis = Redis::connection('dialer');
-
-            $idempotencyKey = "dialer:cac:decremented:{$sessionToken}";
-            if ($redis->get($idempotencyKey)) {
-                Log::info('CAC decrement already processed for session', [
-                    'campaign_id' => $campaignId,
-                    'session_token' => $sessionToken,
-                ]);
-
-                return;
-            }
-
-            $workerKey = "dialer:cac:{$campaignId}:active";
-            $newCount = $redis->decr($workerKey);
-
-            // Prevent counter from going negative
-            if ($newCount < 0) {
-                $redis->set($workerKey, 0);
-                $newCount = 0;
-            }
-
-            $redis->setex($idempotencyKey, 86400, '1');
-
-            Log::info('CAC counter decremented', [
-                'campaign_id' => $campaignId,
-                'active_calls' => $newCount,
-                'session_token' => $sessionToken,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to decrement CAC counter', [
-                'campaign_id' => $campaignId,
-                'session_token' => $sessionToken,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }

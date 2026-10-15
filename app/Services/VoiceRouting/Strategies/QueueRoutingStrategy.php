@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
+use App\Http\Controllers\Api\RecordingsController;
 use App\Models\CallQueue;
-use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\QueueCall;
+use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\AcdWorkerClient;
+use App\Services\CallQueue\MohSegmentationService;
+use App\Services\CallQueue\QueueDialOfferService;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -89,7 +93,7 @@ class QueueRoutingStrategy implements RoutingStrategy
         // Only fresh entries dial immediately; a route() retry for a call that
         // is already ringing (or finalized) must fall through to the hold path.
         if ($callQueue->immediate_connect && $queueCall->wasRecentlyCreated) {
-            $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
+            $dialOffer = app(QueueDialOfferService::class);
             $result = app(AcdWorkerClient::class)->poll(
                 $organizationId,
                 $callQueue->id,
@@ -118,11 +122,14 @@ class QueueRoutingStrategy implements RoutingStrategy
 
     /**
      * Hold CXML: announce queue position (when enabled and a position is known),
-     * play MOH (if configured), then redirect to the poll endpoint.
+     * play one MOH segment (segmented recordings) or the full MOH file, then
+     * redirect to the poll endpoint. Segmented MOH keeps the poll loop
+     * responsive regardless of the MOH file length (WP1, Scenario 2).
      *
      * @param  int|null  $position  Current queue position (from the worker), if known
+     * @param  int  $mohIdx  MOH segment index carried across poll cycles via session_data
      */
-    public function holdResponse(Request $request, CallQueue $callQueue, string $callId, ?int $position = null): Response
+    public function holdResponse(Request $request, CallQueue $callQueue, string $callId, ?int $position = null, int $mohIdx = 0): Response
     {
         $builder = new CxmlBuilder;
 
@@ -134,7 +141,7 @@ class QueueRoutingStrategy implements RoutingStrategy
             );
         }
 
-        $mohUrl = $this->resolveMohUrl($request, $callQueue);
+        [$mohUrl, $nextMohIdx] = $this->resolveMoh($request, $callQueue, $mohIdx);
         if ($mohUrl !== null) {
             $builder->play($mohUrl);
         } else {
@@ -143,54 +150,82 @@ class QueueRoutingStrategy implements RoutingStrategy
             $builder->say('Please hold the line.')->pause(5);
         }
 
-        $builder->redirect($this->getPollUrl($request, $callQueue, $callId));
+        $builder->redirect($this->getPollUrl($request, $callQueue, $callId, $nextMohIdx));
 
         return $builder->toResponse();
     }
 
     /**
-     * Signed URL of the queue's MOH recording, or null when not configured.
+     * Resolve what to play during the hold: the signed URL plus the segment
+     * index to carry into the next poll cycle (null when unsegmented).
+     *
+     * @return array{0: string|null, 1: int|null}
      */
-    private function resolveMohUrl(Request $request, CallQueue $callQueue): ?string
+    private function resolveMoh(Request $request, CallQueue $callQueue, int $mohIdx): array
     {
         if (! $callQueue->moh_recording_id) {
-            return null;
+            return [null, null];
         }
 
-        $recording = $callQueue->mohRecording()->withoutGlobalScope(\App\Scopes\OrganizationScope::class)->first();
+        $recording = $callQueue->mohRecording()->withoutGlobalScope(OrganizationScope::class)->first();
 
         if (! $recording || ! $recording->file_path) {
-            return null;
+            return [null, null];
         }
 
-        return \App\Http\Controllers\Api\RecordingsController::generateSignedRecordingUrl(
+        $segments = app(MohSegmentationService::class)->segmentsFor($recording);
+
+        if ($segments !== []) {
+            $count = count($segments);
+            $index = $mohIdx % $count;
+
+            return [
+                $this->signedRecordingUrl($request, $callQueue, $this->stripOrgPrefix($segments[$index], $callQueue->organization_id)),
+                ($index + 1) % $count,
+            ];
+        }
+
+        return [$this->signedRecordingUrl($request, $callQueue, $recording->file_path), null];
+    }
+
+    private function signedRecordingUrl(Request $request, CallQueue $callQueue, string $filename): string
+    {
+        return RecordingsController::generateSignedRecordingUrl(
             $this->baseUrl($request),
             $callQueue->organization_id,
-            $recording->file_path,
+            $filename,
             3600
         );
     }
 
-    private function baseUrl(Request $request): string
+    /**
+     * Segment paths include the org prefix; generateSignedRecordingUrl re-adds it.
+     */
+    private function stripOrgPrefix(string $path, int $organizationId): string
     {
-        $organizationId = (int) $request->input('_organization_id');
-        $cloudonixSettings = CloudonixSettings::where('organization_id', $organizationId)->first();
+        $prefix = $organizationId.'/';
 
-        return rtrim(
-            $cloudonixSettings?->effective_webhook_base_url ?? config('app.url'),
-            '/'
-        );
+        return str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : $path;
     }
 
-    private function getPollUrl(Request $request, CallQueue $callQueue, string $callId): string
+    private function baseUrl(Request $request): string
     {
-        $sessionData = json_encode([
+        return app(CloudonixSettingsResolver::class)->webhookBaseUrl((int) $request->input('_organization_id'));
+    }
+
+    private function getPollUrl(Request $request, CallQueue $callQueue, string $callId, ?int $nextMohIdx = null): string
+    {
+        $sessionData = [
             'call_queue_id' => $callQueue->id,
             'call_id' => $callId,
             'organization_id' => $callQueue->organization_id,
             'callback_type' => 'queue_poll',
-        ]);
+        ];
 
-        return $this->baseUrl($request).route('voice.queue-poll', ['session_data' => $sessionData], false);
+        if ($nextMohIdx !== null) {
+            $sessionData['moh_idx'] = $nextMohIdx;
+        }
+
+        return $this->baseUrl($request).route('voice.queue-poll', ['session_data' => json_encode($sessionData)], false);
     }
 }

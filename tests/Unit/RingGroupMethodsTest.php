@@ -22,6 +22,7 @@ class RingGroupMethodsTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private RingGroup $ringGroup;
 
     protected function setUp(): void

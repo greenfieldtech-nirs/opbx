@@ -31,6 +31,9 @@ services:
     # spec override tag) so no dev-only settings leak into production.
     expose: !reset
       - "80"
+    # The base file publishes the Vite dev port (3000); the static image listens
+    # on 80 and is reached only through the nginx reverse proxy.
+    ports: !reset []
     # Drop the dev bind mounts (./frontend:/app + node_modules) so the built
     # image's compiled assets are served, not the host source tree.
     volumes: !reset []
@@ -45,7 +48,11 @@ services:
     # SPA (frontend:80) instead of proxying to the Vite dev server (frontend:3000).
     # We mount the prod conf.d directory over the whole /etc/nginx/conf.d so the
     # dev default.conf (which proxies to frontend:3000) is not present.
-    volumes:
+    # `!override` replaces (not merges) the base list so the dev templates mount
+    # is gone; the base sed-render command is replaced by a plain nginx start
+    # because /etc/nginx/conf.d is a read-only mount here.
+    command: ["nginx", "-g", "daemon off;"]
+    volumes: !override
       - ./:/var/www/html
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d.prod:/etc/nginx/conf.d:ro

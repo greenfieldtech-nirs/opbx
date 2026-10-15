@@ -26,18 +26,19 @@ class IvrMenuAudioValidator implements IvrMenuValidatorInterface
                 'tts_text',
                 'Either an audio file or TTS text must be provided.'
             );
+
             return;
         }
 
         // If both are provided, TTS takes precedence (configurable behavior)
-        if (!empty($audioFilePath) && !empty($ttsText)) {
+        if (! empty($audioFilePath) && ! empty($ttsText)) {
             // This could be an error or a warning depending on requirements
             // For now, we'll allow both but log a warning
         }
 
         // Validate audio file path format if provided
-        if (!empty($audioFilePath)) {
-            if (!preg_match('/\.(mp3|wav|m4a|ogg)$/i', $audioFilePath)) {
+        if (! empty($audioFilePath)) {
+            if (! preg_match('/\.(mp3|wav|m4a|ogg)$/i', $audioFilePath)) {
                 $validator->errors()->add(
                     'audio_file_path',
                     'Audio file must be in MP3, WAV, M4A, or OGG format.'
@@ -46,7 +47,7 @@ class IvrMenuAudioValidator implements IvrMenuValidatorInterface
         }
 
         // Validate TTS text length if provided
-        if (!empty($ttsText)) {
+        if (! empty($ttsText)) {
             if (strlen($ttsText) > 1000) {
                 $validator->errors()->add(
                     'tts_text',

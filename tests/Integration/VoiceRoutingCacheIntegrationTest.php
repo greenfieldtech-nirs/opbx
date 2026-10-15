@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
+use App\Enums\BusinessHoursExceptionType;
 use App\Models\BusinessHoursException;
 use App\Models\BusinessHoursSchedule;
-use App\Models\BusinessHoursScheduleDay;
-use App\Models\BusinessHoursTimeRange;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
@@ -27,6 +26,7 @@ class VoiceRoutingCacheIntegrationTest extends TestCase
     use RefreshDatabase;
 
     private VoiceRoutingCacheService $cacheService;
+
     private Organization $organization;
 
     protected function setUp(): void
@@ -249,7 +249,7 @@ class VoiceRoutingCacheIntegrationTest extends TestCase
 
         // Simulate multiple rapid updates
         for ($i = 0; $i < 5; $i++) {
-            $extension->voicemail_enabled = !$extension->voicemail_enabled;
+            $extension->voicemail_enabled = ! $extension->voicemail_enabled;
             $extension->save();
 
             // Fetch after each update - should always get fresh data
@@ -294,7 +294,7 @@ class VoiceRoutingCacheIntegrationTest extends TestCase
             'business_hours_schedule_id' => $schedule->id,
             'date' => '2025-12-25',
             'name' => 'Christmas',
-            'type' => \App\Enums\BusinessHoursExceptionType::CLOSED,
+            'type' => BusinessHoursExceptionType::CLOSED,
         ]);
 
         // First fetch

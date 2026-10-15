@@ -63,7 +63,7 @@ export function FAQSection() {
                   {faq.question}
                 </CardTitle>
                 <ChevronDown
-                  className={`h-5 w-5 text-muted-foreground transition-transform flex-shrink-0 ${
+                  className={`h-5 w-5 text-muted-foreground transition-transform shrink-0 ${
                     openFaq === idx ? 'rotate-180' : ''
                   }`}
                 />

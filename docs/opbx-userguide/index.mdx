@@ -25,7 +25,7 @@ OPBX is an open-source, multi-tenant business PBX platform built on top of the [
 - **Auto Dialer** for outbound campaigns with CAC/CPS rate limiting, scheduling, AMD, and retry logic
 - **Call recordings and CDR reporting** for compliance and analysis
 - **Inbound blacklist and outbound whitelist** for call security
-- **Real-time call monitoring** with live call tracking and WebSocket updates
+- **Real-time call monitoring** with live call status and WebSocket updates
 - **Supervisor role** for read-only, scoped monitoring of specific users and ring groups
 - **Live call coaching** with spy (listen), whisper, and barge modes for Owners and Supervisors
 - **Centralized logging** with an optional Loki + Grafana stack, including per-call audit trails searchable by Cloudonix session token
@@ -42,9 +42,9 @@ graph TB
     Nginx --> Frontend[Vite Dev Server]
     Nginx --> Soketi[Soketi WebSocket /app/]
     Nginx --> AMD[AMD Worker /ws/amd/]
-    Laravel --> MySQL[(MySQL 8)]
+    Laravel --> MySQL[(MySQL 8.4)]
     Laravel --> Redis[(Redis 7)]
-    Laravel --> MinIO[(MinIO Storage)]
+    Laravel --> SeaweedFS[(SeaweedFS Storage)]
     Laravel --> Cloudonix[Cloudonix CPaaS]
     GoWorker[Go Dialer Worker] --> Laravel
     GoWorker --> Redis
@@ -52,7 +52,7 @@ graph TB
     Cloudonix --> |Audio Stream| AMD
 ```
 
-The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in MinIO. Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, and the Java AMD worker analyzes audio streams for voicemail detection.
+The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in SeaweedFS (S3-compatible). Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, and the Java AMD worker analyzes audio streams for voicemail detection.
 
 ## Technology Stack
 
@@ -60,13 +60,15 @@ The browser interacts with a React single-page application served through Nginx.
 |-----------|------------|---------|
 | Backend | Laravel 12 (PHP 8.4) | REST API and business logic |
 | Frontend | React 18 + TypeScript | User interface |
-| Database | MySQL 8 | Persistent data storage |
+| Database | MySQL 8.4 LTS | Persistent data storage |
 | Cache/Queue | Redis 7 | Caching, sessions, job queues, locks |
-| Storage | MinIO | S3-compatible object storage for recordings |
+| Storage | SeaweedFS | S3-compatible object storage for recordings |
 | Real-time | Soketi WebSocket | Live updates and notifications |
 | VoIP | Cloudonix CPaaS | Call handling and SIP services |
 | Dialer | Go Worker | Outbound campaign execution |
 | AMD | Java/Vert.x 5 Worker | Stream-based voicemail detection |
+| ACD | Java/Vert.x 5 Worker | Call queue engine (waiting callers, agent states) |
+| MCP | MCP server | Lets AI agents use the OPBX API |
 
 ## Role Hierarchy
 
@@ -75,13 +77,13 @@ OPBX implements a hierarchical permission system. Each user belongs to exactly o
 | Role | Description | Key Capabilities |
 |------|-------------|------------------|
 | Owner | Organization creator | Full access to all features, can manage all users including other owners, configure system-wide settings |
-| PBX Admin | System administrator | Manage extensions, routing rules, users (except owners), view all reports |
+| PBX Admin | System administrator | Manage extensions, routing rules, phone numbers, trunks and users (within the limits in [User Management](/opbx/modules/user-management)) |
 | Supervisor | Scoped monitor | Read-only view of assigned users/ring groups; coach live calls (spy/whisper/barge); use the Web Phone; no configuration or exports |
 | PBX User | Regular user | View assigned resources, update own extension settings, view personal call history |
 | Reporter | Read-only access | View call logs, generate reports, access dashboards without modification rights |
 
 :::info Role Assignment
-Only Owners can assign the Owner role. PBX Admins cannot create or modify other PBX Admins or Owners.
+The Owner role cannot be assigned through the API or the Users page. Only an Owner can change another user's role. PBX Admins cannot give the PBX Admin role or change an Owner's or PBX Admin's role. See [User Management](/opbx/modules/user-management).
 :::
 
 ## API Documentation
@@ -92,11 +94,14 @@ The OPBX REST API is documented with OpenAPI 3.1.0. You can explore the endpoint
 
 Ready to get started? Follow these steps:
 
-1. [Install OPBX](./installation) using Docker Compose
-2. Complete your [first login and organization setup](./installation/first-login)
-3. Configure [Cloudonix integration](./installation/cloudonix-setup) for telephony
-4. Learn the [core concepts](./installation/concepts) before configuring your PBX
+1. [Install OPBX](/opbx/installation) using Docker Compose
+2. Complete your [first login and organization setup](/opbx/installation/first-login)
+3. Configure [Cloudonix integration](/opbx/installation/cloudonix-setup) for telephony
+4. Learn the [core concepts](/opbx/installation/concepts) before configuring your PBX
+5. Learn the [admin interface](/opbx/administration/navigating-the-interface), then configure each module in the order given in the [modules index](/opbx/modules)
+
+Operators who run the platform for several organizations also read [Platform Management](/opbx/administration/platform-management) and [Centralized Logs](/opbx/administration/centralized-logs).
 
 :::tip New to PBX Systems?
-If you are unfamiliar with PBX terminology, start with the [Core Concepts](./installation/concepts) guide. It explains extensions, DIDs, ring groups, and other essential concepts you will need to configure your phone system.
+If you are unfamiliar with PBX terminology, start with the [Core Concepts](/opbx/installation/concepts) guide. It explains extensions, DIDs, ring groups, and other essential concepts you will need to configure your phone system.
 :::

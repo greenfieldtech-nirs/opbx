@@ -11,17 +11,20 @@ use App\Http\Requests\UpdateCampaignRequest;
 use App\Http\Requests\UploadListRequest;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Models\AutoDialerCampaign;
+use App\Models\AutoDialerList;
 use App\Services\AutoDialer\CallerIdPoolService;
 use App\Services\AutoDialer\CampaignLifecycleService;
 use App\Services\AutoDialer\CampaignListService;
 use App\Services\AutoDialer\CampaignManagementService;
 use App\Services\AutoDialer\CampaignMonitorService;
+use App\Services\AutoDialer\ListManagementService;
 use App\Services\AutoDialer\ScheduleExtractorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Validation\Rule;
 
 class AutoDialerCampaignController extends Controller
 {
@@ -41,10 +44,15 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
+        $request->validate([
+            'exclude_status' => ['nullable', Rule::enum(CampaignStatus::class)],
+        ]);
+
         $filters = [
             'status' => $request->status,
+            'exclude_status' => $request->input('exclude_status'),
             'search' => $request->search,
-            'per_page' => $request->per_page ?? 25,
+            'per_page' => $this->perPage($request, 25),
         ];
 
         $campaigns = $this->managementService->listCampaigns(
@@ -132,16 +140,28 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('update', $campaign);
 
+        if ($campaign->status === CampaignStatus::ACTIVE) {
+            return response()->json([
+                'message' => 'Pause the campaign before editing it.',
+            ], 409);
+        }
+
         $data = $request->validated();
 
-        // Check if trying to modify caller_id_pool on active campaign
-        if (isset($data['caller_id_pool']) && $campaign->status === CampaignStatus::ACTIVE) {
+        // Same pool validation as create: a bad pool is a 422, not a 500 from the sync.
+        if (isset($data['caller_id_pool'])
+            && ! $this->callerIdService->validateCallerIdPool($data['caller_id_pool'], $campaign->organization_id)['valid']) {
             return response()->json([
-                'message' => 'Cannot modify Caller ID pool on an active campaign',
+                'message' => 'Invalid Caller ID pool',
                 'errors' => [
-                    'caller_id_pool' => ['Please pause the campaign before modifying the Caller ID pool.'],
+                    'caller_id_pool' => ['Some DIDs do not exist, do not belong to your organization, or are not active.'],
                 ],
-            ], 409);
+            ], 422);
+        }
+
+        // An explicit null time limit means "no limit defined": the default applies.
+        if (array_key_exists('time_limit', $data) && $data['time_limit'] === null) {
+            $data['time_limit'] = AutoDialerCampaign::DEFAULT_TIME_LIMIT;
         }
 
         // Extract schedule data if provided
@@ -182,6 +202,7 @@ class AutoDialerCampaignController extends Controller
         $this->authorize('delete', $campaign);
 
         $campaign->delete();
+        $campaign->clearRedisKeys();
 
         return response()->json([
             'message' => 'Campaign deleted successfully',
@@ -304,6 +325,10 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('uploadList', $campaign);
 
+        if ($refusal = $campaign->listAssignmentRefusal()) {
+            return response()->json(['error' => $refusal], 422);
+        }
+
         $file = $request->file('file');
         $name = $request->input('name');
 
@@ -316,36 +341,35 @@ class AutoDialerCampaignController extends Controller
     }
 
     /**
-     * Get list for a campaign.
+     * Get the lists assigned to a campaign.
      */
     public function getList(AutoDialerCampaign $campaign): JsonResponse
     {
         $this->authorize('view', $campaign);
 
-        $listDetails = $this->listService->getListDetails($campaign);
-
-        if ($listDetails === null) {
-            return response()->json([
-                'message' => 'No list uploaded for this campaign',
-            ], 404);
-        }
-
         return response()->json([
-            'data' => $listDetails,
+            'data' => $this->listService->getListsDetails($campaign),
         ]);
     }
 
     /**
-     * Delete list from a campaign.
+     * Unassign one list from a campaign (the list and its entries are kept).
      */
-    public function deleteList(AutoDialerCampaign $campaign): JsonResponse
+    public function deleteList(AutoDialerCampaign $campaign, AutoDialerList $list, ListManagementService $listManagement): JsonResponse
     {
         $this->authorize('deleteList', $campaign);
 
-        $this->listService->deleteList($campaign);
+        abort_unless($list->campaign_id === $campaign->id, 404);
+
+        try {
+            $listManagement->unassignList($list);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         return response()->json([
-            'message' => 'List deleted successfully',
+            'message' => 'List unassigned from campaign successfully',
+            'data' => ['list_id' => $list->id],
         ]);
     }
 
@@ -358,7 +382,7 @@ class AutoDialerCampaignController extends Controller
 
         $filters = [
             'status' => $request->status,
-            'per_page' => $request->per_page ?? 50,
+            'per_page' => $this->perPage($request, 50),
         ];
 
         $destinations = $this->managementService->getDestinations($campaign, $filters);
@@ -412,8 +436,11 @@ class AutoDialerCampaignController extends Controller
     {
         $this->authorize('viewAny', AutoDialerCampaign::class);
 
+        $validated = $request->validate(['exclude_campaign_id' => ['nullable', 'integer', 'min:1']]);
+
         $organizationId = Auth::user()->organization_id;
-        $excludeCampaignId = $request->query('exclude_campaign_id');
+        // Another organization's campaign id is harmless: its pool holds only that organization's DIDs.
+        $excludeCampaignId = isset($validated['exclude_campaign_id']) ? (int) $validated['exclude_campaign_id'] : null;
 
         $dids = $this->callerIdService->getAvailableDids($organizationId, $excludeCampaignId);
         $formattedDids = $this->callerIdService->formatAvailableDids($dids);
@@ -494,12 +521,14 @@ class AutoDialerCampaignController extends Controller
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
             'timezone' => $data['timezone'],
-            'time_limit' => $data['time_limit'] ?? 3600,
+            'time_limit' => $data['time_limit'] ?? AutoDialerCampaign::DEFAULT_TIME_LIMIT,
             'record_calls' => $data['record_calls'] ?? false,
             'action_voicemail' => $data['action_voicemail'] ?? null,
             'action_human' => $data['action_human'] ?? null,
             'action_unknown' => $data['action_unknown'] ?? null,
             'retry_on_voicemail' => $data['retry_on_voicemail'] ?? false,
+            'retry_on_busy_no_answer' => $data['retry_on_busy_no_answer'] ?? false,
+            'retry_delay_minutes' => $data['retry_delay_minutes'] ?? 15,
             'days_active' => $scheduleData['days_active'],
             'schedule' => $schedule,
             'start_time' => $scheduleData['start_time'],

@@ -6,13 +6,14 @@ paths:
       summary: Get supervisor assignments
       description: |
         Returns the users and ring groups assigned to a Supervisor. If the target
-        user is not a Supervisor, the `user_ids` and `ring_group_ids` arrays are empty.
-        Owner and PBX Admin can view any supervisor's assignments; a supervisor may
-        view their own.
+        user is not a Supervisor, the `user_ids` and `ring_group_ids` arrays are empty
+        and `users` / `ring_groups` are omitted. Owner and PBX Admin can view any
+        supervisor's assignments in their organization; a supervisor may view their own.
       operationId: getSupervisorAssignments
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: supervisors:read
       parameters:
         - name: user
           in: path
@@ -42,12 +43,14 @@ paths:
       summary: Update supervisor assignments
       description: |
         Replaces the Supervisor's assigned users and ring groups with the supplied
-        sets. All resources must belong to the same organization. A Supervisor cannot
-        be assigned to themselves or to another Supervisor. Owner and PBX Admin only.
+        sets (duplicates are ignored; send empty arrays to clear). All resources must
+        belong to the caller's organization. Only users with the `pbx_user` role can be
+        assigned, and a Supervisor cannot be assigned to themselves. Owner and PBX Admin only.
       operationId: updateSupervisorAssignments
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: supervisors:write
       parameters:
         - name: user
           in: path
@@ -67,12 +70,12 @@ paths:
               properties:
                 user_ids:
                   type: array
-                  description: IDs of organization users this Supervisor may monitor.
+                  description: IDs of organization users (role `pbx_user`) this Supervisor may monitor. Required, may be empty.
                   items:
                     type: integer
                 ring_group_ids:
                   type: array
-                  description: IDs of ring groups this Supervisor may monitor.
+                  description: IDs of ring groups this Supervisor may monitor. Required, may be empty.
                   items:
                     type: integer
       responses:
@@ -92,4 +95,14 @@ paths:
         '404':
           $ref: '../../openapi.yaml#/components/responses/NotFound'
         '422':
-          $ref: '../../openapi.yaml#/components/responses/ValidationError'
+          description: |
+            Validation failed (standard validation body, for example an ID that does not
+            exist in the organization), or a rule was broken (`{"message": ...}`): the
+            target user is not a Supervisor, a user or ring group belongs to another
+            organization, the Supervisor is in `user_ids`, or a user is not a PBX User.
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+              example:
+                message: Only PBX Users can be assigned as supervised users.

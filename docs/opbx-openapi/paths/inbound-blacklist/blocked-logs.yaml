@@ -7,7 +7,123 @@ paths:
       operationId: getBlockedCallLogs
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: inbound-blacklist:read
+      description: |
+        Paginated blocked-call log, newest first. Every authenticated user of the organization
+        can read it. Filters are applied only when present and are not validated.
+      parameters:
+        - $ref: '../../components/parameters/query/Page.yaml'
+        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: caller_id
+          in: query
+          schema:
+            type: string
+          description: Partial caller ID match
+        - name: blacklist_id
+          in: query
+          schema:
+            type: integer
+        - name: did_number_id
+          in: query
+          schema:
+            type: integer
+        - name: from_date
+          in: query
+          schema:
+            type: string
+          description: Inclusive `blocked_at` lower bound (any date/time string MySQL can compare, e.g. `2026-10-01` or `2026-10-01 00:00:00`)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+          description: Inclusive `blocked_at` upper bound (same format as `from_date`)
+        - name: rejection_strategy
+          in: query
+          schema:
+            type: string
+            enum: [drop, reject, torment]
       responses:
         '200':
-          description: Blocked logs retrieved
+          description: Blocked call log page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        organization_id:
+                          type: integer
+                        inbound_blacklist_id:
+                          type:
+                            - integer
+                            - 'null'
+                        did_number_id:
+                          type:
+                            - integer
+                            - 'null'
+                        caller_id:
+                          type: string
+                        called_number:
+                          type: string
+                        call_sid:
+                          type:
+                            - string
+                            - 'null'
+                        session_id:
+                          type:
+                            - string
+                            - 'null'
+                        rejection_strategy:
+                          type: string
+                          enum: [drop, reject, torment]
+                        torment_room_id:
+                          type:
+                            - string
+                            - 'null'
+                        torment_duration:
+                          type:
+                            - integer
+                            - 'null'
+                        webhook_payload:
+                          type:
+                            - object
+                            - 'null'
+                          description: Voice-routing request payload recorded when the call was blocked
+                        source_ip:
+                          type:
+                            - string
+                            - 'null'
+                        blocked_at:
+                          type: string
+                          format: date-time
+                        inbound_blacklist:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            caller_id_pattern:
+                              type: string
+                        did_number:
+                          type:
+                            - object
+                            - 'null'
+                          properties:
+                            id:
+                              type: integer
+                            phone_number:
+                              type: string
+                  meta:
+                    $ref: '../../components/schemas/PaginationMeta.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

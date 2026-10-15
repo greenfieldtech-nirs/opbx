@@ -1,33 +1,29 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-RUN apk add --no-cache git
-
-# Copy go mod files
+# Cache module downloads in their own layer
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY . .
 
-# Tidy modules and build
-RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker cmd/worker/main.go
+# go.mod/go.sum are committed; no `go mod tidy` at build time (reproducible builds)
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /worker ./cmd/worker
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.21
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates wget \
+    && addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
 
-WORKDIR /root/
+WORKDIR /app
+COPY --from=builder /worker /app/worker
 
-# Copy binary from builder
-COPY --from=builder /app/worker .
+USER app
 
-# Expose webhook port
+# Health-check port (see WEBHOOK_PORT)
 EXPOSE 8081
 
-CMD ["./worker"]
+CMD ["/app/worker"]

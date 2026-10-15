@@ -8,18 +8,83 @@ properties:
   name:
     type: string
     example: Main Menu
-  greeting_message:
-    type: string
+  description:
+    type:
+      - string
+      - 'null'
+  audio_file_path:
+    type:
+      - string
+      - 'null'
+    description: Greeting audio URL (a recording download URL or an external URL)
+  recording_id:
+    type:
+      - integer
+      - 'null'
+    description: Recording used as the greeting (set when the menu was saved with `recording_id` or a numeric `audio_file_path`)
+  is_recording_url:
+    type: boolean
+    description: True when audio_file_path points at the recordings download endpoint
+  tts_text:
+    type:
+      - string
+      - 'null'
     example: Thank you for calling
-  voice:
-    type: string
+  tts_voice:
+    type:
+      - string
+      - 'null'
     example: en-US-Standard-A
+  max_timeout:
+    type: integer
+    description: Seconds to wait for input
+  inter_digit_timeout:
+    type: integer
+  max_turns:
+    type: integer
+  failover_destination_type:
+    type:
+      - string
+      - 'null'
+    enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, hangup, unavailable, null]
+  failover_destination_id:
+    type:
+      - integer
+      - 'null'
   status:
     type: string
     enum: [active, inactive]
+  is_unprovisioned:
+    type: boolean
+    readOnly: true
+    description: True when the failover destination or any option is `unavailable` (saved for future use, or set when a deleted user's extension was the target). The API rejects `unavailable` when creating a resource (422, "Choose a destination.") and accepts it on update.
+  options_count:
+    type: integer
+    description: Present only in list responses (not with per_page=100)
   options:
     type: array
-    description: IVR menu options
+    description: Menu options (ordered by priority in list responses). Omitted from list responses requested with per_page=100 (dropdown mode).
+    items:
+      type: object
+      properties:
+        id:
+          type: integer
+        ivr_menu_id:
+          type: integer
+        input_digits:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        destination_type:
+          type: string
+          enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, hangup, unavailable]
+        destination_id:
+          type: integer
+          description: Target ID (0 for `unavailable`)
+        priority:
+          type: integer
   created_at:
     type: string
     format: date-time

@@ -41,6 +41,19 @@ class MaskCredentialsProcessorTest extends TestCase
         $this->assertSame('[redacted]', $record->context['nested']['x-api-key']);
     }
 
+    public function test_signed_url_sig_is_masked_but_similar_keys_are_not(): void
+    {
+        $record = (new MaskCredentialsProcessor)($this->record([
+            'sig' => 'abc123hmac',
+            'sd' => 'payload',
+            'design' => 'keep',
+        ]));
+
+        $this->assertSame('[redacted]', $record->context['sig']);
+        $this->assertSame('payload', $record->context['sd']);
+        $this->assertSame('keep', $record->context['design']);
+    }
+
     public function test_session_token_is_never_masked(): void
     {
         // The session token is the audit-trail search key - masking it would

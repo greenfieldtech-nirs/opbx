@@ -5,6 +5,7 @@
  * Falls back to HTTP polling since WebSocket updates are unreliable
  */
 
+import { queryKeys } from '@/lib/queryKeys';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { sessionUpdatesService, getCoachTarget } from '@/services/sessionUpdates.service';
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { useCallPresence, formatCallDuration } from '@/hooks/useCallPresence';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,6 +126,7 @@ export default function LiveCalls() {
   const isSupervisor = currentUser?.role === 'supervisor';
   const isReadOnly = ['reporter', 'pbx_user', 'supervisor'].includes(currentUser?.role);
   const canUseLiveCallActions = ['owner', 'supervisor'].includes(currentUser?.role);
+  const canDisconnect = can(currentUser?.role, 'liveCalls.disconnect');
   const queryClient = useQueryClient();
 
   // Refresh interval state (default: 5 seconds)
@@ -146,11 +149,10 @@ export default function LiveCalls() {
   }, [recentlyDisconnected]);
 
   // Initial data fetch via HTTP with configurable refresh
-  const { data: initialData, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['active-calls', isSupervisor ? 'supervisor' : 'all'],
+  const { data: initialData, isLoading, isFetching, error } = useQuery({
+    queryKey: queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => sessionUpdatesService.getActiveCalls({ supervisor: isSupervisor }),
     refetchInterval: refreshInterval === 0 ? false : refreshInterval,
-    refetchIntervalInBackground: true,
     staleTime: 0, // Always consider data stale to enable refresh
   });
 
@@ -246,7 +248,9 @@ export default function LiveCalls() {
     mutationFn: (sessionId: number) => sessionUpdatesService.disconnectSession(sessionId),
     onSuccess: () => {
       toast.success('Session disconnected successfully');
-      queryClient.invalidateQueries({ queryKey: ['active-calls'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cdrs.all });
     },
     onError: (error: any) => {
       const errorMessage =
@@ -297,7 +301,18 @@ export default function LiveCalls() {
         setLiveCalls((prev) => prev.filter((c) => c.session_id !== sessionId));
       }
 
-      disconnectMutation.mutate(sessionId);
+      disconnectMutation.mutate(sessionId, {
+        // Refused (e.g. 403): the call is still up, so bring the row back.
+        onError: () => {
+          if (call) {
+            const restored = new Set(recentlyDisconnectedRef.current);
+            restored.delete(call.call_id);
+            setRecentlyDisconnected(restored);
+            recentlyDisconnectedRef.current = restored;
+          }
+          void queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
+        },
+      });
     }
   };
 
@@ -319,6 +334,7 @@ export default function LiveCalls() {
     const sessionIds = callsWithSessionId.map((call) => call.session_id!);
     let completed = 0;
     let failed = 0;
+    const failedSessionIds = new Set<number>();
 
     // Disconnect calls sequentially to avoid overwhelming the server
     for (const sessionId of sessionIds) {
@@ -327,6 +343,7 @@ export default function LiveCalls() {
         completed++;
       } catch (error) {
         failed++;
+        failedSessionIds.add(sessionId);
         console.error(`Failed to disconnect session ${sessionId}:`, error);
       }
       setDisconnectProgress(completed);
@@ -338,16 +355,23 @@ export default function LiveCalls() {
     // reappear while Cloudonix is still processing the disconnection.
     // The backend and WebSocket may continue to report them as active
     // for a few seconds — we filter them out during the grace period.
-    const allCallIds = liveCalls.map((call) => call.call_id);
+    // Calls whose disconnect was refused stay visible.
+    const keptCalls = liveCalls.filter((call) => call.session_id && failedSessionIds.has(call.session_id));
+    const allCallIds = liveCalls.filter((call) => !keptCalls.includes(call)).map((call) => call.call_id);
     const newDisconnected = new Set(recentlyDisconnectedRef.current);
     allCallIds.forEach((id) => newDisconnected.add(id));
     setRecentlyDisconnected(newDisconnected);
     recentlyDisconnectedRef.current = newDisconnected;
 
     // Clear local state and query cache immediately for instant feedback
-    setLiveCalls([]);
-    clearActiveCalls();
-    queryClient.setQueryData(['active-calls', isSupervisor ? 'supervisor' : 'all'], { data: [] });
+    if (keptCalls.length === 0) {
+      setLiveCalls([]);
+      clearActiveCalls();
+      queryClient.setQueryData(queryKeys.activeCalls.list(isSupervisor ? 'supervisor' : 'all'), { data: [] });
+    } else {
+      setLiveCalls(keptCalls);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.activeCalls.all });
+    }
 
     // Remove call IDs from the recently-disconnected set after a grace
     // period so that genuinely new calls with the same ID can still appear.
@@ -385,7 +409,6 @@ export default function LiveCalls() {
     connected: liveCalls.filter((c) => c.status === CallStatus.CONNECTED).length,
   };
 
-  const handleRefresh = useCallback(() => refetch(), [refetch]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(refreshInterval, isFetching);
@@ -417,7 +440,7 @@ export default function LiveCalls() {
         </div>
         <div className="flex items-center gap-4">
           {/* Disconnect All Calls Button */}
-          {!isReadOnly && liveCalls.length > 0 && (
+          {canDisconnect && liveCalls.length > 0 && (
             <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
               <AlertDialogTrigger asChild>
                 <Button
@@ -787,6 +810,7 @@ export default function LiveCalls() {
                                 </TooltipContent>
                               </Tooltip>
 
+                              {canDisconnect && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -807,6 +831,7 @@ export default function LiveCalls() {
                                   <p>Disconnect</p>
                                 </TooltipContent>
                               </Tooltip>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">-</span>

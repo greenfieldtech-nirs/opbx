@@ -11,6 +11,7 @@ import type {
   PlatformOrganizationDetail,
   PlatformUser,
   PlatformAuditLogEntry,
+  PlatformStatusSnapshot,
   PlatformOrganizationsParams,
   PlatformUsersParams,
   PlatformAuditLogsParams,
@@ -19,6 +20,7 @@ import type {
   SetPlatformManagerRequest,
 } from '@/types/platform';
 import type { PaginatedResponse } from '@/types';
+import type { UserDeleteImpact } from './createResourceService';
 
 /**
  * Platform Dashboard API
@@ -89,6 +91,12 @@ export const platformUsersApi = {
       .delete(`/platform/users/${id}`)
       .then((r) => r.data),
 
+  /** What deleting the user will change (same code as the delete itself). */
+  deleteImpact: (id: string | number) =>
+    api
+      .get<{ data: UserDeleteImpact }>(`/platform/users/${id}/delete-impact`)
+      .then((r) => r.data.data),
+
   setPlatformManager: (id: string, data: SetPlatformManagerRequest) =>
     api
       .patch<{ data: { id: string; is_platform_manager: boolean } }>(`/platform/users/${id}/platform-manager`, data)
@@ -136,7 +144,16 @@ export const platformAuditLogsApi = {
 /**
  * Combined Platform API export
  */
+/**
+ * Platform Status API
+ */
+export const platformStatusApi = {
+  get: () => api.get<{ data: PlatformStatusSnapshot }>('/platform/status').then((r) => r.data.data),
+  checkNow: () => api.post<{ data: PlatformStatusSnapshot }>('/platform/status/check').then((r) => r.data.data),
+};
+
 export const platformApi = {
+  status: platformStatusApi,
   dashboard: platformDashboardApi,
   organizations: platformOrganizationsApi,
   users: platformUsersApi,

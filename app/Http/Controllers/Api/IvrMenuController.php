@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\IvrMenuStatus;
-use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\StoreIvrMenuRequest;
+use App\Http\Requests\ToggleIvrMenuStatusRequest;
+use App\Http\Requests\UpdateIvrMenuRequest;
 use App\Http\Resources\IvrMenuResource;
 use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
+use App\Services\Cloudonix\CloudonixPackageService;
 use App\Services\Cloudonix\CloudonixVoiceService;
+use App\Services\CloudonixClient\CloudonixApiException;
 use App\ValueObjects\IvrAudioConfig;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -38,7 +41,8 @@ class IvrMenuController extends AbstractApiCrudController
     private array $optionsData = [];
 
     public function __construct(
-        private CloudonixVoiceService $voiceService
+        private CloudonixVoiceService $voiceService,
+        private CloudonixPackageService $packageService,
     ) {}
 
     /**
@@ -59,6 +63,16 @@ class IvrMenuController extends AbstractApiCrudController
         return 'ivrMenu';
     }
 
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreIvrMenuRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateIvrMenuRequest::class;
+    }
+
     /**
      * Get the resource class name for transforming models.
      */
@@ -74,7 +88,7 @@ class IvrMenuController extends AbstractApiCrudController
      */
     protected function getAllowedFilters(): array
     {
-        return ['status', 'search'];
+        return ['status', 'search', 'unprovisioned'];
     }
 
     /**
@@ -118,6 +132,11 @@ class IvrMenuController extends AbstractApiCrudController
                 'type' => 'search',
                 'scope' => 'search',
             ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
+            ],
         ];
     }
 
@@ -126,7 +145,7 @@ class IvrMenuController extends AbstractApiCrudController
      */
     protected function applyCustomFilters(Builder $query, Request $request): void
     {
-        // Filters are applied via AppliesFilters trait
+        $this->applyFilters($query, $request, $this->getFilterConfig());
     }
 
     /**
@@ -136,6 +155,8 @@ class IvrMenuController extends AbstractApiCrudController
     {
         // For dropdown requests (per_page=100), don't load options to improve performance
         $isDropdownRequest = $request->input('per_page') == 100;
+
+        $query->withExists(['options as has_unavailable_option' => fn ($q) => $q->where('destination_type', IvrMenu::UNPROVISIONED_VALUE)]);
 
         if (! $isDropdownRequest) {
             $query->with([
@@ -193,7 +214,7 @@ class IvrMenuController extends AbstractApiCrudController
                 'input_digits' => $optionData['input_digits'],
                 'description' => $optionData['description'] ?? null,
                 'destination_type' => $optionData['destination_type'],
-                'destination_id' => $optionData['destination_id'],
+                'destination_id' => $optionData['destination_id'] ?? 0,
                 'priority' => $optionData['priority'],
             ]);
         }
@@ -243,7 +264,7 @@ class IvrMenuController extends AbstractApiCrudController
                 'input_digits' => $optionData['input_digits'],
                 'description' => $optionData['description'] ?? null,
                 'destination_type' => $optionData['destination_type'],
-                'destination_id' => $optionData['destination_id'],
+                'destination_id' => $optionData['destination_id'] ?? 0,
                 'priority' => $optionData['priority'],
             ]);
         }
@@ -256,372 +277,12 @@ class IvrMenuController extends AbstractApiCrudController
     }
 
     /**
-     * Display a paginated list of IVR menus.
-     *
-     * Override to skip authorization (no policy defined for IvrMenu).
-     */
-    public function index(Request $request): JsonResponse
-    {
-        $user = $this->getAuthenticatedUser();
-
-        // Build query
-        $modelClass = $this->getModelClass();
-        $query = $modelClass::query()->forOrganization($user->organization_id);
-
-        // Apply custom query building (eager loading, etc.)
-        $this->buildIndexQuery($query, $request);
-
-        // Apply custom filters
-        $this->applyCustomFilters($query, $request);
-
-        // Apply sorting
-        $sortField = $request->input('sort_by', $this->getDefaultSortField());
-        $sortOrder = $request->input('sort_order', $this->getDefaultSortOrder());
-
-        // Validate sort field
-        $allowedSortFields = $this->getAllowedSortFields();
-        if (! in_array($sortField, $allowedSortFields, true)) {
-            $sortField = $this->getDefaultSortField();
-        }
-
-        // Validate sort order
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc'], true)
-            ? strtolower($sortOrder)
-            : $this->getDefaultSortOrder();
-
-        $query->orderBy($sortField, $sortOrder);
-
-        // Paginate
-        $perPage = (int) $request->input('per_page', 20);
-        $perPage = min(max($perPage, 1), 100);
-
-        $models = $query->paginate($perPage);
-
-        // Build filters array for logging
-        $filters = [];
-        foreach ($this->getAllowedFilters() as $filter) {
-            if ($request->has($filter)) {
-                $filters[$filter] = $request->input($filter);
-            }
-        }
-
-        $this->logListRetrieved($this->getResourceKey(), [
-            'user_id' => $user->id,
-            'organization_id' => $user->organization_id,
-            'total' => $models->total(),
-            'per_page' => $perPage,
-            'filters' => $filters,
-        ]);
-
-        $resourceClass = $this->getResourceClass();
-        $collection = $resourceClass::collection($models);
-
-        return response()->json([
-            'data' => $collection->resolve(),
-            'meta' => [
-                'current_page' => $models->currentPage(),
-                'per_page' => $models->perPage(),
-                'total' => $models->total(),
-                'last_page' => $models->lastPage(),
-                'from' => $models->firstItem(),
-                'to' => $models->lastItem(),
-            ],
-        ]);
-    }
-
-    /**
-     * Store a newly created IVR menu.
-     *
-     * Override to skip authorization (no policy defined for IvrMenu).
-     */
-    public function store(Request $request): JsonResponse
-    {
-        $currentUser = $this->getAuthenticatedUser();
-
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
-
-        try {
-            $model = DB::transaction(function () use ($currentUser, $validated, $request): Model {
-                // Apply before hook
-                $validated = $this->beforeStore($validated, $request);
-
-                // Assign to current user's organization
-                $validated['organization_id'] = $currentUser->organization_id;
-
-                // Create model
-                $modelClass = $this->getModelClass();
-                $model = $modelClass::create($validated);
-
-                // Apply after hook
-                $this->afterStore($model, $request);
-
-                return $model;
-            });
-
-            $this->logOperationCompleted($this->getResourceKey(), 'creation', [
-                'creator_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey().'_id' => $model->id,
-            ]);
-
-            $resourceClass = $this->getResourceClass();
-
-            return response()->json([
-                'message' => $this->getCreateSuccessMessage(),
-                'data' => new $resourceClass($model),
-            ], 201);
-        } catch (\Exception $e) {
-            $this->logOperationFailed($this->getResourceKey(), 'creation', [
-                'creator_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return $this->errorResponse(
-                $this->getCreateUserErrorMessage(),
-                500,
-                'CREATION_ERROR',
-                ['resource' => $this->getResourceKey()]
-            );
-        }
-    }
-
-    /**
-     * Display the specified IVR menu.
-     *
-     * Override to skip authorization (no policy defined for IvrMenu).
-     */
-    public function show(Request $request): JsonResponse
-    {
-        $currentUser = $this->getAuthenticatedUser();
-
-        $model = $this->resolveModel($request);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' access attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
-        $this->logDetailsRetrieved($this->getResourceKey(), [
-            'user_id' => $currentUser->id,
-            'organization_id' => $currentUser->organization_id,
-            $this->getResourceKey().'_id' => $model->id,
-        ]);
-
-        // Apply after show hook (for loading additional relationships)
-        $this->afterShow($model, $request);
-
-        $resourceClass = $this->getResourceClass();
-
-        return response()->json([
-            'data' => new $resourceClass($model),
-        ]);
-    }
-
-    /**
-     * Update the specified IVR menu.
-     *
-     * Override to skip authorization (no policy defined for IvrMenu).
-     */
-    public function update(Request $request): JsonResponse
-    {
-        $currentUser = $this->getAuthenticatedUser();
-
-        $model = $this->resolveModel($request);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' update attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
-        // Get validated data - works with FormRequest objects
-        $validated = method_exists($request, 'validated')
-            ? $request->validated()
-            : $request->all();
-
-        // Track changed fields for logging (handles JSON/array fields properly)
-        $changedFields = $this->getChangedFields($model, $validated);
-
-        try {
-            DB::transaction(function () use ($model, $validated, $request): void {
-                // Apply before hook
-                $validated = $this->beforeUpdate($model, $validated, $request);
-
-                // Update model
-                $model->update($validated);
-
-                // Apply after hook
-                $this->afterUpdate($model, $request);
-            });
-
-            // Reload model
-            $model->refresh();
-
-            $this->logOperationCompleted($this->getResourceKey(), 'update', [
-                'updater_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey().'_id' => $model->id,
-                'changed_fields' => $changedFields,
-            ]);
-
-            $resourceClass = $this->getResourceClass();
-
-            return response()->json([
-                'message' => $this->getUpdateSuccessMessage(),
-                'data' => new $resourceClass($model),
-            ]);
-        } catch (\Exception $e) {
-            $this->logOperationFailed($this->getResourceKey(), 'update', [
-                'updater_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey().'_id' => $model->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return $this->errorResponse(
-                $this->getUpdateUserErrorMessage(),
-                500,
-                'UPDATE_ERROR',
-                ['resource' => $this->getResourceKey()]
-            );
-        }
-    }
-
-    /**
-     * Remove the specified IVR menu.
-     *
-     * Override to handle ResourceInUseException and return proper response format.
-     */
-    public function destroy(Request $request): JsonResponse
-    {
-        $currentUser = $this->getAuthenticatedUser();
-        $model = $this->resolveModel($request);
-
-        // Tenant scope check
-        if ($model->organization_id !== $currentUser->organization_id) {
-            $context = $this->getLoggingContext();
-            Log::warning('Cross-tenant '.$this->getResourceKey().' deletion attempt', array_merge($context, [
-                'user_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                'target_'.$this->getResourceKey().'_id' => $model->id,
-                'target_organization_id' => $model->organization_id,
-            ]));
-
-            return response()->json([
-                'error' => 'Not Found',
-                'message' => ucfirst($this->getResourceKey()).' not found.',
-            ], 404);
-        }
-
-        try {
-            DB::transaction(function () use ($model, $request): void {
-                // Apply before hook (checks for references)
-                $this->beforeDestroy($model, $request);
-
-                // Delete model
-                $model->delete();
-
-                // Apply after hook
-                $this->afterDestroy($model, $request);
-            });
-
-            $this->logOperationCompleted($this->getResourceKey(), 'deletion', [
-                'deleter_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey().'_id' => $model->id,
-            ]);
-
-            // Return 200 with message (matching original controller behavior)
-            return response()->json([
-                'message' => 'IVR menu deleted successfully.',
-            ]);
-        } catch (ResourceInUseException $e) {
-            // Transform references to maintain backward compatibility
-            $references = [];
-            foreach ($e->references as $type => $items) {
-                switch ($type) {
-                    case 'ivr_menu_options':
-                        $references['ivr_menus'] = array_map(fn ($item) => [
-                            'id' => $item['ivr_menu_id'],
-                            'name' => $item['ivr_menu_name'],
-                        ], $items);
-                        break;
-                    case 'ivr_failovers':
-                        $references['failover_menus'] = array_map(fn ($item) => [
-                            'id' => $item['id'],
-                            'name' => $item['ivr_menu_name'],
-                        ], $items);
-                        break;
-                    case 'did_numbers':
-                        $references['phone_numbers'] = array_map(fn ($item) => [
-                            'id' => $item['id'],
-                            'phone_number' => $item['phone_number'],
-                        ], $items);
-                        break;
-                }
-            }
-
-            return response()->json([
-                'error' => 'Cannot delete IVR menu',
-                'message' => 'This IVR menu is being used and cannot be deleted. Please remove all references first.',
-                'references' => $references,
-            ], 409);
-        } catch (\Exception $e) {
-            $this->logOperationFailed($this->getResourceKey(), 'deletion', [
-                'deleter_id' => $currentUser->id,
-                'organization_id' => $currentUser->organization_id,
-                $this->getResourceKey().'_id' => $model->id,
-                'error' => $e->getMessage(),
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return $this->errorResponse(
-                $this->getDeleteUserErrorMessage(),
-                500,
-                'DELETE_ERROR',
-                ['resource' => $this->getResourceKey()]
-            );
-        }
-    }
-
-    /**
      * Hook called before deleting an IVR menu.
      *
      * Checks for references before deletion.
      */
     protected function beforeDestroy(Model $model, Request $request): void
     {
-        /** @var IvrMenu $model */
         $this->checkResourceReferencesBeforeDelete('ivr_menu', $model->id, $model->organization_id);
     }
 
@@ -678,13 +339,17 @@ class IvrMenuController extends AbstractApiCrudController
             return response()->json([
                 'data' => $voices,
                 'filters' => $filters,
+                // Cloudonix package tier (null = unknown); the IVR voice picker limits premium voices by it.
+                'cloudonix_package' => $this->packageService->get((int) $currentUser->organization_id),
             ]);
 
         } catch (\RuntimeException $e) {
             // Handle specific CloudonixClient errors
             $errorMessage = $e->getMessage();
 
-            if (str_contains($errorMessage, 'token') || str_contains($errorMessage, 'unauthorized') || str_contains($errorMessage, 'authentication')) {
+            $api = $e instanceof CloudonixApiException ? $e : null;
+
+            if ($api?->isAuthFailure()) {
                 $statusCode = 401; // Unauthorized
                 $userMessage = 'Authentication failed with Cloudonix API.';
                 $troubleshooting = [
@@ -692,7 +357,7 @@ class IvrMenuController extends AbstractApiCrudController
                     'Regenerate API key in Cloudonix dashboard',
                     'Update organization settings with new token',
                 ];
-            } elseif (str_contains($errorMessage, 'timeout') || str_contains($errorMessage, 'connection') || str_contains($errorMessage, 'network')) {
+            } elseif ($api?->isConnectionFailure()) {
                 $statusCode = 502; // Bad Gateway
                 $userMessage = 'Unable to connect to Cloudonix API.';
                 $troubleshooting = [
@@ -742,7 +407,7 @@ class IvrMenuController extends AbstractApiCrudController
     /**
      * Toggle the status of an IVR menu.
      */
-    public function toggleStatus(Request $request, IvrMenu $ivrMenu): JsonResponse
+    public function toggleStatus(ToggleIvrMenuStatusRequest $request, IvrMenu $ivrMenu): JsonResponse
     {
         $user = $this->getAuthenticatedUser();
 
@@ -754,9 +419,7 @@ class IvrMenuController extends AbstractApiCrudController
             ], 404);
         }
 
-        $validated = $request->validate([
-            'status' => ['required', 'string', 'in:active,inactive'],
-        ]);
+        $validated = $request->validated();
 
         $newStatus = $validated['status'];
         $oldStatus = $ivrMenu->status;

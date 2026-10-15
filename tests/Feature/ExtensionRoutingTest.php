@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Enums\ExtensionType;
@@ -14,6 +16,8 @@ use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class ExtensionRoutingTest extends TestCase
@@ -163,14 +167,16 @@ class ExtensionRoutingTest extends TestCase
 
     public function test_ring_group_routing(): void
     {
+        // Simultaneous groups ring each member in its own session; the caller waits in a room.
+        Queue::fake();
+        Http::fake(['*' => Http::response(['token' => 'member-leg'], 200)]);
         $request = $this->createRequest('3001');
 
         $response = OrganizationScope::bypass(fn () => $this->routingManager->handleInbound($request));
 
         $this->assertEquals(200, $response->getStatusCode());
-        $content = $response->getContent();
-        $this->assertStringContainsString('<Dial', $content);
-        $this->assertStringContainsString('<Number>', $content); // Should dial ring group members
+        $this->assertStringContainsString('<Conference', $response->getContent());
+        Http::assertSent(fn ($request) => isset($request['destination'])); // members are originated
     }
 
     public function test_ivr_menu_routing(): void

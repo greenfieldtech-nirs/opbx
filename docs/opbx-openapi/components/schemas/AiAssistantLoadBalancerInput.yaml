@@ -1,0 +1,90 @@
+type: object
+description: AI load balancer create/update request
+properties:
+  name:
+    type: string
+    minLength: 2
+    maxLength: 255
+    description: Unique within the organization
+  description:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  strategy:
+    type: string
+    enum: [round_robin, priority, percentage]
+    description: Defaults to `round_robin` on create
+  follow_through:
+    type:
+      - boolean
+      - 'null'
+  fallback_action:
+    type: string
+    enum: [extension, ring_group, ivr_menu, ai_assistant, ai_load_balancer, call_queue, hangup, unavailable]
+    description: 'Defaults to `hangup` on create. `unavailable` is rejected on create (422, "Choose a destination.") and accepted on update. The matching fallback_*_id is required for extension, ring_group, ivr_menu, ai_assistant, call_queue and ai_load_balancer (a load balancer cannot fall back to itself or through a chain back to itself).'
+  fallback_extension_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ring_group_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ivr_menu_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_assistant_id:
+    type:
+      - integer
+      - 'null'
+  fallback_call_queue_id:
+    type:
+      - integer
+      - 'null'
+  fallback_ai_load_balancer_id:
+    type:
+      - integer
+      - 'null'
+  status:
+    type: string
+    enum: [active, inactive]
+    description: Defaults to `active` on create
+  members:
+    type: array
+    description: Replaces the whole member list when sent. Each AI assistant must be active and appear once.
+    minItems: 1
+    maxItems: 50
+    items:
+      type: object
+      properties:
+        ai_assistant_id:
+          type: integer
+          description: Distinct assistant of the organization
+        priority:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          description: 0 is the highest priority. Defaults to the member's index in the array.
+        weight:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 100
+          description: Defaults to 100
+        position:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          description: Defaults to the member's index in the array
+        status:
+          type:
+            - string
+            - 'null'
+          enum: [active, inactive, null]
+          description: Defaults to `active`
+      required: [ai_assistant_id]

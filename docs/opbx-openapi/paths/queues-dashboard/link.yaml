@@ -1,0 +1,66 @@
+paths:
+  /v1/queues-dashboard/link:
+    get:
+      tags:
+        - Call Queues
+      summary: Get queues dashboard link
+      description: |
+        Returns the public wallboard URL for the organization's queues dashboard.
+        The token (a UUID) is created on the first call. The URL base is the organization's
+        effective webhook base URL (falling back to the app URL), so wallboard browsers can
+        reach it. Owner and PBX Admin only (also when operating as the organization); API keys
+        are refused because this route has no API-key grant.
+        Anyone holding the URL can read the queue dashboard endpoints under
+        `/v1/public/queues-dashboard/{token}`, so treat it as a secret.
+      operationId: getQueuesDashboardLink
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        example: https://opbx.cloudonix.cloud/public/queues-dashboard/3f1c8a3e-7b2d-4c1e-9a55-2d6e0f9b1a10
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+
+  /v1/queues-dashboard/link/regenerate:
+    post:
+      tags:
+        - Call Queues
+      summary: Regenerate queues dashboard link
+      description: |
+        Rotates the public queues dashboard token. The previous URL stops working
+        immediately. Owner and PBX Admin only.
+      operationId: regenerateQueuesDashboardLink
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: New dashboard link (previous link is revoked)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'

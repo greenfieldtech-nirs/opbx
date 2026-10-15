@@ -16,36 +16,15 @@ For the complete webhook authentication reference, see [`docs/WEBHOOK-AUTHENTICA
 
 ## Authentication
 
-OPBX uses Laravel Sanctum with dual authentication modes.
+OPBX uses Laravel Sanctum Bearer tokens. The React web app and API clients authenticate the same way, with `Authorization: Bearer <token>`; the API routes do not use session cookies. Two more principals exist: [API keys](/opbx/data-models/models/api-access#apikey) (`opbxk_` Bearer tokens, resolved by `ResolveApiKey` before `auth:sanctum` and limited by `EnforceApiKeyScope` to their per-resource permissions) and embed tokens (`opbxd_`, resolved by `ResolveEmbedToken` for the embeddable dialer).
 
-### Cookie-Based SPA Authentication
+### Bearer Token Authentication
 
-- Used by the React SPA.
-- Requires a CSRF cookie from `/api/sanctum/csrf-cookie` before login.
-- Login creates an `httpOnly` session cookie.
-- CSRF protection is enforced by Sanctum's web guard.
-- Stateless on the SPA side; the browser sends the session cookie automatically.
-
-### Token-Based API Authentication
-
-- Used by API clients, scripts, and third-party integrations.
-- Login returns a Bearer token if the request does not trigger cookie mode.
+- Used by the React web app, API clients, scripts and third-party integrations.
+- `POST /api/v1/auth/login` returns a Bearer token; the web app stores it and sends it on every request.
 - Tokens are role-scoped with Sanctum abilities instead of wildcard `*`.
-- Tokens expire after 24 hours (`SANCTUM_EXPIRATION=1440`).
-- Refresh revokes the current token and issues a new one.
-
-### How Auth Mode Is Selected
-
-`AuthController::shouldUseCookieAuth()` selects cookie mode when:
-
-- The `X-Auth-Mode: cookie` header is present, **or**
-- The request includes `X-Requested-With` (typical AJAX/SPA request).
-
-Token mode is selected when:
-
-- A Bearer token is already present (logout/refresh), **or**
-- `X-Auth-Mode: token` is present, **or**
-- Neither cookie indicator is present (default).
+- Each token carries its own expiry: 24 hours, or 30 days when the login sends `"remember": true` (**Remember me**). A global Sanctum cap of 30 days also applies, so a token created without its own expiry still expires.
+- `POST /api/v1/auth/refresh` revokes the current token and issues a new one with the same lifetime.
 
 ### Role-Scoped Token Abilities
 
@@ -53,11 +32,13 @@ Token abilities are derived from the user's role:
 
 | Role | Example Abilities |
 |------|-------------------|
-| Owner | `extension:*`, `user:*`, `settings:*`, `recording-download:*`, `platform:*` (if PM) |
+| Owner | `extension:*`, `user:*`, `ring-group:*`, `did-number:*`, `recording:*`, `settings:*`, `business-hours:*`, `conference:*`, `ivr:*`, `call-log:*`, `outbound-whitelist:*`, `recording-download:*` |
 | PBX Admin | `extension:*`, `user:read`, `user:update`, `ring-group:*`, `did-number:*` |
-| Supervisor | `call-log:read`, `session-update:read` (scoped to assigned users/ring groups) |
+| Supervisor | Reporter abilities plus `supervisor:view`, `supervisor:assignments` (data scoped to assigned users and ring groups) |
 | PBX User | `extension:read`, `extension:update:own`, `user:read`, `call-log:read` |
-| Reporter | `extension:read`, `user:read`, `ring-group:read`, `call-log:read` |
+| Reporter | `extension:read`, `user:read`, `ring-group:read`, `did-number:read`, `recording:read`, `call-log:read`, `business-hours:read` |
+
+Platform managers get `platform:read`, `platform:write`, `platform:manage-users`, `platform:manage-organizations` and `platform:audit-logs` on top of their role's abilities.
 
 ---
 
@@ -65,11 +46,11 @@ Token abilities are derived from the user's role:
 
 Authorization combines three layers:
 
-1. **Authentication** — Sanctum cookie or Bearer token.
+1. **Authentication** — Sanctum Bearer token (or an API key / embed token where allowed).
 2. **Tenant scope** — `EnsureTenantScope` ensures the user belongs to an active organization.
 3. **Policies** — Eloquent policies enforce role-based permissions on resources.
 
-Platform managers use the `platform.manager` middleware for cross-tenant operations.
+Platform managers use the `platform.manager` middleware for cross-tenant operations, and can act inside one organization with the `X-Operate-As-Organization` header. See [Multi-Tenancy](/opbx/architecture/multi-tenancy#platform-manager-role).
 
 ### Supervisor Scope
 
@@ -79,6 +60,17 @@ is assigned to, and supervisor-scoped endpoints (`?supervisor=true` live calls a
 CDRs, the supervisor dashboard) restrict results to that set. Supervisors are also
 denied the organization-wide WebSocket channel to prevent event leakage for
 unassigned resources.
+
+### PBX User Call-Record Scope
+
+A PBX User's call records (`/v1/call-detail-records` list, single record, statistics,
+CSV export and recording) are limited by role on the server to calls whose
+`extension_number` (the extension the call belongs to) or `to` (destination) is one of
+their own extension numbers (bare or `+`-prefixed). The Caller ID (`from`) does not
+count, so an outbound call presenting a DID is still theirs and a call that merely
+presents their number is not. Another user's call returns 403. Supervisors match the
+same identifiers against `extension_number`, `from` and `to`. Owners, PBX Admins and
+Reporters are unrestricted; API keys follow their scopes.
 
 ### Call Coaching Authorization
 
@@ -104,39 +96,42 @@ OPBX has several rate limiters.
 
 `App\Http\Middleware\RateLimitPerOrganization` (alias `rate_limit_org`) enforces limits per organization using Redis counters.
 
-Configured in `config/rate-limiting.php`:
+Configured in the `organization` section of `config/rate_limiting.php`:
 
 | Type | Env Var | Default |
 |------|---------|---------|
-| Voice routing | `RATE_LIMIT_VOICE` / `RATE_LIMIT_VOICE_MINUTES` | 100 / 1 min |
-| Webhooks | `RATE_LIMIT_WEBHOOKS` / `RATE_LIMIT_WEBHOOKS_MINUTES` | 200 / 1 min |
 | API | `RATE_LIMIT_API` / `RATE_LIMIT_API_MINUTES` | 60 / 1 min |
-| Default | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min |
+| Default (fallback) | `RATE_LIMIT_DEFAULT` / `RATE_LIMIT_DEFAULT_MINUTES` | 60 / 1 min |
+
+Only the `api` limit is applied to routes (`rate_limit_org:api` on the authenticated API). The counter key is `rate_limit:org:{organization_id}:{type}`.
+
+**Cloudonix webhooks and voice callbacks are intentionally not rate-limited.** With many organisations Cloudonix sends hundreds of events per second; throttling them would drop calls and CDRs. Those routes rely on signature / bearer authentication and idempotency keys instead.
 
 Additional env vars in `.env.example`:
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `RATE_LIMIT_SENSITIVE` | 10 | Sensitive operations per minute for regular users. |
-| `RATE_LIMIT_SENSITIVE_ADMIN` | 60 | Sensitive operations per minute for admins. |
+| `RATE_LIMIT_SENSITIVE_ADMIN` | 60 | Sensitive operations per minute for Owners and PBX Admins. |
+| `RATE_LIMIT_SENSITIVE_DECAY` | 60 | Seconds a sensitive-operation hit counts. |
 | `RATE_LIMIT_AUTH` | 5 | Auth attempts per minute per IP. |
 
 ### Sensitive Operations Rate Limiting
 
-`App\Http\Middleware\RateLimitSensitiveOperations` (alias `sensitive-operations`) limits password changes, settings changes, and other sensitive actions per user + IP. Admins receive a higher limit.
+`App\Http\Middleware\RateLimitSensitiveOperations` (alias `sensitive-operations`) limits sensitive actions per user + IP (key `sensitive-operation:{user_id}:{ip}`). Owners and PBX Admins get `RATE_LIMIT_SENSITIVE_ADMIN`, everyone else `RATE_LIMIT_SENSITIVE`. Over the limit it returns 429 with `Retry-After`.
 
 ### Laravel Throttle
 
-Standard Laravel `throttle` middleware is used for auth, registration, email validation, and dialer worker routes.
+Standard Laravel `throttle` middleware is used for auth (`throttle:auth`, 5 per minute per IP), registration (10 per hour per IP), sensitive routes (`throttle:sensitive`), the embedded dialer API (60 per minute per token and IP), the dialer worker API (`DIALER_WORKER_RATE_LIMIT`, 1000 per minute), the public status page (60 per minute), the public queue wallboard (120 per minute) and a few other routes with inline limits. See [Configuration Reference](/opbx/data-models/configuration/index#webhooks--rate-limiting).
 
 ---
 
 ## Webhook Security
 
-See [Webhooks](./webhooks) for endpoint details. Highlights:
+See [Webhooks](/opbx/architecture/webhooks) for endpoint details. Highlights:
 
 - Voice routing webhooks require a Bearer token (`VerifyVoiceWebhookAuth`) and return CXML on errors.
-- Status/CDR webhooks conditionally require a Bearer token (`VerifyCloudonixSignature`) and return JSON on errors.
+- Status/CDR webhooks conditionally require a Bearer token (`VerifyCloudonixSignature`) and return JSON on errors. `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true` makes the token mandatory.
 - Token comparisons use `hash_equals()` to prevent timing attacks.
 - Per-organization keys are encrypted at rest.
 - Failed attempts are logged with IP, path, organization ID, and reason (never the token).
@@ -148,20 +143,23 @@ See [Webhooks](./webhooks) for endpoint details. Highlights:
 The `CloudonixSettings` model casts sensitive fields as encrypted:
 
 ```php
-protected $casts = [
-    'domain_api_key' => 'encrypted',
-    'domain_requests_api_key' => 'encrypted',
-    'domain_cdr_auth_key' => 'encrypted',
-];
+protected function casts(): array
+{
+    return [
+        'domain_api_key' => 'encrypted',
+        'domain_requests_api_key' => 'encrypted',
+        // ...
+    ];
+}
 ```
 
-These values are encrypted with the Laravel `APP_KEY`. They are masked in API responses (only the last four characters are shown) and excluded from logs.
+These values are encrypted with the Laravel `APP_KEY` and hidden from model serialization. API responses show them masked: the first four and last four characters with `***` between (keys of 8 characters or fewer are fully masked).
 
 ---
 
-## MinIO Signed URLs
+## S3 Signed URLs
 
-Recordings and IVR audio files stored in MinIO are not served directly. Public access is through HMAC-signed URLs generated by `App\Http\Controllers\Api\RecordingsController`.
+Recordings and IVR audio files stored in SeaweedFS (S3 API) are not served directly. Public access is through HMAC-signed URLs generated by `App\Http\Controllers\Api\RecordingsController`.
 
 ### URL Format
 
@@ -177,50 +175,62 @@ Recordings and IVR audio files stored in MinIO are not served directly. Public a
 2. Rejects expired URLs.
 3. Recomputes `hash_hmac('sha256', "{path}|{expires}", config('app.key'))`.
 4. Compares with `hash_equals()`.
-5. Streams the file from MinIO or falls back to local public storage for legacy IVR files.
+5. Streams the file from S3 (SeaweedFS) or falls back to local public storage for legacy IVR files.
 
-Default signed URL TTL is 3600 seconds.
+`generateSignedRecordingUrl()` defaults to a 3600-second TTL. Recordings that users download from the UI use a different mechanism: an encrypted access token (`RecordingAccessService`, valid `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes, default 30).
 
 ---
 
 ## CSRF Protection
 
-CSRF protection applies to cookie-based SPA authentication:
-
-- The SPA calls `/api/sanctum/csrf-cookie` before login.
-- Laravel sets the CSRF cookie and session token.
-- Subsequent requests include the CSRF token in the `X-XSRF-TOKEN` header or `_token` field.
-- Sanctum validates the token against the session.
-
-Token-based clients are not affected by CSRF because they authenticate with a Bearer token in the `Authorization` header.
+CSRF does not apply: every client, including the web app, authenticates with a Bearer token in the `Authorization` header, which a browser never attaches on its own. `/api/sanctum/csrf-cookie` exists as a Laravel Sanctum framework route, but the API does not need it.
 
 ---
 
 ## Security Headers
 
-`App\Http\Middleware\SecurityHeaders` adds the following headers to every response:
+Headers come from two layers.
+
+**Laravel.** `App\Http\Middleware\SecurityHeaders` (global middleware) adds the following headers to every Laravel response:
 
 | Header | Value |
 |--------|-------|
-| `Content-Security-Policy` | `default-src 'self'`; scripts from `'self'` and nonce-based inline; `frame-ancestors 'none'`; `object-src 'none'`; etc. |
+| `Content-Security-Policy` | `default-src 'self'`; `script-src 'self' 'nonce-…'`; `style-src 'self' 'unsafe-inline'`; `img-src 'self' data: https:`; `font-src 'self' data:`; `connect-src` (below); `object-src 'none'`; `media-src 'self'`; `frame-ancestors 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-src 'none'`; plus `upgrade-insecure-requests` in production and `report-uri` when `CSP_REPORT_URI` is set |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Permissions-Policy` | Disables geolocation, microphone, camera, payment, USB, etc. |
-| `Strict-Transport-Security` | Added in production (max-age from `HSTS_MAX_AGE`, default 1 year). |
+| `Permissions-Policy` | `geolocation=()`, `microphone=(self)`, `camera=()`, `payment=()`, `usb=()`, `magnetometer=()`, `accelerometer=()`, `gyroscope=()`. Microphone is allowed for the same origin (the web phone needs it). |
+| `Strict-Transport-Security` | Added when `APP_ENV=production` (max-age from `HSTS_MAX_AGE`, default 1 year). |
 
-CSP connect-src allows `self`, `ws:`, `wss:`, and the configured Cloudonix API domain. Additional domains can be added via `CSP_CONNECT_DOMAINS`.
+CSP connect-src allows `self`, `ws:`, `wss:`, and the configured Cloudonix API domain. Additional domains can be added via `CSP_CONNECT_DOMAINS`. HSTS is tuned with `HSTS_MAX_AGE`, `HSTS_INCLUDE_SUBDOMAINS` and `HSTS_PRELOAD`.
+
+The `/embed/*` routes (the embeddable dialer) are excluded from these headers, because they are meant to be framed by other sites; `EmbedDialerController` sets their own per-token `frame-ancestors` CSP.
+
+**Nginx.** `docker/nginx/conf.d/default.conf` adds to every response it serves, including the SPA assets:
+
+| Header | Value |
+|--------|-------|
+| `X-Frame-Options` | `SAMEORIGIN`, omitted for `/embed/dialer` and `/embed/loader.js` (`$embed_xfo` map in `nginx.conf`) |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `geolocation=(), microphone=(self), camera=()` |
+
+`nginx.conf` also defines an `$embed_permissions` map, but no `add_header` uses it.
 
 ---
 
 ## Log Sanitization
 
-Sensitive fields are redacted from exception context and logs. The excluded keys include:
+Sensitive fields are redacted in two places.
+
+**Exception context** (`bootstrap/app.php`). Password fields are never flashed to the session, and these request keys are removed from the exception context:
 
 - `password`, `password_confirmation`, `current_password`, `new_password`
 - `token`, `access_token`, `api_key`, `api_token`
 - `secret`, `webhook_secret`, `sip_password`
 - `domain_api_key`, `domain_requests_api_key`, `domain_cdr_auth_key`
+
+**JSON log channel** (`config/logging.php`). `App\Logging\MaskCredentialsProcessor` replaces the value of any context key matching `authorization`, `api_key`/`api-key`/`apikey`, `password`, `secret`, `token` or exactly `sig` with `[redacted]`, at any depth. `session_token` is kept, because it is the search key for call-flow logs.
 
 ---
 
@@ -233,10 +243,26 @@ Sensitive fields are redacted from exception context and logs. The excluded keys
 - Compares the Bearer token to `config('services.dialer_worker.token')` (`DIALER_WORKER_API_TOKEN`).
 - Optionally accepts a secondary token (`DIALER_WORKER_API_TOKEN_SECONDARY`) for rotation.
 - Uses `hash_equals()` for constant-time comparison.
+- Routes: `/api/v1/dialer/worker/*`, with `throttle:dialer-worker`.
 
 ### AMD Worker
 
-The AMD worker authenticates to `/api/voice/amd-action` using `AMD_WORKER_API_TOKEN`.
+The AMD worker authenticates to `/api/voice/amd-session` and `/api/voice/amd-action` using `AMD_WORKER_API_TOKEN`. Audio streams for sessions that are not active auto-dialer calls are closed.
+
+### ACD Worker
+
+Laravel authenticates to the ACD worker with `ACD_WORKER_API_TOKEN` (Bearer, constant-time comparison). The ACD and AMD workers refuse to start when their token is empty or contains the shipped placeholder `change-in-production`.
+
+---
+
+## Container Hardening
+
+- Docker Compose refuses to start without the shared secrets (`DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`; Grafana in the `logs` profile also needs `GRAFANA_ADMIN_PASSWORD`). `docker/scripts/generate-secrets.sh` fills in missing ones without printing them.
+- The app container entrypoint rejects weak values (`secret`, `password`, `rootsecret`, `minioadmin`, `admin`, `123456`) for the database password, root password and S3 keys.
+- MySQL, Redis and SeaweedFS publish no host ports. `docker-compose.ports.yml` adds loopback-only (`127.0.0.1`) ports for local tools.
+- The Redis password and the SeaweedFS S3 keys are written to files inside their containers, so they do not appear in `docker inspect` or `ps`.
+- The dialer, AMD and ACD worker images run as a non-root user (uid 10001).
+- In the `logs` profile, Alloy reads container logs through a read-only Docker socket proxy instead of the raw socket.
 
 ---
 
@@ -245,10 +271,10 @@ The AMD worker authenticates to `/api/voice/amd-action` using `AMD_WORKER_API_TO
 For production deployments:
 
 - Set strong `APP_KEY`, database passwords, Redis password, and Pusher secret.
-- Rotate `DIALER_WORKER_API_TOKEN` and `AMD_WORKER_API_TOKEN` regularly.
+- Rotate `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` and `ACD_WORKER_API_TOKEN` regularly.
 - Configure `domain_requests_api_key` per organization in Settings → Cloudonix.
-- Do not expose MySQL, Redis, or MinIO ports publicly.
-- Run HTTPS in production so Sanctum cookies and HSTS are effective.
+- Do not expose MySQL, Redis, or SeaweedFS ports publicly. Never use `docker-compose.ports.yml` in production.
+- Run HTTPS in production so Bearer tokens are never sent in clear text and HSTS is effective.
 - Keep `APP_DEBUG=false` in production.
 - Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domains.
 
@@ -257,7 +283,7 @@ For production deployments:
 ## Related Documentation
 
 - [`docs/WEBHOOK-AUTHENTICATION.md`](https://github.com/greenfieldtech-nirs/opbx/blob/main/docs/WEBHOOK-AUTHENTICATION.md)
-- [Multi-Tenancy](./multi-tenancy)
-- [Webhooks](./webhooks)
-- [Call Flow](./call-flow)
-- [Architecture Overview](./index)
+- [Multi-Tenancy](/opbx/architecture/multi-tenancy)
+- [Webhooks](/opbx/architecture/webhooks)
+- [Call Flow](/opbx/architecture/call-flow)
+- [Architecture Overview](/opbx/architecture)

@@ -295,7 +295,7 @@ Deferred to v2: call-tracking writes, notification settings, recordings upload/d
 | GET | `/v1/recordings` | `listRecordings` | MCP_TOOL | list_recordings | low | cfg | no | Announcement/IVR audio files (NOT call recordings). Policy: owner|pbx_admin only. |
 | POST | `/v1/recordings` | `createRecording` | INTERNAL_NOT_EXPOSED | - | medium | cfg | no | Binary audio upload; impractical over MCP in v1. |
 | GET | `/v1/recordings/download` | `downloadRecordingWithToken` | INTERNAL_NOT_EXPOSED | - | high | public (token) | no | Unauthenticated possession-based access endpoint; never exposed. |
-| DELETE | `/v1/recordings/{recording}` | `deleteRecording` | INTERNAL_NOT_EXPOSED | - | high | cfg | yes | Deletes audio from MinIO. Excluded v1 (upload also excluded); future candidate with confirmation. |
+| DELETE | `/v1/recordings/{recording}` | `deleteRecording` | INTERNAL_NOT_EXPOSED | - | high | cfg | yes | Deletes audio from S3 storage (SeaweedFS). Excluded v1 (upload also excluded); future candidate with confirmation. |
 | GET | `/v1/recordings/{recording}` | `getRecording` | MCP_RESOURCE | opbx://recordings/{id} (+ get_recording_metadata) | low | cfg | no | Metadata only; download URLs are bearer-equivalent tokens - not exposed. |
 | PATCH | `/v1/recordings/{recording}` | `patchRecording` | INTERNAL_NOT_EXPOSED | - | medium | cfg | no | Excluded v1. |
 | PUT | `/v1/recordings/{recording}` | `updateRecording` | INTERNAL_NOT_EXPOSED | - | medium | cfg | no | Rename/metadata edit; excluded v1. |

@@ -4,25 +4,31 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Voice;
 
+use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Voice\QueueCallbackRequest;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\CallQueue;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\QueueCall;
 use App\Models\RingGroup;
+use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\CallQueue\AcdWorkerClient;
-use App\Services\CallQueue\ExtensionPresenceTracker;
+use App\Services\CallQueue\ConferenceOfferService;
 use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\CallQueue\QueueDialOfferService;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 /**
  * Queue poll endpoint: called by Cloudonix after each hold-music play.
@@ -32,6 +38,8 @@ use Illuminate\Support\Facades\Log;
  */
 class QueuePollController extends Controller
 {
+    private const RECONCILE_INTERVAL_SECONDS = 5;
+
     public function handle(QueueCallbackRequest $request): Response
     {
         Log::info('QueuePollController: hold-loop poll', [
@@ -53,7 +61,7 @@ class QueuePollController extends Controller
 
         $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $context['call_queue_id'])
-            ->when($context['organization_id'], fn ($q, $orgId) => $q->where('organization_id', $orgId))
+            ->where('organization_id', $context['organization_id'])
             ->first();
 
         if (! $callQueue) {
@@ -61,6 +69,7 @@ class QueuePollController extends Controller
         }
 
         $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $callQueue->organization_id)
             ->where('call_queue_id', $callQueue->id)
             ->where('call_id', $context['call_id'])
             ->whereNull('disposition')
@@ -72,6 +81,20 @@ class QueuePollController extends Controller
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
+        // Conference-mediated ring-all: a winner means the caller belongs in
+        // the room (application switch missed, or a stale hold document);
+        // a pending offer means agent sessions are still ringing - hold
+        // without asking the worker for a second offer.
+        $conferenceOffers = app(ConferenceOfferService::class);
+
+        if ($conferenceOffers->winnerOf($queueCall->call_id) !== null) {
+            return app(QueueConferenceController::class)->joinResponse($callQueue, $queueCall);
+        }
+
+        if ($conferenceOffers->isOfferPending($queueCall->call_id)) {
+            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id, null, $context['moh_idx']);
+        }
+
         // Stale-document guard: with immediate connect, the pre-switch hold
         // document is still in flight (the switch does not abort it) and its
         // Redirect fires this poll while the offer is in flight - or after
@@ -79,29 +102,41 @@ class QueuePollController extends Controller
         // down the live <Dial>/bridge (customer-visible congestion), so we
         // re-serve the SAME <Dial> to the same agent and never ask the worker
         // for a new offer here.
-        $offerAgentId = app(QueueCallLifecycleService::class)->dialOfferAgentId($queueCall->call_id);
-        $dialResult = \Illuminate\Support\Facades\Redis::get("acd:dialresult:{$queueCall->call_id}");
-        $offerInFlight = $offerAgentId !== null && $dialResult === null;
+        $offerAgentIds = app(QueueCallLifecycleService::class)->dialOfferAgentIds($queueCall->call_id);
+        $dialResult = Redis::get("acd:dialresult:{$queueCall->call_id}");
+        $offerInFlight = $offerAgentIds !== [] && $dialResult === null;
         $bridged = $queueCall->answered_at !== null;
 
         if ($bridged || $offerInFlight) {
-            $agent = \App\Models\User::withoutGlobalScope(OrganizationScope::class)
-                ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
-                ->find($offerAgentId);
+            // While ringing, re-serve the WHOLE offer: a ring_all <Dial> cut
+            // down to one target rings only that agent. After the bridge the
+            // winner is unknown for ring_all; the first-offered agent is kept
+            // (prior behavior) until conference-mediated offers replace this.
+            $reserveIds = $bridged ? array_slice($offerAgentIds, 0, 1) : $offerAgentIds;
 
-            if ($agent?->extension) {
+            $agents = User::withoutGlobalScope(OrganizationScope::class)
+                ->with(['extension' => fn ($q) => $q->withoutGlobalScope(OrganizationScope::class)])
+                ->whereIn('id', $reserveIds)
+                ->get()
+                ->filter(fn (User $agent) => $agent->extension !== null)
+                ->sortBy(fn (User $agent) => array_search($agent->id, $reserveIds, true))
+                ->map(fn (User $agent) => [
+                    'userId' => (string) $agent->id,
+                    'extensionNumber' => $agent->extension->extension_number,
+                ])
+                ->values()
+                ->all();
+
+            if ($agents !== []) {
                 Log::info('QueuePollController: Stale poll, re-serving same dial', [
                     'call_queue_id' => $callQueue->id,
                     'call_id' => $queueCall->call_id,
                     'bridged' => $bridged,
-                    'agent_user_id' => $offerAgentId,
+                    'agent_user_ids' => $reserveIds,
                 ]);
 
-                $dialResponse = app(\App\Services\CallQueue\QueueDialOfferService::class)
-                    ->buildDialResponse($request, $callQueue, $queueCall, [[
-                        'userId' => (string) $agent->id,
-                        'extensionNumber' => $agent->extension->extension_number,
-                    ]], respectPresence: false);
+                $dialResponse = app(QueueDialOfferService::class)
+                    ->buildDialResponse($request, $callQueue, $queueCall, $agents, reserve: true);
 
                 if ($dialResponse !== null) {
                     return $dialResponse;
@@ -109,38 +144,43 @@ class QueuePollController extends Controller
             }
         }
 
+        $roster = app(QueueDialOfferService::class)->roster($callQueue);
+
         $result = app(AcdWorkerClient::class)->poll(
             $callQueue->organization_id,
             $callQueue->id,
             $context['call_id'],
-            app(\App\Services\CallQueue\QueueDialOfferService::class)->roster($callQueue),
+            $roster,
             $callQueue->strategy->value,
             $callQueue->max_wait_seconds
         );
 
         // Worker unreachable: keep holding; the worker re-enqueues on recovery.
         if ($result === null) {
-            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id']);
+            return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $context['call_id'], null, $context['moh_idx']);
         }
 
         // Reap ghost worker entries (ended calls never dequeued) so a stale
-        // head cannot block the queue, then re-check the decision once.
-        if (($result['action'] ?? 'wait') === 'wait') {
-            $dialOffer = app(\App\Services\CallQueue\QueueDialOfferService::class);
-            $roster = $dialOffer->roster($callQueue);
+        // head cannot block the queue, then re-check the decision once. Every
+        // waiting caller polls every few seconds: sweep at most once per
+        // RECONCILE_INTERVAL_SECONDS per queue, and re-poll only if a ghost was reaped.
+        if (($result['action'] ?? 'wait') === 'wait'
+            && Cache::add("acd:reconcile:{$callQueue->id}", 1, self::RECONCILE_INTERVAL_SECONDS)) {
             $waiting = app(AcdWorkerClient::class)->live($callQueue->organization_id, $callQueue->id, $roster);
 
-            app(\App\Services\CallQueue\QueueCallLifecycleService::class)
+            $reaped = app(QueueCallLifecycleService::class)
                 ->reconcileStaleCalls($callQueue, collect($waiting['waiting'] ?? [])->pluck('callId')->all());
 
-            $result = app(AcdWorkerClient::class)->poll(
-                $callQueue->organization_id,
-                $callQueue->id,
-                $context['call_id'],
-                $roster,
-                $callQueue->strategy->value,
-                $callQueue->max_wait_seconds
-            ) ?? $result;
+            if ($reaped !== []) {
+                $result = app(AcdWorkerClient::class)->poll(
+                    $callQueue->organization_id,
+                    $callQueue->id,
+                    $context['call_id'],
+                    $roster,
+                    $callQueue->strategy->value,
+                    $callQueue->max_wait_seconds
+                ) ?? $result;
+            }
         }
 
         // Per-caller max-wait enforcement (source of truth: queue_calls.entered_at).
@@ -160,9 +200,9 @@ class QueuePollController extends Controller
         }
 
         return match ($result['action'] ?? 'wait') {
-            'dial' => $this->handleDial($request, $callQueue, $queueCall, $result['agents'] ?? []),
+            'dial' => $this->handleDial($request, $callQueue, $queueCall, $result['agents'] ?? [], $context['moh_idx']),
             'overflow' => $this->handleOverflow($request, $callQueue, $queueCall),
-            default => $this->holdOrAnnounce($request, $callQueue, $queueCall, (int) ($result['position'] ?? 1)),
+            default => $this->holdOrAnnounce($request, $callQueue, $queueCall, (int) ($result['position'] ?? 1), $context['moh_idx']),
         };
     }
 
@@ -180,13 +220,13 @@ class QueuePollController extends Controller
      * Wait decision: render the hold CXML, announcing the caller's position
      * when enabled and the announce interval has elapsed since the last one.
      */
-    private function holdOrAnnounce(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, int $position): Response
+    private function holdOrAnnounce(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, int $position, int $mohIdx = 0): Response
     {
         $announcePosition = null;
 
         if ($callQueue->announce_position) {
             $waitedSeconds = max(0, (int) $queueCall->entered_at->diffInSeconds(now()));
-            $marker = \Illuminate\Support\Facades\Redis::get("acd:announce:{$queueCall->call_id}");
+            $marker = Redis::get("acd:announce:{$queueCall->call_id}");
 
             // Announce on the first poll of the call, then every interval.
             // Without the null-marker branch, a caller whose announce interval
@@ -196,7 +236,7 @@ class QueuePollController extends Controller
 
             if ($neverAnnounced || $waitedSeconds - $lastAnnounced >= $callQueue->announce_position_timeout) {
                 $announcePosition = $position;
-                \Illuminate\Support\Facades\Redis::setex(
+                Redis::setex(
                     "acd:announce:{$queueCall->call_id}",
                     $callQueue->max_wait_seconds + 300,
                     (string) $waitedSeconds
@@ -208,16 +248,17 @@ class QueuePollController extends Controller
             $request,
             $callQueue,
             $queueCall->call_id,
-            $announcePosition
+            $announcePosition,
+            $mohIdx
         );
     }
 
     /**
      * @param  array<int, array{userId: string, extensionNumber: string}>  $agents
      */
-    private function handleDial(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, array $agents): Response
+    private function handleDial(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall, array $agents, int $mohIdx = 0): Response
     {
-        $dialResponse = app(\App\Services\CallQueue\QueueDialOfferService::class)
+        $dialResponse = app(QueueDialOfferService::class)
             ->buildDialResponse($request, $callQueue, $queueCall, $agents);
 
         if ($dialResponse !== null) {
@@ -225,7 +266,7 @@ class QueuePollController extends Controller
         }
 
         // All offered agents are busy on other calls: keep holding.
-        return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id);
+        return app(QueueRoutingStrategy::class)->holdResponse($request, $callQueue, $queueCall->call_id, null, $mohIdx);
     }
 
     private function handleOverflow(QueueCallbackRequest $request, CallQueue $callQueue, QueueCall $queueCall): Response
@@ -242,7 +283,7 @@ class QueuePollController extends Controller
 
         // Reassure the caller before routing (not for hangup — the hangup
         // fallback speaks its own goodbye).
-        if ($callQueue->fallback_action !== RingGroupFallbackAction::HANGUP) {
+        if (! in_array($callQueue->fallback_action, [RingGroupFallbackAction::HANGUP, RingGroupFallbackAction::UNAVAILABLE], true)) {
             $response = $this->prependSay(
                 $response,
                 "We're sorry, but no one is available to take your call. "
@@ -293,6 +334,8 @@ class QueuePollController extends Controller
             RingGroupFallbackAction::IVR_MENU => $this->fallbackToIvrMenu($callQueue, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->fallbackToAiAssistant($callQueue, $request),
             RingGroupFallbackAction::AI_LOAD_BALANCER => $this->fallbackToAiLoadBalancer($callQueue, $request),
+            RingGroupFallbackAction::CALL_QUEUE => $this->fallbackToCallQueue($callQueue, $request),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => response(CxmlBuilder::unavailable('No agents available. Goodbye.'), 200, ['Content-Type' => 'application/xml']),
         };
     }
@@ -311,7 +354,7 @@ class QueuePollController extends Controller
         return app(VoiceRoutingManager::class)->executeStrategy(
             $fallbackExtension->type,
             $request,
-            new \App\Models\DidNumber,
+            new DidNumber,
             ['extension' => $fallbackExtension]
         );
     }
@@ -328,9 +371,9 @@ class QueuePollController extends Controller
         }
 
         return app(VoiceRoutingManager::class)->executeStrategy(
-            \App\Enums\ExtensionType::RING_GROUP,
+            ExtensionType::RING_GROUP,
             $request,
-            new \App\Models\DidNumber,
+            new DidNumber,
             ['ring_group' => $fallbackRingGroup]
         );
     }
@@ -347,9 +390,9 @@ class QueuePollController extends Controller
         }
 
         return app(VoiceRoutingManager::class)->executeStrategy(
-            \App\Enums\ExtensionType::IVR,
+            ExtensionType::IVR,
             $request,
-            new \App\Models\DidNumber,
+            new DidNumber,
             ['ivr_menu' => $fallbackIvrMenu]
         );
     }
@@ -367,7 +410,7 @@ class QueuePollController extends Controller
 
         $fallbackExtension = Extension::withoutGlobalScope(OrganizationScope::class)
             ->where('organization_id', $callQueue->organization_id)
-            ->where('type', \App\Enums\ExtensionType::AI_ASSISTANT)
+            ->where('type', ExtensionType::AI_ASSISTANT)
             ->get()
             ->first(fn (Extension $ext) => ($ext->configuration['ai_assistant_id'] ?? null) === $fallbackAiAssistant->id);
 
@@ -376,9 +419,9 @@ class QueuePollController extends Controller
         }
 
         return app(VoiceRoutingManager::class)->executeStrategy(
-            \App\Enums\ExtensionType::AI_ASSISTANT,
+            ExtensionType::AI_ASSISTANT,
             $request,
-            new \App\Models\DidNumber,
+            new DidNumber,
             ['extension' => $fallbackExtension]
         );
     }
@@ -396,11 +439,31 @@ class QueuePollController extends Controller
         }
 
         return app(VoiceRoutingManager::class)->executeStrategy(
-            \App\Enums\ExtensionType::AI_LOAD_BALANCER,
+            ExtensionType::AI_LOAD_BALANCER,
             $request,
-            new \App\Models\DidNumber,
+            new DidNumber,
             ['ai_load_balancer' => $aiLoadBalancer]
         );
     }
 
+    /** Enqueue the caller in the target queue exactly like an inbound call to that queue. */
+    private function fallbackToCallQueue(CallQueue $callQueue, QueueCallbackRequest $request): Response
+    {
+        $targetQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)
+            ->where('id', $callQueue->fallback_call_queue_id)
+            ->where('organization_id', $callQueue->organization_id)
+            ->first();
+
+        // Save-time validation refuses loops; the id check is a last guard against bouncing in place.
+        if (! $targetQueue || ! $targetQueue->isActive() || $targetQueue->id === $callQueue->id) {
+            return response(CxmlBuilder::unavailable('No agents available. Goodbye.'), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::QUEUE,
+            $request,
+            new DidNumber,
+            ['call_queue' => $targetQueue]
+        );
+    }
 }

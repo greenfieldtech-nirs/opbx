@@ -29,7 +29,7 @@ class UpdateProfileRequest extends FormRequest
     {
         $authUser = $this->user();
 
-        if (!$authUser) {
+        if (! $authUser) {
             return false;
         }
 
@@ -39,7 +39,7 @@ class UpdateProfileRequest extends FormRequest
             $targetUserId = $this->route('user') ?? $authUser->id;
             $targetUser = User::find($targetUserId);
 
-            if (!$targetUser) {
+            if (! $targetUser) {
                 return false;
             }
 

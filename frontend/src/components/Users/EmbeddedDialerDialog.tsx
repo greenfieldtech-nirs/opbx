@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Copy, RefreshCw, Loader2 } from 'lucide-react';
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { embedTokensService } from '@/services/embedTokens.service';
 import type { EmbedIconPosition } from '@/types/embed.types';
 
@@ -59,7 +61,7 @@ export function EmbeddedDialerDialog({
   const [snippet, setSnippet] = useState<string | null>(null);
 
   const { data: config, isLoading } = useQuery({
-    queryKey: ['embed-token', userId],
+    queryKey: queryKeys.embedToken.forUser(userId),
     queryFn: () => embedTokensService.get(userId!),
     enabled: open && userId != null,
   });
@@ -85,17 +87,19 @@ export function EmbeddedDialerDialog({
       }),
     onSuccess: () => {
       toast.success('Embedded dialer settings saved');
-      queryClient.invalidateQueries({ queryKey: ['embed-token', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.embedToken.forUser(userId) });
     },
     onError: () => toast.error('Failed to save settings'),
   });
+
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   const regenerateMutation = useMutation({
     mutationFn: () => embedTokensService.regenerate(userId!),
     onSuccess: (res) => {
       setSnippet(res.snippet);
       toast.success('New embed token generated. Old token is now revoked.');
-      queryClient.invalidateQueries({ queryKey: ['embed-token', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.embedToken.forUser(userId) });
     },
     onError: () => toast.error('Failed to regenerate token'),
   });
@@ -152,7 +156,7 @@ export function EmbeddedDialerDialog({
                     type="color"
                     value={iconColor}
                     onChange={(e) => setIconColor(e.target.value)}
-                    className="h-9 w-12 cursor-pointer rounded border bg-background p-1"
+                    className="h-9 w-12 cursor-pointer rounded-sm border bg-background p-1"
                     aria-label="Icon background color"
                   />
                   <Input
@@ -200,7 +204,7 @@ export function EmbeddedDialerDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => regenerateMutation.mutate()}
+            onClick={() => setConfirmRegenerate(true)}
             disabled={regenerateMutation.isPending || isLoading}
           >
             <RefreshCw
@@ -218,6 +222,16 @@ export function EmbeddedDialerDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <ConfirmDialog
+        open={confirmRegenerate}
+        onOpenChange={setConfirmRegenerate}
+        title="Regenerate embed token"
+        description="The current token is revoked immediately: every page embedding the dialer with it stops working until you install the new snippet."
+        confirmLabel="Regenerate"
+        variant="danger"
+        onConfirm={() => regenerateMutation.mutate()}
+      />
     </Dialog>
   );
 }

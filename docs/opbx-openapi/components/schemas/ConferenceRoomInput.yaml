@@ -1,0 +1,72 @@
+type: object
+description: Writable conference room fields (create and update requests)
+properties:
+  name:
+    type: string
+    maxLength: 255
+    description: Unique within the organization
+    example: Weekly Standup
+  description:
+    type:
+    - string
+    - 'null'
+    maxLength: 1000
+  max_participants:
+    type: integer
+    minimum: 2
+    maximum: 1000
+    example: 25
+  status:
+    type: string
+    enum:
+    - active
+    - inactive
+    - pending
+    description: Defaults to `active` on create
+    example: active
+  pin:
+    type:
+    - string
+    - 'null'
+    maxLength: 20
+    pattern: ^[0-9]+$
+    description: Digits only. Required when `pin_required` is true.
+  pin_required:
+    type: boolean
+  host_pin:
+    type:
+    - string
+    - 'null'
+    maxLength: 20
+    pattern: ^[0-9]+$
+    description: >-
+      Digits only. Required when `wait_for_host` is true (on update, checked only
+      when the request sends `wait_for_host` or `host_pin`).
+  recording_enabled:
+    type: boolean
+  recording_auto_start:
+    type: boolean
+  recording_webhook_url:
+    type:
+    - string
+    - 'null'
+    format: uri
+    maxLength: 500
+    description: Must be a public http(s) URL
+  wait_for_host:
+    type: boolean
+  mute_on_entry:
+    type: boolean
+  announce_join_leave:
+    type: boolean
+  music_on_hold:
+    type: boolean
+  talk_detection_enabled:
+    type: boolean
+  talk_detection_webhook_url:
+    type:
+    - string
+    - 'null'
+    format: uri
+    maxLength: 500
+    description: Required when `talk_detection_enabled` is true. Must be a public http(s) URL.

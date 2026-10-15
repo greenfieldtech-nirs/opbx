@@ -4,16 +4,52 @@ paths:
       tags:
         - IVR Menus
       summary: Toggle IVR menu status
+      description: Sets the menu's status. Owner and PBX Admin only.
       operationId: toggleIvrMenuStatus
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ivr-menus:write
       parameters:
         - name: ivrMenu
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, inactive]
+              required: [status]
       responses:
         '200':
-          description: Status toggled
+          description: Status set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                        enum: [active, inactive]
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

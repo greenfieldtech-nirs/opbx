@@ -82,21 +82,21 @@ const sidebarSections: SidebarSection[] = [
     roles: ['owner', 'pbx_admin', 'reporter'],
     items: [
       { name: 'Auto Dialer', href: '', icon: '', isHeader: true },
-      { name: 'Campaign Manager', href: '/ui/auto-dialer/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin'] },
-      { name: 'Distribution Lists', href: '/ui/auto-dialer/distribution-lists', icon: 'codicon-list-unordered', roles: ['owner', 'pbx_admin'] },
-      { name: 'Real Time Monitor', href: '/ui/auto-dialer/monitor', icon: 'codicon-pulse', roles: ['owner', 'pbx_admin'] },
+      { name: 'Campaign Manager', href: '/ui/auto-dialer/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Distribution Lists', href: '/ui/auto-dialer/distribution-lists', icon: 'codicon-list-unordered', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Real Time Monitor', href: '/ui/auto-dialer/monitor', icon: 'codicon-pulse', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'AI Configuration', href: '', icon: '', isHeader: true },
       { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'Call Tracking', href: '', icon: '', isHeader: true },
-      { name: 'Dashboard', href: '/ui/call-tracking/dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-      { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
-      { name: 'Sessions', href: '/ui/call-tracking/sessions', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
+      { name: 'Dashboard', href: '/ui/call-tracking/dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Sessions', href: '/ui/call-tracking/sessions', icon: 'codicon-call-incoming', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'DNI Snippet', href: '/ui/call-tracking/dni-snippet', icon: 'codicon-code', roles: ['owner', 'pbx_admin'] },
-      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner'] },
+      { name: 'Integrations', href: '/ui/call-tracking/integrations', icon: 'codicon-plug', roles: ['owner', 'pbx_admin'] },
       { name: 'Security', href: '', icon: '', isHeader: true },
       { name: 'Inbound Blacklist', href: '/ui/inbound-blacklist', icon: 'codicon-circle-slash', roles: ['owner', 'pbx_admin'] },
-      { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner'] },
+      { name: 'Outbound Whitelist', href: '/ui/outbound-whitelist', icon: 'codicon-pass', roles: ['owner', 'pbx_admin'] },
     ],
   },
   {
@@ -144,6 +144,7 @@ const platformSection: SidebarSection = {
     { name: 'Organizations', href: '/ui/platform/organizations', icon: 'codicon-organization' },
     { name: 'Users', href: '/ui/platform/users', icon: 'codicon-account' },
     { name: 'Audit Log', href: '/ui/platform/audit-log', icon: 'codicon-output' },
+    { name: 'Platform Status', href: '/ui/platform/status', icon: 'codicon-pulse' },
   ],
 };
 
@@ -154,6 +155,10 @@ export function Sidebar() {
 
   // Selected section state
   const [selectedSectionId, setSelectedSectionId] = useState<string>('dashboards');
+  // Settings and Profile belong to no section: highlight none until the user picks one on that page.
+  const [pickedOnAccountPage, setPickedOnAccountPage] = useState(false);
+  const onAccountPage = /^\/ui\/(settings|profile)(\/|$)/.test(location.pathname);
+  useEffect(() => setPickedOnAccountPage(false), [location.pathname]);
 
   // Width state for the sidebar (not including activity bar)
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -182,7 +187,7 @@ export function Sidebar() {
     
     // First, check if current URL matches any section's items
     const currentPath = location.pathname;
-    let matchingSection = allSectionsList.find(section => 
+    const matchingSection = allSectionsList.find(section => 
       section.items.some(item => !item.isHeader && currentPath.startsWith(item.href))
     );
     
@@ -335,7 +340,7 @@ export function Sidebar() {
           {/* Activity Icons */}
           <div className="flex-1 py-3 space-y-2">
             {baseSections.map(section => {
-              const isSelected = selectedSectionId === section.id;
+              const isSelected = selectedSectionId === section.id && (!onAccountPage || pickedOnAccountPage);
 
               if (section.roles && (!user?.role || !section.roles.includes(user.role))) {
                 return null;
@@ -350,6 +355,7 @@ export function Sidebar() {
                   key={section.id}
                   onClick={() => {
                     setSelectedSectionId(section.id);
+                    setPickedOnAccountPage(true);
                     if (section.id === 'dashboards') {
                       navigate('/ui/dashboard');
                     }

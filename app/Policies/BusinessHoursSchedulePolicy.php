@@ -26,7 +26,7 @@ class BusinessHoursSchedulePolicy
      *
      * All authenticated users can view business hours schedules within their organization.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to view business hours schedules list
      */
     public function viewAny(User $user): bool
@@ -40,8 +40,8 @@ class BusinessHoursSchedulePolicy
      *
      * Users can view any business hours schedule within their organization.
      *
-     * @param User $user The authenticated user
-     * @param BusinessHoursSchedule $schedule The business hours schedule being viewed
+     * @param  User  $user  The authenticated user
+     * @param  BusinessHoursSchedule  $schedule  The business hours schedule being viewed
      * @return bool True if authorized to view the business hours schedule
      */
     public function view(User $user, BusinessHoursSchedule $schedule): bool
@@ -55,7 +55,7 @@ class BusinessHoursSchedulePolicy
      *
      * Only Owner and PBX Admin can create business hours schedules.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to create business hours schedules
      */
     public function create(User $user): bool
@@ -68,8 +68,8 @@ class BusinessHoursSchedulePolicy
      *
      * Only Owner and PBX Admin can update business hours schedules.
      *
-     * @param User $user The authenticated user
-     * @param BusinessHoursSchedule $schedule The business hours schedule being updated
+     * @param  User  $user  The authenticated user
+     * @param  BusinessHoursSchedule  $schedule  The business hours schedule being updated
      * @return bool True if authorized to update the business hours schedule
      */
     public function update(User $user, BusinessHoursSchedule $schedule): bool
@@ -88,8 +88,8 @@ class BusinessHoursSchedulePolicy
      *
      * Only Owner and PBX Admin can delete business hours schedules.
      *
-     * @param User $user The authenticated user
-     * @param BusinessHoursSchedule $schedule The business hours schedule being deleted
+     * @param  User  $user  The authenticated user
+     * @param  BusinessHoursSchedule  $schedule  The business hours schedule being deleted
      * @return bool True if authorized to delete the business hours schedule
      */
     public function delete(User $user, BusinessHoursSchedule $schedule): bool
@@ -108,8 +108,8 @@ class BusinessHoursSchedulePolicy
      *
      * Only Owner and PBX Admin can duplicate business hours schedules.
      *
-     * @param User $user The authenticated user
-     * @param BusinessHoursSchedule $schedule The business hours schedule being duplicated
+     * @param  User  $user  The authenticated user
+     * @param  BusinessHoursSchedule  $schedule  The business hours schedule being duplicated
      * @return bool True if authorized to duplicate the business hours schedule
      */
     public function duplicate(User $user, BusinessHoursSchedule $schedule): bool

@@ -4,18 +4,49 @@ paths:
       tags:
       - Users
       summary: List users
-      description: 'Get a paginated list of users in the organization.
-
-        Supports filtering and sorting.
+      description: 'Get a paginated list of users in the organization, sorted by `sort_by`
+        (newest first by default). Owner and PBX Admin see every user; a Supervisor sees
+        only themselves and their assigned users; PBX User and Reporter get 403. Each user
+        includes its assigned `extension`.
 
         '
       operationId: listUsers
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:read
       parameters:
       - $ref: ../../components/parameters/query/Page.yaml
       - $ref: ../../components/parameters/query/PerPage.yaml
+      - name: role
+        in: query
+        required: false
+        description: Only users with this role (an unknown value is ignored)
+        schema:
+          type: string
+          enum:
+          - owner
+          - pbx_admin
+          - pbx_user
+          - reporter
+          - supervisor
+      - name: status
+        in: query
+        required: false
+        description: Only users with this status (an unknown value is ignored)
+        schema:
+          type: string
+          enum:
+          - active
+          - inactive
+          - pending
+      - name: search
+        in: query
+        required: false
+        description: Substring match on name or email
+        schema:
+          type: string
+          example: jane
       - name: sort_by
         in: query
         required: false
@@ -29,33 +60,15 @@ paths:
           - created_at
           - updated_at
           default: created_at
-      - $ref: ../../components/parameters/query/SortOrder.yaml
-      - name: role
+      - name: sort_order
         in: query
         required: false
         schema:
           type: string
           enum:
-          - owner
-          - pbx_admin
-          - pbx_user
-          - reporter
-        description: Filter by user role
-      - name: status
-        in: query
-        required: false
-        schema:
-          type: string
-          enum:
-          - active
-          - inactive
-        description: Filter by user status
-      - name: search
-        in: query
-        required: false
-        schema:
-          type: string
-        description: Search in name and email
+          - asc
+          - desc
+          default: desc
       responses:
         '200':
           description: List of users
@@ -78,23 +91,25 @@ paths:
       tags:
       - Users
       summary: Create user
-      description: 'Create a new user in the organization.
+      description: 'Create a new user in the organization. Owner and PBX Admin only.
 
 
         **Role Restrictions:**
 
-        - Owner role cannot be assigned (single owner per organization)
+        - Owner role cannot be assigned (422)
 
-        - PBX Admins can only create PBX Users or Reporters
+        - A PBX Admin cannot create a PBX Admin (422)
 
 
-        Default status is `active` if not specified.
+        Default status is `active` if not specified. An Embedded Dialer token is created for
+        the new user.
 
         '
       operationId: createUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       requestBody:
         required: true
         content:
@@ -112,7 +127,7 @@ paths:
                   type: string
                   format: email
                   maxLength: 255
-                  description: Email address (unique within organization)
+                  description: 'Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."'
                   example: jane.smith@example.com
                 password:
                   type: string
@@ -134,7 +149,8 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
-                  description: User role (owner cannot be assigned)
+                  - supervisor
+                  description: User role (owner cannot be assigned; a PBX Admin cannot assign pbx_admin)
                   example: pbx_user
                 status:
                   type:
@@ -143,6 +159,7 @@ paths:
                   enum:
                   - active
                   - inactive
+                  - pending
                   default: active
                   description: Account status
                   example: active
@@ -206,11 +223,14 @@ paths:
       tags:
       - Users
       summary: Get user
-      description: Get a specific user by ID
+      description: >-
+        Get a specific user by ID. Owner and PBX Admin can read any user; a Supervisor
+        themselves and their assigned users; PBX User and Reporter only themselves.
       operationId: getUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:read
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       responses:
@@ -233,22 +253,29 @@ paths:
       tags:
       - Users
       summary: Update user
-      description: 'Update an existing user.
+      description: 'Update an existing user. All fields are optional.
 
 
         **Restrictions:**
 
-        - Users cannot change their own role
+        - Owner and PBX Admin can update any user, except that only an Owner can update an Owner;
+        a PBX User can update only themselves; Supervisor and Reporter get 403
 
-        - Owner role cannot be assigned
+        - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when
+        updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for
+        an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
 
-        - PBX Admins cannot modify Owner or PBX Admin users
+        - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an
+        Owner (403)
+
+        - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
 
         '
       operationId: updateUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       requestBody:
@@ -267,12 +294,15 @@ paths:
                   type: string
                   format: email
                   maxLength: 255
+                  description: 'Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."'
                   example: jane.smith.new@example.com
                 password:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   format: password
                   minLength: 8
-                  description: Leave empty to keep current password
+                  description: Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                   example: NewSecurePass123
                 role:
                   type: string
@@ -280,12 +310,15 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
+                  - supervisor
+                  description: Owner cannot be assigned; users cannot change their own role
                   example: pbx_admin
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
                   example: active
                 phone:
                   type:
@@ -342,22 +375,29 @@ paths:
       tags:
       - Users
       summary: Partially update user
-      description: 'Update an existing user.
+      description: 'Update an existing user. All fields are optional.
 
 
         **Restrictions:**
 
-        - Users cannot change their own role
+        - Owner and PBX Admin can update any user, except that only an Owner can update an Owner;
+        a PBX User can update only themselves; Supervisor and Reporter get 403
 
-        - Owner role cannot be assigned
+        - Changing `role` is Owner-only and not allowed on yourself (403). Sending `role` when
+        updating yourself, or `role: owner`, is rejected (422); a PBX Admin sending `role` for
+        an Owner or PBX Admin, or `role: pbx_admin`, is rejected (422)
 
-        - PBX Admins cannot modify Owner or PBX Admin users
+        - Changing `status` needs Owner or PBX Admin and is not allowed on yourself or on an
+        Owner (403)
+
+        - Setting `password` follows `PATCH /v1/users/{user}/password` authorization (403)
 
         '
       operationId: patchUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       requestBody:
@@ -376,12 +416,15 @@ paths:
                   type: string
                   format: email
                   maxLength: 255
+                  description: 'Globally unique: an email belongs to one user in one organization. A taken email returns 422 "The email has already been taken."'
                   example: jane.smith.new@example.com
                 password:
-                  type: string
+                  type:
+                  - string
+                  - 'null'
                   format: password
                   minLength: 8
-                  description: Leave empty to keep current password
+                  description: Omit or send null to keep the current password. Same rules as on create (letters, mixed case, numbers).
                   example: NewSecurePass123
                 role:
                   type: string
@@ -389,12 +432,15 @@ paths:
                   - pbx_admin
                   - pbx_user
                   - reporter
+                  - supervisor
+                  description: Owner cannot be assigned; users cannot change their own role
                   example: pbx_admin
                 status:
                   type: string
                   enum:
                   - active
                   - inactive
+                  - pending
                   example: active
                 phone:
                   type:
@@ -451,16 +497,21 @@ paths:
       tags:
       - Users
       summary: Delete user
-      description: 'Delete a user from the organization.
+      description: 'Delete a user from the organization. Owner and PBX Admin only; you cannot
+        delete yourself, and only an Owner can delete an Owner. The last Owner of the
+        organization cannot be deleted (409).
 
 
-        **Restriction:** Cannot delete the last owner in the organization.
+        The user''s extensions are kept but unassigned, their ring group and call queue
+        memberships are removed, and routing entries that pointed at their extensions are
+        switched to `unavailable`. Preview this with `GET /v1/users/{user}/delete-impact`.
 
         '
       operationId: deleteUser
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: users:write
       parameters:
       - $ref: ../../components/parameters/path/UserId.yaml
       responses:
@@ -473,11 +524,24 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '409':
-          description: Cannot delete last owner
+          description: >-
+            The user is the organization's last Owner (`LAST_OWNER_DELETE_BLOCKED`), or the
+            owner-deletion lock could not be acquired (`LOCK_ACQUISITION_FAILED`, retry)
           content:
             application/json:
               schema:
-                $ref: ../../components/schemas/Error.yaml
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                  error_code:
+                    type: string
+                    enum:
+                    - LAST_OWNER_DELETE_BLOCKED
+                    - LOCK_ACQUISITION_FAILED
               example:
                 success: false
                 message: Cannot delete the last owner in the organization.

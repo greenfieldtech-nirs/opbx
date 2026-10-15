@@ -12,9 +12,11 @@ use App\Http\Requests\CallQueue\UpdateCallQueueRequest;
 use App\Http\Resources\CallQueueResource;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
+use App\Services\Supervisor\SupervisorFilterService;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -45,7 +47,7 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['strategy', 'status', 'search'];
+        return ['strategy', 'status', 'search', 'unprovisioned'];
     }
 
     protected function getAllowedSortFields(): array
@@ -80,6 +82,11 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function buildIndexQuery(Builder $query, Request $request): void
     {
+        $currentUser = $request->user();
+        if ($currentUser && $currentUser->isSupervisor()) {
+            $query->whereIn('id', app(SupervisorFilterService::class)->callQueueIds($currentUser));
+        }
+
         $query->with([
             'agents.extension:id,user_id,extension_number,status',
             'mohRecording:id,name',
@@ -88,13 +95,14 @@ class CallQueueController extends AbstractApiCrudController
             'fallbackIvrMenu:id,name',
             'fallbackAiAssistant:id,name',
             'fallbackAiLoadBalancer:id,name',
+            'fallbackCallQueue:id,name',
         ])->withCount('agents');
     }
 
     /**
      * Toggle the queue between active and inactive.
      */
-    public function toggleStatus(Request $request): \Illuminate\Http\JsonResponse
+    public function toggleStatus(Request $request): JsonResponse
     {
         $model = $this->resolveModel($request);
         $this->authorize($this->getUpdateAbility(), $model);
@@ -138,6 +146,11 @@ class CallQueueController extends AbstractApiCrudController
                 'type' => 'search',
                 'scope' => 'search',
             ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
+            ],
         ];
     }
 
@@ -163,6 +176,7 @@ class CallQueueController extends AbstractApiCrudController
             'fallback_ivr_menu_id' => $validated['fallback_ivr_menu_id'] ?? null,
             'fallback_ai_assistant_id' => $validated['fallback_ai_assistant_id'] ?? null,
             'fallback_ai_load_balancer_id' => $validated['fallback_ai_load_balancer_id'] ?? null,
+            'fallback_call_queue_id' => $validated['fallback_call_queue_id'] ?? null,
         ];
 
         $validated['fallback_extension_id'] = null;
@@ -170,6 +184,7 @@ class CallQueueController extends AbstractApiCrudController
         $validated['fallback_ivr_menu_id'] = null;
         $validated['fallback_ai_assistant_id'] = null;
         $validated['fallback_ai_load_balancer_id'] = null;
+        $validated['fallback_call_queue_id'] = null;
 
         $field = match ($action) {
             'extension' => 'fallback_extension_id',
@@ -177,6 +192,7 @@ class CallQueueController extends AbstractApiCrudController
             'ivr_menu' => 'fallback_ivr_menu_id',
             'ai_assistant' => 'fallback_ai_assistant_id',
             'ai_load_balancer' => 'fallback_ai_load_balancer_id',
+            'call_queue' => 'fallback_call_queue_id',
             default => null,
         };
 
@@ -188,9 +204,11 @@ class CallQueueController extends AbstractApiCrudController
     }
 
     /**
-     * @var array<int>
+     * Agent ids to sync after save; null when an update leaves the agents untouched.
+     *
+     * @var array<int>|null
      */
-    private array $tempAgentIds = [];
+    private ?array $tempAgentIds = null;
 
     protected function beforeStore(array $validated, Request $request): array
     {
@@ -216,10 +234,15 @@ class CallQueueController extends AbstractApiCrudController
 
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        $this->tempAgentIds = $validated['agents'] ?? [];
+        $this->tempAgentIds = $validated['agents'] ?? null;
         unset($validated['agents']);
 
         $validated = $this->normalizeAnnounceFields($validated);
+
+        // Partial update: leave the fallback columns alone unless the request touches the fallback.
+        if (! collect($validated)->keys()->contains(fn (string $key) => str_starts_with($key, 'fallback_'))) {
+            return $validated;
+        }
 
         return $this->normalizeFallbackFields($validated, $model);
     }
@@ -252,6 +275,10 @@ class CallQueueController extends AbstractApiCrudController
      */
     private function syncAgents(CallQueue $callQueue): void
     {
+        if ($this->tempAgentIds === null) {
+            return;
+        }
+
         CallQueueAgent::where('call_queue_id', $callQueue->id)->delete();
 
         foreach ($this->tempAgentIds as $userId) {

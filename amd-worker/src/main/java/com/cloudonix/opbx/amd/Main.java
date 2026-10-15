@@ -8,17 +8,19 @@ import org.slf4j.LoggerFactory;
 public class Main {
 
     public static void main(String[] args) {
-        // Configure slf4j-simple log level from env var BEFORE creating any logger.
-        // slf4j-simple reads org.slf4j.simpleLogger.defaultLogLevel system property.
-        String logLevel = System.getenv("AMD_LOG_LEVEL");
-        if (logLevel != null && !logLevel.isEmpty()) {
-            System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", logLevel);
-        }
-
+        // Log level: AMD_LOG_LEVEL, read by logback.xml.
         Logger logger = LoggerFactory.getLogger(Main.class);
         logger.info("AMD Worker starting version=1.0.0");
         Config config = new Config();
         Vertx vertx = Vertx.vertx();
+        // SIGTERM (docker stop): undeploy so stop() closes servers and clients; bounded under Docker's 10 s grace.
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                vertx.close().toCompletionStage().toCompletableFuture().get(8, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception e) {
+                logger.warn("Shutdown did not complete cleanly error={}", e.toString());
+            }
+        }));
         AmdWorkerVerticle verticle = new AmdWorkerVerticle(config);
         vertx.deployVerticle(verticle).onComplete(ar -> {
             if (ar.succeeded()) {

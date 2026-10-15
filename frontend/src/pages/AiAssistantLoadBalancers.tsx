@@ -3,8 +3,11 @@
  * Full CRUD operations with backend API integration
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useState,useEffect,useMemo } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { ringGroupsService } from '@/services/createResourceService';
@@ -13,154 +16,60 @@ import { ivrMenusService } from '@/services/createResourceService';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,EmptyState
 } from '@/components/design-system';
 import { LoadBalancerForm } from './AiAssistantLoadBalancers/components/LoadBalancerForm';
 import type {
-  AiAssistantLoadBalancer,
-  AlbsStrategy,
-  Status,
-  CreateAiAssistantLoadBalancerRequest,
-  UpdateAiAssistantLoadBalancerRequest,
+AiAssistantLoadBalancer,
+AlbsStrategy,
+Status,
+CreateAiAssistantLoadBalancerRequest,
+UpdateAiAssistantLoadBalancerRequest,
 } from '@/types';
 import type {
-  RingGroupFallbackAction,
+RingGroupFallbackAction,
 } from '@/types';
-import type { Extension, AiAssistantLoadBalancerMember } from '@/types';
 
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import {
-  AlertCircle,
-  Plus,
-  Search,
-  Filter,
-  Users,
-  RotateCw,
-  PhoneForwarded,
-  PhoneOff,
-  Edit,
-  Trash2,
-  Eye,
-  X,
-  Info,
-  RefreshCw,
-  GripVertical,
-  Menu,
-  Bot,
-  Phone,
-  ArrowRight,
-  Scale,
-  Target,
+Plus,
+Search,
+Filter,RotateCw,
+RefreshCw,
+Bot,
+Scale,
+Target
 } from 'lucide-react';
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+arrayMove} from '@dnd-kit/sortable';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 
-// Sortable item component for drag-and-drop
-interface SortableItemProps {
-  id: string;
-  children: (dragHandleProps: any) => React.ReactNode;
-}
 
-function SortableItem({ id, children }: SortableItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const dragHandleProps = {
-    ...attributes,
-    ...listeners,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style}>
-      {children(dragHandleProps)}
-    </div>
-  );
-}
 
 // Helper functions
-function getStrategyDisplayName(strategy: AlbsStrategy): string {
-  const names: Record<AlbsStrategy, string> = {
-    round_robin: 'Round Robin',
-    priority: 'Priority Based',
-    percentage: 'Percentage Based',
-  };
-  return names[strategy] || strategy;
-}
 
-function getStrategyDescription(strategy: AlbsStrategy): string {
-  const descriptions: Record<AlbsStrategy, string> = {
-    round_robin: 'Distribute calls evenly across AI assistants in sequential order.',
-    priority: 'Route calls to AI assistants in priority order using drag and drop.',
-    percentage: 'Route calls based on configured weight percentages.',
-  };
-  return descriptions[strategy] || '';
-}
 
 // Strategy icon mapping
 function getStrategyIcon(strategy: AlbsStrategy) {
@@ -177,22 +86,6 @@ function getStrategyIcon(strategy: AlbsStrategy) {
 }
 
 // Fallback icon mapping
-function getFallbackIcon(action: RingGroupFallbackAction) {
-  switch (action) {
-    case 'extension':
-      return <PhoneForwarded className="h-4 w-4" />;
-    case 'ring_group':
-      return <ArrowRight className="h-4 w-4" />;
-    case 'ivr_menu':
-      return <Menu className="h-4 w-4" />;
-    case 'ai_assistant':
-      return <Bot className="h-4 w-4" />;
-    case 'hangup':
-      return <PhoneOff className="h-4 w-4" />;
-    default:
-      return <AlertCircle className="h-4 w-4" />;
-  }
-}
 
 // Extended AiAssistantLoadBalancer type with additional fallback fields
 // Note: follow_through is inherited from base AiAssistantLoadBalancer interface
@@ -200,6 +93,8 @@ interface ExtendedAiAssistantLoadBalancer extends AiAssistantLoadBalancer {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
 }
 
 // Member form data type
@@ -211,7 +106,6 @@ interface MemberFormData {
 }
 
 // Generate weight options for percentage strategy (0% to 100% in 5% increments)
-const WEIGHT_OPTIONS = Array.from({ length: 21 }, (_, i) => i * 5); // [0, 5, 10, ..., 100]
 
 // Helper to build fallback fields based on action
 const buildFallbackFields = (formData: FormData): Record<string, string | null | undefined> => {
@@ -220,6 +114,8 @@ const buildFallbackFields = (formData: FormData): Record<string, string | null |
     fallback_ring_group_id: null as string | null,
     fallback_ivr_menu_id: null as string | null,
     fallback_ai_assistant_id: null as string | null,
+    fallback_call_queue_id: null as string | null,
+    fallback_ai_load_balancer_id: null as string | null,
   };
 
   switch (formData.fallback_action) {
@@ -231,6 +127,10 @@ const buildFallbackFields = (formData: FormData): Record<string, string | null |
       return { ...base, fallback_ivr_menu_id: formData.fallback_ivr_menu_id };
     case 'ai_assistant':
       return { ...base, fallback_ai_assistant_id: formData.fallback_ai_assistant_id };
+    case 'call_queue':
+      return { ...base, fallback_call_queue_id: formData.fallback_call_queue_id };
+    case 'ai_load_balancer':
+      return { ...base, fallback_ai_load_balancer_id: formData.fallback_ai_load_balancer_id };
     case 'hangup':
     default:
       return base;
@@ -249,6 +149,8 @@ interface FormData {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   members: MemberFormData[];
 }
 
@@ -275,10 +177,11 @@ export default function AiAssistantLoadBalancers() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<AlbsStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   // Debounce search input
   useEffect(() => {
@@ -289,12 +192,6 @@ export default function AiAssistantLoadBalancers() {
   }, [searchQuery]);
 
   // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
 
   // Handle drag end for member ordering
   const handleDragEnd = (event: any) => {
@@ -320,7 +217,6 @@ export default function AiAssistantLoadBalancers() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<FormData>(emptyFormData);
@@ -328,13 +224,14 @@ export default function AiAssistantLoadBalancers() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch load balancers with React Query
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', {
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: [...queryKeys.aiLoadBalancers.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }],
@@ -344,6 +241,7 @@ export default function AiAssistantLoadBalancers() {
       search: debouncedSearch || undefined,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }),
@@ -358,7 +256,7 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available AI Assistants
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.aiAssistants.all, { status: 'active', per_page: 100 }],
     queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -366,13 +264,13 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available extensions
   const { data: extensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
   // Fetch all ring groups for fallback destinations
-  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
-    queryKey: ['ring-groups-all'],
+  const { data: allRingGroupsData } = useQuery({
+    queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }),
     staleTime: 60000,
   });
@@ -388,7 +286,7 @@ export default function AiAssistantLoadBalancers() {
 
   // Fetch available IVR menus
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
+    queryKey: queryKeys.ivrMenus.list({ status: 'active', per_page: 100 }),
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -399,7 +297,7 @@ export default function AiAssistantLoadBalancers() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAiAssistantLoadBalancerRequest) => aiAssistantLoadBalancersService.create(data as any),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('AI Load Balancer created successfully');
@@ -415,7 +313,7 @@ export default function AiAssistantLoadBalancers() {
     mutationFn: ({ id, data }: { id: string; data: UpdateAiAssistantLoadBalancerRequest }) =>
       aiAssistantLoadBalancersService.update(id, data as any),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedLoadBalancer(null);
       setFormData(emptyFormData);
@@ -428,15 +326,21 @@ export default function AiAssistantLoadBalancers() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => aiAssistantLoadBalancersService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistant-load-balancers'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedLoadBalancer(null);
       toast.success('AI Load Balancer deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.message || 'Failed to delete AI Load Balancer';
       toast.error(message);
     },
@@ -497,6 +401,18 @@ export default function AiAssistantLoadBalancers() {
 
     if (formData.fallback_action === 'ai_assistant' && !formData.fallback_ai_assistant_id) {
       errors.fallback_ai_assistant = 'Fallback AI Assistant is required';
+    }
+
+    if (formData.fallback_action === 'call_queue' && !formData.fallback_call_queue_id) {
+      errors.fallback_call_queue = 'Fallback call queue is required';
+    }
+
+    if (formData.fallback_action === 'ai_load_balancer') {
+      if (!formData.fallback_ai_load_balancer_id) {
+        errors.fallback_ai_load_balancer = 'Fallback AI load balancer is required';
+      } else if (selectedLoadBalancer && formData.fallback_ai_load_balancer_id === String(selectedLoadBalancer.id)) {
+        errors.fallback_ai_load_balancer = 'A load balancer cannot fall back to itself';
+      }
     }
 
     setFormErrors(errors);
@@ -583,6 +499,8 @@ export default function AiAssistantLoadBalancers() {
       fallback_ring_group_id: lb.fallback_ring_group_id?.toString(),
       fallback_ivr_menu_id: lb.fallback_ivr_menu_id?.toString(),
       fallback_ai_assistant_id: lb.fallback_ai_assistant_id?.toString(),
+      fallback_call_queue_id: lb.fallback_call_queue_id?.toString(),
+      fallback_ai_load_balancer_id: lb.fallback_ai_load_balancer_id?.toString(),
       status: lb.status,
       members: lb.members.map(m => ({
         ai_assistant_id: m.ai_assistant_id,
@@ -602,10 +520,6 @@ export default function AiAssistantLoadBalancers() {
   };
 
   // Open detail sheet
-  const openDetailSheet = (lb: AiAssistantLoadBalancer) => {
-    setSelectedLoadBalancer(lb);
-    setIsDetailSheetOpen(true);
-  };
 
   // Member management functions
   const addMember = () => {
@@ -689,65 +603,12 @@ export default function AiAssistantLoadBalancers() {
     });
   };
 
-  const getAvailableAiAssistantsForMember = (currentMemberAssistantId?: string) => {
-    const currentMembers = formData.members || [];
-    const usedAssistantIds = currentMembers
-      .map((m) => m.ai_assistant_id)
-      .filter((id) => id !== currentMemberAssistantId);
-    return availableAiAssistants.filter((a) => !usedAssistantIds.includes(String(a.id)));
-  };
 
   // Calculate total weight for percentage strategy
-  const totalWeight = useMemo(() => {
-    return formData.members.reduce((sum, m) => sum + (m.weight || 0), 0);
-  }, [formData.members]);
 
   // Get available AI assistants not already in members
-  const availableAiAssistantsForMembers = useMemo(() => {
-    const currentMemberIds = new Set(formData.members.map(m => m.ai_assistant_id));
-    return availableAiAssistants.filter(a => !currentMemberIds.has(String(a.id)));
-  }, [availableAiAssistants, formData.members]);
 
   // Enhanced fallback display text with actual destination names
-  const getFallbackDisplayText = (
-    lb: ExtendedAiAssistantLoadBalancer,
-    ringGroups: any[],
-    ivrMenus: any[]
-  ): string => {
-    switch (lb.fallback_action) {
-      case 'extension':
-        return lb.fallback_extension_id
-          ? `→ Extension: ${lb.fallback_extension_id}`
-          : '→ Extension';
-
-      case 'ring_group':
-        if (lb.fallback_ring_group_id) {
-          const targetGroup = ringGroups.find(rg => rg.id.toString() === lb.fallback_ring_group_id);
-          return targetGroup ? `→ Ring Group: ${targetGroup.name}` : '→ Ring Group';
-        }
-        return '→ Ring Group';
-
-      case 'ivr_menu':
-        if (lb.fallback_ivr_menu_id) {
-          const targetIvr = ivrMenus.find(ivr => ivr.id.toString() === lb.fallback_ivr_menu_id);
-          return targetIvr ? `→ IVR Menu: ${targetIvr.name}` : '→ IVR Menu';
-        }
-        return '→ IVR Menu';
-
-      case 'ai_assistant':
-        if (lb.fallback_ai_assistant_id) {
-          const targetAi = availableAiAssistants.find(a => String(a.id) === lb.fallback_ai_assistant_id);
-          return targetAi ? `→ AI Assistant: ${targetAi.name}` : '→ AI Assistant';
-        }
-        return '→ AI Assistant';
-
-      case 'hangup':
-        return 'Hangup';
-
-      default:
-        return 'Unknown';
-    }
-  };
 
   // Render form dialog content
   const renderFormDialog = (isEdit: boolean) => {
@@ -759,7 +620,7 @@ export default function AiAssistantLoadBalancers() {
     return (
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title}{isEdit && selectedLoadBalancer?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -775,6 +636,7 @@ export default function AiAssistantLoadBalancers() {
           onRemoveMember={removeMember}
           onUpdateMember={updateMemberAssistant}
           onDragEnd={handleDragEnd}
+          allowDisconnect={isEdit}
         />
 
         <DialogFooter>
@@ -800,10 +662,15 @@ export default function AiAssistantLoadBalancers() {
     );
   };
 
-  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load AI assistant load balancers" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -880,6 +747,7 @@ export default function AiAssistantLoadBalancers() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
           </div>
         </CardContent>
       </Card>
@@ -928,7 +796,7 @@ export default function AiAssistantLoadBalancers() {
                 header: 'Fallback',
                 cell: (lb) => (
                   <Badge variant="secondary" className="text-[10px] py-0">
-                    {lb.fallback_action.replace('_', ' ')}
+                    {labelForRoutingType(lb.fallback_action)}
                   </Badge>
                 )
               },
@@ -1042,92 +910,6 @@ export default function AiAssistantLoadBalancers() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedLoadBalancer && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selectedLoadBalancer.name}</SheetTitle>
-                <SheetDescription>
-                  {selectedLoadBalancer.description || 'No description provided'}
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6 mt-6">
-                {/* Strategy */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Load Balancing Strategy</h3>
-                  <div className="flex items-center gap-2">
-                    {getStrategyIcon(selectedLoadBalancer.strategy)}
-                    <Badge variant="outline">{getStrategyDisplayName(selectedLoadBalancer.strategy)}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {getStrategyDescription(selectedLoadBalancer.strategy)}
-                  </p>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Status</h3>
-                  <Badge variant={selectedLoadBalancer.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedLoadBalancer.status === 'active' ? 'Active' : 'Disabled'}
-                  </Badge>
-                </div>
-
-                {/* Fallback Action */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Fallback Action</h3>
-                  <div className="flex items-center gap-2">
-                    {getFallbackIcon(selectedLoadBalancer.fallback_action)}
-                    <span className="text-sm">
-                      {getFallbackDisplayText(
-                        selectedLoadBalancer as ExtendedAiAssistantLoadBalancer,
-                        loadBalancers || [],
-                        availableIvrMenus || []
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Members */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">
-                    AI Assistant Members ({selectedLoadBalancer.members.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedLoadBalancer.members.map((member, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-cyan-500" />
-                            <p className="font-medium">
-                              {member.ai_assistant_name}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Position: {member.position} | Priority: {member.priority} | Weight: {member.weight}
-                          </p>
-                        </div>
-                        <Badge variant="outline">{member.status}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Timestamps */}
-                <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
-                  <p>Created: {new Date(selectedLoadBalancer.created_at).toLocaleString()}</p>
-                  <p>Updated: {new Date(selectedLoadBalancer.updated_at).toLocaleString()}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

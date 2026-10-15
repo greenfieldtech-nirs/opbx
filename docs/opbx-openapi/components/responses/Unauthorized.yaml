@@ -1,9 +1,8 @@
-description: Unauthorized - Authentication required
+description: Unauthorized - Authentication required (missing, invalid or revoked token or API key)
 content:
   application/json:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: UNAUTHORIZED
-      message: Authentication required
-      code: AUTH_REQUIRED
+      error: Unauthenticated
+      message: Authentication required to access this resource.

@@ -10,9 +10,11 @@ use App\Enums\UserRole;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\DidNumber;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class AutoDialerCampaignControllerTest extends TestCase
@@ -115,6 +117,33 @@ class AutoDialerCampaignControllerTest extends TestCase
 
         $response->assertOk()
             ->assertJsonCount(1, 'data');
+    }
+
+    public function test_index_excludes_status_server_side_with_correct_totals(): void
+    {
+        AutoDialerCampaign::factory()->count(3)->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::ARCHIVED->value,
+        ]);
+        AutoDialerCampaign::factory()->count(3)->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::ACTIVE->value,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns?exclude_status=archived&per_page=2&page=2');
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 2);
+    }
+
+    public function test_index_rejects_invalid_exclude_status(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns?exclude_status=bogus')
+            ->assertUnprocessable();
     }
 
     public function test_index_requires_authentication(): void
@@ -331,6 +360,61 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertEquals('New Name', $campaign->name);
     }
 
+    public function test_update_refuses_an_active_campaign_and_changes_nothing(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'name' => 'Old Name',
+            'status' => CampaignStatus::ACTIVE,
+            'dial_timeout' => 30,
+        ]);
+
+        foreach (['putJson', 'patchJson'] as $method) {
+            $this->actingAs($this->user)
+                ->{$method}('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['dial_timeout' => 45])
+                ->assertStatus(409)
+                ->assertJsonPath('message', 'Pause the campaign before editing it.');
+        }
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['name' => 'New Name'])
+            ->assertStatus(409);
+
+        $campaign->refresh();
+        $this->assertSame('Old Name', $campaign->name);
+        $this->assertSame(30, $campaign->dial_timeout);
+    }
+
+    public function test_update_allows_a_paused_campaign(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::PAUSED,
+            'dial_timeout' => 30,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['dial_timeout' => 45])
+            ->assertOk();
+
+        $this->assertSame(45, $campaign->refresh()->dial_timeout);
+    }
+
+    public function test_update_sets_retry_settings_and_validates_delay(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        $url = '/api/v1/auto-dialer-campaigns/'.$campaign->id;
+
+        $this->actingAs($this->user)
+            ->putJson($url, ['retry_on_busy_no_answer' => true, 'retry_delay_minutes' => 30])
+            ->assertOk()
+            ->assertJsonPath('data.retry_on_busy_no_answer', true)
+            ->assertJsonPath('data.retry_delay_minutes', 30);
+
+        $this->actingAs($this->user)->putJson($url, ['retry_delay_minutes' => 0])->assertStatus(422);
+        $this->actingAs($this->user)->putJson($url, ['retry_delay_minutes' => 1441])->assertStatus(422);
+    }
+
     public function test_update_allows_enabled_day_with_empty_time_ranges(): void
     {
         $campaign = AutoDialerCampaign::factory()->create([
@@ -475,5 +559,99 @@ class AutoDialerCampaignControllerTest extends TestCase
         $this->assertDatabaseHas('auto_dialer_destinations', [
             'id' => $destination->id,
         ]);
+    }
+
+    // ==================== AVAILABLE CALLER IDS ====================
+
+    public function test_available_caller_ids_excludes_the_given_campaign_pool(): void
+    {
+        $pooled = DidNumber::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $free = DidNumber::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+        DB::table('auto_dialer_campaign_caller_ids')->insert([
+            'campaign_id' => $campaign->id,
+            'did_number_id' => $pooled->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $ids = $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/available-caller-ids?exclude_campaign_id='.$campaign->id)
+            ->assertOk()
+            ->json('data.*.id');
+
+        $this->assertContains($free->id, $ids);
+        $this->assertNotContains($pooled->id, $ids);
+    }
+
+    public function test_available_caller_ids_rejects_a_non_integer_exclude_campaign_id(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/api/v1/auto-dialer-campaigns/available-caller-ids?exclude_campaign_id=abc')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('exclude_campaign_id');
+    }
+
+    // ==================== TIME LIMIT ====================
+
+    public function test_store_defaults_time_limit_to_600_when_omitted_or_null(): void
+    {
+        $omitted = $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload())
+            ->assertCreated()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->actingAs($this->user)
+            ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload(['name' => 'Null Limit', 'time_limit' => null]))
+            ->assertCreated()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->assertSame(600, AutoDialerCampaign::find($omitted->json('data.id'))->time_limit);
+    }
+
+    public function test_update_with_null_time_limit_resets_it_to_600(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'time_limit' => 1800,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['time_limit' => null])
+            ->assertOk()
+            ->assertJsonPath('data.time_limit', 600);
+
+        $this->assertSame(600, $campaign->fresh()->time_limit);
+    }
+
+    public function test_update_without_time_limit_keeps_it(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'time_limit' => 1800,
+        ]);
+
+        $this->actingAs($this->user)
+            ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['name' => 'Renamed'])
+            ->assertOk();
+
+        $this->assertSame(1800, $campaign->fresh()->time_limit);
+    }
+
+    public function test_time_limit_bounds_are_validated(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
+
+        foreach ([29, 14401] as $bad) {
+            $this->actingAs($this->user)
+                ->postJson('/api/v1/auto-dialer-campaigns', $this->validCampaignPayload(['time_limit' => $bad]))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('time_limit');
+
+            $this->actingAs($this->user)
+                ->putJson('/api/v1/auto-dialer-campaigns/'.$campaign->id, ['time_limit' => $bad])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('time_limit');
+        }
     }
 }

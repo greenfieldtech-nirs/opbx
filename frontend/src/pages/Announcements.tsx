@@ -5,24 +5,30 @@
  */
 
 import { useState } from 'react';
+import { invalidateAnnouncements } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Database, Download, Pause, Play, Plus, Search, Upload, Loader2, Filter, X, Megaphone, RefreshCw, Trash2 } from 'lucide-react';
 import { formatDateTime } from '@/utils/formatters';
 import { recordingsService } from '@/services/createResourceService';
 import { storage } from '@/utils/storage';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import type { Recording, RecordingType, RecordingStatus } from '@/types/api.types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function formatDuration(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
@@ -34,7 +40,6 @@ function formatDuration(totalSeconds: number): string {
 
 export default function Announcements() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
 
 
   // Form state for filters
@@ -53,17 +58,22 @@ export default function Announcements() {
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showRemoteDialog, setShowRemoteDialog] = useState(false);
+  const { user } = useAuth();
+  const canManage = can(user?.role, 'recordings.manage');
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Recording | null>(null);
 
   const queryClient = useQueryClient();
 
   // Fetch announcements with filters
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: announcementsData,
     isLoading: announcementsIsLoading,
     refetch: refetchAnnouncements,
   } = useQuery({
-    queryKey: ['announcements', currentPage, filterForm],
+    queryKey: [...queryKeys.announcements.all, currentPage, filterForm],
     queryFn: () => recordingsService.getAll({
       ...filterForm,
       search: filterForm.search || undefined,
@@ -77,7 +87,7 @@ export default function Announcements() {
   const createAnnouncementMutation = useMutation({
     mutationFn: recordingsService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       setShowUploadDialog(false);
       setShowRemoteDialog(false);
       toast.success('Announcement created successfully');
@@ -121,8 +131,12 @@ export default function Announcements() {
 
       const data = await response.json();
 
-      // Step 2: Download from the secure MinIO URL
-      const downloadResponse = await fetch(data.download_url);
+      // Step 2: Download the file; the short-lived recording token goes in the Authorization header
+      const downloadResponse = await fetch(data.download_endpoint, {
+        headers: {
+          'Authorization': `Bearer ${data.token}`,
+        },
+      });
       if (!downloadResponse.ok) {
         throw new Error('Failed to download file from storage');
       }
@@ -144,14 +158,19 @@ export default function Announcements() {
     },
   });
 
+  const [announcementToDelete, setAnnouncementToDelete] = useState<any>(null);
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   // Delete announcement mutation
   const deleteAnnouncementMutation = useMutation({
     mutationFn: recordingsService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       toast.success('Announcement deleted successfully');
     },
     onError: (error: any) => {
+      setAnnouncementToDelete(null);
+      if (showIfInUse(error)) return;
       toast.error('Failed to delete announcement: ' + error.message);
     },
   });
@@ -161,7 +180,7 @@ export default function Announcements() {
     mutationFn: ({ id, is_moh }: { id: number; is_moh: boolean }) =>
       recordingsService.update(id, { is_moh }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      void invalidateAnnouncements(queryClient);
       toast.success(variables.is_moh ? 'Tagged as hold music' : 'Removed hold music tag');
     },
     onError: (error: any) => {
@@ -174,9 +193,7 @@ export default function Announcements() {
   };
 
   const handleDelete = (announcement: any) => {
-    if (confirm(`Are you sure you want to delete "${announcement.name}"? This action cannot be undone.`)) {
-      deleteAnnouncementMutation.mutate(announcement.id);
-    }
+    setAnnouncementToDelete(announcement);
   };
 
   const handlePlayback = async (announcement: Recording) => {
@@ -215,8 +232,23 @@ export default function Announcements() {
     );
   }
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load announcements" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={announcementToDelete !== null}
+        onOpenChange={(open) => !open && setAnnouncementToDelete(null)}
+        title="Delete announcement"
+        description={`Are you sure you want to delete "${announcementToDelete?.name ?? ''}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (announcementToDelete) deleteAnnouncementMutation.mutate(announcementToDelete.id);
+        }}
+      />
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -230,6 +262,7 @@ export default function Announcements() {
             <span className="text-foreground">Announcements</span>
           </div>
         </div>
+        {canManage && (
         <div className="flex gap-2">
           <Button onClick={() => setShowRemoteDialog(true)} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
@@ -240,6 +273,7 @@ export default function Announcements() {
             Upload File
           </Button>
         </div>
+        )}
       </div>
 
       <Card>
@@ -358,7 +392,7 @@ export default function Announcements() {
                     onCheckedChange={(checked) => {
                       toggleMohMutation.mutate({ id: announcement.id, is_moh: checked });
                     }}
-                    disabled={toggleMohMutation.isPending}
+                    disabled={toggleMohMutation.isPending || !canManage}
                     aria-label="Use as hold music"
                   />
                 )
@@ -420,18 +454,20 @@ export default function Announcements() {
                         <Download className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(announcement);
-                      }}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canManage && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(announcement);
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )
               }
@@ -440,8 +476,8 @@ export default function Announcements() {
               <EmptyState
                 icon={Database}
                 title="No announcements found"
-                description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : 'Get started by uploading a file or adding a remote URL'}
-                action={!filterForm.search && !filterForm.type && !filterForm.status ? {
+                description={filterForm.search || filterForm.type || filterForm.status ? 'Try adjusting your filters' : canManage ? 'Get started by uploading a file or adding a remote URL' : 'No announcements have been added yet'}
+                action={canManage && !filterForm.search && !filterForm.type && !filterForm.status ? {
                   label: "Upload File",
                   onClick: () => setShowUploadDialog(true)
                 } : undefined}
@@ -533,6 +569,7 @@ export default function Announcements() {
           )}
         </DialogContent>
       </Dialog>
+      {inUseDialog}
     </div>
   );
 }

@@ -58,13 +58,8 @@ class SessionUpdateController extends Controller
 
             $organizationId = $user->organization_id;
 
-            $isSupervisor = $request->boolean('supervisor') && $user->isSupervisor();
-            $supervisorIdentifiers = null;
-
-            if ($isSupervisor) {
-                $supervisorIdentifiers = app(SupervisorFilterService::class)
-                    ->resourceIdentifiers($user);
-            }
+            // Supervisors are always scoped by role; the legacy ?supervisor= flag is ignored.
+            $supervisorIdentifiers = app(SupervisorFilterService::class)->scopeFor($user);
 
             try {
                 $activeCalls = app(ActiveCallsService::class)
@@ -228,6 +223,14 @@ class SessionUpdateController extends Controller
     {
         $this->authorize('viewAny', SessionUpdate::class);
 
+        // A Supervisor only sees sessions that involve their scope (anything else reads as not found).
+        $identifiers = app(SupervisorFilterService::class)->scopeFor(auth()->user());
+        if ($identifiers !== null && ! SessionUpdate::where('session_id', $sessionId)
+            ->where(fn ($q) => $q->whereIn('caller_id', $identifiers)->orWhereIn('destination', $identifiers))
+            ->exists()) {
+            return response()->json(['message' => 'Session not found', 'session_id' => $sessionId], 404);
+        }
+
         // Get all events for this session
         $events = SessionUpdate::where('session_id', $sessionId)
             ->orderBy('created_at', 'asc')
@@ -270,39 +273,30 @@ class SessionUpdateController extends Controller
     {
         $this->authorize('viewAny', SessionUpdate::class);
 
-        // Get active session IDs (latest status per session)
-        $activeSessions = SessionUpdate::selectRaw('session_id, MAX(updated_at) as latest_update, status')
-            ->whereIn('status', ['processing', 'ringing', 'connected'])
-            ->groupBy('session_id', 'status')
-            ->get();
-
-        // Calculate statistics
-        $totalActive = $activeSessions->count();
+        // Same bounded window as the live-calls list: latest row per session, updated in the last 30 minutes.
+        $calls = app(ActiveCallsService::class)->forOrganization(
+            (int) $request->user()->organization_id,
+            app(SupervisorFilterService::class)->scopeFor($request->user())
+        );
 
         $byStatus = [
-            'processing' => $activeSessions->where('status', 'processing')->count(),
-            'ringing' => $activeSessions->where('status', 'ringing')->count(),
-            'connected' => $activeSessions->where('status', 'connected')->count(),
+            'processing' => $calls->where('status', 'processing')->count(),
+            'ringing' => $calls->where('status', 'ringing')->count(),
+            'connected' => $calls->where('status', 'connected')->count(),
         ];
 
         $byDirection = [
-            'incoming' => 0, // Would need additional query to get direction counts
-            'outgoing' => 0, // Would need additional query to get direction counts
+            'incoming' => $calls->where('direction', 'incoming')->count(),
+            'outgoing' => $calls->where('direction', 'outgoing')->count(),
         ];
 
-        // Calculate duration statistics
-        $activeSessionIds = $activeSessions->pluck('session_id');
-        $sessionsWithDuration = SessionUpdate::whereIn('session_id', $activeSessionIds)
-            ->whereNotNull('session_created_at')
-            // MIN(): session_created_at is constant per session; MIN keeps the query
-            // valid under ONLY_FULL_GROUP_BY (plain column is rejected).
-            ->selectRaw('session_id, TIMESTAMPDIFF(SECOND, MIN(session_created_at), NOW()) as duration_seconds')
-            ->groupBy('session_id')
-            ->having('duration_seconds', '>', 0)
-            ->get();
+        $durations = $calls
+            ->filter(fn ($call) => $call->session_created_at !== null)
+            ->map(fn ($call) => max(0, Carbon::parse($call->session_created_at)->diffInSeconds(now(), true)));
 
-        $averageDuration = $sessionsWithDuration->avg('duration_seconds') ?? 0;
-        $longestCall = $sessionsWithDuration->max('duration_seconds') ?? 0;
+        $totalActive = $calls->count();
+        $averageDuration = $durations->avg() ?? 0;
+        $longestCall = $durations->max() ?? 0;
 
         return response()->json([
             'data' => [

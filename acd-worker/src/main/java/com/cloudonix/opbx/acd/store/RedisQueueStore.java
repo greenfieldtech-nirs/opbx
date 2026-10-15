@@ -5,41 +5,143 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.redis.client.Redis;
 import io.vertx.redis.client.RedisAPI;
+import io.vertx.redis.client.RedisOptions;
 import io.vertx.redis.client.Response;
 
 /** Redis-backed {@link QueueStore} using the Vert.x redis client. */
 public class RedisQueueStore implements QueueStore {
+    // KEYS: queue, call hash, done tombstone ('' = ignore). Returns {position, added}; {0, 0} when done.
+    private static final String ENQUEUE_LUA = """
+            local pos = redis.call('LPOS', KEYS[1], ARGV[1])
+            if pos then return {pos + 1, 0} end
+            if KEYS[3] ~= '' and redis.call('EXISTS', KEYS[3]) == 1 then return {0, 0} end
+            redis.call('HSET', KEYS[2], 'queuedAt', ARGV[2])
+            return {redis.call('RPUSH', KEYS[1], ARGV[1]), 1}
+            """;
+
+    // KEYS: agent hash, event key ('' = none), key that must be absent ('' = none). ARGV: allowed
+    // states (csv), expected wrapUpUntil ('' = any), event ttl, incr talk, incr calls, count-only
+    // states (csv, '' = none), field/value pairs. Returns 1 applied, 0 skipped, -1 duplicate.
+    private static final String TRANSITION_LUA = """
+            if KEYS[2] ~= '' and not redis.call('SET', KEYS[2], '1', 'NX', 'EX', ARGV[3]) then return -1 end
+            if KEYS[3] ~= '' and redis.call('EXISTS', KEYS[3]) == 1 then return 0 end
+            local state = redis.call('HGET', KEYS[1], 'state')
+            if not state or state == '' then return 0 end
+            local apply = string.find(',' .. ARGV[1] .. ',', ',' .. state .. ',', 1, true)
+            if not apply and not string.find(',' .. ARGV[6] .. ',', ',' .. state .. ',', 1, true) then return 0 end
+            if ARGV[2] ~= '' and redis.call('HGET', KEYS[1], 'wrapUpUntil') ~= ARGV[2] then return 0 end
+            if apply and #ARGV > 6 then redis.call('HSET', KEYS[1], unpack(ARGV, 7)) end
+            if ARGV[4] ~= '0' then redis.call('HINCRBY', KEYS[1], 'talkSecondsTotal', ARGV[4]) end
+            if ARGV[5] ~= '0' then redis.call('HINCRBY', KEYS[1], 'callsHandledTotal', ARGV[5]) end
+            return 1
+            """;
+
+    // KEYS: queue, call hash, done tombstone, event key ('' = none). ARGV: callId, tombstone ttl,
+    // answeredAt ('' = not answered), event ttl. A replayed event (key already claimed) is a no-op.
+    // Tombstone 'a:<queuedAt>' = answered (requeue restores that place), '1' = gone. A replayed
+    // 'answered' (hash already gone) keeps the existing tombstone instead of losing queuedAt.
+    private static final String DEQUEUE_LUA = """
+            if KEYS[4] ~= '' and not redis.call('SET', KEYS[4], '1', 'NX', 'EX', ARGV[4]) then return 0 end
+            if ARGV[3] == '' then
+              redis.call('SET', KEYS[3], '1', 'EX', ARGV[2])
+            else
+              local at = redis.call('HGET', KEYS[2], 'queuedAt')
+              if at then
+                redis.call('SET', KEYS[3], 'a:' .. at, 'EX', ARGV[2])
+              elseif not redis.call('SET', KEYS[3], 'a:' .. ARGV[3], 'NX', 'EX', ARGV[2]) then
+                redis.call('EXPIRE', KEYS[3], ARGV[2])
+              end
+            end
+            redis.call('LREM', KEYS[1], 0, ARGV[1])
+            redis.call('DEL', KEYS[2])
+            return 1
+            """;
+
+    // KEYS: queue, call hash, done tombstone, event key ('' = none). ARGV: callId, event ttl,
+    // call-hash prefix, now. Inserts before the first queued call enqueued later than this one.
+    // shortcut: reads other calls' hashes by prefix (not in KEYS), fine on standalone Redis; a
+    // ZSET by queuedAt is needed for Redis Cluster.
+    private static final String REQUEUE_LUA = """
+            if KEYS[4] ~= '' and not redis.call('SET', KEYS[4], '1', 'NX', 'EX', ARGV[2]) then return -1 end
+            local pos = redis.call('LPOS', KEYS[1], ARGV[1])
+            if pos then return pos + 1 end
+            local done = redis.call('GET', KEYS[3])
+            local at = ARGV[4]
+            if done then
+              if string.sub(done, 1, 2) ~= 'a:' then return 0 end
+              at = string.sub(done, 3)
+              redis.call('DEL', KEYS[3])
+            end
+            redis.call('HSET', KEYS[2], 'queuedAt', at)
+            local ids = redis.call('LRANGE', KEYS[1], 0, -1)
+            for i, id in ipairs(ids) do
+              local other = redis.call('HGET', ARGV[3] .. id, 'queuedAt')
+              if other and tonumber(other) > tonumber(at) then
+                redis.call('LINSERT', KEYS[1], 'BEFORE', id, ARGV[1])
+                return i
+              end
+            end
+            return redis.call('RPUSH', KEYS[1], ARGV[1])
+            """;
+
+    // KEYS: cursor. ARGV: roster ids in order, each prefixed '+' (available) or '-'.
+    private static final String ROUND_ROBIN_LUA = """
+            local last = redis.call('GET', KEYS[1])
+            local n = #ARGV
+            local start = 0
+            for i = 1, n do
+              if string.sub(ARGV[i], 2) == last then start = i break end
+            end
+            for k = 1, n do
+              local entry = ARGV[((start + k - 1) % n) + 1]
+              if string.sub(entry, 1, 1) == '+' then
+                local id = string.sub(entry, 2)
+                redis.call('SET', KEYS[1], id)
+                return id
+              end
+            end
+            return false
+            """;
+
+    private final Redis client;
     private final RedisAPI redis;
 
-    private RedisQueueStore(RedisAPI redis) {
-        this.redis = redis;
-    }
-
-    public static Future<RedisQueueStore> create(Vertx vertx, String redisUri) {
-        return Redis.createClient(vertx, redisUri)
-                .connect()
-                .map(RedisAPI::api)
-                .map(RedisQueueStore::new);
-    }
-
-    @Override
-    public Future<Long> rpush(String key, String value) {
-        return redis.rpush(List.of(key, value)).map(Response::toLong);
+    /**
+     * Pooled client: each command borrows a connection, so a Redis restart or
+     * failover heals on the next command (a single connect()ed connection never does).
+     */
+    public RedisQueueStore(Vertx vertx, String redisUri, String password) {
+        this.client = Redis.createClient(vertx, new RedisOptions()
+                .setConnectionString(redisUri)
+                .setPassword(password == null || password.isEmpty() ? null : password)
+                .setMaxPoolSize(16)
+                .setMaxPoolWaiting(1024));
+        this.redis = RedisAPI.api(client);
     }
 
     @Override
-    public Future<Long> lrem(String key, String value) {
-        return redis.lrem(key, "0", value).map(Response::toLong);
+    public Future<Void> ping() {
+        return redis.ping(List.of()).mapEmpty();
+    }
+
+    public Future<Void> close() {
+        return client.close();
     }
 
     @Override
     public Future<List<String>> lrangeAll(String key) {
         return redis.lrange(key, "0", "-1").map(response -> response.stream().map(Response::toString).toList());
+    }
+
+    @Override
+    public Future<Long> lpos(String key, String value) {
+        return redis.lpos(List.of(key, value)).map(response -> response == null ? null : response.toLong());
     }
 
     @Override
@@ -70,7 +172,57 @@ public class RedisQueueStore implements QueueStore {
     }
 
     @Override
-    public Future<Long> incr(String key) {
-        return redis.incr(key).map(Response::toLong);
+    public Future<EnqueueResult> enqueueIfAbsent(String queueKey, String callKey, String doneKey, String callId,
+            long queuedAt) {
+        return redis.eval(List.of(ENQUEUE_LUA, "3", queueKey, callKey, doneKey == null ? "" : doneKey,
+                callId, String.valueOf(queuedAt)))
+                .map(r -> new EnqueueResult(r.get(0).toInteger(), r.get(1).toInteger() == 1));
+    }
+
+    @Override
+    public Future<Void> dequeue(String queueKey, String callKey, String doneKey, String callId, long doneTtlSeconds,
+            Long answeredAt, String eventKey, long eventTtlSeconds) {
+        return redis.eval(List.of(DEQUEUE_LUA, "4", queueKey, callKey, doneKey, eventKey == null ? "" : eventKey,
+                callId, String.valueOf(doneTtlSeconds), answeredAt == null ? "" : String.valueOf(answeredAt),
+                String.valueOf(eventTtlSeconds)))
+                .mapEmpty();
+    }
+
+    @Override
+    public Future<Integer> requeue(String queueKey, String callKey, String callKeyPrefix, String doneKey,
+            String callId, String eventKey, long eventTtlSeconds, long now) {
+        return redis.eval(List.of(REQUEUE_LUA, "4", queueKey, callKey, doneKey, eventKey == null ? "" : eventKey,
+                callId, String.valueOf(eventTtlSeconds), callKeyPrefix, String.valueOf(now)))
+                .map(Response::toInteger);
+    }
+
+    @Override
+    public Future<String> nextRoundRobin(String cursorKey, List<String> rosterIds, Set<String> availableIds) {
+        List<String> args = new ArrayList<>(List.of(ROUND_ROBIN_LUA, "1", cursorKey));
+        rosterIds.forEach(id -> args.add((availableIds.contains(id) ? "+" : "-") + id));
+        return redis.eval(args).map(r -> r == null ? null : r.toString());
+    }
+
+    @Override
+    public Future<TransitionOutcome> transitionAgent(AgentTransition t) {
+        List<String> args = new ArrayList<>();
+        args.add(TRANSITION_LUA);
+        args.addAll(List.of("3", t.agentKey(), t.eventKey() == null ? "" : t.eventKey(),
+                t.absentKey() == null ? "" : t.absentKey()));
+        args.add(String.join(",", t.allowedFrom()));
+        args.add(t.expectWrapUpUntil() == null ? "" : t.expectWrapUpUntil());
+        args.add(String.valueOf(t.eventTtlSeconds()));
+        args.add(String.valueOf(t.incrTalkSeconds()));
+        args.add(String.valueOf(t.incrCalls()));
+        args.add(String.join(",", t.countOnlyFrom()));
+        t.fields().forEach((k, v) -> {
+            args.add(k);
+            args.add(v);
+        });
+        return redis.eval(args).map(r -> switch (r.toInteger()) {
+            case 1 -> TransitionOutcome.APPLIED;
+            case -1 -> TransitionOutcome.DUPLICATE;
+            default -> TransitionOutcome.SKIPPED;
+        });
     }
 }

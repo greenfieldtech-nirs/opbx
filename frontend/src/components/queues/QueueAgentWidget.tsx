@@ -5,6 +5,8 @@
  * agent of and toggles their presence state (Available / Wrap-up / Log out).
  */
 
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateQueueAgentState } from '@/lib/invalidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Headset } from 'lucide-react';
@@ -24,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 
 const STATE_ACTIONS: { state: QueueAgentStateInput; label: string }[] = [
   { state: 'available', label: 'Go Available' },
@@ -36,7 +38,7 @@ export function QueueAgentWidget() {
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
-    queryKey: ['my-queue-memberships'],
+    queryKey: queryKeys.myQueueMemberships.all,
     queryFn: queueAgentService.myQueues,
     refetchInterval: 15000,
   });
@@ -48,10 +50,9 @@ export function QueueAgentWidget() {
     mutationFn: ({ queueId, state }: { queueId: number; state: QueueAgentStateInput }) =>
       queueAgentService.setState(queueId, state),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-queue-memberships'] });
-      queryClient.invalidateQueries({ queryKey: ['call-queues'] });
+      void invalidateQueueAgentState(queryClient);
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   if (!hasMemberships) {

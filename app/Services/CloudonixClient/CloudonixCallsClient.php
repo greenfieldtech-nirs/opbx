@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\CloudonixClient;
 
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -331,6 +334,129 @@ class CloudonixCallsClient extends CloudonixBaseClient
             },
             cacheKey: null, // No caching for call initiation
             fallbackValue: null
+        );
+    }
+
+    /**
+     * Start an outbound call that runs a voice application once answered.
+     *
+     * POST /calls/{domain-id}/application. The call gets its own session;
+     * its token is returned for later teardown.
+     *
+     * @see https://developers.cloudonix.com/cloudonixRestOpenAPI#/operations/initiateCall
+     *
+     * @param  array<string, mixed>  $payload  callObject: destination, caller-id, url, timeout, ...
+     * @return array<string, mixed>|null callObjectResult (includes `token`) or null on failure
+     */
+    public function originateApplicationCall(array $payload): ?array
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($payload) {
+                $response = $this->client()
+                    ->post("/calls/{$this->getDomainUuid()}/application", $payload);
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+
+                Log::warning('CloudonixClient: Failed to originate application call', [
+                    'destination' => $payload['destination'] ?? null,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return null;
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: null
+        );
+    }
+
+    /**
+     * Originate several application calls concurrently (one HTTP round trip of
+     * latency instead of one per agent).
+     *
+     * @param  array<int, array<string, mixed>>  $payloads  callObjects
+     * @return array<int, array<string, mixed>|null> callObjectResult per payload (same keys), null where it failed
+     */
+    public function originateApplicationCalls(array $payloads): array
+    {
+        $this->requireDomainUuid();
+
+        if ($payloads === []) {
+            return [];
+        }
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($payloads) {
+                $path = "/calls/{$this->getDomainUuid()}/application";
+
+                $responses = Http::pool(fn (Pool $pool) => array_map(
+                    fn ($payload, $key) => $pool->as((string) $key)
+                        ->timeout($this->timeout)
+                        ->withToken($this->token)
+                        ->acceptJson()
+                        ->baseUrl($this->baseUrl)
+                        ->post($path, $payload),
+                    $payloads,
+                    array_keys($payloads)
+                ));
+
+                $results = [];
+                foreach ($payloads as $key => $payload) {
+                    $response = $responses[(string) $key] ?? null;
+
+                    if ($response instanceof Response && $response->successful()) {
+                        $results[$key] = $response->json();
+
+                        continue;
+                    }
+
+                    Log::warning('CloudonixClient: Failed to originate application call', [
+                        'destination' => $payload['destination'] ?? null,
+                        'status' => $response instanceof Response ? $response->status() : null,
+                    ]);
+                    $results[$key] = null;
+                }
+
+                return $results;
+            },
+            cacheKey: null,
+            fallbackValue: array_fill_keys(array_keys($payloads), null)
+        );
+    }
+
+    /**
+     * Terminate a session (ringing or connected) by its token.
+     *
+     * DELETE /calls/{domain-id}/sessions/{token}. A 404 means the session is
+     * already gone, which counts as success.
+     */
+    public function endSession(string $sessionToken): bool
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionToken) {
+                $response = $this->client()
+                    ->delete("/calls/{$this->getDomainUuid()}/sessions/{$sessionToken}");
+
+                if ($response->successful() || $response->status() === 404) {
+                    return true;
+                }
+
+                Log::warning('CloudonixClient: Failed to end session', [
+                    'session_token' => $sessionToken,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return false;
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: false
         );
     }
 

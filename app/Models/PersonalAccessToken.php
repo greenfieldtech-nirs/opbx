@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 
 /**
@@ -20,7 +21,7 @@ class PersonalAccessToken extends SanctumPersonalAccessToken
     /**
      * Get the tokenable model owner.
      */
-    public function tokenable(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    public function tokenable(): MorphTo
     {
         return $this->morphTo(__FUNCTION__, 'tokenable_type', 'tokenable_id')
             ->withoutGlobalScope(OrganizationScope::class);

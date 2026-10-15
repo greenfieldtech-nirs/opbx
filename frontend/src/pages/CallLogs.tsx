@@ -2,38 +2,31 @@
  * Call Logs Page
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { cdrService } from '@/services/cdr.service';
-import { extensionsService } from '@/services/extensions.service';
 import api from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import logger from '@/utils/logger';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Database, Download, Eye, Filter, X, Loader2, RefreshCw, Lock, Play, Pause } from 'lucide-react';
+import { Database, Download, Filter, X, Loader2, RefreshCw, Play, Pause } from 'lucide-react';
 import { formatPhoneNumber, formatDateTime, getDispositionColor } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import { useRefreshTimer } from '@/context/RefreshTimerContext';
 import type { CallDetailRecord, CDRFilters } from '@/types/api.types';
-import { CdrDetailsDialog } from '@/components/cdr/CdrDetailsDialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { JsonViewer } from '@textea/json-viewer';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
+// Loaded on demand: pulls in the syntax highlighter and JSON viewer.
+const CdrDetailsDialog = lazy(() =>
+  import('@/components/cdr/CdrDetailsDialog').then((m) => ({ default: m.CdrDetailsDialog })),
+);
+
 export default function CallLogs() {
   const { user: currentUser } = useAuth();
   const isPbxUser = currentUser?.role === 'pbx_user';
@@ -106,8 +99,9 @@ export default function CallLogs() {
 
   // Form state for filters
   const [filterForm, setFilterForm] = useState({
-    from: '',
+    extension: '',
     to: '',
+    extension_destination_match: 'all' as 'any' | 'all',
     from_date: '',
     to_date: '',
     disposition: '',
@@ -118,51 +112,22 @@ export default function CallLogs() {
   // Auto-refresh interval state (default: 30 seconds)
   const [refreshInterval, setRefreshInterval] = useState<number>(30000);
 
-  // For PBX Users, find their extension number
-  const [userExtensionNumber, setUserExtensionNumber] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUserExtension = async () => {
-      if (isPbxUser) {
-        try {
-          const extensionsData = await extensionsService.getAll({ per_page: 100 });
-          const userExtension = extensionsData.data.find((ext: any) => ext.user_id === currentUser?.id);
-          if (userExtension) {
-            setUserExtensionNumber(userExtension.extension_number);
-          }
-        } catch (error) {
-          logger.error('Failed to fetch user extension:', { error });
-        }
-      }
-    };
-    fetchUserExtension();
-  }, [isPbxUser, currentUser?.id]);
-
-  // Set default filter for PBX Users to show only their calls
-  useEffect(() => {
-    if (isPbxUser && userExtensionNumber) {
-      setCdrFilters({ 
-        per_page: 50,
-        from: userExtensionNumber,  // Show calls from their extension
-        to: userExtensionNumber,    // Or to their extension
-      });
-    }
-  }, [isPbxUser, userExtensionNumber]);
-
   // CDR query
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: cdrData,
     isLoading: cdrIsLoading,
     isFetching: cdrIsFetching,
     refetch: refetchCdr,
   } = useQuery({
-    queryKey: ['cdrs', cdrPage, cdrFilters, sortField, sortDirection, isSupervisor ? 'supervisor' : 'all'],
+    queryKey: queryKeys.cdrs.list(cdrPage, cdrFilters, sortField, sortDirection, isSupervisor ? 'supervisor' : 'all'),
     queryFn: () => cdrService.getAll(
       { ...cdrFilters, page: cdrPage, sort_by: sortField, sort_order: sortDirection },
       isSupervisor
     ),
     refetchInterval: refreshInterval,
-    refetchIntervalInBackground: true,
     staleTime: 0,
   });
 
@@ -184,8 +149,9 @@ export default function CallLogs() {
 
   const handleApplyFilters = () => {
     const newFilters: CDRFilters = { per_page: 50 };
-    if (filterForm.from) newFilters.from = filterForm.from;
+    if (filterForm.extension) newFilters.extension = filterForm.extension;
     if (filterForm.to) newFilters.to = filterForm.to;
+    if (filterForm.extension && filterForm.to) newFilters.extension_destination_match = filterForm.extension_destination_match;
     if (filterForm.from_date) newFilters.from_date = filterForm.from_date;
     if (filterForm.to_date) newFilters.to_date = filterForm.to_date;
     if (filterForm.disposition) newFilters.disposition = filterForm.disposition;
@@ -198,8 +164,9 @@ export default function CallLogs() {
 
   const handleClearFilters = () => {
     setFilterForm({
-      from: '',
+      extension: '',
       to: '',
+      extension_destination_match: 'all',
       from_date: '',
       to_date: '',
       disposition: '',
@@ -221,10 +188,13 @@ export default function CallLogs() {
     }
   };
 
-  const handleRefresh = useCallback(() => refetchCdr(), [refetchCdr]);
 
   // Register refresh timer with AppLayout bar
   useRefreshTimer(refreshInterval, cdrIsFetching);
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call logs" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -234,7 +204,11 @@ export default function CallLogs() {
             <Database className="h-8 w-8" />
             Call Logs
           </h1>
-          <p className="text-muted-foreground mt-1">View call detail records and history</p>
+          <p className="text-muted-foreground mt-1">
+            {isPbxUser
+              ? 'Calls of and to your own extensions'
+              : 'View call detail records and history'}
+          </p>
           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
             <span>Dashboard</span>
             <span>/</span>
@@ -307,23 +281,40 @@ export default function CallLogs() {
             <div className="mb-6 p-4 bg-gray-50 rounded-lg border">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
                 <div>
-                  <Label htmlFor="filter-from">From Number</Label>
+                  <Label htmlFor="filter-extension">Extension</Label>
                   <Input
-                    id="filter-from"
-                    placeholder="e.g., +1415"
-                    value={filterForm.from}
-                    onChange={(e) => setFilterForm({ ...filterForm, from: e.target.value })}
+                    id="filter-extension"
+                    placeholder="Starts with; * or % = any"
+                    value={filterForm.extension}
+                    onChange={(e) => setFilterForm({ ...filterForm, extension: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="filter-to">To Number</Label>
+                  <Label htmlFor="filter-to">Destination</Label>
                   <Input
                     id="filter-to"
-                    placeholder="e.g., +1312"
+                    placeholder="Starts with; * or % = any"
                     value={filterForm.to}
                     onChange={(e) => setFilterForm({ ...filterForm, to: e.target.value })}
                   />
                 </div>
+                {filterForm.extension && filterForm.to && (
+                  <div>
+                    <Label htmlFor="filter-extension-destination-match">Match</Label>
+                    <Select
+                      value={filterForm.extension_destination_match}
+                      onValueChange={(value) => setFilterForm({ ...filterForm, extension_destination_match: value as 'any' | 'all' })}
+                    >
+                      <SelectTrigger id="filter-extension-destination-match">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="any">Any (Extension or Destination)</SelectItem>
+                        <SelectItem value="all">All (Extension and Destination)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="filter-disposition">Disposition</Label>
                   <Select
@@ -426,7 +417,13 @@ export default function CallLogs() {
                 cell: (cdr) => formatDateTime(cdr.session_timestamp)
               },
               {
-                header: 'Extension Number',
+                header: 'Extension',
+                accessorKey: 'extension_number' as any,
+                sortKey: 'extension_number',
+                cell: (cdr) => cdr.extension_number || '-',
+              },
+              {
+                header: 'Caller ID',
                 accessorKey: 'from' as any,
                 sortKey: 'from',
                 cell: (cdr) => formatPhoneNumber(cdr.from),
@@ -581,7 +578,11 @@ export default function CallLogs() {
         </CardContent>
       </Card>
 
-      <CdrDetailsDialog cdr={selectedCdr} open={showCdrDetails} onOpenChange={setShowCdrDetails} />
+      {showCdrDetails && (
+        <Suspense fallback={null}>
+          <CdrDetailsDialog cdr={selectedCdr} open={showCdrDetails} onOpenChange={setShowCdrDetails} />
+        </Suspense>
+      )}
     </div>
   );
 }

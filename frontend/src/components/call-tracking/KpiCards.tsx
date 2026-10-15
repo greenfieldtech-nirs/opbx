@@ -54,7 +54,7 @@ export function KpiCards({ kpis }: KpiCardsProps) {
     },
     {
       label: 'Avg Duration (s)',
-      value: kpis.average_duration,
+      value: Math.round(kpis.average_duration),
       icon: Clock,
       color: 'text-amber-600',
       bgColor: 'bg-amber-100',
@@ -68,7 +68,7 @@ export function KpiCards({ kpis }: KpiCardsProps) {
     },
     {
       label: 'Conversion Rate',
-      value: `${(kpis.conversion_rate * 100).toFixed(1)}%`,
+      value: `${kpis.conversion_rate.toFixed(1)}%`,
       icon: TrendingUp,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-100',

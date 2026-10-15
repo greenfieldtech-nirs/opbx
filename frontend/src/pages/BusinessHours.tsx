@@ -1,42 +1,41 @@
 import React from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
-import { Clock, Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { Clock,Plus,Search,Filter,RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card,CardContent } from '@/components/ui/card';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+AlertDialog,
+AlertDialogAction,
+AlertDialogCancel,
+AlertDialogContent,
+AlertDialogDescription,
+AlertDialogFooter,
+AlertDialogHeader,
+AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import {
-  StandardDataTable,
-  EmptyState
+StandardDataTable,
+EmptyState
 } from '@/components/design-system';
-import type { BusinessHoursSchedule, ScheduleStatus } from '@/types';
+import type { BusinessHoursSchedule,ScheduleStatus } from '@/types';
 import { cn } from '@/lib/utils';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 import {
-  useBusinessHours,
-  CreateEditScheduleDialog,
-  ExceptionDialog,
-  CopyHoursDialog,
-  ScheduleDetailSheet,
-  getActionDisplayName,
-  getActionDisplayNameSimple,
+useBusinessHours,
+CreateEditScheduleDialog,
+ExceptionDialog,
+CopyHoursDialog,getActionDisplayNameSimple
 } from './business-hours-components';
 
 const BusinessHours: React.FC = () => {
@@ -65,13 +64,12 @@ const BusinessHours: React.FC = () => {
     statusFilter,
     setStatusFilter,
     sortBy,
+    sortDirection,
     setSortBy,
     isCreateEditDialogOpen,
     setIsCreateEditDialogOpen,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    isDetailSheetOpen,
-    setIsDetailSheetOpen,
     isExceptionDialogOpen,
     setIsExceptionDialogOpen,
     isCopyHoursDialogOpen,
@@ -105,10 +103,10 @@ const BusinessHours: React.FC = () => {
     handleSaveSchedule,
     handleOpenDelete,
     handleConfirmDelete,
-    handleOpenDetail,
     handleToggleStatus,
     setOpenHoursAction,
     setClosedHoursAction,
+    inUseDialog,
   } = useBusinessHours();
 
   if (error) {
@@ -128,7 +126,7 @@ const BusinessHours: React.FC = () => {
               <p className="text-muted-foreground mb-4">
                 {error instanceof Error ? error.message : 'An error occurred while loading business hours'}
               </p>
-              <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['business-hours'] })} >
+              <Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.businessHours.all })} >
                 Try Again
               </Button>
             </div>
@@ -140,6 +138,7 @@ const BusinessHours: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -201,17 +200,6 @@ const BusinessHours: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(value: string) => setSortBy(value as 'status' | 'name' | 'created_at' | 'updated_at')}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="created_at">Created Date</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="updated_at">Last Modified</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -229,9 +217,10 @@ const BusinessHours: React.FC = () => {
             getIdentityPrimary={(schedule) => schedule.name}
             getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayNameSimple(schedule.open_hours_action?.type)} when open`}
             onIdentityClick={handleEdit}
-            sortField={sortBy}
-            sortDirection="asc"
-            onSort={(field) => setSortBy(field as any)}
+            sortField={sortBy === 'name' ? 'identity' : sortBy}
+            sortDirection={sortDirection}
+            onSort={setSortBy}
+            showUnprovisionedBadge={false}
             canView={false}
             canEdit={false}
             onDelete={handleOpenDelete}
@@ -262,21 +251,25 @@ const BusinessHours: React.FC = () => {
               {
                 header: 'Status',
                 sortKey: 'status',
-                cell: (schedule) => (
+                cell: (schedule) => schedule.is_unprovisioned ? (
+                  // An action has no destination: the rule is unprovisioned until it is edited.
+                  // The badge is not a status toggle.
+                  <UnprovisionedBadge className="text-xs" />
+                ) : (
                   <Badge
                     variant={schedule.status === 'active' ? 'default' : 'secondary'}
                     className={cn(
                       "text-xs transition-all",
                       toggleStatusMutation.isPending && toggleStatusMutation.variables?.id === String(schedule.id)
                         ? 'opacity-50 cursor-wait'
-                        : 'cursor-pointer hover:scale-105',
+                        : canManage && 'cursor-pointer hover:scale-105',
                       schedule.status === 'active'
                         ? "bg-green-100 text-green-800 hover:bg-green-200"
                         : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!toggleStatusMutation.isPending) {
+                      if (canManage && !toggleStatusMutation.isPending) {
                         handleToggleStatus(schedule);
                       }
                     }}
@@ -349,6 +342,7 @@ const BusinessHours: React.FC = () => {
         open={isCreateEditDialogOpen}
         onOpenChange={setIsCreateEditDialogOpen}
         editing={!!editingSchedule}
+        unprovisioned={editingSchedule?.is_unprovisioned}
         formData={formData}
         formErrors={formErrors}
         onFormChange={handleFormChange}
@@ -409,16 +403,6 @@ const BusinessHours: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Detail Sheet */}
-      <ScheduleDetailSheet
-        open={isDetailSheetOpen}
-        onOpenChange={setIsDetailSheetOpen}
-        schedule={selectedSchedule}
-        extensions={extensions}
-        ringGroups={ringGroups}
-        ivrMenus={ivrMenus}
-      />
     </div>
   );
 };

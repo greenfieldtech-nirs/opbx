@@ -1,3 +1,4 @@
+import { AMD_DEFAULT_ACTIONS } from './amdDefaults';
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -8,14 +9,6 @@ import {
   Save,
   Loader2,
   Phone,
-  Bot,
-  Clock,
-  Calendar,
-  Globe,
-  Mic,
-  Settings,
-  AlertCircle,
-  Users,
   Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,12 +33,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   useAutoDialerCampaign,
@@ -53,17 +40,13 @@ import {
   useUpdateAutoDialerCampaign,
 } from '@/hooks/useAutoDialerCampaigns';
 import type { CreateCampaignRequest, UpdateCampaignRequest } from '@/services/autoDialerCampaignsApi';
-import aiAssistantsService from '@/services/aiAssistants.service';
-import { aiAssistantLoadBalancersService } from '@/services/createResourceService';
-import { useQuery } from '@tanstack/react-query';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
 import { WeeklyCalendarView } from '@/pages/business-hours-components/components';
 import type { WeeklySchedule, DayOfWeek } from '@/types';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 import { getTimezonesByRegion, formatTimezoneLabel } from '@/utils/timezones';
 import { getNextTimeRangeId } from '@/utils/businessHours';
-import { cn } from '@/lib/utils';
 import {
   StrategySelector,
   type CallerIdStrategy,
@@ -104,27 +87,20 @@ const campaignSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   timezone: z.string().default('UTC'),
-  time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 3600),
+  time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 600),
   record_calls: z.boolean().nullish().transform(v => v ?? false),
   amd_enabled: z.boolean().nullish().transform(v => v ?? false),
-  action_voicemail: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
-  action_human: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
-  action_unknown: z.union([z.enum(['HANGUP', 'CONTINUE']), z.string().url()]).optional(),
+  action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
+  action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
+  action_unknown: z.enum(['HANGUP', 'CONTINUE']).optional(),
   retry_on_voicemail: z.boolean().nullish().transform(v => v ?? false),
+  retry_on_busy_no_answer: z.boolean().default(false),
+  retry_delay_minutes: z.number().min(1).max(1440).default(15),
   auto_start: z.boolean().nullish().transform(v => v ?? false),
 });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-const daysOfWeek = [
-  { id: 'monday', label: 'Monday' },
-  { id: 'tuesday', label: 'Tuesday' },
-  { id: 'wednesday', label: 'Wednesday' },
-  { id: 'thursday', label: 'Thursday' },
-  { id: 'friday', label: 'Friday' },
-  { id: 'saturday', label: 'Saturday' },
-  { id: 'sunday', label: 'Sunday' },
-];
 
 const timezoneGroups = getTimezonesByRegion();
 const regionOrder = ['Americas', 'Europe', 'Asia', 'Africa', 'Australia', 'Pacific', 'UTC'];
@@ -163,24 +139,6 @@ function convertCampaignToWeeklySchedule(daysActive: string[], startTime: number
   return schedule;
 }
 
-function convertWeeklyScheduleToCampaign(schedule: WeeklySchedule): { daysActive: string[]; startTime: number; endTime: number } {
-  const daysActive: string[] = [];
-  let startTime = 9;
-  let endTime = 17;
-
-  (Object.keys(schedule) as DayOfWeek[]).forEach((day) => {
-    const daySchedule = schedule[day];
-    if (daySchedule.enabled && daySchedule.time_ranges.length > 0) {
-      daysActive.push(day);
-      // Use the first time range to determine start/end times
-      const firstRange = daySchedule.time_ranges[0];
-      startTime = parseInt(firstRange.start_time.split(':')[0]);
-      endTime = parseInt(firstRange.end_time.split(':')[0]);
-    }
-  });
-
-  return { daysActive, startTime, endTime };
-}
 
 // Helper to convert legacy caller_id to pool format
 function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPoolItem[] {
@@ -192,8 +150,7 @@ function convertLegacyCallerIdToPool(callerId: string | undefined): CallerIdPool
 }
 
 /**
- * AMD Action Selector Component (Left Column)
- * Dropdown to select HANGUP, CONTINUE, or Remote CXML URL
+ * AMD Action Selector: HANGUP or CONTINUE (the API accepts nothing else).
  */
 interface AmdActionSelectorProps {
   label: string;
@@ -202,85 +159,18 @@ interface AmdActionSelectorProps {
 }
 
 function AmdActionSelector({ label, value, onChange }: AmdActionSelectorProps) {
-  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-  const selectValue = isCustomUrl ? 'CUSTOM_URL' : (value || 'HANGUP');
-
   return (
     <div className="space-y-2">
       <Label className="text-sm">{label}</Label>
-      <Select
-        value={selectValue}
-        onValueChange={(selected) => {
-          if (selected === 'CUSTOM_URL') {
-            onChange('https://example.com'); // Trigger URL input in right column
-          } else {
-            onChange(selected);
-          }
-        }}
-      >
+      <Select value={value || 'HANGUP'} onValueChange={onChange}>
         <SelectTrigger>
           <SelectValue placeholder="Select action" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="CONTINUE">Continue to destination</SelectItem>
           <SelectItem value="HANGUP">Hang up</SelectItem>
-          <SelectItem value="CUSTOM_URL">Remote CXML URL</SelectItem>
         </SelectContent>
       </Select>
-    </div>
-  );
-}
-
-/**
- * AMD URL Input Component (Right Column)
- * Shown only when the corresponding action is set to Remote CXML URL
- */
-interface AmdUrlInputProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function AmdUrlInput({ label, value, onChange }: AmdUrlInputProps) {
-  const isCustomUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-  const [urlValue, setUrlValue] = useState(isCustomUrl ? value : '');
-
-  // Sync when external value changes
-  useEffect(() => {
-    const externalIsUrl = value !== 'HANGUP' && value !== 'CONTINUE' && value !== '';
-    if (externalIsUrl) {
-      setUrlValue(value);
-    } else {
-      setUrlValue('');
-    }
-  }, [value]);
-
-  if (!isCustomUrl) {
-    return (
-      <div className="space-y-2 opacity-50">
-        <Label className="text-sm">{label}</Label>
-        <Input
-          type="url"
-          placeholder="Select 'Remote CXML URL' on the left..."
-          disabled
-          value=""
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm">{label}</Label>
-      <Input
-        type="url"
-        placeholder="https://your-domain.com/voicemail-cxml"
-        value={urlValue}
-        onChange={(e) => {
-          setUrlValue(e.target.value);
-          onChange(e.target.value);
-        }}
-      />
     </div>
   );
 }
@@ -299,19 +189,6 @@ export default function AutoDialerCampaignForm() {
   const createMutation = useCreateAutoDialerCampaign();
   const updateMutation = useUpdateAutoDialerCampaign();
 
-  // Fetch AI Assistants and Load Balancers
-  const { data: aiAssistantsData } = useQuery({
-    queryKey: ['ai-assistants', { status: 'active' }],
-    queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-assistant-load-balancers', { status: 'active' }],
-    queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
-  });
-
-  const aiAssistants = aiAssistantsData?.data || [];
-  const aiLoadBalancers = aiLoadBalancersData?.data || [];
 
   const {
     register,
@@ -339,23 +216,25 @@ export default function AutoDialerCampaignForm() {
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       timezone: 'UTC',
-      time_limit: 3600,
+      time_limit: 600,
       record_calls: false,
       amd_enabled: false,
       action_voicemail: undefined,
       action_human: undefined,
       action_unknown: undefined,
       retry_on_voicemail: false,
+      retry_on_busy_no_answer: false,
+      retry_delay_minutes: 15,
       auto_start: false,
     },
   });
 
   // Watch values for conditional fields
-  const routingType = watch('routing_destination_type');
-  const startTime = watch('start_time');
-  const endTime = watch('end_time');
   const callerIdPool = watch('caller_id_pool');
   const callerIdStrategy = watch('caller_id_strategy');
+
+  // An active campaign is never edited: the server answers 409 until it is paused
+  const isActiveCampaign = isEditing && existingCampaign?.status === 'active';
 
   // Determine if pool can be modified (only in DRAFT or PAUSED status)
   const canModifyPool = !isEditing || 
@@ -395,13 +274,15 @@ export default function AutoDialerCampaignForm() {
         start_date: existingCampaign.start_date,
         end_date: existingCampaign.end_date,
         timezone: existingCampaign.timezone,
-        time_limit: existingCampaign.time_limit ?? 3600,
+        time_limit: existingCampaign.time_limit ?? 600,
         record_calls: existingCampaign.record_calls ?? false,
         amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
         action_human: (existingCampaign as any).action_human || undefined,
         action_unknown: (existingCampaign as any).action_unknown || undefined,
         retry_on_voicemail: (existingCampaign as any).retry_on_voicemail ?? false,
+        retry_on_busy_no_answer: existingCampaign.retry_on_busy_no_answer ?? false,
+        retry_delay_minutes: existingCampaign.retry_delay_minutes ?? 15,
         auto_start: existingCampaign.auto_start ?? false,
       });
       // Use schedule from campaign if available, otherwise convert from legacy format
@@ -458,13 +339,21 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
+          retry_on_busy_no_answer: data.retry_on_busy_no_answer,
+          retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
           ...(data.amd_enabled ? {
             action_voicemail: data.action_voicemail,
             action_human: data.action_human,
             action_unknown: data.action_unknown,
             retry_on_voicemail: data.retry_on_voicemail,
-          } : {}),
+          } : {
+            // AMD switched off: clear whatever was saved before
+            action_voicemail: null,
+            action_human: null,
+            action_unknown: null,
+            retry_on_voicemail: false,
+          }),
         };
         
         // Add routing fields only if provided
@@ -498,6 +387,8 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
+          retry_on_busy_no_answer: data.retry_on_busy_no_answer,
+          retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
           ...(data.amd_enabled ? {
             action_voicemail: data.action_voicemail,
@@ -517,7 +408,7 @@ export default function AutoDialerCampaignForm() {
       }
       navigate(-1);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
+      toast.error(getApiErrorMessage(error) || `Failed to ${isEditing ? 'update' : 'create'} campaign`);
     }
   };
 
@@ -549,6 +440,16 @@ export default function AutoDialerCampaignForm() {
           </p>
         </div>
       </div>
+
+      {isActiveCampaign && (
+        <Alert className="bg-yellow-50 border-yellow-200">
+          <Info className="h-4 w-4 text-yellow-600" />
+          <AlertTitle className="text-yellow-800">Campaign is running</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            Pause the campaign to edit it.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -744,9 +645,9 @@ export default function AutoDialerCampaignForm() {
                       setValue('amd_enabled', checked);
                       if (checked) {
                         // Set defaults when enabling
-                        setValue('action_voicemail', 'HANGUP');
-                        setValue('action_human', 'CONTINUE');
-                        setValue('action_unknown', 'HANGUP');
+                        setValue('action_voicemail', AMD_DEFAULT_ACTIONS.action_voicemail);
+                        setValue('action_human', AMD_DEFAULT_ACTIONS.action_human);
+                        setValue('action_unknown', AMD_DEFAULT_ACTIONS.action_unknown);
                       } else {
                         // Clear values when disabling
                         setValue('action_voicemail', undefined);
@@ -760,26 +661,24 @@ export default function AutoDialerCampaignForm() {
 
                 {watch('amd_enabled') && (
                   <div className="space-y-4 pl-4 border-l-2 border-muted">
-                    {/* Two-column layout: 25% actions / 75% URL inputs */}
                     <div className="flex flex-col lg:flex-row gap-6">
-                      {/* Left Column - Action Selectors (25%) */}
-                      <div className="lg:w-[25%] space-y-4">
+                      <div className="lg:w-[50%] space-y-4">
                         <AmdActionSelector
                           label="If Voicemail Detected"
                           value={watch('action_voicemail') || ''}
-                          onChange={(value) => setValue('action_voicemail', value)}
+                          onChange={(value) => setValue('action_voicemail', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         <AmdActionSelector
                           label="If Human Detected"
                           value={watch('action_human') || ''}
-                          onChange={(value) => setValue('action_human', value)}
+                          onChange={(value) => setValue('action_human', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         <AmdActionSelector
                           label="If Detection Unclear"
                           value={watch('action_unknown') || ''}
-                          onChange={(value) => setValue('action_unknown', value)}
+                          onChange={(value) => setValue('action_unknown', value as 'HANGUP' | 'CONTINUE')}
                         />
 
                         {/* Retry on Voicemail */}
@@ -798,26 +697,6 @@ export default function AutoDialerCampaignForm() {
                         </div>
                       </div>
 
-                      {/* Right Column - CXML URL Inputs (75%) */}
-                      <div className="lg:w-[75%] space-y-4">
-                        <AmdUrlInput
-                          label="Voicemail CXML URL"
-                          value={watch('action_voicemail') || ''}
-                          onChange={(value) => setValue('action_voicemail', value)}
-                        />
-
-                        <AmdUrlInput
-                          label="Human CXML URL"
-                          value={watch('action_human') || ''}
-                          onChange={(value) => setValue('action_human', value)}
-                        />
-
-                        <AmdUrlInput
-                          label="Unknown CXML URL"
-                          value={watch('action_unknown') || ''}
-                          onChange={(value) => setValue('action_unknown', value)}
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
@@ -857,12 +736,13 @@ export default function AutoDialerCampaignForm() {
                     <Input
                       id="time_limit"
                       type="number"
-                      {...register('time_limit', { valueAsNumber: true })}
+                      // An empty field means "no limit defined": the 600 s default applies
+                      {...register('time_limit', { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
                       min={30}
                       max={14400}
-                      placeholder="3600"
+                      placeholder="600"
                     />
-                    <p className="text-sm text-muted-foreground">Max call duration</p>
+                    <p className="text-sm text-muted-foreground">Max call duration. Empty: 600 seconds</p>
                   </div>
 
                   <div className="space-y-2">
@@ -944,6 +824,34 @@ export default function AutoDialerCampaignForm() {
                       />
                       <p className="text-sm text-muted-foreground">Maximum retry attempts per destination</p>
                     </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="retry_on_busy_no_answer">Retry on busy / no-answer</Label>
+                        <Switch
+                          id="retry_on_busy_no_answer"
+                          checked={watch('retry_on_busy_no_answer')}
+                          onCheckedChange={(checked) => setValue('retry_on_busy_no_answer', checked)}
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Redial busy and unanswered destinations, up to Max Dial Attempts. Cancelled and failed calls are never retried.
+                      </p>
+                    </div>
+
+                    {watch('retry_on_busy_no_answer') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="retry_delay_minutes">First retry delay (minutes)</Label>
+                        <Input
+                          id="retry_delay_minutes"
+                          type="number"
+                          {...register('retry_delay_minutes', { valueAsNumber: true })}
+                          min={1}
+                          max={1440}
+                        />
+                        <p className="text-sm text-muted-foreground">Wait before the first retry (1–1440). Each further retry waits twice as long as the previous one, up to 24 hours.</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Record Calls */}
@@ -986,6 +894,7 @@ export default function AutoDialerCampaignForm() {
           <Button
             type="submit"
             disabled={
+              isActiveCampaign ||
               createMutation.isPending ||
               updateMutation.isPending
             }

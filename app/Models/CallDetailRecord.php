@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Call Detail Record (CDR) Model
@@ -24,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $session_token
  * @property string $from
  * @property string $to
+ * @property string|null $extension_number The OPBX extension the call belongs to (see extensionNumberFor()); `from` is the Caller ID
+ * @property string|null $direction incoming|outgoing|internal|application, copied from the session update at ingest
  * @property string $disposition
  * @property int $duration Total call duration in seconds
  * @property int $billsec Connected/billable duration in seconds
@@ -57,6 +62,8 @@ class CallDetailRecord extends Model
 {
     use HasFactory;
 
+    private const ANSWERER_TTL_SECONDS = 86400;
+
     /**
      * The table associated with the model.
      *
@@ -75,6 +82,7 @@ class CallDetailRecord extends Model
         'session_token',
         'from',
         'to',
+        'extension_number',
         'disposition',
         'duration',
         'billsec',
@@ -89,6 +97,7 @@ class CallDetailRecord extends Model
         'sell_cost',
         'vapp_server',
         'session_id',
+        'direction',
         'call_start_time',
         'call_end_time',
         'call_answer_time',
@@ -178,7 +187,7 @@ class CallDetailRecord extends Model
             $subscriber = self::assertSubscriberFromCallerId($from, $organizationId);
         }
 
-        return self::create([
+        $attributes = [
             'organization_id' => $organizationId,
             'session_timestamp' => isset($payload['timestamp'])
                 ? Carbon::createFromTimestamp($payload['timestamp'])
@@ -213,7 +222,101 @@ class CallDetailRecord extends Model
             'amd_result' => $amdResult,
             'amd_confidence' => $amdConfidence,
             'raw_cdr' => $payload,
-        ]);
+        ];
+        $attributes['extension_number'] = self::extensionNumberFor($organizationId, $subscriber, $from, $attributes['to'], $attributes['session_token']);
+
+        // No unique DB index on (organization_id, call_id) by owner decision (D9):
+        // dedupe here, serialised per call so concurrent deliveries create one row.
+        // Callers can tell a replay apart via ->wasRecentlyCreated.
+        return Cache::lock("cdr:create:{$organizationId}:{$attributes['call_id']}", 10)->block(5, function () use ($attributes, $organizationId): self {
+            return self::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
+                ->where('call_id', $attributes['call_id'])
+                ->first() ?? self::create($attributes + self::directionAttribute($organizationId, $attributes['session_id']));
+        });
+    }
+
+    /**
+     * Direction reported by the session-update webhooks for this CDR's session.
+     * The synthetic cdr_final_status row (always 'incoming') is created after the CDR, so it is ignored.
+     *
+     * @return array<string, string|null>
+     */
+    private static function directionAttribute(int $organizationId, mixed $sessionId): array
+    {
+        // shortcut: hasColumn guard lets this code run before the direction migration has been applied; remove after deploy.
+        static $hasColumn = null;
+        $hasColumn ??= Schema::hasColumn('call_detail_records', 'direction');
+
+        if (! $hasColumn) {
+            return [];
+        }
+
+        $direction = $sessionId === null ? null : SessionUpdate::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('session_id', $sessionId)
+            ->where(fn ($q) => $q->whereNull('action')->orWhere('action', '!=', 'cdr_final_status'))
+            ->orderByDesc('id')
+            ->value('direction');
+
+        return ['direction' => $direction];
+    }
+
+    /**
+     * The organization's extension a call belongs to, independent of the Caller ID it presented:
+     * the subscriber that placed it (CDR `subscriber` = extensions.cloudonix_uuid), else an extension
+     * number used as the caller ID (API-initiated calls), else the extension its destination DID routes to
+     * directly (inbound), else the extension OPBX recorded as answering the call (ring group member, IVR /
+     * business-hours target, queue agent; see recordAnsweringExtension()). Null when none applies.
+     */
+    public static function extensionNumberFor(int $organizationId, ?string $subscriber, string $from, string $to, ?string $sessionToken = null): ?string
+    {
+        $extensions = fn () => Extension::withoutGlobalScope(OrganizationScope::class)->where('organization_id', $organizationId);
+
+        $number = ($subscriber ? $extensions()->where('cloudonix_uuid', $subscriber)->value('extension_number') : null)
+            ?? $extensions()->where('extension_number', ltrim($from, '+'))->value('extension_number');
+
+        if ($number === null && $to !== '') {
+            $extensionId = DidNumber::withoutGlobalScope(OrganizationScope::class)
+                ->where('organization_id', $organizationId)
+                ->whereIn('phone_number', [$to, '+'.ltrim($to, '+')])
+                ->first()
+                ?->getTargetExtensionId();
+
+            $number = $extensionId ? $extensions()->whereKey($extensionId)->value('extension_number') : null;
+        }
+
+        $number ??= $sessionToken ? Redis::get(self::answererKey($organizationId, $sessionToken)) : null;
+
+        return $number === null || $number === false ? null : (string) $number;
+    }
+
+    /**
+     * Remember the extension that answered (or, for a single-target dial, was handed) an inbound call, keyed by
+     * the session token its CDR will carry. First answerer wins. A CDR stored before the answer was known
+     * (race) and still unassigned is updated now.
+     */
+    public static function recordAnsweringExtension(int $organizationId, ?string $sessionToken, ?string $extensionNumber): void
+    {
+        if (! $sessionToken || ! $extensionNumber) {
+            return;
+        }
+
+        // Outlives the longest call plus CDR delivery delay; the CDR row is the durable copy.
+        if (! Redis::set(self::answererKey($organizationId, $sessionToken), $extensionNumber, 'EX', self::ANSWERER_TTL_SECONDS, 'NX')) {
+            return;
+        }
+
+        self::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('session_token', $sessionToken)
+            ->whereNull('extension_number')
+            ->update(['extension_number' => $extensionNumber]);
+    }
+
+    private static function answererKey(int $organizationId, string $sessionToken): string
+    {
+        return "cdr:answerer:{$organizationId}:{$sessionToken}";
     }
 
     /**

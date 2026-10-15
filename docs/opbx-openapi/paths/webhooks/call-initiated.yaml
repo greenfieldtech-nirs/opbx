@@ -5,17 +5,26 @@ paths:
         - Webhooks
       summary: Call initiated webhook
       description: |
-        Async notification from Cloudonix when a call is initiated.
-        
-        **Note**: This is NOT the CXML routing endpoint. For real-time
-        call routing that returns CXML, use `/voice/route`.
-        
-        This endpoint:
-        1. Logs the incoming call notification
-        2. Dispatches job to create CallLog record
-        3. Triggers real-time frontend events
-        
-        Middleware: webhook.signature, webhook.idempotency, rate_limit_org:webhook
+        Async notification from Cloudonix when a call is initiated. This is NOT the CXML
+        routing endpoint (see `POST /voice/route`).
+
+        Validates the payload (`CallInitiatedRequest`), normalizes `from`/`to` (the code
+        prefers `CallSid`/`From`/`To` when present) and queues a job that creates the call log
+        and broadcasts a real-time event.
+
+        Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+        `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+        and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+        `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+        is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+
+        Idempotency (`EnsureWebhookIdempotency`): the key is the `X-Idempotency-Key` header,
+        else a hash of the call ID (`CallSid`/`call_id`) and event (`CallStatus`/`event_type`,
+        else the route name), else a hash of the whole payload. A repeat within
+        `WEBHOOK_IDEMPOTENCY_TTL` (default 24 h) replays the first successful response; a
+        repeat while the first is still running answers 409. A body `timestamp` older than
+        `WEBHOOK_REPLAY_MAX_AGE` (default 300 s) answers 400 `Webhook Expired`, one more than
+        60 s in the future 400 `Invalid Timestamp`.
       operationId: callInitiatedWebhook
       security:
         - webhookBearer: []
@@ -27,7 +36,7 @@ paths:
               $ref: '../../components/schemas/webhooks/CallInitiatedPayload.yaml'
       responses:
         '200':
-          description: Webhook received
+          description: Notification accepted (`status` is `warning` when no organization could be identified)
           content:
             application/json:
               schema:
@@ -35,9 +44,46 @@ paths:
                 properties:
                   status:
                     type: string
+                    enum: [accepted, warning]
                     example: accepted
                   message:
                     type: string
                     example: Call notification received
         '400':
-          $ref: '../../components/responses/BadRequest.yaml'
+          description: Missing `domain` (`VerifyCloudonixSignature`), or an expired/future `timestamp` (`EnsureWebhookIdempotency`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Bad Request - Missing domain parameter
+                  message:
+                    type: string
+        '401':
+          description: Unknown domain, or missing/invalid Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized - Invalid Bearer token
+        '409':
+          description: The same webhook is still being processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Webhook is being processed
+        '422':
+          description: Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'

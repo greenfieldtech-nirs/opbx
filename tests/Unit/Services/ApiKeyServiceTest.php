@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use App\Models\ApiKey;
 use App\Models\Organization;
 use App\Services\ApiKeyService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

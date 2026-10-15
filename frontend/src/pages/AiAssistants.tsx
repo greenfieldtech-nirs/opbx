@@ -1,78 +1,55 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState,useEffect } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Bot,
-  Phone,
-  Wifi,
-  ChevronDown,
-  RefreshCw,
-  Eye,
-  EyeOff,
+Plus,
+Search,
+Filter,Bot,
+Phone,
+Wifi,RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+Card,
+CardContent
 } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import aiAssistantsService from '@/services/aiAssistants.service';
 import aiAssistantProvidersService from '@/services/aiAssistantProviders.service';
 import { useAuth } from '@/hooks/useAuth';
 import { AiAssistantForm } from './AiAssistants/components/AiAssistantForm';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState
+StandardDataTable,
+Column
 } from '@/components/design-system';
-import type { AiAssistant, CreateAiAssistantRequest, UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
+import type { AiAssistant,CreateAiAssistantRequest,UpdateAiAssistantRequest } from '@/services/aiAssistants.service';
 import type { ProviderDefinition } from '@/types/aiAssistant';
 import { cn } from '@/lib/utils';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type AssistantFormData = {
   name: string;
   provider: string;
-  configuration: Record<string, string>;
+  configuration: Record<string, string | boolean>;
 };
 
 const emptyFormData: AssistantFormData = {
@@ -94,16 +71,14 @@ export default function AiAssistants() {
   const [sortField, setSortField] = useState<'name' | 'provider' | 'created_at'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAssistant, setSelectedAssistant] = useState<AiAssistant | null>(null);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   const [formData, setFormData] = useState<AssistantFormData>(emptyFormData);
-  const [visibleTokens, setVisibleTokens] = useState<Set<string>>(new Set());
 
   const canManageAssistants = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
   const isReadOnly = ['reporter', 'pbx_user'].includes(currentUser?.role);
@@ -119,8 +94,8 @@ export default function AiAssistants() {
   }, [searchQuery]);
 
   // Fetch AI Assistants
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ai-assistants', {
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: [...queryKeys.aiAssistants.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
@@ -157,7 +132,7 @@ export default function AiAssistants() {
   const createMutation = useMutation({
     mutationFn: (data: CreateAiAssistantRequest) => aiAssistantsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       toast.success('AI Assistant created successfully');
@@ -173,7 +148,7 @@ export default function AiAssistants() {
     mutationFn: ({ id, data }: { id: number; data: UpdateAiAssistantRequest }) =>
       aiAssistantsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedAssistant(null);
       setFormData(emptyFormData);
@@ -186,15 +161,21 @@ export default function AiAssistants() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => aiAssistantsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai-assistants'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedAssistant(null);
       toast.success('AI Assistant deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.error?.message || error.response?.data?.message || 'Failed to delete AI Assistant';
       toast.error(message);
     },
@@ -258,27 +239,8 @@ export default function AiAssistants() {
     setIsEditDialogOpen(true);
   };
 
-  const openDeleteDialog = (assistant: AiAssistant) => {
-    setSelectedAssistant(assistant);
-    setIsDeleteDialogOpen(true);
-  };
 
-  const openDetailSheet = (assistant: AiAssistant) => {
-    setSelectedAssistant(assistant);
-    setIsDetailSheetOpen(true);
-  };
 
-  const toggleTokenVisibility = (key: string) => {
-    setVisibleTokens(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  };
 
 
 
@@ -334,7 +296,20 @@ export default function AiAssistants() {
       header: 'Provider',
       cell: (assistant) => {
         const provider = providers.find((p: ProviderDefinition) => p.key === assistant.provider);
-        return <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>;
+        const phoneNumber = assistant.configuration?.phone_number;
+        return (
+          <div>
+            <div className="font-medium text-sm">{provider?.name || assistant.provider}</div>
+            {phoneNumber && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                {phoneNumber}
+                {assistant.configuration?.enable_non_e164 === true && (
+                  <Badge variant="outline" className="text-[10px] px-1 py-0">non-E.164</Badge>
+                )}
+              </div>
+            )}
+          </div>
+        );
       }
     },
     {
@@ -376,8 +351,13 @@ export default function AiAssistants() {
     }
   ];
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load AI assistants" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      {inUseDialog}
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
@@ -496,11 +476,7 @@ export default function AiAssistants() {
             onSort={handleSort}
             canView={false}
             canEdit={false}
-            onDelete={canManageAssistants ? ((assistant, e) => {
-              if ((assistant.usage_count || 0) > 0) {
-                toast.error(`Cannot delete AI Assistant in use by ${assistant.usage_count} extension(s)`);
-                return;
-              }
+            onDelete={canManageAssistants ? ((assistant) => {
               setSelectedAssistant(assistant);
               setIsDeleteDialogOpen(true);
             }) : undefined}
@@ -638,7 +614,7 @@ export default function AiAssistants() {
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleteMutation.isPending || (selectedAssistant && (selectedAssistant.usage_count || 0) > 0)}
+              disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
@@ -646,180 +622,6 @@ export default function AiAssistants() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-          {selectedAssistant && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
-                  {selectedAssistant.name}
-                </SheetTitle>
-                <SheetDescription>
-                  AI Assistant Details
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-6">
-                {/* Status */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Status</h3>
-                  <Badge variant={selectedAssistant.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedAssistant.status}
-                  </Badge>
-                </div>
-
-                {/* Description */}
-                {selectedAssistant.description && (
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Description</h3>
-                    <p className="text-sm text-muted-foreground">{selectedAssistant.description}</p>
-                  </div>
-                )}
-
-                {/* Provider Configuration */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Provider Configuration</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Provider:</span>
-                      <span className="text-sm font-medium">
-                        {providers.find((p: ProviderDefinition) => p.key === selectedAssistant.provider)?.name || selectedAssistant.provider}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Protocol:</span>
-                      <Badge variant={selectedAssistant.protocol === 'websocket' ? 'default' : selectedAssistant.protocol === 'dummy' ? 'outline' : 'secondary'}>
-                        {selectedAssistant.protocol === 'websocket' ? (
-                          <>
-                            <Wifi className="h-3 w-3 mr-1" />
-                            WebSocket
-                          </>
-                        ) : selectedAssistant.protocol === 'dummy' ? (
-                          <>
-                            <Bot className="h-3 w-3 mr-1" />
-                            Dummy
-                          </>
-                        ) : (
-                          <>
-                            <Phone className="h-3 w-3 mr-1" />
-                            SIP
-                          </>
-                        )}
-                      </Badge>
-                    </div>
-
-                    {/* Dynamic configuration display */}
-                    {Object.entries(selectedAssistant.configuration || {}).map(([key, value]) => {
-                      const isSensitive = key.includes('token') || key.includes('key') || key.includes('password');
-                      return (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground capitalize">
-                            {key.replace(/_/g, ' ')}:
-                          </span>
-                          {isSensitive ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-mono">
-                                {visibleTokens.has(key) ? value : '•'.repeat(16)}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleTokenVisibility(key)}
-                              >
-                                {visibleTokens.has(key) ? (
-                                  <EyeOff className="h-3 w-3" />
-                                ) : (
-                                  <Eye className="h-3 w-3" />
-                                )}
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-sm font-mono">{value}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Usage */}
-                <div>
-                  <h3 className="text-sm font-medium mb-3">Usage</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Used by {selectedAssistant.usage_count || 0} extension(s)
-                  </p>
-                  {selectedAssistant.used_by_extensions && selectedAssistant.used_by_extensions.length > 0 && (
-                    <div className="space-y-2">
-                      {selectedAssistant.used_by_extensions.map((ext) => (
-                        <div key={ext.id} className="flex items-center gap-2 text-sm">
-                          <span className="font-mono">{ext.extension_number}</span>
-                          <Badge variant="outline">{ext.type}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Metadata */}
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-medium mb-3">Metadata</h3>
-                  <div className="space-y-2 text-sm">
-                    {selectedAssistant.created_by && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Created by:</span>
-                        <span>{selectedAssistant.created_by.name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Created at:</span>
-                      <span>{new Date(selectedAssistant.created_at).toLocaleString()}</span>
-                    </div>
-                    {selectedAssistant.updated_by && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Updated by:</span>
-                        <span>{selectedAssistant.updated_by.name}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Updated at:</span>
-                      <span>{new Date(selectedAssistant.updated_at).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                {canManageAssistants && (
-                  <div className="pt-4 border-t flex gap-2">
-                    <Button
-                      className="flex-1"
-                      onClick={() => {
-                        openEditDialog(selectedAssistant);
-                        setIsDetailSheetOpen(false);
-                      }}
-                    >
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        openDeleteDialog(selectedAssistant);
-                        setIsDetailSheetOpen(false);
-                      }}
-                      disabled={(selectedAssistant.usage_count || 0) > 0}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

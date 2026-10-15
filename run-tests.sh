@@ -31,13 +31,21 @@ fi
 # Default to running all tests
 TEST_FILTER="${1:-}"
 
+# Safety net: back up the production database before every test battery.
+# Tests are guarded to only touch opbx_test (phpunit.xml.dist force + TestCase
+# guard), but this backup is the last line of defense. Failure is a warning,
+# not a blocker.
+./scripts/backup-database.sh pre-test || echo "WARNING: pre-test backup failed; continuing (tests are guarded to opbx_test)"
+
 echo "=========================================="
 echo "Running OpenPBX PHPUnit Tests"
 echo "Database: MySQL (opbx_test)"
 echo "=========================================="
 
 # Run tests with proper environment variables
-DB_PASSWORD="${DB_PASSWORD:-}"
+# Exported and passed by name only (-e DB_PASSWORD): a value on the command line
+# is echoed by compose when the command fails.
+export DB_PASSWORD="${DB_PASSWORD:-}"
 DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-}"
 
 docker compose exec \
@@ -46,12 +54,16 @@ docker compose exec \
     -e DB_HOST=mysql \
     -e DB_PORT=3306 \
     -e DB_DATABASE=opbx_test \
+    -e DB_CDR_ARCHIVE_DATABASE=opbx_test \
     -e DB_USERNAME=opbx \
-    -e DB_PASSWORD="$DB_PASSWORD" \
+    -e DB_PASSWORD \
     -e CACHE_STORE=array \
     -e QUEUE_CONNECTION=sync \
     -e SESSION_DRIVER=array \
     -e BROADCAST_CONNECTION=null \
+    -e REDIS_DB=15 \
+    -e REDIS_CACHE_DB=14 \
+    -e REDIS_PREFIX=opbx-test- \
     -e PULSE_ENABLED=false \
     -e TELESCOPE_ENABLED=false \
     -e NIGHTWATCH_ENABLED=false \

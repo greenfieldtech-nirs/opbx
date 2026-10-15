@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\CallTrackingCampaignStatus;
+use App\Exceptions\ResourceInUseException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\AppliesFilters;
 use App\Http\Requests\CallTracking\StoreCampaignRequest;
 use App\Http\Requests\CallTracking\UpdateCampaignRequest;
 use App\Http\Resources\CallTrackingCampaignResource;
 use App\Models\CallTrackingCampaign;
+use App\Services\ResourceReferenceChecker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -61,17 +63,7 @@ class CallTrackingCampaignController extends Controller
 
         $campaigns = $query->paginate($perPage);
 
-        return response()->json([
-            'data' => CallTrackingCampaignResource::collection($campaigns)->resolve(),
-            'meta' => [
-                'current_page' => $campaigns->currentPage(),
-                'per_page' => $campaigns->perPage(),
-                'total' => $campaigns->total(),
-                'last_page' => $campaigns->lastPage(),
-                'from' => $campaigns->firstItem(),
-                'to' => $campaigns->lastItem(),
-            ],
-        ]);
+        return $this->paginatedResponse($campaigns, CallTrackingCampaignResource::collection($campaigns)->resolve(), withRange: true);
     }
 
     /**
@@ -202,6 +194,12 @@ class CallTrackingCampaignController extends Controller
             ], 404);
         }
 
+        // Reject while DIDs still route to the campaign (sessions are history and never block).
+        $check = app(ResourceReferenceChecker::class)->checkReferences('call_tracking_campaign', $callTrackingCampaign->id, $callTrackingCampaign->organization_id);
+        if ($check['has_references']) {
+            throw new ResourceInUseException('call_tracking_campaign', $check['references']);
+        }
+
         try {
             $callTrackingCampaign->delete();
 
@@ -252,6 +250,11 @@ class CallTrackingCampaignController extends Controller
             'search' => [
                 'type' => 'search',
                 'scope' => 'search',
+            ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
             ],
         ];
     }

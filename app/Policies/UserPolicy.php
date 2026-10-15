@@ -21,6 +21,15 @@ use App\Models\User;
 class UserPolicy
 {
     /**
+     * The single "nobody but an Owner touches an Owner" rule: true when a non-Owner acts on an Owner account.
+     * Every user-targeted write (and the Owner's extension credentials) must refuse when this is true.
+     */
+    public function actsOnOwner(User $actor, User $target): bool
+    {
+        return $target->role->isOwner() && ! $actor->role->isOwner();
+    }
+
+    /**
      * Determine if the user can view the users list.
      *
      * - Owner and PBX Admin can view all users
@@ -132,6 +141,10 @@ class UserPolicy
             return false;
         }
 
+        if ($this->actsOnOwner($authUser, $targetUser)) {
+            return false;
+        }
+
         // Owner and PBX Admin can update any user
         if ($authUser->role->canManageUsers()) {
             return true;
@@ -180,7 +193,7 @@ class UserPolicy
     /**
      * Determine if the user can delete another user.
      *
-     * - Owner and PBX Admin can delete users
+     * - Owner and PBX Admin can delete users; only an Owner can delete an Owner
      * - Users cannot delete themselves (prevents lockout)
      * - Controller handles "last owner" business logic
      *
@@ -202,6 +215,11 @@ class UserPolicy
 
         // Users cannot delete themselves
         if ($authUser->id === $targetUser->id) {
+            return false;
+        }
+
+        // Only an Owner may delete an Owner (the controller keeps the last-Owner protection)
+        if ($this->actsOnOwner($authUser, $targetUser)) {
             return false;
         }
 
@@ -231,6 +249,10 @@ class UserPolicy
             return false;
         }
 
+        if ($this->actsOnOwner($authUser, $targetUser)) {
+            return false;
+        }
+
         // Owner can change any user's password
         if ($authUser->role->isOwner()) {
             return true;
@@ -242,5 +264,15 @@ class UserPolicy
         }
 
         return false;
+    }
+
+    /**
+     * Embedded-dialer token management (view/update/regenerate) for a user.
+     */
+    public function manageEmbedToken(User $actor, User $target): bool
+    {
+        return $actor->organization_id === $target->organization_id
+            && $actor->role->canManageUsers()
+            && ! $this->actsOnOwner($actor, $target);
     }
 }

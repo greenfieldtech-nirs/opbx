@@ -29,7 +29,7 @@ OPBX REST API
 - **Stateless Streamable HTTP.** A fresh `McpServer` + transport per HTTP request
   (official SDK v1.30 stateless pattern). No session state → trivial horizontal scaling;
   no sticky sessions required.
-- **Identity resolution at the edge.** PATs are resolved once per request (cached 5 min
+- **Identity resolution at the edge.** PATs are resolved once per request (cached 30 s
   by token hash) via `GET /api/v1/auth/me`; `opbxk_` keys skip resolution (no upstream
   identity endpoint exists) and rely on OPBX's deny-by-default scope enforcement.
 - **Tenancy is structural.** OPBX derives the organization from the credential

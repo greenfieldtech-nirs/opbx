@@ -15,14 +15,18 @@ paths:
         - Auto Dialer Campaigns
       summary: Start campaign
       description: |
-        Start an auto-dialer campaign.
-        
-        The campaign must be in 'draft' status and have a valid
-        distribution list assigned before it can be started.
+        Start an auto-dialer campaign. Owner and PBX Admin only.
+
+        The campaign must be `draft` or `paused` (any other status returns 403) and must have
+        a distribution list assigned whose status is `ready` or `in_use` (otherwise 422). The
+        campaign becomes `active`, `started_at` is set to now and the CAC counter is reset to 0.
+        A `draft` campaign with `auto_start` and a `ready` or `in_use` list is also started by the
+        scheduler (every minute) once the current time is inside its schedule.
       operationId: startAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Campaign started successfully
@@ -43,15 +47,13 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
-          description: Cannot start campaign
+          description: No usable distribution list is assigned
           content:
             application/json:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
               example:
-                error: "START_FAILED"
-                message: "Campaign cannot be started. Ensure it has a valid list assigned."
-                code: "NO_LIST_ASSIGNED"
+                message: "Cannot start campaign without a destination list"
 
   /v1/auto-dialer-campaigns/{campaign}/pause:
     parameters:
@@ -69,14 +71,17 @@ paths:
         - Auto Dialer Campaigns
       summary: Pause campaign
       description: |
-        Pause an active auto-dialer campaign.
-        
-        Paused campaigns stop initiating new calls but active
-        calls continue until completion.
+        Pause an active auto-dialer campaign. Owner and PBX Admin only; a campaign that is not
+        `active` returns 403.
+
+        The dialer stops initiating new calls. Call sessions still `initiated`, `ringing` or
+        `answered` are marked `failed` with disposition `cancelled`, and the CAC counter is
+        reset to 0.
       operationId: pauseAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Campaign paused successfully
@@ -96,16 +101,6 @@ paths:
           $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
-        '422':
-          description: Cannot pause campaign
-          content:
-            application/json:
-              schema:
-                $ref: '../../components/schemas/Error.yaml'
-              example:
-                error: "PAUSE_FAILED"
-                message: "Only active campaigns can be paused"
-                code: "CAMPAIGN_NOT_ACTIVE"
 
   /v1/auto-dialer-campaigns/{campaign}/resume:
     parameters:
@@ -123,15 +118,16 @@ paths:
         - Auto Dialer Campaigns
       summary: Resume campaign
       description: |
-        Resume a paused auto-dialer campaign.
-        
-        Resumes campaign operations. If the campaign was paused
-        due to rate limiting, it will check if the resume time
-        has been reached before resuming.
+        Resume a paused auto-dialer campaign. Owner and PBX Admin only; a campaign that is not
+        `paused` returns 403.
+
+        The campaign becomes `active` immediately (a rate-limit `resumes_at` is not checked) and
+        the CAC counter is reset to 0.
       operationId: resumeAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Campaign resumed successfully
@@ -151,16 +147,6 @@ paths:
           $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
-        '422':
-          description: Cannot resume campaign
-          content:
-            application/json:
-              schema:
-                $ref: '../../components/schemas/Error.yaml'
-              example:
-                error: "RESUME_FAILED"
-                message: "Campaign is rate limited and cannot resume yet"
-                code: "RATE_LIMITED"
 
   /v1/auto-dialer-campaigns/{campaign}/archive:
     parameters:
@@ -178,14 +164,16 @@ paths:
         - Auto Dialer Campaigns
       summary: Archive campaign
       description: |
-        Archive a completed or paused auto-dialer campaign.
-        
-        Archived campaigns are kept for record-keeping but cannot
-        be modified or restarted. Use this for finished campaigns.
+        Archive an auto-dialer campaign in any status. Owner only.
+
+        An `active` campaign is paused first (see Pause campaign). The campaign's dialer Redis
+        keys (CAC counter, caller ID cycle position) are cleared. An archived campaign cannot be
+        started, resumed or deleted.
       operationId: archiveAutoDialerCampaign
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
           description: Campaign archived successfully
@@ -205,13 +193,3 @@ paths:
           $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
-        '422':
-          description: Cannot archive campaign
-          content:
-            application/json:
-              schema:
-                $ref: '../../components/schemas/Error.yaml'
-              example:
-                error: "ARCHIVE_FAILED"
-                message: "Only completed or paused campaigns can be archived"
-                code: "CAMPAIGN_CANNOT_ARCHIVE"

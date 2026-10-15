@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use Illuminate\Database\Migrations\Migration;
 use Tests\TestCase;
 
 class MigrationRollbackTest extends TestCase
@@ -16,7 +17,7 @@ class MigrationRollbackTest extends TestCase
         // This test will fail if there are PHP syntax errors in the migration file
         $migration = include database_path('migrations/2026_01_09_000000_create_outbound_whitelists_table.php');
 
-        $this->assertInstanceOf(\Illuminate\Database\Migrations\Migration::class, $migration);
+        $this->assertInstanceOf(Migration::class, $migration);
         $this->assertTrue(method_exists($migration, 'up'));
         $this->assertTrue(method_exists($migration, 'down'));
     }
@@ -29,7 +30,7 @@ class MigrationRollbackTest extends TestCase
         $migration = include database_path('migrations/2026_01_09_000000_create_outbound_whitelists_table.php');
 
         // Verify the migration class is properly structured
-        $this->assertInstanceOf(\Illuminate\Database\Migrations\Migration::class, $migration);
+        $this->assertInstanceOf(Migration::class, $migration);
 
         // Check that up() method exists and is callable
         $this->assertTrue(method_exists($migration, 'up'));
@@ -45,7 +46,7 @@ class MigrationRollbackTest extends TestCase
 
         // Test that the migration can be instantiated multiple times (important for rollback testing)
         $migration2 = include database_path('migrations/2026_01_09_000000_create_outbound_whitelists_table.php');
-        $this->assertInstanceOf(\Illuminate\Database\Migrations\Migration::class, $migration2);
+        $this->assertInstanceOf(Migration::class, $migration2);
         $this->assertNotSame($migration, $migration2); // Should be different instances
     }
 }

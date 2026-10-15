@@ -15,17 +15,32 @@ paths:
         - Distribution Lists
       summary: Upload CSV to list
       description: |
-        Upload a CSV file to populate a distribution list.
-        
-        If the list is in DRAFT/PROCESSING/FAILED status, the file
-        is uploaded to the current list. If the list is in READY/USED
-        status, old destinations are backed up and the list is updated.
-        
-        CSV format: phone_number,description (first row is header)
+        Upload a CSV file to populate a distribution list. Processing runs in a
+        background job; poll `GET .../lists/upload-progress/{jobId}` with the
+        returned `job_id`.
+
+        - List in `draft`, `pending` or `failed` status (`action: upload`): the
+          file is loaded into the current list.
+        - List in `ready` or `used` status (`action: update`): the existing
+          destinations are kept as a previous version (see
+          `GET .../lists/{list}/versions`) and deleted, the counters are reset,
+          `version_number` is incremented and the file is loaded into the same
+          list.
+        - Any other status (`processing`, `in_use`, `archived`): 422.
+
+        The list moves to `processing` and ends in `ready` or `failed`. Phone
+        numbers are validated with libphonenumber (default region US) and stored
+        in E.164. Files with more than 100,000 data rows are split: the first
+        100,000 rows stay in this list and each further block of up to 100,000
+        rows goes into a new list named `<name> (Part N)`.
+
+        Columns are chosen with `mapping`; send the fields as multipart form
+        fields. Roles: Owner and PBX Admin.
       operationId: uploadDistributionListCsv
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -36,9 +51,45 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: CSV file to upload (max 50MB)
+                  description: CSV or TXT file to upload (max 50 MB)
+                has_header:
+                  type:
+                    - boolean
+                    - 'null'
+                  default: true
+                  description: Whether the first row is a header row. Without a header the
+                    columns are addressed as `column_1`, `column_2`, ...
+                mapping:
+                  type: object
+                  description: >-
+                    Column mapping, sent as form fields `mapping[phone]`, `mapping[name]`,
+                    `mapping[batch_identifier]` and `mapping[metadata][]`.
+                  properties:
+                    phone:
+                      type: string
+                      description: CSV column holding the phone number
+                    name:
+                      type:
+                        - string
+                        - 'null'
+                      description: CSV column holding the contact name
+                    batch_identifier:
+                      type:
+                        - string
+                        - 'null'
+                      description: CSV column holding the batch identifier
+                    metadata:
+                      type:
+                        - array
+                        - 'null'
+                      description: CSV columns stored as metadata on each destination
+                      items:
+                        type: string
+                  required:
+                    - phone
               required:
                 - file
+                - mapping
       responses:
         '200':
           description: File uploaded and processing started
@@ -55,12 +106,17 @@ paths:
                     properties:
                       job_id:
                         type: string
+                        format: uuid
                         description: Job ID for tracking progress
-                        example: "upload-abc123"
+                        example: "9b2f6c1e-3d4a-4f6b-8c2d-1e5a7b9c0d3f"
                       total_rows:
                         type: integer
-                        description: Total rows in file
+                        description: Data rows in the file (the first row is always skipped when counting)
                         example: 1000
+                      is_large_file:
+                        type: boolean
+                        description: The file has more than 100,000 data rows and is split across several lists
+                        example: false
                       action:
                         type: string
                         enum: [upload, update]
@@ -70,9 +126,13 @@ paths:
                         type: integer
                         description: List ID
                         example: 1
+                      version_number:
+                        type: integer
+                        description: New version number (`update` only)
+                        example: 2
                       new_version_number:
                         type: integer
-                        description: New version number (for updates)
+                        description: Same as `version_number` (`update` only)
                         example: 2
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
@@ -81,15 +141,25 @@ paths:
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
-          description: Cannot upload to list
+          description: >-
+            Request validation failed (Laravel validation error body), or the list
+            status does not allow an upload (`{"error": "..."}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '../../components/schemas/ValidationError.yaml'
+                  - $ref: '../../components/schemas/Error.yaml'
+              example:
+                error: "Cannot upload to list in status: In Use"
+        '500':
+          description: Processing could not be started
           content:
             application/json:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
               example:
-                error: "UPLOAD_FAILED"
-                message: "Cannot upload to list in status: In Use"
-                code: "INVALID_STATUS"
+                error: "Failed to process upload: ..."
 
   /v1/auto-dialer-campaigns/lists/{list}/preview-csv:
     parameters:
@@ -111,10 +181,14 @@ paths:
         so the UI can show a preview before committing to
         `POST .../{list}/upload`. The file is written to a temp path for
         parsing and deleted immediately afterward — nothing is stored.
+        Blank rows are skipped. Works for a list in any status.
+
+        Roles: Owner, PBX Admin and Reporter.
       operationId: previewDistributionListCsv
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:write
       requestBody:
         required: true
         content:
@@ -147,18 +221,18 @@ paths:
                         type: array
                         items:
                           type: string
-                        description: Column headers (empty if has_header is false).
-                        example: ['phone_number', 'description']
+                        description: Column headers. When has_header is false they are generated as `column_1`, `column_2`, ...
+                        example: ['phone_number', 'name', 'batch_identifier']
                       rows:
                         type: array
-                        description: Up to 5 parsed data rows, keyed by header name (or column index when has_header is false).
+                        description: Up to 5 parsed data rows, keyed by header name (or `column_N` when has_header is false).
                         items:
                           type: object
                           additionalProperties:
                             type: string
                       total_rows:
                         type: integer
-                        description: Total data row count in the file (excluding the header row).
+                        description: Non-blank data rows in the file (excluding the header row).
                         example: 1000
                       has_header:
                         type: boolean
@@ -180,20 +254,25 @@ paths:
         description: Upload job ID
         schema:
           type: string
-        example: "upload-abc123"
+        example: "9b2f6c1e-3d4a-4f6b-8c2d-1e5a7b9c0d3f"
 
     get:
       tags:
         - Distribution Lists
       summary: Get upload progress
       description: |
-        Get the progress of a CSV upload job.
-        
-        Returns processing status, row counts, and any errors.
+        Get the progress of a CSV upload job, as stored in the cache by the
+        upload job. Progress entries expire 2 hours after the last update
+        (4 hours for split files). Row counts and errors are not part of this
+        response: read the list (`statistics`, `status`) and
+        `GET .../{list}/validation-errors` once the job finishes.
+
+        Roles: Owner, PBX Admin and Reporter.
       operationId: getUploadProgress
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: distribution-lists:read
       responses:
         '200':
           description: Upload progress
@@ -205,40 +284,34 @@ paths:
                   data:
                     type: object
                     properties:
-                      job_id:
-                        type: string
-                        example: "upload-abc123"
+                      percentage:
+                        type: integer
+                        minimum: 0
+                        maximum: 100
+                        example: 40
                       status:
                         type: string
-                        enum: [pending, processing, completed, failed]
-                        example: "processing"
-                      total_rows:
+                        description: >-
+                          Job stage. `queued` right after the upload; then `started`, `validating`,
+                          `processing`, `creating_destinations`, `finalizing`; split files report
+                          `splitting` and `processing_chunk`. Final values: `completed`, `failed`,
+                          `validation_failed` and `error` (a failed attempt that is retried).
+                        enum: [queued, started, validating, processing, creating_destinations, finalizing, splitting, processing_chunk, completed, failed, validation_failed, error]
+                        example: "creating_destinations"
+                      updated_at:
+                        type: string
+                        format: date-time
+                        example: "2026-10-14T09:30:00+00:00"
+                      current_chunk:
                         type: integer
-                        example: 1000
-                      processed_rows:
+                        description: Chunk being processed (split files only)
+                      total_chunks:
                         type: integer
-                        example: 500
-                      valid_rows:
-                        type: integer
-                        example: 480
-                      invalid_rows:
-                        type: integer
-                        example: 20
-                      progress_percentage:
-                        type: number
-                        format: float
-                        example: 50.0
-                      errors:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            row:
-                              type: integer
-                              example: 15
-                            message:
-                              type: string
-                              example: "Invalid phone number format"
+                        description: Number of chunks (split files only)
+                    required:
+                      - percentage
+                      - status
+                      - updated_at
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
@@ -250,6 +323,4 @@ paths:
               schema:
                 $ref: '../../components/schemas/Error.yaml'
               example:
-                error: "NOT_FOUND"
-                message: "Job not found or expired"
-                code: "JOB_NOT_FOUND"
+                error: "Job not found or expired"

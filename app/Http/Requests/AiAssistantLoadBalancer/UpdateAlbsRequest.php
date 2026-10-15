@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\AiAssistantLoadBalancer;
 
+use App\Enums\AiAssistantStatus;
 use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
-use App\Enums\AiAssistantStatus;use App\Models\AiAssistant;
+use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\Extension;
 use App\Models\IvrMenu;
@@ -16,6 +17,7 @@ use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating an AI Assistant Load Balancer.
@@ -47,8 +49,12 @@ class UpdateAlbsRequest extends FormRequest
         $user = $this->user();
         $loadBalancerId = $this->route('ai_assistant_load_balancer');
 
+        $route = $this->route('ai_assistant_load_balancer');
+        $selfId = is_object($route) ? $route->id : (int) $route;
+
         return [
             'name' => [
+                'sometimes',
                 'required',
                 'string',
                 'min:2',
@@ -66,6 +72,7 @@ class UpdateAlbsRequest extends FormRequest
                 'max:1000',
             ],
             'strategy' => [
+                'sometimes',
                 'required',
                 new Enum(AlbsStrategy::class),
             ],
@@ -74,34 +81,48 @@ class UpdateAlbsRequest extends FormRequest
                 'boolean',
             ],
             'fallback_action' => [
+                'sometimes',
                 'required',
                 new Enum(RingGroupFallbackAction::class),
             ],
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ring_group_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
-                'exists:ring_groups,id',
+                Rule::exists('ring_groups', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ivr_menu_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
-                'exists:ivr_menus,id',
+                Rule::exists('ivr_menus', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
+            ],
+            'fallback_call_queue_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
+                'nullable',
+                Rule::exists('call_queues', 'id')->where('organization_id', $user->organization_id),
+            ],
+            'fallback_ai_load_balancer_id' => [
+                Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
+                'nullable',
+                Rule::notIn([$selfId]),
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $user->organization_id)->whereNull('deleted_at'),
             ],
             'status' => [
+                'sometimes',
                 'required',
                 new Enum(AlbsStatus::class),
             ],
             'members' => [
+                'sometimes',
                 'required',
                 'array',
                 'min:1',
@@ -110,7 +131,7 @@ class UpdateAlbsRequest extends FormRequest
             'members.*.ai_assistant_id' => [
                 'required',
                 'distinct',
-                'exists:ai_assistants,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
             'members.*.priority' => [
                 'nullable',
@@ -158,6 +179,11 @@ class UpdateAlbsRequest extends FormRequest
             'fallback_ivr_menu_id.exists' => 'The selected fallback IVR menu does not exist.',
             'fallback_ai_assistant_id.required_if' => 'Fallback AI assistant is required when fallback action is "ai_assistant".',
             'fallback_ai_assistant_id.exists' => 'The selected fallback AI assistant does not exist.',
+            'fallback_call_queue_id.required_if' => 'Fallback call queue is required when fallback action is "call_queue".',
+            'fallback_call_queue_id.exists' => 'The selected fallback call queue does not exist.',
+            'fallback_ai_load_balancer_id.required_if' => 'Fallback AI load balancer is required when fallback action is "ai_load_balancer".',
+            'fallback_ai_load_balancer_id.exists' => 'The selected fallback AI load balancer does not exist.',
+            'fallback_ai_load_balancer_id.not_in' => 'A load balancer cannot fall back to itself.',
             'status.required' => 'Status is required.',
             'members.required' => 'At least one AI assistant member is required.',
             'members.min' => 'At least one AI assistant member is required.',
@@ -177,6 +203,12 @@ class UpdateAlbsRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        // A partial update (e.g. the status toggle) sends no members: leave the key absent
+        // instead of merging an empty list, which `min:1` would reject.
+        if (! $this->has('members')) {
+            return;
+        }
+
         // Set default position for members if not provided
         $members = $this->input('members', []);
         foreach ($members as $index => &$member) {
@@ -199,7 +231,7 @@ class UpdateAlbsRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -255,6 +287,31 @@ class UpdateAlbsRequest extends FormRequest
                 }
             }
 
+            // Refuse fallback loops: following ai_load_balancer fallbacks must never come back to this balancer.
+            $nextId = $fallbackAction === RingGroupFallbackAction::AI_LOAD_BALANCER->value
+                ? $this->input('fallback_ai_load_balancer_id') : null;
+            $selfModel = is_object($loadBalancerId) ? $loadBalancerId : $existingLoadBalancer;
+            $selfId = $selfModel?->id;
+            $path = [$selfModel?->name ?? '#'.$selfId];
+            $seen = [];
+            while ($selfId && $nextId && ! in_array((int) $nextId, $seen, true)) {
+                $seen[] = (int) $nextId;
+                $next = AiAssistantLoadBalancer::find($nextId);
+                if (! $next) {
+                    break;
+                }
+                $path[] = $next->name;
+                if ((int) $next->id === (int) $selfId) {
+                    $validator->errors()->add(
+                        'fallback_ai_load_balancer_id',
+                        'Fallback loop detected: '.implode(' -> ', $path).'. A load balancer fallback chain must not return to itself.'
+                    );
+                    break;
+                }
+                $nextId = $next->fallback_action?->value === RingGroupFallbackAction::AI_LOAD_BALANCER->value
+                    ? $next->fallback_ai_load_balancer_id : null;
+            }
+
             // Check for self-reference: cannot set own load balancer as fallback
             if ($fallbackAction === RingGroupFallbackAction::RING_GROUP->value && $fallbackRingGroupId) {
                 // Note: In the future if we allow ALBS to reference other ALBS, check here
@@ -272,7 +329,7 @@ class UpdateAlbsRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackExtension->status !== AiAssistantStatus::ACTIVE) {
+                    if ($fallbackExtension->status !== UserStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'

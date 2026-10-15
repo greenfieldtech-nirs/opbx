@@ -7,8 +7,10 @@ namespace Tests\Feature\Api;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\UserRole;
 use App\Models\BusinessHoursSchedule;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
+use App\Services\VoiceRoutingCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -34,12 +36,19 @@ class BusinessHoursControllerTest extends TestCase
 
     private User $otherOrgOwner;
 
+    private Extension $extA;
+
+    private Extension $extB;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->organization = Organization::factory()->create(['name' => 'Test Org']);
         $this->otherOrganization = Organization::factory()->create(['name' => 'Other Org']);
+
+        $this->extA = Extension::factory()->create(['organization_id' => $this->organization->id]);
+        $this->extB = Extension::factory()->create(['organization_id' => $this->organization->id]);
 
         $this->owner = User::factory()->create([
             'organization_id' => $this->organization->id,
@@ -131,11 +140,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-101',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -184,11 +193,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-101',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -225,11 +234,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-102',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '10:00', 'end_time' => '18:00']]],
@@ -273,11 +282,11 @@ class BusinessHoursControllerTest extends TestCase
             'timezone' => 'America/New_York',
             'open_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-102',
+                'target_id' => "ext-{$this->extA->id}",
             ],
             'closed_hours_action' => [
                 'type' => 'extension',
-                'target_id' => 'ext-100',
+                'target_id' => "ext-{$this->extB->id}",
             ],
             'schedule' => [
                 'monday' => ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]],
@@ -371,5 +380,164 @@ class BusinessHoursControllerTest extends TestCase
         $response = $this->postJson("/api/v1/business-hours/{$schedule->id}/duplicate");
 
         $response->assertStatus(403);
+    }
+
+    public function test_only_owner_and_pbx_admin_can_toggle_business_hours_status(): void
+    {
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => BusinessHoursStatus::ACTIVE,
+        ]);
+
+        foreach ([UserRole::PBX_USER, UserRole::REPORTER, UserRole::SUPERVISOR] as $role) {
+            Sanctum::actingAs(User::factory()->create([
+                'organization_id' => $this->organization->id,
+                'role' => $role,
+            ]));
+
+            $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+                ->assertStatus(403);
+        }
+        $this->assertSame(BusinessHoursStatus::ACTIVE, $schedule->fresh()->status);
+
+        foreach ([$this->owner, $this->admin] as $user) {
+            Sanctum::actingAs($user);
+            $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+                ->assertOk();
+        }
+        $this->assertSame(BusinessHoursStatus::INACTIVE, $schedule->fresh()->status);
+    }
+
+    public function test_toggle_business_hours_status_clears_the_routing_cache(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => BusinessHoursStatus::ACTIVE,
+        ]);
+
+        $cache = $this->mock(VoiceRoutingCacheService::class);
+        $cache->shouldReceive('invalidateBusinessHoursSchedule')->atLeast()->once()->with($this->organization->id);
+
+        $this->patchJson("/api/v1/business-hours/{$schedule->id}/toggle-status", ['status' => 'inactive'])
+            ->assertOk();
+    }
+
+    public function test_store_rejects_target_from_another_organization(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $foreign = Extension::factory()->create(['organization_id' => $this->otherOrganization->id]);
+
+        $day = ['enabled' => false, 'time_ranges' => []];
+        $this->postJson('/api/v1/business-hours', [
+            'name' => 'Cross org',
+            'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'UTC',
+            'open_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$foreign->id}"],
+            'closed_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extA->id}"],
+            'schedule' => array_fill_keys(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], $day),
+        ])->assertStatus(422)->assertJsonValidationErrors(['open_hours_action.target_id']);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $exceptions
+     * @return array<string, mixed>
+     */
+    private function schedulePayload(string $name, array $exceptions): array
+    {
+        $open = ['enabled' => true, 'time_ranges' => [['start_time' => '09:00', 'end_time' => '17:00']]];
+        $closed = ['enabled' => false, 'time_ranges' => []];
+
+        return [
+            'name' => $name,
+            'status' => BusinessHoursStatus::ACTIVE->value,
+            'timezone' => 'America/New_York',
+            'open_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extA->id}"],
+            'closed_hours_action' => ['type' => 'extension', 'target_id' => "ext-{$this->extB->id}"],
+            'schedule' => [
+                'monday' => $open, 'tuesday' => $open, 'wednesday' => $open, 'thursday' => $open,
+                'friday' => $open, 'saturday' => $closed, 'sunday' => $closed,
+            ],
+            'exceptions' => $exceptions,
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function mixedExceptions(): array
+    {
+        return [
+            ['date' => '2026-12-25', 'name' => 'Christmas', 'type' => 'closed'],
+            [
+                'date' => '2026-12-24',
+                'name' => 'Christmas Eve',
+                'type' => 'special_hours',
+                'time_ranges' => [['start_time' => '09:00', 'end_time' => '12:00']],
+            ],
+        ];
+    }
+
+    private function assertExceptionTypes(BusinessHoursSchedule $schedule): void
+    {
+        $exceptions = $schedule->exceptions()->with('timeRanges')->get()->keyBy('name');
+
+        $this->assertSame('closed', $exceptions['Christmas']->type->value);
+        $this->assertSame('special_hours', $exceptions['Christmas Eve']->type->value);
+        $this->assertCount(1, $exceptions['Christmas Eve']->timeRanges);
+        $this->assertSame('09:00', substr((string) $exceptions['Christmas Eve']->timeRanges->first()->start_time, 0, 5));
+    }
+
+    public function test_store_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $id = $this->postJson('/api/v1/business-hours', $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertExceptionTypes(BusinessHoursSchedule::findOrFail($id));
+    }
+
+    public function test_update_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create(['organization_id' => $this->organization->id]);
+
+        $this->putJson("/api/v1/business-hours/{$schedule->id}", $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertOk();
+
+        $this->assertExceptionTypes($schedule->fresh());
+    }
+
+    public function test_duplicate_keeps_exception_type(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $id = $this->postJson('/api/v1/business-hours', $this->schedulePayload('Holiday Hours', $this->mixedExceptions()))
+            ->assertCreated()
+            ->json('data.id');
+
+        $copyId = $this->postJson("/api/v1/business-hours/{$id}/duplicate")
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertExceptionTypes(BusinessHoursSchedule::findOrFail($copyId));
+    }
+
+    public function test_duplicate_keeps_timezone(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $schedule = BusinessHoursSchedule::factory()->create([
+            'organization_id' => $this->organization->id,
+            'timezone' => 'Asia/Jerusalem',
+        ]);
+
+        $copyId = $this->postJson("/api/v1/business-hours/{$schedule->id}/duplicate")
+            ->assertCreated()
+            ->assertJsonPath('data.timezone', 'Asia/Jerusalem')
+            ->json('data.id');
+
+        $this->assertSame('Asia/Jerusalem', BusinessHoursSchedule::findOrFail($copyId)->timezone);
     }
 }

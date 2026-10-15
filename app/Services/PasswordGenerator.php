@@ -18,6 +18,7 @@ use InvalidArgumentException;
 class PasswordGenerator
 {
     private const MIN_LENGTH = 16;
+
     private const MAX_LENGTH = 32;
 
     /**
@@ -48,6 +49,7 @@ class PasswordGenerator
     ];
 
     private const SPECIAL_CHARS = '!@#$%&*-+=?';
+
     private const DIGITS = '0123456789';
 
     /**
@@ -56,8 +58,9 @@ class PasswordGenerator
      * Format: Word1{digit}Word2{digit}Word3{special}
      * Example: Green4Mountain7Tiger!
      *
-     * @param int $wordCount Number of words to use (default: 3)
+     * @param  int  $wordCount  Number of words to use (default: 3)
      * @return string Generated passphrase
+     *
      * @throws InvalidArgumentException If word count is invalid
      */
     public function generate(int $wordCount = 3): string
@@ -119,7 +122,7 @@ class PasswordGenerator
      * - At least one digit
      * - At least one special character
      *
-     * @param string $password Password to validate
+     * @param  string  $password  Password to validate
      * @return bool True if password meets requirements
      */
     public function validate(string $password): bool
@@ -135,7 +138,7 @@ class PasswordGenerator
         $hasUppercase = preg_match('/[A-Z]/', $password) === 1;
         $hasLowercase = preg_match('/[a-z]/', $password) === 1;
         $hasDigit = preg_match('/[0-9]/', $password) === 1;
-        $hasSpecial = preg_match('/[' . preg_quote(self::SPECIAL_CHARS, '/') . ']/', $password) === 1;
+        $hasSpecial = preg_match('/['.preg_quote(self::SPECIAL_CHARS, '/').']/', $password) === 1;
 
         return $hasUppercase && $hasLowercase && $hasDigit && $hasSpecial;
     }

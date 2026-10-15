@@ -36,8 +36,9 @@ class RemoveSessionIds extends Command
             $this->line("  - {$sessionId}");
         }
 
-        if (!$this->confirm('Do you want to proceed with the deletion?')) {
+        if (! $this->confirm('Do you want to proceed with the deletion?')) {
             $this->info('Operation cancelled.');
+
             return;
         }
 

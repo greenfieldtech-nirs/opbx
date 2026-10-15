@@ -34,13 +34,12 @@ paths:
         - Health
       summary: Storage health check
       description: |
-        Detailed health check for the storage subsystem (MinIO/S3).
+        Detailed health check for the storage subsystem (S3 / SeaweedFS).
         Tests connectivity, read/write operations.
         Requires authentication to prevent internal info leakage.
       operationId: storageHealthCheck
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Storage is healthy
@@ -91,7 +90,6 @@ paths:
       operationId: websocketHealthCheck
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: WebSocket is healthy

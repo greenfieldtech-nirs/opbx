@@ -1,7 +1,9 @@
 name: per_page
 in: query
 required: false
-description: Number of items per page
+description: >-
+  Number of items per page. Most list endpoints clamp out-of-range values into 1-100;
+  endpoints that validate the value answer 422 instead.
 schema:
   type: integer
   minimum: 1

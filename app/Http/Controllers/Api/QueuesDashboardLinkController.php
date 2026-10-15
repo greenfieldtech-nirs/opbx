@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CloudonixSettings;
+use App\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -45,11 +47,11 @@ class QueuesDashboardLinkController extends Controller
         abort_unless($request->user()->isOwner() || $request->user()->isPBXAdmin(), 403);
     }
 
-    private function buildUrl(\App\Models\Organization $organization, string $token): string
+    private function buildUrl(Organization $organization, string $token): string
     {
         // The link must be reachable from wallboard browsers - use the same
         // public base as the org's webhooks, not the internal app.url.
-        $settings = \App\Models\CloudonixSettings::where('organization_id', $organization->id)->first();
+        $settings = CloudonixSettings::where('organization_id', $organization->id)->first();
         $base = rtrim($settings?->effective_webhook_base_url ?? config('app.url'), '/');
 
         return "{$base}/public/queues-dashboard/{$token}";

@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use App\Enums\UserRole;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRecordingRequest extends FormRequest
@@ -13,13 +16,14 @@ class StoreRecordingRequest extends FormRequest
     public function authorize(): bool
     {
         $user = auth()->user();
+
         return $user->hasRole(UserRole::OWNER) || $user->hasRole(UserRole::PBX_ADMIN);
     }
 
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -33,7 +37,7 @@ class StoreRecordingRequest extends FormRequest
                 'required',
                 'file',
                 'mimes:mp3,wav',
-                'max:' . (5 * 1024), // 5MB in KB
+                'max:'.(5 * 1024), // 5MB in KB
             ];
         } elseif ($this->input('type') === 'remote') {
             $rules['remote_url'] = [

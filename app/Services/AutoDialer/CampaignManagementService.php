@@ -34,6 +34,10 @@ class CampaignManagementService
             $query->where('status', $filters['status']);
         }
 
+        if (! empty($filters['exclude_status'])) {
+            $query->where('status', '!=', $filters['exclude_status']);
+        }
+
         // Apply search filter
         if (! empty($filters['search'])) {
             $search = $filters['search'];
@@ -52,7 +56,7 @@ class CampaignManagementService
      * @param  AutoDialerCampaign  $campaign  The campaign to load
      * @param  array<int, string>  $relations  Relations to eager load
      */
-    public function getCampaign(AutoDialerCampaign $campaign, array $relations = ['callerIds', 'list']): AutoDialerCampaign
+    public function getCampaign(AutoDialerCampaign $campaign, array $relations = ['callerIds', 'lists']): AutoDialerCampaign
     {
         if (! empty($relations)) {
             $campaign->load($relations);
@@ -134,8 +138,8 @@ class CampaignManagementService
     {
         return AutoDialerCampaign::where('auto_start', true)
             ->where('status', CampaignStatus::DRAFT)
-            ->whereHas('list', function ($query) {
-                $query->where('status', 'ready');
+            ->whereHas('lists', function ($query) {
+                $query->whereIn('status', ['ready', 'in_use']);
             })
             ->get();
     }

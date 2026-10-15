@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
-  Filter,
   Shield,
   RefreshCw,
   CheckCircle2,
   XCircle,
   Loader2,
 } from 'lucide-react';
-import { getCountryOptions, getCountryByCode, type CountryOption } from '@/utils/countries';
+import { getCountryOptions, getCountryByCode } from '@/utils/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,14 +26,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -49,10 +41,12 @@ import {
 import { toast } from 'sonner';
 import { outboundWhitelistService } from '@/services/outboundWhitelist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
-import { settingsService, type CloudonixTrunk } from '@/services/settings.service';
+import { settingsService } from '@/services/settings.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { OutboundWhitelistForm } from './OutboundWhitelist/components/OutboundWhitelistForm';
 import type { OutboundWhitelist, CreateOutboundWhitelistRequest, UpdateOutboundWhitelistRequest, DIDNumber } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type WhitelistFormData = {
   name: string;
@@ -84,7 +78,7 @@ const OutboundWhitelistPage: React.FC = () => {
 
   // Pagination and Sorting
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage] = useState(20);
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -97,16 +91,17 @@ const OutboundWhitelistPage: React.FC = () => {
   );
 
   // Check permissions
-  const canManageWhitelist = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManageWhitelist = can(user?.role, 'outboundWhitelist.manage');
 
   // Fetch outbound whitelist entries
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: whitelistData,
     isLoading,
-    error,
-    refetch,
   } = useQuery({
-    queryKey: ['outbound-whitelist', { search: searchQuery }],
+    queryKey: [...queryKeys.outboundWhitelist.all, { search: searchQuery }],
     queryFn: () => outboundWhitelistService.getAll({
       search: searchQuery || undefined,
       per_page: 50,
@@ -117,17 +112,16 @@ const OutboundWhitelistPage: React.FC = () => {
   const {
     data: trunks = [],
     isLoading: trunksLoading,
-    error: trunksError,
     refetch: refetchTrunks,
   } = useQuery({
-    queryKey: ['outbound-trunks'],
+    queryKey: queryKeys.trunks.outbound(),
     queryFn: () => settingsService.getOutboundTrunks(),
   });
 
   // Fetch active DIDs for Default Caller ID selector
   const { data: didsData } = useQuery({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
-    queryFn: () => phoneNumbersService.getAll({ status: 'active' }),
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
+    queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids: DIDNumber[] = didsData?.data ?? [];
 
@@ -135,7 +129,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateOutboundWhitelistRequest) => outboundWhitelistService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       setFormErrors({});
@@ -158,7 +152,7 @@ const OutboundWhitelistPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: string; data: UpdateOutboundWhitelistRequest }) =>
       outboundWhitelistService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setIsEditDialogOpen(false);
       setEditingItem(null);
       setFormData(emptyFormData);
@@ -181,7 +175,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => outboundWhitelistService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       setDeleteItem(null);
       toast.success('Outbound whitelist entry deleted successfully');
     },
@@ -194,7 +188,7 @@ const OutboundWhitelistPage: React.FC = () => {
   const toggleStatusMutation = useMutation({
     mutationFn: (id: string) => outboundWhitelistService.toggleStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['outbound-whitelist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.outboundWhitelist.all });
       toast.success('Status updated successfully');
     },
     onError: (error: any) => {
@@ -281,7 +275,7 @@ const OutboundWhitelistPage: React.FC = () => {
   };
 
   const paginatedData = useMemo(() => {
-    let result = [...whitelist];
+    const result = [...whitelist];
 
     // Client-side sorting
     if (sortField) {
@@ -307,6 +301,10 @@ const OutboundWhitelistPage: React.FC = () => {
     setSearchQuery('');
     setCurrentPage(1);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load outbound whitelist" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

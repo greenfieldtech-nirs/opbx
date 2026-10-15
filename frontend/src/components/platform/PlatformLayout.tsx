@@ -45,6 +45,7 @@ function getPageName(pathname: string): string {
     organizations: 'Organizations',
     users: 'Users',
     'audit-logs': 'Activity Log',
+    status: 'Platform Status',
   };
 
   return pageNames[lastSegment] || lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);

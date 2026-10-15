@@ -3,8 +3,8 @@ description: Validation error response with field-level errors
 properties:
   message:
     type: string
-    description: General validation error message
-    example: The given data was invalid.
+    description: The first validation error, followed by `(and N more error[s])` when there are more
+    example: The email field is required. (and 1 more error)
   errors:
     type: object
     description: Field-level validation errors
@@ -15,9 +15,8 @@ properties:
     example:
       email:
         - The email field is required.
-        - The email must be a valid email address.
       password:
-        - The password must be at least 8 characters.
+        - The password field must be at least 8 characters.
 required:
   - message
   - errors

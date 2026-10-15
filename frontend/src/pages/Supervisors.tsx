@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -30,6 +33,7 @@ import { SupervisorAssignmentDialog } from '@/components/Supervisors/SupervisorA
 import { usersService } from '@/services/createResourceService';
 import { getSupervisorAssignments } from '@/services/supervisorAssignments.service';
 import type { User, UserStatus } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function Supervisors() {
   const { user: currentUser } = useAuth();
@@ -41,12 +45,8 @@ export default function Supervisors() {
 
   // Guard: only owner and pbx_admin can access this page
   const canAccess = currentUser?.role === 'owner' || currentUser?.role === 'pbx_admin';
-  if (!canAccess) {
-    return <Navigate to="/ui/dashboard" replace />;
-  }
-
-  const { data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['users'],
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: usersResponse, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: queryKeys.users.all,
     queryFn: () => usersService.getAll({ per_page: 1000 }),
     staleTime: 30000,
   });
@@ -100,13 +100,15 @@ export default function Supervisors() {
     setShowAssignmentDialog(true);
   };
 
+  const [statusSupervisor, setStatusSupervisor] = useState<User | null>(null);
+
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: UserStatus }) => {
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       return usersService.patch(id, { status: newStatus });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Supervisor status updated');
     },
     onError: (error: any) => {
@@ -118,7 +120,7 @@ export default function Supervisors() {
 
   const handleStatusToggle = (supervisor: User, e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleStatusMutation.mutate({ id: supervisor.id, currentStatus: supervisor.status });
+    setStatusSupervisor(supervisor);
   };
 
   const handleAssignmentClose = (open: boolean) => {
@@ -160,6 +162,14 @@ export default function Supervisors() {
     );
   };
 
+  if (!canAccess) {
+    return <Navigate to="/ui/dashboard" replace />;
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load supervisors" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -195,7 +205,7 @@ export default function Supervisors() {
               size="icon"
               onClick={() => {
                 refetch();
-                queryClient.invalidateQueries({ queryKey: ['supervisor-assignments'] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.supervisorAssignments.all });
               }}
               disabled={isRefetching}
               title="Refresh"
@@ -306,6 +316,18 @@ export default function Supervisors() {
           />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={statusSupervisor !== null}
+        onOpenChange={(open) => { if (!open) setStatusSupervisor(null); }}
+        title={statusSupervisor?.status === 'active' ? 'Deactivate Supervisor' : 'Activate Supervisor'}
+        description={`Are you sure you want to ${statusSupervisor?.status === 'active' ? 'deactivate' : 'activate'} ${statusSupervisor?.name ?? 'this supervisor'}?`}
+        confirmLabel={statusSupervisor?.status === 'active' ? 'Deactivate' : 'Activate'}
+        variant={statusSupervisor?.status === 'active' ? 'danger' : 'default'}
+        onConfirm={() => statusSupervisor
+          ? toggleStatusMutation.mutateAsync({ id: statusSupervisor.id, currentStatus: statusSupervisor.status }).catch(() => undefined)
+          : undefined}
+      />
 
       <SupervisorAssignmentDialog
         userId={assignmentUserId}

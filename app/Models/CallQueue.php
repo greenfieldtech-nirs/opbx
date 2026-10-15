@@ -7,8 +7,10 @@ namespace App\Models;
 use App\Enums\CallQueueStatus;
 use App\Enums\CallQueueStrategy;
 use App\Enums\RingGroupFallbackAction;
-use App\Models\AiAssistantLoadBalancer;
+use App\Jobs\SegmentQueueMohJob;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
+use App\Services\CallQueue\MohSegmentationService;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[ScopedBy([OrganizationScope::class])]
 class CallQueue extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUnprovisionedState;
 
     /**
      * The attributes that are mass assignable.
@@ -39,6 +41,7 @@ class CallQueue extends Model
         'announce_position_timeout',
         'announce_position_language',
         'immediate_connect',
+        'conference_ring_all',
         'moh_recording_id',
         'fallback_action',
         'fallback_extension_id',
@@ -46,6 +49,7 @@ class CallQueue extends Model
         'fallback_ivr_menu_id',
         'fallback_ai_assistant_id',
         'fallback_ai_load_balancer_id',
+        'fallback_call_queue_id',
         'status',
     ];
 
@@ -66,12 +70,58 @@ class CallQueue extends Model
             'announce_position' => 'boolean',
             'announce_position_timeout' => 'integer',
             'immediate_connect' => 'boolean',
+            'conference_ring_all' => 'boolean',
         ];
     }
 
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /**
+     * Keep MOH segments in sync with the assigned recording (WP1, Scenario 2):
+     * segment the new recording off-request, drop the old recording's segments.
+     */
+    protected static function booted(): void
+    {
+        // ponytail: split created/updated because changes are only synced on
+        // update — wasChanged() is empty right after an insert.
+        static::created(function (CallQueue $queue): void {
+            if ($queue->moh_recording_id !== null) {
+                SegmentQueueMohJob::dispatch($queue->moh_recording_id);
+            }
+        });
+
+        static::updated(function (CallQueue $queue): void {
+            if (! $queue->wasChanged('moh_recording_id')) {
+                return;
+            }
+
+            $previousId = $queue->getOriginal('moh_recording_id');
+            $currentId = $queue->moh_recording_id;
+
+            if ($previousId !== null && $previousId !== $currentId) {
+                // Only drop segments when no other queue still uses the
+                // recording — queues may share a MOH recording.
+                $stillReferenced = OrganizationScope::bypass(
+                    fn () => static::where('moh_recording_id', $previousId)
+                        ->whereKeyNot($queue->id)
+                        ->exists()
+                );
+
+                if (! $stillReferenced) {
+                    $previous = OrganizationScope::bypass(fn () => Recording::find($previousId));
+                    if ($previous instanceof Recording) {
+                        app(MohSegmentationService::class)->invalidate($previous);
+                    }
+                }
+            }
+
+            if ($currentId !== null) {
+                SegmentQueueMohJob::dispatch($currentId);
+            }
+        });
     }
 
     /**
@@ -120,6 +170,11 @@ class CallQueue extends Model
         return $this->belongsTo(AiAssistantLoadBalancer::class, 'fallback_ai_load_balancer_id');
     }
 
+    public function fallbackCallQueue(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'fallback_call_queue_id');
+    }
+
     public function isActive(): bool
     {
         return $this->status === CallQueueStatus::ACTIVE;
@@ -151,5 +206,11 @@ class CallQueue extends Model
             $q->where('name', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%");
         });
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['fallback_action'];
     }
 }

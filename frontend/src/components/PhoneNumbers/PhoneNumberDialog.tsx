@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 
 interface PhoneNumberDialogProps {
   open: boolean;
@@ -59,7 +60,8 @@ export function PhoneNumberDialog({
     if (open) {
       if (phoneNumber) {
         // Edit mode - populate with existing data
-        const targetId =
+        // Selector option ids are strings; the API may return numeric ids, which would not match
+        const targetId = String(
           phoneNumber.routing_config.extension_id ||
           phoneNumber.routing_config.ai_assistant_id ||
           phoneNumber.routing_config.ai_load_balancer_id ||
@@ -68,7 +70,8 @@ export function PhoneNumberDialog({
           phoneNumber.routing_config.conference_room_id ||
           phoneNumber.routing_config.ivr_menu_id ||
           phoneNumber.routing_config.call_queue_id ||
-          '';
+          ''
+        );
 
         setFormData({
           phone_number: phoneNumber.phone_number,
@@ -120,7 +123,7 @@ export function PhoneNumberDialog({
     }
 
     // Target validation
-    if (!formData.target_id) {
+    if (!formData.target_id && formData.routing_type !== 'unavailable') {
       errors.target_id = 'Please select a destination';
     }
 
@@ -190,6 +193,7 @@ export function PhoneNumberDialog({
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? `Edit Phone Number` : 'Add Phone Number'}
+            {phoneNumber?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
           </DialogTitle>
           <DialogDescription>
             {isEditMode
@@ -280,6 +284,7 @@ export function PhoneNumberDialog({
 
             {/* Unified Destination Selector */}
             <DestinationTypeAndSelector
+              allowDisconnect={isEditMode}
               typeValue={formData.routing_type as DestinationType}
               destinationValue={formData.target_id}
               onChange={(type, destId) => {

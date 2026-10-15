@@ -4,34 +4,117 @@ paths:
       tags:
         - Call Detail Records
       summary: List Call Detail Records
-      description: Get a paginated, filterable list of Call Detail Records for the current organization.
+      description: |
+        Paginated, filterable list of the organization's Call Detail Records, newest
+        `session_timestamp` first by default. Any role can list; a Supervisor always sees only
+        CDRs whose `extension_number`, `from` or `to` matches a resource they supervise (none when
+        nothing is assigned), and a PBX User only CDRs whose `extension_number` or `to` is one of
+        their own extension numbers (bare or `+`-prefixed; none without an extension). The Caller ID
+        (`from`) is display-only and not a filter. The server enforces both
+        scopes by role; filters only narrow them. An unknown `sort_by` falls back to `session_timestamp`.
       operationId: listCallDetailRecords
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
-        - name: from
+        - name: extension
           in: query
           required: false
           schema:
             type: string
-            format: date-time
-          description: Start of the date range (ISO 8601).
+          description: >-
+            Extension filter, on the extension the call belongs to (`extension_number`). A term without a wildcard matches numbers that start with it (with or
+            without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere
+            (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal.
         - name: to
           in: query
           required: false
           schema:
             type: string
-            format: date-time
-          description: End of the date range (ISO 8601).
-        - name: extension_id
+          description: >-
+            Destination (called number) filter. A term without a wildcard matches numbers that start with it (with or
+            without a leading `+`). `*` and `%` are wildcards for any characters and may appear anywhere
+            (a leading wildcard means contains/ends-with and cannot use the index). `_` is literal.
+        - name: extension_destination_match
           in: query
           required: false
           schema:
-            type: integer
-          description: Filter by destination extension.
+            type: string
+            enum: [all, any]
+            default: all
+          description: >-
+            How `extension` and `to` combine when both are sent. `all` (default) returns calls of the
+            extension AND to the destination. `any` returns calls matching either one. Ignored when only
+            one of them is sent; the other filters always still apply. Other values return 422.
+        - name: from_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: First day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored.
+        - name: to_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Last day of the date range (inclusive), on `session_timestamp`. An unparseable value is ignored.
+        - name: disposition
+          in: query
+          schema:
+            type: string
+          description: Exact disposition (for example ANSWER, BUSY, NOANSWER)
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [incoming, outgoing, internal, application]
+        - name: user
+          in: query
+          schema:
+            type: string
+          description: Partial name of the extension's user (not available with `archive`)
+        - name: session_token
+          in: query
+          schema:
+            type: string
+          description: Exact session token (locates the CDR of a queue call)
+        - name: supervisor
+          in: query
+          deprecated: true
+          schema:
+            type: boolean
+          description: Ignored. Supervisors are always restricted to the resources they supervise.
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [session_timestamp, extension_number, from, to, duration, billsec, disposition, user_full_name, direction]
+            default: session_timestamp
+          description: '`user_full_name` is not available with `archive`'
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+          description: Sort direction. Defaults to `desc` on this endpoint.
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [raw_cdr]
+          description: Include the complete raw CDR in each row
+        - name: archive
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: >-
+            Search the warm archive (CDRs older than 6 months and up to 12 months) instead of the
+            live table. Honoured only for requests authenticated with an organisation API key;
+            ignored for session (browser) users. Archived rows have no extension user, and the
+            `user` filter and `user_full_name` sort are not available. CDRs older than the warm
+            period are stored as files and are not available through the API.
       responses:
         '200':
           description: List of Call Detail Records
@@ -49,56 +132,6 @@ paths:
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
 
-  /v1/call-detail-records/export:
-    get:
-      tags:
-        - Call Detail Records
-      summary: Export Call Detail Records
-      description: Export CDRs as CSV/Excel for the current organization.
-      operationId: exportCallDetailRecords
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      parameters:
-        - name: format
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [csv, xlsx]
-            default: csv
-          description: Export format.
-      responses:
-        '200':
-          description: Exported CDR file
-          content:
-            text/csv:
-              schema:
-                type: string
-                format: binary
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
-  /v1/call-detail-records/statistics:
-    get:
-      tags:
-        - Call Detail Records
-      summary: CDR Statistics
-      description: Aggregate statistics for CDRs in the current organization.
-      operationId: callDetailRecordStatistics
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Statistics object
-          content:
-            application/json:
-              schema:
-                type: object
-        '401':
-          $ref: '../../components/responses/Unauthorized.yaml'
-
   /v1/call-detail-records/{call_detail_record}:
     parameters:
       - name: call_detail_record
@@ -111,19 +144,36 @@ paths:
       tags:
         - Call Detail Records
       summary: Get Call Detail Record
-      description: Retrieve a single CDR by ID.
+      description: >-
+        Retrieve a single CDR by ID. A Supervisor gets 403 for a CDR outside the resources they
+        supervise, and a PBX User gets 403 for a CDR that is neither of nor to one of their own extensions.
+        A CDR of another organization, or an unknown ID, is 404. With an organisation API key, `archive=1` looks the CDR up in the warm archive
+        instead of the live table.
+      parameters:
+        - $ref: '../../components/parameters/query/CdrArchive.yaml'
+        - name: include
+          in: query
+          schema:
+            type: string
+            enum: [raw_cdr]
       operationId: getCallDetailRecord
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
       responses:
         '200':
           description: Call Detail Record details
           content:
             application/json:
               schema:
-                $ref: '../../components/schemas/CallDetailRecord.yaml'
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/CallDetailRecord.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'

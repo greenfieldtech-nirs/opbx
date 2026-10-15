@@ -585,7 +585,7 @@ export default function Register() {
                       {/* Info notice about email validation */}
                       {emailValidationStatus === 'error' && (
                         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                           <p className="text-sm text-amber-800">
                             Unable to validate email at this time. Please try again later or contact support.
                           </p>

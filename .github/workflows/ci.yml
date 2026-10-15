@@ -1,0 +1,130 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer:2
+          coverage: none
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      - run: vendor/bin/pint --test
+
+  php-tests:
+    runs-on: ubuntu-latest
+    # Ephemeral service containers: the suite never touches a real database or Redis.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root
+          MYSQL_DATABASE: opbx_test
+          MYSQL_USER: opbx
+          MYSQL_PASSWORD: ci-test-password
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_PASSWORD: ci-test-password
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          tools: composer:2
+          extensions: pdo_mysql, mbstring, zip, exif, pcntl, bcmath, intl, redis
+          coverage: none
+      - run: composer install --no-interaction --no-progress --prefer-dist
+      # phpunit.xml pins DB_HOST=mysql and the Redis host to the compose service names.
+      - run: echo "127.0.0.1 mysql redis" | sudo tee -a /etc/hosts
+      - run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      # Empty .env: dotenv's suppressed read of a missing file is reported as a warning on every test.
+      - run: touch .env
+      - run: php -d memory_limit=1024M artisan test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm test
+      - run: npm run build
+
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dialer-worker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: dialer-worker/go.mod
+          # The module lives in a subdirectory; setup-go looks for go.sum at the repo root by default.
+          cache-dependency-path: dialer-worker/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...
+
+  java:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [acd-worker, amd-worker]
+    defaults:
+      run:
+        working-directory: ${{ matrix.worker }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # amd-worker pulls a ~139 MB onnxruntime jar; a dropped connection to Maven Central
+      # used to fail the whole job ("Premature end of Content-Length delimited message body").
+      # Resolve everything up front with Maven's HTTP retries on, and retry the step itself.
+      - name: Resolve dependencies
+        run: |
+          for attempt in 1 2 3; do
+            mvn -B -q dependency:go-offline \
+              -Daether.transport.http.retryHandler.count=5 \
+              -Dmaven.wagon.http.retryHandler.count=5 && exit 0
+            echo "Dependency download failed (attempt $attempt), retrying in 20 s..."
+            sleep 20
+          done
+          exit 1
+      - run: mvn -B test

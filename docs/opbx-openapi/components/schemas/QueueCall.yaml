@@ -58,3 +58,5 @@ properties:
       - answered
       - abandoned
       - overflow
+      - null
+    description: Null while the call is still in progress

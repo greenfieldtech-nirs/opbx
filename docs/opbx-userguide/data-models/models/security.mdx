@@ -1,0 +1,167 @@
+---
+sidebar_position: 25
+slug: /data-models/models/security
+sidebar_class_name: cxGuidesSidebar
+title: "Inbound Blacklist and Outbound Whitelist"
+---
+
+# Inbound Blacklist and Outbound Whitelist
+
+Call blocking and outbound routing rules.
+
+## InboundBlacklist
+
+A caller ID pattern that is blocked on all numbers or on selected numbers.
+
+**Table:** `inbound_blacklists`  
+**Model:** `App\Models\InboundBlacklist`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `match_type` | enum | No | `exact` | How `caller_id_pattern` is matched. Values: `exact`, `prefix`, `wildcard` (cast to `InboundBlacklistMatchType`) |
+| `caller_id_pattern` | varchar(50) | No | - | Pattern |
+| `description` | varchar(255) | Yes | null | Description |
+| `is_global` | boolean | No | `false` | Applies to every number; otherwise only to the linked numbers |
+| `rejection_strategy` | enum | No | `drop` | What happens to a blocked call. Values: `drop`, `reject`, `torment` (cast to `InboundBlacklistRejectionStrategy`) |
+| `torment_room_prefix` | varchar(20) | Yes | null | Random conference room prefix, generated for `torment` entries |
+| `torment_music_timeout` | int | No | `300` | Seconds a tormented caller is held |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `InboundBlacklistStatus`) |
+| `expires_at` | timestamp | Yes | null | Not used by the current code |
+| `blocked_count` | int | No | `0` | Calls blocked so far |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `inbound_blacklists_organization_id_caller_id_pattern_index`: `organization_id`, `caller_id_pattern`
+- `inbound_blacklists_organization_id_did_number_id_index`: `organization_id`
+- `inbound_blacklists_organization_id_is_global_status_index`: `organization_id`, `is_global`, `status`
+- `inbound_blacklists_organization_id_status_index`: `organization_id`, `status`
+
+**Not mass assignable:** `description`, `expires_at`  
+
+**Relationships**
+
+```php
+$inboundBlacklist->organization() → Organization (organization_id) [BelongsTo]
+$inboundBlacklist->didNumbers() → DidNumber (pivot inbound_blacklist_did_number) [BelongsToMany]
+$inboundBlacklist->blockedCallLogs() → BlockedCallLog (inbound_blacklist_id) [HasMany]
+```
+
+**Methods:** `didNumber()`, `matches()`, `incrementBlockedCount()`, `toggleStatus()`, `isActive()`  
+
+`matches()` compares exactly (`exact`), with `str_starts_with` (`prefix`) or with `fnmatch` (`wildcard`). Numbers are linked through the `inbound_blacklist_did_number` pivot (below).
+
+## inbound_blacklist_did_number
+
+Pivot between blacklist entries and the numbers they apply to.
+
+**Table:** `inbound_blacklist_did_number` (no Eloquent model)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `inbound_blacklist_id` | bigint unsigned | No | - | Blacklist entry. Foreign key to `inbound_blacklists`, on delete cascade |
+| `did_number_id` | bigint unsigned | No | - | Number. Foreign key to `did_numbers`, on delete cascade |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `bl_did_unique` (unique): `inbound_blacklist_id`, `did_number_id`
+- `inbound_blacklist_did_number_did_number_id_index`: `did_number_id`
+- `inbound_blacklist_did_number_inbound_blacklist_id_index`: `inbound_blacklist_id`
+
+## OutboundWhitelist
+
+A destination that outbound calls may reach, and the trunk they use.
+
+**Table:** `outbound_whitelists`  
+**Model:** `App\Models\OutboundWhitelist`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(255) | No | - | Rule name |
+| `destination_country` | varchar(255) | No | - | Country |
+| `destination_prefix` | varchar(255) | Yes | null | Number prefix |
+| `outbound_trunk_name` | varchar(255) | No | - | Cloudonix trunk name |
+| `default_caller_id_did_id` | bigint unsigned | Yes | null | Caller ID for calls that match. Foreign key to `did_numbers`, on delete set null |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `WhitelistStatus`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `outbound_whitelists_default_caller_id_did_id_foreign`: `default_caller_id_did_id`
+- `owl_org_dest_country_idx`: `organization_id`, `destination_country`
+- `owl_org_dest_prefix_idx`: `organization_id`, `destination_prefix`
+- `owl_org_trunk_name_idx`: `organization_id`, `outbound_trunk_name`
+
+
+**Relationships**
+
+```php
+$outboundWhitelist->organization() → Organization (organization_id) [BelongsTo]
+$outboundWhitelist->defaultCallerId() → DidNumber (default_caller_id_did_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `search()`  
+**Methods:** `toggleStatus()`, `isActive()`  
+
+## BlockedCallLog
+
+A call rejected by the inbound blacklist.
+
+**Table:** `blocked_call_logs`  
+**Model:** `App\Models\BlockedCallLog`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `PrunesByRetention`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `inbound_blacklist_id` | bigint unsigned | Yes | null | Entry that matched. Foreign key to `inbound_blacklists`, on delete set null |
+| `did_number_id` | bigint unsigned | Yes | null | Number called. Foreign key to `did_numbers`, on delete set null |
+| `caller_id` | varchar(50) | No | - | Caller |
+| `called_number` | varchar(50) | No | - | Number called |
+| `call_sid` | varchar(100) | Yes | null | Cloudonix call ID |
+| `session_id` | varchar(50) | Yes | null | Cloudonix session |
+| `rejection_strategy` | enum | No | - | Strategy applied. Values: `drop`, `reject`, `torment` (cast to `InboundBlacklistRejectionStrategy`) |
+| `torment_room_id` | varchar(100) | Yes | null | Conference room used for `torment` |
+| `torment_duration` | int | Yes | null | Seconds held |
+| `webhook_payload` | json | Yes | null | Voice webhook payload |
+| `source_ip` | varchar(45) | Yes | null | Webhook source IP |
+| `blocked_at` | timestamp | No | - | When the call was blocked |
+
+**Indexes**
+
+- `bcl_org_blocked_idx`: `organization_id`, `blocked_at`
+- `bcl_org_caller_idx`: `organization_id`, `caller_id`
+- `bcl_org_did_blocked_idx`: `organization_id`, `did_number_id`, `blocked_at`
+- `blocked_call_logs_did_number_id_foreign`: `did_number_id`
+- `blocked_call_logs_inbound_blacklist_id_foreign`: `inbound_blacklist_id`
+
+**Casts:** `webhook_payload` (array)  
+
+**Relationships**
+
+```php
+$blockedCallLog->organization() → Organization (organization_id) [BelongsTo]
+$blockedCallLog->inboundBlacklist() → InboundBlacklist (inbound_blacklist_id) [BelongsTo]
+$blockedCallLog->didNumber() → DidNumber (did_number_id) [BelongsTo]
+```
+
+
+Rows whose `blocked_at` is older than `RETENTION_BLOCKED_CALL_LOGS_DAYS` (default 90) are deleted daily by `model:prune`.
+
+## Related Documentation
+
+- [Inbound Blacklist](/opbx/modules/inbound-blacklist)
+- [Outbound Whitelist](/opbx/modules/outbound-whitelist)

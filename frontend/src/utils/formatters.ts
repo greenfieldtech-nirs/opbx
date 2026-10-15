@@ -1,4 +1,4 @@
-import { format, formatDistance, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 /**
  * Format Utilities

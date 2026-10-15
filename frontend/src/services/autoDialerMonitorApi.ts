@@ -22,19 +22,11 @@ export interface MonitorCampaign {
   concurrent_active_calls: number;
   active_calls: number;
   cac_utilization: number;
-  rate_limit_status: RateLimitStatus;
   caller_id: string;
   routing_destination_type: string;
   routing_destination_label: string;
   start_date: string;
   end_date: string;
-}
-
-export interface RateLimitStatus {
-  is_rate_limited: boolean;
-  pause_reason: string | null;
-  resumes_at: string | null;
-  can_resume_now?: boolean;
 }
 
 export interface MonitorTotals {
@@ -102,7 +94,6 @@ export interface MonitorDetailResponse {
   statistics: MonitorDetailStatistics;
   dispositions: MonitorDetailDispositions;
   active_sessions: MonitorActiveSession[];
-  rate_limit_status: RateLimitStatus;
 }
 
 /**

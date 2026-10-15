@@ -58,6 +58,7 @@ import {
   useRevokeApiKey,
 } from '@/hooks/useApiKeys';
 import type { ApiKey, ApiKeyPermission } from '@/services/apiKeys.service';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function formatLastUsed(value: string | null): string {
   if (!value) return 'Never';
@@ -74,7 +75,7 @@ export default function ApiKeysSettings() {
   const { user } = useAuth();
   const canCreate = user?.role === 'owner';
 
-  const { data: apiKeys = [], isLoading } = useApiKeys();
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: apiKeys = [], isLoading } = useApiKeys();
   const { data: resources = [] } = useGrantableResources();
   const createMutation = useCreateApiKey();
   const revokeMutation = useRevokeApiKey();
@@ -128,6 +129,10 @@ export default function ApiKeysSettings() {
     resetCreateForm();
     setCreateOpen(true);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load API keys" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-4 p-6">
@@ -232,7 +237,7 @@ export default function ApiKeysSettings() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create API Key</DialogTitle>
             <DialogDescription>

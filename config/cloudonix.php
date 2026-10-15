@@ -38,6 +38,11 @@ return [
     |
     */
 
+    // When true, webhooks for orgs without a domain_requests_api_key get 401.
+    'webhooks' => [
+        'require_auth' => (bool) env('CLOUDONIX_WEBHOOK_REQUIRE_AUTH', false),
+    ],
+
     'cxml' => [
         'default_timeout' => (int) env('CXML_DEFAULT_TIMEOUT', 30),
     ],

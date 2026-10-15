@@ -16,10 +16,10 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
 
-    /* Linting - relaxed for now to focus on compilation */
+    /* Linting */
     "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": false,
     "strictNullChecks": false,

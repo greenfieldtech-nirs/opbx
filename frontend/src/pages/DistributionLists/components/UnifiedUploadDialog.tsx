@@ -136,6 +136,7 @@ export function UnifiedUploadDialog({
         listId: list.id,
         file,
         mapping: cleanedMapping,
+        hasHeader,
       });
 
       setJobId(result.data.job_id);
@@ -147,7 +148,7 @@ export function UnifiedUploadDialog({
 
       toast.success(
         result.data.action === 'update'
-          ? `Version ${result.data.new_version_number} created. Old data backed up. Processing...`
+          ? `Version ${result.data.new_version_number} created. The previous entries are in Version History. Processing...`
           : 'Upload started. Processing...'
       );
     } catch (err) {
@@ -213,7 +214,8 @@ export function UnifiedUploadDialog({
           <Alert className="bg-amber-50 border-amber-200">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="text-amber-800">
-              Current version (v{list.version_number}) will be archived and version {newVersionNumber} will be created.
+              The current entries (v{list.version_number}) will be replaced by version {newVersionNumber}. You can
+              still open and download them from the list's Version History tab.
             </AlertDescription>
           </Alert>
         )}
@@ -306,7 +308,7 @@ export function UnifiedUploadDialog({
 
             <div className="space-y-2">
               <Label>Metadata columns</Label>
-              <div className="grid grid-cols-2 gap-2 border rounded p-3">
+              <div className="grid grid-cols-2 gap-2 border rounded-sm p-3">
                 {availableColumns.map((col) => (
                   <div key={col} className="flex items-center gap-2">
                     <Checkbox

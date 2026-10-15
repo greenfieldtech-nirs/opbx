@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -7,18 +7,14 @@ import {
   Download,
   Archive,
   Trash2,
-  FileSpreadsheet,
   Phone,
   Clock,
   BarChart3,
   AlertCircle,
   CheckCircle,
-  XCircle,
   RotateCcw,
-  ExternalLink,
   Filter,
   Search,
-  History,
   RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,28 +42,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/hooks/useAuth';
-import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations } from '@/hooks/useDistributionLists';
+import { can, canDeleteDistributionList } from '@/utils/roleHelpers';
+import { distributionListKeys, useDistributionList, useListDestinations, useDownloadList, useResetDialAttempts, useBulkResetDialAttempts, useResetPendingDestinations, useDeleteList, useArchiveList } from '@/hooks/useDistributionLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { DistributionListsLoading } from './DistributionLists/components/DistributionListsLoading';
 import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
-import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
+import { ListVersionHistory } from './DistributionLists/components/ListVersionHistory';
+import { ListParts } from './DistributionLists/components/ListParts';
 import { toast } from 'sonner';
-import type { AutoDialerList, ListDestination } from '@/types';
+import { getApiErrorMessage } from '@/services/api';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-800',
@@ -78,6 +71,8 @@ const statusColors: Record<string, string> = {
   in_use: 'bg-purple-100 text-purple-800',
   used: 'bg-orange-100 text-orange-800',
   archived: 'bg-gray-100 text-gray-500',
+  active: 'bg-green-100 text-green-800',
+  paused: 'bg-yellow-100 text-yellow-800',
   completed: 'bg-green-100 text-green-800',
   connected: 'bg-blue-100 text-blue-800',
   invalid: 'bg-red-100 text-red-800',
@@ -114,27 +109,30 @@ export default function DistributionListDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   // Get return URL from location state, default to distribution lists
   const returnUrl = (location.state as { from?: string })?.from || '/ui/auto-dialer/distribution-lists';
 
   const [activeTab, setActiveTab] = useState('destinations');
+  // Opening a part (or its source list) reuses this page: start each list on its entries.
+  useEffect(() => setActiveTab('destinations'), [id]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selectedDestinations, setSelectedDestinations] = useState<number[]>([]);
-  const [cdrPhoneNumber, setCdrPhoneNumber] = useState<string | null>(null);
 
   // Dialog states
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isCopyOpen, setIsCopyOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isErrorsOpen, setIsErrorsOpen] = useState(false);
+  const deleteListMutation = useDeleteList();
+  const archiveListMutation = useArchiveList();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: listData, isLoading: isListLoading } = useDistributionList(id!);
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: listData, isLoading: isListLoading } = useDistributionList(id!);
   const { data: destinationsData, isLoading: isDestinationsLoading } = useListDestinations(
     id!,
     { page, per_page: 25, status: statusFilter !== 'all' ? statusFilter : undefined, search: search || undefined }
@@ -146,6 +144,15 @@ export default function DistributionListDetail() {
   const queryClient = useQueryClient();
 
   const list = listData?.data;
+
+  // When a worker finishes processing an upload, reload the entries (the dialog may be closed by then)
+  const previousStatus = useRef(list?.status);
+  useEffect(() => {
+    if (previousStatus.current === 'processing' && list?.status !== 'processing') {
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.destinations(id!) });
+    }
+    previousStatus.current = list?.status;
+  }, [list?.status, id, queryClient]);
   const destinations = destinationsData?.data || [];
   const meta = destinationsData?.meta;
 
@@ -215,11 +222,6 @@ export default function DistributionListDetail() {
     }
   };
 
-  const handleRetryFailed = () => {
-    // TODO: Implement retry failed destinations
-    toast.info('Retry functionality coming soon');
-  };
-
   const handleResetDialAttempts = (destinationId: number) => {
     resetDialAttemptsMutation.mutate(
       { listId: id!, destinationId },
@@ -264,17 +266,6 @@ export default function DistributionListDetail() {
     );
   };
 
-  const handleDeleteDestination = (destinationId: number) => {
-    // TODO: Implement delete destination
-    toast.info('Delete destination functionality coming soon');
-  };
-
-  const handleBulkDelete = () => {
-    // TODO: Implement bulk delete
-    toast.info(`Deleting ${selectedDestinations.length} destinations...`);
-    setSelectedDestinations([]);
-  };
-
   const toggleDestinationSelection = (id: number) => {
     setSelectedDestinations(prev => 
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
@@ -289,9 +280,9 @@ export default function DistributionListDetail() {
     }
   };
 
-  const openCDRHistory = (phoneNumber: string) => {
-    setCdrPhoneNumber(phoneNumber);
-  };
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load distribution list" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -313,11 +304,11 @@ export default function DistributionListDetail() {
           {list.description && (
             <p className="text-muted-foreground">{list.description}</p>
           )}
-          {list.parent_list_id && (
+          {list.parent_list && (
             <p className="text-sm text-muted-foreground">
-              Copied from{' '}
-              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.parent_list_id}`)}>
-                Version {list.parent_list?.version_number || 'Unknown'}
+              Part of{' '}
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${list.parent_list!.id}`)}>
+                {list.parent_list.name}
               </Button>
             </p>
           )}
@@ -328,7 +319,8 @@ export default function DistributionListDetail() {
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          {canManage && list.status !== 'in_use' && (
+          {/* Server accepts uploads for ListStatus::canUpload() or canCreateVersion(); others get 422 */}
+          {canManage && ['draft', 'pending', 'failed', 'ready', 'used'].includes(list.status) && (
             <Button variant="outline" onClick={() => setIsUploadOpen(true)}>
               <Upload className="h-4 w-4 mr-2" />
               Upload
@@ -340,17 +332,29 @@ export default function DistributionListDetail() {
               Copy
             </Button>
           )}
-          <Button variant="outline" onClick={handleDownload} disabled={downloadMutation.isPending}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
+          {canManage && (
+            <Button variant="outline" onClick={handleDownload} disabled={downloadMutation.isPending}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          )}
           {list.can_archive && canManage && list.status !== 'failed' && (
             <Button variant="outline" className="text-red-600" onClick={() => setIsArchiveOpen(true)}>
               <Archive className="h-4 w-4 mr-2" />
               Archive
             </Button>
           )}
-          {list.status === 'failed' && canManage && (
+          {list.campaign_id && canManage && (
+            <Button
+              variant="outline"
+              disabled
+              title="This list is assigned to a campaign. Unassign it first to archive or delete it."
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Archive
+            </Button>
+          )}
+          {list.can_delete && canDeleteDistributionList(user?.role, list.status) && (
             <Button variant="outline" className="text-red-600" onClick={() => setIsDeleteOpen(true)}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -409,7 +413,7 @@ export default function DistributionListDetail() {
               <div>
                 <p className="text-sm text-muted-foreground">Status</p>
                 <Badge className={statusColors[list.used_by_campaign.status] || 'bg-gray-100'}>
-                  {list.used_by_campaign.status}
+                  {list.used_by_campaign.status_label}
                 </Badge>
               </div>
             </div>
@@ -421,8 +425,8 @@ export default function DistributionListDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="destinations">Destinations</TabsTrigger>
-          {list.versions?.length > 0 && <TabsTrigger value="versions">Version History</TabsTrigger>}
-          {list.status === 'failed' && <TabsTrigger value="errors">Validation Errors</TabsTrigger>}
+          {list.has_versions && <TabsTrigger value="versions">Version History</TabsTrigger>}
+          {!!list.parts_count && <TabsTrigger value="parts">Parts ({list.parts_count})</TabsTrigger>}
           {list.original_filename && <TabsTrigger value="upload">Upload Info</TabsTrigger>}
         </TabsList>
 
@@ -453,30 +457,22 @@ export default function DistributionListDetail() {
                     <SelectItem value="invalid">Invalid</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={handleResetPendingDestinations}
-                  disabled={resetPendingDestinationsMutation.isPending}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset Pending Entries
-                </Button>
-                {selectedDestinations.length > 0 && (
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="h-10" onClick={handleRetryFailed}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Retry ({selectedDestinations.length})
-                    </Button>
-                    <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset Dial Attempts ({selectedDestinations.length})
-                    </Button>
-                    <Button variant="destructive" className="h-10" onClick={handleBulkDelete}>
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </Button>
-                  </div>
+                {canManage && (
+                  <Button
+                    variant="outline"
+                    className="h-10"
+                    onClick={handleResetPendingDestinations}
+                    disabled={resetPendingDestinationsMutation.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Pending Entries
+                  </Button>
+                )}
+                {canManage && selectedDestinations.length > 0 && (
+                  <Button variant="outline" className="h-10" onClick={handleBulkResetDialAttempts}>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Dial Attempts ({selectedDestinations.length})
+                  </Button>
                 )}
               </div>
             </CardContent>
@@ -488,12 +484,14 @@ export default function DistributionListDetail() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40px]">
-                      <Checkbox
-                        checked={selectedDestinations.length === destinations.length && destinations.length > 0}
-                        onCheckedChange={toggleAllDestinations}
-                      />
-                    </TableHead>
+                    {canManage && (
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={selectedDestinations.length === destinations.length && destinations.length > 0}
+                          onCheckedChange={toggleAllDestinations}
+                        />
+                      </TableHead>
+                    )}
                     <TableHead>Phone Number</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Batch</TableHead>
@@ -502,39 +500,35 @@ export default function DistributionListDetail() {
                     <TableHead>Dial Attempts</TableHead>
                     <TableHead>Last Call</TableHead>
                     <TableHead>Duration</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    {canManage && <TableHead className="w-[80px]">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isDestinationsLoading ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8">
+                      <TableCell colSpan={canManage ? 10 : 8} className="text-center py-8">
                         Loading destinations...
                       </TableCell>
                     </TableRow>
                   ) : destinations.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={canManage ? 10 : 8} className="text-center py-8 text-muted-foreground">
                         No destinations found
                       </TableCell>
                     </TableRow>
                   ) : (
                     destinations.map((destination) => (
                       <TableRow key={destination.id}>
+                        {canManage && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedDestinations.includes(destination.id)}
+                              onCheckedChange={() => toggleDestinationSelection(destination.id)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell>
-                          <Checkbox
-                            checked={selectedDestinations.includes(destination.id)}
-                            onCheckedChange={() => toggleDestinationSelection(destination.id)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            className="font-mono text-sm hover:underline hover:text-primary flex items-center gap-1"
-                            onClick={() => openCDRHistory(destination.phone_number)}
-                          >
-                            {destination.phone_number}
-                            <ExternalLink className="h-3 w-3" />
-                          </button>
+                          <span className="font-mono text-sm">{destination.phone_number}</span>
                         </TableCell>
                         <TableCell className="max-w-[200px]">
                           {destination.name || '-'}
@@ -591,8 +585,8 @@ export default function DistributionListDetail() {
                             '-'
                           )}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                        {canManage && (
+                          <TableCell>
                             {destination.dial_attempts > 0 && (
                               <TooltipProvider>
                                 <Tooltip>
@@ -611,26 +605,8 @@ export default function DistributionListDetail() {
                                 </Tooltip>
                               </TooltipProvider>
                             )}
-                            {destination.status === 'failed' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRetryFailed()}
-                              >
-                                <RotateCcw className="h-4 w-4 mr-1" />
-                                Retry
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteDestination(destination.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))
                   )}
@@ -666,70 +642,11 @@ export default function DistributionListDetail() {
         </TabsContent>
 
         <TabsContent value="versions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Version History</CardTitle>
-              <CardDescription>All versions of this list</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Destinations</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.versions?.map((version) => (
-                    <TableRow key={version.id}>
-                      <TableCell>v{version.version_number}</TableCell>
-                      <TableCell>
-                        <Badge className={statusColors[version.status]}>
-                          {version.status_label}
-                        </Badge>
-                        {version.is_latest_version && (
-                          <Badge variant="secondary" className="ml-2">Latest</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{version.statistics?.valid_rows || 0} valid</TableCell>
-                      <TableCell>{new Date(version.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/ui/auto-dialer/distribution-lists/${version.id}`)}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <ListVersionHistory listId={id!} listName={list.name} canDownload={canManage} />
         </TabsContent>
 
-        <TabsContent value="errors">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-600">
-                <XCircle className="h-5 w-5" />
-                Validation Errors
-              </CardTitle>
-              <CardDescription>Errors found during CSV validation</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="mb-4">
-                <Download className="h-4 w-4 mr-2" />
-                Download Errors CSV
-              </Button>
-              {/* Errors table would go here */}
-            </CardContent>
-          </Card>
+        <TabsContent value="parts">
+          <ListParts listId={id!} />
         </TabsContent>
 
         <TabsContent value="upload">
@@ -790,53 +707,37 @@ export default function DistributionListDetail() {
         list={list}
         open={isArchiveOpen}
         onOpenChange={setIsArchiveOpen}
-        onConfirm={() => {
-          toast.success('List archived');
-          setIsArchiveOpen(false);
+        onConfirm={async () => {
+          try {
+            await archiveListMutation.mutateAsync(list.id);
+            toast.success('List archived');
+            setIsArchiveOpen(false);
+          } catch (err) {
+            toast.error(getApiErrorMessage(err) || 'Failed to archive list');
+          }
         }}
-        isArchiving={false}
+        isArchiving={archiveListMutation.isPending}
       />
 
       <DeleteListDialog
         list={list}
         open={isDeleteOpen}
         onOpenChange={setIsDeleteOpen}
-        onConfirm={() => {
-          toast.success('List deleted');
-          setIsDeleteOpen(false);
-          navigate('/ui/auto-dialer/distribution-lists');
+        onConfirm={async () => {
+          try {
+            await deleteListMutation.mutateAsync(list.id);
+            toast.success('List deleted');
+            setIsDeleteOpen(false);
+            navigate('/ui/auto-dialer/distribution-lists');
+          } catch (err) {
+            setIsDeleteOpen(false);
+            if (!showIfInUse(err)) toast.error('Failed to delete list');
+          }
         }}
-        isDeleting={false}
+        isDeleting={deleteListMutation.isPending}
       />
 
-      <ValidationErrorsDialog
-        list={list}
-        open={isErrorsOpen}
-        onOpenChange={setIsErrorsOpen}
-      />
-
-      {/* CDR History Dialog */}
-      <Dialog open={!!cdrPhoneNumber} onOpenChange={() => setCdrPhoneNumber(null)}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Call History
-            </DialogTitle>
-            <DialogDescription>
-              Recent calls to {cdrPhoneNumber}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              CDR integration coming soon. This will show the call detail records for this phone number.
-            </p>
-            <Button variant="outline" className="w-full" onClick={() => setCdrPhoneNumber(null)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {inUseDialog}
     </div>
   );
 }

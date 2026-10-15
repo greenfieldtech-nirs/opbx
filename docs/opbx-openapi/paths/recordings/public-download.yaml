@@ -6,12 +6,62 @@ paths:
       summary: Public recording download with HMAC
       operationId: publicRecordingDownload
       security: []
+      description: |
+        Serves a stored recording through a signed, expiring URL. Used for audio that Cloudonix
+        fetches while playing IVR menu greetings and call queue hold music; the URLs are generated
+        by the voice-routing code (lifetime 1 hour). No authentication or rate limit applies.
+
+        `sig` is the hex HMAC-SHA256 of `<path>|<expires>` keyed with the application key.
+        The file is read from the recordings storage at `<path>`; if it is missing there, the
+        legacy local file `ivr/<filename>` is tried. `Content-Type` follows the file extension
+        (`wav` audio/wav, `mp3` audio/mpeg, `ogg` audio/ogg, `m4a` audio/m4a, `aac` audio/aac,
+        `flac` audio/flac, anything else audio/wav), with `Cache-Control: public, max-age=300`.
       parameters:
         - name: path
           in: path
           required: true
+          description: '`<organization_id>/<filename>`; the route only matches `[0-9]+/.+`'
           schema:
             type: string
+        - name: expires
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Unix expiry timestamp
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+          description: HMAC signature
       responses:
         '200':
-          description: Recording downloaded
+          description: Recording file
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Missing or invalid signature (`Forbidden`) or URL expired (`URL expired`), as plain text
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: 'File not found in either location (`{error: File not found}`)'
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '500':
+          description: Unexpected error (plain text `Internal server error`)
+          content:
+            text/plain:
+              schema:
+                type: string

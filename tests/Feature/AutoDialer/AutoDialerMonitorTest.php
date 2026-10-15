@@ -14,6 +14,7 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Redis;
 use Tests\TestCase;
 
 /**
@@ -101,11 +102,6 @@ class AutoDialerMonitorTest extends TestCase
                             'concurrent_active_calls',
                             'active_calls',
                             'cac_utilization',
-                            'rate_limit_status' => [
-                                'is_rate_limited',
-                                'pause_reason',
-                                'resumes_at',
-                            ],
                             'caller_id',
                             'routing_destination_type',
                             'routing_destination_label',
@@ -355,12 +351,6 @@ class AutoDialerMonitorTest extends TestCase
                         'cancelled',
                         'congestion',
                     ],
-                    'rate_limit_status' => [
-                        'is_rate_limited',
-                        'pause_reason',
-                        'resumes_at',
-                        'can_resume_now',
-                    ],
                 ],
             ]);
     }
@@ -541,10 +531,9 @@ class AutoDialerMonitorTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_monitor_detail_allows_same_organization_users(): void
+    public function test_monitor_detail_refuses_pbx_user(): void
     {
-        // The view policy only checks organization, not role
-        // So regular users in the same org can view campaign details
+        // Auto-dialer read access is Owner, PBX Admin and Reporter only.
         $campaign = AutoDialerCampaign::factory()->create([
             'organization_id' => $this->organization->id,
             'status' => CampaignStatus::ACTIVE,
@@ -553,7 +542,7 @@ class AutoDialerMonitorTest extends TestCase
         $response = $this->actingAs($this->regularUser)
             ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail");
 
-        $response->assertOk();
+        $response->assertForbidden();
     }
 
     public function test_monitor_detail_owner_can_access(): void
@@ -586,11 +575,11 @@ class AutoDialerMonitorTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.campaign.status', 'paused')
-            ->assertJsonPath('data.rate_limit_status.is_rate_limited', false)
-            ->assertJsonPath('data.rate_limit_status.pause_reason', 'Manual pause');
+            ->assertJsonMissingPath('data.rate_limit_status');
     }
 
-    public function test_monitor_detail_shows_rate_limited_status(): void
+    /** The Rate Limited indicator is gone (R47): no rate_limit_status on the summary, detail or concurrency endpoints. */
+    public function test_monitor_no_longer_reports_rate_limit_status(): void
     {
         $campaign = AutoDialerCampaign::factory()->create([
             'organization_id' => $this->organization->id,
@@ -599,12 +588,82 @@ class AutoDialerMonitorTest extends TestCase
             'resume_at' => now()->addMinutes(30),
         ]);
 
-        $response = $this->actingAs($this->adminUser)
-            ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail");
+        $this->actingAs($this->adminUser)->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/monitor/detail")
+            ->assertOk()->assertJsonMissingPath('data.rate_limit_status');
+        $this->actingAs($this->adminUser)->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/concurrency")
+            ->assertOk()->assertJsonMissingPath('data.rate_limit_status');
+        $summary = $this->actingAs($this->adminUser)->getJson('/api/v1/auto-dialer-campaigns/monitor/summary')
+            ->assertOk()->json('data');
+        $this->assertStringNotContainsString('rate_limit_status', (string) json_encode($summary));
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CONCURRENCY ENDPOINT TESTS
+    // GET /api/v1/auto-dialer-campaigns/{campaign}/concurrency
+    // ═══════════════════════════════════════════════════════════
+
+    public function test_concurrency_reads_worker_cac_counter_and_live_sessions(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::ACTIVE,
+            'concurrent_active_calls' => 10,
+        ]);
+        $key = "dialer:cac:{$campaign->id}:active";
+        Redis::connection('dialer')->set($key, 4);
+
+        $live = AutoDialerCallSession::factory()->create([
+            'organization_id' => $this->organization->id,
+            'campaign_id' => $campaign->id,
+            'status' => 'answered',
+            'call_id' => 'call-live-1',
+            'initiated_at' => now()->subSeconds(30),
+        ]);
+        AutoDialerCallSession::factory()->create([
+            'organization_id' => $this->organization->id,
+            'campaign_id' => $campaign->id,
+            'status' => 'completed',
+            'initiated_at' => now()->subSeconds(30),
+        ]);
+
+        try {
+            $response = $this->actingAs($this->adminUser)
+                ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/concurrency");
+        } finally {
+            Redis::connection('dialer')->del($key);
+        }
 
         $response->assertOk()
-            ->assertJsonPath('data.rate_limit_status.is_rate_limited', true)
-            ->assertJsonPath('data.rate_limit_status.pause_reason', 'cloudonix_rate_limit')
-            ->assertJsonPath('data.rate_limit_status.can_resume_now', false);
+            ->assertJsonPath('data.cac_limit', 10)
+            ->assertJsonPath('data.active_calls', 4)
+            ->assertJsonPath('data.available_slots', 6)
+            ->assertJsonPath('data.utilization_percentage', 40)
+            ->assertJsonCount(1, 'data.active_sessions')
+            ->assertJsonPath('data.active_sessions.0.id', $live->id)
+            ->assertJsonPath('data.active_sessions.0.status', 'answered')
+            ->assertJsonPath('data.active_sessions.0.call_id', 'call-live-1');
+    }
+
+    public function test_concurrency_reports_zero_for_paused_campaign(): void
+    {
+        $campaign = AutoDialerCampaign::factory()->create([
+            'organization_id' => $this->organization->id,
+            'status' => CampaignStatus::PAUSED,
+            'concurrent_active_calls' => 10,
+        ]);
+        $key = "dialer:cac:{$campaign->id}:active";
+        Redis::connection('dialer')->set($key, 3);
+
+        try {
+            $response = $this->actingAs($this->adminUser)
+                ->getJson("/api/v1/auto-dialer-campaigns/{$campaign->id}/concurrency");
+        } finally {
+            Redis::connection('dialer')->del($key);
+        }
+
+        $response->assertOk()
+            ->assertJsonPath('data.active_calls', 0)
+            ->assertJsonPath('data.available_slots', 10)
+            ->assertJsonPath('data.active_sessions', []);
     }
 }

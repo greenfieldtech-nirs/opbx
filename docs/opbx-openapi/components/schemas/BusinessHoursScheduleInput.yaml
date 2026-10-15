@@ -1,0 +1,126 @@
+type: object
+description: >-
+  Business hours schedule create/update request. On create, `name`, `timezone`,
+  `open_hours_action`, `closed_hours_action` and `schedule` are required, days that
+  are not sent are stored as disabled, and `status` defaults to `active`. On update
+  (PUT or PATCH) every field is optional: only the fields sent are validated and
+  saved, and the others keep their stored values.
+properties:
+  name:
+    type: string
+    minLength: 2
+    maxLength: 255
+    description: Unique within the organization
+  status:
+    type: string
+    enum: [active, inactive]
+    description: Defaults to `active` on create when omitted or empty; on update an omitted status is kept
+  timezone:
+    type: string
+    description: Any valid timezone identifier
+    example: America/New_York
+  open_hours_action:
+    $ref: '#/$defs/Action'
+  closed_hours_action:
+    $ref: '#/$defs/Action'
+  schedule:
+    type: object
+    description: >-
+      On create, days that are not sent are stored as disabled with no time ranges.
+      On update, each day sent replaces that day and days not sent keep their hours.
+    properties:
+      monday:
+        $ref: '#/$defs/Day'
+      tuesday:
+        $ref: '#/$defs/Day'
+      wednesday:
+        $ref: '#/$defs/Day'
+      thursday:
+        $ref: '#/$defs/Day'
+      friday:
+        $ref: '#/$defs/Day'
+      saturday:
+        $ref: '#/$defs/Day'
+      sunday:
+        $ref: '#/$defs/Day'
+  exceptions:
+    type:
+      - array
+      - 'null'
+    maxItems: 100
+    description: >-
+      Date exceptions. When two exceptions share a date only the first is kept.
+      On update, a sent `exceptions` (also `[]` or null) replaces every exception;
+      when omitted the stored exceptions are kept.
+      `closed` exceptions must not have time ranges; `special_hours` exceptions
+      need at least one.
+    items:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Y-m-d
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        type:
+          type: string
+          enum: [closed, special_hours]
+          description: >-
+            Stored as sent. A `special_hours` exception is open only during its time
+            ranges on that date; a `closed` exception is closed all day.
+        time_ranges:
+          type:
+            - array
+            - 'null'
+          items:
+            $ref: '#/$defs/TimeRange'
+      required: [date, name, type]
+$defs:
+  TimeRange:
+    type: object
+    properties:
+      start_time:
+        type: string
+        pattern: ^\d{2}:\d{2}$
+        description: H:i
+        example: '09:00'
+      end_time:
+        type: string
+        pattern: ^(([01][0-9]|2[0-3]):[0-5][0-9]|24:00)$
+        description: H:i, after start_time. 24:00 means end of day, so 00:00-24:00 is open the whole day
+        example: '17:00'
+    required: [start_time, end_time]
+  Day:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+      time_ranges:
+        type:
+          - array
+          - 'null'
+        items:
+          $ref: '#/$defs/TimeRange'
+    required: [enabled]
+    description: An enabled day needs at least one time range
+  Action:
+    type: object
+    properties:
+      type:
+        type: string
+        enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, call_queue, unavailable]
+        description: '`unavailable` is rejected on create (422) and accepted on update'
+      target_id:
+        type: string
+        maxLength: 255
+        description: >-
+          Prefixed target ID: `ext-{id}` (extension), `rg-{id}` (ring group),
+          `queue-{id}` (call queue) and `ivr-{id}` (IVR menu) are format-checked;
+          `conf-{id}` (conference room) and `alb-{id}` (AI load balancer) are the
+          formats the UI sends; an AI assistant uses its plain ID. Prefixed
+          extension, ring group, call queue, IVR menu and conference room
+          targets must exist in the organization.
+    required: [type, target_id]

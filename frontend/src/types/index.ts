@@ -70,7 +70,7 @@ export type CallDirection = 'inbound' | 'outbound';
 export type RingGroupStrategy = 'simultaneous' | 'round_robin' | 'sequential';
 
 // Ring Group Fallback Action
-export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup';
+export type RingGroupFallbackAction = 'extension' | 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'ai_load_balancer' | 'call_queue' | 'hangup' | 'unavailable';
 
 // AI Assistant Load Balancer Strategy
 export type AlbsStrategy = 'round_robin' | 'priority' | 'percentage';
@@ -178,6 +178,8 @@ export interface Extension {
 
 // DID Number
 export interface DIDNumber {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   phone_number: string;
@@ -225,6 +227,8 @@ export interface RingGroupMember {
 
 // Ring Group
 export interface RingGroup {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -263,6 +267,8 @@ export interface AiAssistantLoadBalancerMember {
 
 // AI Assistant Load Balancer
 export interface AiAssistantLoadBalancer {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -275,6 +281,8 @@ export interface AiAssistantLoadBalancer {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   fallback_extension?: {
     id: string;
     extension_number: string;
@@ -423,6 +431,8 @@ export interface RecentCall {
 export interface LoginRequest {
   email: string;
   password: string;
+  /** "Remember me": 30-day token kept across browser restarts (default: 24 hours, this browser session) */
+  remember?: boolean;
 }
 
 export interface LoginResponse {
@@ -634,6 +644,8 @@ export interface CreateAiAssistantLoadBalancerRequest {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   status?: Status;
 }
 
@@ -654,6 +666,8 @@ export interface UpdateAiAssistantLoadBalancerRequest {
   fallback_ring_group_id?: string;
   fallback_ivr_menu_id?: string;
   fallback_ai_assistant_id?: string;
+  fallback_call_queue_id?: string;
+  fallback_ai_load_balancer_id?: string;
   status?: Status;
 }
 
@@ -752,7 +766,7 @@ export interface ExceptionDate {
 
 export type ScheduleStatus = 'active' | 'inactive';
 
-export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference_room' | 'ai_assistant' | 'ai_load_balancer' | 'forward';
+export type BusinessHoursActionType = 'extension' | 'ivr_menu' | 'ring_group' | 'conference_room' | 'ai_assistant' | 'ai_load_balancer' | 'forward' | 'unavailable';
 
 export interface BusinessHoursAction {
   type: BusinessHoursActionType;
@@ -760,6 +774,8 @@ export interface BusinessHoursAction {
 }
 
 export interface BusinessHoursSchedule {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;
@@ -938,6 +954,8 @@ export interface WebhookUrlDetails {
 }
 
 export interface CloudonixSettings {
+  /** Set by the update endpoint when the settings were saved locally but the Cloudonix sync failed. */
+  warning?: string;
   id: number;
   organization_id: number;
   domain_uuid: string | null;
@@ -969,7 +987,6 @@ export interface UpdateCloudonixSettingsRequest {
   no_answer_timeout?: number;
   call_recording_mode?: CallRecordingMode;
   recording_format?: RecordingFormat;
-  cloudonix_package?: string;
 }
 
 export interface ValidateCloudonixCredentialsRequest {
@@ -1278,17 +1295,23 @@ export interface AutoDialerList {
     invalid_rows: number;
   };
   parent_list_id: number | null;
+  /** The list this "(Part N)" list was split from. */
   parent_list?: {
     id: number;
-    version_number: number;
+    name: string;
   };
+  /** Whether previous versions (entries replaced by a re-upload) are kept. */
   has_versions: boolean;
+  /** "(Part N)" lists a large upload was split into; deleting the list deletes them too. */
+  parts_count?: number;
   can_archive: boolean;
   can_assign: boolean;
   can_upload: boolean;
   can_copy: boolean;
   can_delete: boolean;
   can_unassign: boolean;
+  /** Why the list cannot be unassigned (campaign active, or entries started); null when it can or is not assigned. */
+  unassign_refusal: string | null;
   created_at: string;
   processed_at: string | null;
   archived_at: string | null;
@@ -1301,8 +1324,40 @@ export interface AutoDialerList {
     id: number;
     name: string;
     status: string;
+    status_label: string;
   };
-  versions?: AutoDialerList[];
+}
+
+/** A previous version of a distribution list: the entries a re-upload replaced. */
+export interface ListVersion {
+  id: number;
+  list_id: number;
+  version_number: number;
+  original_filename: string | null;
+  uploaded_at: string | null;
+  uploaded_by: { id: number; name: string } | null;
+  replaced_at: string;
+  /** When the version is deleted; null when versions are kept indefinitely. */
+  expires_at: string | null;
+  entries_count: number;
+  total_rows: number | null;
+  valid_rows: number | null;
+  invalid_rows: number | null;
+}
+
+/** One entry of a previous version, as it was when the version was replaced. */
+export interface ListVersionDestination {
+  id: number;
+  phone_number: string;
+  name: string | null;
+  batch_identifier: string | null;
+  metadata: Record<string, string> | null;
+  status: string;
+  status_label: string;
+  dial_attempts: number;
+  last_disposition: string | null;
+  last_dialed_at: string | null;
+  duration: number;
 }
 
 export interface ListDestination {
@@ -1385,6 +1440,8 @@ export interface IvrMenuOption {
 }
 
 export interface IvrMenu {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: string;
   organization_id: string;
   name: string;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Recording;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -29,7 +30,7 @@ class IvrMenuResource extends JsonResource
         if ($audioFilePath && str_contains($audioFilePath, '/api/v1/recordings/download')) {
             // Try to extract recording ID from the URL by finding a matching recording
             // The recording is identified by checking if the audio path matches any recording's file_path
-            $recording = \App\Models\Recording::where('organization_id', $this->organization_id)
+            $recording = Recording::where('organization_id', $this->organization_id)
                 ->where(function ($query) {
                     $query->whereNotNull('file_path')
                         ->where('file_path', '!=', '');
@@ -61,6 +62,7 @@ class IvrMenuResource extends JsonResource
             'failover_destination_type' => $this->failover_destination_type?->value,
             'failover_destination_id' => $this->failover_destination_id,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'options_count' => $this->whenCounted('options'),
             'options' => $this->whenLoaded('options', function () {
                 return $this->options->map(function ($option) {

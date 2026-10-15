@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\BusinessHoursActionType;
 use App\Enums\BusinessHoursStatus;
 use App\Enums\DayOfWeek;
+use App\Models\Concerns\HasUnprovisionedState;
 use App\Scopes\OrganizationScope;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -50,7 +51,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class BusinessHoursSchedule extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasUnprovisionedState, SoftDeletes;
 
     /**
      * The table associated with the model.
@@ -148,10 +149,6 @@ class BusinessHoursSchedule extends Model
      */
     public function getCurrentStatusAttribute(): string
     {
-        if ($this->status === BusinessHoursStatus::INACTIVE) {
-            return 'closed';
-        }
-
         return $this->isCurrentlyOpen() ? 'open' : 'closed';
     }
 
@@ -160,7 +157,13 @@ class BusinessHoursSchedule extends Model
      */
     public function isCurrentlyOpen(?Carbon $dateTime = null): bool
     {
-        $dateTime ??= Carbon::now();
+        // An inactive schedule is never open: every routing path then uses its Closed action.
+        if ($this->status !== BusinessHoursStatus::ACTIVE) {
+            return false;
+        }
+
+        // Evaluate in the schedule's own time zone (defaults to UTC, seeded from the organisation's).
+        $dateTime = ($dateTime ?? Carbon::now())->copy()->setTimezone($this->timezone ?: 'UTC');
 
         // Check if it's an exception date
         $exception = $this->getExceptionForDate($dateTime);
@@ -232,7 +235,7 @@ class BusinessHoursSchedule extends Model
      * Validates and extracts the target type and numeric ID from prefixed strings
      * like "ext-13", "rg-5", "conf-1", or "ivr-1".
      *
-     * @param string $targetId The target ID in prefixed format (e.g., "ext-13")
+     * @param  string  $targetId  The target ID in prefixed format (e.g., "ext-13")
      * @return array|null Returns ['type' => string, 'id' => int] or null if invalid
      *
      * @see BusinessHoursActionType for valid target type prefixes
@@ -262,7 +265,7 @@ class BusinessHoursSchedule extends Model
     /**
      * Validate that a target ID is in the correct prefixed format.
      *
-     * @param string $targetId The target ID to validate
+     * @param  string  $targetId  The target ID to validate
      * @return bool True if valid, false otherwise
      */
     public static function isValidTargetId(string $targetId): bool
@@ -271,7 +274,7 @@ class BusinessHoursSchedule extends Model
     }
 
     /**
-     * Convert business hours action to routing format expected by CallRoutingService.
+     * Convert business hours action to routing format expected by the voice routing strategies.
      *
      * Parses target_id using the prefixed format (ext-13, rg-5, etc.) and extracts
      * the numeric ID for database lookups.
@@ -280,6 +283,10 @@ class BusinessHoursSchedule extends Model
      */
     private function convertActionToRoutingFormat(array $action, BusinessHoursActionType $actionType): array
     {
+        if ($actionType === BusinessHoursActionType::UNAVAILABLE) {
+            return ['type' => 'unavailable', 'config' => []];
+        }
+
         $targetId = $action['target_id'] ?? null;
 
         if (! $targetId) {
@@ -314,6 +321,12 @@ class BusinessHoursSchedule extends Model
                 // Parse "ivr-1" to get IVR menu ID 1
                 if (preg_match('/^ivr-(\d+)$/', $targetId, $matches)) {
                     $config['ivr_menu_id'] = (int) $matches[1];
+                }
+                break;
+
+            case BusinessHoursActionType::CALL_QUEUE:
+                if (preg_match('/^queue-(\d+)$/', $targetId, $matches)) {
+                    $config['call_queue_id'] = (int) $matches[1];
                 }
                 break;
         }
@@ -410,5 +423,11 @@ class BusinessHoursSchedule extends Model
         return $this->isCurrentlyOpen($dateTime)
             ? $this->getOpenHoursTargetId()
             : $this->getClosedHoursTargetId();
+    }
+
+    /** @return list<string> */
+    protected function unprovisionedColumns(): array
+    {
+        return ['open_hours_action_type', 'closed_hours_action_type'];
     }
 }

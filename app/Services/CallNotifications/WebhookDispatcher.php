@@ -6,7 +6,9 @@ namespace App\Services\CallNotifications;
 
 use App\Models\CallNotificationLog;
 use App\Models\CallNotificationsSettings;
+use App\Scopes\OrganizationScope;
 use App\Services\Security\SsrfUrlValidator;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
@@ -25,13 +27,10 @@ class WebhookDispatcher
     private const RATE_LIMIT_KEY_PREFIX = 'call_notifications:rate_limit:';
 
     /**
-     * Dispatch a webhook notification.
+     * Deliver a webhook notification (single attempt, no retries).
      *
-     * @param  CallNotificationsSettings  $settings  The notification settings
      * @param  array<string, mixed>  $payload  The webhook payload
-     * @param  string  $eventId  Unique event identifier
-     * @param  string  $sessionToken  Call session token
-     * @return bool Whether the dispatch was successful
+     * @return bool Whether the delivery was successful
      */
     public function dispatch(
         CallNotificationsSettings $settings,
@@ -39,6 +38,24 @@ class WebhookDispatcher
         string $eventId,
         string $sessionToken
     ): bool {
+        return $this->deliver($settings, $payload, $eventId, $sessionToken)['delivered'];
+    }
+
+    /**
+     * Make one delivery attempt and report whether a later attempt could succeed.
+     * Retries are the caller's job (see DispatchCallNotificationJob): this never sleeps.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  int  $attempt  1-based attempt number; the rate limit is only charged on the first
+     * @return array{delivered: bool, retryable: bool}
+     */
+    public function deliver(
+        CallNotificationsSettings $settings,
+        array $payload,
+        string $eventId,
+        string $sessionToken,
+        int $attempt = 1
+    ): array {
         // Defense in depth: Validate URL against SSRF attacks before dispatching
         $ssrfValidator = new SsrfUrlValidator;
         $isValidUrl = $ssrfValidator->isValid($settings->webhook_url);
@@ -56,22 +73,31 @@ class WebhookDispatcher
                 'webhook_url' => $settings->webhook_url,
             ]);
 
-            return false;
+            return ['delivered' => false, 'retryable' => false];
         }
 
-        // Check rate limiting
-        if (! $this->checkRateLimit($settings)) {
+        if ($attempt === 1 && ! $this->checkRateLimit($settings)) {
             Log::warning('Call notification rate limit exceeded', [
                 'organization_id' => $settings->organization_id,
                 'event_id' => $eventId,
             ]);
 
-            return false;
+            return ['delivered' => false, 'retryable' => false];
         }
 
-        // Create log entry
-        // Must bypass OrganizationScope since webhooks have no authenticated user context
-        $log = \App\Scopes\OrganizationScope::bypass(function () use ($settings, $payload, $eventId, $sessionToken) {
+        // Must bypass OrganizationScope since webhooks have no authenticated user context.
+        // One log row per event: later attempts update it.
+        $log = OrganizationScope::bypass(function () use ($settings, $payload, $eventId, $sessionToken, $attempt) {
+            $log = $attempt > 1
+                ? CallNotificationLog::where('organization_id', $settings->organization_id)->where('event_id', $eventId)->first()
+                : null;
+
+            if ($log) {
+                $log->update(['attempt_number' => $attempt]);
+
+                return $log;
+            }
+
             return CallNotificationLog::create([
                 'organization_id' => $settings->organization_id,
                 'call_session_token' => $sessionToken,
@@ -80,43 +106,18 @@ class WebhookDispatcher
                 'status' => $payload['session']['status'] ?? 'unknown',
                 'webhook_url' => $settings->webhook_url,
                 'request_payload' => $payload,
-                'attempt_number' => 1,
+                'attempt_number' => $attempt,
                 'is_success' => false,
                 'created_at' => now(),
             ]);
         });
 
-        // Attempt delivery with retries
-        $maxAttempts = $settings->retry_attempts ?? 3;
-        $backoffSeconds = $settings->retry_backoff_seconds ?? 60;
+        $result = $this->attemptDelivery($settings, $payload, $log);
 
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $result = $this->attemptDelivery($settings, $payload, $log);
-
-            if ($result['success']) {
-                return true;
-            }
-
-            // Check if we should retry
-            if ($attempt < $maxAttempts && $this->shouldRetry($result['status_code'])) {
-                $delay = $backoffSeconds * pow(2, $attempt - 1);
-                Log::info('Retrying call notification webhook', [
-                    'organization_id' => $settings->organization_id,
-                    'event_id' => $eventId,
-                    'attempt' => $attempt,
-                    'next_attempt_delay' => $delay,
-                ]);
-                sleep($delay);
-
-                // Update log for next attempt
-                $log->update(['attempt_number' => $attempt + 1]);
-            } else {
-                // Final failure
-                break;
-            }
-        }
-
-        return false;
+        return [
+            'delivered' => $result['success'],
+            'retryable' => ! $result['success'] && $this->shouldRetry($result['status_code']),
+        ];
     }
 
     /**
@@ -138,6 +139,8 @@ class WebhookDispatcher
         $headers['Content-Type'] = 'application/json';
         $headers['Accept'] = 'application/json';
         $headers['User-Agent'] = 'Cloudonix-PBX-Webhook/1.0';
+        // Delivery logs must never hold the customer's webhook secret.
+        $loggedHeaders = isset($headers['Authorization']) ? ['Authorization' => '[redacted]'] + $headers : $headers;
 
         $requestBody = json_encode($payload);
 
@@ -150,7 +153,7 @@ class WebhookDispatcher
 
             // Capture debug info
             $debugInfo = [
-                'request_headers' => $headers,
+                'request_headers' => $loggedHeaders,
                 'request_body' => $requestBody,
                 'response_headers' => $response->headers(),
             ];
@@ -164,8 +167,10 @@ class WebhookDispatcher
                 );
 
                 Log::info('Call notification webhook delivered successfully', [
+                    'type' => 'HTTP_RESPONSE',
                     'organization_id' => $settings->organization_id,
                     'event_id' => $log->event_id,
+                    'status' => $response->status(),
                     'response_time_ms' => $responseTimeMs,
                 ]);
 
@@ -186,9 +191,10 @@ class WebhookDispatcher
             );
 
             Log::warning('Call notification webhook returned non-success status', [
+                'type' => 'HTTP_RESPONSE',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
-                'status_code' => $response->status(),
+                'status' => $response->status(),
                 'response_body' => $response->body(),
             ]);
 
@@ -197,7 +203,7 @@ class WebhookDispatcher
                 'status_code' => $response->status(),
             ];
 
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+        } catch (ConnectionException $e) {
             $responseTimeMs = (int) ((microtime(true) - $startTime) * 1000);
 
             $log->markAsFailed(
@@ -206,13 +212,14 @@ class WebhookDispatcher
                 'Connection error: '.$e->getMessage(),
                 $responseTimeMs,
                 [
-                    'request_headers' => $headers,
+                    'request_headers' => $loggedHeaders,
                     'request_body' => $requestBody,
                     'response_headers' => null,
                 ]
             );
 
             Log::error('Call notification webhook connection failed', [
+                'type' => 'HTTP_REQUEST',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
                 'error' => $e->getMessage(),
@@ -232,13 +239,14 @@ class WebhookDispatcher
                 'Exception: '.$e->getMessage(),
                 $responseTimeMs,
                 [
-                    'request_headers' => $headers,
+                    'request_headers' => $loggedHeaders,
                     'request_body' => $requestBody,
                     'response_headers' => null,
                 ]
             );
 
             Log::error('Call notification webhook delivery failed', [
+                'type' => 'HTTP_REQUEST',
                 'organization_id' => $settings->organization_id,
                 'event_id' => $log->event_id,
                 'error' => $e->getMessage(),
@@ -269,22 +277,13 @@ class WebhookDispatcher
         $limit = $settings->rate_limit_per_minute ?? 500;
         $window = 60; // 1 minute
 
-        $current = Redis::get($key);
-
-        if ($current === null) {
-            // First request in window
-            Redis::setex($key, $window, 1);
-
-            return true;
+        // Atomic: INCR then set the TTL only when this call created the key.
+        $current = (int) Redis::incr($key);
+        if ($current === 1) {
+            Redis::expire($key, $window);
         }
 
-        if ((int) $current >= $limit) {
-            return false;
-        }
-
-        Redis::incr($key);
-
-        return true;
+        return $current <= $limit;
     }
 
     /**
@@ -298,7 +297,7 @@ class WebhookDispatcher
         $current = (int) (Redis::get($key) ?? 0);
         $ttl = Redis::ttl($key);
 
-        $settings = \App\Scopes\OrganizationScope::bypass(function () use ($organizationId) {
+        $settings = OrganizationScope::bypass(function () use ($organizationId) {
             return CallNotificationsSettings::forOrganization($organizationId)->first();
         });
         $limit = $settings?->rate_limit_per_minute ?? 500;

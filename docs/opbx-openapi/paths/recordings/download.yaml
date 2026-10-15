@@ -5,22 +5,70 @@ paths:
         - Recordings
       summary: Download recording with token
       operationId: downloadRecordingWithToken
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
+      description: >-
+        Streams (or downloads) a recording using the access token issued by
+        `GET /v1/recordings/{recording}/download` (also embedded in a recording's `playback_url`).
+        The token is sent as `Authorization: Bearer <token>` (preferred) or `?token=`. No Sanctum
+        session, API key or rate limit applies. The token is valid for
+        `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30).
+
+        `Content-Type` is the recording's stored MIME type (`application/octet-stream` when unknown).
+        The file is sent inline with `Accept-Ranges: bytes` when the request has
+        `Sec-Fetch-Dest: audio` or an `Accept` header containing `audio`; otherwise it is sent as an
+        attachment (`Content-Disposition: attachment; filename="<original filename>"`).
+      security: []
+      parameters:
+        - name: token
+          in: query
+          schema:
+            type: string
+          description: Recording access token (alternative to the Authorization header)
       responses:
         '200':
-          description: Recording downloaded
+          description: Audio file (inline when the request accepts audio, otherwise as an attachment)
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: No token supplied (`{error, message}`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '403':
+          description: 'Token invalid or expired (`{error: Access denied or token expired}`)'
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '404':
+          description: The recording has no stored file, or the file is missing from storage (`{error}`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
 
   /v1/recordings/{recording}/download:
     get:
       tags:
         - Recordings
       summary: Download specific recording
+      description: |
+        Issues an access token for `GET /v1/recordings/download`. Owner, PBX Admin and Reporter
+        only. `expires_in` is always reported as 1800; the token's real lifetime is
+        `RECORDINGS_ACCESS_TOKEN_EXPIRY` minutes (default 30). `filename` is the original upload
+        name, or the stored file name when that is unknown.
       operationId: downloadRecording
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: recordings:read
       parameters:
         - name: recording
           in: path
@@ -29,4 +77,36 @@ paths:
             type: integer
       responses:
         '200':
-          description: Recording downloaded
+          description: >-
+            A 30-minute access token for `GET /v1/recordings/download` (uploaded recordings only).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  download_endpoint:
+                    type: string
+                    example: /api/v1/recordings/download
+                  token:
+                    type: string
+                  filename:
+                    type: string
+                  expires_in:
+                    type: integer
+                    example: 1800
+                  authorization_header:
+                    type: string
+                  security_note:
+                    type: string
+        '400':
+          description: Only uploaded recordings can be downloaded (`{error}`); remote recordings are refused
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'

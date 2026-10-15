@@ -167,6 +167,9 @@ export default function Profile() {
 
 
 
+  // Live confirm-match state for the new password fields
+  const [watchedNewPassword, watchedConfirmPassword] = watchPassword(['new_password', 'new_password_confirmation']);
+
   // Load profile data on mount
   useEffect(() => {
     const loadProfile = async () => {
@@ -291,9 +294,7 @@ export default function Profile() {
       if (data.country !== profileData?.country) {
         updateData.country = data.country || null;
       }
-      if (data.role && data.role !== profileData?.role) {
-        updateData.role = data.role;
-      }
+      // Own role changes are refused by the server (UpdateProfileRequest), so none is sent.
 
       // If nothing changed, just show success
       if (Object.keys(updateData).length === 0) {
@@ -303,6 +304,11 @@ export default function Profile() {
 
       const updatedProfile = await profileService.updateProfile(updateData);
       setProfileData(updatedProfile);
+
+      // Re-sync the form with what the server stored (it may normalise values), keeping it clean
+      (['name', 'email', 'phone', 'street_address', 'city', 'state_province', 'postal_code', 'country'] as const).forEach((key) =>
+        setProfileValue(key, updatedProfile[key] || '', { shouldDirty: false }),
+      );
 
       // Refresh user context
       await refreshUser();
@@ -439,7 +445,7 @@ export default function Profile() {
           <CardContent>
             {!isOwner && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800">
                   Only organization owners can edit these settings
                 </p>
@@ -601,7 +607,7 @@ export default function Profile() {
                          emptyText="No country found."
                          disabled={isUpdatingProfile}
                          buttonClassName="w-full"
-                         contentClassName="w-[--radix-popover-trigger-width]"
+                         contentClassName="w-(--radix-popover-trigger-width)"
                        />
                      )}
                   />
@@ -662,38 +668,7 @@ export default function Profile() {
                   <Shield className="inline h-4 w-4 mr-1" />
                   Role
                 </Label>
-                {isOwner ? (
-                  <>
-                    <Controller
-                      name="role"
-                      control={controlProfile}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          disabled={isUpdatingProfile}
-                        >
-                          <SelectTrigger id="role">
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="owner">Owner</SelectItem>
-                            <SelectItem value="pbx_admin">PBX Admin</SelectItem>
-                            <SelectItem value="pbx_user">PBX User</SelectItem>
-                            <SelectItem value="reporter">Reporter</SelectItem>
-                            <SelectItem value="supervisor">Supervisor</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                      <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-amber-800">
-                        Changing user roles affects their permissions. Be careful when modifying roles.
-                      </p>
-                    </div>
-                  </>
-                ) : (
+                {(
                   <>
                     <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
                       <Badge className={getRoleColor(profileData?.role as UserRole)}>
@@ -701,7 +676,9 @@ export default function Profile() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Contact your organization owner to change your role
+                      {isOwner
+                        ? 'You cannot change your own role.'
+                        : 'Contact your organization owner to change your role'}
                     </p>
                   </>
                 )}
@@ -832,6 +809,14 @@ export default function Profile() {
                     {passwordErrors.new_password_confirmation.message}
                   </p>
                 )}
+                {!passwordErrors.new_password_confirmation && watchedConfirmPassword && (
+                  <p
+                    className={`text-sm ${watchedNewPassword === watchedConfirmPassword ? 'text-green-600' : 'text-destructive'}`}
+                    aria-live="polite"
+                  >
+                    {watchedNewPassword === watchedConfirmPassword ? 'Passwords match' : "Passwords don't match"}
+                  </p>
+                )}
               </div>
 
               {/* Password Generator Section */}
@@ -868,13 +853,13 @@ export default function Profile() {
                         variant="ghost"
                         size="sm"
                         onClick={handleCopyPassword}
-                        className="flex-shrink-0"
+                        className="shrink-0"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-start gap-1">
-                      <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
                       Make sure to save this password securely before submitting the form
                     </p>
                   </div>
@@ -914,9 +899,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {auth0Config.providers
-                  ?.filter((provider) => !['x', 'microsoft', 'facebook'].includes(provider))
-                  .map((provider) => {
+                {auth0Config.providers?.map((provider) => {
                   const isLinked = linkedProviders.includes(provider);
                   const label = provider.charAt(0).toUpperCase() + provider.slice(1);
 

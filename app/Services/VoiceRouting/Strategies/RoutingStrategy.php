@@ -19,9 +19,9 @@ interface RoutingStrategy
     /**
      * Route the call to the destination.
      *
-     * @param Request $request The incoming webhook request
-     * @param DidNumber $did The DID number being called
-     * @param array $destination The resolved destination resources (extension, ring group, etc.)
+     * @param  Request  $request  The incoming webhook request
+     * @param  DidNumber  $did  The DID number being called
+     * @param  array  $destination  The resolved destination resources (extension, ring group, etc.)
      * @return Response The CXML response
      */
     public function route(Request $request, DidNumber $did, array $destination): Response;

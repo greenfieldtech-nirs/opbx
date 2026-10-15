@@ -61,7 +61,7 @@ api.interceptors.response.use(
   (error: AxiosError<APIError>) => {
     // Handle 401 Unauthorized - token expired or invalid
     if (error.response?.status === 401) {
-      console.log('[API] 401 Unauthorized received', {
+      logger.debug('[API] 401 Unauthorized received', {
         url: error.config?.url,
         pathname: window.location.pathname
       });
@@ -69,7 +69,7 @@ api.interceptors.response.use(
       // Don't redirect for login requests - show error toast instead
       const isLoginRequest = error.config?.url?.includes('/auth/login');
       if (isLoginRequest) {
-        console.log('[API] Login request failed, showing error');
+        logger.debug('[API] Login request failed, showing error');
         return Promise.reject(error);
       }
 
@@ -80,13 +80,13 @@ api.interceptors.response.use(
                           window.location.pathname === '/ui/invite';
       
       if (isPublicPage) {
-        console.log('[API] 401 on public page, not redirecting');
+        logger.debug('[API] 401 on public page, not redirecting');
         // Clear storage but don't redirect
         storage.clearAll();
         return Promise.reject(error);
       }
 
-      console.log('[API] Clearing storage and redirecting to login');
+      logger.debug('[API] Clearing storage and redirecting to login');
       storage.clearAll();
       // Redirect to login if not already there (respect /ui basename)
       if (!window.location.pathname.includes('/login')) {
@@ -134,6 +134,11 @@ export function getApiErrorMessage(error: unknown): string {
     const axiosError = error as AxiosError<APIError>;
     const errorData = axiosError.response?.data?.error;
 
+    // Some endpoints return { error: "text" }
+    if (typeof errorData === 'string' && errorData) {
+      return errorData;
+    }
+
     // Return validation errors if present (array format)
     if (errorData?.details && Array.isArray(errorData.details)) {
       const details = errorData.details;
@@ -151,6 +156,12 @@ export function getApiErrorMessage(error: unknown): string {
     // Return error message
     if (errorData?.message) {
       return errorData.message;
+    }
+
+    // Laravel's default envelope: { message, errors }
+    const topLevelMessage = (axiosError.response?.data as { message?: unknown } | undefined)?.message;
+    if (typeof topLevelMessage === 'string' && topLevelMessage) {
+      return topLevelMessage;
     }
 
     // Return generic network error

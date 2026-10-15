@@ -14,6 +14,14 @@ final class EmbedConfigController extends Controller
 {
     public function config(Request $request, WebPhoneConfigBuilder $builder): JsonResponse
     {
+        // Config carries SIP credentials. Cross-origin callers send an Origin, which the
+        // middleware checks against the allowlist. The widget iframe is served by OPBX and
+        // calls this same-origin, where browsers send no Origin: accept a missing Origin
+        // only when the browser marks the request same-origin (owner decision D4).
+        if (! $request->headers->get('Origin') && $request->headers->get('Sec-Fetch-Site') !== 'same-origin') {
+            return response()->json(['message' => 'Origin required.'], 403);
+        }
+
         $user = $request->attributes->get('embedUser');
         $config = $builder->buildForUser($user);
 

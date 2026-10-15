@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -107,7 +108,9 @@ class Organization extends Model
      */
     public function cloudonixSettings(): HasOne
     {
-        return $this->hasOne(CloudonixSettings::class);
+        // Anchored on this organization's id, so the tenant scope adds nothing and would
+        // break lookups made without an authenticated user (jobs, webhooks, workers).
+        return $this->hasOne(CloudonixSettings::class)->withoutGlobalScope(OrganizationScope::class);
     }
 
     /**
@@ -117,6 +120,4 @@ class Organization extends Model
     {
         return $this->status === 'active';
     }
-
-
 }

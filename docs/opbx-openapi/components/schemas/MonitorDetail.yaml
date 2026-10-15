@@ -29,12 +29,12 @@ properties:
         example: 10
       active_calls:
         type: integer
-        description: Currently active calls
+        description: Active calls reported by the dialer worker (always 0 for a paused campaign)
         example: 5
       cac_utilization:
         type: number
         format: float
-        description: CAC utilization percentage
+        description: active_calls / concurrent_active_calls x 100, one decimal
         example: 50.0
   statistics:
     type: object
@@ -42,36 +42,46 @@ properties:
     properties:
       total_destinations:
         type: integer
-        description: Total number of destinations
+        description: Destinations across all lists assigned to the campaign
         example: 1000
       completed_calls:
         type: integer
-        description: Number of completed calls
+        description: Destinations in `completed` status
         example: 755
       failed_calls:
         type: integer
-        description: Number of failed calls
+        description: Destinations in `failed` status
         example: 45
+      voicemail_calls:
+        type: integer
+        description: Calls where the AMD worker detected a voicemail
+        example: 12
       pending_calls:
         type: integer
-        description: Number of pending calls
+        description: Destinations in `pending` status
         example: 200
+      dialing_calls:
+        type: integer
+        description: Destinations in `dialing` status
+        example: 3
       progress_percentage:
-        type: number
-        format: float
-        description: Campaign completion percentage
-        example: 75.5
+        type: integer
+        description: (completed + failed) / total_destinations x 100, rounded; 0 when the campaign has no destinations
+        example: 80
       avg_duration_seconds:
         type: integer
-        description: Average call duration in seconds
+        description: Average duration of completed call sessions with a duration above 0 (rounded; 0 when none)
         example: 120
       avg_billsec_seconds:
         type: integer
-        description: Average billable seconds
+        description: Average billable seconds of completed call sessions with billsec above 0 (rounded; 0 when none)
         example: 95
   dispositions:
     type: object
-    description: Call disposition breakdown
+    description: |
+      Call session dispositions, counted per session. Cloudonix spellings are normalized
+      (`answer` -> answered, `no-answer`/`noanswer` -> no_answer, `cancel` -> cancelled);
+      other dispositions are not counted. Every key is always present.
     properties:
       answered:
         type: integer
@@ -101,34 +111,11 @@ properties:
         type: integer
         description: Number of congestion errors
         example: 5
-  rate_limit_status:
-    type: object
-    description: Rate limiting status
-    properties:
-      is_rate_limited:
-        type: boolean
-        description: Whether campaign is rate limited
-        example: false
-      pause_reason:
-        type:
-        - string
-        - 'null'
-        description: Reason for pause
-        example: null
-      resumes_at:
-        type:
-        - string
-        - 'null'
-        format: date-time
-        description: When the campaign can resume
-        example: null
-      can_resume_now:
-        type: boolean
-        description: Whether campaign can be resumed now
-        example: true
   active_sessions:
     type: array
-    description: Currently active call sessions
+    description: |
+      Call sessions in `initiated`, `ringing` or `answered` status that started in the last
+      5 minutes, newest first. Never cached. Always empty for a paused campaign.
     items:
       type: object
       properties:
@@ -137,7 +124,9 @@ properties:
           description: Session ID
           example: 123
         phone_number:
-          type: string
+          type:
+          - string
+          - 'null'
           description: Destination phone number
           example: '+14155551212'
         status:
@@ -149,8 +138,10 @@ properties:
           description: Current call status
           example: answered
         call_id:
-          type: string
-          description: Cloudonix call ID
+          type:
+          - string
+          - 'null'
+          description: Cloudonix call ID (null until the call is placed)
           example: call-abc123
         initiated_at:
           type: string
@@ -159,11 +150,10 @@ properties:
           example: '2024-01-15T14:30:00Z'
         duration_seconds:
           type: integer
-          description: Call duration in seconds
+          description: Seconds since initiated_at
           example: 45
 required:
 - campaign
 - statistics
 - dispositions
-- rate_limit_status
 - active_sessions

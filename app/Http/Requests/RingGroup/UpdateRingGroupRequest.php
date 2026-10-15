@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\RingGroup;
 
+use App\Enums\AiAssistantStatus;
+use App\Enums\AlbsStatus;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Enums\UserStatus;
-use App\Enums\AiAssistantStatus;use App\Models\Extension;
+use App\Models\AiAssistant;
+use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
+use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 /**
  * Form request validator for updating a ring group.
@@ -48,6 +54,7 @@ class UpdateRingGroupRequest extends FormRequest
 
         return [
             'name' => [
+                'sometimes',
                 'required',
                 'string',
                 'min:2',
@@ -65,60 +72,66 @@ class UpdateRingGroupRequest extends FormRequest
                 'max:1000',
             ],
             'strategy' => [
+                'sometimes',
                 'required',
                 new Enum(RingGroupStrategy::class),
             ],
             'timeout' => [
+                'sometimes',
                 'required',
                 'integer',
                 'min:5',
                 'max:300',
             ],
             'ring_turns' => [
+                'sometimes',
                 'required',
                 'integer',
                 'min:1',
                 'max:9',
             ],
             'fallback_action' => [
+                'sometimes',
                 'required',
                 new Enum(RingGroupFallbackAction::class),
             ],
             'fallback_extension_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::EXTENSION->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ring_group_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::RING_GROUP->value),
                 'nullable',
-                'exists:ring_groups,id',
+                Rule::exists('ring_groups', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ivr_menu_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::IVR_MENU->value),
                 'nullable',
-                'exists:ivr_menus,id',
+                Rule::exists('ivr_menus', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ai_assistant_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_ASSISTANT->value),
                 'nullable',
-                'exists:extensions,id',
+                Rule::exists('ai_assistants', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_ai_load_balancer_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::AI_LOAD_BALANCER->value),
                 'nullable',
-                'exists:ai_assistant_load_balancers,id',
+                Rule::exists('ai_assistant_load_balancers', 'id')->where('organization_id', $user->organization_id),
             ],
             'fallback_call_queue_id' => [
                 Rule::requiredIf(fn () => $this->input('fallback_action') === RingGroupFallbackAction::CALL_QUEUE->value),
                 'nullable',
-                'exists:call_queues,id',
+                Rule::exists('call_queues', 'id')->where('organization_id', $user->organization_id),
             ],
             'status' => [
+                'sometimes',
                 'required',
                 new Enum(RingGroupStatus::class),
             ],
             'members' => [
+                'sometimes',
                 'required',
                 'array',
                 'min:1',
@@ -127,7 +140,7 @@ class UpdateRingGroupRequest extends FormRequest
             'members.*.extension_id' => [
                 'required',
                 'distinct',
-                'exists:extensions,id',
+                Rule::exists('extensions', 'id')->where('organization_id', $user->organization_id),
             ],
             'members.*.priority' => [
                 'required',
@@ -185,7 +198,7 @@ class UpdateRingGroupRequest extends FormRequest
     /**
      * Configure the validator instance.
      *
-     * @param  \Illuminate\Validation\Validator  $validator
+     * @param  Validator  $validator
      */
     public function withValidator($validator): void
     {
@@ -226,7 +239,7 @@ class UpdateRingGroupRequest extends FormRequest
 
                 // Validate that all extensions are active
                 foreach ($validExtensions as $extension) {
-                    if ($extension->status !== AiAssistantStatus::ACTIVE) {
+                    if ($extension->status !== UserStatus::ACTIVE) {
                         $validator->errors()->add(
                             'members',
                             'Only active extensions can be added to ring groups. Extension '.$extension->extension_number.' is not active.'
@@ -247,7 +260,7 @@ class UpdateRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackExtension->status !== AiAssistantStatus::ACTIVE) {
+                    if ($fallbackExtension->status !== UserStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_extension_id',
                             'Fallback extension must be active.'
@@ -296,9 +309,9 @@ class UpdateRingGroupRequest extends FormRequest
                 }
             }
 
-            // Validate fallback AI assistant belongs to organization, is active, and is AI assistant type
+            // Validate fallback AI assistant belongs to organization and is active
             if ($fallbackAction === RingGroupFallbackAction::AI_ASSISTANT->value && $fallbackAiAssistantId) {
-                $fallbackAiAssistant = Extension::find($fallbackAiAssistantId);
+                $fallbackAiAssistant = AiAssistant::find($fallbackAiAssistantId);
                 if ($fallbackAiAssistant) {
                     if ($fallbackAiAssistant->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
@@ -313,19 +326,12 @@ class UpdateRingGroupRequest extends FormRequest
                             'Fallback AI assistant must be active.'
                         );
                     }
-
-                    if ($fallbackAiAssistant->type !== ExtensionType::AI_ASSISTANT) {
-                        $validator->errors()->add(
-                            'fallback_ai_assistant_id',
-                            'The selected extension is not an AI assistant.'
-                        );
-                    }
                 }
             }
 
             // Validate fallback call queue belongs to organization and is active
             if ($fallbackAction === RingGroupFallbackAction::CALL_QUEUE->value && $this->input('fallback_call_queue_id')) {
-                $fallbackCallQueue = \App\Models\CallQueue::find($this->input('fallback_call_queue_id'));
+                $fallbackCallQueue = CallQueue::find($this->input('fallback_call_queue_id'));
                 if ($fallbackCallQueue) {
                     if ($fallbackCallQueue->organization_id !== $user->organization_id) {
                         $validator->errors()->add(
@@ -354,7 +360,7 @@ class UpdateRingGroupRequest extends FormRequest
                         );
                     }
 
-                    if ($fallbackAiLoadBalancer->status !== AiAssistantStatus::ACTIVE) {
+                    if ($fallbackAiLoadBalancer->status !== AlbsStatus::ACTIVE) {
                         $validator->errors()->add(
                             'fallback_ai_load_balancer_id',
                             'Fallback AI load balancer must be active.'

@@ -53,8 +53,10 @@ OPBX can route calls to these destination types:
 | IVR Menu | Interactive voice response menu |
 | Business Hours | Time-based routing decision |
 | Conference Room | Multi-party conference bridge |
-| AI Assistant | AI-powered voice agent |
+| AI Assistant | AI assistant from a supported provider |
 | AI Load Balancer | Distributed AI agent routing |
+| Call Queue | Callers wait on hold until an agent is free |
+| Unavailable | Says "Destination doesn't exist" and hangs up. Set only when you edit a route (**Disconnect**) |
 
 ## Routing Chains
 
@@ -91,13 +93,15 @@ graph LR
 
 ## Inbound Blacklist
 
-Before routing, OPBX checks if the caller is on the inbound blacklist:
+Before routing a call from an external number, OPBX checks if the caller is on an active inbound blacklist entry. Each entry has a rejection strategy:
 
-| Action | Behavior |
-|--------|----------|
-| Silent Drop | Call ends without notification |
-| Reject | Caller hears a busy or error message |
-| Torment | Call connects to a "torment" conference (hold music loop) |
+| Strategy | Behavior |
+|----------|----------|
+| Drop | The call is hung up silently |
+| Reject | The caller hears "Your call has been rejected" and the call ends |
+| Torment | The caller is put in a "torment" conference with hold music until the entry's timeout |
+
+See [Inbound Blacklist](/opbx/modules/inbound-blacklist).
 
 :::tip
 Use the blacklist to block spam callers, competitors, or harassing callers.
@@ -136,25 +140,25 @@ Configure routing at these levels:
 
 The entry point for all inbound calls. Each DID has a routing type and destination.
 
-See [Phone Numbers (DIDs)](../modules/phone-numbers) for details.
+See [Phone Numbers (DIDs)](/opbx/modules/phone-numbers) for details.
 
 ### Ring Groups
 
 Distribute calls to multiple extensions with various strategies.
 
-See [Ring Groups](../modules/ring-groups) for details.
+See [Ring Groups](/opbx/modules/ring-groups) for details.
 
 ### IVR Menus
 
 Create interactive menus for caller self-service.
 
-See [IVR Menus](../modules/ivr-menus) for details.
+See [IVR Menus](/opbx/modules/ivr-menus) for details.
 
 ### Business Hours
 
 Route based on time of day and day of week.
 
-See [Business Hours](../modules/business-hours) for details.
+See [Business Hours](/opbx/modules/business-hours) for details.
 
 ## Best Practices
 

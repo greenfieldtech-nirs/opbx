@@ -7,9 +7,11 @@ namespace Tests\Feature\Platform;
 use App\Enums\OrganizationStatus;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
+use App\Http\Controllers\Platform\PlatformOperateAsController;
+use App\Http\Middleware\ApplyOperateAsOrganization;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
-use App\Models\PlatformAuditLog;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,8 +22,8 @@ use Tests\TestCase;
  * Operate As Organization (platform-owner impersonation) feature tests.
  *
  * Verifies the header-driven scope switch performed by
- * {@see \App\Http\Middleware\ApplyOperateAsOrganization} and the
- * start/stop audit endpoints on {@see \App\Http\Controllers\Platform\PlatformOperateAsController}.
+ * {@see ApplyOperateAsOrganization} and the
+ * start/stop audit endpoints on {@see PlatformOperateAsController}.
  */
 class OperateAsTest extends TestCase
 {
@@ -127,10 +129,10 @@ class OperateAsTest extends TestCase
     public function real_token_operate_as_scopes_globally_scoped_reads_to_target_org(): void
     {
         // A DID (globally scoped by OrganizationScope) in each org.
-        $homeDid = OrganizationScope::bypass(fn () => \App\Models\DidNumber::factory()->create([
+        $homeDid = OrganizationScope::bypass(fn () => DidNumber::factory()->create([
             'organization_id' => $this->platformOrg->id,
         ]));
-        $targetDid = OrganizationScope::bypass(fn () => \App\Models\DidNumber::factory()->create([
+        $targetDid = OrganizationScope::bypass(fn () => DidNumber::factory()->create([
             'organization_id' => $this->targetOrg->id,
         ]));
 

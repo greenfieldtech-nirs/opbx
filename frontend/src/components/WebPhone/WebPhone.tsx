@@ -12,6 +12,7 @@ import {
   PhoneOff,
   PhoneCall,
   Delete,
+  Grid3x3,
   X,
   Volume1,
   Volume2,
@@ -25,13 +26,17 @@ import {
 } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
-import { getEmbedBus } from './embedBus';
+import { getEmbedBus, handleEmbedClose } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
 import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
-type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error';
+import { classifyConfigError } from './configError';
+import { dtmfTransportFor } from './dtmf';
+import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
+
+type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error' | 'other_tab';
 type CallState = 'idle' | 'ringing' | 'connected';
 
 type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -45,6 +50,8 @@ interface WebPhoneProps {
   iconBackgroundColor?: string;
   // Embed may open the dialer immediately.
   autoOpen?: boolean;
+  // Web Lock name electing the one tab that holds the SIP registration (the embed uses its own).
+  lockName?: string;
 }
 
 // Map the 4 corners to fixed-position Tailwind classes for the pull tab + panel.
@@ -143,6 +150,7 @@ export function WebPhone({
   iconPosition = 'bottom-right',
   iconBackgroundColor,
   autoOpen = false,
+  lockName = SIP_LOCK_NAME,
 }: WebPhoneProps = {}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
@@ -152,6 +160,11 @@ export function WebPhone({
   const cornerClass = CORNER_CLASSES[iconPosition];
 
   const [open, setOpen] = useState(autoOpen);
+  // The phone stays registered in the background for the whole session; the panel (`open`) is UI only.
+  // Only the leader tab registers; other tabs show "active in another tab".
+  const { role, takeOver } = useSipLeader(true, lockName);
+  const isLeader = role === 'leader';
+  const [initNonce, setInitNonce] = useState(0);
   const [state, setState] = useState<PhoneLifecycle>('loading');
   const [status, setStatus] = useState('Initializing...');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
@@ -160,6 +173,9 @@ export function WebPhone({
   const [isMuted, setIsMuted] = useState(false);
   const [isHeld, setIsHeld] = useState(false);
   const [volume, setVolume] = useState(1);
+  // In-call keypad: shown on demand; digits sent this call are echoed in place of the number.
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [dtmfDigits, setDtmfDigits] = useState('');
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
   const pendingCoachRef = useRef<string | null>(null);
@@ -207,7 +223,7 @@ export function WebPhone({
   const { data: configResponse, error: configError, refetch } = useQuery({
     queryKey: ['webphone-config'],
     queryFn: configQueryFn ?? getWebPhoneConfig,
-    enabled: open,
+    enabled: isLeader,
     retry: false,
     staleTime: Infinity,
   });
@@ -218,6 +234,8 @@ export function WebPhone({
     setCallState('idle');
     setIsMuted(false);
     setIsHeld(false);
+    setShowKeypad(false);
+    setDtmfDigits('');
     setIncomingSession(null);
     setIncomingNumber('');
     setCoachLabel(null);
@@ -323,8 +341,8 @@ export function WebPhone({
   );
 
   useEffect(() => {
-    if (!open) {
-      setState('loading');
+    if (!isLeader) {
+      setState(role === 'follower' ? 'other_tab' : 'loading');
       resetCallState();
       setStatus('Initializing...');
       setErrorDetail(null);
@@ -341,9 +359,16 @@ export function WebPhone({
     }
 
     if (configError) {
-      const status = (configError as any)?.response?.status;
-      if (status === 404) {
+      const failure = classifyConfigError(configError);
+      if (failure === 'no_extension') {
         setState('no_extension');
+      } else if (failure === 'cloudonix_not_configured') {
+        setErrorDetail({
+          title: 'Web Phone Unavailable',
+          message: "Cloudonix isn't configured for your organization.",
+          hint: 'Ask your Owner to complete Settings > Cloudonix.',
+        });
+        setState('error');
       } else {
         setErrorDetail({
           title: 'Web Phone Unavailable',
@@ -426,6 +451,7 @@ export function WebPhone({
             setIncomingNumber(remoteUri);
             setIncomingSession(session);
             setStatus('Incoming call');
+            setOpen(true); // ring: bring the panel up even if it was closed
           } else {
             setCallState('ringing');
             setStatus('Calling...');
@@ -461,7 +487,7 @@ export function WebPhone({
         uaRef.current = null;
       }
     };
-  }, [open, config, configError, handleSessionEvents, resetCallState, getTonePlayer]);
+  }, [isLeader, role, initNonce, config, configError, handleSessionEvents, resetCallState, getTonePlayer]);
 
   const handleCall = useCallback(() => {
     if (!uaRef.current || !number || !config) return;
@@ -553,11 +579,11 @@ export function WebPhone({
           setOpen(true);
           break;
         case 'close':
-          setOpen(false);
+          handleEmbedClose(inActiveCall, bus, () => setOpen(false));
           break;
       }
     });
-  }, [handleHangup]);
+  }, [handleHangup, inActiveCall]);
 
   // Tell the host the widget is registered and ready to take commands.
   useEffect(() => {
@@ -632,6 +658,33 @@ export function WebPhone({
     }
   }, [isHeld]);
 
+  const sendDtmf = useCallback(
+    (tone: string) => {
+      const session = sessionRef.current;
+      if (!session || callState !== 'connected') return;
+      try {
+        session.sendDTMF(tone, { transportType: dtmfTransportFor(session) });
+        setDtmfDigits((prev) => prev + tone);
+        getTonePlayer().playDtmf(tone);
+      } catch (error) {
+        console.error('[WebPhone] Send DTMF failed:', error);
+      }
+    },
+    [callState, getTonePlayer]
+  );
+
+  // Physical keyboard sends DTMF while the in-call keypad is open.
+  useEffect(() => {
+    if (callState !== 'connected' || !showKeypad) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || !DIAL_KEYS.includes(e.key)) return;
+      e.preventDefault();
+      sendDtmf(e.key);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [callState, showKeypad, sendDtmf]);
+
   const appendDigit = useCallback((digit: string) => {
     setNumber((prev) => prev + digit);
   }, []);
@@ -656,8 +709,7 @@ export function WebPhone({
       refetch();
       return;
     }
-    setOpen(false);
-    setTimeout(() => setOpen(true), 0);
+    setInitNonce((n) => n + 1);
   }, [configError, refetch]);
 
   return (
@@ -715,6 +767,21 @@ export function WebPhone({
                 <div className="flex flex-col items-center justify-center gap-3 py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">Initializing Web Phone...</p>
+                </div>
+              )}
+
+              {state === 'other_tab' && (
+                <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+                  <Phone className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h4 className="font-semibold">Web Phone is active in another tab</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Only one tab can receive calls. Use it here to move the phone to this tab.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={takeOver}>
+                    Use here
+                  </Button>
                 </div>
               )}
 
@@ -780,7 +847,7 @@ export function WebPhone({
                       </div>
                     </div>
                   ) : callState === 'connected' ? (
-                    <div className="flex flex-col items-center justify-center gap-10 py-6">
+                    <div className={`flex flex-col items-center justify-center ${showKeypad ? 'gap-5' : 'gap-10 py-6'}`}>
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
@@ -797,17 +864,40 @@ export function WebPhone({
                             <p className="text-sm text-muted-foreground tabular-nums">
                               {formatCallDuration(callSeconds)}
                             </p>
-                            <p className={`font-medium break-all px-4 ${numberSizeClass(number.length)}`}>
-                              {number || ' '}
+                            {/* With the keypad open, echo the digits sent (last 18 fit on one line). */}
+                            <p
+                              className={`font-medium break-all px-4 ${numberSizeClass(
+                                showKeypad ? Math.min(dtmfDigits.length, 18) : number.length
+                              )}`}
+                              aria-live={showKeypad ? 'polite' : undefined}
+                            >
+                              {(showKeypad ? dtmfDigits.slice(-18) : number) || ' '}
                             </p>
                           </>
                         )}
                       </div>
-                      <div className="flex items-center justify-center gap-6">
+
+                      {showKeypad && (
+                        <div className="grid grid-cols-3 gap-x-6 gap-y-2">
+                          {DIAL_KEYS.map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => sendDtmf(key)}
+                              className="h-14 w-14 rounded-full bg-gray-100 text-xl font-medium text-gray-900 hover:bg-gray-200 active:scale-95 active:bg-gray-300 transition-all shadow-xs"
+                              aria-label={`Send ${key}`}
+                            >
+                              {key}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-center gap-4">
                         <button
                           type="button"
                           onClick={handleMute}
-                          className={`h-[72px] w-[72px] rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
+                          className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
                             isMuted
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
@@ -819,16 +909,22 @@ export function WebPhone({
                         </button>
                         <button
                           type="button"
-                          onClick={handleHangup}
-                          className="h-[72px] w-[72px] rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Hangup"
+                          onClick={() => setShowKeypad((v) => !v)}
+                          className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
+                            showKeypad
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                          }`}
+                          aria-label={showKeypad ? 'Hide keypad' : 'Show keypad'}
+                          aria-pressed={showKeypad}
                         >
-                          <PhoneOff className="h-8 w-8" />
+                          <Grid3x3 className="h-6 w-6" />
+                          <span className="text-[10px] font-medium">Keypad</span>
                         </button>
                         <button
                           type="button"
                           onClick={handleHold}
-                          className={`h-[72px] w-[72px] rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
+                          className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
                             isHeld
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
@@ -837,6 +933,14 @@ export function WebPhone({
                         >
                           {isHeld ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
                           <span className="text-[10px] font-medium">{isHeld ? 'Resume' : 'Hold'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleHangup}
+                          className="h-16 w-16 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
+                          aria-label="Hang Up"
+                        >
+                          <PhoneOff className="h-7 w-7" />
                         </button>
                       </div>
 
@@ -899,7 +1003,7 @@ export function WebPhone({
                                   handleCall();
                                 }
                               }}
-                              className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-none focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
+                              className={`w-full max-w-[280px] border-0 bg-transparent text-center font-medium text-foreground focus:outline-hidden focus-visible:ring-0 caret-transparent ${numberSizeClass(number.length)}`}
                               aria-label="Phone number"
                             />
                             {number && (
@@ -923,7 +1027,7 @@ export function WebPhone({
                             key={key}
                             type="button"
                             onClick={() => appendDigit(key)}
-                            className="h-16 w-16 rounded-full bg-gray-100 text-xl font-medium text-gray-900 hover:bg-gray-200 active:scale-95 active:bg-gray-300 transition-all shadow-sm"
+                            className="h-16 w-16 rounded-full bg-gray-100 text-xl font-medium text-gray-900 hover:bg-gray-200 active:scale-95 active:bg-gray-300 transition-all shadow-xs"
                             aria-label={`Dial ${key}`}
                           >
                             {key}
@@ -947,7 +1051,7 @@ export function WebPhone({
                           onClick={handleHangup}
                           disabled={callState === 'idle' && !incomingSession}
                           className="h-[72px] w-[72px] rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500 flex items-center justify-center"
-                          aria-label="Hangup"
+                          aria-label="Hang Up"
                         >
                           <PhoneOff className="h-8 w-8" />
                         </button>

@@ -7,6 +7,7 @@ namespace App\Rules;
 use App\Services\Security\SsrfUrlValidator;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
 
 /**
  * Validation rule for webhook URLs that prevents SSRF attacks.
@@ -21,7 +22,7 @@ class ValidWebhookUrl implements ValidationRule
      *
      * @param  string  $attribute  The attribute being validated
      * @param  mixed  $value  The value being validated
-     * @param  Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail  The callback to call on failure
+     * @param  Closure(string): PotentiallyTranslatedString  $fail  The callback to call on failure
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {

@@ -14,9 +14,11 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\PlatformAuditService;
+use App\Services\UserDeletionImpactService;
 use Illuminate\Hashing\HashManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Platform User Controller
@@ -83,7 +85,7 @@ class PlatformUserController extends Controller
                 $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
             }
 
-            $perPage = $request->input('per_page', 25);
+            $perPage = $this->perPage($request, 25);
 
             $paginator = $query->paginate(min($perPage, 100));
 
@@ -150,7 +152,7 @@ class PlatformUserController extends Controller
             $query->orderBy($sortBy, $sortDirection === 'asc' ? 'asc' : 'desc');
         }
 
-        $perPage = $request->input('per_page', 25);
+        $perPage = $this->perPage($request, 25);
         $paginator = $query->paginate(min($perPage, 100));
 
         return response()->json([
@@ -255,6 +257,14 @@ class PlatformUserController extends Controller
     }
 
     /**
+     * Preview what deleting this user changes (same code as destroy). Same route group/authorization as destroy.
+     */
+    public function deleteImpact(User $user): JsonResponse
+    {
+        return response()->json(['data' => app(UserDeletionImpactService::class)->preview($user)]);
+    }
+
+    /**
      * Delete a user.
      */
     public function destroy(
@@ -288,7 +298,10 @@ class PlatformUserController extends Controller
         $organizationId = $user->organization_id;
         $userId = $user->id;
 
-        $user->delete();
+        DB::transaction(function () use ($user): void {
+            app(UserDeletionImpactService::class)->apply($user);
+            $user->delete();
+        });
 
         // Audit log
         $auditService->log(

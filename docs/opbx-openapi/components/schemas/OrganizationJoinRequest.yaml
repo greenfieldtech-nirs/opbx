@@ -17,16 +17,13 @@ properties:
     example: jane.smith@example.com
   name:
     type: string
-    description: Display name of the requester
+    description: Display name from the social profile (the email when the profile has no name)
     example: Jane Smith
   provider:
     type: string
     enum:
       - google
-      - facebook
-      - microsoft
       - github
-      - x
     description: Social identity provider used for the request
     example: google
   provider_subject:
@@ -48,7 +45,7 @@ properties:
       - pbx_admin
       - pbx_user
       - reporter
-    description: Role that will be assigned if the request is approved
+    description: Role recorded on the request (always `pbx_user`; approval creates a PBX User)
     example: pbx_user
   created_at:
     type: string
@@ -67,7 +64,7 @@ properties:
       - string
       - 'null'
     format: date-time
-    description: Timestamp when the request was soft-deleted
+    description: Timestamp when the request was soft-deleted (absent in the create response)
     readOnly: true
     example: '2024-01-15T10:30:00Z'
 required:

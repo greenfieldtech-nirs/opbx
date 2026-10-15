@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\OrganizationStatus;
 use App\Enums\UserRole;
+use App\Models\ApiKey;
 use App\Models\Organization;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
@@ -31,7 +32,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Guarantees:
  * - Only a real, authenticated {@see User} that `is_platform_manager` may
- *   trigger a scope switch. An {@see \App\Models\ApiKey} principal or any
+ *   trigger a scope switch. An {@see ApiKey} principal or any
  *   non-platform-manager user sending the header receives a 403 and NO switch
  *   ever happens.
  * - The effective user is a SEPARATE model instance loaded fresh from the

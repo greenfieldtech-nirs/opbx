@@ -1,4 +1,4 @@
-description: Remaining requests in current window
+description: Requests left in the current rate-limit window
 schema:
   type: integer
 example: 45

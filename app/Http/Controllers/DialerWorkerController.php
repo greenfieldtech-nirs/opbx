@@ -18,6 +18,7 @@ use App\Services\AutoDialer\DestinationManagementService;
 use App\Services\AutoDialer\DialerWorkerCampaignService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -156,6 +157,13 @@ class DialerWorkerController extends Controller
             ], 422);
         }
 
+        // A replayed request (lost response) gets the original answer, not a second call.
+        $idemKey = $request->header('Idempotency-Key');
+        $idemCacheKey = $idemKey ? 'dialer:initiate:'.$destination->id.':'.hash('sha256', $idemKey) : null;
+        if ($idemCacheKey && ($cached = Cache::get($idemCacheKey))) {
+            return response()->json($cached, 201);
+        }
+
         // Get Cloudonix settings for the organization
         $cloudonixSettings = $campaign->organization->cloudonixSettings;
 
@@ -174,6 +182,13 @@ class DialerWorkerController extends Controller
         $webhookBaseUrl = $cloudonixSettings->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
         $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
 
+        // Claim before placing the call: the loser of a race gets 409 and never dials.
+        if (! $this->destinationService->claimForDialing($destination->id)) {
+            return response()->json([
+                'message' => 'Destination is not pending (already claimed or finished)',
+            ], 409);
+        }
+
         // Initiate the call via Cloudonix API with selected Caller ID
         $result = $cloudonixService->initiateCall(
             $campaign,
@@ -185,6 +200,10 @@ class DialerWorkerController extends Controller
         );
 
         if (! $result['success']) {
+            if ($this->destinationService->releaseClaim($destination->id, (string) $result['error'])) {
+                $this->campaignService->incrementFailedCalls($campaign);
+            }
+
             Log::error('DialerWorker: Failed to initiate call via Cloudonix', [
                 'campaign_id' => $campaign->id,
                 'destination_id' => $destination->id,
@@ -207,8 +226,7 @@ class DialerWorkerController extends Controller
             'initiated_at' => $validated['initiated_at'],
         ]);
 
-        // Update destination status
-        $this->destinationService->markAsDialing($destination);
+        $this->destinationService->clearInitiateFailures($destination->id);
 
         // Increment campaign pending calls counter
         $this->campaignService->incrementPendingCalls($campaign);
@@ -221,7 +239,7 @@ class DialerWorkerController extends Controller
             'call_id' => $result['call_id'],
         ]);
 
-        return response()->json([
+        $payload = [
             'message' => 'Call initiated',
             'data' => [
                 'session_id' => $session->id,
@@ -230,7 +248,13 @@ class DialerWorkerController extends Controller
                 'caller_did_id' => $validated['caller_did_id'] ?? null,
                 'callback_url' => $callbackUrl,
             ],
-        ], 201);
+        ];
+
+        if ($idemCacheKey) {
+            Cache::put($idemCacheKey, $payload, now()->addHour());
+        }
+
+        return response()->json($payload, 201);
     }
 
     /**
@@ -260,15 +284,18 @@ class DialerWorkerController extends Controller
         $campaign = $sessionModel->campaign;
         $destination = $sessionModel->destination;
 
-        // Update session
-        $this->callSessionService->updateSession($sessionModel, [
+        // Update session. Not every status update carries a disposition: only set it when sent.
+        $sessionUpdate = [
             'status' => $validated['status'],
-            'disposition' => $validated['disposition'],
             'duration' => $validated['duration'] ?? 0,
             'billsec' => $validated['billsec'] ?? 0,
             'recording_url' => $validated['recording_url'] ?? null,
             'completed_at' => $validated['completed_at'] ?? null,
-        ]);
+        ];
+        if (isset($validated['disposition'])) {
+            $sessionUpdate['disposition'] = $validated['disposition'];
+        }
+        $this->callSessionService->updateSession($sessionModel, $sessionUpdate);
 
         // Handle destination status based on disposition
         $this->handleDispositionUpdate($campaign, $destination, $validated);
@@ -286,7 +313,7 @@ class DialerWorkerController extends Controller
             'message' => 'Call status updated',
             'data' => [
                 'session_id' => $sessionModel->id,
-                'destination_status' => $this->getDestinationStatusFromDisposition($validated['disposition'] ?? null)->value,
+                'destination_status' => ($validated['disposition'] ?? null) === null ? DestinationStatus::PENDING->value : $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $validated['disposition'])['status']->value,
             ],
         ]);
     }
@@ -343,7 +370,7 @@ class DialerWorkerController extends Controller
                 'session_id' => $sessionModel->id,
                 'disposition' => $validated['disposition'],
                 'destination_status' => $destinationStatus->value,
-                'will_retry' => $validated['should_retry'] && isset($validated['next_retry_at']),
+                'will_retry' => $destinationStatus === DestinationStatus::PENDING,
             ],
         ]);
     }
@@ -535,20 +562,15 @@ class DialerWorkerController extends Controller
             'billsec' => $billsec,
         ];
 
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            $destinationData['status'] = DestinationStatus::COMPLETED;
+        $outcome = $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destinationData['status'] = $outcome['status'];
+
+        if ($outcome['status'] === DestinationStatus::COMPLETED) {
             $this->campaignService->incrementCompletedCalls($campaign);
-        } elseif ($this->campaignService->isFailedDisposition($disposition)) {
-            if ($this->campaignService->isRetryableDisposition($disposition) &&
-                ! $this->destinationService->hasReachedMaxAttempts($destination, $campaign->max_dial_attempts)) {
-                $destinationData['next_retry_at'] = $this->campaignService->calculateNextRetry($destination->dial_attempts);
-                $destinationData['status'] = DestinationStatus::PENDING;
-            } else {
-                $destinationData['status'] = DestinationStatus::FAILED;
-                $this->campaignService->incrementFailedCalls($campaign);
-            }
+        } elseif ($outcome['status'] === DestinationStatus::PENDING) {
+            $destinationData['next_retry_at'] = $outcome['next_retry_at']->toIso8601String();
         } else {
-            $destinationData['status'] = $destination->status;
+            $this->campaignService->incrementFailedCalls($campaign);
         }
 
         $this->destinationService->updateDisposition($destination, $destinationData);
@@ -565,31 +587,31 @@ class DialerWorkerController extends Controller
     private function processDisposition($session, $campaign, $destination, array $validated): DestinationStatus
     {
         $disposition = $validated['disposition'];
-        $shouldRetry = $validated['should_retry'];
-        $nextRetryAt = $validated['next_retry_at'] ?? null;
 
-        // Determine destination status first
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            $this->destinationService->markAsCompleted($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+        // The server decides; the worker's should_retry / next_retry_at hints are ignored.
+        $outcome = $this->campaignService->decideOutcome($campaign, (int) $destination->dial_attempts, $disposition);
+        $destStatus = $outcome['status'];
+        $duration = $validated['duration'] ?? 0;
+        $billsec = $validated['billsec'] ?? 0;
+
+        if ($destStatus === DestinationStatus::COMPLETED) {
+            $this->destinationService->markAsCompleted($destination, $disposition, $duration, $billsec);
             $this->campaignService->incrementCompletedCalls($campaign);
             $sessionStatus = 'completed';
-            $destStatus = DestinationStatus::COMPLETED;
-        } elseif ($shouldRetry && $nextRetryAt) {
-            $this->destinationService->scheduleRetry($destination, $nextRetryAt, $disposition);
+        } elseif ($destStatus === DestinationStatus::PENDING) {
+            $this->destinationService->scheduleRetry($destination, $outcome['next_retry_at']->toIso8601String(), $disposition);
             $sessionStatus = 'failed';
-            $destStatus = DestinationStatus::PENDING;
 
             Log::info('DialerWorker: Destination scheduled for retry', [
                 'session_id' => $session->id,
                 'destination_id' => $destination->id,
                 'attempt_number' => $validated['attempt_number'],
-                'next_retry_at' => $nextRetryAt,
+                'next_retry_at' => $outcome['next_retry_at']->toIso8601String(),
             ]);
         } else {
-            $this->destinationService->markAsFailed($destination, $disposition, $validated['duration'] ?? 0, $validated['billsec'] ?? 0);
+            $this->destinationService->markAsFailed($destination, $disposition, $duration, $billsec);
             $this->campaignService->incrementFailedCalls($campaign);
             $sessionStatus = 'failed';
-            $destStatus = DestinationStatus::FAILED;
         }
 
         // Update session
@@ -604,25 +626,5 @@ class DialerWorkerController extends Controller
         $this->campaignService->decrementPendingCalls($campaign);
 
         return $destStatus;
-    }
-
-    /**
-     * Get destination status from disposition string.
-     */
-    private function getDestinationStatusFromDisposition(?string $disposition): DestinationStatus
-    {
-        if ($disposition === null) {
-            return DestinationStatus::PENDING;
-        }
-
-        if ($this->campaignService->isCompletedDisposition($disposition)) {
-            return DestinationStatus::COMPLETED;
-        }
-
-        if (in_array($disposition, ['failed', 'congestion'], true)) {
-            return DestinationStatus::FAILED;
-        }
-
-        return DestinationStatus::PENDING;
     }
 }

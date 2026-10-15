@@ -4,6 +4,7 @@ content:
     schema:
       $ref: ../schemas/Error.yaml
     example:
-      error: SERVER_ERROR
-      message: An internal server error occurred
-      code: INTERNAL_ERROR
+      error:
+        code: INTERNAL_ERROR
+        message: An internal server error occurred
+        details: null

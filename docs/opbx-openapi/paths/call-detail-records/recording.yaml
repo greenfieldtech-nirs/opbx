@@ -1,0 +1,59 @@
+paths:
+  /v1/call-detail-records/{call_detail_record}/recording:
+    parameters:
+      - name: call_detail_record
+        in: path
+        required: true
+        description: Call detail record ID
+        schema:
+          type: integer
+
+    get:
+      tags:
+        - Call Detail Records
+      summary: Stream CDR recording
+      description: |
+        Streams the stored recording of a call for playback. Only recordings with
+        status `available` are served. Owner, PBX Admin, Reporter and Supervisor only
+        (PBX User gets 403), and a Supervisor only for calls of resources they
+        supervise. The content type is the recording's stored MIME type (default
+        `audio/mpeg`). Not available for archived CDRs.
+      operationId: streamCallDetailRecordRecording
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
+      responses:
+        '200':
+          description: Recording audio
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: private, no-cache
+            Content-Length:
+              schema:
+                type: integer
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '404':
+          description: Recording not available, or the file is missing from storage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum: [Recording not available, Recording file not found in storage]

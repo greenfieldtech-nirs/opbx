@@ -45,7 +45,7 @@ export default function Auth0Callback() {
           if (code === 'AUTH0_REGISTRATION_REQUIRED') {
             const registrationData = data as Auth0RegistrationRequired;
             navigate(
-              `/ui/auth/onboarding?email=${encodeURIComponent(registrationData.profile.email)}&provider=${registrationData.profile.provider}&subject=${registrationData.profile.subject}&name=${encodeURIComponent(registrationData.profile.name)}`
+              `/ui/auth/onboarding?email=${encodeURIComponent(registrationData.profile.email)}&provider=${registrationData.profile.provider}&onboarding_id=${encodeURIComponent(registrationData.profile.onboarding_id)}&name=${encodeURIComponent(registrationData.profile.name)}`
             );
             return;
           }

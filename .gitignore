@@ -171,8 +171,12 @@ reports/
 # ============================================================================
 /backups/
 /volumes/minio/
+/volumes/seaweedfs/
 /volumes/mysql/
 /volumes/redis/
+# Older bind-mount paths still used by some local docker-compose.yml files.
+/volumes/mysql_data/
+/volumes/redis_data/
 /volumes/amd-dumps/
 
 # ============================================================================
@@ -189,3 +193,13 @@ reports/
 .superpowers/
 .agent-screenshots/
 acd-worker/target/
+
+# Per-developer Claude Code permissions (may contain tokens)
+**/.claude/settings.local.json
+
+# Stray SQLite database created by running the app outside Docker
+/opbx
+
+# scripts/update-compose.sh backups and scratch dirs
+docker-compose.yml.bak-*
+.compose-update.*/

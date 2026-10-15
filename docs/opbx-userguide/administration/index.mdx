@@ -2,48 +2,37 @@
 sidebar_position: 3
 slug: /administration
 title: "Organization Settings"
-description: "Organization configuration, user profile, and Cloudonix integration"
+description: "Your profile, the organization's Cloudonix integration, and where to find the organization settings"
 ---
 
 # Organization Settings
 
-The **Settings** section is available from the sidebar navigation. Most settings pages are restricted to the organization **Owner**; profile and password pages are available to all authenticated users.
+This page tells you where the settings that apply to your own account and to your organization live. The admin interface itself is explained in [Navigating the Admin Interface](/opbx/administration/navigating-the-interface).
 
-## What is covered here
+## Where the settings are
 
-| Page | Path | Who can access |
-|------|------|----------------|
-| Profile | `/profile` | Any authenticated user |
-| Cloudonix Integration | `/settings` | Owner only |
-| Organization Users | `/users` | Owner / PBX Admin |
+| Page | How to open it | Who can use it | What it holds |
+|------|----------------|----------------|---------------|
+| Profile (`/ui/profile`) | User menu, top right: **Profile** | Every signed-in user, for their own account | Your name, email, contact details, password and linked social accounts. The Owner also renames the organization and sets its time zone here. See [Profile](/opbx/administration/profile) |
+| Settings (`/ui/settings`) | User menu, top right: **Settings** | Owner only | The Cloudonix integration: domain credentials, webhook key, webhook base URL, no-answer timeout, call recording, recording format and the embedded dialer's allowed domains. See [Settings](/opbx/modules/settings) |
+| Users (`/ui/users`) | Sidebar, PBX Configuration: **Users** | Owner and PBX Admin | The organization's users and roles. See [User Management](/opbx/modules/user-management) |
+| API Keys (`/ui/api-keys`) | Sidebar, Analytics: **API Keys** | Owner only | Keys for scripts and integrations. See [API Keys](/opbx/modules/api-keys) |
+| Call Notifications (`/ui/call-notifications`) | Sidebar, Analytics: **Call Notifications** | Owner and PBX Admin | The organization's call-event webhook. See [Call Notifications](/opbx/modules/call-notifications) |
+| Platform Management | Sidebar, Platform Management section | Platform managers only | Cross-tenant administration. See [Platform Management](/opbx/administration/platform-management) |
+
+Other roles do not see the **Settings** item in the user menu. If they open `/ui/settings` directly, they get an "Access denied" toast and are sent back to the dashboard.
 
 :::tip
-For the full Cloudonix setup workflow, see [Cloudonix Setup](./cloudonix-setup). For local webhook development with ngrok, see the [Installation guide](./installation).
+For the first-time Cloudonix setup, see [Cloudonix Setup](/opbx/installation/cloudonix-setup). For local webhook development with ngrok, see the [Installation guide](/opbx/installation#webhooks-not-received-in-local-development).
 :::
 
-## Profile
+{/* SCREENSHOT: settings-cloudonix — Settings page, Cloudonix Integration section with the domain fields filled in (values masked) and the Validate and Save Settings button */}
 
-Every user can update their own:
+## Related
 
-- Name and email
-- Password
-- Organization name (if Owner)
-
-## Cloudonix Integration
-
-The Cloudonix integration connects your organization to the Cloudonix CPaaS for voice services. Required fields:
-
-| Field | Description |
-|-------|-------------|
-| Domain UUID | Your Cloudonix domain UUID |
-| Domain API Key | Cloudonix API key with access to the domain |
-| Requests API Key | Auto-generated key used to authenticate voice webhooks |
-| Webhook Base URL | Public URL where Cloudonix can reach OPBX |
-| No-answer Timeout | Seconds to wait before treating a call as unanswered |
-| Recording Format | `mp3` or `wav` |
-
-Saving the settings validates the credentials, updates the domain profile in Cloudonix, creates or updates the OPBX voice application, and sets it as the domain default.
-
-## Platform Management
-
-If your user account has the `is_platform_manager` flag, you also have access to cross-tenant platform management. See [Platform Management](./platform-management) for details.
+- [Navigating the Admin Interface](/opbx/administration/navigating-the-interface)
+- [Profile](/opbx/administration/profile)
+- [Settings](/opbx/modules/settings)
+- [Cloudonix Setup](/opbx/installation/cloudonix-setup)
+- [Trunks](/opbx/modules/trunks) — SIP trunks stored in Cloudonix
+- [Centralized Logs](/opbx/administration/centralized-logs) — optional log stack for operators

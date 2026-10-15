@@ -13,6 +13,8 @@ export interface CallQueueAgent {
 }
 
 export interface CallQueue {
+  /** True when any route is 'unavailable' (saved for future use). */
+  is_unprovisioned?: boolean;
   id: number;
   organization_id: number;
   name: string;
@@ -25,6 +27,7 @@ export interface CallQueue {
   announce_position_timeout: number;
   announce_position_language?: string | null;
   immediate_connect: boolean;
+  conference_ring_all?: boolean;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;
@@ -32,6 +35,7 @@ export interface CallQueue {
   fallback_ivr_menu_id?: number | null;
   fallback_ai_assistant_id?: number | null;
   fallback_ai_load_balancer_id?: number | null;
+  fallback_call_queue_id?: number | null;
   status: 'active' | 'inactive';
   agents?: CallQueueAgent[];
   agents_count?: number;
@@ -41,6 +45,7 @@ export interface CallQueue {
   fallback_ivr_menu?: { id: number; name: string } | null;
   fallback_ai_assistant?: { id: number; name: string } | null;
   fallback_ai_load_balancer?: { id: number; name: string } | null;
+  fallback_call_queue?: { id: number; name: string } | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -56,6 +61,7 @@ export interface CallQueuePayload {
   announce_position_timeout: number;
   announce_position_language?: string | null;
   immediate_connect: boolean;
+  conference_ring_all?: boolean;
   moh_recording_id?: number | null;
   fallback_action: string;
   fallback_extension_id?: number | null;
@@ -63,6 +69,7 @@ export interface CallQueuePayload {
   fallback_ivr_menu_id?: number | null;
   fallback_ai_assistant_id?: number | null;
   fallback_ai_load_balancer_id?: number | null;
+  fallback_call_queue_id?: number | null;
   status: 'active' | 'inactive';
   agents: number[];
 }
@@ -189,11 +196,17 @@ export const queueReportsService = {
     return response.data;
   },
 
-  exportCsvUrl: (params?: Record<string, unknown>): string => {
-    const search = new URLSearchParams(
-      Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== '') as [string, string][],
-    ).toString();
-    return `/api/v1/queue-calls/export${search ? `?${search}` : ''}`;
+  /** Fetches the CSV through the authenticated client (Bearer + operate-as) and saves it. */
+  exportCsv: async (params?: Record<string, unknown>): Promise<void> => {
+    const response = await api.get('/queue-calls/export', { params, responseType: 'blob' });
+    const url = URL.createObjectURL(response.data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'queue-calls.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   },
 };
 

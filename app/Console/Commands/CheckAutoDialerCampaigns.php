@@ -38,6 +38,8 @@ class CheckAutoDialerCampaigns extends Command
 
         try {
             $lifecycleManager->checkAndAutoStart();
+            $lifecycleManager->reconcileStaleDestinations();
+            $lifecycleManager->completeFinishedCampaigns();
 
             $this->info('Campaign check completed successfully.');
 

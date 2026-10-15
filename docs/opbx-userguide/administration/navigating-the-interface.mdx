@@ -1,0 +1,140 @@
+---
+sidebar_position: 1
+slug: /administration/navigating-the-interface
+sidebar_class_name: cxGuidesSidebar
+title: "Navigating the Admin Interface"
+description: "Sidebar areas, roles, delete confirmations, unprovisioned resources and the Operate As banner"
+---
+
+# Navigating the Admin Interface
+
+This page explains how the OPBX web interface is organised, which menu items you see for your role, and the patterns that repeat across every module: delete confirmations, the "still in use" dialog, the Unprovisioned badge, and the banner shown while a platform manager operates as an organization.
+
+Read this page first. The module guides assume you know where things are.
+
+## Page Layout
+
+Every signed-in page has the same frame:
+
+- **Activity bar** (far left): one icon per sidebar section. Hover an icon to see the section name; click it to show that section's items in the sidebar. The **Dashboards** icon also opens your dashboard.
+- **Sidebar**: the items of the selected section. Drag its right edge to make it wider or narrower (200 to 400 pixels); the width and the selected section are remembered in your browser.
+- **Header** (top): your name, the queue agent widget when you are a call-queue agent, and the **user menu**.
+- **Web Phone**: a floating softphone, shown when an extension is assigned to you. See [Web Phone](/opbx/modules/web-phone).
+
+## Sidebar Areas
+
+The sidebar is grouped into sections. Items you cannot use for your role are hidden, and a section with no visible item is hidden too.
+
+| Section | What is in it |
+|---------|---------------|
+| **Dashboards** | Your home dashboard |
+| **PBX Configuration** | Users, Supervisors, Extensions, Conference Rooms, Ring Groups, Call Queues, IVR Menus, Business Hours, Announcements, Phone Numbers, Trunks |
+| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
+| **Analytics** | Live Calls, Queues Dashboard, Queue Reports, Call Logs, Call Notifications, API Keys |
+| **Supervisor** | Shown to Supervisors instead of the sections above: Dashboard, Live Calls, Call Logs, Users, Ring Groups, Call Queues |
+| **Platform Management** | Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers, and hidden while they [operate as an organization](#operating-as-an-organization-platform-managers) |
+
+Which roles see each item comes from the sidebar configuration. Examples:
+
+| Item | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| Users | Yes | Yes | No | No | Yes (own scope) |
+| Extensions, Conference Rooms | Yes | Yes | Yes | Yes | No |
+| Ring Groups, Call Queues | Yes | Yes | No | Yes | Yes (own scope) |
+| IVR Menus, Business Hours, Announcements, Trunks | Yes | Yes | No | No | No |
+| Phone Numbers | Yes | Yes | No | Yes | No |
+| Auto Dialer, AI Load Balancers | Yes | Yes | No | Yes | No |
+| AI Assistants | Yes | Yes | No (section hidden) | Yes | No |
+| Inbound Blacklist, Outbound Whitelist | Yes | Yes | No | No | No |
+| Live Calls, Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | Live Calls only |
+| Call Logs | Yes | Yes | Yes | Yes | Yes |
+| Call Notifications | Yes | Yes | No | No | No |
+| API Keys | Yes | No | No | No | No |
+
+:::info Supervisors
+A user with the Supervisor role sees the **Supervisor** section, not the configuration sections. Their Users, Ring Groups and Call Queues views are limited to the users and groups assigned to them. See [Supervisors](/opbx/modules/supervisors).
+:::
+
+## The User Menu
+
+Click your name at the top right to open the user menu. It shows your name and email and these items:
+
+| Item | Who sees it | Opens |
+|------|-------------|-------|
+| **Profile** | Everyone | Your [profile](/opbx/administration/profile): contact details, password, linked accounts and (Owner) organization details |
+| **Settings** | Owner | The organization's [Cloudonix settings](/opbx/modules/settings) |
+| **Logout** | Everyone | Signs you out |
+
+### Log out
+
+Who can do this: every signed-in user.
+
+1. Click your name at the top right.
+2. Choose **Logout**.
+
+The toast "Logged out successfully" appears and the login page opens. Your current token is revoked.
+
+## Roles at a Glance
+
+| Role | Typical use |
+|------|-------------|
+| **Owner** | Runs the organization. The only role that can change another user's role, manage Cloudonix settings and manage API keys |
+| **PBX Admin** | Day-to-day administration: routing, users (within the limits below), phone numbers, queues |
+| **PBX User** | Has an extension. Uses the Web Phone and their own queue login state |
+| **Reporter** | Read-only access to reports, call logs and most configuration |
+| **Supervisor** | Monitors and coaches the users and groups assigned to them |
+
+Full permissions per module are on each module page. The role rules that affect user management are in [User Management](/opbx/modules/user-management).
+
+## Repeated Patterns
+
+### Delete Confirmations
+
+Every delete in the interface asks for confirmation first. Some deletes show more than a yes/no question:
+
+- **User delete** shows an impact preview: which extensions are kept, which groups or queues lose the user, and which routes will change. The delete goes ahead only when you confirm. See [User Management](/opbx/modules/user-management).
+- **Routing resources** (extensions used as a target, ring groups, IVR menus, DIDs and similar) are refused while other configuration still points at them. The refusal opens a **"Cannot delete: still in use"** dialog that lists every place the resource is used. Remove or change those references first, then delete again. History records (call logs, CDRs, session logs) never block a delete.
+
+:::note
+The server enforces the in-use check. The dialog is the display of that result, so the list you see is always the one the server returned.
+:::
+
+![Cannot delete: still in use dialog listing three references (a call queue fallback, an IVR menu option and a business hours action)](../img/screens/ring-groups-in-use-dialog.jpg)
+
+### Unprovisioned Resources
+
+An **Unprovisioned** badge marks a resource that has at least one route set to **Destination unavailable**. This is the "set up for future use" state. Callers who reach that route hear "Destination doesn't exist" and the call ends.
+
+- The badge appears on the list row and in the edit dialog title.
+- Six resource types can be unprovisioned: IVR menus, phone numbers (DIDs), ring groups, call queues, AI load balancers and business hours schedules. Each list page has an **Unprovisioned** filter.
+- A new resource must be fully connected when it is created. "Destination unavailable" is only offered on **edit** screens, under **Disconnect**.
+
+![Ring Groups list with the Unprovisioned filter on and Executive Line showing the Unprovisioned badge](../img/screens/navigating-unprovisioned-filter.jpg)
+
+### Live Data
+
+Pages with live data (Live Calls, Queues Dashboard, Platform Status) refresh themselves while the browser tab is visible and stop when the tab is hidden. Use the page's refresh control or reload if a value looks stale.
+
+### Notifications
+
+Confirmations and errors appear as short notifications (toasts) at the top center of the screen and close on their own. Up to five are shown at once.
+
+### Error States
+
+When the main data for a list or detail page cannot be loaded, the page shows an error state with the message from the server instead of an empty table. An empty table means there is genuinely no data.
+
+## Operating as an Organization (Platform Managers)
+
+A platform manager can act as the Owner of an active organization. While that session is active:
+
+- A yellow banner at the top of every page names the organization and offers **Exit organization**.
+- Every request carries the organization being operated on. Changes you make are real changes to that organization.
+- The session ends when you exit, log out, or your token expires.
+
+Start and stop are both recorded in the platform audit log. Read [Platform Management](/opbx/administration/platform-management) before using it.
+
+## Where to Go Next
+
+- [Organization Settings](/opbx/administration) — profile, Cloudonix integration and organization users
+- [Module guides](/opbx/modules) — one page per feature, in the order listed in the modules index
+- [Platform Management](/opbx/administration/platform-management) — for platform owners and operators only

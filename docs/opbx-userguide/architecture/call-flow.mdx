@@ -43,7 +43,7 @@ sequenceDiagram
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/session-update
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/cdr
     Laravel->>MySQL: Store CDR / session update
-    Laravel->>Soketi: Broadcast call events
+    Laravel->>Soketi: Broadcast call.initiated
 ```
 
 ---
@@ -68,10 +68,10 @@ Cloudonix sends a JSON payload that includes:
 
 1. Extracts the Bearer token from the `Authorization` header.
 2. Extracts `Domain` and the `to`/`from` numbers.
-3. Looks up `CloudonixSettings` by `domain_name` or `domain_uuid`.
+3. Looks up `CloudonixSettings` by `domain_name`, then `domain_uuid`.
 4. Compares the Bearer token to `domain_requests_api_key` with `hash_equals()`.
 5. Injects `_organization_id` into the request.
-6. Returns CXML unauthorized response on failure.
+6. Returns a CXML response on failure: 401 for a token or domain problem, 400 when `Domain` or the `to` number is missing.
 
 If authentication succeeds, the request reaches `VoiceRoutingController@handleInbound`.
 
@@ -80,6 +80,10 @@ If authentication succeeds, the request reaches `VoiceRoutingController@handleIn
 ## Step 3: VoiceRoutingManager
 
 `VoiceRoutingController` delegates to `App\Services\VoiceRouting\VoiceRoutingManager`.
+
+### Coach Calls
+
+Before anything else, `CoachRoutingService::tryHandle()` checks whether the call is a supervisor coaching call (`spy_{token}`, `whisper_{party}_{token}` or `barge_{token}`, dialed from the supervisor's Web Phone) and, if so, answers it with a Cloudonix `<Coach>` verb.
 
 ### Direction Dispatch
 
@@ -93,32 +97,41 @@ The manager dispatches by the `Direction` field:
 | `application` | `handleApplicationDirection()` | API-initiated calls. |
 | default | `handleUnknownDirection()` | Falls back to inbound. |
 
+A `subscriber` call tries, in order: a direct extension dial, the DID routing of the dialed number, then outbound routing (outbound whitelist). The calls are marked `internal` for `call_recording_mode`; inbound calls are marked `inbound`.
+
+For an `inbound` call, the manager first checks the [inbound blacklist](/opbx/modules/inbound-blacklist) against the dialed DID and, on a match, returns the rejection CXML. If the caller (`From`) is itself one of the organization's numbers, the call is handled as an internal call from a DID.
+
 ### DID Resolution
 
 For inbound calls, the manager resolves the called DID (`To` number):
 
-1. Look up `did_numbers` by phone number.
-2. Read the DID's `routing_type` and `routing_type_id`.
-3. Load the destination model based on the routing type.
+1. Look up an active `did_numbers` row with that phone number in the organization (`InboundRoutingService::handleDidRouting()`).
+2. Read the DID's `routing_type`, and the target ID from `routing_config` (for example `routing_config.ring_group_id`).
+3. Load the destination model based on the routing type, then pick the strategy for it.
 
 ### Destination Types
 
-| Routing Type | Model | Strategy |
-|--------------|-------|----------|
-| `extension` | `Extension` | `UserRoutingStrategy` |
+The DID's `routing_type` selects the destination. The routing config holds the target ID.
+
+| Routing Type | Model | Handled by |
+|--------------|-------|------------|
+| `extension` | `Extension` | Strategy for the extension's type (`UserRoutingStrategy`, `ForwardRoutingStrategy`, `AiAgentRoutingStrategy`, and so on) |
 | `ring_group` | `RingGroup` | `RingGroupRoutingStrategy` |
+| `call_queue` | `CallQueue` | `QueueRoutingStrategy` |
 | `ivr_menu` | `IvrMenu` | `IvrRoutingStrategy` |
 | `conference_room` | `ConferenceRoom` | `ConferenceRoutingStrategy` |
-| `business_hours` | `BusinessHoursSchedule` | `BusinessHoursRoutingService` |
-| `ai_assistant` | `Extension` with AI assistant | `AiAgentRoutingStrategy` |
-| `ai_load_balancer` | `Extension` with ALB | `AiLoadBalancerRoutingStrategy` |
-| `forward` | Forward target | `ForwardRoutingStrategy` |
+| `business_hours` | `BusinessHoursSchedule` | `InboundRoutingService` resolves the schedule's current open or closed target, then that target's strategy runs |
+| `ai_assistant` | `AiAssistant` | `AiAgentRoutingStrategy` |
+| `ai_load_balancer` | `AiAssistantLoadBalancer` | `AiLoadBalancerRoutingStrategy` |
+| `unavailable` | none | Plays the "destination unavailable" prompt and hangs up |
+
+A DID with no valid destination gets a spoken error prompt (`Destination not configured` or `Unsupported routing configuration`) and a hangup.
 
 ---
 
 ## Step 4: Strategy Execution
 
-`VoiceRoutingStrategyExecutor` iterates registered strategies and picks the first one whose `canHandle()` method matches the destination. The selected strategy returns a CXML response via `CxmlBuilder`.
+`InboundRoutingService` maps the resolved destination to an `ExtensionType` (the extension's own type, or `RING_GROUP`, `CONFERENCE`, `QUEUE`, `IVR`, `AI_ASSISTANT`, `AI_LOAD_BALANCER`). `VoiceRoutingStrategyExecutor` iterates the registered strategies and runs the first one whose `canHandle()` accepts that type. The selected strategy returns a CXML response via `CxmlBuilder`.
 
 ### CxmlBuilder
 
@@ -132,7 +145,8 @@ For inbound calls, the manager resolves the called DID (`To` number):
 | `joinConference(...)` | `<Dial><Conference>...</Conference></Dial>` |
 | `gather(...)` | `<Gather>` for IVR digit collection |
 | `streamToWebSocket($url)` | `<Connect><Stream url="wss://..."/></Connect>` |
-| `busy($msg)` / `unavailable($msg)` | Error prompt + hangup |
+| `dialQueueConference($room)` | `<Dial><Conference>` for a queue offer through a conference |
+| `busy($msg)` / `unavailable($msg)` / `destinationUnavailable()` | Error prompt + hangup |
 
 The CXML response is returned to Cloudonix with `Content-Type: application/xml`.
 
@@ -153,17 +167,35 @@ If the route returns an IVR `Gather`, Cloudonix POSTs the caller's digits to `/a
 
 ## Step 6: Ring Group Callback
 
-For ring groups with sequential strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` determines the next action (try next member, failover, or hangup).
+For ring groups with Sequential and Round Robin strategies, Cloudonix POSTs to `/api/callbacks/voice/ring-group-callback` after each dial attempt. `VoiceRoutingManager::routeRingGroupCallback` first reads the dial outcome (`DialCallStatus`, else `CallStatus`). When the dial was answered (`answered`, `completed` or `in-progress`), the call is over: the member named by the callback URL's `dialed_extension` is recorded as the call's answering extension (see [CDR](#cdr)) and the response is `<Hangup/>`, so no further member is dialed and the fallback does not run, for every strategy. Any other outcome (`no-answer`, `busy`, `failed`, `canceled`, `unknown`, or no status) determines the next action as before (try the next member, or the fallback).
+
+### Simultaneous ring groups
+
+A Simultaneous ring group does not use a multi-number `<Dial>` (Cloudonix's action callback would not say which member answered). `RingGroupRoutingStrategy::handleSimultaneous` hands the members to `RingGroupConferenceService::offer`, which originates one Cloudonix session per member (`CloudonixCallsClient::originateApplicationCalls`, `POST /calls/{domain}/application`; destination = the member's extension number or a Forward member's `forward_to`; caller ID = the caller's `From`; timeout = the group's ring timeout; URL = the signed `/api/callbacks/voice/ring-group-member-connect`). The caller's response is `<Dial><Conference>` into the room `rg{ring_group_id}c{caller session token}` (hold music while alone; recorded when call recording applies). Redis keeps the pending offer (`rg:offer:{group}:{token}`, member extension => member session token), each member session (`rg:leg:{token}`) and the caller (`rg:caller:{token}`). No member could be originated: the fallback runs at once.
+
+- A member answers: its session fetches `ring-group-member-connect`. The first member of the current offer wins `SET NX rg:resolved:{group}:{token}`, joins the caller's room, the other member sessions are ended (`DELETE /calls/{domain}/sessions/{token}`) and the member is recorded as the call's answering extension (see [CDR](#cdr)). Any later answer gets `<Hangup/>`.
+- A member session ends unanswered (session update with a terminal status or `deleted`, routed through `QueueCallLifecycleService`): it leaves the offer; when the last one leaves, the fallback runs.
+- The ring timeout plus 10 seconds passes (`ExpireRingGroupOfferJob`, delayed): the members still ringing are ended and the fallback runs.
+- The fallback runs by switching the caller's session (`POST /calls/{domain}/sessions/{token}/application`) to the signed `/api/callbacks/voice/ring-group-fallback`, which answers the group's fallback action. `rg:resolved` makes the winner, the fallback and the caller hanging up (members ended) mutually exclusive.
+- Both the caller and the winning member end the room on exit, so the call ends when either hangs up.
 
 ---
 
 ## Step 7: AI Load Balancer Follow-Through
 
-For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failover when the primary AI provider is busy or unavailable. It tries the next assistant in the balancer distribution.
+For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failover when the primary AI provider is busy or unavailable. It tries the next assistant in the balancer distribution. When none is left, the balancer's fallback runs; a ring-group or call-queue fallback is handed to `AiLoadBalancerRoutingStrategy` (`handleFallbackRingGroup`, `handleFallbackCallQueue`), which runs the target's normal strategy.
+
+A ring group is always routed through `RingGroupRoutingStrategy` (`VoiceRoutingManager::executeStrategy(RING_GROUP, ...)`), whatever reaches it: a DID, an extension, an IVR option or failover, a business-hours action (`BusinessHoursRoutingService` and the IVR business-hours path), or a ring group, call queue or AI load balancer fallback. So its strategy, fallback and answering-member attribution are the same on every path.
 
 ---
 
-## Step 8: Asynchronous Notifications
+## Step 8: Call Queues
+
+A call routed to a call queue is enqueued in the [ACD worker](/opbx/workers/acd-worker) and hears hold music. After each hold segment Cloudonix POSTs to `/api/callbacks/voice/queue-poll`. Laravel asks the ACD worker for a decision: **wait**, **dial** (the selected agents' extensions) or **overflow** (to the queue's fallback). The dial result comes back on `/api/callbacks/voice/queue-dial-callback`. Agents who are already on a call are skipped, using the extension presence kept in Redis from session updates.
+
+---
+
+## Step 9: Asynchronous Notifications
 
 While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPBX.
 
@@ -173,7 +205,7 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 
 - Normalizes `from` and `to` to E.164.
 - Identifies the organization from the middleware-injected `_organization_id` or by DID lookup.
-- Dispatches `ProcessInboundCallJob` to create a `CallLog` and broadcast `CallInitiated`.
+- Dispatches `ProcessInboundCallJob` to create a `CallLog` and broadcast `CallInitiated` (`call.initiated` on the `presence-org.{organization_id}` channel).
 
 ### session-update
 
@@ -183,37 +215,38 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 - Filters statuses to the allowed notification list.
 - Creates a `SessionUpdate` record.
 - Triggers call notification webhooks if configured.
-- Broadcasts `CallAnswered` and `CallEnded` events via Soketi.
+- Does not broadcast. The `CallAnswered` and `CallEnded` event classes exist, but no code dispatches them; the Live Calls page polls the API instead (see [Real-Time](/opbx/architecture/real-time)).
 
 ### CDR
 
 `POST /api/webhooks/cloudonix/cdr`
 
-- Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`.
-- Backfills the legacy `CallLog` record.
+- Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update. `extension_number` comes from the calling subscriber, an extension caller ID, a DID routed directly to an extension, or else the answering extension recorded during routing (single-extension dial, answered ring group member of any strategy, answering queue agent). An answer recorded after the CDR (queue finalization runs after the CDR is stored) updates the CDR if its `extension_number` is still null.
+- Updates the legacy `CallLog` record if one exists.
 - Creates a final `SessionUpdate` with `action = 'cdr_final_status'`.
 - Triggers call notification webhooks for the final status.
 - For auto-dialer calls:
   - Updates `AutoDialerCallSession` and `AutoDialerDestination`.
   - Updates campaign counters.
-  - Decrements the Redis CAC counter using the `dialer` connection (raw key `dialer:cac:{campaign_id}:active`).
-  - Publishes the CDR event to Redis Pub/Sub channel `cdr:completed`.
+  - Decrements the Redis CAC counter using the `dialer` connection (raw key `dialer:cac:{campaign_id}:active`). Laravel owns this count, and `dialer:reconcile-cac` heals drift every minute.
 
 ---
 
 ## Call State in Redis
 
-- `lock:call:{call_id}` — distributed lock for a call
-- IVR state — turn count and digit history
+- `cdr:create:{organization_id}:{call_id}` — lock that keeps a CDR from being created twice
+- `cdr:answerer:{organization_id}:{session_token}` — the extension that answered the call (first one wins, 24-hour TTL), read when the CDR is stored
+- IVR state — turn count and digit history (`ivr:call:{call_sid}`), with `ivr:idempotency:{event_id}`
 - Dialer CAC counters — `dialer:cac:{campaign_id}:active`
+- Call queue state — `acd:*` keys owned by the ACD worker, and extension presence `acd:presence:{organization_id}:{extension}`
 
 ---
 
 ## Related Documentation
 
-- [Architecture Overview](./index)
-- [Webhooks](./webhooks)
-- [Multi-Tenancy](./multi-tenancy)
-- [Security](./security)
-- [Real-Time](./real-time)
-- [Voice Routing Engine](/modules/voice-routing-engine) *(if available)*
+- [Architecture Overview](/opbx/architecture)
+- [Webhooks](/opbx/architecture/webhooks)
+- [Multi-Tenancy](/opbx/architecture/multi-tenancy)
+- [Security](/opbx/architecture/security)
+- [Real-Time](/opbx/architecture/real-time)
+- [Call Queues](/opbx/modules/call-queues)

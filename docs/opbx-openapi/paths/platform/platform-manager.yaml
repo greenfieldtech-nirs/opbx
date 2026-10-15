@@ -4,16 +4,65 @@ paths:
       tags:
         - Platform
       summary: Set platform manager flag
+      description: |
+        Grants or revokes platform manager status. Platform managers only. Revoking also
+        revokes all of the user's API tokens. Revoking the last platform manager is
+        refused. Writes a `user.platform_manager.granted` or `user.platform_manager.revoked`
+        audit log entry.
       operationId: setPlatformManager
       security:
         - bearerAuth: []
-        - cookieAuth: []
       parameters:
         - name: user
           in: path
           required: true
           schema:
             type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_platform_manager:
+                  type: boolean
+              required: [is_platform_manager]
       responses:
         '200':
-          description: Platform manager status updated
+          description: Flag updated (revoking also invalidates the user's tokens)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Platform manager status granted.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      is_platform_manager:
+                        type: boolean
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.
+        '404':
+          $ref: '../../components/responses/NotFound.yaml'
+        '422':
+          description: Validation failed, or this would revoke the last platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Cannot revoke the last platform manager.

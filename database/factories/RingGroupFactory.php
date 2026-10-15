@@ -9,10 +9,11 @@ use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Models\Extension;
 use App\Models\Organization;
+use App\Models\RingGroup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\RingGroup>
+ * @extends Factory<RingGroup>
  */
 class RingGroupFactory extends Factory
 {
@@ -25,7 +26,7 @@ class RingGroupFactory extends Factory
     {
         return [
             'organization_id' => Organization::factory(),
-            'name' => fake()->words(3, true) . ' Ring Group',
+            'name' => fake()->words(3, true).' Ring Group',
             'description' => fake()->sentence(),
             'strategy' => RingGroupStrategy::SIMULTANEOUS,
             'timeout' => 30,

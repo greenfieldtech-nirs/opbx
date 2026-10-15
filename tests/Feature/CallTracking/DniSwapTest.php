@@ -104,6 +104,36 @@ class DniSwapTest extends TestCase
             ]);
     }
 
+    public function test_utm_campaign_wildcards_are_literal(): void
+    {
+        $organization = Organization::factory()->create(['status' => 'active']);
+        $campaign = CallTrackingCampaign::factory()->create([
+            'organization_id' => $organization->id,
+            'name' => 'Summer Sale',
+            'source' => 'google',
+            'medium' => 'cpc',
+            'status' => CallTrackingCampaignStatus::ACTIVE,
+        ]);
+        $did = DidNumber::factory()->create(['organization_id' => $organization->id, 'phone_number' => '+14155551234', 'status' => 'active']);
+        CallTrackingNumber::factory()->create([
+            'organization_id' => $organization->id,
+            'call_tracking_campaign_id' => $campaign->id,
+            'did_number_id' => $did->id,
+            'status' => CallTrackingCampaignStatus::ACTIVE,
+        ]);
+
+        $swap = fn (string $utm) => $this->getJson(route('call-tracking.dni.swap', [
+            'organization_id' => $organization->id,
+            'utm_source' => 'google',
+            'utm_medium' => 'cpc',
+            'utm_campaign' => $utm,
+        ]))->assertOk();
+
+        $swap('%')->assertJsonMissing(['campaign_id' => $campaign->id]);
+        $swap('Summ_r')->assertJsonMissing(['campaign_id' => $campaign->id]);
+        $swap('summer')->assertJson(['campaign_id' => $campaign->id]);
+    }
+
     public function test_no_match_returns_default_number(): void
     {
         $organization = Organization::factory()->create(['status' => 'active']);

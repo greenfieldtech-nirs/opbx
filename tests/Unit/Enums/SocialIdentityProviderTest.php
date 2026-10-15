@@ -18,4 +18,12 @@ class SocialIdentityProviderTest extends TestCase
     {
         $this->assertSame('twitter', SocialIdentityProvider::X->auth0Connection());
     }
+
+    public function test_only_google_and_github_are_supported(): void
+    {
+        $this->assertSame(['google', 'github'], SocialIdentityProvider::values());
+        $this->assertFalse(SocialIdentityProvider::FACEBOOK->isSupported());
+        $this->assertFalse(SocialIdentityProvider::MICROSOFT->isSupported());
+        $this->assertFalse(SocialIdentityProvider::X->isSupported());
+    }
 }

@@ -158,6 +158,12 @@ else
     print_success "APP_KEY is already set"
 fi
 
+# Worker tokens, Soketi secret and dialer webhook secret: validate-env.sh
+# refuses to start the app with the shipped placeholders.
+print_info "Ensuring shared service secrets are set..."
+bash docker/scripts/generate-secrets.sh .env
+print_info "Grafana (/logs/) login: admin / the GRAFANA_ADMIN_PASSWORD value in .env"
+
 print_header "Step 3: Configuration Files"
 
 # Check/Create config/broadcasting.php
@@ -279,8 +285,9 @@ for DIR in "${DIRS_TO_CHECK[@]}"; do
         print_info "Created directory: $DIR"
     fi
 
-    # Set permissions (777 is fine for Docker, as container user will own files)
-    chmod -R 777 "$DIR" 2>/dev/null || true
+    # 775, not 777: the app container's entrypoint (root) chowns these bind
+    # mounts to www-data on start, so world-writable is never needed.
+    chmod -R 775 "$DIR" 2>/dev/null || true
 done
 
 print_success "Storage and cache directories are ready"
@@ -360,15 +367,15 @@ echo ""
 print_header "Optional: Local Webhook Development"
 
 echo "For local development with Cloudonix webhooks, ngrok is included in Docker"
-echo "and will automatically expose your local server to the internet."
+echo "(profile \"dev\") and exposes your local server to the internet when started."
 echo ""
 echo "Steps to configure:"
 echo ""
 echo "  1. Ensure NGROK_AUTHTOKEN is set in your .env file"
 echo "     Get your token from: https://dashboard.ngrok.com/get-started/your-authtoken"
 echo ""
-echo "  2. Start Docker services (ngrok will start automatically)"
-echo "     docker compose up -d"
+echo "  2. Start Docker services, including the ngrok tunnel"
+echo "     docker compose --profile dev up -d"
 echo ""
 echo "  3. Get your ngrok public URL:"
 echo "     - Web UI: http://localhost:4040"

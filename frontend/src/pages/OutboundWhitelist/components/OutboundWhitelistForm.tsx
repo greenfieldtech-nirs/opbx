@@ -75,7 +75,7 @@ export function OutboundWhitelistForm({
           searchPlaceholder="Search countries..."
           emptyText="No country found."
           buttonClassName="w-full"
-          contentClassName="w-[--radix-popover-trigger-width]"
+          contentClassName="w-(--radix-popover-trigger-width)"
         />
         {formErrors.destination_country && (
           <p className="text-sm text-destructive mt-1">{formErrors.destination_country}</p>

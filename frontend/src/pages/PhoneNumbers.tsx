@@ -4,7 +4,10 @@
  * Manage inbound phone numbers (DIDs) and their routing configuration
  */
 
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidatePhoneNumbers } from '@/lib/invalidation';
 import { useState, useEffect } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -19,9 +22,7 @@ import type {
   Status,
   RoutingType,
   CreateDIDRequest,
-  UpdateDIDRequest,
-  PaginatedResponse
-} from '@/types';
+  UpdateDIDRequest} from '@/types';
 import { PhoneNumberDialog } from '@/components/PhoneNumbers/PhoneNumberDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,14 +43,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -57,10 +50,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 import { cn } from '@/lib/utils';
 import {
   StandardDataTable,
-  Column,
   EmptyState
 } from '@/components/design-system';
 import {
@@ -77,6 +70,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function PhoneNumbers() {
   const queryClient = useQueryClient();
@@ -91,8 +86,9 @@ export default function PhoneNumbers() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [routingTypeFilter, setRoutingTypeFilter] = useState<RoutingType | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage] = useState(20);
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -112,7 +108,7 @@ export default function PhoneNumbers() {
   }, [searchQuery]);
 
   // Fetch phone numbers with React Query
-  const { data: phoneNumbersResponse, isLoading, error, refetch, isPlaceholderData } = useQuery<{
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: phoneNumbersResponse, isLoading, refetch, isPlaceholderData } = useQuery<{
     data: DIDNumber[];
     meta: {
       total: number;
@@ -123,18 +119,16 @@ export default function PhoneNumbers() {
       to?: number;
     };
   }>({
-    queryKey: [
-      'phone-numbers',
-      {
+    queryKey: queryKeys.phoneNumbers.list({
         page: currentPage,
         per_page: perPage,
         search: debouncedSearch,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
         sort_field: sortField,
         sort_direction: sortDirection,
-      },
-    ],
+    }),
     queryFn: () =>
       phoneNumbersService.getAll({
         page: currentPage,
@@ -142,6 +136,7 @@ export default function PhoneNumbers() {
         search: debouncedSearch || undefined,
         routing_type: routingTypeFilter !== 'all' ? routingTypeFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
         sort_field: sortField || undefined,
         sort_direction: sortDirection,
       }),
@@ -156,7 +151,7 @@ export default function PhoneNumbers() {
   const createMutation = useMutation({
     mutationFn: (data: CreateDIDRequest) => phoneNumbersService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      void invalidatePhoneNumbers(queryClient);
       setIsCreateDialogOpen(false);
       toast.success('Phone number added successfully');
     },
@@ -171,7 +166,7 @@ export default function PhoneNumbers() {
     mutationFn: ({ id, data }: { id: string; data: UpdateDIDRequest }) =>
       phoneNumbersService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      void invalidatePhoneNumbers(queryClient);
       setIsEditDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number updated successfully');
@@ -183,15 +178,21 @@ export default function PhoneNumbers() {
   });
 
   // Delete mutation
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => phoneNumbersService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['phone-numbers'] });
+      void invalidatePhoneNumbers(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedPhoneNumber(null);
       toast.success('Phone number deleted successfully');
     },
     onError: (error: any) => {
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       const message = error.response?.data?.message || 'Failed to delete phone number';
       toast.error(message);
     },
@@ -202,7 +203,7 @@ export default function PhoneNumbers() {
 
   // Fetch org's active DIDs independently of page filters/pagination
   const { data: activeDidsResponse } = useQuery<{ data: DIDNumber[] }>({
-    queryKey: ['phone-numbers', 'active-for-caller-id'],
+    queryKey: queryKeys.phoneNumbers.activeForCallerId(),
     queryFn: () => phoneNumbersService.getAll({ status: 'active', per_page: 100 }),
   });
   const activeDids = activeDidsResponse?.data || [];
@@ -211,7 +212,7 @@ export default function PhoneNumbers() {
   const { data: defaultCallerIdResponse, isLoading: isDefaultLoading } = useQuery<{
     data: DefaultCallerId | null;
   }>({
-    queryKey: ['default-caller-id'],
+    queryKey: queryKeys.phoneNumbers.defaultCallerId(),
     queryFn: getDefaultCallerId,
   });
   const defaultCallerId = defaultCallerIdResponse?.data ?? null;
@@ -220,14 +221,14 @@ export default function PhoneNumbers() {
   const defaultCallerIdMutation = useMutation({
     mutationFn: (didId: number | null) => setDefaultCallerId(didId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+      void invalidatePhoneNumbers(queryClient);
       toast.success('Default outbound caller ID updated');
     },
     onError: (error: any) => {
       const message = error.response?.data?.message || 'Failed to update default caller ID';
       toast.error(message);
       // Reset the Select to the server value on failure
-      queryClient.invalidateQueries({ queryKey: ['default-caller-id'] });
+      void invalidatePhoneNumbers(queryClient);
     },
   });
 
@@ -240,10 +241,6 @@ export default function PhoneNumbers() {
     setIsCreateDialogOpen(true);
   };
 
-  const handleEditClick = (phoneNumber: DIDNumber) => {
-    setSelectedPhoneNumber(phoneNumber);
-    setIsEditDialogOpen(true);
-  };
 
   const handleDeleteClick = (phoneNumber: DIDNumber) => {
     setSelectedPhoneNumber(phoneNumber);
@@ -314,7 +311,7 @@ export default function PhoneNumbers() {
       default:
         return {
           icon: Phone,
-          label: routingType,
+          label: labelForRoutingType(routingType),
           color: 'bg-gray-100 text-gray-800 border-gray-200',
         };
     }
@@ -373,15 +370,21 @@ export default function PhoneNumbers() {
     setSearchQuery('');
     setRoutingTypeFilter('all');
     setStatusFilter('all');
+    setUnprovisionedOnly(false);
     setCurrentPage(1);
     setSortField(null);
     setSortDirection('asc');
   };
 
-  const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || routingTypeFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load phone numbers" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -420,7 +423,7 @@ export default function PhoneNumbers() {
               <SelectContent>
                 <SelectItem value={NONE_VALUE}>None (Unknown)</SelectItem>
                 {/* Ensure the current default is selectable even if absent from the active list */}
-                {defaultCallerId && !activeDids.some((d) => d.id === String(defaultCallerId.did_id)) && (
+                {defaultCallerId && !activeDids.some((d) => String(d.id) === String(defaultCallerId.did_id)) && (
                   <SelectItem value={String(defaultCallerId.did_id)}>
                     {defaultCallerId.friendly_name
                       ? `${defaultCallerId.friendly_name} (${formatPhoneNumber(defaultCallerId.phone_number)})`
@@ -499,6 +502,7 @@ export default function PhoneNumbers() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
 
             {/* Clear Filters */}
             {hasActiveFilters && (
@@ -569,14 +573,14 @@ export default function PhoneNumbers() {
                             "text-xs transition-all",
                             updateMutation.isPending && updateMutation.variables?.id === phoneNumber.id
                               ? 'opacity-50 cursor-wait'
-                              : 'cursor-pointer hover:scale-105 active:scale-95',
+                              : canManage && 'cursor-pointer hover:scale-105 active:scale-95',
                             phoneNumber.status === 'active'
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!updateMutation.isPending) {
+                            if (canManage && !updateMutation.isPending) {
                               handleToggleStatus(phoneNumber);
                             }
                           }}
@@ -592,7 +596,7 @@ export default function PhoneNumbers() {
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Click to toggle status</p>
+                        <p>{canManage ? 'Click to toggle status' : 'Only Owners and PBX Admins can change the status'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

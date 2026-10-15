@@ -22,7 +22,9 @@ export type DestinationType =
   | 'ai_assistant'
   | 'ai_load_balancer'
   | 'call_queue'
-  | 'hangup';
+  | 'hangup'
+  /** Set by the server when the target (a deleted user's extension) is gone. Display-only, never offered as a choice. */
+  | 'unavailable';
 
 /**
  * Category for grouping destination types in UI
@@ -93,6 +95,8 @@ export interface DestinationTypeSelectorProps {
   allowedTypes?: DestinationType[];
   /** Include 'hangup' option (typically for failover) */
   includeHangup?: boolean;
+  /** Edit forms only: offer "Disconnect" (sets the route to 'unavailable'). Never on create forms. */
+  allowDisconnect?: boolean;
   /** Show descriptions under each option */
   showDescriptions?: boolean;
   /** Size variant */
@@ -121,6 +125,8 @@ export interface DestinationSelectorProps {
   organizationId?: string;
   /** Filter extensions by type (default: ['user', 'forward']) */
   extensionTypes?: ExtensionType[];
+  /** Destination IDs to leave out (e.g. the record being edited) */
+  excludeIds?: string[];
   /** Show type badges in dropdown */
   showBadges?: boolean;
   /** Show the description line (subLabel) in dropdown options (default: true) */
@@ -153,6 +159,8 @@ export interface DestinationTypeAndSelectorProps {
   allowedTypes?: DestinationType[];
   /** Include 'hangup' option */
   includeHangup?: boolean;
+  /** Edit forms only: offer "Disconnect" (sets the route to 'unavailable'). Never on create forms. */
+  allowDisconnect?: boolean;
   /** Layout arrangement */
   layout?: 'horizontal' | 'vertical' | 'grid';
   /** Grid column widths (when layout='grid') */
@@ -162,6 +170,8 @@ export interface DestinationTypeAndSelectorProps {
   };
   /** Filter extensions by type */
   extensionTypes?: ExtensionType[];
+  /** Destination IDs to leave out (e.g. the record being edited) */
+  excludeIds?: string[];
   /** Show type descriptions */
   showDescriptions?: boolean;
   /** Additional CSS classes for container */

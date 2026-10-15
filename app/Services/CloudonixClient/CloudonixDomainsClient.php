@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\CloudonixClient;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -48,24 +47,8 @@ class CloudonixDomainsClient extends CloudonixBaseClient
                 'api_key_prefix' => substr($apiKey, 0, 4).'...',
             ]);
 
-            $baseUrl = config('cloudonix.api.base_url');
-            if (empty($baseUrl)) {
-                throw new \RuntimeException(
-                    'Cloudonix API base URL is not configured. '.
-                    'Please set CLOUDONIX_API_BASE_URL in your .env file (e.g., https://api.cloudonix.io)'
-                );
-            }
-
-            $timeout = (int) config('cloudonix.api.timeout', 30);
-
-            // Create temporary client with provided credentials
-            $tempClient = Http::timeout($timeout)
-                ->withHeaders([
-                    'Authorization' => 'Bearer '.$apiKey,
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                ])
-                ->baseUrl(rtrim($baseUrl, '/'));
+            // The base-client constructor validates the base URL config.
+            $tempClient = (new self(null, false))->createTemporaryClient($apiKey);
 
             $response = $tempClient->get("/customers/self/domains/{$domainUuid}");
 

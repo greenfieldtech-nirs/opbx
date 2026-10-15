@@ -23,7 +23,7 @@ enum RoutingDestinationType: string
         return match ($this) {
             self::AI_ASSISTANT => 'AI Assistant',
             self::AI_LOAD_BALANCER => 'AI Load Balancer',
-            self::HANGUP => 'Hangup',
+            self::HANGUP => 'Hang Up',
         };
     }
 

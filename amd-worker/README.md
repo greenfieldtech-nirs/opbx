@@ -231,6 +231,9 @@ export AMD_DUMP_AUDIO="false"
 export AMD_DUMP_AUDIO_PATH="/tmp/amd-dumps"
 export AMD_WORKER_API_TOKEN="your-api-token"
 export AMD_ACTION_CALLBACK_URL="http://nginx/api/voice/amd-action"
+# Optional; defaults to AMD_ACTION_CALLBACK_URL with /amd-action replaced by /amd-session.
+# Each stream's start.session is checked here; unknown/inactive sessions are closed with 1008.
+export AMD_SESSION_CHECK_URL="http://nginx/api/voice/amd-session"
 ```
 
 ---

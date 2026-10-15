@@ -7,6 +7,7 @@ namespace Tests\Unit\Services;
 use App\Models\BusinessHoursSchedule;
 use App\Models\Extension;
 use App\Models\Organization;
+use App\Models\User;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -25,13 +26,14 @@ class VoiceRoutingCacheServiceTest extends TestCase
     use RefreshDatabase;
 
     private VoiceRoutingCacheService $service;
+
     private Organization $organization;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->service = new VoiceRoutingCacheService();
+        $this->service = new VoiceRoutingCacheService;
         $this->organization = Organization::factory()->create();
 
         // Clear cache before each test
@@ -115,7 +117,7 @@ class VoiceRoutingCacheServiceTest extends TestCase
     public function test_get_extension_loads_user_relationship(): void
     {
         // Arrange
-        $user = \App\Models\User::factory()->create([
+        $user = User::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
 

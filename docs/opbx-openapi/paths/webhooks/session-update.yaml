@@ -5,11 +5,23 @@ paths:
         - Webhooks
       summary: Session update webhook
       description: |
-        High-velocity session update webhook from Cloudonix.
-        
-        Note: No rate limiting on this endpoint due to high message volume.
-        
-        Middleware: webhook.signature (no rate limiting)
+        High-velocity session update webhook from Cloudonix, validated by
+        `SessionUpdateRequest`. `status` is lower-cased; only these statuses are stored:
+        new/initiated/created, ringing/ring/progress, connected/connect,
+        answer/answered/active, busy, cancel/cancelled/canceled, failed/fail/error,
+        congestion/congested. Other statuses answer `Status not processed` (terminal statuses
+        and deletions still end extension presence). A stored update triggers the call
+        notification webhook (when enabled) and call queue tracking. A repeated `eventId` for
+        the organization is not stored twice.
+
+        Authentication (`VerifyCloudonixSignature`): the organization comes from the payload's
+        `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain answers 400
+        and an unknown domain 401. When the organization has a `domain_requests_api_key`,
+        `Authorization: Bearer <key>` must match it (401 otherwise); without a key the request
+        is accepted unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. No HMAC. Not rate-limited.
+
+        No `webhook.idempotency` middleware on this route (duplicates are detected by
+        `eventId`).
       operationId: sessionUpdateWebhook
       security:
         - webhookBearer: []
@@ -21,14 +33,62 @@ paths:
               $ref: '../../components/schemas/webhooks/SessionUpdatePayload.yaml'
       responses:
         '200':
-          description: Session update processed
+          description: Session update stored, already stored, or ignored
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  status:
+                  message:
                     type: string
-                    example: processed
+                    enum: [Session record updated successfully, Status not processed]
+                    example: Session record updated successfully
         '400':
-          $ref: '../../components/responses/BadRequest.yaml'
+          description: Missing `domain`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Bad Request - Missing domain parameter
+        '401':
+          description: Unknown domain, or missing/invalid Bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized - Invalid Bearer token
+        '403':
+          description: No organization matches `domain` (checked again by the controller)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Organization not identified
+        '422':
+          description: Validation failed (JSON only when the request accepts JSON; otherwise Laravel redirects with 302)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'
+        '500':
+          description: Processing failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Session update processing failed
+                  message:
+                    type: string
+                    example: An internal error occurred.

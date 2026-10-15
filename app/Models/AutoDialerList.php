@@ -4,21 +4,25 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 #[ScopedBy([OrganizationScope::class])]
 class AutoDialerList extends Model
 {
     use HasFactory;
+
+    public const string STARTED_PROCESSING_MESSAGE = 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).';
+
+    public const string CAMPAIGN_ACTIVE_MESSAGE = 'Cannot unassign list: its campaign is active. Pause the campaign first.';
 
     /**
      * The table associated with the model.
@@ -42,6 +46,8 @@ class AutoDialerList extends Model
         'used_by_campaign_id',
         'used_at',
         'original_filename',
+        'uploaded_by',
+        'uploaded_at',
         'processed_at',
         'total_rows',
         'valid_rows',
@@ -60,6 +66,7 @@ class AutoDialerList extends Model
         'is_latest_version' => 'boolean',
         'validation_errors' => 'array',
         'processed_at' => 'datetime',
+        'uploaded_at' => 'datetime',
         'used_at' => 'datetime',
         'archived_at' => 'datetime',
     ];
@@ -97,21 +104,30 @@ class AutoDialerList extends Model
     }
 
     /**
-     * Get all versions of this list.
+     * Previous versions of this list: the entries each re-upload replaced.
      */
     public function versions(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_list_id');
+        return $this->hasMany(AutoDialerListVersion::class, 'list_id');
     }
 
     /**
-     * Get the latest version of this list lineage.
+     * The "(Part N)" lists ProcessLargeListJob split off this list. The name filter keeps out
+     * list rows left by the retired create-new-version flow, which share parent_list_id.
      */
-    public function latestVersion(): HasOne
+    public function parts(): HasMany
     {
-        return $this->hasOne(self::class, 'parent_list_id')
-            ->where('is_latest_version', true)
-            ->orderByDesc('version_number');
+        return $this->hasMany(self::class, 'parent_list_id')->where('name', 'like', '% (Part %)');
+    }
+
+    /**
+     * Every part of this list, and their parts in turn.
+     *
+     * @return Collection<int, self>
+     */
+    public function allParts(): Collection
+    {
+        return $this->parts->flatMap(fn (self $part) => [$part, ...$part->allParts()]);
     }
 
     /**
@@ -191,10 +207,7 @@ class AutoDialerList extends Model
      */
     public function allDestinationsArePendingAndFresh(): bool
     {
-        if ($this->statistics['total_rows'] ?? $this->total_rows === 0) {
-            return true;
-        }
-
+        // Query the entries themselves: the row counters can lag behind them.
         return $this->destinations()
             ->where(function ($query) {
                 $query->where('status', '!=', 'pending')
@@ -208,25 +221,41 @@ class AutoDialerList extends Model
      */
     public function canDelete(): bool
     {
-        // Not assigned to any campaign
-        if (! $this->campaign_id) {
-            return true;
-        }
-
-        // Assigned, but all entries are pending with zero dial attempts
-        return $this->allDestinationsArePendingAndFresh();
+        return ! $this->isAssigned();
     }
 
     /**
-     * Check if the list can be unassigned from its campaign.
+     * Whether the list is assigned to a campaign (assigned lists cannot be deleted or archived).
+     */
+    public function isAssigned(): bool
+    {
+        return $this->campaign_id !== null;
+    }
+
+    /**
+     * Why the list cannot be unassigned from its campaign right now, or null when it can:
+     * refused while the campaign is active, and once any of its entries has started
+     * processing (dialled, or no longer pending).
+     */
+    public function unassignRefusal(): ?string
+    {
+        if (! $this->campaign_id) {
+            return 'List is not assigned to any campaign';
+        }
+
+        if ($this->campaign?->status === CampaignStatus::ACTIVE) {
+            return self::CAMPAIGN_ACTIVE_MESSAGE;
+        }
+
+        return $this->allDestinationsArePendingAndFresh() ? null : self::STARTED_PROCESSING_MESSAGE;
+    }
+
+    /**
+     * Check if the list can be unassigned from its campaign (see unassignRefusal()).
      */
     public function canUnassign(): bool
     {
-        if (! $this->campaign_id) {
-            return false;
-        }
-
-        return $this->allDestinationsArePendingAndFresh();
+        return $this->unassignRefusal() === null;
     }
 
     /**
@@ -239,33 +268,6 @@ class AutoDialerList extends Model
         }
 
         return $this->status->isLocked();
-    }
-
-    /**
-     * Get the version history for this list.
-     *
-     * @return Collection<int, self>
-     */
-    public function getVersionHistory(): Collection
-    {
-        // If this is the root list (no parent), get all children
-        if ($this->parent_list_id === null) {
-            return self::where('parent_list_id', $this->id)
-                ->orWhere('id', $this->id)
-                ->orderBy('version_number')
-                ->get();
-        }
-
-        // If this is a child, find the root first
-        $root = $this->parentList;
-        while ($root->parent_list_id !== null) {
-            $root = $root->parentList;
-        }
-
-        return self::where('parent_list_id', $root->id)
-            ->orWhere('id', $root->id)
-            ->orderBy('version_number')
-            ->get();
     }
 
     /**
@@ -300,31 +302,6 @@ class AutoDialerList extends Model
             'status' => ListStatus::ARCHIVED,
             'archived_at' => now(),
             'is_latest_version' => false,
-        ]);
-    }
-
-    /**
-     * Create a new version of this list.
-     */
-    public function createNewVersion(string $name): self
-    {
-        // Archive current version if it's the latest
-        if ($this->is_latest_version) {
-            $this->update(['is_latest_version' => false]);
-        }
-
-        // Determine version number
-        $maxVersion = self::where('parent_list_id', $this->id)
-            ->orWhere('id', $this->id)
-            ->max('version_number') ?? 0;
-
-        return self::create([
-            'organization_id' => $this->organization_id,
-            'name' => $name,
-            'version_number' => $maxVersion + 1,
-            'parent_list_id' => $this->parent_list_id ?? $this->id,
-            'is_latest_version' => true,
-            'status' => ListStatus::DRAFT,
         ]);
     }
 

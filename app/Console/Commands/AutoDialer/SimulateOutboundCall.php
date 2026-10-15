@@ -19,7 +19,7 @@ class SimulateOutboundCall extends Command
     protected $signature = 'dialer:simulate-call
                             {campaign_id : The ID of the campaign (e.g., 2)}
                             {--phone= : Destination phone number (default: +12025551234)}
-                            {--domain= : Cloudonix domain (default: dograh-ejm4ke.cloudonix.net)}
+                            {--domain= : Cloudonix domain (required when the org has no Cloudonix settings)}
                             {--api-key= : Cloudonix API key}';
 
     protected $description = 'Simulate an outbound call from a campaign to test Cloudonix integration';
@@ -47,15 +47,19 @@ class SimulateOutboundCall extends Command
         $this->info("   Caller ID: {$campaign->caller_id}");
 
         // Get or create Cloudonix settings
-        $settings = CloudonixSettings::where('organization_id', $campaign->organization_id)->first();
+        $settings = CloudonixSettings::forOrganization($campaign->organization_id);
 
         if (! $settings) {
             $this->warn("⚠️  No Cloudonix settings found for organization {$campaign->organization_id}");
             $this->info('   Creating temporary settings with provided credentials...');
 
-            // Use credentials from command options or defaults
-            $domain = $this->option('domain') ?: 'dograh-ejm4ke.cloudonix.net';
-            $apiKey = $this->option('api-key') ?: 'XIBB0E3CD4FB1F46698DE5FC51B49A012E';
+            $domain = $this->option('domain');
+            $apiKey = $this->option('api-key');
+            if (! $domain || ! $apiKey) {
+                $this->error('❌ No Cloudonix settings for this organization: pass --domain and --api-key.');
+
+                return self::FAILURE;
+            }
 
             $settings = new CloudonixSettings([
                 'organization_id' => $campaign->organization_id,

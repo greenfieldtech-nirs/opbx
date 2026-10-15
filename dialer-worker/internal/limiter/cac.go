@@ -6,14 +6,18 @@ import (
 	"math"
 	"sync"
 	"time"
-
-	"opbx/dialer-worker/internal/redis"
 )
+
+// counterStore is the Redis surface the limiter needs (satisfied by *redis.Client).
+type counterStore interface {
+	IncrementIfBelow(ctx context.Context, key string, max int64) (int64, bool, error)
+	DecrementActiveCalls(ctx context.Context, campaignID int64) (int64, error)
+}
 
 // CACRateLimiter implements rate limiting based on Concurrent Active Calls (CAC)
 // per the functional specification
 type CACRateLimiter struct {
-	redis     *redis.Client
+	store     counterStore
 	mu        sync.RWMutex
 	campaigns map[int64]*CampaignLimiter
 }
@@ -29,9 +33,9 @@ type CampaignLimiter struct {
 }
 
 // NewCACRateLimiter creates a new CAC-based rate limiter
-func NewCACRateLimiter(redisClient *redis.Client) *CACRateLimiter {
+func NewCACRateLimiter(store counterStore) *CACRateLimiter {
 	return &CACRateLimiter{
-		redis:     redisClient,
+		store:     store,
 		campaigns: make(map[int64]*CampaignLimiter),
 	}
 }
@@ -53,6 +57,11 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	// Calculate minimum interval between calls from CPS: 1000/CPS milliseconds
 	minInterval := time.Duration(math.Round(1000.0/float64(cps))) * time.Millisecond
 
+	// Update in place so LastCallTime (CPS pacing) survives every poll.
+	if l, ok := rl.campaigns[campaignID]; ok {
+		l.CAC, l.CPS, l.MinInterval = cac, cps, minInterval
+		return
+	}
 	rl.campaigns[campaignID] = &CampaignLimiter{
 		CampaignID:  campaignID,
 		CAC:         cac,
@@ -61,18 +70,17 @@ func (rl *CACRateLimiter) RegisterCampaign(campaignID int64, cac int, cps int) {
 	}
 }
 
-// UnregisterCampaign removes a campaign from rate limiting
-func (rl *CACRateLimiter) UnregisterCampaign(campaignID int64) {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	delete(rl.campaigns, campaignID)
-}
-
 // CanDial checks if a call can be dialed for the given campaign.
 // Returns true, the new active call count, and nil error if a slot was reserved.
 func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, int64, error) {
 	rl.mu.RLock()
 	limiter, exists := rl.campaigns[campaignID]
+	var lastCall time.Time
+	var minInterval time.Duration
+	var cac int
+	if exists {
+		lastCall, minInterval, cac = limiter.LastCallTime, limiter.MinInterval, limiter.CAC
+	}
 	rl.mu.RUnlock()
 
 	if !exists {
@@ -80,14 +88,13 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 	}
 
 	// Check minimum interval between calls first (local check)
-	now := time.Now()
-	if now.Sub(limiter.LastCallTime) < limiter.MinInterval {
+	if time.Since(lastCall) < minInterval {
 		return false, 0, nil // Rate limited by time
 	}
 
 	// Check CAC limit atomically using Redis Lua script
 	key := fmt.Sprintf("dialer:cac:%d:active", campaignID)
-	newCount, acquired, err := rl.redis.IncrementIfBelow(ctx, key, int64(limiter.CAC))
+	newCount, acquired, err := rl.store.IncrementIfBelow(ctx, key, int64(cac))
 	if err != nil {
 		return false, 0, err
 	}
@@ -109,9 +116,9 @@ func (rl *CACRateLimiter) CanDial(ctx context.Context, campaignID int64) (bool, 
 // WaitTime returns how long to wait before next call can be made
 func (rl *CACRateLimiter) WaitTime(campaignID int64) time.Duration {
 	rl.mu.RLock()
-	limiter, exists := rl.campaigns[campaignID]
-	rl.mu.RUnlock()
+	defer rl.mu.RUnlock()
 
+	limiter, exists := rl.campaigns[campaignID]
 	if !exists {
 		return 0
 	}
@@ -134,35 +141,7 @@ func (rl *CACRateLimiter) RecordCall(campaignID int64) {
 	}
 }
 
-// IncrementActive increments active call count in Redis
-func (rl *CACRateLimiter) IncrementActive(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.IncrementActiveCalls(ctx, campaignID)
-}
-
 // DecrementActive decrements active call count in Redis
 func (rl *CACRateLimiter) DecrementActive(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.DecrementActiveCalls(ctx, campaignID)
-}
-
-// GetActiveCount gets current active call count from Redis
-func (rl *CACRateLimiter) GetActiveCount(ctx context.Context, campaignID int64) (int64, error) {
-	return rl.redis.GetActiveCalls(ctx, campaignID)
-}
-
-// IsCACAvailable checks if CAC slots are available without recording
-func (rl *CACRateLimiter) IsCACAvailable(ctx context.Context, campaignID int64) (bool, error) {
-	rl.mu.RLock()
-	limiter, exists := rl.campaigns[campaignID]
-	rl.mu.RUnlock()
-
-	if !exists {
-		return false, nil
-	}
-
-	activeCalls, err := rl.redis.GetActiveCalls(ctx, campaignID)
-	if err != nil {
-		return false, err
-	}
-
-	return int(activeCalls) < limiter.CAC, nil
+	return rl.store.DecrementActiveCalls(ctx, campaignID)
 }

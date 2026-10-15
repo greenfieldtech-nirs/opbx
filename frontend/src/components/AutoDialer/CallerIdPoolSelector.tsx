@@ -22,7 +22,6 @@
 import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -44,7 +43,6 @@ import {
   Plus,
   X,
   AlertCircle,
-  Check,
   ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -173,7 +171,7 @@ export function CallerIdPoolSelector({
                   onValueChange={setSearchQuery}
                 />
                 <CommandList className="max-h-[300px]">
-                  <CommandEmpty>No phone numbers found</CommandEmpty>
+                  {filteredOptions.length === 0 && <CommandEmpty>No phone numbers found</CommandEmpty>}
                   <CommandGroup heading="Available Phone Numbers">
                     {filteredOptions.map((did) => (
                       <CommandItem
@@ -234,7 +232,7 @@ export function CallerIdPoolSelector({
                 onValueChange={setSearchQuery}
               />
               <CommandList className="max-h-[300px]">
-                <CommandEmpty>No phone numbers found</CommandEmpty>
+                {filteredOptions.length === 0 && <CommandEmpty>No phone numbers found</CommandEmpty>}
                 <CommandGroup heading="Available Phone Numbers">
                   {filteredOptions.map((did) => (
                     <CommandItem
@@ -278,7 +276,7 @@ export function CallerIdPoolSelector({
 
       {/* Selected items list */}
       <Card className="divide-y">
-        {selected.map((item, index) => (
+        {selected.map((item) => (
           <div
             key={item.did_id}
             className={cn(

@@ -22,10 +22,8 @@ use Symfony\Component\HttpFoundation\Response;
  *    - Bearer token MUST be present and match
  *    - If token missing or mismatch → 401 Unauthorized
  * 4. If organization has NO domain_requests_api_key configured:
- *    - Request processed without token validation
- *
- * This ensures backward compatibility while allowing organizations to enable
- * webhook authentication when needed.
+ *    - 401 when cloudonix.webhooks.require_auth is true; otherwise allowed with a
+ *      `webhook.unauthenticated` warning (rollout window).
  *
  * Used for: call-initiated, call-status, session-update, and CDR webhooks
  *
@@ -133,7 +131,7 @@ class VerifyCloudonixSignature
     private function findOrganizationByDomain(string $domain, array $payload): ?CloudonixSettings
     {
         // Try domain_name match first
-        $settings = CloudonixSettings::where('domain_name', $domain)->first();
+        $settings = CloudonixSettings::forDomain('domain_name', $domain);
 
         if ($settings) {
             return $settings;
@@ -141,7 +139,7 @@ class VerifyCloudonixSignature
 
         // Try domain_uuid match (if domain looks like a UUID)
         if ($this->isUuid($domain)) {
-            $settings = CloudonixSettings::where('domain_uuid', $domain)->first();
+            $settings = CloudonixSettings::forDomain('domain_uuid', $domain);
 
             if ($settings) {
                 return $settings;
@@ -150,7 +148,7 @@ class VerifyCloudonixSignature
 
         // Also check owner.domain.uuid if present (for CDR)
         if (! empty($payload['owner']['domain']['uuid'])) {
-            $settings = CloudonixSettings::where('domain_uuid', $payload['owner']['domain']['uuid'])->first();
+            $settings = CloudonixSettings::forDomain('domain_uuid', $payload['owner']['domain']['uuid']);
 
             if ($settings) {
                 return $settings;
@@ -170,10 +168,12 @@ class VerifyCloudonixSignature
 
     /**
      * Authenticate the request based on organization's auth configuration.
+     * Also used by CloudonixWebhookController::recordingStatus(), whose payload
+     * carries no domain (the org is only known from the matched CDR).
      *
      * @return array{success: bool, reason: string|null, method: string|null}
      */
-    private function authenticateRequest(Request $request, CloudonixSettings $settings): array
+    public function authenticateRequest(Request $request, CloudonixSettings $settings): array
     {
         $providedToken = $this->extractBearerToken($request);
 
@@ -202,8 +202,17 @@ class VerifyCloudonixSignature
             ];
         }
 
-        // Case 2: Organization has NO webhook auth configured
-        // Allow request regardless of token presence
+        // Case 2: no key configured. Enforced once CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true;
+        // until then warn-only so legacy orgs keep working during key rollout.
+        if (config('cloudonix.webhooks.require_auth')) {
+            return ['success' => false, 'reason' => 'Webhook key not configured', 'method' => null];
+        }
+
+        Log::warning('webhook.unauthenticated', [
+            'organization_id' => $settings->organization_id,
+            'route' => $request->path(),
+        ]);
+
         return [
             'success' => true,
             'reason' => null,

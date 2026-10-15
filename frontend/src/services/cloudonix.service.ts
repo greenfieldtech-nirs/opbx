@@ -26,6 +26,8 @@ export interface VoiceFilters {
 export interface VoicesResponse {
   data: VoiceOption[];
   filters: VoiceFilters;
+  /** Cloudonix package tier, read live and cached per organization (null = unknown) */
+  cloudonix_package?: string | null;
 }
 
 export interface VoiceTrunk {

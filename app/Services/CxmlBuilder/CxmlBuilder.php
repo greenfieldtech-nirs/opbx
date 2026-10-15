@@ -268,7 +268,7 @@ class CxmlBuilder
         }
 
         if ($waitUrl !== null) {
-            $conference->setAttribute('waitUrl', htmlspecialchars($waitUrl, ENT_XML1 | ENT_QUOTES, 'UTF-8'));
+            $conference->setAttribute('waitUrl', $waitUrl);
         }
 
         $conference->setAttribute('muteOnEntry', $muteOnEntry ? 'true' : 'false');
@@ -276,6 +276,90 @@ class CxmlBuilder
 
         // Add conference identifier as text content
         $conference->textContent = $conferenceIdentifier;
+
+        $dial->appendChild($conference);
+        $this->response->appendChild($dial);
+
+        return $this;
+    }
+
+    /**
+     * Add Dial with a Conference noun using only attributes Cloudonix documents for <Conference>.
+     *
+     * @param  string  $room  Conference identifier (letters/digits/underscore)
+     * @param  bool  $startOnEnter  false makes the participant wait until someone with true enters
+     * @param  int|null  $maxParticipants  Capped to Cloudonix's maximum of 250
+     * @param  bool  $muted  Join muted
+     * @param  bool  $holdMusic  Play hold music while alone / waiting
+     * @param  bool  $prompts  Voice prompts when participants join or leave
+     * @param  bool  $record  Record the conference from its start
+     * @param  bool  $endOnExit  Ending the conference when this participant leaves (the host)
+     */
+    public function dialConferenceRoom(
+        string $room,
+        bool $startOnEnter = true,
+        ?int $maxParticipants = null,
+        bool $muted = false,
+        bool $holdMusic = true,
+        bool $prompts = false,
+        bool $record = false,
+        ?string $recordingStatusCallback = null,
+        bool $endOnExit = false
+    ): self {
+        $dial = $this->document->createElement('Dial');
+
+        $conference = $this->document->createElement('Conference', htmlspecialchars($room, self::XML_ENCODING, 'UTF-8'));
+        $conference->setAttribute('startConferenceOnEnter', $startOnEnter ? 'true' : 'false');
+        $conference->setAttribute('endConferenceOnExit', $endOnExit ? 'true' : 'false');
+        $conference->setAttribute('muted', $muted ? 'true' : 'false');
+        $conference->setAttribute('holdMusic', $holdMusic ? 'true' : 'false');
+        $conference->setAttribute('prompts', $prompts ? 'true' : 'false');
+
+        if ($maxParticipants !== null) {
+            $conference->setAttribute('maxParticipants', (string) min(250, max(1, $maxParticipants)));
+        }
+
+        if ($record) {
+            $conference->setAttribute('record', 'record-from-start');
+
+            if ($recordingStatusCallback !== null) {
+                $conference->setAttribute('recordingStatusCallback', $recordingStatusCallback);
+            }
+        }
+
+        $dial->appendChild($conference);
+        $this->response->appendChild($dial);
+
+        return $this;
+    }
+
+    /**
+     * Join a call-queue conference room (conference-mediated ring-all).
+     *
+     * Emits only attributes Cloudonix documents for <Conference>. Both the
+     * caller and the winning agent end the room on exit: it exists solely to
+     * bridge the two sessions. Recording applies to the whole room.
+     *
+     * @param  string  $room  Room name (letters/digits only)
+     * @param  bool  $record  Record the room from start
+     * @param  string|null  $recordingStatusCallback  URL notified once the recording is ready
+     */
+    public function dialQueueConference(string $room, bool $record = false, ?string $recordingStatusCallback = null): self
+    {
+        $dial = $this->document->createElement('Dial');
+
+        $conference = $this->document->createElement('Conference', htmlspecialchars($room, self::XML_ENCODING, 'UTF-8'));
+        $conference->setAttribute('startConferenceOnEnter', 'true');
+        $conference->setAttribute('endConferenceOnExit', 'true');
+        $conference->setAttribute('beep', 'false');
+
+        if ($record) {
+            $conference->setAttribute('record', 'record-from-start');
+
+            if ($recordingStatusCallback !== null) {
+                $conference->setAttribute('recordingStatusCallback', $recordingStatusCallback);
+            }
+        }
 
         $dial->appendChild($conference);
         $this->response->appendChild($dial);
@@ -380,6 +464,14 @@ class CxmlBuilder
             ->hangup();
 
         return $builder->build();
+    }
+
+    /**
+     * Say that the routing target no longer exists, then hang up (deleted user's extension).
+     */
+    public static function destinationUnavailable(): string
+    {
+        return self::sayWithHangup("Destination doesn't exist.", true);
     }
 
     /**
@@ -623,7 +715,8 @@ class CxmlBuilder
         string $finishOnKey = '#',
         int $minDigits = 1,
         int $maxDigits = 1,
-        ?int $maxTimeout = null
+        ?int $maxTimeout = null,
+        bool $actionOnEmptyResult = false
     ): self {
         $gather = $this->document->createElement('Gather');
 
@@ -635,6 +728,10 @@ class CxmlBuilder
 
         if ($maxTimeout !== null) {
             $gather->setAttribute('maxTimeout', (string) $maxTimeout);
+        }
+
+        if ($actionOnEmptyResult) {
+            $gather->setAttribute('actionOnEmptyResult', 'true');
         }
 
         // Parse and append nested verbs
@@ -664,6 +761,7 @@ class CxmlBuilder
      * @param  string  $finishOnKey  Key that ends input collection
      * @param  int  $minDigits  Minimum number of digits to collect
      * @param  int  $maxDigits  Maximum number of digits to collect
+     * @param  bool  $actionOnEmptyResult  Call the action URL even when the caller pressed nothing
      */
     public static function gather(
         string $nestedVerbs,
@@ -672,11 +770,12 @@ class CxmlBuilder
         string $finishOnKey = '#',
         int $minDigits = 1,
         int $maxDigits = 1,
-        ?int $maxTimeout = null
+        ?int $maxTimeout = null,
+        bool $actionOnEmptyResult = false
     ): string {
         $builder = new self;
 
-        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout)->build();
+        return $builder->addGather($nestedVerbs, $action, $timeout, $finishOnKey, $minDigits, $maxDigits, $maxTimeout, $actionOnEmptyResult)->build();
     }
 
     /**

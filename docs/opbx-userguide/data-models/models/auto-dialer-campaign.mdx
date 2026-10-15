@@ -21,41 +21,55 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `organization_id` | bigint unsigned | No | - | Foreign key to organizations |
 | `name` | varchar(255) | No | - | Campaign name |
 | `description` | text | Yes | null | Campaign description |
-| `status` | varchar(20) | No | draft | Campaign status enum |
+| `status` | enum | No | draft | `draft`, `active`, `paused`, `completed`, `archived` |
 | `auto_start` | boolean | No | false | Auto-start when ready |
-| `routing_destination_type` | varchar(50) | No | - | ai_assistant, ai_load_balancer, hangup |
+| `routing_destination_type` | enum | No | - | `ai_assistant`, `ai_load_balancer`, `hangup` |
 | `routing_destination_id` | bigint unsigned | Yes | null | Target destination ID |
-| `dial_timeout` | int | No | 60 | Seconds to ring before timeout |
-| `destination_connect` | varchar(20) | No | connected | connected or immediately |
-| `caller_id` | varchar(50) | Yes | null | Default Caller ID (legacy) |
+| `dial_timeout` | smallint unsigned | No | 60 | Seconds to ring before timeout |
+| `destination_connect` | enum | No | connected | `connected` or `immediately` |
+| `caller_id` | varchar(255) | No | - | Default Caller ID, E.164 |
 | `caller_id_strategy` | varchar(20) | No | round_robin | Distribution strategy for pool |
 | `caller_id_pool_enabled` | boolean | No | false | Whether pool mode is enabled |
-| `max_dial_attempts` | int | No | 1 | Max retries per destination |
-| `concurrent_active_calls` | int | No | 1 | Max concurrent calls (CAC, 1-50) |
-| `calls_per_second` | int | No | 1 | Call initiation rate (CPS, 1-30) |
-| `days_active` | json | Yes | null | Legacy schedule days |
-| `start_time` | int | Yes | null | Legacy start hour |
-| `end_time` | int | Yes | null | Legacy end hour |
-| `start_date` | date | Yes | null | Campaign start date |
-| `end_date` | date | Yes | null | Campaign end date |
-| `timezone` | varchar(50) | Yes | UTC | Schedule timezone |
+| `max_dial_attempts` | tinyint unsigned | No | 1 | Max attempts per destination (API: 1-5) |
+| `concurrent_active_calls` | int unsigned | No | 0 | Max concurrent calls (CAC; API: 1-50) |
+| `calls_per_second` | tinyint unsigned | No | 1 | Call initiation rate (CPS; API: 1-30) |
+| `days_active` | json | No | - | Legacy schedule days |
+| `start_time` | tinyint unsigned | Yes | null | Legacy start hour |
+| `end_time` | tinyint unsigned | Yes | null | Legacy end hour |
+| `start_date` | date | No | - | Campaign start date |
+| `end_date` | date | No | - | Campaign end date |
+| `timezone` | varchar(255) | No | UTC | Schedule timezone |
 | `schedule` | json | Yes | null | Full weekly schedule |
-| `time_limit` | int | Yes | null | Max call duration (seconds) |
+| `time_limit` | mediumint unsigned | No | 600 | Max call duration in seconds (API: 30-14400; omitted or null on create, or null on update, stores 600) |
 | `record_calls` | boolean | No | false | Enable recording |
-| `action_voicemail` | string | Yes | null | AMD action for voicemail |
-| `action_human` | string | Yes | null | AMD action for human |
-| `action_unknown` | string | Yes | null | AMD action for unknown |
-| `total_destinations` | int | No | 0 | Total destinations count |
-| `completed_calls` | int | No | 0 | Completed calls count |
-| `failed_calls` | int | No | 0 | Failed calls count |
-| `voicemail_calls` | int | No | 0 | Voicemail calls count |
-| `pending_calls` | int | No | 0 | Pending calls count |
-| `pause_reason` | varchar(50) | Yes | null | Reason for pause |
+| `action_voicemail` | varchar(255) | Yes | null | AMD action for voicemail (`HANGUP` or `CONTINUE`) |
+| `action_human` | varchar(255) | Yes | null | AMD action for human |
+| `action_unknown` | varchar(255) | Yes | null | AMD action for unknown |
+| `retry_on_voicemail` | boolean | No | false | Retry a destination that reached voicemail |
+| `retry_on_busy_no_answer` | boolean | No | false | Redial busy / no-answer destinations within `max_dial_attempts` |
+| `retry_delay_minutes` | smallint unsigned | No | 15 | Minutes before the first busy / no-answer retry (1 to 1440); doubles for each further retry, capped at 24 hours |
+| `total_destinations` | int unsigned | No | 0 | Total destinations count |
+| `completed_calls` | int unsigned | No | 0 | Completed calls count |
+| `failed_calls` | int unsigned | No | 0 | Failed calls count |
+| `voicemail_calls` | int unsigned | No | 0 | Voicemail calls count |
+| `pending_calls` | int unsigned | No | 0 | Pending calls count |
+| `pause_reason` | varchar(255) | Yes | null | Reason for pause |
 | `resume_at` | timestamp | Yes | null | Scheduled resume time |
 | `started_at` | timestamp | Yes | null | When campaign started |
 | `completed_at` | timestamp | Yes | null | When campaign completed |
 | `created_at` | timestamp | Yes | null | Creation timestamp |
 | `updated_at` | timestamp | Yes | null | Last update timestamp |
+
+## Indexes
+
+| Index | Columns |
+|-------|---------|
+| `adc_org_status_idx` | `organization_id`, `status` |
+| `adc_org_auto_start_idx` | `organization_id`, `auto_start`, `status` |
+| `adc_dates_idx` | `start_date`, `end_date` |
+| `auto_dialer_campaigns_routing_destination_id_foreign` | `routing_destination_id` |
+
+`organization_id` references `organizations` with `ON DELETE CASCADE`. `routing_destination_id` has no foreign key constraint: it points to an AI assistant or an AI load balancer depending on `routing_destination_type`.
 
 ## Relationships
 
@@ -63,13 +77,15 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 
 ```php
 campaign.organization() → Organization
+campaign.aiAssistant() → AiAssistant (routing_destination_id, when routing to an AI assistant)
+campaign.aiLoadBalancer() → AiAssistantLoadBalancer (routing_destination_id, when routing to a load balancer)
 ```
 
 ### Has Many
 
 ```php
-campaign.lists() → AutoDialerList[]
-campaign.destinations() → AutoDialerDestination[] (through list)
+campaign.lists() → AutoDialerList[] (a campaign can hold several lists)
+campaign.destinations() → AutoDialerDestination[] (through its lists)
 campaign.callSessions() → AutoDialerCallSession[]
 campaign.callerIdStats() → AutoDialerCallerIdStat[]
 ```
@@ -79,7 +95,7 @@ campaign.callerIdStats() → AutoDialerCallerIdStat[]
 ```php
 campaign.callerIds() → DidNumber[]
   - Pivot: auto_dialer_campaign_caller_ids
-  - With pivot: weight
+  - With pivot: weight, with timestamps
 ```
 
 ## Enums
@@ -147,7 +163,7 @@ AutoDialerCampaign::forOrganization($orgId)
 AutoDialerCampaign::active()
 AutoDialerCampaign::paused()
 AutoDialerCampaign::draft()
-AutoDialerCampaign::runnable() // Active and within schedule
+AutoDialerCampaign::runnable() // Active, with start_date/end_date within one day of today (coarse pre-filter; isRunnable() does the exact, timezone-aware check)
 ```
 
 ### Business Logic
@@ -158,15 +174,21 @@ $campaign->getProgressPercentage(): int
 $campaign->getApiIntervalMilliseconds(): float
 $campaign->hasValidCac(): bool
 $campaign->hasValidCps(): bool
-$campaign->hasList(): bool
+$campaign->hasList(): bool               // at least one list assigned
 $campaign->canStart(): bool
 $campaign->canPause(): bool
 $campaign->canAcceptList(): bool
+$campaign->listAssignmentRefusal(): ?string // why a list cannot be added now (status, or running), or null
+$campaign->getPendingCount(): int          // destinations with status pending
+$campaign->getRoutingDestinationLabel(): string
+$campaign->clearRedisKeys(): void          // deletes dialer:cac:{id}:active and campaign:{id}:caller_id_index on the dialer Redis
 ```
+
+`isRunnable()` evaluates the current time in the campaign's `timezone` and checks the date range and the `schedule` time ranges for today. `getApiIntervalMilliseconds()` returns `1000 / calls_per_second`. `hasValidCac()` and `hasValidCps()` check the `MIN_CAC`/`MAX_CAC` (1-50) and `MIN_CPS`/`MAX_CPS` (1-30) constants.
 
 ## Related Documentation
 
-- [Auto Dialer Campaigns Module](../../modules/auto-dialer-campaigns)
-- [Dialer Worker](../../workers/dialer-worker)
-- [AutoDialerCampaignCallerId](./auto-dialer-campaign-caller-id)
-- [AutoDialerCallerIdStat](./auto-dialer-caller-id-stat)
+- [Auto Dialer Campaigns Module](/opbx/modules/auto-dialer-campaigns)
+- [Dialer Worker](/opbx/workers/dialer-worker)
+- [AutoDialerCampaignCallerId](/opbx/data-models/models/auto-dialer-campaign-caller-id)
+- [AutoDialerCallerIdStat](/opbx/data-models/models/auto-dialer-caller-id-stat)

@@ -11,16 +11,17 @@ use App\Models\BusinessHoursScheduleDay;
 use App\Models\BusinessHoursTimeRange;
 use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\BusinessHoursSchedule>
+ * @extends Factory<BusinessHoursSchedule>
  */
 class BusinessHoursScheduleFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
      *
-     * @var class-string<\Illuminate\Database\Eloquent\Model>
+     * @var class-string<Model>
      */
     protected $model = BusinessHoursSchedule::class;
 
@@ -35,10 +36,10 @@ class BusinessHoursScheduleFactory extends Factory
     {
         return [
             'organization_id' => Organization::factory(),
-            'name' => fake()->words(2, true) . ' Hours',
+            'name' => fake()->words(2, true).' Hours',
             'status' => BusinessHoursStatus::ACTIVE,
             'open_hours_action' => [
-                'target_id' => 'ext-' . fake()->numberBetween(100, 999),
+                'target_id' => 'ext-'.fake()->numberBetween(100, 999),
             ],
             'open_hours_action_type' => 'extension',
             'closed_hours_action' => [
@@ -137,8 +138,8 @@ class BusinessHoursScheduleFactory extends Factory
     /**
      * Create a schedule with custom hours.
      *
-     * @param string $startTime Format: HH:mm
-     * @param string $endTime Format: HH:mm
+     * @param  string  $startTime  Format: HH:mm
+     * @param  string  $endTime  Format: HH:mm
      */
     public function withHours(string $startTime, string $endTime): static
     {

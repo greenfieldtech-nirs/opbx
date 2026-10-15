@@ -132,11 +132,11 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Checking if database seeding is needed..."
     run_as_app php artisan db:seed-if-fresh --no-interaction || echo "Seeding skipped or already completed"
 
-    # Initialize storage (verifies MinIO bucket access).
-    # The bucket itself is provisioned by the minio-init service; this must never
+    # Initialize storage (verifies S3 / SeaweedFS bucket access).
+    # The bucket itself is provisioned by ops (`weed shell` s3.bucket.create, see docker/README.md); this must never
     # abort startup, so failures are logged and swallowed (matches migrate/seed).
     echo "Initializing storage..."
-    run_as_app php artisan storage:initialize || echo "⚠️  Storage initialization failed (recordings uploads may not work until MinIO is reachable)."
+    run_as_app php artisan storage:initialize || echo "⚠️  Storage initialization failed (recordings uploads may not work until SeaweedFS is reachable)."
 
     echo "Validating configuration..."
     run_as_app php artisan config:validate --silent || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."

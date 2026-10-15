@@ -1,18 +1,17 @@
 import { useState } from 'react';
+import { getApiErrorMessage } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Search,
   MoreVertical,
   Download,
-  Upload,
   Copy,
   Archive,
   FileSpreadsheet,
   RefreshCw,
   AlertCircle,
   Trash2,
-  Link2,
   Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,9 +19,6 @@ import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Table,
@@ -48,6 +44,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Pagination component - simple implementation
 import { useAuth } from '@/hooks/useAuth';
+import { can, canDeleteDistributionList } from '@/utils/roleHelpers';
 import { distributionListKeys, useDistributionLists, useArchiveList, useDownloadExample, useDeleteList, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
 import { useAutoDialerCampaigns } from '@/hooks/useAutoDialerCampaigns';
 import { cn } from '@/lib/utils';
@@ -57,12 +54,13 @@ import { DistributionListsEmpty } from './DistributionLists/components/Distribut
 import { CreateListDialog } from './DistributionLists/components/CreateListDialog';
 import { CopyListDialog } from './DistributionLists/components/CopyListDialog';
 import { ArchiveListDialog } from './DistributionLists/components/ArchiveListDialog';
-import { UnifiedUploadDialog } from './DistributionLists/components/UnifiedUploadDialog';
 import { ValidationErrorsDialog } from './DistributionLists/components/ValidationErrorsDialog';
 import { DeleteListDialog } from './DistributionLists/components/DeleteListDialog';
 import { AssignCampaignDialog } from './DistributionLists/components/AssignCampaignDialog';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import type { AutoDialerList, DistributionListStatus } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const statusColors: Record<DistributionListStatus, string> = {
   draft: 'bg-gray-100 text-gray-800',
@@ -78,7 +76,7 @@ const statusColors: Record<DistributionListStatus, string> = {
 export default function DistributionLists() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'autoDialer.manage');
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('active');
@@ -87,19 +85,20 @@ export default function DistributionLists() {
   const [copyList, setCopyList] = useState<AutoDialerList | null>(null);
   const [archiveList, setArchiveList] = useState<AutoDialerList | null>(null);
   const [deleteList, setDeleteList] = useState<AutoDialerList | null>(null);
-  const [uploadList, setUploadList] = useState<AutoDialerList | null>(null);
   const [errorsList, setErrorsList] = useState<AutoDialerList | null>(null);
   const [assignList, setAssignList] = useState<AutoDialerList | null>(null);
 
-  const { data, isLoading, isFetching, error } = useDistributionLists({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isFetching, error } = useDistributionLists({
     page,
     per_page: 25,
     search: search || undefined,
-    status: status && status !== 'all' && status !== 'active' ? status as DistributionListStatus : undefined,
+    // 'active' = server default (archived hidden); 'all' includes archived
+    status: status && status !== 'active' ? status as DistributionListStatus : undefined,
   });
 
   const archiveMutation = useArchiveList();
   const deleteMutation = useDeleteList();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const unassignMutation = useUnassignListFromCampaign();
   const downloadExampleMutation = useDownloadExample();
   const queryClient = useQueryClient();
@@ -138,7 +137,7 @@ export default function DistributionLists() {
       await unassignMutation.mutateAsync(listId);
       toast.success('List unassigned from campaign successfully');
     } catch (err: any) {
-      const message = err?.response?.data?.error || 'Failed to unassign list from campaign';
+      const message = getApiErrorMessage(err);
       toast.error('Unassign failed', { description: message });
     }
   };
@@ -150,22 +149,11 @@ export default function DistributionLists() {
       await deleteMutation.mutateAsync(deleteList.id);
       toast.success('List deleted successfully');
       setDeleteList(null);
-    } catch {
+    } catch (err) {
+      setDeleteList(null);
+      if (showIfInUse(err)) return;
       toast.error('Failed to delete list');
     }
-  };
-
-  const handleUploadSuccess = () => {
-    // Force immediate refetch of the list to show updated status after upload
-    queryClient.invalidateQueries({
-      queryKey: distributionListKeys.all,
-      refetchType: 'all',
-    });
-    // Also force a direct refetch to ensure the UI updates immediately
-    queryClient.refetchQueries({
-      queryKey: distributionListKeys.all,
-      type: 'active',
-    });
   };
 
   if (isLoading) {
@@ -196,8 +184,12 @@ export default function DistributionLists() {
     );
   }
 
-  const lists = data?.data.filter(list => status !== 'active' || list.status !== 'archived') || [];
+  const lists = data?.data || [];
   const meta = data?.meta;
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load distribution lists" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -348,7 +340,7 @@ export default function DistributionLists() {
                             {canManage && !list.can_unassign && (
                               <span
                                 className="text-xs text-muted-foreground"
-                                title="Cannot unassign: some destinations have been dialed"
+                                title={list.unassign_refusal ?? 'Cannot unassign this list'}
                               >
                                 Locked
                               </span>
@@ -387,15 +379,6 @@ export default function DistributionLists() {
                             }}>
                               View Details
                             </DropdownMenuItem>
-                            {list.can_upload && canManage && (
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                setUploadList(list);
-                              }}>
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Destinations
-                              </DropdownMenuItem>
-                            )}
                             {list.can_copy && canManage && (
                               <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();
@@ -414,7 +397,7 @@ export default function DistributionLists() {
                                 View Errors
                               </DropdownMenuItem>
                             )}
-                            {list.can_delete && canManage && (
+                            {list.can_delete && canDeleteDistributionList(user?.role, list.status) && (
                               <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={(e) => {
@@ -424,6 +407,15 @@ export default function DistributionLists() {
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 Delete
+                              </DropdownMenuItem>
+                            )}
+                            {list.campaign_id && canManage && list.status !== 'archived' && (
+                              <DropdownMenuItem
+                                disabled
+                                title="This list is assigned to a campaign. Unassign it first to archive or delete it."
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                Archive (unassign first)
                               </DropdownMenuItem>
                             )}
                             {list.can_archive && canManage && list.status !== 'failed' && (
@@ -496,18 +488,6 @@ export default function DistributionLists() {
         />
       )}
 
-      {uploadList && (
-        <UnifiedUploadDialog
-          list={uploadList}
-          open={!!uploadList}
-          onOpenChange={() => setUploadList(null)}
-          onSuccess={() => {
-            handleUploadSuccess();
-            // Same list is updated, no navigation needed
-          }}
-        />
-      )}
-
       {errorsList && (
         <ValidationErrorsDialog
           list={errorsList}
@@ -534,6 +514,7 @@ export default function DistributionLists() {
           campaigns={campaignsData?.data || []}
         />
       )}
+      {inUseDialog}
     </div>
   );
 }

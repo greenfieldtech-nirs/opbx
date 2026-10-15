@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\CallQueue;
 
+use App\Jobs\SendAcdEventJob;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * HTTP client for the acd-worker (Java/Vert.x) call queue engine.
@@ -64,9 +69,24 @@ class AcdWorkerClient
             'agentUserId' => $agentUserId !== null ? (string) $agentUserId : null,
             'talkSeconds' => $talkSeconds,
             'wrapUpSeconds' => $wrapUpSeconds,
+            // Stable across the inline attempt and SendAcdEventJob replays: the worker dedupes
+            // on it, so an event it already applied (slow response) is not counted twice.
+            'eventId' => (string) Str::uuid(),
         ], fn ($value) => $value !== null);
 
-        $this->post('/events', $payload);
+        // A worker blip must not lose ended/abandoned/dial_failed: replay from the queue.
+        if (! $this->sendEvent($payload)) {
+            SendAcdEventJob::dispatch($payload);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return bool whether the worker accepted the event
+     */
+    public function sendEvent(array $payload): bool
+    {
+        return $this->post('/events', $payload) !== null;
     }
 
     /**
@@ -102,7 +122,7 @@ class AcdWorkerClient
         return $this->post('/agents/state', $payload) !== null;
     }
 
-    private function request(): \Illuminate\Http\Client\PendingRequest
+    private function request(): PendingRequest
     {
         return Http::baseUrl(rtrim((string) config('services.acd_worker.url'), '/'))
             ->withToken((string) config('services.acd_worker.api_token'))
@@ -115,16 +135,17 @@ class AcdWorkerClient
      * Fire-and-forget POST wrapper: logs and returns null on connection errors
      * or non-2xx responses (e.g. worker auth failures must never be silent).
      */
-    private function post(string $path, array $payload): ?\Illuminate\Http\Client\Response
+    private function post(string $path, array $payload): ?Response
     {
         try {
             $response = $this->request()->post($path, $payload);
 
             if ($response->failed()) {
                 Log::warning('ACD worker rejected request', [
+                    'type' => 'HTTP_RESPONSE',
                     'path' => $path,
                     'status' => $response->status(),
-                    'body' => \Illuminate\Support\Str::limit($response->body(), 300),
+                    'body' => Str::limit($response->body(), 300),
                     'call_id' => $payload['call_id'] ?? null,
                     'org_id' => $payload['organization_id'] ?? null,
                 ]);
@@ -133,6 +154,7 @@ class AcdWorkerClient
             }
 
             Log::info('ACD worker request', [
+                'type' => 'HTTP_RESPONSE',
                 'path' => $path,
                 'status' => $response->status(),
                 'call_id' => $payload['call_id'] ?? null,
@@ -140,8 +162,9 @@ class AcdWorkerClient
             ]);
 
             return $response;
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+        } catch (ConnectionException $e) {
             Log::warning('ACD worker unreachable', [
+                'type' => 'HTTP_REQUEST',
                 'path' => $path,
                 'error' => $e->getMessage(),
             ]);

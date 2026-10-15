@@ -1,0 +1,105 @@
+---
+sidebar_position: 19
+slug: /data-models/models/ring-groups
+sidebar_class_name: cxGuidesSidebar
+title: "Ring Groups"
+---
+
+# Ring Groups
+
+Ring groups and their members. Supervisor assignments to ring groups are on [Users and Organizations](/opbx/data-models/models/users-and-organizations#supervisor_ring_group_assignments).
+
+## RingGroup
+
+A group of extensions rung together or in turn.
+
+**Table:** `ring_groups`  
+**Model:** `App\Models\RingGroup`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `HasUnprovisionedState`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `name` | varchar(100) | No | - | Ring group name |
+| `description` | text | Yes | null | Description |
+| `strategy` | enum | No | `simultaneous` | How members are rung. Values: `simultaneous`, `round_robin`, `sequential` (cast to `RingGroupStrategy`) |
+| `timeout` | int | No | `30` | Seconds to ring |
+| `ring_turns` | int | No | `1` | Times to cycle through the members |
+| `fallback_action` | enum | No | `hangup` | Where the call goes when nobody answers. Values: `extension`, `ring_group`, `ivr_menu`, `ai_assistant`, `ai_load_balancer`, `hangup`, `call_queue`, `unavailable` (cast to `RingGroupFallbackAction`) |
+| `fallback_extension_id` | bigint unsigned | Yes | null | Fallback extension. Foreign key to `extensions`, on delete set null |
+| `status` | enum | No | `active` | Active or inactive. Values: `active`, `inactive` (cast to `RingGroupStatus`) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `fallback_ring_group_id` | bigint unsigned | Yes | null | Fallback ring group. Foreign key to `ring_groups`, on delete set null |
+| `fallback_ivr_menu_id` | bigint unsigned | Yes | null | Fallback IVR menu. Foreign key to `ivr_menus`, on delete set null |
+| `fallback_ai_assistant_id` | bigint unsigned | Yes | null | Fallback AI assistant, like call queues and load balancers. Foreign key to `ai_assistants`, on delete set null. Migration `2026_10_15_100000_point_ring_group_ai_assistant_fallback_at_ai_assistants` converted older values, which held an AI Assistant extension ID, to that extension's assistant (null when it had none) |
+| `fallback_ai_load_balancer_id` | bigint unsigned | Yes | null | Fallback AI load balancer. Foreign key to `ai_assistant_load_balancers`, on delete set null |
+| `fallback_call_queue_id` | bigint unsigned | Yes | null | Fallback call queue. Foreign key to `call_queues`, on delete set null |
+
+**Indexes**
+
+- `ring_groups_fallback_ai_assistant_id_foreign`: `fallback_ai_assistant_id`
+- `ring_groups_fallback_ai_load_balancer_id_foreign`: `fallback_ai_load_balancer_id`
+- `ring_groups_fallback_call_queue_id_foreign`: `fallback_call_queue_id`
+- `ring_groups_fallback_extension_id_foreign`: `fallback_extension_id`
+- `ring_groups_fallback_ivr_menu_id_foreign`: `fallback_ivr_menu_id`
+- `ring_groups_fallback_ring_group_id_foreign`: `fallback_ring_group_id`
+- `ring_groups_organization_id_name_unique` (unique): `organization_id`, `name`
+- `ring_groups_organization_id_status_index`: `organization_id`, `status`
+
+
+**Relationships**
+
+```php
+$ringGroup->organization() → Organization (organization_id) [BelongsTo]
+$ringGroup->members() → RingGroupMember (ring_group_id) [HasMany]
+$ringGroup->fallbackExtension() → Extension (fallback_extension_id) [BelongsTo]
+$ringGroup->fallbackRingGroup() → RingGroup (fallback_ring_group_id) [BelongsTo]
+$ringGroup->fallbackIvrMenu() → IvrMenu (fallback_ivr_menu_id) [BelongsTo]
+$ringGroup->fallbackAiAssistant() → AiAssistant (fallback_ai_assistant_id) [BelongsTo]
+$ringGroup->fallbackAiLoadBalancer() → AiAssistantLoadBalancer (fallback_ai_load_balancer_id) [BelongsTo]
+$ringGroup->fallbackCallQueue() → CallQueue (fallback_call_queue_id) [BelongsTo]
+```
+
+**Scopes:** `forOrganization()`, `withStrategy()`, `withStatus()`, `search()`, `active()`, `unprovisioned()`  
+**Methods:** `isActive()`, `isInactive()`, `getMembers()`, `getActiveMemberCount()`  
+
+`unprovisioned()` and `is_unprovisioned` are true when `fallback_action` is `unavailable`. `fallbackAiAssistant()` returns an `Extension`.
+
+## RingGroupMember
+
+An extension in a ring group.
+
+**Table:** `ring_group_members`  
+**Model:** `App\Models\RingGroupMember`  
+**Tenant scoped:** no
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `ring_group_id` | bigint unsigned | No | - | Ring group. Foreign key to `ring_groups`, on delete cascade |
+| `extension_id` | bigint unsigned | No | - | Member extension. Foreign key to `extensions`, on delete cascade |
+| `priority` | int | No | `1` | Order for sequential and round-robin rings |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `ring_group_members_extension_id_index`: `extension_id`
+- `ring_group_members_ring_group_id_extension_id_unique` (unique): `ring_group_id`, `extension_id`
+- `ring_group_members_ring_group_id_index`: `ring_group_id`
+
+
+**Relationships**
+
+```php
+$ringGroupMember->ringGroup() → RingGroup (ring_group_id) [BelongsTo]
+$ringGroupMember->extension() → Extension (extension_id) [BelongsTo]
+```
+
+## Related Documentation
+
+- [Ring Groups](/opbx/modules/ring-groups)
+- [Enumerations](/opbx/data-models/enums/index#ringgroupstrategy)

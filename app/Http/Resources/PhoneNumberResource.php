@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
-use App\Http\Resources\AiAssistantLoadBalancerResource;
-use App\Http\Resources\AiAssistantResource;
-use App\Http\Resources\IvrMenuResource;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
@@ -21,7 +18,6 @@ class PhoneNumberResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -34,6 +30,7 @@ class PhoneNumberResource extends JsonResource
             'routing_type' => $this->routing_type,
             'routing_config' => $this->routing_config ?? [],
             'status' => $this->status,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'cloudonix_config' => $this->cloudonix_config ?? [],
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
@@ -42,35 +39,35 @@ class PhoneNumberResource extends JsonResource
             // These will only be present if manually loaded in the controller
             'extension' => $this->when(
                 $this->routing_type === 'extension' && $this->extension !== null,
-                fn() => new ExtensionResource($this->extension)
+                fn () => new ExtensionResource($this->extension)
             ),
             'ring_group' => $this->when(
                 $this->routing_type === 'ring_group' && $this->ring_group !== null,
-                fn() => new RingGroupResource($this->ring_group)
+                fn () => new RingGroupResource($this->ring_group)
             ),
             'business_hours_schedule' => $this->when(
                 $this->routing_type === 'business_hours' && $this->business_hours_schedule !== null,
-                fn() => new BusinessHoursScheduleResource($this->business_hours_schedule)
+                fn () => new BusinessHoursScheduleResource($this->business_hours_schedule)
             ),
             'conference_room' => $this->when(
                 $this->routing_type === 'conference_room' && $this->conference_room !== null,
-                fn() => new ConferenceRoomResource($this->conference_room)
+                fn () => new ConferenceRoomResource($this->conference_room)
             ),
             'ai_assistant' => $this->when(
                 $this->routing_type === 'ai_assistant' && $this->ai_assistant !== null,
-                fn() => new AiAssistantResource($this->ai_assistant)
+                fn () => new AiAssistantResource($this->ai_assistant)
             ),
             'ai_load_balancer' => $this->when(
                 $this->routing_type === 'ai_load_balancer' && $this->ai_load_balancer !== null,
-                fn() => new AiAssistantLoadBalancerResource($this->ai_load_balancer)
+                fn () => new AiAssistantLoadBalancerResource($this->ai_load_balancer)
             ),
             'ivr_menu' => $this->when(
                 $this->routing_type === 'ivr_menu' && $this->ivr_menu !== null,
-                fn() => new IvrMenuResource($this->ivr_menu)
+                fn () => new IvrMenuResource($this->ivr_menu)
             ),
             'call_queue' => $this->when(
                 $this->routing_type === 'call_queue' && $this->call_queue !== null,
-                fn() => ['id' => $this->call_queue->id, 'name' => $this->call_queue->name]
+                fn () => ['id' => $this->call_queue->id, 'name' => $this->call_queue->name]
             ),
         ];
     }

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Scopes\OrganizationScope;
+use App\Services\ApplicationConfig;
 use App\Services\WebhookUrlResolver;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,14 +30,38 @@ use Illuminate\Support\Carbon;
  * @property int $no_answer_timeout
  * @property string $call_recording_mode
  * @property string $recording_format
- * @property string|null $cloudonix_package
+ * @property string|null $cloudonix_package Unused: the package tier is read live (CloudonixPackageService)
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Organization $organization
  */
+#[ScopedBy([OrganizationScope::class])]
 class CloudonixSettings extends Model
 {
     use HasFactory;
+
+    /**
+     * Webhook-auth lookup by Cloudonix domain (`domain_name` or `domain_uuid`): the caller
+     * is not authenticated yet, so the tenant scope is bypassed on purpose.
+     */
+    public static function forDomain(string $column, string $value): ?self
+    {
+        assert(in_array($column, ['domain_name', 'domain_uuid'], true));
+
+        return OrganizationScope::bypass(fn () => static::where($column, $value)->first());
+    }
+
+    /**
+     * Settings of an explicit organization, for contexts with no authenticated user
+     * (voice webhooks, queue jobs, workers, console). Callers pass the organization id
+     * they already trust, so the tenant scope is bypassed on purpose.
+     */
+    public static function forOrganization(?int $organizationId): ?self
+    {
+        return $organizationId === null
+            ? null
+            : OrganizationScope::bypass(fn () => static::where('organization_id', $organizationId)->first());
+    }
 
     /**
      * The table associated with the model.
@@ -62,7 +89,6 @@ class CloudonixSettings extends Model
         'no_answer_timeout',
         'call_recording_mode',
         'recording_format',
-        'cloudonix_package',
     ];
 
     /**
@@ -203,11 +229,10 @@ class CloudonixSettings extends Model
      */
     public function getEffectiveWebhookBaseUrlAttribute(): ?string
     {
-        if (! $this->organization) {
-            return null;
-        }
-
-        return WebhookUrlResolver::resolveWebhookBaseUrl($this->organization);
+        // Same rule as WebhookUrlResolver::resolveWebhookBaseUrl(), without re-loading this row via the organization.
+        return WebhookUrlResolver::shouldUseApplicationUrl()
+            ? ApplicationConfig::getApplicationWebhookBaseUrl()
+            : $this->webhook_base_url;
     }
 
     /**

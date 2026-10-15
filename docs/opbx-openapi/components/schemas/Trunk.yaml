@@ -38,11 +38,13 @@ properties:
     - 'null'
   active:
     type: boolean
+    description: True when Cloudonix omits the flag.
   created_at:
     type:
     - string
     - 'null'
     format: date-time
+    description: Cloudonix `createdAt`.
   has_credentials:
     type: boolean
     description: True when the trunk has authentication credentials configured.
@@ -57,7 +59,7 @@ properties:
     type: array
     items:
       type: string
-    description: Names of outbound-whitelist entries referencing this trunk.
+    description: Names of outbound-whitelist entries referencing this trunk (filled on list and get only; empty on create/update).
 required:
 - id
 - name

@@ -8,11 +8,9 @@ description: "Install OPBX using Docker Compose"
 
 # Installation
 
-This guide walks you through installing OPBX using Docker Compose. This is the recommended method for production deployments and local development.
+This guide installs OPBX with Docker Compose. The same compose file is used for local development and, with the production overlay, for production.
 
 ## Prerequisites
-
-Before you begin, ensure your system meets these requirements:
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
@@ -22,113 +20,178 @@ Before you begin, ensure your system meets these requirements:
 | Docker Compose | 2.0+ | Latest |
 | Git | 2.30+ | Latest |
 
-You also need these ports available on your host machine (all can be remapped via `.env`):
+These host ports are published by default (each can be remapped in `.env`):
 
-| Default Port | Service |
-|--------------|---------|
-| 80 | Nginx reverse proxy |
-| 3000 | React frontend (Vite dev server) |
-| 6001 | Soketi WebSocket server |
-| 4040 | ngrok web interface |
-| 8181 | Dialer worker webhook listener (container port 8081) |
-| 8080 | MCP server (AI-agent API; configurable via `MCP_PORT`) |
+| Default Port | Service | Variable |
+|--------------|---------|----------|
+| 80 | Nginx reverse proxy | `APP_PORT` |
+| 3000 | React frontend (Vite dev server) | `FRONTEND_PORT` |
+| 6001 | Soketi WebSocket server | `SOKETI_PORT` |
+| 9601 | Soketi metrics | `SOKETI_METRICS_PORT` |
+| 4040 | ngrok web interface (only with the `dev` profile) | — |
+
+MySQL, Redis, SeaweedFS, the dialer worker and the MCP server publish **no** host ports. For local tools, `docker-compose.ports.yml` adds loopback-only ports (`127.0.0.1`):
+
+| Port | Service | Variable |
+|------|---------|----------|
+| 3306 | MySQL | `DB_EXPOSE_PORT` |
+| 6379 | Redis | `REDIS_EXPOSE_PORT` |
+| 8333 | SeaweedFS S3 API | `MINIO_EXPOSE_PORT` |
+| 9333 | SeaweedFS master UI | `MINIO_CONSOLE_EXPOSE_PORT` |
+| 8181 | Dialer worker health endpoint (container port 8081) | `DIALER_WEBHOOK_HOST_PORT` |
+| 8080 | MCP server | `MCP_PORT` |
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d
+```
+
+Never use `docker-compose.ports.yml` in production. MCP clients reach the MCP server through Nginx at `/mcp` without it.
 
 ## Installation Steps
 
 ### 1. Clone the Repository
-
-Download the OPBX source code from GitHub:
 
 ```bash
 git clone https://github.com/greenfieldtech-nirs/opbx.git
 cd opbx
 ```
 
-### 2. Configure Environment Variables
-
-Copy the example environment file and customize it for your deployment:
+### 2. Create the Configuration Files
 
 ```bash
 cp .env.example .env
 cp docker-compose.yml.example docker-compose.yml
 ```
 
-Edit the `.env` file and set these required variables at minimum:
+`docker-compose.yml` is ignored by git, so you can adapt it to your host.
+
+:::tip Bootstrap script
+`./opbx_bootstrap.sh` does steps 2 and 3 for you and runs a few checks. It verifies that Docker and Docker Compose are installed and running, copies `docker-compose.yml` and `.env` from the examples when they are missing, generates `APP_KEY` when it is empty, runs `docker/scripts/generate-secrets.sh`, creates `config/broadcasting.php` if it is missing, creates the `storage/` and `bootstrap/cache` directories, and warns when `APP_NAME`, `APP_KEY`, `DB_DATABASE`, `DB_USERNAME` or `DB_PASSWORD` is empty. You still set `DB_PASSWORD`, `DB_ROOT_PASSWORD` and `REDIS_PASSWORD` by hand. Ignore its warning about `CLOUDONIX_API_TOKEN`: Cloudonix credentials are entered per organization in the web UI.
+:::
+
+### 3. Set the Secrets
+
+Fill in the shared secrets the workers, Soketi and Grafana need. The script writes only values that are missing or still a placeholder, and prints no values:
+
+```bash
+docker/scripts/generate-secrets.sh
+```
+
+It sets `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET`, `GRAFANA_ADMIN_PASSWORD`, `MINIO_ACCESS_KEY` and `MINIO_SECRET_KEY`.
+
+Then edit `.env` and set the rest by hand:
 
 | Variable | Description | How to Generate |
 |----------|-------------|-----------------|
-| `APP_KEY` | Laravel encryption key | `php artisan key:generate` |
+| `APP_KEY` | Laravel encryption key | `echo "base64:$(openssl rand -base64 32)"` |
+| `APP_URL` | Your public URL | `http://localhost` for local use |
 | `DB_PASSWORD` | MySQL `opbx` user password | `openssl rand -base64 32` |
 | `DB_ROOT_PASSWORD` | MySQL root password | `openssl rand -base64 32` |
-| `REDIS_PASSWORD` | Redis authentication password | `openssl rand -base64 32` |
-| `PUSHER_APP_SECRET` | Soketi application secret | `openssl rand -base64 64` |
-| `DIALER_WORKER_API_TOKEN` | Go worker authentication token | `openssl rand -hex 32` |
-| `AMD_WORKER_API_TOKEN` | AMD worker callback authentication token | `openssl rand -hex 32` |
-| `APP_URL` | Your domain or IP address | `http://localhost` for local use |
+| `REDIS_PASSWORD` | Redis password | `openssl rand -base64 32` |
+
+The `.env.example` ships the S3 keys empty (the script above generates them). Compose itself refuses to start the stack (any service, any profile) while the worker tokens, `PUSHER_APP_SECRET`, the S3 keys or `GRAFANA_ADMIN_PASSWORD` are unset.
+
+The `app` container checks the values again on every start and exits when one fails:
+
+| Check | Fails when |
+|-------|-----------|
+| Weak passwords | `DB_PASSWORD`, `MINIO_ACCESS_KEY` or `MINIO_SECRET_KEY` is exactly `secret`, `password`, `rootsecret`, `minioadmin`, `admin` or `123456` |
+| Required secrets | `APP_KEY`, `DB_PASSWORD`, `PUSHER_APP_SECRET`, `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN` or `ACD_WORKER_API_TOKEN` is empty, is `admin`, or **contains** a placeholder word: `CHANGE_ME`, `GENERATE_32_CHAR`, `64_CHAR_SECRET`, `default123`, `password`, `secret`, `change-in-production` or `pbxappsecret` |
+| Grafana | Same rule for `GRAFANA_ADMIN_PASSWORD`, only when the log stack is enabled (`LOG_STACK_ENABLED=true` or `logs` in `COMPOSE_PROFILES`) |
+| Password length | `DB_PASSWORD` is shorter than 8 characters |
+| Production | `APP_ENV=production` with `APP_DEBUG=true`, or with `REDIS_EXPOSE_PORT` set |
+
+`DB_ROOT_PASSWORD` is not checked (MySQL falls back to `rootsecret` when it is unset), so make sure you set it. Because the check looks for the words inside the value, a generated secret must not contain `password` or `secret`. Values from `openssl rand` never do.
 
 Optional but commonly configured variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `APP_PORT` | Host port for Nginx | `80` |
-| `FRONTEND_PORT` | Host port for Vite dev server | `3000` |
+| `FRONTEND_PORT` | Host port for the Vite dev server | `3000` |
 | `NGROK_AUTHTOKEN` | ngrok authtoken for local webhook development | *(empty)* |
 | `NGROK_DOMAIN` | Custom ngrok domain (paid plans) | *(empty)* |
 | `USERCHECK_API_TOKEN` | UserCheck email validation token | *(empty)* |
+| `DB_CDR_ARCHIVE_DATABASE` | Separate schema for the warm call-record archive. Create it and grant the app user first | *(main schema)* |
+
+All variables are listed in the [Configuration Reference](/opbx/data-models/configuration/index).
 
 :::note Cloudonix Configuration
-Cloudonix integration is configured through the web UI after your first login. Do not add Cloudonix credentials to the `.env` file.
+Cloudonix credentials are per organization and are entered in the web UI after your first login. Do not add them to `.env`.
 :::
 
 :::danger Security Notice
-Never commit `.env` or `docker-compose.yml` files to version control. The `.env.example` and `docker-compose.yml.example` templates are safe to commit because they contain no secrets.
+Never commit `.env` or `docker-compose.yml` to version control.
 :::
 
-### 3. Start the Services
+### 4. Install the PHP Dependencies
 
-Launch all OPBX services with Docker Compose:
+The compose file bind-mounts the repository over the app image, so the `vendor/` directory must exist on the host. The app container stops with "Composer dependencies are not installed" when it is missing. Run Composer on the host, or through the Composer image:
+
+```bash
+composer install
+# or, without PHP on the host:
+docker run --rm -v "$PWD":/app -w /app composer:2 install --ignore-platform-reqs
+```
+
+### 5. Start the Services
 
 ```bash
 docker compose up -d
 ```
 
-This command builds images and starts the following services:
+This builds the local images and starts these services:
 
-| Service | Container | Purpose | Exposed Port |
-|---------|-----------|---------|--------------|
-| `app` | `opbx_app` | Laravel PHP-FPM backend | 9000 (internal) |
-| `nginx` | `opbx_nginx` | Reverse proxy and static file server | `APP_PORT` (default 80) |
-| `frontend` | `opbx_frontend` | React Vite dev server | `FRONTEND_PORT` (default 3000) |
-| `mysql` | `opbx_mysql` | MySQL 8 database | *(internal by default)* |
-| `redis` | `opbx_redis` | Cache, sessions, queues, locks | *(internal by default)* |
-| `minio` | `opbx_minio` | S3-compatible object storage | *(internal by default)* |
-| `soketi` | `opbx_websocket` | WebSocket server | 6001 |
+| Service | Container | Purpose | Host Port |
+|---------|-----------|---------|-----------|
+| `app` | `opbx_app` | Laravel PHP-FPM backend | — |
+| `nginx` | `opbx_nginx` | Reverse proxy | `APP_PORT` (80) |
+| `frontend` | `opbx_frontend` | React Vite dev server | `FRONTEND_PORT` (3000) |
+| `mysql` | `opbx_mysql` | MySQL 8.4 LTS | — |
+| `redis` | `opbx_redis` | Cache, sessions, queues, locks | — |
+| `seaweedfs` | `opbx_seaweedfs` | S3-compatible object storage | — |
+| `soketi` | `opbx_websocket` | WebSocket server | 6001, 9601 |
 | `queue-worker` | `opbx_queue_worker` | Laravel queue worker | — |
-| `scheduler` | `opbx_scheduler` | Laravel task scheduler | — |
-| `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker | 8181 (host) → 8081 (container) |
-| `amd-worker` | `opbx_amd_worker` | Java/Vert.x AMD worker | *(internal)* |
-| `ngrok` | `opbx_ngrok` | Webhook tunnel (dev only) | 4040 |
-| `mcp-server` | `opbx_mcp` | MCP server for AI agents (see [MCP Server](/modules/mcp-server)) | 8080 |
+| `queue-worker-long` | `opbx_queue_worker_long` | Queue worker for long jobs (distribution list uploads, queue hold-music segmentation) | — |
+| `scheduler` | `opbx_scheduler` | Laravel scheduler | — |
+| `dialer-worker` | `opbx_dialer_worker` | Go auto-dialer worker (one replica) | — |
+| `amd-worker` | `opbx_amd_worker` | Java/Vert.x answering-machine detection | — |
+| `acd-worker` | `opbx_acd_worker` | Java/Vert.x call queue engine | — |
+| `mcp-server` | `opbx_mcp` | MCP server for AI agents (see [MCP Server](/opbx/modules/mcp-server)) | — |
+
+Two groups of services start only with a profile:
+
+| Profile | Services | Start with |
+|---------|----------|------------|
+| `dev` | `ngrok` (webhook tunnel) | `docker compose --profile dev up -d ngrok` |
+| `logs` | `loki`, `alloy`, `grafana`, `docker-socket-proxy` | `docker compose --profile logs up -d` (see [Centralized Logs](/opbx/administration/centralized-logs)) |
 
 :::tip First Boot
-The PHP entrypoint runs migrations, seeds, and configuration validation on first startup. Wait **120 seconds** after starting containers before testing.
+On start, the `app` container validates the environment, waits for MySQL (up to `MYSQL_WAIT_TIMEOUT`, default 60 seconds), runs migrations, seeds a fresh database, checks object storage and validates the configuration. Wait **120 seconds** after starting the containers before testing.
 :::
 
-### 4. Verify Installation
+### 6. Create the Storage Buckets
 
-Check that all services are running:
+The app expects two private buckets in SeaweedFS: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold call-record archive). Startup only checks that they are reachable. Create them once:
+
+```bash
+echo "s3.bucket.create -name recordings" | docker compose exec -T seaweedfs weed shell
+echo "s3.bucket.create -name cdr-archive" | docker compose exec -T seaweedfs weed shell
+```
+
+### 7. Verify the Installation
 
 ```bash
 docker compose ps
 ```
+
+Every service with a healthcheck should show `healthy`. The `app`, `mysql`, `redis`, `seaweedfs`, `soketi`, queue workers, `scheduler`, the three workers and `mcp-server` all have one.
 
 Test the public health endpoint:
 
 ```bash
 curl http://localhost/api/health
 ```
-
-You should receive a JSON response similar to:
 
 ```json
 {
@@ -137,48 +200,53 @@ You should receive a JSON response similar to:
 }
 ```
 
-### 5. Access the Application
-
-Open your browser and navigate to:
+### 8. Access the Application
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost/ui` | OPBX web application |
+| `http://localhost/ui/login` | OPBX web application |
+| `http://localhost/status` | Public platform status page |
 | `http://localhost/api/health` | Public health check |
-| `http://localhost:4040` | ngrok dashboard (when enabled) |
+| `http://localhost:4040` | ngrok dashboard (`dev` profile) |
+| `http://localhost/logs/` | Grafana log viewer (`logs` profile) |
 
 :::tip Next Steps
-Proceed to [First Login](./first-login) to create your organization and admin account. If you are enabling Auth0 social login, also see [Auth0 Setup](./auth0-setup). To understand how calls are handled, see the [Call Routing Overview](./call-routing-overview) (inbound) and [Outbound Calling Overview](./outbound-calling-overview) (outbound and caller ID assignment).
+Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Troubleshooting
 
 ### Port Conflicts
 
-If you see errors about ports already in use, change the corresponding variable in your `.env` file:
+Change the corresponding variable in `.env`:
 
 ```bash
-APP_PORT=8080        # Use port 8080 instead of 80 (but see MCP_PORT below)
-FRONTEND_PORT=3001   # Use port 3001 instead of 3000
+APP_PORT=8080        # Nginx on 8080 instead of 80
+FRONTEND_PORT=3001   # Vite on 3001 instead of 3000
 ```
 
-Available port overrides: `APP_PORT` (nginx), `FRONTEND_PORT` (Vite), `MCP_PORT` (MCP server, default 8080), `DIALER_WEBHOOK_HOST_PORT` (dialer worker webhooks, default 8181).
+### The app Container Exits on Start
 
-### MySQL Slow Start
+```bash
+docker compose logs app | head -n 50
+```
+
+Common causes: an empty or placeholder secret, a weak database password or S3 key, `APP_DEBUG=true` in production, a missing `vendor/` directory ("Composer dependencies are not installed"), or MySQL not ready within `MYSQL_WAIT_TIMEOUT` seconds ("MySQL not ready after …"). The log names the variable that failed.
 
 ### "No such image" Errors (podman-compose)
 
-Podman-compose does **not** build images automatically on `docker compose up` the way Docker Compose does. If a service fails with `no such image: ...-mcp-server` (or another locally-built service), build it explicitly first:
+Podman-compose does not build images automatically. Build them first:
 
 ```bash
-docker compose build mcp-server   # or: docker compose build
-docker compose up -d mcp-server
+docker compose build   # or: docker compose build mcp-server
+docker compose up -d
 ```
 
-Using `docker compose up -d --build` also works.
+`docker compose up -d --build` also works.
 
+### MySQL Slow Start
 
-MySQL may take longer to initialize on first boot. Wait up to 120 seconds after starting containers before testing:
+MySQL may take longer to initialize on first boot:
 
 ```bash
 docker compose logs -f mysql
@@ -186,7 +254,7 @@ docker compose logs -f mysql
 
 ### Permission Denied
 
-If you encounter permission errors, ensure your user is in the `docker` group:
+Make sure your user is in the `docker` group:
 
 ```bash
 sudo usermod -aG docker $USER
@@ -195,67 +263,86 @@ sudo usermod -aG docker $USER
 
 ### Container Failures
 
-Check individual service logs for errors:
-
 ```bash
 docker compose logs -f [service-name]
 ```
 
-Common service names: `app`, `nginx`, `mysql`, `redis`, `queue-worker`, `dialer-worker`, `amd-worker`, `mcp-server`.
+Common service names: `app`, `nginx`, `mysql`, `redis`, `seaweedfs`, `queue-worker`, `scheduler`, `dialer-worker`, `amd-worker`, `acd-worker`, `mcp-server`.
 
 ### Migrations Do Not Run
 
-The `app` container runs migrations only when `RUN_MIGRATIONS=true` (the default). If you set it to `false`, run migrations manually:
+The `app` container runs migrations unless `RUN_MIGRATIONS=false`. The queue workers and scheduler never run them. To run them by hand:
 
 ```bash
 docker compose exec app php artisan migrate
 ```
 
-### Webhooks Not Receiving in Local Development
+### Webhooks Not Received in Local Development
 
-For Cloudonix to reach your local instance, enable ngrok:
+For Cloudonix to reach your local instance, start the ngrok tunnel:
 
-1. Add your `NGROK_AUTHTOKEN` to `.env`.
-2. Restart the stack: `docker compose up -d`.
-3. Find your public HTTPS URL in the ngrok dashboard (`http://localhost:4040`) or logs.
-4. Enter that URL as the webhook base URL in **Settings > Cloudonix**.
+1. Add `NGROK_AUTHTOKEN` to `.env`.
+2. Start the tunnel: `docker compose --profile dev up -d ngrok`.
+3. Find your public HTTPS URL in the ngrok dashboard (`http://localhost:4040`) or with `docker compose logs ngrok`.
+4. Sign in as the Owner, open **Settings** from the user menu (top right), enter that URL in **Webhook Base URL** and click **Validate and Save Settings**.
 
 ## Updating OPBX
 
-To update to the latest version:
-
 ```bash
-# Pull latest code
+# Pull the new version
 git pull
 
-# Stop running containers
-docker compose down
+# Bring docker-compose.yml up to date with docker-compose.yml.example
+./scripts/update-compose.sh --dry-run   # report only
+./scripts/update-compose.sh             # asks per changed service
 
-# Rebuild images without cache
-docker compose build --no-cache
-
-# Start updated services
+# Update PHP dependencies, rebuild and restart
+composer install
+docker compose build
 docker compose up -d
 ```
 
+`scripts/update-compose.sh` compares your `docker-compose.yml` with the new example service by service (all profiles). New services are added, services that exist only in your file are kept, and services removed upstream (such as `minio`) are removed only when you confirm. It validates the result with `docker compose config`, keeps the old file as `docker-compose.yml.bak-<timestamp>`, and restarts nothing. `--yes` runs it unattended. It needs only Docker.
+
+### Upgrading from MinIO
+
+Older installations stored objects in MinIO (`./volumes/minio`). SeaweedFS replaces it. After updating `docker-compose.yml`, copy the objects across:
+
+```bash
+./scripts/migrate-minio-to-seaweedfs.sh --dry-run   # list buckets and object counts
+./scripts/migrate-minio-to-seaweedfs.sh             # copy and verify every bucket
+```
+
+The script starts SeaweedFS and a temporary MinIO container on the old data, mirrors every bucket, verifies it, and leaves `./volumes/minio` in place as a fallback. It is safe to re-run. When it succeeds, set `MINIO_ENDPOINT=http://seaweedfs:8333` in `.env`, recreate `app`, restart the queue workers and scheduler, and run `docker compose exec app php artisan storage:initialize`. Copied objects get a new modification date, so recording retention counts from the migration date.
+
+### Upgrading from MySQL 8.0
+
+The compose file uses MySQL 8.4. Back up first (`./scripts/backup-database.sh`); an 8.0 data directory is upgraded in place on the first 8.4 start. `docker/mysql/my.cnf` keeps `mysql_native_password` loaded for older clients.
+
 :::warning Data Preservation
-Database and object-storage data are persisted in `./volumes/` bind mounts. These survive `docker compose down`. **Data will be lost** if you run `docker compose down -v` or delete the `volumes/` directory.
+MySQL, Redis and SeaweedFS data live in bind mounts under `./volumes/` (`mysql`, `redis`, `seaweedfs`). They survive `docker compose down` and `down -v`. Deleting the `volumes/` directory deletes the data. The `logs` profile keeps Loki and Grafana data in the named volumes `loki_data` and `grafana_data`, which `down -v` does remove.
 :::
 
 ## Production Deployment
 
-For production environments, consider these additional steps:
+Serve the compiled frontend instead of the Vite dev server with the production overlay:
 
-1. Use a reverse proxy (nginx, traefik) with SSL termination
-2. Configure automated backups for MySQL (`./scripts/backup-database.sh`) and MinIO data
-3. Set strong passwords for all services and rotate tokens regularly
-4. Do not expose MySQL, Redis, or MinIO ports publicly
-5. Enable Redis persistence (already enabled via AOF in the example compose file)
-6. Configure log aggregation
-7. Set up monitoring and alerting
-8. Set `APP_ENV=production` and `APP_DEBUG=false`
-9. Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domain
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+`docker-compose.prod.yml` builds the frontend as a static site (the `VITE_*` values are baked in at build time; set `VITE_WS_HOST`, `VITE_WS_PORT` and `VITE_WS_SCHEME` for your public host), removes the dev port and bind mounts, and switches Nginx to the production virtual host in `docker/nginx/conf.d.prod`.
+
+Also:
+
+1. Terminate TLS in front of Nginx (a load balancer or another reverse proxy).
+2. Back up MySQL (`./scripts/backup-database.sh`) and `./volumes/seaweedfs` on a schedule.
+3. Set `APP_ENV=production` and `APP_DEBUG=false`.
+4. Set `OPBX_APPLICATION_MODE=production` and `OPBX_APPLICATION_WEBHOOK_BASEURL` to your public URL.
+5. Restrict `SANCTUM_STATEFUL_DOMAINS` to your domains.
+6. Rotate the worker tokens regularly.
+7. Optionally enable the [log stack](/opbx/administration/centralized-logs).
 
 :::danger Security Notice
-Never expose the MySQL, Redis, or MinIO ports to the public internet. Use Docker networks or private IPs for inter-service communication.
+Never expose the MySQL, Redis or SeaweedFS ports to the internet, and never use `docker-compose.ports.yml` on a production host.
 :::

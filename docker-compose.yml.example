@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     build:
@@ -33,14 +31,29 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: opbx_nginx
     ports:
       - "${APP_PORT:-80}:80"
     volumes:
       - ./:/var/www/html
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/templates/conf.d:ro
+    # Fill the resolver address from the container's own /etc/resolv.conf so the
+    # config works under both Docker (127.0.0.11) and Podman (network gateway).
+    # The mounted conf.d is read-only, so render into /etc/nginx/conf.d first.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        RESOLVER=$$(awk '/^nameserver/ {print $$2; exit}' /etc/resolv.conf)
+        : "$${RESOLVER:?could not determine DNS resolver from /etc/resolv.conf}"
+        mkdir -p /etc/nginx/conf.d
+        for f in /etc/nginx/templates/conf.d/*.conf; do
+          sed "s/__NGINX_RESOLVER__/$${RESOLVER}/g" "$$f" > "/etc/nginx/conf.d/$$(basename "$$f")"
+        done
+        exec nginx -g 'daemon off;'
     depends_on:
       app:
         condition: service_healthy
@@ -53,6 +66,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: opbx_app
+    labels:
+      - "logging.opbx/collect=true"
     deploy:
       resources:
         limits:
@@ -63,6 +78,8 @@ services:
       - ./:/var/www/html
     environment:
       - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      # Structured JSON logs to stdout for the optional log stack (alloy/loki).
+      - LOG_STACK=${OPBX_LOG_STACK:-single,json}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost}
@@ -77,11 +94,11 @@ services:
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
       - MINIO_REGION=us-east-1
       - MINIO_BUCKET=recordings
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://seaweedfs:8333
       - MINIO_USE_PATH_STYLE=true
       - MCP_PORT=${MCP_PORT:-8080}
       # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       mysql:
         condition: service_healthy
@@ -101,6 +118,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: opbx_queue_worker
+    labels:
+      - "logging.opbx/collect=true"
     deploy:
       resources:
         limits:
@@ -112,6 +131,8 @@ services:
       - ./:/var/www/html
     environment:
       - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      # Structured JSON logs to stdout for the optional log stack (alloy/loki).
+      - LOG_STACK=${OPBX_LOG_STACK:-single,json}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - DB_CONNECTION=mysql
@@ -123,12 +144,65 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
       # Auto Dialer Worker authentication
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       - app
       - redis
     networks:
       - opbx
+    healthcheck:
+      # Process-level liveness; `restart: unless-stopped` only reacts to exits, this surfaces a dead worker.
+      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  queue-worker-long:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: opbx_queue_worker_long
+    labels:
+      - "logging.opbx/collect=true"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    command: ["php", "artisan", "queue:work", "auto-dialer", "--queue=auto-dialer-long", "--sleep=3", "--tries=3", "--timeout=7200"]
+    volumes:
+      - ./:/var/www/html
+    environment:
+      - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      # Structured JSON logs to stdout for the optional log stack (alloy/loki).
+      - LOG_STACK=${OPBX_LOG_STACK:-single,json}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_DATABASE=${DB_DATABASE:-opbx}
+      - DB_USERNAME=${DB_USERNAME:-opbx}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
+      - RUN_MIGRATIONS=false
+      # Auto Dialer Worker authentication
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
+    depends_on:
+      - app
+      - redis
+    networks:
+      - opbx
+    healthcheck:
+      # Process-level liveness; `restart: unless-stopped` only reacts to exits, this surfaces a dead worker.
+      test: ["CMD-SHELL", "pgrep -f 'artisan queue:work' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
 
   scheduler:
@@ -136,6 +210,8 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     container_name: opbx_scheduler
+    labels:
+      - "logging.opbx/collect=true"
     deploy:
       resources:
         limits:
@@ -147,6 +223,8 @@ services:
       - ./:/var/www/html
     environment:
       - OPCACHE_VALIDATE_TIMESTAMPS=${OPCACHE_VALIDATE_TIMESTAMPS:-1}
+      # Structured JSON logs to stdout for the optional log stack (alloy/loki).
+      - LOG_STACK=${OPBX_LOG_STACK:-single,json}
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - DB_CONNECTION=mysql
@@ -158,21 +236,27 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-null}
       - RUN_MIGRATIONS=false
       # Auto Dialer Worker authentication
-      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
       - app
     networks:
       - opbx
+    healthcheck:
+      # scheduler.sh touches this file after every schedule:run tick (60s).
+      test: ["CMD-SHELL", "find /tmp/scheduler.heartbeat -mmin -3 | grep -q . || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
 
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: opbx_mysql
     # SECURITY: MySQL port exposure is disabled by default for security
     # Set DB_EXPOSE_PORT in .env to enable external access (not recommended for production)
     # MySQL remains accessible within the Docker network at port 3306
-    ports:
-      - "${DB_EXPOSE_PORT:-}:3306"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
       - MYSQL_DATABASE=${DB_DATABASE:-opbx}
@@ -184,8 +268,16 @@ services:
       # The directory is gitignored so it won't be committed.
       # Always backup before major changes: ./scripts/backup-database.sh
       - ./volumes/mysql:/var/lib/mysql
+      # Tuned server settings (buffer pool, connections, slow query log).
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/opbx.cnf:ro
     networks:
       - opbx
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
     # Restart policy ensures MySQL comes back up after host reboots
     restart: unless-stopped
     healthcheck:
@@ -200,8 +292,7 @@ services:
     # SECURITY: Redis port exposure is disabled by default for security
     # Set REDIS_EXPOSE_PORT in .env to enable external access (not recommended for production)
     # Redis remains accessible within the Docker network at port 6379
-    ports:
-      - "${REDIS_EXPOSE_PORT:-}:6379"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     volumes:
       # PERSISTENCE: Bind mount stores Redis data in ./volumes/redis on the host.
       # AOF is enabled so data is written to disk and survives container removal.
@@ -209,52 +300,74 @@ services:
       - ./volumes/redis:/data
     networks:
       - opbx
-    command: >
-      redis-server
-      --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
-      --bind 0.0.0.0
-      --protected-mode yes
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+    environment:
+      # redis-cli reads the password from here, so it does not show up in the
+      # healthcheck's process arguments.
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    # The password is written to a root-only config file inside the container
+    # (from REDISCLI_AUTH) instead of being passed as --requirepass, so it never
+    # appears in `docker inspect` command args or in `ps`. It may contain any
+    # characters (backslash and double quote are escaped).
+    command:
+      - sh
+      - -c
+      - |
+        umask 077
+        esc=$$(printf '%s' "$$REDISCLI_AUTH" | sed 's/[\\"]/\\&/g')
+        printf 'requirepass "%s"\nappendonly yes\nbind 0.0.0.0\nprotected-mode yes\n' "$$esc" > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
     healthcheck:
-      test: ["CMD", "sh", "-c", "redis-cli -a ${REDIS_PASSWORD} ping || exit 1"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    container_name: opbx_minio
-    # SECURITY: MinIO ports are disabled by default for security
-    # Set MINIO_EXPOSE_PORT and MINIO_CONSOLE_EXPOSE_PORT in .env to enable external access
-    # MinIO remains accessible within the Docker network
-    ports:
-      - "${MINIO_EXPOSE_PORT:-}:9000"  # MinIO API
-      - "${MINIO_CONSOLE_EXPOSE_PORT:-}:9001"  # MinIO Console (Web UI)
+  seaweedfs:
+    # S3-compatible object storage for call recordings and the cold CDR archive.
+    # Replaces MinIO, whose community edition stopped shipping images (2025) and
+    # was archived. The app still uses the MINIO_* env names (they are just the
+    # S3 endpoint and keys); on AWS, point MINIO_ENDPOINT/keys at real S3 instead.
+    image: chrislusf/seaweedfs:4.47
+    container_name: opbx_seaweedfs
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_REGION: ${MINIO_REGION:-us-east-1}
-      MINIO_SCANNER: "off"  # Disable scanner to reduce memory usage
+      S3_ACCESS_KEY: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      S3_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
     volumes:
-      - ./volumes/minio:/data
+      - ./volumes/seaweedfs:/data
     networks:
       - opbx
-    command: server /data --console-address ":9001"
+    # The S3 identity file is written inside the container from the env vars,
+    # so the keys never appear in command args. JSON special chars are escaped.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        esc() { printf '%s' "$$1" | sed 's/[\\"]/\\&/g'; }
+        printf '{"identities":[{"name":"opbx","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","List","Tagging","Write"]}]}' "$$(esc "$$S3_ACCESS_KEY")" "$$(esc "$$S3_SECRET_KEY")" > /tmp/s3.json
+        exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024 -volume.max=0
     deploy:
       resources:
         limits:
-          memory: 512M  # Limit memory usage
+          memory: 512M
         reservations:
-          memory: 256M  # Reserve minimum memory
+          memory: 128M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9333/cluster/status || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   soketi:
-    image: 'quay.io/soketi/soketi:latest-16-alpine'
+    image: 'quay.io/soketi/soketi:1.6-16-alpine'
     container_name: opbx_websocket
     ports:
       - "${SOKETI_PORT:-6001}:6001"
@@ -263,7 +376,7 @@ services:
       SOKETI_DEBUG: '${SOKETI_DEBUG:-0}'
       SOKETI_DEFAULT_APP_ID: '${PUSHER_APP_ID:-app-id}'
       SOKETI_DEFAULT_APP_KEY: '${PUSHER_APP_KEY:-pbxappkey}'
-      SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:-pbxappsecret}'
+      SOKETI_DEFAULT_APP_SECRET: '${PUSHER_APP_SECRET:?set PUSHER_APP_SECRET}'
       SOKETI_METRICS_SERVER_PORT: '9601'
       SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: 'false'
       SOKETI_DEFAULT_APP_ENABLE_STATISTICS: 'true'
@@ -274,7 +387,8 @@ services:
     networks:
       - opbx
     healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:9601/ready']
+      # 127.0.0.1, not localhost: soketi listens on IPv4 only and localhost resolves to ::1 first.
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9601/ready']
       interval: 10s
       timeout: 5s
       retries: 3
@@ -288,26 +402,25 @@ services:
       context: ./amd-worker
       dockerfile: Dockerfile
     container_name: opbx_amd_worker
+    labels:
+      - "logging.opbx/collect=true"
     restart: unless-stopped
     # No external ports - all traffic proxied through nginx
     environment:
       - AMD_WEBSOCKET_PORT=8082
       - AMD_HTTP_PORT=8083
-      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:-dev-amd-token-change-in-production}
+      - AMD_WORKER_API_TOKEN=${AMD_WORKER_API_TOKEN:?set AMD_WORKER_API_TOKEN}
       - AMD_MODEL_PATH=/app/models/beep_detector.onnx
       - AMD_MAX_CONCURRENT_STREAMS=${AMD_MAX_CONCURRENT_STREAMS:-100}
-      - AMD_LOG_LEVEL=info
+      - AMD_MIN_BEEP_START_MS=${AMD_MIN_BEEP_START_MS:-2000}
+      - AMD_LOG_LEVEL=${AMD_LOG_LEVEL:-info}
       - AMD_DUMP_AUDIO=${AMD_DUMP_AUDIO:-false}
       - AMD_DUMP_AUDIO_PATH=${AMD_DUMP_AUDIO_PATH:-/tmp/amd-dumps}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./amd-worker/models:/app/models:ro
       - ./volumes/amd-dumps:/tmp/amd-dumps
     depends_on:
       - nginx
-      - redis
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8083/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -317,29 +430,57 @@ services:
     networks:
       - opbx
 
-  # Auto Dialer Worker - Go-based service for outbound campaigns
-  # Receives CDR events from Laravel via webhook at /webhooks/cdr
+  acd-worker:
+    build:
+      context: ./acd-worker
+      dockerfile: Dockerfile
+    container_name: opbx_acd_worker
+    labels:
+      - "logging.opbx/collect=true"
+    restart: unless-stopped
+    # No external ports - reached by Laravel over the internal Docker network
+    environment:
+      - ACD_HTTP_PORT=8084
+      - ACD_HEALTH_PORT=8085
+      - ACD_WORKER_API_TOKEN=${ACD_WORKER_API_TOKEN:?set ACD_WORKER_API_TOKEN}
+      - ACD_LOG_LEVEL=${ACD_LOG_LEVEL:-info}
+      - ACD_REDIS_HOST=redis
+      - ACD_REDIS_PORT=6379
+      - ACD_REDIS_PASSWORD=${REDIS_PASSWORD}
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - opbx
+
+  # Auto Dialer Worker - Go-based service for outbound campaigns (polls Laravel; no inbound webhooks)
   dialer-worker:
     build:
       context: ./dialer-worker
       dockerfile: Dockerfile
     container_name: opbx_dialer_worker
+    labels:
+      - "logging.opbx/collect=true"
+    # D5: exactly one replica. CPS pacing and the in-flight batch are in-process state,
+    # so a second worker would double the dial rate. Do not scale this service.
+    deploy:
+      replicas: 1
     environment:
       - WORKER_ID=${DIALER_WORKER_ID:-worker-1}
       - LARAVEL_API_URL=${DIALER_LARAVEL_API_URL:-http://nginx}
-      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN:-dev-token-change-in-production}
+      - LARAVEL_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_DB=0
       - POLL_INTERVAL=${DIALER_POLL_INTERVAL:-10s}
-      - HEALTH_CHECK_PORT=${DIALER_HEALTH_PORT:-8080}
       - WEBHOOK_PORT=${DIALER_WEBHOOK_PORT:-8081}
-      - WEBHOOK_SECRET=${DIALER_WEBHOOK_SECRET:-}
-    ports:
-      # Host-side port is separate from the container's WEBHOOK_PORT (8081)
-      # because dev machines often have other services on 8081.
-      - "${DIALER_WEBHOOK_HOST_PORT:-8181}:8081"  # Webhook endpoint for CDR
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     networks:
       - opbx
     depends_on:
@@ -347,8 +488,11 @@ services:
       - nginx
       - redis
     restart: unless-stopped
+    # The worker drains in-flight initiates for up to 45s on SIGTERM.
+    stop_grace_period: 60s
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/webhooks/health"]
+      # GET, not --spider: the health route is GET-only and HEAD returns 404.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/webhooks/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -358,8 +502,11 @@ services:
   # Provides a public URL for Cloudonix webhooks
   # Docs: https://ngrok.com/docs
   ngrok:
-    image: ngrok/ngrok:latest
+    image: ngrok/ngrok:3-alpine
     container_name: opbx_ngrok
+    # Dev-only tunnel: start it explicitly with `docker compose --profile dev up -d ngrok`.
+    # Never part of a plain `up`, so production hosts do not publish a tunnel.
+    profiles: ["dev"]
     # Use a shell command to conditionally add --url when NGROK_DOMAIN is set
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -394,8 +541,7 @@ services:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: opbx_mcp
-    ports:
-      - "${MCP_PORT:-8080}:8080"
+    # No published ports; see docker-compose.ports.yml for loopback-only dev access.
     environment:
       NODE_ENV: production
       OPBX_BASE_URL: http://nginx
@@ -415,6 +561,104 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+
+  # ── Log aggregation stack (optional, profile "logs") ──────────────────
+  # Enable with: docker compose --profile logs up -d
+  # Grafana UI is proxied by nginx at /logs/. See docs/LOG-AGGREGATION.md.
+  loki:
+    image: grafana/loki:3.4.2
+    container_name: opbx_loki
+    profiles: ["logs"]
+    command: -config.file=/etc/loki/loki-config.yml -config.expand-env=true
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    environment:
+      - LOKI_RETENTION_HOURS=${LOKI_RETENTION_HOURS:-168}
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:3100/ready']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  # Read-only, filtered view of the Docker API for Alloy. Only container
+  # listing, logs and events are allowed; every write endpoint is denied, so
+  # Alloy no longer needs root or the raw socket.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    container_name: opbx_docker_socket_proxy
+    profiles: ["logs"]
+    environment:
+      CONTAINERS: 1
+      NETWORKS: 1
+      EVENTS: 1
+      POST: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Rootless Podman (SELinux) blocks socket access without this; harmless on Docker.
+    security_opt:
+      - label=disable
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.8.3
+    container_name: opbx_alloy
+    profiles: ["logs"]
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy /etc/alloy/config.alloy
+    volumes:
+      - ./docker/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      loki:
+        condition: service_started
+      docker-socket-proxy:
+        condition: service_started
+    # No healthcheck: the alloy image is distroless (no wget/curl/shell).
+    networks:
+      - opbx
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.4.12
+    container_name: opbx_grafana
+    profiles: ["logs"]
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      # root_url MUST name the URL the browser actually uses: Grafana's CSRF
+      # middleware rejects any authenticated POST (e.g. /api/ds/query) whose
+      # Origin header does not match it, with 403 "origin not allowed".
+      # Set GRAFANA_ROOT_URL in .env to "<APP_URL>/logs/".
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost/logs/}
+      # Any additional hostnames the UI is reached by (ngrok, localhost, a
+      # second domain) - space-separated, no scheme. root_url's own host is
+      # always trusted and does not need listing here.
+      - GF_SECURITY_CSRF_TRUSTED_ORIGINS=${GRAFANA_CSRF_TRUSTED_ORIGINS:-}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+    depends_on:
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:3000/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - opbx
+    restart: unless-stopped
+
+volumes:
+  loki_data:
+  grafana_data:
 
 networks:
   opbx:

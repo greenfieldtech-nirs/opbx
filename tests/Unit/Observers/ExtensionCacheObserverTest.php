@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Observers;
 
+use App\Models\AiAssistant;
 use App\Models\Extension;
 use App\Models\Organization;
+use App\Models\User;
 use App\Observers\ExtensionCacheObserver;
 use App\Services\VoiceRouting\VoiceRoutingCacheService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,6 +25,7 @@ class ExtensionCacheObserverTest extends TestCase
     use RefreshDatabase;
 
     private VoiceRoutingCacheService $cacheService;
+
     private Organization $organization;
 
     protected function setUp(): void
@@ -201,7 +204,7 @@ class ExtensionCacheObserverTest extends TestCase
             $this->assertTrue(Cache::has($cacheKey), "Cache should exist before update #{$i}");
 
             // Update extension
-            $extension->voicemail_enabled = !$extension->voicemail_enabled;
+            $extension->voicemail_enabled = ! $extension->voicemail_enabled;
             $extension->save();
 
             // Verify cache was invalidated
@@ -267,12 +270,9 @@ class ExtensionCacheObserverTest extends TestCase
         $extension->extension_number = '1010';
         $extension->save();
 
-        // Assert - Due to how Laravel observers work, the observer receives the NEW
-        // extension_number (1010), so it invalidates the new cache (which doesn't exist).
-        // The old cache (1009) remains, which is acceptable because:
-        // - It will expire after TTL
-        // - No routing will match extension 1009 anymore (safe stale cache)
-        $this->assertTrue(Cache::has($oldCacheKey), 'Old cache remains due to observer limitation');
+        // Assert - the observer invalidates the old number too, so the stale entry cannot
+        // keep routing 1009 to the renamed extension.
+        $this->assertFalse(Cache::has($oldCacheKey), 'Old number is invalidated');
 
         // The new extension number won't have a cache entry until accessed
         $newCacheKey = "routing:extension:{$this->organization->id}:1010";
@@ -323,5 +323,57 @@ class ExtensionCacheObserverTest extends TestCase
         // Verify the observer has the cache service injected
         // (This is implicit through successful construction via DI)
         $this->assertTrue(true);
+    }
+
+    public function test_renaming_an_extension_invalidates_the_old_number(): void
+    {
+        $extension = Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'extension_number' => '2001',
+            'password' => 'test-password-123',
+        ]);
+        $this->cacheService->getExtension($this->organization->id, '2001');
+        $oldKey = "routing:extension:{$this->organization->id}:2001";
+        $this->assertTrue(Cache::has($oldKey));
+
+        $extension->update(['extension_number' => '2002']);
+
+        $this->assertFalse(Cache::has($oldKey));
+    }
+
+    public function test_updating_the_ai_assistant_invalidates_its_extension(): void
+    {
+        $assistant = AiAssistant::factory()->create(['organization_id' => $this->organization->id]);
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'extension_number' => '3001',
+            'password' => 'test-password-123',
+            'ai_assistant_id' => $assistant->id,
+        ]);
+        $this->cacheService->getExtension($this->organization->id, '3001');
+        $key = "routing:extension:{$this->organization->id}:3001";
+        $this->assertTrue(Cache::has($key));
+
+        $assistant->update(['name' => 'Renamed assistant']);
+
+        $this->assertFalse(Cache::has($key));
+    }
+
+    public function test_updating_the_user_invalidates_its_extension(): void
+    {
+        $user = User::factory()->create(['organization_id' => $this->organization->id]);
+        Extension::factory()->create([
+            'organization_id' => $this->organization->id,
+            'extension_number' => '4001',
+            'password' => 'test-password-123',
+            'user_id' => $user->id,
+        ]);
+        $this->cacheService->getExtension($this->organization->id, '4001');
+        $key = "routing:extension:{$this->organization->id}:4001";
+        $this->assertTrue(Cache::has($key));
+
+        $user->update(['name' => 'New Name']);
+
+        $this->assertFalse(Cache::has($key));
     }
 }

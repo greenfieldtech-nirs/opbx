@@ -17,7 +17,8 @@ class AutoDialerCampaignPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->role->canManageUsers();
+        // Read access: Owner, PBX Admin and Reporter only.
+        return $user->role->canViewReports();
     }
 
     /**
@@ -27,7 +28,7 @@ class AutoDialerCampaignPolicy
      */
     public function view(User $user, AutoDialerCampaign $campaign): bool
     {
-        return $user->organization_id === $campaign->organization_id;
+        return $user->organization_id === $campaign->organization_id && $user->role->canViewReports();
     }
 
     /**
@@ -161,18 +162,14 @@ class AutoDialerCampaignPolicy
             return false;
         }
 
-        // Cannot upload if campaign already has a list
-        if ($campaign->hasList()) {
-            return false;
-        }
-
         return true;
     }
 
     /**
-     * Determine whether the user can delete the list from the campaign.
+     * Determine whether the user can unassign a list from the campaign.
      *
-     * User must have manage permission and campaign must not be active.
+     * User must have manage permission; the list rules (campaign not active, entries not
+     * started) are checked by ListManagementService::unassignList().
      */
     public function deleteList(User $user, AutoDialerCampaign $campaign): bool
     {
@@ -184,11 +181,6 @@ class AutoDialerCampaignPolicy
             return false;
         }
 
-        // Cannot delete list if campaign is active
-        if ($campaign->status === CampaignStatus::ACTIVE) {
-            return false;
-        }
-
-        return $campaign->hasList();
+        return true;
     }
 }

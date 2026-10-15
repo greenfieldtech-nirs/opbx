@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\SocialIdentityProvider;
+
 /**
  * Application Configuration Service
  *
@@ -142,7 +144,8 @@ class ApplicationConfig
             'enabled' => true,
             'domain' => config('services.auth0.domain'),
             'client_id' => config('services.auth0.client_id'),
-            'providers' => config('services.auth0.providers', []),
+            // Only supported providers (google, github); other AUTH0_PROVIDERS values are ignored.
+            'providers' => array_values(array_intersect(config('services.auth0.providers', []), SocialIdentityProvider::values())),
         ];
     }
 

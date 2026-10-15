@@ -5,6 +5,8 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
 import { platformApi } from '@/services/platformApi';
 import type {
   PlatformOrganizationsParams,
@@ -20,7 +22,7 @@ import type {
  */
 export function usePlatformDashboard() {
   return useQuery({
-    queryKey: ['platform', 'dashboard'],
+    queryKey: [...queryKeys.platform.all, 'dashboard'],
     queryFn: () => platformApi.dashboard.getStats(),
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -31,7 +33,7 @@ export function usePlatformDashboard() {
  */
 export function usePlatformOrganizations(params?: PlatformOrganizationsParams) {
   return useQuery({
-    queryKey: ['platform', 'organizations', params],
+    queryKey: [...queryKeys.platform.all, 'organizations', params],
     queryFn: () => platformApi.organizations.getAll(params),
     staleTime: 60 * 1000, // 1 minute
   });
@@ -39,7 +41,7 @@ export function usePlatformOrganizations(params?: PlatformOrganizationsParams) {
 
 export function usePlatformOrganization(id: string) {
   return useQuery({
-    queryKey: ['platform', 'organization', id],
+    queryKey: [...queryKeys.platform.all, 'organization', id],
     queryFn: () => platformApi.organizations.getById(id),
     staleTime: 60 * 1000,
     enabled: !!id,
@@ -53,8 +55,7 @@ export function useUpdateOrganizationStatus() {
     mutationFn: ({ id, data }: { id: string; data: UpdateOrganizationStatusRequest }) =>
       platformApi.organizations.updateStatus(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'organizations'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     },
   });
 }
@@ -65,9 +66,8 @@ export function useUpdateOrganizationSettings() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateOrganizationSettingsRequest }) =>
       platformApi.organizations.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'organizations'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'organization', variables.id] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     },
   });
 }
@@ -77,7 +77,7 @@ export function useUpdateOrganizationSettings() {
  */
 export function usePlatformUsers(params?: PlatformUsersParams) {
   return useQuery({
-    queryKey: ['platform', 'users', params],
+    queryKey: [...queryKeys.platform.all, 'users', params],
     queryFn: () => platformApi.users.getAll(params),
     staleTime: 60 * 1000,
   });
@@ -88,7 +88,7 @@ export function usePlatformUsersByOrganization(
   params?: Omit<PlatformUsersParams, 'organization_id'>
 ) {
   return useQuery({
-    queryKey: ['platform', 'users', 'organization', organizationId, params],
+    queryKey: [...queryKeys.platform.all, 'users', 'organization', organizationId, params],
     queryFn: () => platformApi.users.getByOrganization(organizationId, params),
     staleTime: 60 * 1000,
     enabled: !!organizationId,
@@ -97,7 +97,7 @@ export function usePlatformUsersByOrganization(
 
 export function usePlatformUser(id: string) {
   return useQuery({
-    queryKey: ['platform', 'user', id],
+    queryKey: [...queryKeys.platform.all, 'user', id],
     queryFn: () => platformApi.users.getById(id),
     staleTime: 60 * 1000,
     enabled: !!id,
@@ -111,8 +111,8 @@ export function useCreatePlatformUser() {
     mutationFn: ({ organizationId, data }: { organizationId: string; data: unknown }) =>
       platformApi.users.create(organizationId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
+      void invalidateRoutingResources(queryClient); // tenant users / extensions / memberships change too
     },
   });
 }
@@ -124,7 +124,8 @@ export function useUpdatePlatformUser() {
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       platformApi.users.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'users'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
+      void invalidateRoutingResources(queryClient); // tenant users / extensions / memberships change too
     },
   });
 }
@@ -135,8 +136,8 @@ export function useDeletePlatformUser() {
   return useMutation({
     mutationFn: (id: string) => platformApi.users.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
+      void invalidateRoutingResources(queryClient); // tenant users / extensions / memberships change too
     },
   });
 }
@@ -148,8 +149,7 @@ export function useSetPlatformManager() {
     mutationFn: ({ id, data }: { id: string; data: SetPlatformManagerRequest }) =>
       platformApi.users.setPlatformManager(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['platform', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['platform', 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     },
   });
 }
@@ -166,8 +166,30 @@ export function useUpdateUserPassword() {
  */
 export function usePlatformAuditLogs(params?: PlatformAuditLogsParams) {
   return useQuery({
-    queryKey: ['platform', 'audit-logs', params],
+    queryKey: [...queryKeys.platform.all, 'audit-logs', params],
     queryFn: () => platformApi.auditLogs.getAll(params),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
+ * Platform Status (polls every 30s; react-query pauses polling while the tab is hidden)
+ */
+export function usePlatformStatus() {
+  return useQuery({
+    queryKey: queryKeys.platform.status(),
+    queryFn: () => platformApi.status.get(),
+    refetchInterval: 30 * 1000,
+  });
+}
+
+export function useRunPlatformStatusCheck() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => platformApi.status.checkNow(),
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(queryKeys.platform.status(), snapshot);
+    },
   });
 }

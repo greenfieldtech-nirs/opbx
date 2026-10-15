@@ -12,7 +12,7 @@ This section provides comprehensive documentation of the data structures in OPBX
 
 ## Categories
 
-### [Database Models](./models/index)
+### [Database Models](/opbx/data-models/models/index)
 
 Complete reference of all Eloquent models including:
 
@@ -21,7 +21,7 @@ Complete reference of all Eloquent models including:
 - Scopes and mutators
 - Business logic methods
 
-### [Enumerations](./enums/index)
+### [Enumerations](/opbx/data-models/enums/index)
 
 All PHP enums used throughout the application:
 
@@ -30,7 +30,7 @@ All PHP enums used throughout the application:
 - Strategy enums
 - Mode enums
 
-### [Configuration](./configuration/index)
+### [Configuration](/opbx/data-models/configuration/index)
 
 Configuration files and environment variables:
 
@@ -43,56 +43,61 @@ Configuration files and environment variables:
 
 ### Auto Dialer
 
-- [AutoDialerCampaign](./models/auto-dialer-campaign) — Campaign configuration
-- [AutoDialerCampaignCallerId](./models/auto-dialer-campaign-caller-id) — Caller ID pool entries
-- [AutoDialerCallerIdStat](./models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
-- AutoDialerList (`App\Models\AutoDialerList`) — Distribution lists
-- AutoDialerDestination (`App\Models\AutoDialerDestination`) — List destinations
+- [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign) — Campaign configuration
+- [AutoDialerCampaignCallerId](/opbx/data-models/models/auto-dialer-campaign-caller-id) — Caller ID pool entries
+- [AutoDialerCallerIdStat](/opbx/data-models/models/auto-dialer-caller-id-stat) — Per-Caller ID statistics
+- [AutoDialerList](/opbx/data-models/models/auto-dialer-lists#autodialerlist) — Distribution lists
+- [AutoDialerDestination](/opbx/data-models/models/auto-dialer-lists#autodialerdestination) — List destinations
+- [AutoDialerListVersion](/opbx/data-models/models/auto-dialer-lists#autodialerlistversion) — Previous versions of a list, and their numbers
 
 ### Core PBX
 
-- Extension (`App\Models\Extension`) — PBX extensions
-- DidNumber (`App\Models\DidNumber`) — Phone numbers
-- RingGroup (`App\Models\RingGroup`) — Ring group configuration
-- IvrMenu (`App\Models\IvrMenu`) — IVR menu structure
-- BusinessHoursSchedule (`App\Models\BusinessHoursSchedule`) — Business hours
+- [Extension](/opbx/data-models/models/extensions-and-numbers#extension) — PBX extensions
+- [DidNumber](/opbx/data-models/models/extensions-and-numbers#didnumber) — Phone numbers
+- [RingGroup](/opbx/data-models/models/ring-groups#ringgroup) — Ring group configuration
+- [IvrMenu](/opbx/data-models/models/ivr-menus#ivrmenu) — IVR menu structure
+- [BusinessHoursSchedule](/opbx/data-models/models/business-hours#businesshoursschedule) — Business hours
+- [CallQueue](/opbx/data-models/models/call-queues#callqueue) — Call queues (live state is in the ACD worker)
 
 ### AI Integration
 
-- AiAssistant (`App\Models\AiAssistant`) — AI assistant configuration
-- AiAssistantLoadBalancer (`App\Models\AiAssistantLoadBalancer`) — Load balancer setup
+- [AiAssistant](/opbx/data-models/models/ai-assistants#aiassistant) — AI assistant configuration
+- [AiAssistantLoadBalancer](/opbx/data-models/models/ai-assistants#aiassistantloadbalancer) — Load balancer setup
 
 ### Users & Organizations
 
-- User (`App\Models\User`) — User accounts
-- Organization (`App\Models\Organization`) — Multi-tenant organizations
-- [CloudonixSettings](./models/cloudonix-settings) — Cloudonix credentials per org
+- [User](/opbx/data-models/models/users-and-organizations#user) — User accounts
+- [Organization](/opbx/data-models/models/users-and-organizations#organization) — Multi-tenant organizations
+- [CloudonixSettings](/opbx/data-models/models/cloudonix-settings) — Cloudonix credentials per org
 
 ### Call & Logging
 
-- CallDetailRecord (`App\Models\CallDetailRecord`) — CDR from Cloudonix
-- [SessionUpdate](./models/session-updates) — Real-time session events
-- [CallNotificationsSettings](./models/call-notifications-settings) — Webhook notification config
-- CallNotificationLog (`App\Models\CallNotificationLog`) — Notification delivery log
-- [EmailLog](./models/email-logs) — Transactional email log
-- [PlatformAuditLog](./models/platform-audit-logs) — Cross-tenant audit trail
-
-### Call Tracking
-
-- [CallTrackingCampaign](./models/call-tracking-campaign) — Marketing campaign attribution
-- [CallTrackingNumber](./models/call-tracking-number) — DID-to-campaign assignment
-- [CallTrackingSession](./models/call-tracking-session) — Attributed call session
-- [CallTrackingNotificationSettings](./models/call-tracking-notification-settings) — Per-campaign webhook settings
-- CallTrackingNotificationLog (`App\Models\CallTrackingNotificationLog`) — Notification delivery log
-- CallTrackingAdPlatformIntegration (`App\Models\CallTrackingAdPlatformIntegration`) — Google Ads / Meta settings
+- [CallDetailRecord](/opbx/data-models/models/call-detail-record) — CDR from Cloudonix, with the warm archive table
+- [SessionUpdate](/opbx/data-models/models/session-updates) — Real-time session events
+- [CallNotificationsSettings](/opbx/data-models/models/call-notifications-settings) — Webhook notification config
+- [CallNotificationLog](/opbx/data-models/models/logs-and-integrations#callnotificationlog) — Notification delivery log
+- [EmailLog](/opbx/data-models/models/email-logs) — Transactional email log
+- [PlatformAuditLog](/opbx/data-models/models/platform-audit-logs) — Cross-tenant audit trail
+- [PlatformHealthCheck](/opbx/data-models/models/platform-health-check) — Platform Status history
 
 ### Security
 
-- InboundBlacklist (`App\Models\InboundBlacklist`) — Blocked caller patterns
-- OutboundWhitelist (`App\Models\OutboundWhitelist`) — Outbound routing rules
-- BlockedCallLog (`App\Models\BlockedCallLog`) — Log of blocked calls
+- [InboundBlacklist](/opbx/data-models/models/security#inboundblacklist) — Blocked caller patterns
+- [OutboundWhitelist](/opbx/data-models/models/security#outboundwhitelist) — Outbound routing rules
+- [BlockedCallLog](/opbx/data-models/models/security#blockedcalllog) — Log of blocked calls
 
 ## Recently Added
+
+### Call Record Tiers and Platform Status (2026-10)
+
+| Change | Purpose |
+|--------|---------|
+| `archived_call_detail_records` | Warm tier for call records 6-12 months old |
+| `direction` on `call_detail_records` | Call direction, copied from the session update |
+| `platform_health_checks` | Platform Status history |
+| `unavailable` destination type | Added to every routing destination enum column |
+
+The unused `VoiceAgent` model was removed; AI assistants are `AiAssistant`.
 
 ### Caller ID Pooling (v2026.04)
 
@@ -103,4 +108,4 @@ New models supporting multiple Caller IDs per campaign:
 | `AutoDialerCampaignCallerId` | Pivot table linking campaigns to DIDs |
 | `AutoDialerCallerIdStat` | Tracks call statistics per Caller ID |
 
-See [Auto Dialer Campaigns](../modules/auto-dialer-campaigns) for usage documentation.
+See [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) for usage documentation.

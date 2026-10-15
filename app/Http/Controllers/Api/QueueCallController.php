@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -35,25 +37,11 @@ class QueueCallController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = QueueCall::withoutGlobalScope(OrganizationScope::class)
-            ->where('organization_id', $user->organization_id)
-            ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
-            ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
-            ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
-            ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to))
-            ->orderByDesc('entered_at');
+        $query = $this->filtered($request, $user->organization_id);
 
         $rows = $query->paginate((int) $request->input('per_page', 20));
 
-        return response()->json([
-            'data' => $rows->map(fn (QueueCall $call) => $this->row($call))->values(),
-            'meta' => [
-                'current_page' => $rows->currentPage(),
-                'per_page' => $rows->perPage(),
-                'total' => $rows->total(),
-                'last_page' => $rows->lastPage(),
-            ],
-        ]);
+        return $this->paginatedResponse($rows, $rows->map(fn (QueueCall $call) => $this->row($call))->values());
     }
 
     /**
@@ -79,13 +67,7 @@ class QueueCallController extends Controller
             fputcsv($out, ['Queue Call ID', 'Queue ID', 'Call ID', 'From', 'To', 'Entered At', 'Answered At',
                 'Abandoned At', 'Ended At', 'Agent User ID', 'Waiting Seconds', 'Handling Seconds', 'Disposition']);
 
-            QueueCall::withoutGlobalScope(OrganizationScope::class)
-                ->where('organization_id', $user->organization_id)
-                ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
-                ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
-                ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
-                ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to))
-                ->orderByDesc('entered_at')
+            $this->filtered($request, $user->organization_id)
                 ->chunk(1000, function ($rows) use ($out) {
                     foreach ($rows as $call) {
                         fputcsv($out, [
@@ -111,6 +93,22 @@ class QueueCallController extends Controller
     }
 
     /**
+     * Report rows for the organization, newest first. The `to` day is inclusive (up to its end).
+     *
+     * @return Builder<QueueCall>
+     */
+    private function filtered(Request $request, int $organizationId): Builder
+    {
+        return QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->when($request->filled('queue_id'), fn ($q) => $q->where('call_queue_id', (int) $request->input('queue_id')))
+            ->when($request->filled('disposition'), fn ($q) => $q->where('disposition', $request->input('disposition')))
+            ->when($request->date('from'), fn ($q, $from) => $q->where('entered_at', '>=', $from))
+            ->when($request->date('to'), fn ($q, $to) => $q->where('entered_at', '<=', $to->endOfDay()))
+            ->orderByDesc('entered_at');
+    }
+
+    /**
      * Queue reports are readable by the same roles that can view queues.
      */
     private function guard(Request $request): void
@@ -119,7 +117,7 @@ class QueueCallController extends Controller
 
         abort_unless(
             $role->canManageConfiguration() || $role->canViewReports()
-                || $role === \App\Enums\UserRole::PBX_USER,
+                || $role === UserRole::PBX_USER,
             403
         );
     }

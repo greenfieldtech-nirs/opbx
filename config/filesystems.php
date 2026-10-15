@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -47,15 +49,36 @@ return [
             'report' => false,
         ],
 
+        // Copies of a distribution list's entries kept when the list is re-uploaded.
+        'list_backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups/lists'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'recordings' => [
             'driver' => 's3',
             'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('MINIO_REGION', 'us-east-1'),
             'bucket' => env('MINIO_BUCKET', 'recordings'),
-            'endpoint' => env('MINIO_ENDPOINT', 'http://minio:9000'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://seaweedfs:8333'),
             'use_path_style_endpoint' => env('MINIO_USE_PATH_STYLE', true),
             'throw' => false,
+            'report' => false,
+            'visibility' => 'private',
+        ],
+
+        'cdr_archive' => [
+            'driver' => 's3',
+            'key' => env('MINIO_ACCESS_KEY', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('MINIO_SECRET_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('MINIO_REGION', 'us-east-1'),
+            'bucket' => env('CDR_ARCHIVE_BUCKET', 'cdr-archive'),
+            'endpoint' => env('MINIO_ENDPOINT', 'http://seaweedfs:8333'),
+            'use_path_style_endpoint' => env('MINIO_USE_PATH_STYLE', true),
+            'throw' => true,
             'report' => false,
             'visibility' => 'private',
         ],

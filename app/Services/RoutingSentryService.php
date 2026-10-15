@@ -15,8 +15,8 @@ class RoutingSentryService
     /**
      * Check if an inbound call is allowed to proceed.
      *
-     * @param Request $request The incoming webhook request
-     * @param DidNumber $did The DID number being called
+     * @param  Request  $request  The incoming webhook request
+     * @param  DidNumber  $did  The DID number being called
      * @return array{allowed: bool, reason?: string} Check result with optional reason
      */
     public function checkInbound(Request $request, DidNumber $did): array

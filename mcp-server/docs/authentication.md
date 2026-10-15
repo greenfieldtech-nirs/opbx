@@ -9,7 +9,7 @@ it (in-memory, per request) to the OPBX REST API.
 ### 1. Sanctum Personal Access Token (`id|token…`)
 
 - Resolved via `GET /api/v1/auth/me` → `{ user: { id, organization_id, role, status, is_platform_manager, organization } }`.
-- Identity cached for `AUTH_IDENTITY_CACHE_TTL_SECONDS` (default 300s), keyed by
+- Identity cached for `AUTH_IDENTITY_CACHE_TTL_SECONDS` (default 30s), keyed by
   SHA-256 of the token, in memory only.
 - **Lifecycle caveat (upstream):** PATs expire after 24h and are revoked by any
   login/refresh/password change on that account. Prefer API keys for long-lived agents.

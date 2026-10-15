@@ -153,6 +153,18 @@ class UpdateConferenceRoomRequest extends FormRequest
                 );
             }
 
+            // Waiting for a host needs a host PIN. Fields not sent keep the stored value, so
+            // legacy rooms are only rejected when this update touches wait_for_host / host_pin.
+            $room = $this->route('conference_room');
+            $waitForHost = $this->has('wait_for_host') ? (bool) $this->input('wait_for_host') : (bool) $room->wait_for_host;
+            $hostPin = $this->has('host_pin') ? $this->input('host_pin') : $room->host_pin;
+            if (($this->has('wait_for_host') || $this->has('host_pin')) && $waitForHost && blank($hostPin)) {
+                $validator->errors()->add(
+                    'host_pin',
+                    'A host PIN is required when waiting for the host is enabled.'
+                );
+            }
+
             // If talk detection is enabled, ensure webhook URL is provided
             if ($this->input('talk_detection_enabled') && ! $this->filled('talk_detection_webhook_url')) {
                 $validator->errors()->add(

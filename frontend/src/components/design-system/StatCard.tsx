@@ -77,12 +77,12 @@ export function StatCard({
     return (
       <Card className={cn('animate-pulse', className)}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div className="h-4 w-24 bg-neutral-200 rounded" />
+          <div className="h-4 w-24 bg-neutral-200 rounded-sm" />
           <div className="h-10 w-10 bg-neutral-200 rounded-lg" />
         </CardHeader>
         <CardContent>
-          <div className="h-8 w-16 bg-neutral-200 rounded mb-1" />
-          {description && <div className="h-3 w-32 bg-neutral-200 rounded" />}
+          <div className="h-8 w-16 bg-neutral-200 rounded-sm mb-1" />
+          {description && <div className="h-3 w-32 bg-neutral-200 rounded-sm" />}
         </CardContent>
       </Card>
     );

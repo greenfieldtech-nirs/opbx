@@ -25,7 +25,8 @@ interface Props {
 const EVENT_OPTIONS = [
   { value: 'call.received', label: 'Call Received' },
   { value: 'call.answered', label: 'Call Answered' },
-  { value: 'call.completed', label: 'Call Completed' },
+  { value: 'call.missed', label: 'Call Missed' },
+  { value: 'call.failed', label: 'Call Failed' },
   { value: 'call.converted', label: 'Call Converted' },
 ];
 
@@ -103,7 +104,7 @@ export function CallTrackingNotificationSettingsForm({ settings, onSubmit, isSub
             <label
               key={option.value}
               htmlFor={`event-${option.value}`}
-              className="flex items-center gap-2 border rounded px-3 py-2 cursor-pointer"
+              className="flex items-center gap-2 border rounded-sm px-3 py-2 cursor-pointer"
             >
               <Checkbox
                 id={`event-${option.value}`}

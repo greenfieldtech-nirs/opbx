@@ -1,0 +1,20 @@
+description: |
+  The resource is still referenced by other resources (routing, extensions, campaigns,
+  and so on) and cannot be deleted. Nothing is deleted. The `references` array lists
+  what still points at the resource; remove those references and retry.
+content:
+  application/json:
+    schema:
+      $ref: '../schemas/ResourceInUseError.yaml'
+    example:
+      error: Cannot delete IVR menu
+      message: 'This IVR menu is still used by: ring group "Sales" (fallback); extension "1001" (no-answer destination). Remove these references first.'
+      references:
+        - type: ring_group
+          id: 7
+          name: Sales
+          detail: fallback
+        - type: extension
+          id: 12
+          name: '1001'
+          detail: no-answer destination

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,15 +21,9 @@ type Config struct {
 	RedisDB       int
 
 	// Worker Configuration
-	WorkerID        string
-	PollInterval    time.Duration
-	HealthCheckPort string
-	WebhookPort     string
-	WebhookSecret   string
-
-	// Retry Configuration (per spec)
-	RetryIntervals []time.Duration
-	MaxRetries     int
+	WorkerID     string
+	PollInterval time.Duration
+	WebhookPort  string
 }
 
 // Load loads configuration from environment variables
@@ -43,20 +38,9 @@ func Load() (*Config, error) {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 		RedisDB:       getEnvInt("REDIS_DB", 0),
 
-		WorkerID:        getEnv("WORKER_ID", "worker-1"),
-		PollInterval:    getEnvDuration("POLL_INTERVAL", 10*time.Second),
-		HealthCheckPort: getEnv("HEALTH_CHECK_PORT", "8080"),
-		WebhookPort:     getEnv("WEBHOOK_PORT", "8081"),
-		WebhookSecret:   getEnv("WEBHOOK_SECRET", ""),
-
-		// Per spec: 5min → 15min → 60min → 24hr
-		RetryIntervals: []time.Duration{
-			5 * time.Minute,
-			15 * time.Minute,
-			60 * time.Minute,
-			24 * time.Hour,
-		},
-		MaxRetries: 4,
+		WorkerID:     getEnv("WORKER_ID", "worker-1"),
+		PollInterval: getEnvDuration("POLL_INTERVAL", 10*time.Second),
+		WebhookPort:  getEnv("WEBHOOK_PORT", "8081"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -74,6 +58,9 @@ func (c *Config) Validate() error {
 	}
 	if c.LaravelAPIToken == "" {
 		return fmt.Errorf("LARAVEL_API_TOKEN is required")
+	}
+	if strings.Contains(c.LaravelAPIToken, "change-in-production") {
+		return fmt.Errorf("LARAVEL_API_TOKEN is a shipped default; set a real secret")
 	}
 
 	// Validate Redis configuration
@@ -94,13 +81,9 @@ func (c *Config) Validate() error {
 	if c.PollInterval <= 0 {
 		return fmt.Errorf("POLL_INTERVAL must be positive")
 	}
-	if c.HealthCheckPort == "" {
-		return fmt.Errorf("HEALTH_CHECK_PORT is required")
-	}
 	if c.WebhookPort == "" {
 		return fmt.Errorf("WEBHOOK_PORT is required")
 	}
-	// Note: WEBHOOK_SECRET is optional - only required if webhook signature verification is enabled
 
 	return nil
 }

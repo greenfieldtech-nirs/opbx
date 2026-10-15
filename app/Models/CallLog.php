@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CallStatus;
+use App\Events\CallAnswered;
+use App\Events\CallEnded;
 use App\Scopes\OrganizationScope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -102,5 +104,60 @@ class CallLog extends Model
     public function isCompleted(): bool
     {
         return $this->status->isTerminal();
+    }
+
+    /**
+     * The call log of a call, matched by any of its Cloudonix identifiers (session token, call IDs).
+     *
+     * @param  array<int, mixed>  $callIds
+     */
+    public static function forCall(int $organizationId, array $callIds): ?self
+    {
+        $callIds = array_values(array_filter($callIds, fn ($id) => is_string($id) && $id !== ''));
+
+        return $callIds === [] ? null : static::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->whereIn('call_id', $callIds)
+            ->first();
+    }
+
+    /** Marks the call answered and broadcasts call.answered, only the first time and only while it has not ended. */
+    public function markAnswered(): void
+    {
+        $won = static::withoutGlobalScopes()->whereKey($this->id)->whereNull('answered_at')->whereNull('ended_at')
+            ->update(['status' => CallStatus::ANSWERED->value, 'answered_at' => now()]);
+
+        if ($won) {
+            event(new CallAnswered($this->refresh()));
+        }
+    }
+
+    /**
+     * Marks the call ended and broadcasts call.ended, only the first time.
+     *
+     * @param  string  $outcome  Cloudonix session status or CDR disposition
+     */
+    public function markEnded(string $outcome, ?int $duration = null): void
+    {
+        $won = static::withoutGlobalScopes()->whereKey($this->id)->whereNull('ended_at')->update([
+            'status' => $this->endStatus($outcome)->value,
+            'ended_at' => now(),
+            'duration' => $duration ?? $this->duration,
+        ]);
+
+        if ($won) {
+            event(new CallEnded($this->refresh()));
+        }
+    }
+
+    private function endStatus(string $outcome): CallStatus
+    {
+        return match (str_replace([' ', '_', '-'], '', strtoupper($outcome))) {
+            'CONNECTED', 'CONNECT', 'ANSWER', 'ANSWERED', 'ACTIVE' => CallStatus::COMPLETED,
+            'COMPLETED', 'HANGUP', 'BYE' => $this->answered_at ? CallStatus::COMPLETED : CallStatus::NO_ANSWER,
+            'BUSY' => CallStatus::BUSY,
+            'NOANSWER', 'CANCEL', 'CANCELLED', 'CANCELED' => CallStatus::NO_ANSWER,
+            default => CallStatus::FAILED,
+        };
     }
 }

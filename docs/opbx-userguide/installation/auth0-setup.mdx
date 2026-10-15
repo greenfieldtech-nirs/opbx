@@ -21,17 +21,14 @@ Before you start:
 
 ## Supported Providers
 
-OPBX can syndicate authentication through the following social connections:
+OPBX supports two social connections:
 
 | OPBX Provider | Auth0 Connection | Typical Email Verification |
 |---------------|------------------|----------------------------|
 | Google        | `google-oauth2`  | Verified by default        |
-| Facebook      | `facebook`       | Depends on Auth0 setup     |
-| Microsoft     | `windowslive`    | Verified by default        |
 | GitHub        | `github`         | Depends on Auth0 setup     |
-| X             | `twitter`        | Depends on Auth0 setup     |
 
-The providers that actually appear on the login and registration pages are controlled by the `AUTH0_PROVIDERS` environment variable.
+Each provider in `AUTH0_PROVIDERS` gets a button on the login and register pages and is listed under **Linked Accounts** on the profile. Other values (for example `facebook`, `microsoft` or `x`) are ignored, and the API refuses them with 422 "The selected provider is invalid."
 
 ## Auth0 Application Setup
 
@@ -49,7 +46,7 @@ The providers that actually appear on the login and registration pages are contr
 | Allowed Origins (CORS) | `https://your-opbx-domain` |
 
 6. Go to **Authentication > Social** and enable each provider you want to support. Configure the provider's own API keys or secrets where Auth0 asks for them.
-7. For each social connection, ensure it returns `email_verified: true` for verified email addresses. Google and Microsoft usually do this by default; Facebook, GitHub, and X may need additional configuration.
+7. For each social connection, ensure it returns `email_verified: true` for verified email addresses. Google usually does this by default; GitHub may need additional configuration.
 
 :::info Redirect URI
 The callback must point to the frontend route `/ui/auth/callback`. This page exchanges the OAuth code with the backend. The value you enter in Auth0 must exactly match the `AUTH0_REDIRECT_URI` environment variable.
@@ -66,17 +63,17 @@ AUTH0_DOMAIN=your-tenant.us.auth0.com
 AUTH0_CLIENT_ID=your-client-id
 AUTH0_CLIENT_SECRET=your-client-secret
 AUTH0_REDIRECT_URI=https://your-opbx-domain/ui/auth/callback
-AUTH0_PROVIDERS=google,facebook,microsoft,github,x
+AUTH0_PROVIDERS=google,github
 
 # Optional invitation tuning
 OPBX_INVITE_TOKEN_TTL_HOURS=24
 OPBX_INVITE_RATE_LIMIT_PER_HOUR=10
 ```
 
-After editing `.env`, clear the configuration cache:
+After editing `.env`, recreate the app containers so they read the new values (the entrypoint also clears the config cache):
 
 ```bash
-php artisan config:clear
+docker compose up -d --force-recreate app queue-worker queue-worker-long scheduler
 ```
 
 ## Verify Frontend Configuration
@@ -90,32 +87,39 @@ The frontend reads SaaS and Auth0 state from `/api/v1/config/application`. Open 
     "enabled": true,
     "domain": "your-tenant.us.auth0.com",
     "client_id": "your-client-id",
-    "redirect_uri": "https://your-opbx-domain/ui/auth/callback",
-    "providers": ["google", "facebook", "microsoft", "github", "x"]
+    "providers": ["google", "github"]
   }
 }
 ```
 
-If `auth0.enabled` is `false`, confirm that all `AUTH0_*` variables are set and the config cache is cleared.
+`saas_enabled` and `auth0.enabled` both follow `OPBX_SAAS_ENABLED` alone. If they are `false`, check that variable and recreate the containers. If they are `true` but a provider button fails, check the `AUTH0_*` values: when `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` or `AUTH0_REDIRECT_URI` is empty, the Auth0 endpoints fail with "Auth0 is enabled but missing required configuration." (logged as a server error).
 
 ## Login and Signup Flow
 
-Once configured, the **Login** (`/ui/login`) and **Register** (`/ui/register`) pages display social-provider buttons:
+Once configured, the **Login** (`/ui/login`) and **Register** (`/ui/register`) pages show the Google and GitHub buttons (those listed in `AUTH0_PROVIDERS`):
 
 1. The user clicks a provider button.
 2. The frontend calls `POST /v1/auth/auth0/redirect`.
 3. The backend builds an Auth0 `/authorize` URL with PKCE and redirects the user to Auth0.
 4. The user authenticates with the social provider and is redirected back to `/ui/auth/callback`.
 5. The frontend sends the authorization `code` and `state` to `GET /v1/auth/auth0/callback`.
-6. The backend resolves the profile and either logs the user in, creates an organization, or sends the user to onboarding.
+6. The backend resolves the profile:
+   - a social account already linked to an OPBX user signs that user in;
+   - from the **Register** page, a new email creates a new organization (named after the email, time zone UTC) with the user as its **Owner**;
+   - from the **Login** page, a new email opens the **Complete your account** page (onboarding), where the user creates an organization or requests to join one;
+   - an email that already belongs to a password account is refused: the user signs in with the password and links the provider in the profile.
+
+The end-user screens and messages are described in [Auth0 Syndicated Authentication](/opbx/modules/auth0-syndicated-auth).
+
+{/* SCREENSHOT: auth0-login-buttons — sign-in page with email and password fields and the Google and GitHub buttons below */}
 
 ## Linking and Unlinking Identities
 
 Users who originally registered with an email and password can still use social login after linking their account:
 
 1. Log in with the existing email and password.
-2. Go to **Profile** settings and open **Linked Accounts**.
-3. Click **Connect** next to the desired provider.
+2. Open **Profile** from the user menu (top right) and find the **Linked Accounts** card.
+3. Click **Connect** next to the desired provider (Google or GitHub).
 4. Complete the Auth0 flow with the **same verified email address**.
 5. The social identity is now linked; future logins can use that provider.
 
@@ -125,24 +129,17 @@ To remove a linked provider, click **Disconnect** in **Linked Accounts**. The un
 
 ### Inviting a User
 
-Owners and PBX Admins can invite users by email:
-
-1. Go to **Users** in the sidebar.
-2. Click **Invite User**.
-3. Enter the email address and send the invitation.
-
-OPBX creates a pending user and sends a magic-link email. When the invitee accepts, they complete Auth0 authentication with the invited email address and are activated as a **PBX User**.
+Owners and PBX Admins invite users by email from the **Users** page (**Invite User**; the button is disabled while SaaS mode is off). OPBX creates a pending user and sends a magic-link email. When the invitee accepts, they complete Auth0 authentication with the invited email address and are activated as a **PBX User**. The step-by-step workflow is in [User Management](/opbx/modules/user-management#invite-a-user).
 
 ### Requesting to Join an Organization
 
 New users who do not want to create their own organization can request to join an existing one:
 
-1. Click a social provider on `/ui/register`.
-2. On the onboarding page, choose **Request to join an organization**.
-3. Enter the organization's slug.
-4. Submit the request.
+1. Click a social provider button on the **Login** page (`/ui/login`). The **Register** page always creates a new organization instead.
+2. On the **Complete your account** page, enter the **Organization slug** (for example `acme-corp`).
+3. Click **Request to join organization**. The toast says "Join request submitted. Please wait for approval."
 
-An Owner or PBX Admin of the target organization can approve or reject the request. Once approved, the user receives an access token and can log in.
+An Owner or PBX Admin of the target organization approves or rejects the request. There is no screen for this; use the API (`GET /v1/organizations/join-requests`, then `POST /v1/organizations/join-requests/{id}/approve` or `/reject`). Approval creates an active **PBX User** linked to that social account; the person then signs in with the same provider. OPBX does not email the requester about the decision.
 
 ## Configuration Reference
 
@@ -153,7 +150,7 @@ An Owner or PBX Admin of the target organization can approve or reject the reque
 | `AUTH0_CLIENT_ID` | Yes (if SaaS enabled) | — | Client ID of the Auth0 Regular Web Application. |
 | `AUTH0_CLIENT_SECRET` | Yes (if SaaS enabled) | — | Client secret of the Auth0 application. |
 | `AUTH0_REDIRECT_URI` | Yes (if SaaS enabled) | — | Must match the **Allowed Callback URL** in Auth0. Use the frontend route `/ui/auth/callback`. |
-| `AUTH0_PROVIDERS` | Yes (if SaaS enabled) | — | Comma-separated list of enabled providers, e.g. `google,github`. |
+| `AUTH0_PROVIDERS` | Yes (if SaaS enabled) | *(empty)* | Comma-separated list of enabled providers: `google` and/or `github`. Other values are ignored. `.env.example` lists both. |
 | `OPBX_INVITE_TOKEN_TTL_HOURS` | No | `24` | Lifetime of invitation magic links, in hours. |
 | `OPBX_INVITE_RATE_LIMIT_PER_HOUR` | No | `10` | Maximum invitations per organization per hour. |
 
@@ -168,11 +165,14 @@ An Owner or PBX Admin of the target organization can approve or reject the reque
 | POST | `/v1/users/invite` | Invite a user by email |
 | GET | `/v1/users/invite/validate` | Validate an invitation token |
 | POST | `/v1/users/invite/accept` | Accept an invitation and start Auth0 binding |
+| POST | `/v1/organizations/join-requests` | Submit a join request from onboarding |
+| GET | `/v1/organizations/join-requests` | List pending join requests (Owner, PBX Admin) |
+| POST | `/v1/organizations/join-requests/{id}/approve`, `/reject` | Approve or reject a join request (Owner, PBX Admin) |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for request/response schemas.
 
 ## Related Modules
 
-- [First Login](./first-login) — Create the first organization and local admin account
-- [User Management](../modules/user-management) — Manage users, roles, and local invitations
-- [Auth0 Syndicated Authentication](../modules/auth0-syndicated-auth) — End-user flows and permissions
+- [First Login](/opbx/installation/first-login) — Create the first organization and local admin account
+- [User Management](/opbx/modules/user-management) — Manage users, roles, and local invitations
+- [Auth0 Syndicated Authentication](/opbx/modules/auth0-syndicated-auth) — End-user flows and permissions

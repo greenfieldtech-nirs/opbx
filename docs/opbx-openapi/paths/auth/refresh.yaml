@@ -5,45 +5,32 @@ paths:
         - Authentication
       summary: Refresh authentication
       description: |
-        Refresh authentication credentials.
-        
-        Supports both authentication modes:
-        - Cookie-based: Regenerates session, extends cookie expiration
-        - Token-based: Revokes current token and issues a new one
-        
-        Token expires in 24 hours (1440 minutes).
+        Refresh the Bearer token: revokes the current token and issues a new one
+        with role-scoped abilities (no `user` in the response).
+
+        The new token keeps the lifetime of the current one: 24 hours, or 30 days for a
+        token issued by a "Remember me" login. Not rate limited.
       operationId: refreshAuth
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Authentication refreshed successfully
           content:
             application/json:
               schema:
-                oneOf:
-                  - title: Cookie Auth Response
-                    type: object
-                    properties:
-                      message:
-                        type: string
-                        example: Session refreshed successfully
-                      user:
-                        $ref: '../../components/schemas/User.yaml'
-                  - title: Token Auth Response
-                    type: object
-                    properties:
-                      access_token:
-                        type: string
-                        description: New bearer token
-                        example: 1|new_laravel_sanctum_token_abc456
-                      token_type:
-                        type: string
-                        example: Bearer
-                      expires_in:
-                        type: integer
-                        description: Token expiration in seconds
-                        example: 86400
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    description: New bearer token
+                    example: 1|new_laravel_sanctum_token_abc456
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    description: Token lifetime in seconds (86400, or 2592000 for a "Remember me" token)
+                    example: 86400
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'

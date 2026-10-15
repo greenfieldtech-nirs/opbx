@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Platform;
 
 use App\Enums\OrganizationStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\ApplyOperateAsOrganization;
 use App\Models\Organization;
 use App\Services\PlatformAuditService;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +20,7 @@ use Illuminate\Http\Response;
  * (platform-owner impersonation) feature. These endpoints DO NOT themselves
  * change server-side scope; the actual context switch is driven by the
  * `X-Operate-As-Organization` header on subsequent requests (see
- * {@see \App\Http\Middleware\ApplyOperateAsOrganization}). Their responsibility
+ * {@see ApplyOperateAsOrganization}). Their responsibility
  * is to validate the target organization and to write the audit trail.
  */
 class PlatformOperateAsController extends Controller

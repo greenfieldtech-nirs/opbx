@@ -1,0 +1,99 @@
+paths:
+  /callbacks/voice/conference-pin:
+    post:
+      tags:
+      - Voice Routing
+      summary: Conference PIN callback
+      description: 'Handle the digits a caller entered at a conference room PIN prompt.
+
+        Cloudonix calls this as the `<Gather>` action of the PIN prompt that conference routing returns.
+
+
+        - The room host PIN joins the caller as host (also when the room has no participant PIN but waits for a host).
+
+        - Without a participant PIN, any other input joins the caller as a participant.
+
+        - The room PIN joins the caller as a participant.
+
+        - A wrong PIN repeats the prompt; after 3 wrong attempts the call is hung up.
+
+        - An inactive or unknown room gets a "closed" message.
+
+
+        Query Parameters:
+
+        - `room_id`: Conference room ID
+
+        - `attempt`: Attempt number (starts at 1)
+
+
+        Authentication: `voiceWebhookAuth` (Bearer `domain_requests_api_key`). Unexpected exceptions
+        answer 200 CXML (`We are sorry, an error occurred...`). Not rate-limited.
+
+        '
+      operationId: conferencePinCallback
+      security:
+      - voiceWebhookAuth: []
+      parameters:
+      - name: room_id
+        in: query
+        required: true
+        schema:
+          type: integer
+        description: Conference room ID
+        example: 7
+      - name: attempt
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 3
+          default: 1
+        description: PIN attempt number
+        example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: No FormRequest validates this body. It must be JSON because the authentication middleware reads `Domain` and `To` from it.
+              properties:
+                CallSid:
+                  type: string
+                  description: Unique call identifier from Cloudonix
+                  example: CA550e8400e29b41d4a716446655440000
+                Digits:
+                  type: string
+                  description: Digits the caller entered (empty when the prompt timed out)
+                  example: '4321'
+                Domain:
+                  type: string
+                  description: Cloudonix domain name or UUID (required by the authentication middleware)
+                  example: acme.cloudonix.net
+                To:
+                  type: string
+                  description: Called number (required by the authentication middleware)
+                From:
+                  type: string
+                  description: Caller number
+      responses:
+        '200':
+          description: CXML that joins the conference, repeats the PIN prompt, or hangs up
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+        '400':
+          description: '`Domain` or `To` missing (CXML)'
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml
+        '401':
+          description: Missing or invalid Bearer token, unknown domain, or no `domain_requests_api_key` configured (CXML)
+          content:
+            application/xml:
+              schema:
+                $ref: ../../components/schemas/cxml/CxmlResponse.yaml

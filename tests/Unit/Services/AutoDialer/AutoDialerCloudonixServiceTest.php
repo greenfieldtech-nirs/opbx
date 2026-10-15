@@ -13,6 +13,7 @@ use App\Models\OutboundWhitelist;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\PhoneNumberService;
 use App\Services\VoiceRouting\OutboundRoutingService;
+use Carbon\Carbon;
 use Mockery;
 use Tests\TestCase;
 
@@ -52,7 +53,7 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $this->settings = new CloudonixSettings([
             'organization_id' => $this->organization->id,
             'domain_uuid' => 'test-domain-uuid-123',
-            'domain_api_key' => 'XIBB0E3CD4FB1F46698DE5FC51B49A012E',
+            'domain_api_key' => 'XI-test-not-a-real-key',
             'domain_name' => 'test.cloudonix.io',
         ]);
         $this->settings->id = 1;
@@ -60,7 +61,7 @@ class AutoDialerCloudonixServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        \Mockery::close();
+        Mockery::close();
         parent::tearDown();
     }
 
@@ -262,13 +263,30 @@ class AutoDialerCloudonixServiceTest extends TestCase
         $this->assertArrayHasKey('deadline', $payload);
 
         // Deadline must be a valid ISO-8601 timestamp, 5 minutes ahead of now.
-        $deadline = \Carbon\Carbon::parse($payload['deadline']);
+        $deadline = Carbon::parse($payload['deadline']);
         $this->assertEqualsWithDelta(
             now()->addMinutes(5)->getTimestamp(),
             $deadline->getTimestamp(),
             2,
             'Deadline should be ~5 minutes in the future'
         );
+    }
+
+    public function test_build_payload_passes_connect_when_as_execute(): void
+    {
+        $this->mockOutboundRouting->shouldReceive('findOutboundWhitelistEntry')->andReturn(null);
+        $method = (new \ReflectionClass($this->service))->getMethod('buildPayload');
+        $method->setAccessible(true);
+
+        foreach (['immediately' => 'immediately', 'connected' => 'connected'] as $stored => $expected) {
+            $campaign = $this->createCampaign([
+                'routing_destination_type' => RoutingDestinationType::HANGUP,
+                'destination_connect' => $stored,
+            ]);
+            $payload = $method->invoke($this->service, $campaign, $this->createDestination(), 'https://example.com/w', null);
+
+            $this->assertSame($expected, $payload['execute']);
+        }
     }
 
     public function test_validate_credentials_delegates_to_client(): void

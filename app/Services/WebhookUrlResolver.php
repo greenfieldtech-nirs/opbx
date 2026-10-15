@@ -69,7 +69,7 @@ class WebhookUrlResolver
             'cdr' => $baseUrl.'/api/webhooks/cloudonix/cdr',
             'voice_route' => $baseUrl.'/api/voice/route',
             'ivr_input' => $baseUrl.'/api/voice/ivr-input',
-            'ring_group_callback' => $baseUrl.'/api/voice/ring-group-callback',
+            'ring_group_callback' => $baseUrl.route('voice.ring-group-callback', [], false),
         ];
     }
 

@@ -6,7 +6,6 @@ namespace Tests\Unit\Services\AutoDialer;
 
 use App\Enums\CampaignStatus;
 use App\Enums\ListStatus;
-use App\Jobs\ProcessAutoDialerCampaignJob;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerList;
 use App\Models\Organization;
@@ -62,7 +61,7 @@ class CampaignLifecycleManagerTest extends TestCase
         $campaign->refresh();
         $this->assertEquals(CampaignStatus::ACTIVE, $campaign->status);
         $this->assertNotNull($campaign->started_at);
-        Queue::assertPushed(ProcessAutoDialerCampaignJob::class, 1);
+        Queue::assertNothingPushed(); // the Go dialer is the only dialing path
     }
 
     public function test_start_returns_false_when_already_active(): void
@@ -132,7 +131,7 @@ class CampaignLifecycleManagerTest extends TestCase
         $this->assertTrue($result);
         $campaign->refresh();
         $this->assertEquals(CampaignStatus::ACTIVE, $campaign->status);
-        Queue::assertPushed(ProcessAutoDialerCampaignJob::class, 1);
+        Queue::assertNothingPushed(); // the Go dialer is the only dialing path
     }
 
     public function test_resume_returns_false_when_not_paused(): void
@@ -210,7 +209,7 @@ class CampaignLifecycleManagerTest extends TestCase
 
         $campaign->refresh();
         $this->assertEquals(CampaignStatus::ACTIVE, $campaign->status);
-        Queue::assertPushed(ProcessAutoDialerCampaignJob::class, 1);
+        Queue::assertNothingPushed(); // the Go dialer is the only dialing path
     }
 
     public function test_check_and_auto_start_does_not_start_outside_schedule(): void
@@ -252,5 +251,26 @@ class CampaignLifecycleManagerTest extends TestCase
         $this->assertTrue($summary['can_start']);
         $this->assertFalse($summary['can_pause']);
         $this->assertFalse($summary['is_runnable']);
+    }
+
+    public function test_check_and_auto_start_starts_a_campaign_on_its_end_date_without_a_tenant(): void
+    {
+        $campaign = $this->createCampaign([
+            'status' => CampaignStatus::DRAFT,
+            'auto_start' => true,
+            'start_time' => 9,
+            'end_time' => 17,
+            'start_date' => now()->subDays(3)->toDateString(),
+            'end_date' => now()->toDateString(),
+            'timezone' => 'UTC',
+        ]);
+        AutoDialerList::factory()->assignedToCampaign($campaign)->create();
+
+        $this->travelTo(now('UTC')->setTime(14, 0));
+        auth()->logout(); // scheduled command: no user, no tenant
+
+        $this->manager->checkAndAutoStart();
+
+        $this->assertEquals(CampaignStatus::ACTIVE, $campaign->fresh()->status);
     }
 }

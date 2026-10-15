@@ -7,12 +7,14 @@ namespace App\Policies;
 use App\Enums\UserRole;
 use App\Models\CallQueue;
 use App\Models\User;
+use App\Services\Supervisor\SupervisorFilterService;
 
 /**
  * Call Queue authorization policy.
  *
  * - Owner / PBX Admin: full access
  * - PBX User / Reporter: read-only within their organization
+ * - Supervisor: read-only on queues where an assigned user (or they) is an agent
  */
 class CallQueuePolicy
 {
@@ -25,6 +27,10 @@ class CallQueuePolicy
     {
         if ($user->organization_id !== $callQueue->organization_id) {
             return false;
+        }
+
+        if ($user->isSupervisor()) {
+            return in_array($callQueue->id, app(SupervisorFilterService::class)->callQueueIds($user), true);
         }
 
         return $user->role->canManageConfiguration()

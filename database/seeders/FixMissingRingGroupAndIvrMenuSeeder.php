@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
 use App\Models\Extension;
@@ -19,8 +21,9 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
         // Get the first organization (assuming single-tenant for now)
         $organization = Organization::first();
 
-        if (!$organization) {
+        if (! $organization) {
             $this->command->error('No organization found. Please run AdminUserSeeder first.');
+
             return;
         }
 
@@ -32,13 +35,13 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
 
         // Create ring group for extension 3001 if it doesn't exist
         if ($extension3001) {
-            $this->command->info("Found extension 3001, checking ring group...");
+            $this->command->info('Found extension 3001, checking ring group...');
 
             $ringGroupId = $extension3001->configuration['ring_group_id'] ?? null;
             $ringGroup = $ringGroupId ? RingGroup::find($ringGroupId) : null;
 
-            if (!$ringGroup) {
-                $this->command->info("Creating test ring group for extension 3001...");
+            if (! $ringGroup) {
+                $this->command->info('Creating test ring group for extension 3001...');
 
                 $ringGroup = RingGroup::create([
                     'organization_id' => $organization->id,
@@ -53,7 +56,7 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
                     ->where('extension_number', '3000')
                     ->first();
 
-                if (!$memberExtension) {
+                if (! $memberExtension) {
                     $memberExtension = Extension::where('organization_id', $organization->id)->first();
                 }
 
@@ -68,8 +71,8 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
                 // Update extension 3001 configuration
                 $extension3001->update([
                     'configuration' => array_merge($extension3001->configuration ?? [], [
-                        'ring_group_id' => $ringGroup->id
-                    ])
+                        'ring_group_id' => $ringGroup->id,
+                    ]),
                 ]);
 
                 $this->command->info("Updated extension 3001 to reference ring group ID: {$ringGroup->id}");
@@ -80,13 +83,13 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
 
         // Create IVR menu for extension 3002 if it doesn't exist
         if ($extension3002) {
-            $this->command->info("Found extension 3002, checking IVR menu...");
+            $this->command->info('Found extension 3002, checking IVR menu...');
 
             $ivrId = $extension3002->configuration['ivr_id'] ?? null;
             $ivrMenu = $ivrId ? IvrMenu::find($ivrId) : null;
 
-            if (!$ivrMenu) {
-                $this->command->info("Creating test IVR menu for extension 3002...");
+            if (! $ivrMenu) {
+                $this->command->info('Creating test IVR menu for extension 3002...');
 
                 $ivrMenu = IvrMenu::create([
                     'organization_id' => $organization->id,
@@ -99,8 +102,8 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
                 // Update extension 3002 configuration
                 $extension3002->update([
                     'configuration' => array_merge($extension3002->configuration ?? [], [
-                        'ivr_id' => $ivrMenu->id
-                    ])
+                        'ivr_id' => $ivrMenu->id,
+                    ]),
                 ]);
 
                 $this->command->info("Updated extension 3002 to reference IVR menu ID: {$ivrMenu->id}");
@@ -109,10 +112,10 @@ class FixMissingRingGroupAndIvrMenuSeeder extends Seeder
             }
         }
 
-        if (!$extension3001 && !$extension3002) {
-            $this->command->warn("Extensions 3001 and 3002 not found. This seeder is designed to fix references for existing extensions.");
+        if (! $extension3001 && ! $extension3002) {
+            $this->command->warn('Extensions 3001 and 3002 not found. This seeder is designed to fix references for existing extensions.');
         }
 
-        $this->command->info("Seeder completed successfully!");
+        $this->command->info('Seeder completed successfully!');
     }
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateCallTracking } from '@/hooks/useCallTrackingCampaigns';
 import { callTrackingNumbersApi, type NumberFormData } from '@/services/callTrackingNumbersApi';
 
 export const callTrackingNumberKeys = {
@@ -20,8 +21,7 @@ export function useCreateCallTrackingNumber() {
   return useMutation({
     mutationFn: ({ campaignId, data }: { campaignId: string | number; data: NumberFormData }) =>
       callTrackingNumbersApi.create(campaignId, data),
-    onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({ queryKey: callTrackingNumberKeys.list(variables.campaignId) }),
+    onSuccess: () => invalidateCallTracking(queryClient),
   });
 }
 
@@ -37,8 +37,7 @@ export function useUpdateCallTrackingNumber() {
       id: string | number;
       data: Partial<NumberFormData>;
     }) => callTrackingNumbersApi.update(campaignId, id, data),
-    onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({ queryKey: callTrackingNumberKeys.list(variables.campaignId) }),
+    onSuccess: () => invalidateCallTracking(queryClient),
   });
 }
 
@@ -47,7 +46,6 @@ export function useDeleteCallTrackingNumber() {
   return useMutation({
     mutationFn: ({ campaignId, id }: { campaignId: string | number; id: string | number }) =>
       callTrackingNumbersApi.destroy(campaignId, id),
-    onSuccess: (_, variables) =>
-      queryClient.invalidateQueries({ queryKey: callTrackingNumberKeys.list(variables.campaignId) }),
+    onSuccess: () => invalidateCallTracking(queryClient),
   });
 }

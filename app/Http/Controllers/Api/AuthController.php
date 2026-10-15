@@ -4,28 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Services\Cloudonix\CloudonixPackageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
- * Authentication API controller using Laravel Sanctum.
+ * Authentication API controller using Laravel Sanctum Bearer tokens.
  *
- * Supports dual authentication modes:
- * 1. Cookie-based (SPA): Uses httpOnly session cookies + CSRF protection
- * 2. Token-based (API): Returns bearer tokens for stateless authentication
- *
- * Mode is automatically detected based on request origin (stateful domains use cookies).
+ * Every login returns a Bearer token, for the web app and API clients alike;
+ * there is no cookie session mode.
  *
  * Implements security best practices including rate limiting, audit logging,
  * and proper error handling.
@@ -40,93 +36,24 @@ class AuthController extends Controller
     private const TOKEN_EXPIRATION_MINUTES = 1440;
 
     /**
-     * Token abilities for scoped access control.
-     *
-     * Security: Using scoped tokens instead of wildcard ['*'] to limit
-     * the damage if a token is compromised.
-     *
-     * Note: Using string keys (enum values) instead of enum instances
-     * because PHP constants cannot have enum instances as array keys.
+     * Token expiration time in minutes with "Remember me" (30 days).
      */
-    private const TOKEN_ABILITIES = [
-        // Owner: Full access to all resources
-        'owner' => [
-            'extension:*',
-            'user:*',
-            'ring-group:*',
-            'did-number:*',
-            'recording:*',
-            'settings:*',
-            'business-hours:*',
-            'conference:*',
-            'ivr:*',
-            'voice-agent:*',
-            'call-log:*',
-            'outbound-whitelist:*',
-            'recording-download:*',
-        ],
-        // PBX Admin: Full access except user management and sensitive settings
-        'pbx_admin' => [
-            'extension:*',
-            'user:read',
-            'user:update',
-            'ring-group:*',
-            'did-number:*',
-            'recording:read',
-            'business-hours:*',
-            'conference:*',
-            'ivr:*',
-            'call-log:*',
-        ],
-        // PBX User: Read access to most, can update own extension
-        'pbx_user' => [
-            'extension:read',
-            'extension:update:own',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-        ],
-        // Reporter: Read-only access
-        'reporter' => [
-            'extension:read',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-            'business-hours:read',
-        ],
-        // Supervisor: Read-only access to assigned resources plus supervisor features
-        'supervisor' => [
-            'extension:read',
-            'user:read',
-            'ring-group:read',
-            'did-number:read',
-            'recording:read',
-            'call-log:read',
-            'business-hours:read',
-            'supervisor:view',
-            'supervisor:assignments',
-        ],
-    ];
+    private const REMEMBER_ME_TOKEN_EXPIRATION_MINUTES = 43200;
 
     /**
-     * Authenticate user and issue authentication credentials.
-     *
-     * Supports two authentication modes:
-     * - Cookie-based (SPA): Returns user data, sets httpOnly session cookie
-     * - Token-based (API): Returns API token for bearer authentication
+     * Token name that marks a "Remember me" token, so a refresh keeps its lifetime.
+     */
+    private const REMEMBER_ME_TOKEN_NAME = 'api-token-remember';
+
+    /**
+     * Authenticate user and issue a Bearer token.
      *
      * Security features:
      * - Rate limited to 5 attempts per minute per IP
      * - Generic error messages to prevent user enumeration
      * - Validates user and organization status
      * - Logs authentication attempts with context
-     * - Revokes old tokens on successful login (token mode only)
-     * - HttpOnly cookies prevent XSS attacks (cookie mode)
-     * - CSRF protection via Sanctum (cookie mode)
+     * - Revokes old tokens on successful login
      *
      * @param  LoginRequest  $request  Validated login credentials
      * @return JsonResponse Authentication response
@@ -201,8 +128,8 @@ class AuthController extends Controller
             );
         }
 
-        // Detect authentication mode based on request
-        $useCookieAuth = $this->shouldUseCookieAuth($request);
+        // Warm the Cloudonix package tier after the response is sent; never fails the login.
+        defer(fn () => rescue(fn () => app(CloudonixPackageService::class)->refresh((int) $user->organization_id)));
 
         Log::info('Login successful', [
             'request_id' => $requestId,
@@ -211,122 +138,27 @@ class AuthController extends Controller
             'organization_id' => $user->organization_id,
             'role' => $user->role->value,
             'ip_address' => $ipAddress,
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based authentication (SPA)
-            // Login user via session - Laravel will set httpOnly cookie automatically
-            Auth::guard('web')->login($user, true);
-
-            return response()->json([
-                'message' => 'Login successful',
-                'user' => $this->formatUserResponse($user),
-            ]);
-        }
-
-        // Token-based authentication (API clients)
         // Revoke all existing tokens for security
         $user->tokens()->delete();
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
-        $token = $user->createToken(
-            'api-token',
-            $abilities,
-            now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
-        )->plainTextToken;
+        $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
+        [$name, $minutes] = $this->tokenNameAndLifetime($request->boolean('remember'));
+        $token = $user->createToken($name, $abilities, now()->addMinutes($minutes))->plainTextToken;
 
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
+            'expires_in' => $minutes * 60,
             'user' => $this->formatUserResponse($user),
         ]);
     }
 
     /**
-     * Determine if request should use cookie-based authentication.
-     *
-     * Cookie auth is used when:
-     * - Request explicitly asks for cookie auth via X-Auth-Mode header
-     * - OR request has X-Requested-With header (indicates AJAX/SPA request)
-     *
-     * Token auth is used when:
-     * - Request has Authorization Bearer header (for logout/refresh of existing token sessions)
-     * - OR request explicitly asks for token auth via X-Auth-Mode header
-     * - OR request doesn't meet cookie auth criteria (default)
-     */
-    private function shouldUseCookieAuth(Request $request): bool
-    {
-        // If Bearer token is already present in logout/refresh, use token auth
-        // This prevents conflicts when both auth modes are possible
-        if ($request->bearerToken()) {
-            return false;
-        }
-
-        // Check for explicit auth mode header
-        $authMode = $request->header('X-Auth-Mode');
-        if ($authMode === 'cookie') {
-            return true;
-        }
-        if ($authMode === 'token') {
-            return false;
-        }
-
-        // Check for AJAX/SPA indicators (X-Requested-With: XMLHttpRequest)
-        // SPAs typically send this header, while API clients don't
-        if ($request->hasHeader('X-Requested-With')) {
-            return true;
-        }
-
-        // Default to token-based for backward compatibility
-        return false;
-    }
-
-    /**
-     * Platform manager abilities added to tokens for PM users.
-     */
-    private const PLATFORM_ABILITIES = [
-        'platform:read',
-        'platform:write',
-        'platform:manage-users',
-        'platform:manage-organizations',
-        'platform:audit-logs',
-    ];
-
-    /**
-     * Get token abilities based on user role.
-     *
-     * Security: Returns role-specific abilities instead of wildcard ['*']
-     * to limit token scope and reduce impact of token compromise.
-     *
-     * If the user is a platform manager, platform abilities are merged in.
-     *
-     * @param  UserRole  $role  User's role
-     * @param  bool  $isPlatformManager  Whether user has platform manager flag
-     * @return array Token abilities
-     */
-    private function getTokenAbilities(UserRole $role, bool $isPlatformManager = false): array
-    {
-        $roleValue = $role->value;
-        $abilities = self::TOKEN_ABILITIES[$roleValue] ?? self::TOKEN_ABILITIES['reporter'];
-
-        // Add platform abilities for platform managers
-        if ($isPlatformManager) {
-            $abilities = array_merge($abilities, self::PLATFORM_ABILITIES);
-        }
-
-        return $abilities;
-    }
-
-    /**
-     * Logout user (revoke authentication).
-     *
-     * Supports both authentication modes:
-     * - Cookie-based: Logs out of session, clears httpOnly cookie
-     * - Token-based: Deletes current access token
+     * Logout user: deletes the current access token.
      *
      * @param  Request  $request  Authenticated request
      * @return JsonResponse Success message
@@ -336,32 +168,17 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
-        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
-
         Log::info('Logout initiated', [
             'request_id' => $requestId,
             'user_id' => $user?->id,
             'email' => $user?->email,
             'ip_address' => $request->ip(),
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based logout
-            Auth::guard('web')->logout();
-
-            // Invalidate session using the helper (avoids "Session store not set on request" in tests)
-            session()->invalidate();
-
-            // Regenerate CSRF token
-            session()->regenerateToken();
-        } else {
-            // Token-based logout: only delete real persisted tokens
-            $token = $request->user()?->currentAccessToken();
-            if ($token instanceof PersonalAccessToken) {
-                $token->delete();
-            }
+        // Only delete real persisted tokens
+        $token = $request->user()?->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
         }
 
         Log::info('Logout successful', [
@@ -418,11 +235,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Refresh authentication credentials.
-     *
-     * Supports both authentication modes:
-     * - Cookie-based: Regenerates session, extends cookie expiration
-     * - Token-based: Revokes current token and issues a new one
+     * Refresh authentication: revokes the current token and issues a new one.
      *
      * @param  Request  $request  Authenticated request
      * @return JsonResponse Refresh response
@@ -432,47 +245,27 @@ class AuthController extends Controller
         $user = $this->getAuthenticatedUser($request);
         $requestId = $this->getRequestId();
 
-        // Detect if using cookie auth (web guard is authenticated and no bearer token is present)
-        $useCookieAuth = Auth::guard('web')->check() && ! $request->bearerToken();
-
         Log::info('Authentication refresh initiated', [
             'request_id' => $requestId,
             'user_id' => $user->id,
             'email' => $user->email,
             'ip_address' => $request->ip(),
-            'auth_mode' => $useCookieAuth ? 'cookie' : 'token',
         ]);
 
-        if ($useCookieAuth) {
-            // Cookie-based refresh - regenerate session using the helper
-            session()->regenerate();
-
-            Log::info('Session refresh successful', [
-                'request_id' => $requestId,
-                'user_id' => $user->id,
-            ]);
-
-            return response()->json([
-                'message' => 'Session refreshed successfully',
-                'user' => $this->formatUserResponse($user),
-            ]);
-        }
-
-        // Token-based refresh
-        // Revoke current real token (if any), then issue a new one
+        // Revoke current real token (if any), then issue a new one with the same lifetime
+        // (a "Remember me" token stays a 30-day token).
+        $remember = false;
         $token = $request->user()->currentAccessToken();
         if ($token instanceof PersonalAccessToken) {
+            $remember = $token->name === self::REMEMBER_ME_TOKEN_NAME;
             $token->delete();
         }
 
         // Create new token with role-scoped abilities
         // Include platform abilities if user is a platform manager
-        $abilities = $this->getTokenAbilities($user->role, $user->is_platform_manager ?? false);
-        $token = $user->createToken(
-            'api-token',
-            $abilities,
-            now()->addMinutes(self::TOKEN_EXPIRATION_MINUTES)
-        )->plainTextToken;
+        $abilities = $user->role->tokenAbilities($user->is_platform_manager ?? false);
+        [$name, $minutes] = $this->tokenNameAndLifetime($remember);
+        $token = $user->createToken($name, $abilities, now()->addMinutes($minutes))->plainTextToken;
 
         Log::info('Token refresh successful', [
             'request_id' => $requestId,
@@ -482,8 +275,18 @@ class AuthController extends Controller
         return response()->json([
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'expires_in' => self::TOKEN_EXPIRATION_MINUTES * 60,
+            'expires_in' => $minutes * 60,
         ]);
+    }
+
+    /**
+     * @return array{0: string, 1: int} token name and lifetime in minutes
+     */
+    private function tokenNameAndLifetime(bool $remember): array
+    {
+        return $remember
+            ? [self::REMEMBER_ME_TOKEN_NAME, self::REMEMBER_ME_TOKEN_EXPIRATION_MINUTES]
+            : ['api-token', self::TOKEN_EXPIRATION_MINUTES];
     }
 
     /**

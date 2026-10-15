@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Exceptions;
 
 use Exception;
+use Illuminate\Http\JsonResponse;
 
 /**
  * Exception thrown when attempting to delete a resource that is still in use.
@@ -17,9 +18,9 @@ class ResourceInUseException extends Exception
     /**
      * Create a new ResourceInUseException instance.
      *
-     * @param string $resourceType The type of resource being deleted
-     * @param array $references Array of references where the resource is used
-     * @param string $message Optional custom message
+     * @param  string  $resourceType  The type of resource being deleted
+     * @param  array  $references  Array of references where the resource is used
+     * @param  string  $message  Optional custom message
      */
     public function __construct(
         public readonly string $resourceType,
@@ -30,15 +31,22 @@ class ResourceInUseException extends Exception
     }
 
     /**
-     * Render the exception as a JSON response.
+     * Render the exception as a 409 whose message names where the resource is used.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * `references` is a list of ['type', 'id', 'name', 'detail'].
      */
-    public function render(): \Illuminate\Http\JsonResponse
+    public function render(): JsonResponse
     {
+        $label = str_replace(['ivr_menu', '_'], ['IVR menu', ' '], $this->resourceType);
+        $lines = array_map(
+            fn (array $ref): string => sprintf('%s "%s" (%s)', str_replace(['ivr_menu', '_'], ['IVR menu', ' '], $ref['type']), $ref['name'], $ref['detail']),
+            array_slice($this->references, 0, 10),
+        );
+        $more = count($this->references) - count($lines);
+
         return response()->json([
-            'error' => "Cannot delete {$this->resourceType}",
-            'message' => "This {$this->resourceType} is being used and cannot be deleted. Please remove all references first.",
+            'error' => "Cannot delete {$label}",
+            'message' => "This {$label} is still used by: ".implode('; ', $lines).($more > 0 ? "; and {$more} more" : '').'. Remove these references first.',
             'references' => $this->references,
         ], 409);
     }

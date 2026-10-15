@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\CallQueue;
+use App\Models\CallQueueAgent;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CallQueueAgent>
+ * @extends Factory<CallQueueAgent>
  */
 class CallQueueAgentFactory extends Factory
 {

@@ -5,8 +5,8 @@
  * Design aligned with Extensions page.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -14,26 +14,18 @@ import {
   Search,
   X,
   RefreshCw,
-  MoreVertical,
-  Edit,
-  Trash2,
   Shield,
-  UserX,
-  UserCheck,
   Mail,
   Building2,
-  ChevronDown,
-  ChevronUp,
-  Plus,
   Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDate, getStatusColor } from '@/utils/formatters';
+import { formatDate } from '@/utils/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -49,13 +41,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { PlatformLayout } from '@/components/platform';
 import {
@@ -66,18 +51,20 @@ import {
 import {
   usePlatformUsers,
   useSetPlatformManager,
-  useDeletePlatformUser,
-  useCreatePlatformUser,
   useUpdatePlatformUser,
+  useDeletePlatformUser,
   useUpdateUserPassword,
 } from '@/hooks/platform';
 import type { PlatformUser } from '@/types/platform';
+import { UserDeleteDialog } from '@/components/Users/UserDeleteDialog';
+import { platformApi } from '@/services/platformApi';
+import { getApiErrorMessage } from '@/services/api';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type SortField = 'id' | 'name' | 'email' | 'status' | 'is_platform_manager' | 'created_at';
 type SortDirection = 'asc' | 'desc' | null;
 
 export default function PlatformUsers() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
   const hasRefreshed = useRef(false);
@@ -88,7 +75,7 @@ export default function PlatformUsers() {
     hasRefreshed.current = true;
 
     // Clear platform-related queries to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     // Refresh user data from server
     refreshUser();
   }, [queryClient, refreshUser]);
@@ -112,7 +99,7 @@ export default function PlatformUsers() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformUsers({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformUsers({
     page: currentPage,
     per_page: perPage,
     search: debouncedSearch || undefined,
@@ -128,6 +115,7 @@ export default function PlatformUsers() {
   const totalPages = Math.ceil(totalUsers / perPage);
 
   const setManagerMutation = useSetPlatformManager();
+  const updateUserMutation = useUpdatePlatformUser();
   const deleteMutation = useDeletePlatformUser();
   const updatePasswordMutation = useUpdateUserPassword();
 
@@ -136,7 +124,7 @@ export default function PlatformUsers() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
-  const [editFormData, setEditFormData] = useState({ name: '', email: '', role: 'pbx_user' });
+  const [editFormData, setEditFormData] = useState({ name: '', email: '', role: 'pbx_user', status: 'active' });
   const [passwordFormData, setPasswordFormData] = useState({ password: '', password_confirmation: '' });
 
   const hasActiveFilters =
@@ -167,8 +155,8 @@ export default function PlatformUsers() {
       toast.success(isManager ? 'Platform manager rights granted' : 'Platform manager rights revoked');
       // Update the selected user so the dialog toggle reflects the new state immediately
       setSelectedUser((prev) => (prev ? { ...prev, is_platform_manager: isManager } : null));
-    } catch {
-      toast.error('Failed to update platform manager status');
+    } catch (error) {
+      toast.error('Failed to update platform manager status', { description: getApiErrorMessage(error) });
     }
   };
 
@@ -178,15 +166,26 @@ export default function PlatformUsers() {
       await deleteMutation.mutateAsync(selectedUser.id);
       toast.success('User deleted');
       setShowDeleteDialog(false);
-    } catch {
-      toast.error('Failed to delete user');
+    } catch (error) {
+      toast.error('Failed to delete user', { description: getApiErrorMessage(error) });
     }
   };
 
   const openEditDialog = (user: PlatformUser) => {
     setSelectedUser(user);
-    setEditFormData({ name: user.name, email: user.email, role: user.role });
+    setEditFormData({ name: user.name, email: user.email, role: user.role, status: user.status });
     setShowEditDialog(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!selectedUser) return;
+    try {
+      await updateUserMutation.mutateAsync({ id: selectedUser.id, data: editFormData });
+      toast.success('User updated');
+      setShowEditDialog(false);
+    } catch (error) {
+      toast.error('Failed to update user', { description: getApiErrorMessage(error) });
+    }
   };
 
   const openPasswordDialog = (user: PlatformUser) => {
@@ -216,34 +215,19 @@ export default function PlatformUsers() {
       toast.success('Password updated successfully');
       setShowPasswordDialog(false);
       setPasswordFormData({ password: '', password_confirmation: '' });
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Failed to update password';
-      toast.error(message);
+    } catch (error) {
+      toast.error('Failed to update password', { description: getApiErrorMessage(error) });
     }
   };
 
   // Get role badge
-  const getRoleBadge = (role: string) => {
-    const configs: Record<string, { label: string; color: string }> = {
-      owner: { label: 'Owner', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-      pbx_admin: { label: 'Admin', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-      pbx_user: { label: 'User', color: 'bg-green-100 text-green-800 border-green-200' },
-      reporter: { label: 'Reporter', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-    };
-    const config = configs[role] || configs.pbx_user;
-    return (
-      <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
-        {config.label}
-      </Badge>
-    );
-  };
 
   // Get status badge
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; color: string }> = {
       active: { label: 'Active', color: 'bg-green-100 text-green-800 border-green-200' },
       inactive: { label: 'Inactive', color: 'bg-gray-100 text-gray-800 border-gray-200' },
-      suspended: { label: 'Suspended', color: 'bg-red-100 text-red-800 border-red-200' },
+      pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
     };
     const config = configs[status] || configs.inactive;
     return (
@@ -322,6 +306,10 @@ export default function PlatformUsers() {
     },
   ];
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load users" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <PlatformLayout>
       <div className="space-y-6">
@@ -333,7 +321,7 @@ export default function PlatformUsers() {
               Users
             </h1>
             <p className="text-muted-foreground mt-1">
-              {totalUsers} user{totalUsers !== 1 ? 's' : ''} across all organizations
+              {totalUsers} owner{totalUsers !== 1 ? 's' : ''} across all organizations
             </p>
           </div>
         </div>
@@ -379,7 +367,7 @@ export default function PlatformUsers() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -544,9 +532,21 @@ export default function PlatformUsers() {
                   />
                 </div>
 
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="text-sm text-muted-foreground">Status:</div>
-                  {getStatusBadge(selectedUser.status)}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select
+                    value={editFormData.status}
+                    onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="pt-4 border-t">
@@ -567,8 +567,8 @@ export default function PlatformUsers() {
               <Button variant="outline" onClick={() => setShowEditDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setShowEditDialog(false)}>
-                Save Changes
+              <Button onClick={handleEditSave} disabled={updateUserMutation.isPending}>
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -618,30 +618,17 @@ export default function PlatformUsers() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation */}
-        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete User</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedUser?.name}? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Delete Confirmation (with impact preview) */}
+        <UserDeleteDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          scope="platform"
+          userId={selectedUser?.id}
+          userName={selectedUser?.name}
+          loadImpact={platformApi.users.deleteImpact}
+          onConfirm={handleDelete}
+          isPending={deleteMutation.isPending}
+        />
       </div>
     </PlatformLayout>
   );

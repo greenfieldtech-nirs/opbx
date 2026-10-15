@@ -7,11 +7,12 @@ namespace Tests\Feature\CallQueues;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserRole;
+use App\Models\BusinessHoursSchedule;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
 use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
-use App\Models\Extension;
+use App\Models\IvrMenu;
 use App\Models\IvrMenuOption;
 use App\Models\Organization;
 use App\Models\RingGroup;
@@ -69,7 +70,7 @@ class QueueDestinationIntegrationTest extends TestCase
 
     public function test_ivr_option_resolves_call_queue_destination(): void
     {
-        $ivrMenu = \App\Models\IvrMenu::factory()->create([
+        $ivrMenu = IvrMenu::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
 
@@ -131,7 +132,7 @@ class QueueDestinationIntegrationTest extends TestCase
 
     public function test_business_hours_parse_target_id_supports_queue_prefix(): void
     {
-        $parsed = \App\Models\BusinessHoursSchedule::parseTargetId('queue-42');
+        $parsed = BusinessHoursSchedule::parseTargetId('queue-42');
 
         $this->assertSame(['type' => 'call_queue', 'id' => 42], $parsed);
     }
@@ -173,8 +174,9 @@ class QueueDestinationIntegrationTest extends TestCase
             'name' => 'Main Menu',
             'description' => 'Test',
             'audio_file_path' => 'https://example.com/greeting.wav',
-            'timeout' => 10,
-            'max_retries' => 3,
+            'max_timeout' => 10,
+            'inter_digit_timeout' => 5,
+            'max_turns' => 3,
             'failover_destination_type' => 'call_queue',
             'failover_destination_id' => $this->queue->id,
             'status' => 'active',
@@ -201,7 +203,7 @@ class QueueDestinationIntegrationTest extends TestCase
             'organization_id' => $this->organization->id,
             'role' => UserRole::OWNER,
         ]);
-        $did = \App\Models\DidNumber::factory()->create([
+        $did = DidNumber::factory()->create([
             'organization_id' => $this->organization->id,
         ]);
 
@@ -234,6 +236,6 @@ class QueueDestinationIntegrationTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $this->deleteJson("/api/v1/call-queues/{$this->queue->id}")->assertStatus(500);
+        $this->deleteJson("/api/v1/call-queues/{$this->queue->id}")->assertStatus(409);
     }
 }

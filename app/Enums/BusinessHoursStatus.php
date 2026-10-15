@@ -21,17 +21,15 @@ enum BusinessHoursStatus: string
      */
     public static function values(): array
     {
-        return array_map(fn(self $status) => $status->value, self::cases());
+        return array_map(fn (self $status) => $status->value, self::cases());
     }
 
     /**
      * Get the display label for this status.
-     *
-     * @return string
      */
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::ACTIVE => 'Active',
             self::INACTIVE => 'Inactive',
         };

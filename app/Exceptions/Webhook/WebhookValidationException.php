@@ -26,8 +26,8 @@ class WebhookValidationException extends WebhookException
     /**
      * Create a new validation exception.
      *
-     * @param string $message Human-readable error message
-     * @param array $errors Structured validation errors
+     * @param  string  $message  Human-readable error message
+     * @param  array  $errors  Structured validation errors
      */
     public function __construct(string $message = 'Validation failed', array $errors = [])
     {
@@ -57,7 +57,7 @@ class WebhookValidationException extends WebhookException
     {
         $data = parent::toArray();
 
-        if (!empty($this->errors)) {
+        if (! empty($this->errors)) {
             $data['errors'] = $this->errors;
         }
 

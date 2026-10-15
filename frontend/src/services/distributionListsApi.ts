@@ -1,5 +1,5 @@
 import api from '@/services/api';
-import type { AutoDialerList, CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams, PaginatedResponse } from '@/types';
+import type { AutoDialerList, CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams, ListVersion, ListVersionDestination, PaginatedResponse } from '@/types';
 
 export interface ListDestination {
   id: number;
@@ -103,6 +103,7 @@ export const distributionListsApi = {
     listId: string | number,
     file: File,
     mapping: CsvMappingConfig,
+    hasHeader: boolean = true,
   ): Promise<{
     message: string;
     data: {
@@ -112,11 +113,11 @@ export const distributionListsApi = {
       total_rows: number;
       action: 'upload' | 'update';
       new_version_number?: number;
-      backup_path?: string;
     }
   }> => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('has_header', hasHeader ? '1' : '0');
     formData.append('mapping[phone]', mapping.phone);
     if (mapping.name) {
       formData.append('mapping[name]', mapping.name);
@@ -219,10 +220,46 @@ export const distributionListsApi = {
   },
 
   /**
-   * Get version history
+   * Previous versions of a list, newest first
    */
-  getVersions: async (listId: string | number): Promise<{ data: AutoDialerList[] }> => {
+  getVersions: async (
+    listId: string | number,
+  ): Promise<{ data: ListVersion[]; meta: { retention_days: number | null } }> => {
     const response = await api.get(`/auto-dialer-campaigns/lists/${listId}/versions`);
+    return response.data;
+  },
+
+  /**
+   * Entries of a previous version (paged, searchable by number or name)
+   */
+  getVersionDestinations: async (
+    listId: string | number,
+    versionId: number,
+    params?: { page?: number; per_page?: number; search?: string },
+  ): Promise<PaginatedResponse<ListVersionDestination>> => {
+    const response = await api.get(
+      `/auto-dialer-campaigns/lists/${listId}/versions/${versionId}/destinations`,
+      { params },
+    );
+    return response.data;
+  },
+
+  /**
+   * Download a previous version as CSV
+   */
+  downloadVersion: async (listId: string | number, versionId: number): Promise<Blob> => {
+    const response = await api.get(
+      `/auto-dialer-campaigns/lists/${listId}/versions/${versionId}/download`,
+      { responseType: 'blob' },
+    );
+    return response.data;
+  },
+
+  /**
+   * The "(Part N)" lists a large upload to this list was split into
+   */
+  getParts: async (listId: string | number): Promise<{ data: AutoDialerList[] }> => {
+    const response = await api.get(`/auto-dialer-campaigns/lists/${listId}/parts`);
     return response.data;
   },
 

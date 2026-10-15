@@ -110,7 +110,15 @@ class CallTrackingRoutingStrategy implements RoutingStrategy
             );
         }
 
+        if ($campaign->destination_type === CallTrackingDestinationType::UNAVAILABLE) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
+
         $resolvedDestination = $this->destinationResolver->resolve($campaign);
+
+        if (($resolvedDestination['unavailable'] ?? false) === true) {
+            return response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']);
+        }
 
         if (! $resolvedDestination || ! isset($resolvedDestination['type'])) {
             Log::warning('CallTrackingRoutingStrategy: Could not resolve campaign destination', [

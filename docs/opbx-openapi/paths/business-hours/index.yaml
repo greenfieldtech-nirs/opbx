@@ -4,14 +4,30 @@ paths:
       tags:
         - Business Hours
       summary: List Business Hours Schedules
-      description: Get paginated list of Business Hours Schedules
+      description: >
+        Paginated list of the organization's schedules. Available to all roles.
+        An unknown `sort_by` falls back to `name`; default order is ascending.
       operationId: listBusinessHoursSchedules
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, status, created_at, updated_at]
+            default: name
+        - $ref: '../../components/parameters/query/SortOrder.yaml'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - $ref: '../../components/parameters/query/Unprovisioned.yaml'
       responses:
         '200':
           description: List of Business Hours Schedules
@@ -33,24 +49,37 @@ paths:
       tags:
         - Business Hours
       summary: Create Business Hours Schedule
+      description: Owner and PBX Admin only.
       operationId: createBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
+              allOf:
+                - $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
+                - required: [name, timezone, open_hours_action, closed_hours_action, schedule]
       responses:
         '201':
           description: Business Hours Schedule created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Businesshoursschedule created successfully.
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -69,10 +98,18 @@ paths:
       operationId: getBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:read
       responses:
         '200':
           description: Business Hours Schedule details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '404':
@@ -82,21 +119,42 @@ paths:
       tags:
         - Business Hours
       summary: Update Business Hours Schedule
+      description: >
+        Owner and PBX Admin only. PUT and PATCH both update only the fields sent:
+        every field is optional and an omitted field keeps its stored value (a body
+        with just `name` renames the schedule and changes nothing else). A field that
+        is sent is validated as on create, so it cannot be blanked; an action needs
+        both `type` and `target_id`. Each day sent in `schedule` replaces that day's
+        setting and time ranges, and days not sent are kept. `exceptions`, when sent
+        (also `[]` or null), replaces every exception.
       operationId: updateBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
       responses:
         '200':
           description: Business Hours Schedule updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Businesshoursschedule updated successfully.
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -105,21 +163,37 @@ paths:
       tags:
         - Business Hours
       summary: Partially update Business Hours Schedule
+      description: >
+        Same as PUT: only the fields sent are validated and saved; omitted fields
+        keep their stored values.
       operationId: patchBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
       responses:
         '200':
           description: Business Hours Schedule updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Businesshoursschedule updated successfully.
+                  data:
+                    $ref: '../../components/schemas/BusinessHoursSchedule.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -129,14 +203,20 @@ paths:
       tags:
         - Business Hours
       summary: Delete Business Hours Schedule
+      description: Owner and PBX Admin only. Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
       operationId: deleteBusinessHoursSchedule
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: business-hours:write
       responses:
         '204':
           description: Business Hours Schedule deleted
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

@@ -80,7 +80,7 @@ const CommandInput = React.forwardRef<HTMLInputElement, CommandInputProps>(
           value={inputValue}
           onChange={handleChange}
           className={cn(
-            'flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none',
+            'flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-hidden',
             'placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
@@ -179,7 +179,7 @@ const CommandItem = React.forwardRef<HTMLDivElement, CommandItemProps>(
         role="option"
         aria-disabled={disabled}
         className={cn(
-          'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none',
+          'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden',
           'hover:bg-accent hover:text-accent-foreground',
           'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
           disabled && 'pointer-events-none opacity-50',

@@ -13,7 +13,9 @@ use App\Models\BlockedCallLog;
 use App\Models\InboundBlacklist;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class InboundBlacklistController extends Controller
 {
@@ -109,7 +111,7 @@ class InboundBlacklistController extends Controller
 
             // Auto-generate torment settings if using torment strategy
             if ($validated['rejection_strategy'] === 'torment') {
-                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_room_prefix'] = Str::random(16);
                 $validated['torment_music_timeout'] = 600;
             }
 
@@ -121,7 +123,7 @@ class InboundBlacklistController extends Controller
             }
 
             // Clear statistics cache
-            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
+            Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Created inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -215,7 +217,7 @@ class InboundBlacklistController extends Controller
 
             // Auto-generate torment settings if using torment strategy
             if (isset($validated['rejection_strategy']) && $validated['rejection_strategy'] === 'torment') {
-                $validated['torment_room_prefix'] = \Illuminate\Support\Str::random(16);
+                $validated['torment_room_prefix'] = Str::random(16);
                 $validated['torment_music_timeout'] = 600;
             }
 
@@ -227,7 +229,7 @@ class InboundBlacklistController extends Controller
             }
 
             // Clear statistics cache
-            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
+            Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Updated inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -287,7 +289,7 @@ class InboundBlacklistController extends Controller
             $inboundBlacklist->delete();
 
             // Clear statistics cache
-            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
+            Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Deleted inbound blacklist entry', [
                 'request_id' => $requestId,
@@ -344,7 +346,7 @@ class InboundBlacklistController extends Controller
             $inboundBlacklist->toggleStatus();
 
             // Clear statistics cache
-            \Illuminate\Support\Facades\Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
+            Cache::forget("inbound-blacklist:stats:{$user->organization_id}");
 
             Log::info('Toggled inbound blacklist entry status', [
                 'request_id' => $requestId,
@@ -449,7 +451,7 @@ class InboundBlacklistController extends Controller
 
         $cacheKey = "inbound-blacklist:stats:{$user->organization_id}";
 
-        $stats = \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($user) {
+        $stats = Cache::remember($cacheKey, 300, function () use ($user) {
             return [
                 'total_entries' => InboundBlacklist::where('organization_id', $user->organization_id)->count(),
                 'active_entries' => InboundBlacklist::where('organization_id', $user->organization_id)
@@ -494,7 +496,7 @@ class InboundBlacklistController extends Controller
             'request_id' => $requestId,
             'user_id' => $user->id,
             'organization_id' => $user->organization_id,
-            'cached' => \Illuminate\Support\Facades\Cache::has($cacheKey),
+            'cached' => Cache::has($cacheKey),
         ]);
 
         return response()->json(['data' => $stats]);

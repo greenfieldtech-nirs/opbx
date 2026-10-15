@@ -29,11 +29,14 @@ class AiAssistantLoadBalancerResource extends JsonResource
             'strategy' => $this->strategy->value,
             'follow_through' => $this->follow_through,
             'status' => $this->status->value,
+            'is_unprovisioned' => $this->is_unprovisioned,
             'fallback_action' => $this->fallback_action->value,
             'fallback_extension_id' => $this->fallback_extension_id,
             'fallback_ring_group_id' => $this->fallback_ring_group_id,
             'fallback_ivr_menu_id' => $this->fallback_ivr_menu_id,
             'fallback_ai_assistant_id' => $this->fallback_ai_assistant_id,
+            'fallback_call_queue_id' => $this->fallback_call_queue_id,
+            'fallback_ai_load_balancer_id' => $this->fallback_ai_load_balancer_id,
             'members' => $this->whenLoaded('members', function () {
                 return $this->members->map(function ($member) {
                     return [
@@ -71,6 +74,18 @@ class AiAssistantLoadBalancerResource extends JsonResource
                 return $this->fallbackAiAssistant ? [
                     'id' => $this->fallbackAiAssistant->id,
                     'name' => $this->fallbackAiAssistant->name,
+                ] : null;
+            }),
+            'fallback_call_queue' => $this->whenLoaded('fallbackCallQueue', function () {
+                return $this->fallbackCallQueue ? [
+                    'id' => $this->fallbackCallQueue->id,
+                    'name' => $this->fallbackCallQueue->name,
+                ] : null;
+            }),
+            'fallback_ai_load_balancer' => $this->whenLoaded('fallbackAiLoadBalancer', function () {
+                return $this->fallbackAiLoadBalancer ? [
+                    'id' => $this->fallbackAiLoadBalancer->id,
+                    'name' => $this->fallbackAiLoadBalancer->name,
                 ] : null;
             }),
             'created_at' => $this->created_at?->toIso8601String(),

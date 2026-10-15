@@ -12,28 +12,68 @@ paths:
     get:
       tags:
       - Auto Dialer Campaigns
-      summary: Get campaign list
-      description: 'Get the distribution list currently assigned to a campaign.
+      summary: Get campaign lists
+      description: |
+        Get every distribution list assigned to a campaign, oldest assignment first (by list ID).
+        A campaign can hold several lists. Owner, PBX Admin and Reporter only.
 
-
-        Returns 404 if no list has been uploaded or assigned.
-
-        '
+        `can_unassign` is false while the campaign is `active`, and for good once the campaign
+        has started processing the list's entries (any destination dialed or no longer pending);
+        `unassign_refusal` gives the reason.
+        Returns `{"data": []}` when no list is assigned.
       operationId: getCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:read
       responses:
         '200':
-          description: Campaign list details
+          description: The campaign's lists
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    type: object
-                    additionalProperties: true
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 12
+                        name:
+                          type: string
+                          example: leads.csv
+                        status:
+                          type: string
+                          enum: [draft, pending, processing, ready, failed, in_use, used, archived]
+                          example: in_use
+                        total_rows:
+                          type: integer
+                          example: 120
+                        valid_rows:
+                          type: integer
+                          example: 118
+                        invalid_rows:
+                          type: integer
+                          example: 2
+                        processed_at:
+                          type:
+                          - string
+                          - 'null'
+                          format: date-time
+                          example: '2026-04-10T14:35:00+00:00'
+                        can_unassign:
+                          type: boolean
+                          description: True while the campaign is not active and every entry of the list is still pending with zero dial attempts
+                          example: true
+                        unassign_refusal:
+                          type:
+                          - string
+                          - 'null'
+                          description: Why the list cannot be unassigned now; null when it can
+                          example: null
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -44,18 +84,23 @@ paths:
       tags:
       - Auto Dialer Campaigns
       summary: Upload campaign list
-      description: 'Upload a CSV distribution list directly to a campaign.
+      description: |
+        Upload a CSV as another distribution list of a campaign; the campaign's existing lists
+        are kept. Owner and PBX Admin only. The campaign must be Draft, Paused, or Active with a
+        start date still in the future in the campaign's timezone (otherwise 422; an Active
+        campaign that has started must be paused first).
 
-
-        The file must be a valid CSV or TXT file up to 10 MB.
-
-        An optional list name can be provided.
-
-        '
+        The file must be a CSV or TXT file up to 10 MB. The first row is a header and is skipped.
+        Only the first column is read: it must be an E.164 number (`+` then 2-15 digits);
+        other rows count as invalid. Duplicate numbers are removed (and counted as invalid).
+        The file is processed during the request: the list is created assigned to the campaign
+        (status `in_use`), and the number of valid rows is added to the campaign's
+        `total_destinations` and `pending_calls`. The list name defaults to the uploaded file name.
       operationId: uploadCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       requestBody:
         required: true
         content:
@@ -66,13 +111,13 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: CSV/TXT file containing phone numbers and optional descriptions
+                  description: CSV/TXT file (max 10 MB); header row, then one E.164 number in the first column of each row
                 name:
                   type:
                   - string
                   - 'null'
                   maxLength: 255
-                  description: Optional name for the uploaded list
+                  description: List name (defaults to the uploaded file name)
               required:
               - file
       responses:
@@ -88,7 +133,22 @@ paths:
                     example: List uploaded successfully
                   data:
                     type: object
-                    additionalProperties: true
+                    properties:
+                      list_id:
+                        type: integer
+                        example: 12
+                      total_rows:
+                        type: integer
+                        description: Data rows read (header excluded)
+                        example: 120
+                      valid_rows:
+                        type: integer
+                        description: Unique valid numbers stored as destinations
+                        example: 118
+                      invalid_rows:
+                        type: integer
+                        description: Rows with an invalid number plus removed duplicates
+                        example: 2
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
@@ -96,21 +156,55 @@ paths:
         '404':
           $ref: ../../components/responses/NotFound.yaml
         '422':
-          $ref: ../../components/responses/ValidationError.yaml
+          description: >-
+            Request validation failed, or the campaign cannot take a list now
+            (`{"error": "Cannot assign list to \"…\" because it has already started. Pause the campaign first, then assign the list."}`).
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: ../../components/schemas/ValidationError.yaml
+                - $ref: ../../components/schemas/Error.yaml
+  /v1/auto-dialer-campaigns/{campaign}/list/{list}:
+    parameters:
+    - name: campaign
+      in: path
+      required: true
+      description: Campaign ID
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    - name: list
+      in: path
+      required: true
+      description: Distribution list ID (must be assigned to this campaign)
+      schema:
+        type: integer
+        minimum: 1
+      example: 12
     delete:
       tags:
       - Auto Dialer Campaigns
-      summary: Delete campaign list
-      description: 'Remove the distribution list currently assigned to a campaign.
+      summary: Unassign a campaign list
+      description: |
+        Unassign one distribution list from a campaign. The list and its destinations are kept;
+        the list returns to `ready` and the campaign's other lists are not affected.
+        Owner and PBX Admin only; refused with 403 while the campaign is `active` ("Cannot
+        unassign list: its campaign is active. Pause the campaign first."). Same rules, status
+        codes and messages as `POST /v1/auto-dialer-campaigns/lists/{list}/unassign`.
 
-        '
+        Once the campaign has started processing the list's entries (any destination dialed or
+        no longer pending) the list can no longer be unassigned (422). Returns 404 when the list
+        is not assigned to this campaign.
       operationId: deleteCampaignList
       security:
       - bearerAuth: []
-      - cookieAuth: []
+      - apiKeyAuth: []
+      x-api-key-scope: auto-dialer-campaigns:write
       responses:
         '200':
-          description: List deleted successfully
+          description: List unassigned
           content:
             application/json:
               schema:
@@ -118,10 +212,39 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: List deleted successfully
+                    example: List unassigned from campaign successfully
+                  data:
+                    type: object
+                    properties:
+                      list_id:
+                        type: integer
+                        example: 12
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '403':
-          $ref: ../../components/responses/Forbidden.yaml
+          description: Not allowed, or the list's campaign is active
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              examples:
+                campaignActive:
+                  summary: The list's campaign is active
+                  value:
+                    error: Forbidden
+                    message: 'Cannot unassign list: its campaign is active. Pause the campaign first.'
+                notAllowed:
+                  summary: Role or policy denial
+                  value:
+                    error: Forbidden
+                    message: This action is unauthorized.
         '404':
           $ref: ../../components/responses/NotFound.yaml
+        '422':
+          description: The list's entries have started processing
+          content:
+            application/json:
+              schema:
+                $ref: ../../components/schemas/Error.yaml
+              example:
+                error: 'Cannot unassign list: its entries have started processing for this campaign (some destinations have been dialed or are no longer pending).'

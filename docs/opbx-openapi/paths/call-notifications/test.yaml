@@ -7,7 +7,58 @@ paths:
       operationId: testNotificationSettings
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-notifications:write
+      description: |
+        Owner and PBX Admin only. Sends one test `call.status_update` event (session status
+        `new`, `"test": true`, fake numbers) to the configured webhook through the normal
+        dispatcher, so it counts against the rate limit and is logged.
       responses:
         '200':
-          description: Test completed
+          description: Test webhook delivered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Test webhook delivered successfully
+                  webhook_url:
+                    type: string
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '400':
+          description: No settings, no webhook URL, or the settings are inactive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Notification settings not configured
+        '502':
+          description: Delivery failed (the receiver did not accept the test event)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Test webhook delivery failed
+                  webhook_url:
+                    type: string
+        '500':
+          description: 'Delivery raised an error (`error` is "Test webhook delivery failed: " plus the exception message)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string

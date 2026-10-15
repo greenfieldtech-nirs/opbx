@@ -3,162 +3,237 @@ sidebar_position: 24
 slug: /modules/web-phone
 sidebar_class_name: cxGuidesSidebar
 title: "Web Phone"
-description: "In-browser softphone for placing, receiving, and coaching calls without a physical device"
+description: "Place and receive calls in the browser with your own extension, redial recent calls, and coach live calls"
 ---
 
 # Web Phone
 
-The Web Phone is an in-browser softphone that lets any user place and receive
-calls directly from the OPBX interface — no desk phone or external SIP client
-required. It registers with Cloudonix over WebRTC using the user's own
-extension. Owners and Supervisors can additionally coach live calls.
+The Web Phone is a softphone built into OPBX. It registers your own **user extension** with Cloudonix over WebRTC, so you can place and receive calls in the browser without a desk phone or a SIP app. Owners and Supervisors also use it to coach live calls.
 
 ## Purpose
 
 Use the Web Phone to:
 
-- Make and receive calls from any page in the application
-- Coach live calls (spy, whisper, barge) from the [Live Calls](/modules/live-calls) page
-- Work without provisioning a physical SIP device
+- place calls from any page of OPBX;
+- answer calls to your extension in the browser, whether or not the panel is open;
+- redial your recent outbound calls;
+- spy, whisper or barge from [Live Calls](/opbx/modules/live-calls) (Owners and Supervisors).
 
-The same Web Phone can also be embedded into third-party websites (such as a
-CRM) with a single script snippet — see the
-[Embedded Dialer](/modules/embedded-dialer).
+The same Web Phone can be placed on another website, such as a CRM. See [Embedded Dialer](/opbx/modules/embedded-dialer).
+
+## Prerequisites
+
+- A **user extension** assigned to you (extension type User). Other extension types, such as forward or ring group extensions, do not count. See [Extensions](/opbx/modules/extensions).
+- The organization's Cloudonix settings, with a domain name. See [Settings](/opbx/modules/settings).
+- A browser with microphone access. The browser asks for permission the first time you place or answer a call.
+- Network access to `wss://webrtc.cloudonix.io` on port 443.
 
 ## Availability
 
-The Web Phone is available to **every role**. What determines whether it works
-is not the role but whether the signed-in user has an assigned extension:
+| Role | Use the Web Phone | Coach calls with it |
+|------|:-----------------:|:-------------------:|
+| Owner | Yes, with a user extension | Yes |
+| PBX Admin | Yes, with a user extension | No |
+| PBX User | Yes, with a user extension | No |
+| Reporter | Yes, with a user extension | No |
+| Supervisor | Yes, with a user extension | Yes, calls in their scope |
 
-| Role | Web Phone access |
-|------|-----------------|
-| Owner | Yes (with extension) |
-| Supervisor | Yes (with extension) |
-| PBX Admin | Yes (with extension) |
-| PBX User | Yes (with extension) |
-| Reporter | Yes (with extension) |
+The role does not decide whether the Web Phone works; the extension does. Without a user extension the Web Phone opens with **Web Phone Unavailable** — "No extension is assigned to your account. Web Phone cannot be used."
 
-The Web Phone requires:
+:::note
+When the organization has no Cloudonix domain configured, the panel instead says "Cloudonix isn't configured for your organization" and asks you to have your Owner complete Settings > Cloudonix (the server answers 409 `cloudonix_not_configured`, while a missing extension is 404).
+:::
 
-- A **user-type extension** assigned to the signed-in user
-- Configured **Cloudonix settings** for the organization
+## Workflows
 
-If the user has no assigned extension, the Web Phone shows an "unavailable"
-state explaining that no extension is assigned. Coaching (spy/whisper/barge)
-remains limited to Owners and Supervisors.
+No role check applies to these tasks; the Web Phone only needs your user extension.
 
-## How It Works
+### Open the Web Phone
 
-1. The frontend calls `GET /v1/webphone/config` to retrieve JsSIP-compatible SIP
-   provisioning for the user's extension.
-2. It loads the JsSIP library and creates a SIP user agent.
-3. The user agent registers with Cloudonix over secure WebSocket
-   (`wss://webrtc.cloudonix.io:443`).
-4. Once registered, the phone is ready to place and receive calls.
+Who can do this: any user with a user extension.
 
-The SIP credentials are the user's own extension number and password; the SIP
-domain is the organization's Cloudonix domain.
+1. Click the round phone button in the bottom-right corner of any page (tooltip **Web Phone**).
+2. The panel opens. Its header shows **Web Phone** and the registration status: "Initializing...", "Connecting...", "Connected, registering..." and then **Registered**.
+3. When it reads **Registered**, the **Keypad** tab is ready.
 
-## User Interface
+Close the panel with **X**. While a call is ringing or active, **X** is disabled ("End the call before closing").
 
-The Web Phone is an app-wide floating dialer available on every page:
+:::note The phone stays registered
+The Web Phone registers when you sign in to OPBX and stays registered while you are signed in, whether the panel is open or not. An incoming call opens the panel and rings. Closing the panel does not unregister the phone; signing out does.
+:::
 
-- **Collapsed** — a fixed "Web Phone" pull tab on the right edge of the screen.
-- **Expanded (idle)** — a centered floating dialer panel; the rest of the page
-  stays interactive.
-- **Expanded (active call)** — a dimming backdrop blocks the rest of the UI, and
-  the close button is disabled until the call ends.
+{/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, header status Registered, a number entered in the display */}
 
-The dialer provides an iOS-style keypad with:
+### Place a call
 
-- A large number display that auto-scales for long numbers
-- Backspace
-- A green call button and a red hangup/end button
-- **Press Enter** in the number field to place the call, the same as clicking the green call button
-- Answer / reject controls for incoming calls
-- Mute, hold, and an in-call volume slider with a speaker toggle
-- A live **elapsed call timer** shown while a call is connected (`M:SS`, switching to `H:MM:SS` after one hour)
+Who can do this: any user with a user extension.
 
-A bottom tab bar (phone-app style) switches between two views:
+1. [Open the Web Phone](#open-the-web-phone).
+2. On the **Keypad** tab, type the number or click the keys (`0`–`9`, `*`, `#`). Use the backspace button to correct. A number is dialled at your Cloudonix domain; an entry that contains `@` is dialled as that SIP address.
+3. Click the green call button, or press **Enter** in the number field. The green button stays disabled while the number is empty.
+4. The status reads "Calling..." and then "Ringing...", and you hear the ringing tone of your country (see [Call-progress tones](#call-progress-tones)). Click the red button to cancel.
+5. When the call connects, the status reads "On call" and a timer starts: `M:SS`, then `H:MM:SS` after one hour.
+6. Hang up with the red button.
 
-- **Keypad** — the dialer described above.
-- **Recents** — the calls log (see below).
+The panel returns to **Registered**. If the call fails because the other side is busy or the network is congested, the matching tone plays.
 
-The tab bar is locked during an active call so the user cannot navigate away
-from the live dialer.
+While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** tab bar is locked. The keypad is not shown once the call connects, so you cannot send touch tones (DTMF) from the Web Phone. Transferring a call is not available in the Web Phone.
 
-## Call-Progress Tones
+### Answer an incoming call
 
-The Web Phone plays country-appropriate call-progress tones (ring, busy,
-congestion, dial) using the Web Audio API. The country is read from the
-organization's settings (defaulting to `us`) and returned in the `country`
-field of the Web Phone config. Tone cadences are derived from the standard
-Asterisk indications data set.
+Who can do this: any user with a user extension.
 
-## Coaching Calls
+1. While the phone is registered, an incoming call opens the panel by itself and shows **Incoming call** with the caller's SIP address.
+2. Click the green **Answer** button. The browser asks for microphone access the first time.
 
-When an Owner or Supervisor starts a spy, whisper, or barge action on the
-**Live Calls** page, the Web Phone automatically opens, dials the coaching
-target, and shows a short label (**Spy**, **Whisper**, or **Barge**). When the
-coaching call ends, the Web Phone closes and collapses back to the pull tab.
+The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts.
 
-See [Live Calls → Call Coaching](/modules/live-calls#call-coaching-spy--whisper--barge)
-for the full workflow.
+{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller address such as sip:+12025550142@acme.example.com and the green Answer and red Reject buttons */}
 
-## Recents (Calls Log)
+### Reject an incoming call
 
-The **Recents** tab shows the last 50 calls the signed-in user placed from
-their own extension, newest first. Each row shows the dialed number, when the
-call was placed, its duration, and its disposition. Answered calls (disposition
-`ANSWER`) are color-coded green; all other dispositions are shown in red.
+Who can do this: any user with a user extension.
 
-Tap any row to redial: the Web Phone switches to the Keypad tab, prefills the
-number, and places the call automatically.
+1. When the panel shows **Incoming call**, click the red **Reject** button.
 
-Each calls-log entry returns the fields `to`, `session_timestamp`, `duration`,
-`duration_formatted`, and `disposition`.
+The call is ended and the panel returns to **Registered**.
 
-The log is refreshed each time the Recents tab is opened. Coaching calls
-(spy, whisper, barge) are excluded — only regular outbound calls appear. The
-list is scoped to the signed-in user's extension only; it never shows other
-users' or other organizations' calls.
+### Use the call controls
 
-## Related API Endpoints
+Who can do this: any user with a user extension.
+
+During a connected call the panel shows the timer, the number and these controls:
+
+| Control | What it does |
+|---------|--------------|
+| **Mute** / **Unmute** | Stops or resumes sending your microphone |
+| **Keypad** | Shows or hides the in-call keypad for sending tones (see below) |
+| **Hold** / **Resume** | Puts the other party on hold |
+| Speaker button | Mutes or unmutes the incoming audio |
+| Volume slider | Sets the incoming audio level |
+| Hang up (red) | Ends the call |
+
+1. Click **Mute** to stop sending your microphone; the button turns blue and reads **Unmute**. Click it again to resume.
+2. Click **Hold** to put the other party on hold; the button reads **Resume**. Click it again to take the call off hold.
+3. Drag the volume slider, or click the speaker button to silence and restore the incoming audio.
+4. Click the red button to hang up.
+
+{/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the timer, Mute, Keypad, Hold, Hang Up and the volume slider, and the page behind dimmed */}
+
+### Send tones during a call
+
+Who can do this: any user with a user extension.
+
+Use the in-call keypad to answer a voice menu ("press 1 for sales"), enter a conference PIN or type an account number.
+
+1. During a connected call, click **Keypad**. The button turns blue and the keypad opens above the call controls.
+2. Click a key (`0`–`9`, `*`, `#`), or type it on your keyboard. Each key sends one tone to the other party and plays a short beep for you.
+3. The keys you sent appear under the call timer.
+4. Click **Keypad** again to hide the keypad. The keys you sent are cleared when the call ends.
+
+{/* SCREENSHOT: web-phone-in-call-keypad — Web Phone during a connected call with the keypad open, a few sent digits under the timer, and Keypad highlighted in the call controls */}
+
+### Redial a recent call
+
+Who can do this: any user with a user extension.
+
+1. [Open the Web Phone](#open-the-web-phone).
+2. Click the **Recents** tab.
+3. Click the row of the number you want to call.
+
+The Web Phone switches to **Keypad**, fills in the number and places the call.
+
+The **Recents** tab lists the last **50** calls placed **from your extension**, newest first. Each row shows the number, when it was placed and, for calls with a duration, how long it lasted. The icon is green when the disposition is `ANSWER` or `CONNECTED` and red otherwise.
+
+- The list is reloaded each time you open the tab ("Loading recent calls...").
+- Coaching calls are left out.
+- Only your own extension's calls are shown, never another user's.
+
+When there are none, the tab reads "No recent calls yet." If the list cannot be loaded, it reads "Could not load recent calls."
+
+{/* SCREENSHOT: web-phone-recents — Web Phone Recents tab listing several recent outbound calls with time, duration and coloured dispositions */}
+
+### Move the Web Phone to this tab
+
+Who can do this: any user with a user extension.
+
+Only one browser tab holds the registration. In any other tab the panel says "Web Phone is active in another tab".
+
+1. Open the Web Phone in the tab you want to use.
+2. Click **Use here**.
+
+This tab takes the registration and the other tab shows "Web Phone is active in another tab". When the tab holding the registration closes, the next open tab takes over automatically.
+
+### Retry after an error
+
+Who can do this: any user with a user extension.
+
+1. When the panel shows an error (see [Common errors](#common-errors)), click **Retry**.
+
+The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the header goes back to "Initializing...". **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
+
+## Coaching from Live Calls
+
+When an Owner or Supervisor clicks **Spy**, **Whisper** or **Barge** on [Live Calls](/opbx/modules/live-calls), the Web Phone opens by itself and dials the coaching target. Once connected, the header reads "On call - Coaching: Spy" (or Whisper, Barge). When the coaching call ends, the Web Phone closes.
+
+## Call-progress tones
+
+The ringing, busy and congestion tones follow the conventions of the organization's country, taken from the organization's `country` setting (default `us`; it cannot be changed from the UI). The cadences come from the standard Asterisk indications table.
+
+## Common errors
+
+| Message | What it means | What to do |
+|---------|---------------|-----------|
+| Web Phone Unavailable — No extension is assigned to your account. Web Phone cannot be used. | No user extension | Assign a user extension, then reload the page |
+| Web Phone Unavailable — Cloudonix isn't configured for your organization. | The organization has no Cloudonix domain | Ask your Owner to complete [Settings](/opbx/modules/settings) |
+| Web Phone Unavailable — Could not load the Web Phone configuration from the server. | Any other failure of `GET /v1/webphone/config` | **Retry**; if it persists, contact your administrator |
+| Web Phone Error — The Web Phone engine failed to load. | The bundled SIP library did not load | Reload the page |
+| Connection Failed — Could not open a connection to the voice server. | The browser cannot reach `wss://webrtc.cloudonix.io` | Check the network and firewall, then **Retry** |
+| Authentication Rejected | Cloudonix refused the extension's password | Reset the extension password on [Extensions](/opbx/modules/extensions) |
+| Extension Not Found | The subscriber does not exist in Cloudonix | Check that the extension is synced to Cloudonix |
+| Web Phone Error — …no reply came back in time. | Registration timed out | **Retry** in a moment |
+| Web Phone Error — Registration with the voice server failed. | Any other registration failure | **Retry**; if it persists, contact your administrator |
+
+Registration errors also show the raw cause from the SIP library (for example `Request Timeout`). Every error screen except the missing-extension one has a **Retry** button.
+
+## How it works
+
+1. When you sign in (in the tab that holds the registration), OPBX calls `GET /v1/webphone/config` for your extension's SIP settings.
+2. The bundled JsSIP library (served by OPBX itself, not loaded from a third-party site) creates a SIP user agent.
+3. The user agent connects to `wss://webrtc.cloudonix.io:443` and registers as `sip:<extension>@<your Cloudonix domain>` with the extension's password.
+4. Calls you place go through the normal OPBX outbound routing, as from any other phone on your extension.
+
+### Config response fields
+
+| Field | Meaning |
+|-------|---------|
+| `sip_username`, `sip_contact` | Your extension number |
+| `sip_password` | Your extension's SIP password |
+| `sip_domain` | The organization's Cloudonix domain |
+| `sip_uri` | `sip:{extension}@{domain}` |
+| `display_name`, `profile_name` | Your name |
+| `wss_server`, `websocket_port`, `server_path` | `wss://webrtc.cloudonix.io`, `443`, empty |
+| `registration_mode` | `Direct` |
+| `country` | Country code for tones |
+
+The config contains your SIP password. It is returned only to you, for your own extension, and every request is logged as a security event.
+
+## Related API endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/webphone/config` | Get SIP provisioning for the signed-in user |
-| GET | `/v1/webphone/calls-log` | Last 50 calls placed from the user's extension |
-| POST | `/v1/session-updates/{sessionId}/coach-target` | Resolve a coaching dial target |
+| GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 "No extension is assigned to this user." when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
+| GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
+| POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
+
+These endpoints are for signed-in users only; scoped API keys cannot call them.
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
-## Config Response Fields
+## Related modules
 
-| Field | Description |
-|-------|-------------|
-| `sip_username` | Extension number used as the SIP username |
-| `sip_password` | Extension SIP password |
-| `sip_domain` | Cloudonix domain name |
-| `sip_uri` | Full SIP URI (`sip:{ext}@{domain}`) |
-| `display_name` | User's display name |
-| `wss_server` | WebRTC WebSocket server |
-| `websocket_port` | WebSocket port (443) |
-| `server_path` | WebSocket server path |
-| `sip_contact` | SIP contact (extension number) |
-| `profile_name` | JsSIP profile name |
-| `registration_mode` | SIP registration mode (for example `Direct`) |
-| `country` | ISO country code driving tone cadences |
-
-:::info Licensing
-The Web Phone uses the MIT-licensed JsSIP library, keeping OPBX fully
-MIT-compatible.
-:::
-
-## Related Modules
-
-- [Embedded Dialer](/modules/embedded-dialer) — Embed this Web Phone into third-party sites
-- [Live Calls](/modules/live-calls) — Monitor and coach active calls
-- [Supervisors](/modules/supervisors) — The other role that can use the Web Phone
-- [Extensions](/modules/extensions) — Provision the extension the Web Phone registers as
-- [Settings](/modules/settings) — Configure Cloudonix integration
+- [Embedded Dialer](/opbx/modules/embedded-dialer) — the same Web Phone on another website
+- [Live Calls](/opbx/modules/live-calls) — start a coaching call
+- [Supervisors](/opbx/modules/supervisors) — who a Supervisor may coach
+- [Extensions](/opbx/modules/extensions) — the extension the Web Phone registers as
+- [Settings](/opbx/modules/settings) — Cloudonix domain

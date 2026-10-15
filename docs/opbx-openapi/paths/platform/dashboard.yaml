@@ -4,15 +4,154 @@ paths:
       tags:
         - Platform
       summary: Platform dashboard
-      description: Get cross-tenant statistics and dashboard data
+      description: Cross-tenant statistics and dashboard data. Platform managers only.
       operationId: getPlatformDashboard
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
-          description: Dashboard data
+          description: Cross-tenant counts plus the latest organizations and audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      organizations:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          active:
+                            type: integer
+                          suspended:
+                            type: integer
+                          deleted:
+                            type: integer
+                      users:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          active:
+                            type: integer
+                          inactive:
+                            type: integer
+                          platform_managers:
+                            type: integer
+                      extensions:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                      dids:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                      recent_organizations:
+                        type: array
+                        description: The 10 most recently created organizations
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            slug:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                                - active
+                                - suspended
+                                - deleted
+                            timezone:
+                              type: string
+                            users_count:
+                              type: integer
+                            extensions_count:
+                              type: integer
+                            dids_count:
+                              type: integer
+                            created_at:
+                              type: string
+                              format: date-time
+                            updated_at:
+                              type: string
+                              format: date-time
+                      recent_audit_logs:
+                        type: array
+                        description: The 10 most recent audit log entries
+                        items:
+                          type: object
+                          description: Audit-log entry without `ip_address`, `user_agent` and `updated_at`
+                          properties:
+                            id:
+                              type: integer
+                            platform_manager_user_id:
+                              type: integer
+                            platform_manager:
+                              type:
+                                - object
+                                - 'null'
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                email:
+                                  type: string
+                            target_organization_id:
+                              type:
+                                - integer
+                                - 'null'
+                            target_organization:
+                              type:
+                                - object
+                                - 'null'
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                slug:
+                                  type: string
+                            action:
+                              type: string
+                            target_entity_type:
+                              type:
+                                - string
+                                - 'null'
+                            target_entity_id:
+                              type:
+                                - integer
+                                - 'null'
+                            before_state:
+                              type:
+                                - object
+                                - 'null'
+                            after_state:
+                              type:
+                                - object
+                                - 'null'
+                            reason:
+                              type:
+                                - string
+                                - 'null'
+                            created_at:
+                              type: string
+                              format: date-time
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':
-          $ref: '../../components/responses/Forbidden.yaml'
+          description: Not a platform manager
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+              example:
+                message: Forbidden. Platform manager access required.

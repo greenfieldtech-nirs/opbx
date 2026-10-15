@@ -7,11 +7,16 @@ namespace App\Http\Controllers\Api;
 use App\Enums\AlbsStatus;
 use App\Enums\AlbsStrategy;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\AiAssistantLoadBalancer\StoreAlbsRequest;
+use App\Http\Requests\AiAssistantLoadBalancer\UpdateAlbsRequest;
 use App\Http\Resources\AiAssistantLoadBalancerResource;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AiAssistantLoadBalancerMember;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +47,7 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['strategy', 'status', 'search'];
+        return ['strategy', 'status', 'search', 'unprovisioned'];
     }
 
     protected function getAllowedSortFields(): array
@@ -58,6 +63,16 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
     protected function getDefaultSortOrder(): string
     {
         return 'desc';
+    }
+
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreAlbsRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateAlbsRequest::class;
     }
 
     protected function getRouteParameterName(): string
@@ -79,6 +94,8 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
             'fallbackRingGroup:id,name',
             'fallbackIvrMenu:id,name',
             'fallbackAiAssistant:id,name',
+            'fallbackCallQueue:id,name',
+            'fallbackAiLoadBalancer:id,name',
         ])
             ->withCount([
                 'members',
@@ -112,6 +129,11 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
                 'type' => 'search',
                 'scope' => 'search',
             ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
+            ],
         ];
     }
 
@@ -138,12 +160,16 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         $incomingRingGroupId = $validated['fallback_ring_group_id'] ?? null;
         $incomingIvrMenuId = $validated['fallback_ivr_menu_id'] ?? null;
         $incomingAiAssistantId = $validated['fallback_ai_assistant_id'] ?? null;
+        $incomingCallQueueId = $validated['fallback_call_queue_id'] ?? null;
+        $incomingAiLoadBalancerId = $validated['fallback_ai_load_balancer_id'] ?? null;
 
         // Clear all fallback IDs first
         $validated['fallback_extension_id'] = null;
         $validated['fallback_ring_group_id'] = null;
         $validated['fallback_ivr_menu_id'] = null;
         $validated['fallback_ai_assistant_id'] = null;
+        $validated['fallback_call_queue_id'] = null;
+        $validated['fallback_ai_load_balancer_id'] = null;
 
         // Set only the relevant fallback ID based on action type
         switch ($action) {
@@ -162,6 +188,14 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
             case 'ai_assistant':
                 $validated['fallback_ai_assistant_id'] = $incomingAiAssistantId
                     ?? $loadBalancer?->fallback_ai_assistant_id;
+                break;
+            case 'call_queue':
+                $validated['fallback_call_queue_id'] = $incomingCallQueueId
+                    ?? $loadBalancer?->fallback_call_queue_id;
+                break;
+            case 'ai_load_balancer':
+                $validated['fallback_ai_load_balancer_id'] = $incomingAiLoadBalancerId
+                    ?? $loadBalancer?->fallback_ai_load_balancer_id;
                 break;
                 // Other actions (hangup) don't need fallback IDs
         }
@@ -214,7 +248,7 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         $model->loadMissing(AiAssistantLoadBalancer::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
-    protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
+    protected function acquireUpdateLock(Model $model, Request $request): ?Lock
     {
         $lockKey = "lock:albs:{$model->id}";
         $lock = Cache::lock($lockKey, self::LOCK_TIMEOUT_SECONDS);
@@ -222,8 +256,10 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
 
-        // Try to acquire lock with timeout
-        if (! $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS)) {
+        // block() throws when the lock stays taken; the hook must return ?Lock, so the 409 is thrown.
+        try {
+            $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS);
+        } catch (LockTimeoutException) {
             Log::warning('Failed to acquire load balancer lock', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -231,10 +267,10 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
                 'lock_key' => $lockKey,
             ]);
 
-            return response()->json([
+            throw new HttpResponseException(response()->json([
                 'error' => 'Conflict',
                 'message' => 'Load balancer is currently being modified. Please try again.',
-            ], 409);
+            ], 409));
         }
 
         Log::debug('Load balancer lock acquired', [
@@ -246,7 +282,7 @@ class AiAssistantLoadBalancerController extends AbstractApiCrudController
         return $lock;
     }
 
-    protected function releaseUpdateLock(?\Illuminate\Contracts\Cache\Lock $lock, Model $model, Request $request): void
+    protected function releaseUpdateLock(?Lock $lock, Model $model, Request $request): void
     {
         if ($lock) {
             $lock->release();

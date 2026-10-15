@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -25,21 +26,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PlatformLayout } from '@/components/platform';
-import { AuditLogEntry } from '@/components/platform';
+import { AuditLogEntry, actionLabels } from '@/components/platform';
 import { usePlatformAuditLogs } from '@/hooks/platform';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const actionTypes = [
   { value: 'all', label: 'All Actions' },
-  { value: 'user.create', label: 'User Created' },
-  { value: 'user.update', label: 'User Updated' },
-  { value: 'user.delete', label: 'User Deleted' },
-  { value: 'user.set_platform_manager', label: 'Platform Manager Set' },
-  { value: 'user.revoke_platform_manager', label: 'Platform Manager Revoked' },
-  { value: 'organization.create', label: 'Organization Created' },
-  { value: 'organization.update', label: 'Organization Updated' },
-  { value: 'organization.update_status', label: 'Status Changed' },
-  { value: 'organization.soft_delete', label: 'Organization Deleted' },
-  { value: 'organization.restore', label: 'Organization Restored' },
+  ...Object.entries(actionLabels).map(([value, label]) => ({ value, label })),
 ];
 
 export default function PlatformAuditLog() {
@@ -53,7 +46,7 @@ export default function PlatformAuditLog() {
     hasRefreshed.current = true;
 
     // Clear platform-related queries to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: ['platform'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.platform.all });
     // Refresh user data from server
     refreshUser();
   }, [queryClient, refreshUser]);
@@ -63,7 +56,7 @@ export default function PlatformAuditLog() {
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
 
-  const { data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, isRefetching, refetch } = usePlatformAuditLogs({
     page: currentPage,
     per_page: perPage,
     platform_manager_user_id: platformManagerUserId || undefined,
@@ -81,6 +74,10 @@ export default function PlatformAuditLog() {
     setAction('all');
     setCurrentPage(1);
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load audit log" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <PlatformLayout>

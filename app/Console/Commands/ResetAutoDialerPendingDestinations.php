@@ -10,14 +10,27 @@ use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
 use App\Scopes\OrganizationScope;
 use Illuminate\Console\Command;
+use Illuminate\Console\ConfirmableTrait;
 
 class ResetAutoDialerPendingDestinations extends Command
 {
-    protected $signature = 'auto-dialer:reset-pending-destinations {campaign? : Campaign ID or name to target}';
+    use ConfirmableTrait;
+
+    protected $signature = 'auto-dialer:reset-pending-destinations {campaign? : Campaign ID or name to target} {--force : Skip the production confirmation}';
 
     protected $description = 'Reset dial_attempts to 0 for pending destinations so they can be dialed again';
 
     public function handle(): int
+    {
+        if (! $this->confirmToProceed()) {
+            return self::FAILURE;
+        }
+
+        // Console has no authenticated user, so the tenant scope would match zero rows.
+        return OrganizationScope::bypass(fn (): int => $this->reset());
+    }
+
+    private function reset(): int
     {
         $campaignInput = $this->argument('campaign');
 
@@ -46,6 +59,7 @@ class ResetAutoDialerPendingDestinations extends Command
 
             if (empty($listIds)) {
                 $this->warn('  No lists found for this campaign.');
+
                 continue;
             }
 

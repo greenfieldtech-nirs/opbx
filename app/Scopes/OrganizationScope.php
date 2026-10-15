@@ -7,6 +7,7 @@ namespace App\Scopes;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Organization Scope
@@ -64,6 +65,12 @@ class OrganizationScope implements Scope
         if ($organizationId !== null) {
             $builder->where($model->getTable().'.organization_id', $organizationId);
         } else {
+            if (app()->runningInConsole()) {
+                Log::warning('OrganizationScope: console query without bypass matches zero rows', [
+                    'model' => $model::class,
+                ]);
+            }
+
             // SECURITY: Force zero results when unauthenticated
             // This prevents unauthorized access to any organization's data
             $builder->whereRaw('1 = 0');
@@ -82,7 +89,7 @@ class OrganizationScope implements Scope
         }
 
         // Log when no organization ID is found
-        \Illuminate\Support\Facades\Log::debug('OrganizationScope: No authenticated user or organization_id', [
+        Log::debug('OrganizationScope: No authenticated user or organization_id', [
             'user' => $user ? $user->id : null,
             'has_organization_id' => $user && isset($user->organization_id),
         ]);

@@ -4,10 +4,78 @@ paths:
       tags:
         - Call Detail Records
       summary: Get CDR statistics
+      description: |
+        Totals over the CDRs whose `session_timestamp` date is between `from_date` and `to_date`
+        (inclusive). Any role; a Supervisor's totals cover only the resources they supervise and a
+        PBX User's only calls of or to their own extensions. The `extension`, `to` and
+        `extension_destination_match` filters apply as on the list endpoint.
+        The response is not wrapped in `data`. No other list filters apply.
       operationId: getCdrStatistics
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: call-detail-records:read
+      parameters:
+        - $ref: '../../components/parameters/query/CdrArchive.yaml'
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Defaults to 30 days ago
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Defaults to today
+        - name: extension
+          in: query
+          schema:
+            type: string
+          description: Extension filter, as on the list endpoint
+        - name: to
+          in: query
+          schema:
+            type: string
+          description: Destination filter, as on the list endpoint
+        - name: extension_destination_match
+          in: query
+          schema:
+            type: string
+            enum: [all, any]
+            default: all
+          description: How `extension` and `to` combine, as on the list endpoint
       responses:
         '200':
           description: CDR statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_calls:
+                    type: integer
+                  total_duration:
+                    type:
+                      - integer
+                      - number
+                  total_billsec:
+                    type:
+                      - integer
+                      - number
+                  average_duration:
+                    type:
+                      - number
+                      - 'null'
+                    description: Average over calls with a duration above 0
+                  total_cost:
+                    type: number
+                    description: Sum of `sell_cost`
+                  by_disposition:
+                    type: object
+                    description: Call count per disposition
+                    additionalProperties:
+                      type: integer
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'

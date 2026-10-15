@@ -94,3 +94,45 @@ export function getAllRoles(): Array<{
 export function canEditRoles(role: UserRole): boolean {
   return role === 'owner';
 }
+
+/**
+ * True when `actorRole` may act on an account whose role is `targetRole`.
+ * An Owner account can only be changed (edit, password, embed token, delete,
+ * its extension credentials) by an Owner; mirrors UserPolicy::actsOnOwner.
+ */
+export function canActOnRole(actorRole: UserRole | undefined, targetRole: UserRole | undefined): boolean {
+  return targetRole !== 'owner' || actorRole === 'owner';
+}
+
+/**
+ * Abilities the UI gates on, mirroring the server policies (the server stays authoritative).
+ * Keep each entry next to the policy it mirrors.
+ */
+const ABILITY_ROLES = {
+  // SessionUpdatePolicy::disconnect (canManageOrganization)
+  'liveCalls.disconnect': ['owner'],
+  // AutoDialerCampaignPolicy / DistributionListPolicy: create, update, start, pause, resume, upload (canManageUsers)
+  'autoDialer.manage': ['owner', 'pbx_admin'],
+  // AutoDialerCampaignPolicy::delete / archive, DistributionListPolicy::delete (Owner only)
+  'autoDialer.destroy': ['owner'],
+  // RecordingPolicy create/update/delete
+  'recordings.manage': ['owner', 'pbx_admin'],
+  // CallTrackingAdPlatformIntegrationPolicy
+  'callTracking.integrations': ['owner', 'pbx_admin'],
+  // CallQueuePolicy create/update/delete (Supervisors only read queues with their agents)
+  'callQueues.manage': ['owner', 'pbx_admin'],
+  // OutboundWhitelistPolicy create/update/delete (view is open to every role)
+  'outboundWhitelist.manage': ['owner', 'pbx_admin'],
+} as const;
+
+export type Ability = keyof typeof ABILITY_ROLES;
+
+/** True when `role` holds `ability` according to the server policy it mirrors. */
+export function can(role: UserRole | string | undefined, ability: Ability): boolean {
+  return !!role && (ABILITY_ROLES[ability] as readonly string[]).includes(role);
+}
+
+/** DistributionListPolicy::delete — Owner always; PBX Admin only for failed lists. */
+export function canDeleteDistributionList(role: UserRole | string | undefined, listStatus: string): boolean {
+  return can(role, 'autoDialer.destroy') || (role === 'pbx_admin' && listStatus === 'failed');
+}

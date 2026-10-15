@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
@@ -25,16 +27,11 @@ class RecordingResource extends JsonResource
 
     /**
      * Set the current user ID for all resources in this request.
-     *
-     * @param  int  $userId
-     * @return void
      */
     public static function setCurrentUserId(int $userId): void
     {
         static::$currentUserId = $userId;
     }
-
-
 
     /**
      * Transform the resource into an array.

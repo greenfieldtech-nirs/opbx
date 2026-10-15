@@ -29,3 +29,6 @@ required:
   - id
   - name
   - permissions
+  - last_used_at
+  - revoked_at
+  - created_at

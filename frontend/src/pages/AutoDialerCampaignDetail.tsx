@@ -26,10 +26,12 @@ import {
   ListOrdered,
   Timer,
   Voicemail,
+  Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -49,6 +51,7 @@ import {
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import {
   useAutoDialerCampaign,
   useStartCampaign,
@@ -57,8 +60,9 @@ import {
   useArchiveCampaign,
   autoDialerKeys,
 } from '@/hooks/useAutoDialerCampaigns';
-import { useDistributionLists } from '@/hooks/useDistributionLists';
-import type { AutoDialerCampaign } from '@/services/autoDialerCampaignsApi';
+import { useDistributionLists, useUnassignListFromCampaign } from '@/hooks/useDistributionLists';
+import { getApiErrorMessage } from '@/services/api';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 function getStatusBadge(status: string) {
   const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
@@ -112,7 +116,8 @@ export default function AutoDialerCampaignDetail() {
   const [listsPage, setListsPage] = useState(1);
   const LISTS_PER_PAGE = 5;
 
-  const canManageCampaigns = currentUser && ['owner', 'pbx_admin'].includes(currentUser.role);
+  const canManageCampaigns = can(currentUser?.role, 'autoDialer.manage');
+  const canArchiveCampaign = can(currentUser?.role, 'autoDialer.destroy');
 
   // Mutations
   const startMutation = useStartCampaign();
@@ -121,13 +126,25 @@ export default function AutoDialerCampaignDetail() {
   const archiveMutation = useArchiveCampaign();
 
   // Fetch campaign data — poll every 10s when campaign is active
-  const { data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: campaign, isLoading: isCampaignLoading, error: campaignError } = useAutoDialerCampaign(id || '', 10000);
 
   // Fetch distribution lists for this campaign
   const { data: distributionListsData, isLoading: isListsLoading } = useDistributionLists(
     { campaign_id: id ? parseInt(id, 10) : undefined, per_page: 100 }
   );
   const distributionLists = distributionListsData?.data || [];
+  const unassignMutation = useUnassignListFromCampaign();
+
+  // A list can be unassigned only while the campaign is not active and its entries have not started processing (can_unassign).
+  const handleUnassignList = async (listId: number) => {
+    try {
+      await unassignMutation.mutateAsync(listId);
+      queryClient.invalidateQueries({ queryKey: autoDialerKeys.all });
+      toast.success('List unassigned from campaign');
+    } catch (err) {
+      toast.error('Unassign failed', { description: getApiErrorMessage(err) });
+    }
+  };
 
   // Get Caller ID pool from campaign data
   const callerIdPool = (campaign as any)?.caller_id_pool || [];
@@ -210,6 +227,10 @@ export default function AutoDialerCampaignDetail() {
     );
   }
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load campaign" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -229,15 +250,27 @@ export default function AutoDialerCampaignDetail() {
 
         {canManageCampaigns && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={campaign.status === 'active'}
-              onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}
-              title={campaign.status === 'active' ? 'Pause the campaign to edit' : undefined}
-            >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
+            {campaign.status === 'active' ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* A disabled button gets no pointer events, so the span carries the tooltip */}
+                    <span tabIndex={0}>
+                      <Button variant="outline" disabled>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Pause the campaign to edit it</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Button variant="outline" onClick={() => navigate(`/ui/auto-dialer/campaigns/${id}/edit`)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            )}
             {campaign.status === 'draft' && (
               <Button onClick={() => handleAction('start')}>
                 <Play className="h-4 w-4 mr-2" />
@@ -256,10 +289,12 @@ export default function AutoDialerCampaignDetail() {
                 Resume
               </Button>
             )}
-            <Button onClick={() => handleAction('archive')} variant="outline" className="text-destructive">
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
-            </Button>
+            {canArchiveCampaign && (
+              <Button onClick={() => handleAction('archive')} variant="outline" className="text-destructive">
+                <Archive className="h-4 w-4 mr-2" />
+                Archive
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -388,7 +423,7 @@ export default function AutoDialerCampaignDetail() {
                       <div className="py-2 border-b">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-muted-foreground">Caller ID Pool</span>
-                          <span className="text-xs text-muted-foreground">{callerIdPool.length} numbers</span>
+                          <span className="text-xs text-muted-foreground">{callerIdPool.length} {callerIdPool.length === 1 ? 'number' : 'numbers'}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {callerIdPool.map((item: any) => (
@@ -422,6 +457,12 @@ export default function AutoDialerCampaignDetail() {
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Max Dial Attempts</span>
                     <span className="font-medium">{campaign.max_dial_attempts}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b">
+                    <span className="text-muted-foreground">Retry on busy / no-answer</span>
+                    <span className="font-medium">
+                      {campaign.retry_on_busy_no_answer ? `Yes, first retry after ${campaign.retry_delay_minutes ?? 15} min (doubling)` : 'No'}
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Concurrent Active Calls</span>
@@ -459,6 +500,7 @@ export default function AutoDialerCampaignDetail() {
                             <TableHead className="text-center">Version</TableHead>
                             <TableHead className="text-right">Records</TableHead>
                             <TableHead className="text-right">Invalid</TableHead>
+                            {canManageCampaigns && <TableHead className="w-24" />}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -492,6 +534,30 @@ export default function AutoDialerCampaignDetail() {
                                     <span className="text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
+                                {canManageCampaigns && (
+                                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                    {list.can_unassign ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-red-600 hover:text-red-800"
+                                        onClick={() => handleUnassignList(list.id)}
+                                        disabled={unassignMutation.isPending}
+                                        title="Unassign from campaign"
+                                      >
+                                        <Unlink className="h-4 w-4 mr-1" />
+                                        Unassign
+                                      </Button>
+                                    ) : (
+                                      <span
+                                        className="text-xs text-muted-foreground"
+                                        title={list.unassign_refusal ?? 'Cannot unassign this list'}
+                                      >
+                                        Locked
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                         </TableBody>
@@ -567,7 +633,7 @@ export default function AutoDialerCampaignDetail() {
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Time Limit</span>
-                    <span className="font-medium">{campaign.time_limit || 3600} seconds</span>
+                    <span className="font-medium">{campaign.time_limit || 600} seconds</span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Record Calls</span>

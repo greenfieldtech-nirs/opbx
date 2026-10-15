@@ -43,6 +43,8 @@ export interface AutoDialerCampaign {
   action_human?: 'HANGUP' | 'CONTINUE' | string;
   action_unknown?: 'HANGUP' | 'CONTINUE' | string;
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   statistics: {
     total_destinations: number;
     completed_calls: number;
@@ -88,6 +90,8 @@ export interface CreateCampaignRequest {
   action_human?: 'HANGUP' | 'CONTINUE' | string;
   action_unknown?: 'HANGUP' | 'CONTINUE' | string;
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   auto_start?: boolean;
 }
 
@@ -117,10 +121,12 @@ export interface UpdateCampaignRequest {
   time_limit?: number;
   record_calls?: boolean;
   // WebSocket-based AMD action fields
-  action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
-  action_human?: 'HANGUP' | 'CONTINUE' | string;
-  action_unknown?: 'HANGUP' | 'CONTINUE' | string;
+  action_voicemail?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
+  action_human?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
+  action_unknown?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   retry_on_voicemail?: boolean;
+  retry_on_busy_no_answer?: boolean;
+  retry_delay_minutes?: number;
   auto_start?: boolean;
 }
 
@@ -149,6 +155,7 @@ export interface CampaignDestination {
 
 export interface CampaignParams {
   status?: string;
+  exclude_status?: string;
   search?: string;
   per_page?: number;
   page?: number;
@@ -256,11 +263,6 @@ export const autoDialerCampaignsApi = {
       )
       .then((r) => r.data);
   },
-
-  deleteList: (campaignId: string) =>
-    api
-      .delete<{ message: string }>(`/auto-dialer-campaigns/${campaignId}/list`)
-      .then((r) => r.data),
 
   // Destinations
   getDestinations: (campaignId: string, params?: { status?: string; per_page?: number; page?: number }) =>

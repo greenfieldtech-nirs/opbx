@@ -1,18 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { distributionListsApi } from '@/services/distributionListsApi';
-import type { CreateListRequest, CsvMappingConfig, CsvPreview, DistributionListParams } from '@/types';
+import type { CreateListRequest, CsvMappingConfig, DistributionListParams } from '@/types';
 
-// Query keys
+// Query keys. Params are appended only when given: a trailing `undefined` would make the
+// params-less key stop prefix-matching the paged queries, so invalidating it would miss them.
+const withParams = (params?: object) => (params ? [params] : []);
+
 export const distributionListKeys = {
   all: ['distributionLists'] as const,
   lists: (params?: DistributionListParams) =>
-    [...distributionListKeys.all, 'list', params] as const,
+    [...distributionListKeys.all, 'list', ...withParams(params)] as const,
   detail: (id: string | number) =>
     [...distributionListKeys.all, 'detail', id] as const,
   destinations: (id: string | number, params?: object) =>
-    [...distributionListKeys.all, 'destinations', id, params] as const,
+    [...distributionListKeys.all, 'destinations', id, ...withParams(params)] as const,
   versions: (id: string | number) =>
     [...distributionListKeys.all, 'versions', id] as const,
+  versionDestinations: (id: string | number, versionId: number, params?: object) =>
+    [...distributionListKeys.all, 'versions', id, versionId, 'destinations', ...withParams(params)] as const,
+  parts: (id: string | number) =>
+    [...distributionListKeys.all, 'parts', id] as const,
   progress: (jobId: string) =>
     [...distributionListKeys.all, 'progress', jobId] as const,
 };
@@ -35,6 +42,8 @@ export function useDistributionList(id: string | number) {
     queryKey: distributionListKeys.detail(id),
     queryFn: () => distributionListsApi.getById(id),
     enabled: !!id,
+    // Uploads are processed by a worker: keep the list fresh until it leaves 'processing'
+    refetchInterval: (query) => (query.state.data?.data?.status === 'processing' ? 2000 : false),
   });
 }
 
@@ -47,6 +56,7 @@ export function useCreateList() {
   return useMutation({
     mutationFn: (data: CreateListRequest) => distributionListsApi.create(data),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -77,15 +87,16 @@ export function useUploadList() {
       listId,
       file,
       mapping,
+      hasHeader,
     }: {
       listId: string | number;
       file: File;
       mapping: CsvMappingConfig;
-    }) => distributionListsApi.uploadCsv(listId, file, mapping),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+      hasHeader?: boolean;
+    }) => distributionListsApi.uploadCsv(listId, file, mapping, hasHeader),
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -138,13 +149,9 @@ export function useAddDestination() {
       listId: string | number;
       data: { phone_number: string; description?: string };
     }) => distributionListsApi.addDestination(listId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -163,25 +170,57 @@ export function useAddDestinationsBatch() {
       listId: string | number;
       destinations: Array<{ phone_number: string; description?: string }>;
     }) => distributionListsApi.addDestinationsBatch(listId, destinations),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
 
 /**
- * Hook to fetch version history
+ * Hook to fetch a list's previous versions
  */
-export function useListVersions(listId: string | number) {
+export function useListVersions(listId: string | number, enabled = true) {
   return useQuery({
     queryKey: distributionListKeys.versions(listId),
     queryFn: () => distributionListsApi.getVersions(listId),
-    enabled: !!listId,
+    enabled: !!listId && enabled,
+  });
+}
+
+/**
+ * Hook to page and search a previous version's entries
+ */
+export function useListVersionDestinations(
+  listId: string | number,
+  versionId: number | null,
+  params: { page?: number; per_page?: number; search?: string },
+) {
+  return useQuery({
+    queryKey: distributionListKeys.versionDestinations(listId, versionId ?? 0, params),
+    queryFn: () => distributionListsApi.getVersionDestinations(listId, versionId!, params),
+    enabled: !!listId && versionId !== null,
+  });
+}
+
+/**
+ * Hook to download a previous version as CSV
+ */
+export function useDownloadListVersion() {
+  return useMutation({
+    mutationFn: ({ listId, versionId }: { listId: string | number; versionId: number }) =>
+      distributionListsApi.downloadVersion(listId, versionId),
+  });
+}
+
+/**
+ * Hook to fetch the "(Part N)" lists a list was split into
+ */
+export function useListParts(listId: string | number, enabled = true) {
+  return useQuery({
+    queryKey: distributionListKeys.parts(listId),
+    queryFn: () => distributionListsApi.getParts(listId),
+    enabled: !!listId && enabled,
   });
 }
 
@@ -195,6 +234,7 @@ export function useCopyList() {
     mutationFn: ({ listId, newName }: { listId: string | number; newName: string }) =>
       distributionListsApi.copy(listId, newName),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -208,11 +248,9 @@ export function useArchiveList() {
 
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.archive(listId),
-    onSuccess: (_, listId) => {
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(listId),
-      });
     },
   });
 }
@@ -260,13 +298,9 @@ export function useResetDialAttempts() {
       listId: string | number;
       destinationId: number;
     }) => distributionListsApi.resetDialAttempts(listId, destinationId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -285,13 +319,9 @@ export function useBulkResetDialAttempts() {
       listId: string | number;
       destinationIds: number[];
     }) => distributionListsApi.bulkResetDialAttempts(listId, destinationIds),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -305,13 +335,9 @@ export function useResetPendingDestinations() {
   return useMutation({
     mutationFn: ({ listId }: { listId: string | number }) =>
       distributionListsApi.resetPendingDestinations(listId),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.destinations(variables.listId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: distributionListKeys.detail(variables.listId),
-      });
+    onSuccess: (_) => {
+      // Counts, destinations, versions and progress all hang off the list root.
+      queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
 }
@@ -325,6 +351,7 @@ export function useDeleteList() {
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.delete(listId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -340,6 +367,7 @@ export function useAssignListToCampaign() {
     mutationFn: ({ listId, campaignId }: { listId: string | number; campaignId: number }) =>
       distributionListsApi.assignToCampaign(listId, campaignId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });
@@ -354,6 +382,7 @@ export function useUnassignListFromCampaign() {
   return useMutation({
     mutationFn: (listId: string | number) => distributionListsApi.unassignFromCampaign(listId),
     onSuccess: () => {
+      // Counts, destinations, versions and progress all hang off the list root.
       queryClient.invalidateQueries({ queryKey: distributionListKeys.all });
     },
   });

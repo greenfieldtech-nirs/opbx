@@ -22,7 +22,7 @@ class RecordingUploadServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->service = new RecordingUploadService();
+        $this->service = new RecordingUploadService;
 
         // Set default config values
         Config::set('recordings.max_file_size_kb', 5120); // 5MB
@@ -137,7 +137,7 @@ class RecordingUploadServiceTest extends TestCase
         $reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'LPT1'];
 
         foreach ($reservedNames as $name) {
-            $this->assertTrue($method->invoke($this->service, $name . '.mp3'), "Should detect $name as reserved");
+            $this->assertTrue($method->invoke($this->service, $name.'.mp3'), "Should detect $name as reserved");
         }
 
         $this->assertFalse($method->invoke($this->service, 'normal.mp3'));
@@ -289,7 +289,7 @@ class RecordingUploadServiceTest extends TestCase
 
         // Temporarily move the file to simulate missing file
         $realPath = $file->getRealPath();
-        $tempPath = $realPath . '.backup';
+        $tempPath = $realPath.'.backup';
         rename($realPath, $tempPath);
 
         $metadata = $method->invoke($this->service, $file);

@@ -11,6 +11,7 @@ use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\BusinessHoursSchedule;
+use App\Models\CallQueue;
 use App\Models\CallTrackingCampaign;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
@@ -39,6 +40,7 @@ class CallTrackingDestinationResolver
             CallTrackingDestinationType::IVR_MENU => $this->resolveIvrMenu($campaign),
             CallTrackingDestinationType::AI_ASSISTANT => $this->resolveAiAssistant($campaign),
             CallTrackingDestinationType::AI_LOAD_BALANCER => $this->resolveAiLoadBalancer($campaign),
+            CallTrackingDestinationType::UNAVAILABLE => null,
         };
     }
 
@@ -228,7 +230,6 @@ class CallTrackingDestinationResolver
         $schedule = BusinessHoursSchedule::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $scheduleId)
             ->where('organization_id', $campaign->organization_id)
-            ->where('status', 'active')
             ->first();
 
         if (! $schedule) {
@@ -264,6 +265,8 @@ class CallTrackingDestinationResolver
             'ivr_menu' => $this->resolveBusinessHoursIvrMenu($campaign, $schedule, $targetId),
             'ai_assistant' => $this->resolveBusinessHoursAiAssistant($campaign, $schedule, $targetId),
             'ai_load_balancer' => $this->resolveBusinessHoursAiLoadBalancer($campaign, $schedule, $targetId),
+            'call_queue' => $this->resolveBusinessHoursCallQueue($campaign, $schedule, $targetId),
+            'unavailable' => ['type' => null, 'unavailable' => true],
             default => [
                 'type' => null,
                 'business_hours' => $schedule,
@@ -458,6 +461,35 @@ class CallTrackingDestinationResolver
         return [
             'type' => ExtensionType::AI_LOAD_BALANCER,
             'ai_load_balancer' => $loadBalancer,
+            'business_hours' => $schedule,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveBusinessHoursCallQueue(
+        CallTrackingCampaign $campaign,
+        BusinessHoursSchedule $schedule,
+        string $targetId
+    ): ?array {
+        $callQueueId = $this->parsePrefixedId($targetId, 'queue');
+
+        $callQueue = $callQueueId
+            ? CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $callQueueId)
+                ->where('organization_id', $campaign->organization_id)
+                ->where('status', 'active')
+                ->first()
+            : null;
+
+        if (! $callQueue) {
+            return null;
+        }
+
+        return [
+            'type' => ExtensionType::QUEUE,
+            'call_queue' => $callQueue,
             'business_hours' => $schedule,
         ];
     }

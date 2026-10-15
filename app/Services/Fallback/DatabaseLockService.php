@@ -20,8 +20,8 @@ class DatabaseLockService
     /**
      * Attempt to acquire a lock.
      *
-     * @param string $key Lock identifier
-     * @param int $seconds Lock duration in seconds
+     * @param  string  $key  Lock identifier
+     * @param  int  $seconds  Lock duration in seconds
      * @return string|null Lock owner ID if acquired, null if failed
      */
     public function acquire(string $key, int $seconds = 30): ?string
@@ -63,8 +63,8 @@ class DatabaseLockService
     /**
      * Release a lock by owner.
      *
-     * @param string $key Lock identifier
-     * @param string $owner Lock owner ID
+     * @param  string  $key  Lock identifier
+     * @param  string  $owner  Lock owner ID
      * @return bool True if released, false otherwise
      */
     public function release(string $key, string $owner): bool
@@ -89,7 +89,7 @@ class DatabaseLockService
     /**
      * Release a lock by key (regardless of owner).
      *
-     * @param string $key Lock identifier
+     * @param  string  $key  Lock identifier
      * @return bool True if released, false otherwise
      */
     public function forceRelease(string $key): bool
@@ -112,11 +112,12 @@ class DatabaseLockService
     /**
      * Execute callback with lock protection.
      *
-     * @param string $key Lock identifier
-     * @param callable $callback Callback to execute while holding lock
-     * @param int $seconds Lock duration
-     * @param int $waitSeconds Seconds to wait for lock acquisition
+     * @param  string  $key  Lock identifier
+     * @param  callable  $callback  Callback to execute while holding lock
+     * @param  int  $seconds  Lock duration
+     * @param  int  $waitSeconds  Seconds to wait for lock acquisition
      * @return mixed Result from callback
+     *
      * @throws \RuntimeException If lock cannot be acquired
      */
     public function block(string $key, callable $callback, int $seconds = 30, int $waitSeconds = 5): mixed
@@ -152,7 +153,7 @@ class DatabaseLockService
     /**
      * Cleanup expired locks for a specific key.
      *
-     * @param string $key Lock identifier
+     * @param  string  $key  Lock identifier
      * @return int Number of locks cleaned up
      */
     private function cleanupExpired(string $key): int
@@ -186,7 +187,7 @@ class DatabaseLockService
     /**
      * Check if a lock exists.
      *
-     * @param string $key Lock identifier
+     * @param  string  $key  Lock identifier
      * @return bool True if lock exists and is not expired
      */
     public function exists(string $key): bool

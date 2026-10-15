@@ -6,10 +6,11 @@ namespace Database\Factories;
 
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\AiAssistantLoadBalancerMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AiAssistantLoadBalancerMember>
+ * @extends Factory<AiAssistantLoadBalancerMember>
  */
 class AiAssistantLoadBalancerMemberFactory extends Factory
 {

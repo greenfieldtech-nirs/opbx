@@ -1,0 +1,56 @@
+type: object
+description: |
+  Recording status callback from Cloudonix. Both the PascalCase Cloudonix fields and the
+  snake_case fallbacks are accepted (`RecordingStatusRequest`). At least one call or session
+  identifier is needed to find the call detail record.
+properties:
+  CallSid:
+    type: string
+    maxLength: 255
+    description: Cloudonix call ID (matches `call_id` on the CDR).
+    example: CA550e8400e29b41d4a716446655440000
+  call_id:
+    type: string
+    maxLength: 255
+    description: Fallback for `CallSid`.
+  Session:
+    type: string
+    description: Session token of the call (read, not validated).
+  session_token:
+    type: string
+    maxLength: 255
+    description: Fallback for `Session`.
+  session:
+    type: object
+    properties:
+      token:
+        type: string
+        maxLength: 255
+        description: Fallback for `Session` and `session_token`.
+  RecordingUrl:
+    type: string
+    format: uri
+    maxLength: 2000
+    description: Location of the recording to download.
+  recording_url:
+    type: string
+    format: uri
+    maxLength: 2000
+    description: Fallback for `RecordingUrl`.
+  RecordingStatus:
+    type: string
+    maxLength: 50
+    description: Recording state. `absent` means there is nothing to download.
+    example: completed
+  recording_status:
+    type: string
+    maxLength: 50
+    description: Fallback for `RecordingStatus`.
+  RecordingDuration:
+    type: integer
+    minimum: 0
+    description: Recording length in seconds.
+  recording_duration:
+    type: integer
+    minimum: 0
+    description: Fallback for `RecordingDuration`.

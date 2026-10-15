@@ -3,130 +3,163 @@ info:
   title: OPBX REST API
   description: |
     This API provides complete control plane access for managing a multi-tenant business PBX system.
-    The API is built on Laravel 12 with Sanctum authentication.
+    The API is built on Laravel 12 with Sanctum authentication. All paths are relative to
+    `<APP_URL>/api`.
 
-    > **Generated from source:** This specification is derived from the current Laravel
-    > route list (`docs/superpowers/work/route-list.json`) and controller FormRequest
-    > classes. Regenerate it whenever routes or validation rules change.
-    
+    > **Derived from source:** This specification follows the Laravel route list
+    > (`php artisan route:list --json`), the FormRequest classes and the API Resources.
+    > Update it whenever routes, validation rules or resources change.
+
     ## Authentication
-    
-    The API supports two authentication modes:
-    
-    - **Bearer Token** (API clients): Include `Authorization: Bearer <token>` header
-    - **Cookie-based** (SPA): Uses httpOnly session cookies + CSRF protection
-    
+
+    Each operation lists the schemes it accepts in `security`:
+
+    - **Bearer token** (`bearerAuth`, used by API clients and by the web app):
+      `POST /v1/auth/login` returns a Sanctum personal access token that expires after
+      24 hours. Send it as `Authorization: Bearer <token>`. The API does not use session
+      cookies.
+    - **Organization API key** (`apiKeyAuth`, `opbxk_...`): only on operations that carry
+      `x-api-key-scope`; every other operation answers API keys with 403.
+    - **Embedded Dialer token** (`embedTokenAuth`, `opbxd_...`): only for `/v1/embed/*`.
+    - **Cloudonix webhooks** (`webhookBearer`), **voice routing callbacks** (`voiceWebhookAuth`),
+      **dialer worker** (`dialerWorkerAuth`) and **AMD worker** (`amdWorkerAuth`): see the
+      security scheme descriptions.
+
+    Authenticated tenant routes also reject users whose organization is suspended or not
+    active (403). A platform manager can send `X-Operate-As-Organization: <organization id>`
+    to act as that organization's Owner (see `POST /v1/platform/operate-as/{organization}`).
+
     ## Architecture
-    
+
     - **Control Plane**: REST API for configuration and management
-    - **Execution Plane**: Webhooks for real-time call routing (returns CXML)
-    
+    - **Execution Plane**: Cloudonix webhooks and voice routing callbacks (voice routing returns CXML)
+
     ## API Overview
-    
+
     ### Control Plane (Authenticated)
-                 
+
       | Resource | Endpoints |
       |----------|-----------|
-      | **Health** | `GET /health`, `GET /storage/health`, `GET /websocket/health` |
-      | **Auth** | Login, logout, refresh, register, me, Auth0 social login |
+      | **Health** | `GET /health` (public), `GET /storage/health`, `GET /websocket/health` |
+      | **Auth** | Login, logout, refresh, register, me, email validation, Auth0 social login, broadcasting channel auth |
       | **Profile** | Get/update profile, password, organization |
-      | **Users** | CRUD operations for organization users |
+      | **Organizations** | Join requests (submit, list, approve, reject) |
+      | **Users** | CRUD for organization users, invitations, password, delete-impact preview, per-user Embedded Dialer token |
+      | **API Keys** | Owner-managed scoped API keys |
       | **Extensions** | CRUD + sync + password management |
       | **Conference Rooms** | CRUD for conference rooms |
       | **Ring Groups** | CRUD for ring groups |
+      | **Call Queues** | CRUD + toggle status, agent state, live view, statistics, queue call history and export, public wallboard link |
       | **Business Hours** | CRUD + duplicate + toggle status |
       | **IVR Menus** | CRUD + voices + toggle status |
       | **Phone Numbers** | DID management |
-      | **AI Assistants** | AI assistant configuration |
-      | **Call Detail Records** | CDR records and export |
-      | **Call Tracking** | Campaigns, DNI, sessions, analytics, ad-platform integrations |
+      | **AI Assistants** | AI assistant configuration and providers |
+      | **AI Load Balancers** | AI assistant load balancer configuration |
+      | **Call Detail Records** | CDR records, statistics, export and recording |
       | **Recordings** | Recording management and download |
       | **Inbound Blacklist** | Blocked caller management |
       | **Outbound Whitelist** | Outbound dialing restrictions |
-      | **Settings** | Organization and Cloudonix settings |
+      | **Settings** | Cloudonix settings |
       | **Trunks** | SIP trunk management (proxied from Cloudonix) |
       | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
       | **Supervisors** | Supervisor assignments + supervisor dashboard |
-      | **Web Phone** | In-browser softphone SIP provisioning (Owner/Supervisor) |
-      | **Call Notifications** | Webhook notification settings |
+      | **Web Phone** | In-browser softphone SIP provisioning + recent calls log (any role with a user extension) |
+      | **Embedded Dialer** | Token-authenticated widget runtime API (config + calls log) |
+      | **Call Notifications** | Webhook notification settings, logs and test |
       | **Auto Dialer** | Campaign management, monitoring, lifecycle |
       | **Distribution Lists** | List upload, assignment, management |
-    
+      | **Configuration** | Public application configuration |
+      | **Dialer Worker** | Internal API for the Go dialer worker |
+
     ### Execution Plane (Webhooks)
-      
+
       | Endpoint | Purpose |
       |----------|---------|
       | `POST /webhooks/cloudonix/call-initiated` | Async call notification |
       | `POST /webhooks/cloudonix/call-status` | Call status updates |
       | `POST /webhooks/cloudonix/cdr` | Call detail records |
       | `POST /webhooks/cloudonix/session-update` | Session updates (high velocity) |
+      | `POST /webhooks/cloudonix/recording-status` | Recording status |
       | `POST /webhooks/cloudonix/dialer` | Auto-dialer webhook proxy |
       | `POST /webhooks/auto-dialer/call-status` | Auto-dialer call status |
       | `POST /webhooks/auto-dialer/amd-result` | Auto-dialer AMD result |
-    
+
     ### Voice Routing (CXML)
-      
+
       | Endpoint | Purpose |
       |----------|---------|
       | `POST /voice/route` | Main inbound call routing (returns CXML) |
       | `POST /voice/ivr-input` | IVR digit input handling |
+      | `GET /voice/health` | Voice routing health |
+      | `POST /voice/amd-session`, `POST /voice/amd-action` | AMD worker session check and detection result |
       | `POST /callbacks/voice/ring-group-callback` | Ring group routing |
-      | `POST /callbacks/voice/albs-follow-through` | ALB failover routing |
-    
+      | `/callbacks/voice/ring-group-member-connect`, `/callbacks/voice/ring-group-fallback` | Simultaneous ring group member answer and fallback (signed URLs) |
+      | `POST /callbacks/voice/conference-pin` | Conference room PIN entry |
+      | `POST /callbacks/voice/albs-follow-through` | AI load balancer failover routing |
+      | `/callbacks/voice/queue-*` | Call queue polling, dialing and conference callbacks |
+
     ### Platform Manager
-      
+
       | Resource | Endpoints |
       |----------|-----------|
       | **Dashboard** | Cross-tenant statistics |
-      | **Organizations** | Organization management |
+      | **Organizations** | Organization management, status, users |
+      | **Operate As** | Act as an organization's Owner |
       | **Users** | Cross-tenant user management |
       | **Audit Logs** | Platform-wide audit trail |
-    
+      | **CDR Archive** | Warm-archive CDRs across organizations |
+      | **Status** | Platform status and on-demand health check (plus the public `GET /v1/public/status`) |
+
     ## Rate Limiting
-    
-    Rate limits are applied per organization:
-      
-      | Endpoint Type | Limit |
-      |---------------|-------|
-      | API endpoints | 60 requests/minute |
-      | Webhooks | 100 requests/minute |
-      | Voice routing | 1000 requests/minute |
-      | Sensitive operations | 10 requests/minute |
-      | Authentication | 5 attempts/minute |
-    
+
+      | Scope | Limit |
+      |-------|-------|
+      | Tenant API (`/v1/*` routes with the per-organization limiter) | 60 requests/minute per organization (`RATE_LIMIT_API`); responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` |
+      | Profile password and organization updates | 10 requests/minute per user (`RATE_LIMIT_SENSITIVE`) |
+      | Extension password view and reset | 10 requests/minute per user and IP; 60 for Owner and PBX Admin (`RATE_LIMIT_SENSITIVE_ADMIN`) |
+      | Login, Auth0 redirect/callback, join requests, invitation validate/accept | 5 requests/minute per IP (`RATE_LIMIT_AUTH`) |
+      | Registration | 10 requests/hour per IP |
+      | Email validation | 10 requests/minute per IP |
+      | Embedded Dialer API | 60 requests/minute per token and IP |
+      | Public status / public queues wallboard / platform status check | 60 / 120 / 6 requests/minute |
+      | Dialer worker API | 1000 requests/minute per IP (`DIALER_WORKER_RATE_LIMIT`) |
+      | Cloudonix webhooks, voice routing and voice callbacks | Not rate-limited |
+
+    Routes without a limiter in this table (for example auto-dialer campaigns, distribution
+    lists and session updates) are not rate-limited. A limited request answers 429 with
+    `{"error", "message", "retry_after"}` and a `Retry-After` header.
+
     ## Response Format
-    
+
     ### Success Response
+    Single resources are usually returned as `{"data": {...}}`, sometimes with a `message`.
+    The exact shape is documented on each operation.
+
+    ### Error Response
+    Authentication, authorization and HTTP exceptions:
       ```json
-      {
-        "message": "Operation completed successfully",
-        "data": { ... }
-      }
+      { "error": "Unauthenticated", "message": "Authentication required to access this resource." }
       ```
-      
-      ### Error Response
+    Controller errors:
       ```json
-      {
-        "error": "ERROR_CODE",
-        "message": "Human-readable error message",
-        "code": "MACHINE_CODE"
-      }
+      { "error": { "code": "CREATION_ERROR", "message": "Human-readable error message", "details": null } }
       ```
-      
-      ### Validation Error
+    API-key scope denials and tenant-scope checks return only `{"message": "..."}`.
+
+    ### Validation Error (422)
       ```json
       {
-        "message": "The given data was invalid.",
+        "message": "The name field is required. (and 1 more error)",
         "errors": {
-          "field": ["Error message 1", "Error message 2"]
+          "name": ["The name field is required."],
+          "email": ["The email field must be a valid email address."]
         }
       }
       ```
-    
+
     ## Pagination
-    
-    List endpoints return paginated responses:
-      
+
+    Most list endpoints return:
       ```json
       {
         "data": [...],
@@ -140,20 +173,15 @@ info:
         }
       }
       ```
-    
-    Query parameters:
+    Some endpoints return a Laravel resource collection instead (a top-level `links` object
+    and a `meta` that also has `path` and `links`); each operation shows its shape.
+
+    Common query parameters:
       - `page` - Page number (default: 1)
-      - `per_page` - Items per page (1-100, default: 20)
-      - `sort_by` - Sort field
-      - `sort_order` - asc or desc (default: asc) 
-    
-    ## Rate Limiting
-    
-    Rate limits are applied per organization:
-    - API endpoints: 60 requests/minute
-    - Webhooks: 100 requests/minute
-    - Voice routing: 1000 requests/minute
-    - Sensitive operations: 10 requests/minute
+      - `per_page` - Items per page (usually 1-100, default 20; most endpoints clamp
+        out-of-range values, some answer 422)
+      - `sort_by` - Sort field; values that are not allowed fall back to the endpoint's default
+      - `sort_order` - `asc` or `desc`; the default depends on the endpoint
 
   version: 1.0.0
   contact:
@@ -167,11 +195,10 @@ servers:
   - url: https://opbx.cloudonix.cloud/api
     description: Production server
   - url: http://localhost/api
-    description: Local development server
+    description: Local development server (Docker Compose nginx on `APP_PORT`, default 80)
 
 security:
   - bearerAuth: []
-  - cookieAuth: []
 
 paths:
   /callbacks/voice/albs-follow-through:
@@ -179,6 +206,30 @@ paths:
 
   /callbacks/voice/ring-group-callback:
     $ref: './paths/voice/ring-group-callback.yaml#/paths/~1callbacks~1voice~1ring-group-callback'
+
+  /callbacks/voice/ring-group-member-connect:
+    $ref: './paths/voice/ring-group-conference.yaml#/paths/~1callbacks~1voice~1ring-group-member-connect'
+
+  /callbacks/voice/ring-group-fallback:
+    $ref: './paths/voice/ring-group-conference.yaml#/paths/~1callbacks~1voice~1ring-group-fallback'
+
+  /callbacks/voice/conference-pin:
+    $ref: './paths/voice/conference-pin.yaml#/paths/~1callbacks~1voice~1conference-pin'
+
+  /callbacks/voice/queue-agent-connect:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-agent-connect'
+
+  /callbacks/voice/queue-conference-join:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-conference-join'
+
+  /callbacks/voice/queue-dial:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-dial'
+
+  /callbacks/voice/queue-dial-callback:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-dial-callback'
+
+  /callbacks/voice/queue-poll:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-poll'
 
   /health:
     $ref: './paths/health.yaml#/paths/~1health'
@@ -246,43 +297,6 @@ paths:
   /v1/broadcasting/auth:
     $ref: './paths/broadcasting/auth.yaml#/paths/~1v1~1broadcasting~1auth'
 
-  /v1/call-tracking-ad-platform-integrations:
-    $ref: './paths/call-tracking-ad-platform-integrations/index.yaml#/paths/~1v1~1call-tracking-ad-platform-integrations'
-
-
-  /v1/call-tracking-analytics:
-    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics'
-
-  /v1/call-tracking-analytics/export:
-    $ref: './paths/call-tracking-campaigns/analytics.yaml#/paths/~1v1~1call-tracking-analytics~1export'
-
-  /v1/call-tracking-campaigns:
-    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}:
-    $ref: './paths/call-tracking-campaigns/index.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers:
-    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/call-tracking-numbers/{call_tracking_number}:
-    $ref: './paths/call-tracking-campaigns/numbers.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1call-tracking-numbers~1{call_tracking_number}'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-logs:
-    $ref: './paths/call-tracking-campaigns/notification-logs.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-logs'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings:
-    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings'
-
-  /v1/call-tracking-campaigns/{call_tracking_campaign}/notification-settings/test:
-    $ref: './paths/call-tracking-campaigns/notification-settings.yaml#/paths/~1v1~1call-tracking-campaigns~1{call_tracking_campaign}~1notification-settings~1test'
-
-  /v1/call-tracking-dni/swap:
-    $ref: './paths/call-tracking-dni/index.yaml#/paths/~1v1~1call-tracking-dni~1swap'
-
-  /v1/call-tracking-sessions:
-    $ref: './paths/call-tracking-campaigns/sessions.yaml#/paths/~1v1~1call-tracking-sessions'
-
   /v1/auto-dialer-campaigns:
     $ref: './paths/auto-dialer-campaigns/index.yaml#/paths/~1v1~1auto-dialer-campaigns'
 
@@ -325,6 +339,9 @@ paths:
   /v1/auto-dialer-campaigns/lists/{list}/download:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1download'
 
+  /v1/auto-dialer-campaigns/lists/{list}/parts:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1parts'
+
   /v1/auto-dialer-campaigns/lists/{list}/preview-csv:
     $ref: './paths/distribution-lists/upload.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1preview-csv'
 
@@ -341,7 +358,13 @@ paths:
     $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1validation-errors'
 
   /v1/auto-dialer-campaigns/lists/{list}/versions:
-    $ref: './paths/distribution-lists/management.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions'
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions'
+
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/destinations:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions~1{version}~1destinations'
+
+  /v1/auto-dialer-campaigns/lists/{list}/versions/{version}/download:
+    $ref: './paths/distribution-lists/versions.yaml#/paths/~1v1~1auto-dialer-campaigns~1lists~1{list}~1versions~1{version}~1download'
 
   /v1/auto-dialer-campaigns/monitor/summary:
     $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1monitor~1summary'
@@ -363,6 +386,8 @@ paths:
 
   /v1/auto-dialer-campaigns/{campaign}/list:
     $ref: './paths/auto-dialer-campaigns/list.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1list'
+  /v1/auto-dialer-campaigns/{campaign}/list/{list}:
+    $ref: './paths/auto-dialer-campaigns/list.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1list~1{list}'
 
   /v1/auto-dialer-campaigns/{campaign}/monitor/detail:
     $ref: './paths/auto-dialer-campaigns/monitor.yaml#/paths/~1v1~1auto-dialer-campaigns~1{campaign}~1monitor~1detail'
@@ -415,6 +440,9 @@ paths:
   /v1/call-detail-records/{call_detail_record}:
     $ref: './paths/call-detail-records/index.yaml#/paths/~1v1~1call-detail-records~1{call_detail_record}'
 
+  /v1/call-detail-records/{call_detail_record}/recording:
+    $ref: './paths/call-detail-records/recording.yaml#/paths/~1v1~1call-detail-records~1{call_detail_record}~1recording'
+
   /v1/call-notifications/logs:
     $ref: './paths/call-notifications/logs.yaml#/paths/~1v1~1call-notifications~1logs'
 
@@ -439,6 +467,9 @@ paths:
   /v1/call-queues/{call_queue}:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}'
 
+  /v1/call-queues/{call_queue}/toggle-status:
+    $ref: './paths/call-queues/toggle-status.yaml#/paths/~1v1~1call-queues~1{call_queue}~1toggle-status'
+
   /v1/call-queues/{call_queue}/agents/me/state:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1call-queues~1{call_queue}~1agents~1me~1state'
 
@@ -453,6 +484,12 @@ paths:
 
   /v1/queue-calls/export:
     $ref: './paths/call-queues/index.yaml#/paths/~1v1~1queue-calls~1export'
+
+  /v1/queues-dashboard/link:
+    $ref: './paths/queues-dashboard/link.yaml#/paths/~1v1~1queues-dashboard~1link'
+
+  /v1/queues-dashboard/link/regenerate:
+    $ref: './paths/queues-dashboard/link.yaml#/paths/~1v1~1queues-dashboard~1link~1regenerate'
 
   /v1/conference-rooms:
     $ref: './paths/conference-rooms/index.yaml#/paths/~1v1~1conference-rooms'
@@ -577,8 +614,29 @@ paths:
   /v1/platform/audit-logs:
     $ref: './paths/platform/audit-logs.yaml#/paths/~1v1~1platform~1audit-logs'
 
+  /v1/platform/cdr-archive:
+    $ref: './paths/platform/cdr-archive.yaml#/paths/~1v1~1platform~1cdr-archive'
+
   /v1/platform/dashboard:
     $ref: './paths/platform/dashboard.yaml#/paths/~1v1~1platform~1dashboard'
+
+  /v1/public/status:
+    $ref: './paths/platform/public-status.yaml#/paths/~1v1~1public~1status'
+
+  /v1/public/queues-dashboard/{token}/queues:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/live:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1live'
+
+  /v1/public/queues-dashboard/{token}/queues/{queue}/stats:
+    $ref: './paths/public/queues-dashboard.yaml#/paths/~1v1~1public~1queues-dashboard~1{token}~1queues~1{queue}~1stats'
+
+  /v1/platform/status:
+    $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status'
+
+  /v1/platform/status/check:
+    $ref: './paths/platform/status.yaml#/paths/~1v1~1platform~1status~1check'
 
   /v1/platform/operate-as:
     $ref: './paths/platform/operate-as.yaml#/paths/~1v1~1platform~1operate-as'
@@ -603,6 +661,9 @@ paths:
 
   /v1/platform/users/{user}:
     $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}'
+
+  /v1/platform/users/{user}/delete-impact:
+    $ref: './paths/platform/user-delete-impact.yaml#/paths/~1v1~1platform~1users~1{user}~1delete-impact'
 
   /v1/platform/users/{user}/password:
     $ref: './paths/platform/users.yaml#/paths/~1v1~1platform~1users~1{user}~1password'
@@ -688,6 +749,9 @@ paths:
   /v1/users/{user}:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users~1{user}'
 
+  /v1/users/{user}/delete-impact:
+    $ref: './paths/users/delete-impact.yaml#/paths/~1v1~1users~1{user}~1delete-impact'
+
   /v1/users/{user}/embed-token:
     $ref: './paths/users/embed-token.yaml#/paths/~1v1~1users~1{user}~1embed-token'
 
@@ -711,6 +775,9 @@ paths:
 
   /voice/amd-action:
     $ref: './paths/voice/amd-action.yaml#/paths/~1voice~1amd-action'
+
+  /voice/amd-session:
+    $ref: './paths/voice/amd-action.yaml#/paths/~1voice~1amd-session'
 
   /voice/health:
     $ref: './paths/voice/health.yaml#/paths/~1voice~1health'
@@ -739,6 +806,9 @@ paths:
   /webhooks/cloudonix/dialer:
     $ref: './paths/webhooks/dialer-proxy.yaml#/paths/~1webhooks~1cloudonix~1dialer'
 
+  /webhooks/cloudonix/recording-status:
+    $ref: './paths/webhooks/recording-status.yaml#/paths/~1webhooks~1cloudonix~1recording-status'
+
   /webhooks/cloudonix/session-update:
     $ref: './paths/webhooks/session-update.yaml#/paths/~1webhooks~1cloudonix~1session-update'
 
@@ -751,19 +821,21 @@ components:
       type: http
       scheme: bearer
       bearerFormat: Sanctum
-      description: Bearer token authentication via Laravel Sanctum (personal access tokens).
-    cookieAuth:
-      type: apiKey
-      in: header
-      name: X-XSRF-TOKEN
       description: |
-        Cookie-based SPA authentication. The browser sends the `laravel_session`
-        httpOnly cookie automatically; the `X-XSRF-TOKEN` header must contain the
-        decoded value of the `XSRF-TOKEN` cookie for CSRF protection.
+        Laravel Sanctum personal access token returned by `POST /v1/auth/login`
+        (also by `POST /v1/auth/refresh` and the Auth0 callback). Login revokes the user's
+        previous tokens; a token expires after 24 hours.
     webhookBearer:
       type: http
       scheme: bearer
-      description: Bearer token authentication for Cloudonix webhooks. Required only if domain_requests_api_key is configured in CloudonixSettings.
+      description: |
+        Cloudonix webhooks (`VerifyCloudonixSignature`). The organization is identified by the
+        payload's `domain` (or `owner.domain.name` / `owner.domain.uuid`); a missing domain
+        answers 400 and an unknown domain 401. When the organization has a
+        `domain_requests_api_key` (Cloudonix Settings), `Authorization: Bearer <key>` must
+        match it, otherwise 401. When no key is configured the request is accepted (and
+        logged) unless `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`, which answers 401. There is no
+        HMAC signature check.
     embedTokenAuth:
       type: http
       scheme: bearer
@@ -773,15 +845,35 @@ components:
         widget's runtime API (`/v1/embed/*`). Requests carrying a browser
         `Origin` header are additionally checked against the organization's
         `embed_allowed_domains` allowlist.
+    apiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opbxk_ API key
+      description: |
+        Organization API key (prefix `opbxk_`), created by the Owner with
+        `POST /v1/api-keys` and sent as `Authorization: Bearer opbxk_...`.
+        Deny-by-default: a key reaches only operations whose resource it has
+        been granted. Each such operation names the grant it needs in its
+        `x-api-key-scope` extension (`<resource>:read` for GET,
+        `<resource>:write` for other methods; a `write` grant also allows
+        reads). Operations without `x-api-key-scope` answer API keys with 403.
     voiceWebhookAuth:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: Bearer token for voice routing webhooks (per-organization)
+      type: http
+      scheme: bearer
+      description: |
+        Voice routing and voice callbacks (`VerifyVoiceWebhookAuth`). `Authorization: Bearer <key>`
+        must equal the `domain_requests_api_key` of the organization named by the JSON body's
+        `Domain` (domain name or UUID). A missing or wrong token, an unknown domain or an
+        organization without a key answers 401 with CXML (`<Say>` + `<Hangup/>`); a missing
+        `Domain` or destination (`To`) answers 400.
     dialerWorkerAuth:
       type: http
       scheme: bearer
-      description: Bearer token for dialer worker authentication (DIALER_WORKER_API_TOKEN)
+      description: Bearer token for dialer worker authentication (`DIALER_WORKER_API_TOKEN`, or `DIALER_WORKER_API_TOKEN_SECONDARY` during rotation)
+    amdWorkerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token for AMD worker authentication (AMD_WORKER_API_TOKEN). Used by `/voice/amd-action` and `/voice/amd-session`.
   
   schemas:
     # Common response schemas
@@ -791,6 +883,10 @@ components:
       $ref: './components/schemas/ValidationError.yaml'
     PaginationMeta:
       $ref: './components/schemas/PaginationMeta.yaml'
+    ResourceCollectionMeta:
+      $ref: './components/schemas/ResourceCollectionMeta.yaml'
+    PaginationLinks:
+      $ref: './components/schemas/PaginationLinks.yaml'
     
     # Entity schemas
     User:
@@ -811,26 +907,42 @@ components:
       $ref: './components/schemas/Organization.yaml'
     RingGroup:
       $ref: './components/schemas/RingGroup.yaml'
+    RingGroupInput:
+      $ref: './components/schemas/RingGroupInput.yaml'
     CallQueue:
       $ref: './components/schemas/CallQueue.yaml'
+    CallQueueInput:
+      $ref: './components/schemas/CallQueueInput.yaml'
     QueueCall:
       $ref: './components/schemas/QueueCall.yaml'
     ConferenceRoom:
       $ref: './components/schemas/ConferenceRoom.yaml'
+    ConferenceRoomInput:
+      $ref: './components/schemas/ConferenceRoomInput.yaml'
     BusinessHoursSchedule:
       $ref: './components/schemas/BusinessHoursSchedule.yaml'
+    BusinessHoursScheduleInput:
+      $ref: './components/schemas/BusinessHoursScheduleInput.yaml'
     ApiKey:
       $ref: './components/schemas/ApiKey.yaml'
     ApiKeyPermission:
       $ref: './components/schemas/ApiKeyPermission.yaml'
     IvrMenu:
       $ref: './components/schemas/IvrMenu.yaml'
+    IvrMenuInput:
+      $ref: './components/schemas/IvrMenuInput.yaml'
     PhoneNumber:
       $ref: './components/schemas/PhoneNumber.yaml'
+    PhoneNumberInput:
+      $ref: './components/schemas/PhoneNumberInput.yaml'
     AiAssistant:
       $ref: './components/schemas/AiAssistant.yaml'
+    AiAssistantInput:
+      $ref: './components/schemas/AiAssistantInput.yaml'
     AiAssistantLoadBalancer:
       $ref: './components/schemas/AiAssistantLoadBalancer.yaml'
+    AiAssistantLoadBalancerInput:
+      $ref: './components/schemas/AiAssistantLoadBalancerInput.yaml'
     CallDetailRecord:
       $ref: './components/schemas/CallDetailRecord.yaml'
     Recording:
@@ -843,28 +955,20 @@ components:
       $ref: './components/schemas/CloudonixSettings.yaml'
     CallNotificationsSettings:
       $ref: './components/schemas/CallNotificationsSettings.yaml'
+    CallNotificationsSettingsInput:
+      $ref: './components/schemas/CallNotificationsSettingsInput.yaml'
+    CallNotificationLog:
+      $ref: './components/schemas/CallNotificationLog.yaml'
     SessionUpdate:
       $ref: './components/schemas/SessionUpdate.yaml'
     SupervisorAssignment:
       $ref: './components/schemas/SupervisorAssignment.yaml'
     AutoDialerCampaign:
       $ref: './components/schemas/AutoDialerCampaign.yaml'
-    CallTrackingCampaign:
-      $ref: './components/schemas/CallTrackingCampaign.yaml'
-    CallTrackingNumber:
-      $ref: './components/schemas/CallTrackingNumber.yaml'
-    CallTrackingSession:
-      $ref: './components/schemas/CallTrackingSession.yaml'
-    CallTrackingAnalytics:
-      $ref: './components/schemas/CallTrackingAnalytics.yaml'
-    CallTrackingNotificationSettings:
-      $ref: './components/schemas/CallTrackingNotificationSettings.yaml'
-    CallTrackingNotificationLog:
-      $ref: './components/schemas/CallTrackingNotificationLog.yaml'
-    CallTrackingAdPlatformIntegration:
-      $ref: './components/schemas/CallTrackingAdPlatformIntegration.yaml'
     DistributionList:
       $ref: './components/schemas/DistributionList.yaml'
+    ListDestination:
+      $ref: './components/schemas/ListDestination.yaml'
     MonitorSummary:
       $ref: './components/schemas/MonitorSummary.yaml'
     MonitorDetail:
@@ -924,22 +1028,24 @@ components:
       $ref: './components/responses/TooManyRequests.yaml'
 
   headers:
-    X-Request-Id:
-      $ref: './components/headers/X-Request-Id.yaml'
     X-RateLimit-Limit:
       $ref: './components/headers/X-RateLimit-Limit.yaml'
     X-RateLimit-Remaining:
       $ref: './components/headers/X-RateLimit-Remaining.yaml'
+    X-RateLimit-Reset:
+      $ref: './components/headers/X-RateLimit-Reset.yaml'
 
 tags:
   - name: Health
     description: Health check endpoints
   - name: Authentication
-    description: User authentication, session management, and broadcasting channel auth
+    description: User authentication, registration, session management and Auth0 social login
   - name: Broadcasting
     description: Laravel Echo broadcasting channel authentication
   - name: Profile
     description: User profile management
+  - name: Organizations
+    description: Requests to join an existing organization (submit, list, approve, reject)
   - name: Users
     description: User management within organization
   - name: Extensions
@@ -948,6 +1054,8 @@ tags:
     description: Conference room management
   - name: Ring Groups
     description: Ring group management for call distribution
+  - name: Call Queues
+    description: Call queues (ACD), agent state, live view, statistics, queue call history and the public wallboard link
   - name: Business Hours
     description: Business hours schedule management
   - name: API Keys
@@ -975,25 +1083,21 @@ tags:
   - name: Supervisors
     description: Supervisor role assignments and supervisor-scoped dashboard
   - name: Web Phone
-    description: In-browser softphone (JsSIP/WebRTC) SIP provisioning for Owner and Supervisor
+    description: In-browser softphone (JsSIP/WebRTC) SIP provisioning and recent calls log for any user with a user extension
+  - name: Embedded Dialer
+    description: Runtime API of the embeddable dialer widget (Embedded Dialer token)
   - name: Call Notifications
     description: Call notification configuration
   - name: Auto Dialer Campaigns
     description: Outbound campaign management with rate limiting and scheduling
-  - name: Call Tracking Campaigns
-    description: Marketing campaign call attribution and tracking
-  - name: Call Tracking Analytics
-    description: Call tracking analytics, reporting, and conversion tracking
-  - name: Call Tracking Ad Platform Integrations
-    description: Google Ads and Meta conversion upload integrations
   - name: Distribution Lists
     description: Phone number list management for auto-dialer campaigns
   - name: Trunks
     description: SIP trunk management (proxied from Cloudonix)
   - name: Configuration
-    description: Application configuration
+    description: Public application configuration for the frontend
   - name: Webhooks
-    description: Incoming webhooks from Cloudonix (call-initiated, call-status, CDR, session-update)
+    description: Incoming webhooks from Cloudonix (call-initiated, call-status, CDR, session-update, recording-status, dialer proxy)
   - name: Auto Dialer Webhooks
     description: Cloudonix webhooks specific to auto-dialer campaigns
   - name: Voice Routing
@@ -1001,4 +1105,6 @@ tags:
   - name: Dialer Worker
     description: Go-based dialer worker service endpoints
   - name: Platform
-    description: Platform manager administrative endpoints
+    description: Platform manager administrative endpoints and the public platform status
+  - name: Public
+    description: Unauthenticated, token-addressed public queues wallboard

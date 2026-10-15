@@ -3,18 +3,47 @@ paths:
     get:
       tags:
         - Outbound Whitelist
-      summary: List Outbound Whitelist Entrys
-      description: Get paginated list of Outbound Whitelist Entrys
+      summary: List outbound whitelist entries
+      description: |
+        Paginated list. Every authenticated user of the organization can list entries.
+        `meta` has current_page, per_page, total, last_page, from and to. Unknown `sort_by`
+        or `sort_order` values fall back to the defaults. Only list responses include the
+        nested `default_caller_id` object.
       operationId: listOutboundWhitelistEntrys
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
-        - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: per_page
+          in: query
+          description: Items per page (clamped to 1-100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [destination_country, destination_prefix, outbound_trunk_name, created_at, updated_at]
+            default: created_at
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: search
+          in: query
+          description: Substring match on name, destination_country, destination_prefix or outbound_trunk_name
+          schema:
+            type: string
       responses:
         '200':
-          description: List of Outbound Whitelist Entrys
+          description: List of outbound whitelist entries
           content:
             application/json:
               schema:
@@ -28,15 +57,22 @@ paths:
                     $ref: '../../components/schemas/PaginationMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
 
     post:
       tags:
         - Outbound Whitelist
       summary: Create Outbound Whitelist Entry
       operationId: createOutboundWhitelistEntry
+      description: |
+        Owner and PBX Admin only. `name`, `destination_country` and `outbound_trunk_name` are
+        trimmed; runs of spaces in `destination_prefix` are collapsed. `status` cannot be set
+        here: new entries are `active` (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
@@ -60,6 +96,7 @@ paths:
                     - string
                     - 'null'
                   maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
                   description: Digits, spaces, '+' and '-' only.
                 outbound_trunk_name:
                   type: string
@@ -68,12 +105,25 @@ paths:
                   type:
                     - integer
                     - 'null'
-                  description: Must reference an active DID owned by the authenticated organization.
+                  description: |
+                    ID of a DID of the organization (any status). At call time it is used only
+                    while the DID is active.
       responses:
         '201':
-          description: Outbound Whitelist Entry created
+          description: Whitelist entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -92,12 +142,22 @@ paths:
       operationId: getOutboundWhitelistEntry
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:read
       responses:
         '200':
-          description: Outbound Whitelist Entry details
+          description: Whitelist entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
@@ -106,15 +166,21 @@ paths:
         - Outbound Whitelist
       summary: Update Outbound Whitelist Entry
       operationId: updateOutboundWhitelistEntry
+      description: Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - destination_country
+                - outbound_trunk_name
               properties:
                 name:
                   type: string
@@ -122,11 +188,14 @@ paths:
                 destination_country:
                   type: string
                   maxLength: 100
+                  description: Unique within the organization.
                 destination_prefix:
                   type:
                     - string
                     - 'null'
                   maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
+                  description: Digits, spaces, '+' and '-' only.
                 outbound_trunk_name:
                   type: string
                   maxLength: 255
@@ -134,12 +203,25 @@ paths:
                   type:
                     - integer
                     - 'null'
-                  description: Must reference an active DID owned by the authenticated organization.
+                  description: |
+                    ID of a DID of the organization (any status). At call time it is used only
+                    while the DID is active.
       responses:
         '200':
-          description: Outbound Whitelist Entry updated
+          description: Whitelist entry updated (update requires the same fields as create)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -149,20 +231,62 @@ paths:
         - Outbound Whitelist
       summary: Partially update Outbound Whitelist Entry
       operationId: patchOutboundWhitelistEntry
+      description: Owner and PBX Admin only. PUT and PATCH both require the full field set; `status` cannot be changed here (use toggle-status).
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
+              required:
+                - name
+                - destination_country
+                - outbound_trunk_name
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                destination_country:
+                  type: string
+                  maxLength: 100
+                  description: Unique within the organization.
+                destination_prefix:
+                  type:
+                    - string
+                    - 'null'
+                  maxLength: 12
+                  pattern: ^[0-9+\-\s]+$
+                  description: Digits, spaces, '+' and '-' only.
+                outbound_trunk_name:
+                  type: string
+                  maxLength: 255
+                default_caller_id_did_id:
+                  type:
+                    - integer
+                    - 'null'
+                  description: |
+                    ID of a DID of the organization (any status). At call time it is used only
+                    while the DID is active.
       responses:
         '200':
-          description: Outbound Whitelist Entry updated
+          description: Whitelist entry updated (update requires the same fields as create)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '../../components/schemas/OutboundWhitelist.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -173,13 +297,17 @@ paths:
         - Outbound Whitelist
       summary: Delete Outbound Whitelist Entry
       operationId: deleteOutboundWhitelistEntry
+      description: Owner and PBX Admin only.
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: outbound-whitelist:write
       responses:
         '204':
-          description: Outbound Whitelist Entry deleted
+          description: Outbound whitelist entry deleted (empty body)
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'

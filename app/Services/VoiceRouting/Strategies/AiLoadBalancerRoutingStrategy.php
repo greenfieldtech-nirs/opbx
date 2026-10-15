@@ -10,14 +10,18 @@ use App\Enums\RingGroupFallbackAction;
 use App\Enums\UserStatus;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
+use App\Models\CallQueue;
 use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\IvrMenu;
 use App\Models\RingGroup;
+use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\AlbsDistributionService;
+use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
@@ -47,11 +51,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         Request $request
     ): string {
         $organizationId = $request->input('_organization_id');
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $organizationId)->first();
-
-        $baseUrl = $cloudonixSettings
-            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
-            : rtrim(config('app.url'), '/');
+        $baseUrl = app(CloudonixSettingsResolver::class)->webhookBaseUrl($organizationId);
 
         $relativeUrl = route('voice.albs-follow-through', [
             'albs_id' => $aiLoadBalancer->id,
@@ -106,24 +106,23 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             );
         }
 
-        $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $aiLoadBalancer = AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
             ->with(['members' => function ($query) {
                 $query->where('status', 'active')
                     ->whereHas('aiAssistant', function ($q) {
-                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+                        $q->withoutGlobalScope(OrganizationScope::class)
                             ->where('status', UserStatus::ACTIVE->value);
                     })
                     ->with(['aiAssistant' => function ($q) {
-                        $q->withoutGlobalScope(\App\Scopes\OrganizationScope::class);
+                        $q->withoutGlobalScope(OrganizationScope::class);
                     }]);
             }])
             ->where('id', $aiLoadBalancerId)
             ->where('organization_id', $extension->organization_id)
-            ->where('status', AlbsStatus::ACTIVE)
             ->first();
 
         if (! $aiLoadBalancer) {
-            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found or inactive', [
+            Log::error('AiLoadBalancerRoutingStrategy: AI Load Balancer not found', [
                 'ai_load_balancer_id' => $aiLoadBalancerId,
                 'extension_id' => $extension->id,
                 'extension_number' => $extension->extension_number,
@@ -155,7 +154,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
                 'status' => $aiLoadBalancer->status->value,
             ]);
 
-            return $this->handleFallback($aiLoadBalancer, $request);
+            // An inactive load balancer ends the call; its fallback is only for when an active one's members fail.
+            return response(
+                CxmlBuilder::unavailable('The AI load balancer you are trying to reach is unavailable.'),
+                200,
+                ['Content-Type' => 'application/xml']
+            );
         }
 
         Log::info('AiLoadBalancerRoutingStrategy: Routing to AI Load Balancer', [
@@ -343,7 +347,10 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             RingGroupFallbackAction::RING_GROUP => $this->handleFallbackRingGroup($aiLoadBalancer, $request),
             RingGroupFallbackAction::IVR_MENU => $this->handleFallbackIvrMenu($aiLoadBalancer, $request),
             RingGroupFallbackAction::AI_ASSISTANT => $this->handleFallbackAiAssistant($aiLoadBalancer, $request),
+            RingGroupFallbackAction::CALL_QUEUE => $this->handleFallbackCallQueue($aiLoadBalancer, $request),
+            RingGroupFallbackAction::AI_LOAD_BALANCER => $this->handleFallbackAiLoadBalancer($aiLoadBalancer, $request),
             RingGroupFallbackAction::HANGUP => $this->handleFallbackHangup($aiLoadBalancer),
+            RingGroupFallbackAction::UNAVAILABLE => response(CxmlBuilder::destinationUnavailable(), 200, ['Content-Type' => 'application/xml']),
             default => $this->handleFallbackHangup($aiLoadBalancer),
         };
     }
@@ -360,7 +367,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($aiLoadBalancer);
         }
 
-        $fallbackExtension = Extension::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $fallbackExtension = Extension::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $fallbackExtensionId)
             ->where('organization_id', $aiLoadBalancer->organization_id)
             ->first();
@@ -382,7 +389,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 
         $destination = ['extension' => $fallbackExtension];
 
-        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+        $voiceRoutingManager = app(VoiceRoutingManager::class);
 
         return $voiceRoutingManager->executeStrategy(
             $fallbackExtension->type,
@@ -392,7 +399,8 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         );
     }
 
-    private function handleFallbackRingGroup(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    /** Public: the follow-through controller reuses it. */
+    public function handleFallbackRingGroup(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         $fallbackRingGroupId = $aiLoadBalancer->fallback_ring_group_id;
 
@@ -404,7 +412,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($aiLoadBalancer);
         }
 
-        $fallbackRingGroup = RingGroup::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $fallbackRingGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $fallbackRingGroupId)
             ->where('organization_id', $aiLoadBalancer->organization_id)
             ->first();
@@ -426,7 +434,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 
         $destination = ['ring_group' => $fallbackRingGroup];
 
-        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+        $voiceRoutingManager = app(VoiceRoutingManager::class);
 
         return $voiceRoutingManager->executeStrategy(
             ExtensionType::RING_GROUP,
@@ -448,7 +456,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($aiLoadBalancer);
         }
 
-        $fallbackIvrMenu = IvrMenu::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $fallbackIvrMenu = IvrMenu::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $fallbackIvrMenuId)
             ->where('organization_id', $aiLoadBalancer->organization_id)
             ->first();
@@ -470,7 +478,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
 
         $destination = ['ivr_menu' => $fallbackIvrMenu];
 
-        $voiceRoutingManager = app(\App\Services\VoiceRouting\VoiceRoutingManager::class);
+        $voiceRoutingManager = app(VoiceRoutingManager::class);
 
         return $voiceRoutingManager->executeStrategy(
             ExtensionType::IVR,
@@ -492,7 +500,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             return $this->handleFallbackHangup($aiLoadBalancer);
         }
 
-        $fallbackAiAssistant = AiAssistant::withoutGlobalScope(\App\Scopes\OrganizationScope::class)
+        $fallbackAiAssistant = AiAssistant::withoutGlobalScope(OrganizationScope::class)
             ->where('id', $fallbackAiAssistantId)
             ->where('organization_id', $aiLoadBalancer->organization_id)
             ->first();
@@ -513,6 +521,67 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         ]);
 
         return $this->routeToAiAssistant($fallbackAiAssistant, $aiLoadBalancer, $request);
+    }
+
+    /** Public: the follow-through controller reuses it. */
+    public function handleFallbackCallQueue(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    {
+        $callQueue = $aiLoadBalancer->fallback_call_queue_id
+            ? CallQueue::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $aiLoadBalancer->fallback_call_queue_id)
+                ->where('organization_id', $aiLoadBalancer->organization_id)
+                ->first()
+            : null;
+
+        if (! $callQueue || ! $callQueue->isActive()) {
+            Log::warning('AiLoadBalancerRoutingStrategy: Fallback call queue missing or inactive', [
+                'ai_load_balancer_id' => $aiLoadBalancer->id,
+                'fallback_call_queue_id' => $aiLoadBalancer->fallback_call_queue_id,
+            ]);
+
+            return $this->handleFallbackHangup($aiLoadBalancer);
+        }
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::QUEUE,
+            $request,
+            new DidNumber,
+            ['call_queue' => $callQueue]
+        );
+    }
+
+    public function handleFallbackAiLoadBalancer(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
+    {
+        $targetId = $aiLoadBalancer->fallback_ai_load_balancer_id;
+
+        // Loop guard: A -> B -> A would otherwise recurse forever when every assistant is unavailable.
+        $visited = $request->attributes->get('albs_fallback_chain', [$aiLoadBalancer->id]);
+
+        $target = $targetId && ! in_array($targetId, $visited, true)
+            ? AiAssistantLoadBalancer::withoutGlobalScope(OrganizationScope::class)
+                ->where('id', $targetId)
+                ->where('organization_id', $aiLoadBalancer->organization_id)
+                ->where('status', AlbsStatus::ACTIVE)
+                ->first()
+            : null;
+
+        if (! $target) {
+            Log::warning('AiLoadBalancerRoutingStrategy: Fallback AI load balancer missing, inactive or looping', [
+                'ai_load_balancer_id' => $aiLoadBalancer->id,
+                'fallback_ai_load_balancer_id' => $targetId,
+            ]);
+
+            return $this->handleFallbackHangup($aiLoadBalancer);
+        }
+
+        $request->attributes->set('albs_fallback_chain', [...$visited, $target->id]);
+
+        return app(VoiceRoutingManager::class)->executeStrategy(
+            ExtensionType::AI_LOAD_BALANCER,
+            $request,
+            new DidNumber,
+            ['ai_load_balancer' => $target]
+        );
     }
 
     private function handleFallbackHangup(AiAssistantLoadBalancer $aiLoadBalancer): Response

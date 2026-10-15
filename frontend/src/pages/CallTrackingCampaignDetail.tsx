@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, Plus, Trash2, Target } from 'lucide-react';
 import { toast } from 'sonner';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,6 +23,10 @@ import {
 import { CallTrackingNumbersList } from '@/components/call-tracking/CallTrackingNumbersList';
 import { CallTrackingNotificationSettingsForm } from '@/components/call-tracking/CallTrackingNotificationSettingsForm';
 import { CallTrackingNotificationLogsTable } from '@/components/call-tracking/CallTrackingNotificationLogsTable';
+import { AddCallTrackingNumberDialog } from '@/components/call-tracking/AddCallTrackingNumberDialog';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 
 export default function CallTrackingCampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +35,7 @@ export default function CallTrackingCampaignDetail() {
   const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
   const isReadOnly = ['reporter', 'pbx_user'].includes(user?.role || '');
   const [campaignToDelete, setCampaignToDelete] = useState(false);
+  const [addNumberOpen, setAddNumberOpen] = useState(false);
 
   const { data: campaign, isLoading: campaignLoading, isError, error } = useCallTrackingCampaign(id);
   const { data: numbers, isLoading: numbersLoading } = useCallTrackingNumbers(id!);
@@ -37,6 +43,7 @@ export default function CallTrackingCampaignDetail() {
   const { data: logs, isLoading: logsLoading } = useCallTrackingNotificationLogs(id!, { per_page: 10 });
 
   const deleteMutation = useDeleteCallTrackingCampaign();
+  const { showIfInUse, inUseDialog } = useResourceInUse();
   const updateSettingsMutation = useUpdateCallTrackingNotificationSettings();
   const testNotificationMutation = useTestCallTrackingNotification();
 
@@ -47,6 +54,8 @@ export default function CallTrackingCampaignDetail() {
       toast.success('Campaign deleted successfully');
       navigate('/ui/call-tracking/campaigns');
     } catch (err) {
+      setCampaignToDelete(false);
+      if (showIfInUse(err)) return;
       toast.error((err as Error)?.message || 'Failed to delete campaign');
     }
   };
@@ -138,6 +147,7 @@ export default function CallTrackingCampaignDetail() {
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Target className="h-8 w-8" />
                 {campaign.name}
+                {campaign.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
               </h1>
               {isReadOnly && (
                 <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
@@ -183,9 +193,9 @@ export default function CallTrackingCampaignDetail() {
           variant={campaign.status === 'active' ? 'default' : 'secondary'}
           className={campaign.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
         >
-          {campaign.status}
+          {labelForRoutingType(campaign.status)}
         </Badge>
-        <Badge variant="outline">Destination: {campaign.destination_type}</Badge>
+        <Badge variant="outline">Destination: {labelForRoutingType(campaign.destination_type)}</Badge>
         {campaign.google_ads_upload_enabled && <Badge variant="outline">Google Ads</Badge>}
         {campaign.meta_upload_enabled && <Badge variant="outline">Meta</Badge>}
       </div>
@@ -202,7 +212,7 @@ export default function CallTrackingCampaignDetail() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Tracking Numbers</CardTitle>
               {canManage && (
-                <Button onClick={() => navigate(`/ui/call-tracking/campaigns/${id}/numbers/new`)}>
+                <Button onClick={() => setAddNumberOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Number
                 </Button>
@@ -262,6 +272,8 @@ export default function CallTrackingCampaignDetail() {
         variant="danger"
         loading={deleteMutation.isPending}
       />
+      {inUseDialog}
+      {id && <AddCallTrackingNumberDialog campaignId={id} open={addNumberOpen} onOpenChange={setAddNumberOpen} />}
     </div>
   );
 }

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Cloudonix;
 
 use App\Models\CloudonixSettings;
+use App\Services\CloudonixClient\CloudonixApiException;
 use App\Services\CloudonixClient\CloudonixClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -38,11 +40,11 @@ class CloudonixVoiceService
         try {
             Log::info('Fetching voices from Cloudonix API', [
                 'request_id' => $requestId,
-                'domain_uuid' => $settings->domain_uuid
+                'domain_uuid' => $settings->domain_uuid,
             ]);
 
             // Create a client instance with the organization-specific settings
-            $client = new \App\Services\CloudonixClient\CloudonixClient($settings);
+            $client = new CloudonixClient($settings);
             $voices = $client->getVoices($settings->domain_uuid);
 
             if (empty($voices)) {
@@ -51,20 +53,12 @@ class CloudonixVoiceService
 
             return $this->normalizeVoices($voices, $requestId);
 
-        } catch (\RuntimeException $e) {
-            // Re-throw runtime exceptions as-is
-            throw $e;
-        } catch (\Exception $e) {
-            // Convert other exceptions to runtime exceptions with appropriate messages
-            $message = $e->getMessage();
-
-            if (str_contains($message, 'token') || str_contains($message, 'unauthorized') || str_contains($message, 'authentication')) {
-                throw new \RuntimeException('Authentication failed - invalid API token');
-            } elseif (str_contains($message, 'timeout') || str_contains($message, 'connection') || str_contains($message, 'network')) {
-                throw new \RuntimeException('Unable to connect to Cloudonix API');
-            } else {
-                throw new \RuntimeException('Cloudonix API error: ' . $message);
-            }
+        } catch (ConnectionException $e) {
+            throw new CloudonixApiException('Unable to connect to Cloudonix API', 0, $e);
+        } catch (CloudonixApiException $e) {
+            throw $e->isAuthFailure()
+                ? new CloudonixApiException('Authentication failed - invalid API token', $e->status, $e)
+                : $e;
         }
     }
 
@@ -76,11 +70,12 @@ class CloudonixVoiceService
         // Normalize the response format to match our VoiceOption interface
         $normalizedVoices = array_map(function ($voice) use ($requestId) {
             // Ensure required fields exist
-            if (!isset($voice['voice'])) {
+            if (! isset($voice['voice'])) {
                 Log::warning('Skipping invalid voice entry missing voice field', [
                     'request_id' => $requestId,
-                    'voice_data' => $voice
+                    'voice_data' => $voice,
                 ]);
+
                 return null; // Skip invalid voices
             }
 
@@ -93,10 +88,10 @@ class CloudonixVoiceService
                 'id' => $voice['voice'], // The full voice identifier for CXML, e.g., "AWS:Maxim"
                 'name' => $name, // Just the voice name part
                 'provider' => $voice['provider'] ?? '', // e.g., "Polly", "Google", "Azure"
-                'language' => isset($voice['languages']) && is_array($voice['languages']) && !empty($voice['languages']) ? $voice['languages'][0] : 'en-US', // Primary language
+                'language' => isset($voice['languages']) && is_array($voice['languages']) && ! empty($voice['languages']) ? $voice['languages'][0] : 'en-US', // Primary language
                 'gender' => $voice['gender'] ?? 'neutral',
                 'premium' => ($voice['pricing'] ?? 'standard') === 'premium',
-                'pricing' => $voice['pricing'] ?? 'standard'
+                'pricing' => $voice['pricing'] ?? 'standard',
             ];
         }, $voices);
 
@@ -126,12 +121,13 @@ class CloudonixVoiceService
             // Tertiary sort: name
             $aName = $a['name'] ?? '';
             $bName = $b['name'] ?? '';
+
             return strcmp($aName, $bName);
         });
 
         Log::info('Successfully normalized voices', [
             'request_id' => $requestId,
-            'total_voices' => count($normalizedVoices)
+            'total_voices' => count($normalizedVoices),
         ]);
 
         return $normalizedVoices;
@@ -152,10 +148,10 @@ class CloudonixVoiceService
             $languageCode = $voice['language'];
             $languageName = $this->languageMapper->getLanguageName($languageCode);
 
-            if (!isset($languages[$languageCode])) {
+            if (! isset($languages[$languageCode])) {
                 $languages[$languageCode] = [
                     'code' => $languageCode,
-                    'name' => $languageName
+                    'name' => $languageName,
                 ];
             }
 
@@ -179,7 +175,7 @@ class CloudonixVoiceService
             'languages' => array_values($languages),
             'genders' => array_values($genders),
             'providers' => array_values($providers),
-            'pricing' => array_values($pricing)
+            'pricing' => array_values($pricing),
         ];
     }
 }

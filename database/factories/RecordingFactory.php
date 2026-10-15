@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Organization;
+use App\Models\Recording;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Recording>
+ * @extends Factory<Recording>
  */
 class RecordingFactory extends Factory
 {
@@ -42,10 +43,10 @@ class RecordingFactory extends Factory
      */
     public function uploaded(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'upload',
-            'file_path' => Str::uuid() . '.mp3',
-            'original_filename' => fake()->word() . '.mp3',
+            'file_path' => Str::uuid().'.mp3',
+            'original_filename' => fake()->word().'.mp3',
             'file_size' => fake()->numberBetween(100000, 10000000), // 100KB to 10MB
             'mime_type' => 'audio/mpeg',
             'duration_seconds' => fake()->numberBetween(30, 3600), // 30 seconds to 1 hour
@@ -57,9 +58,9 @@ class RecordingFactory extends Factory
      */
     public function remote(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'type' => 'remote',
-            'remote_url' => 'https://example.com/audio/' . Str::uuid() . '.mp3',
+            'remote_url' => 'https://example.com/audio/'.Str::uuid().'.mp3',
             'file_size' => fake()->numberBetween(100000, 10000000),
             'mime_type' => 'audio/mpeg',
             'duration_seconds' => fake()->numberBetween(30, 3600),
@@ -71,7 +72,7 @@ class RecordingFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'status' => 'inactive',
         ]);
     }
@@ -81,7 +82,7 @@ class RecordingFactory extends Factory
      */
     public function withMetadata(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'file_size' => fake()->numberBetween(500000, 5000000), // 500KB to 5MB
             'mime_type' => fake()->randomElement(['audio/mpeg', 'audio/wav', 'audio/ogg']),
             'duration_seconds' => fake()->numberBetween(60, 1800), // 1 to 30 minutes
@@ -93,7 +94,7 @@ class RecordingFactory extends Factory
      */
     public function forOrganization(Organization $organization): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'organization_id' => $organization->id,
         ]);
     }
@@ -103,7 +104,7 @@ class RecordingFactory extends Factory
      */
     public function createdBy(User $user): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'created_by' => $user->id,
         ]);
     }

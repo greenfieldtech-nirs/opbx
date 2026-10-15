@@ -3,11 +3,16 @@
  * CRUD with agents, strategy, MOH, position announcements, and fallback destination.
  */
 
-import { useState } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useEffect, useState } from 'react';
+import { ConfirmDialog } from '@/components/design-system/ConfirmDialog';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Users, ListMusic } from 'lucide-react';
+import { Plus, Users, ListMusic, Search, Filter, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import {
   callQueuesService,
@@ -18,10 +23,11 @@ import {
 import { recordingsService, usersService } from '@/services/createResourceService';
 import { cloudonixService } from '@/services/cloudonix.service';
 import { useAuth } from '@/hooks/useAuth';
+import { can } from '@/utils/roleHelpers';
 import { StandardDataTable, Column, EmptyState, CallQueueStrategySelector } from '@/components/design-system';
 import { DestinationTypeAndSelector } from '@/components/destinations';
 import type { DestinationType } from '@/components/destinations/types/destination.types';
-import { getErrorMessage } from '@/types/api';
+import { getApiErrorMessage } from '@/services/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,6 +36,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 const AGENT_RING_TIMEOUTS = [15, 20, 25, 30, 35, 40, 45, 50, 55, 60];
 const MAX_WAIT_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300];
@@ -47,6 +56,7 @@ interface QueueFormState {
   announce_position_timeout: number;
   announce_position_language: string;
   immediate_connect: boolean;
+  conference_ring_all: boolean;
   moh_recording_id: string;
   fallback_action: string;
   fallback_extension_id: string;
@@ -54,6 +64,7 @@ interface QueueFormState {
   fallback_ivr_menu_id: string;
   fallback_ai_assistant_id: string;
   fallback_ai_load_balancer_id: string;
+  fallback_call_queue_id: string;
   status: 'active' | 'inactive';
   agents: number[];
 }
@@ -69,6 +80,7 @@ const emptyForm: QueueFormState = {
   announce_position_timeout: 60,
   announce_position_language: '',
   immediate_connect: false,
+  conference_ring_all: true,
   moh_recording_id: '',
   fallback_action: 'hangup',
   fallback_extension_id: '',
@@ -76,6 +88,7 @@ const emptyForm: QueueFormState = {
   fallback_ivr_menu_id: '',
   fallback_ai_assistant_id: '',
   fallback_ai_load_balancer_id: '',
+  fallback_call_queue_id: '',
   status: 'active',
   agents: [],
 };
@@ -109,7 +122,7 @@ function NumberSelect({
 
 export default function CallQueues() {
   const { user } = useAuth();
-  const canManage = user?.role === 'owner' || user?.role === 'pbx_admin';
+  const canManage = can(user?.role, 'callQueues.manage');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -117,19 +130,41 @@ export default function CallQueues() {
   const [editing, setEditing] = useState<CallQueue | null>(null);
   const [form, setForm] = useState<QueueFormState>(emptyForm);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['call-queues'],
-    queryFn: () => callQueuesService.getAll(),
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [strategyFilter, setStrategyFilter] = useState<CallQueueStrategy | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const listParams = {
+    search: debouncedSearch || undefined,
+    strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    unprovisioned: unprovisionedOnly ? 1 : undefined,
+  };
+  const hasActiveFilters = !!searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly;
+
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: queryKeys.callQueues.list(listParams),
+    queryFn: () => callQueuesService.getAll(listParams),
   });
 
   const { data: recordingsData } = useQuery({
-    queryKey: ['recordings', 'moh'],
+    queryKey: queryKeys.recordings.list({ moh: 1, per_page: 100 }),
     queryFn: () => recordingsService.getAll({ moh: 1, per_page: 100 }),
   });
 
   // TTS languages for position announcements (same source as IVR Menus).
   const { data: voicesData } = useQuery({
-    queryKey: ['cloudonix-voices'],
+    queryKey: queryKeys.cloudonix.voices(),
     queryFn: () => cloudonixService.getVoices(),
     staleTime: 30 * 24 * 60 * 60 * 1000,
   });
@@ -137,14 +172,14 @@ export default function CallQueues() {
 
   // Agents are users with an assigned extension.
   const { data: usersData } = useQuery({
-    queryKey: ['users', 'queue-agents'],
+    queryKey: queryKeys.users.queueAgents(),
     queryFn: () => usersService.getAll({ per_page: 100 }),
     enabled: canManage,
   });
 
   const agentUsers = (usersData?.data ?? []).filter((u: any) => u.extension?.extension_number);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['call-queues'] });
+  const invalidate = () => invalidateRoutingResources(queryClient);
 
   const createMutation = useMutation({
     mutationFn: callQueuesService.create,
@@ -153,7 +188,7 @@ export default function CallQueues() {
       invalidate();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const updateMutation = useMutation({
@@ -164,14 +199,18 @@ export default function CallQueues() {
       invalidate();
       setDialogOpen(false);
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const toggleStatusMutation = useMutation({
     mutationFn: callQueuesService.toggleStatus,
     onSuccess: () => invalidate(),
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
+
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
+  const [queueToDelete, setQueueToDelete] = useState<CallQueue | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: callQueuesService.delete,
@@ -179,7 +218,10 @@ export default function CallQueues() {
       toast.success('Call queue deleted');
       invalidate();
     },
-    onError: (error) => toast.error(getErrorMessage(error)),
+    onError: (error) => {
+      setQueueToDelete(null);
+      if (!showIfInUse(error)) toast.error(getApiErrorMessage(error));
+    },
   });
 
   const openCreate = () => {
@@ -201,6 +243,7 @@ export default function CallQueues() {
       announce_position_timeout: queue.announce_position_timeout ?? 60,
       announce_position_language: queue.announce_position_language ?? '',
       immediate_connect: queue.immediate_connect ?? false,
+      conference_ring_all: queue.conference_ring_all ?? false,
       moh_recording_id: queue.moh_recording_id ? String(queue.moh_recording_id) : '',
       fallback_action: queue.fallback_action,
       fallback_extension_id: queue.fallback_extension_id ? String(queue.fallback_extension_id) : '',
@@ -210,6 +253,7 @@ export default function CallQueues() {
       fallback_ai_load_balancer_id: queue.fallback_ai_load_balancer_id
         ? String(queue.fallback_ai_load_balancer_id)
         : '',
+      fallback_call_queue_id: queue.fallback_call_queue_id ? String(queue.fallback_call_queue_id) : '',
       // Status is not editable in the dialog; preserve the existing value.
       status: queue.status,
       agents: (queue.agents ?? []).map((a) => a.id),
@@ -227,6 +271,7 @@ export default function CallQueues() {
     announce_position_timeout: form.announce_position_timeout,
     announce_position_language: form.announce_position ? form.announce_position_language || null : null,
     immediate_connect: form.immediate_connect,
+    conference_ring_all: form.conference_ring_all,
     moh_recording_id: form.moh_recording_id ? Number(form.moh_recording_id) : null,
     fallback_action: form.fallback_action,
     fallback_extension_id: form.fallback_extension_id ? Number(form.fallback_extension_id) : null,
@@ -236,6 +281,7 @@ export default function CallQueues() {
     fallback_ai_load_balancer_id: form.fallback_ai_load_balancer_id
       ? Number(form.fallback_ai_load_balancer_id)
       : null,
+    fallback_call_queue_id: form.fallback_call_queue_id ? Number(form.fallback_call_queue_id) : null,
     // New queues are always created active.
     status: editing ? editing.status : 'active',
     agents: form.agents,
@@ -262,8 +308,12 @@ export default function CallQueues() {
         return q.fallback_ai_assistant?.name ?? '—';
       case 'ai_load_balancer':
         return q.fallback_ai_load_balancer?.name ?? '—';
+      case 'call_queue':
+        return q.fallback_call_queue?.name ?? '—';
       case 'hangup':
         return 'Hang Up';
+      case 'unavailable':
+        return 'Destination unavailable';
       default:
         return q.fallback_action;
     }
@@ -339,8 +389,25 @@ export default function CallQueues() {
   const set = <K extends keyof QueueFormState>(key: K, value: QueueFormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call queues" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      {inUseDialog}
+      <ConfirmDialog
+        open={queueToDelete !== null}
+        onOpenChange={(open) => !open && setQueueToDelete(null)}
+        title="Delete call queue"
+        description={`Delete call queue "${queueToDelete?.name ?? ''}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (queueToDelete) deleteMutation.mutate(queueToDelete.id);
+          setDialogOpen(false);
+        }}
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Call Queues</h1>
@@ -355,6 +422,59 @@ export default function CallQueues() {
           </Button>
         )}
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search call queues..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+              title="Refresh"
+            >
+              <RefreshCw className={cn('h-4 w-4', isRefetching && 'animate-spin')} />
+            </Button>
+            <Select value={strategyFilter} onValueChange={(value: any) => setStrategyFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Strategies</SelectItem>
+                <SelectItem value="ring_all">Ring All</SelectItem>
+                <SelectItem value="round_robin">Round Robin</SelectItem>
+                <SelectItem value="least_talk_time">Least Talk Time</SelectItem>
+                <SelectItem value="fewest_calls">Fewest Calls</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-full md:w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="pt-6">
@@ -374,16 +494,12 @@ export default function CallQueues() {
             canEdit={canManage}
             onEdit={(q) => openEdit(q)}
             canDelete={canManage}
-            onDelete={(q) => {
-              if (confirm(`Delete call queue "${q.name}"? This action cannot be undone.`)) {
-                deleteMutation.mutate(q.id);
-              }
-            }}
+            onDelete={(q) => setQueueToDelete(q)}
             emptyState={
               <EmptyState
                 icon={Users}
-                title="No call queues"
-                description="Create a call queue to distribute calls to logged-in agents."
+                title={hasActiveFilters ? 'No call queues found' : 'No call queues'}
+                description={hasActiveFilters ? 'Try adjusting your filters' : 'Create a call queue to distribute calls to logged-in agents.'}
               />
             }
           />
@@ -393,7 +509,7 @@ export default function CallQueues() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Call Queue' : 'New Call Queue'}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Call Queue' : 'New Call Queue'}{editing?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -530,6 +646,22 @@ export default function CallQueues() {
               />
             </div>
 
+            {form.strategy === 'ring_all' && (
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label>Ring Agents in Separate Calls</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Each agent is rung in a call of their own; the first to answer is connected to the
+                    caller and the other agents stop ringing. Prevents late rings and three-way calls.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.conference_ring_all}
+                  onCheckedChange={(v) => set('conference_ring_all', v)}
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Agents *</Label>
               <Select
@@ -576,6 +708,7 @@ export default function CallQueues() {
               <div className="min-w-0 space-y-2">
                 <Label>Overflow Fallback</Label>
                 <DestinationTypeAndSelector
+                  allowDisconnect={!!editing}
                   layout="horizontal"
                   typeClassName="min-w-0"
                   destinationClassName="min-w-0"
@@ -592,7 +725,9 @@ export default function CallQueues() {
                             ? form.fallback_ai_assistant_id
                             : form.fallback_action === 'ai_load_balancer'
                               ? form.fallback_ai_load_balancer_id
-                              : ''
+                              : form.fallback_action === 'call_queue'
+                                ? form.fallback_call_queue_id
+                                : ''
                   }
                   onChange={(type, destinationId) =>
                     setForm((prev) => ({
@@ -603,12 +738,14 @@ export default function CallQueues() {
                       fallback_ivr_menu_id: type === 'ivr_menu' ? destinationId : '',
                       fallback_ai_assistant_id: type === 'ai_assistant' ? destinationId : '',
                       fallback_ai_load_balancer_id: type === 'ai_load_balancer' ? destinationId : '',
+                      fallback_call_queue_id: type === 'call_queue' ? destinationId : '',
                     }))
                   }
-                  allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'hangup']}
+                  allowedTypes={['extension', 'ring_group', 'ivr_menu', 'ai_assistant', 'ai_load_balancer', 'call_queue', 'hangup']}
+                  excludeIds={editing && form.fallback_action === 'call_queue' ? [String(editing.id)] : undefined}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Used when a caller exceeds max wait or no agents are available.
+                  Used when a caller has waited longer than Max Wait. Callers keep waiting while no agent is available.
                 </p>
               </div>
           </div>
@@ -617,10 +754,7 @@ export default function CallQueues() {
             {editing && (
               <Button
                 variant="destructive"
-                onClick={() => {
-                  deleteMutation.mutate(editing.id);
-                  setDialogOpen(false);
-                }}
+                onClick={() => setQueueToDelete(editing)}
               >
                 Delete
               </Button>

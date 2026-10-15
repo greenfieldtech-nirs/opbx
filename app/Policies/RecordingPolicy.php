@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Policies;
 
 use App\Models\Recording;
@@ -12,7 +14,7 @@ class RecordingPolicy
      */
     public function viewAny(User $user): bool
     {
-        return ($user->isOwner() || $user->isPBXAdmin()) &&
+        return ($user->isOwner() || $user->isPBXAdmin() || $user->isReporter()) &&
                $user->organization_id !== null;
     }
 
@@ -21,8 +23,16 @@ class RecordingPolicy
      */
     public function view(User $user, Recording $recording): bool
     {
-        return ($user->isOwner() || $user->isPBXAdmin()) &&
+        return ($user->isOwner() || $user->isPBXAdmin() || $user->isReporter()) &&
                $user->organization_id === $recording->organization_id;
+    }
+
+    /**
+     * Play/download: same audience as view (Owner, PBX Admin, Reporter).
+     */
+    public function download(User $user, Recording $recording): bool
+    {
+        return $this->view($user, $recording);
     }
 
     /**

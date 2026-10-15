@@ -52,6 +52,14 @@ export function DeleteListDialog({
                 lists that are not failed. This action cannot be undone.
               </>
             )}
+            {!!list.parts_count && (
+              <>
+                <br />
+                <br />
+                Its {list.parts_count} {list.parts_count === 1 ? 'part' : 'parts'} (&quot;{list.name} (Part
+                N)&quot;) will be deleted too, with their entries.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 

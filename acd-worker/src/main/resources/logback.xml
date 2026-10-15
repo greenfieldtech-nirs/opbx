@@ -3,7 +3,10 @@
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <!-- Flat contract shared with the rest of the stack. -->
             <customFields>{"service":"acd-worker","log_type":"call_flow"}</customFields>
-            <includeMdcKeyNames>session_token,call_id,org_id,queue_id</includeMdcKeyNames>
+            <includeMdcKeyName>session_token</includeMdcKeyName>
+            <includeMdcKeyName>call_id</includeMdcKeyName>
+            <includeMdcKeyName>org_id</includeMdcKeyName>
+            <includeMdcKeyName>queue_id</includeMdcKeyName>
             <fieldNames>
                 <timestamp>ts</timestamp>
                 <message>msg</message>
@@ -15,7 +18,7 @@
             <timeZone>UTC</timeZone>
         </encoder>
     </appender>
-    <root level="${LOG_LEVEL:-info}">
+    <root level="${ACD_LOG_LEVEL:-info}">
         <appender-ref ref="JSON"/>
     </root>
 </configuration>

@@ -3,6 +3,8 @@
  * Manages webhook notification configuration for call events
  */
 
+import { getApiErrorMessage } from '@/services/api';
+import { queryKeys } from '@/lib/queryKeys';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -45,7 +47,6 @@ import {
   RefreshCw,
   Send,
   Check,
-  X,
   AlertCircle,
   Settings,
   Bug,
@@ -62,6 +63,7 @@ import type {
   CallNotificationEvent,
   CallNotificationsRateLimitStatus,
 } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 export default function CallNotificationsSettingsPage() {
   const { user } = useAuth();
@@ -89,8 +91,8 @@ export default function CallNotificationsSettingsPage() {
   const [selectedSessionToken, setSelectedSessionToken] = useState<string | null>(null);
 
   // Fetch settings
-  const { data: settingsData, isLoading: isLoadingSettings } = useQuery({
-    queryKey: ['call-notifications-settings'],
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: settingsData, isLoading: isLoadingSettings } = useQuery({
+    queryKey: queryKeys.callNotifications.settings(),
     queryFn: async () => {
       const response = await api.get('/call-notifications/settings');
       return response.data.data as CallNotificationsSettings | null;
@@ -155,11 +157,11 @@ export default function CallNotificationsSettingsPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-notifications-settings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.callNotifications.settings() });
       toast.success('Notification settings created successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to create settings');
+      toast.error(getApiErrorMessage(error));
     },
   });
 
@@ -170,11 +172,11 @@ export default function CallNotificationsSettingsPage() {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['call-notifications-settings'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.callNotifications.settings() });
       toast.success('Notification settings updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update settings');
+      toast.error(getApiErrorMessage(error));
     },
   });
 
@@ -188,7 +190,7 @@ export default function CallNotificationsSettingsPage() {
       toast.success('Test webhook sent successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Test webhook failed');
+      toast.error(getApiErrorMessage(error));
     },
   });
 
@@ -217,6 +219,10 @@ export default function CallNotificationsSettingsPage() {
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
+  }
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load call notification settings" error={loadError} onRetry={() => void retryLoad()} />;
   }
 
   return (
@@ -309,8 +315,8 @@ export default function CallNotificationsSettingsPage() {
                         disabled={!canManage}
                       />
                       {formData.webhook_url && formData.webhook_url.startsWith('http://') && (
-                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded-sm">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
                           <span>Warning: HTTP is insecure. Use HTTPS in production environments.</span>
                         </div>
                       )}
@@ -494,7 +500,7 @@ export default function CallNotificationsSettingsPage() {
                     {EVENT_OPTIONS.map((event) => (
                       <div
                         key={event.value}
-                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/50"
+                        className="flex items-start gap-2 p-2 rounded-sm hover:bg-muted/50"
                       >
                         <Switch
                           id={`event-${event.value}`}
@@ -673,7 +679,7 @@ export default function CallNotificationsSettingsPage() {
                         </TableCell>
                         <TableCell>
                           <div
-                            className={`flex items-center gap-1 w-fit px-2 py-1 rounded text-xs font-medium ${
+                            className={`flex items-center gap-1 w-fit px-2 py-1 rounded-sm text-xs font-medium ${
                               log.is_success
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'

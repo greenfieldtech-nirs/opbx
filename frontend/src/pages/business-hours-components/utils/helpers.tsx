@@ -4,11 +4,10 @@
  * Utility functions for displaying and formatting business hours data.
  */
 
-import React from 'react';
 import { Phone, Users, Menu, Bot, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek, TimeRange } from '@/types';
+import type { BusinessHoursAction, WeeklySchedule, DaySchedule, DayOfWeek } from '@/types';
 import type { Extension, RingGroup, IvrMenu } from '@/types';
 
 let timeRangeIdCounter = 0;
@@ -69,7 +68,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });
@@ -107,7 +106,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });
@@ -126,7 +125,7 @@ export function applyScheduleTemplate(template: string): WeeklySchedule {
           time_ranges: [{
             id: getNextTimeRangeId(),
             start_time: '00:00',
-            end_time: '23:59'
+            end_time: '24:00'
           }]
         };
       });
@@ -158,6 +157,8 @@ const extractNumericId = (targetId: string): string => {
 /**
  * Get simple action display name as string (for table subtitles)
  */
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
+
 export const getActionDisplayNameSimple = (action: unknown): string => {
   if (!action) return 'Not set';
 
@@ -174,12 +175,12 @@ export const getActionDisplayNameSimple = (action: unknown): string => {
       case 'ai_assistant':
         return `AI Assistant ${actionObj.target_id}`;
       default:
-        return `${actionObj.type}: ${actionObj.target_id}`;
+        return `${labelForRoutingType(actionObj.type)} ${actionObj.target_id}`;
     }
   }
 
   if (typeof action === 'string') {
-    return action;
+    return labelForRoutingType(action);
   }
 
   return 'Unknown';

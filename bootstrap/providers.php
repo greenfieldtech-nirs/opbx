@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Providers\AppServiceProvider;
+use App\Services\Email\Providers\EmailServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Services\Email\Providers\EmailServiceProvider::class,
+    AppServiceProvider::class,
+    EmailServiceProvider::class,
 ];

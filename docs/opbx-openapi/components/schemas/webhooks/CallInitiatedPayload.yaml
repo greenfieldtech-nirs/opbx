@@ -1,36 +1,63 @@
 type: object
-description: Cloudonix call-initiated webhook payload
+description: |
+  Cloudonix call-initiated webhook payload, validated by `CallInitiatedRequest`. The
+  authentication middleware also needs `domain` (or `owner.domain.name` /
+  `owner.domain.uuid`). The controller prefers `CallSid`, `From` and `To` over `call_id`,
+  `from` and `to` when they are present.
 properties:
+  domain:
+    type: string
+    description: Cloudonix domain name or UUID (required by the authentication middleware)
+    example: acme.cloudonix.net
   call_id:
     type: string
+    maxLength: 255
+    pattern: '^[a-zA-Z0-9_-]+$'
     description: Unique call identifier
     example: CA550e8400e29b41d4a716446655440000
   from:
     type: string
+    maxLength: 16
+    pattern: '^\+?[1-9]\d{1,14}$'
     description: Caller number in E.164 format
-    example: '+1234567890'
+    example: '+12025550101'
   to:
     type: string
+    maxLength: 16
+    pattern: '^\+?[1-9]\d{1,14}$'
     description: Called number in E.164 format
-    example: '+1987654321'
+    example: '+12025550102'
   did:
     type: string
+    maxLength: 16
+    pattern: '^\+?[1-9]\d{1,14}$'
     description: DID number that received the call
-    example: '+1987654321'
+    example: '+12025550102'
   timestamp:
-    type: integer
-    description: Unix timestamp
+    type:
+    - integer
+    - 'null'
+    minimum: 1000000000
+    maximum: 9999999999
+    description: Unix timestamp (also checked for replay by the idempotency middleware)
     example: 1705312800
   organization_id:
-    type: integer
-    description: Organization ID (if known)
-    example: 1
+    type:
+    - integer
+    - 'null'
+    minimum: 1
+    description: Validated but not used; the organization comes from `domain`
   direction:
-    type: string
-    enum: [inbound, outbound]
+    type:
+    - string
+    - 'null'
+    enum: [inbound, outbound, null]
     example: inbound
   status:
-    type: string
+    type:
+    - string
+    - 'null'
+    maxLength: 50
     description: Initial call status
     example: initiated
 required:

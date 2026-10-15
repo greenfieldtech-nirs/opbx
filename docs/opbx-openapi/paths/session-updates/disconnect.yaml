@@ -5,13 +5,17 @@ paths:
         - Session Updates
       summary: Disconnect session
       description: |
-        Disconnects an active call. Owner only
-        (`SessionUpdatePolicy::disconnect`). Supervisors and PBX Admins cannot
-        disconnect calls.
+        Disconnects a call through the Cloudonix API, using the session token received from
+        the session-update webhooks. Owner only (`SessionUpdatePolicy::disconnect`);
+        Supervisors and PBX Admins cannot disconnect calls. An API key with
+        `session-updates:write` can disconnect calls, by design (unlike coaching,
+        which always answers API keys with 403). The session must belong to the organization; its
+        status is not checked.
       operationId: disconnectSession
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: session-updates:write
       parameters:
         - name: sessionId
           in: path
@@ -32,11 +36,14 @@ paths:
                   message:
                     type: string
         '400':
-          description: Dial token not available
+          description: The session token has not been received from Cloudonix yet
           content:
             application/json:
               schema:
                 $ref: '../../openapi.yaml#/components/schemas/Error'
+              example:
+                error: Session token not available
+                message: 'Unable to disconnect: session token not yet received from Cloudonix. Please try again in a moment.'
         '401':
           $ref: '../../openapi.yaml#/components/responses/Unauthorized'
         '403':
@@ -46,18 +53,16 @@ paths:
               schema:
                 $ref: '../../openapi.yaml#/components/schemas/Error'
         '404':
-          description: Session not found
+          description: Session not found in the organization
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  session_id:
-                    type: integer
+                $ref: '../../openapi.yaml#/components/schemas/Error'
+              example:
+                error: Not Found
+                message: Session not found or does not belong to your organization
         '500':
-          description: Cloudonix configuration or API error
+          description: Cloudonix settings missing, the Cloudonix API call failed, or another error (`error` + `message`)
           content:
             application/json:
               schema:

@@ -3,18 +3,40 @@ paths:
     get:
       tags:
         - Phone Numbers
-      summary: List Phone Numbers
-      description: Get paginated list of Phone Numbers
+      summary: List phone numbers
       operationId: listPhoneNumbers
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:read
       parameters:
         - $ref: '../../components/parameters/query/Page.yaml'
         - $ref: '../../components/parameters/query/PerPage.yaml'
+        - name: status
+          in: query
+          description: Other values are ignored
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: routing_type
+          in: query
+          description: Other values (including `call_queue` and `unavailable`) are ignored
+          schema:
+            type: string
+            enum: [extension, ring_group, business_hours, conference_room, ai_assistant, ai_load_balancer, ivr_menu]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Matches phone number or friendly name
+        - $ref: '../../components/parameters/query/Unprovisioned.yaml'
+      description: |
+        Paginated list ordered by created_at descending (per_page default 20, max 100). Returned
+        as a Laravel resource collection (top-level `links`). Every authenticated user of the
+        organization can list phone numbers.
       responses:
         '200':
-          description: List of Phone Numbers
+          description: List of phone numbers
           content:
             application/json:
               schema:
@@ -24,33 +46,50 @@ paths:
                     type: array
                     items:
                       $ref: '../../components/schemas/PhoneNumber.yaml'
+                  links:
+                    $ref: '../../components/schemas/PaginationLinks.yaml'
                   meta:
-                    $ref: '../../components/schemas/PaginationMeta.yaml'
+                    $ref: '../../components/schemas/ResourceCollectionMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
 
     post:
       tags:
         - Phone Numbers
-      summary: Create Phone Number
+      summary: Create phone number
+      description: |
+        Owner and PBX Admin only. `status` defaults to `active` when omitted. The routing target
+        named in `routing_config` must exist in the organization and be active (a ring group also
+        needs at least one active member); `unavailable` is rejected (422, "Choose a destination.").
       operationId: createPhoneNumber
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
+              allOf:
+                - $ref: '../../components/schemas/PhoneNumberInput.yaml'
+                - required: [phone_number, routing_type, routing_config]
       responses:
         '201':
-          description: Phone Number created
+          description: Phone number created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '422':
           $ref: '../../components/responses/ValidationError.yaml'
 
@@ -65,38 +104,63 @@ paths:
     get:
       tags:
         - Phone Numbers
-      summary: Get Phone Number
+      summary: Get phone number
       operationId: getPhoneNumber
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:read
       responses:
         '200':
-          description: Phone Number details
+          description: Phone number details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
 
     put:
       tags:
         - Phone Numbers
-      summary: Update Phone Number
+      summary: Update phone number
+      description: |
+        Owner and PBX Admin only. All fields are optional; `phone_number` and `enable_non_e164`
+        are not accepted (`phone_number` is prohibited). When `routing_type` is sent,
+        `routing_config` must be sent too and the target is validated as on create (`unavailable`
+        is accepted). `routing_config` sent without `routing_type` is stored without target checks.
       operationId: updatePhoneNumber
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/PhoneNumberInput.yaml'
       responses:
         '200':
-          description: Phone Number updated
+          description: Phone number updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -104,22 +168,37 @@ paths:
     patch:
       tags:
         - Phone Numbers
-      summary: Partially update Phone Number
+      summary: Partially update phone number
+      description: |
+        Owner and PBX Admin only. All fields are optional; `phone_number` and `enable_non_e164`
+        are not accepted (`phone_number` is prohibited). When `routing_type` is sent,
+        `routing_config` must be sent too and the target is validated as on create (`unavailable`
+        is accepted). `routing_config` sent without `routing_type` is stored without target checks.
       operationId: patchPhoneNumber
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
+              $ref: '../../components/schemas/PhoneNumberInput.yaml'
       responses:
         '200':
-          description: Phone Number updated
+          description: Phone number updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '../../components/schemas/PhoneNumber.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
         '422':
@@ -128,15 +207,21 @@ paths:
     delete:
       tags:
         - Phone Numbers
-      summary: Delete Phone Number
+      summary: Delete phone number
+      description: Owner and PBX Admin only. Refused with 409 when the DID is still referenced (for example by routing, an auto-dialer caller ID pool, or a blocked-DID entry). The 409 body lists the references.
       operationId: deletePhoneNumber
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: phone-numbers:write
       responses:
         '204':
-          description: Phone Number deleted
+          description: Phone number deleted (empty body)
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
         '404':
           $ref: '../../components/responses/NotFound.yaml'
+        '409':
+          $ref: '../../components/responses/ResourceInUse.yaml'

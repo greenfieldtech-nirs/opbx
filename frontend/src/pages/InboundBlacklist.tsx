@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { queryKeys } from '@/lib/queryKeys';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -28,14 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { StandardDataTable, EmptyState } from '@/components/design-system';
 import {
@@ -49,7 +42,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import api from '@/services/api';
 import { inboundBlacklistService } from '@/services/inboundBlacklist.service';
 import { phoneNumbersService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,9 +52,8 @@ import type {
   UpdateInboundBlacklistRequest,
   InboundBlacklistMatchType,
   InboundBlacklistRejectionStrategy,
-  DIDNumber,
-  Status,
 } from '@/types';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 type BlacklistFormData = {
   caller_id_pattern: string;
@@ -113,7 +104,7 @@ const InboundBlacklistPage: React.FC = () => {
 
   // Pagination and Sorting
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(20);
+  const [perPage] = useState(20);
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -122,11 +113,13 @@ const InboundBlacklistPage: React.FC = () => {
 
   // Fetch blacklist entries
   const {
+    isError: loadFailed,
+    error: loadError,
+    refetch: retryLoad,
     data: blacklistData,
     isLoading,
-    refetch,
   } = useQuery({
-    queryKey: ['inbound-blacklist', { search: searchQuery }],
+    queryKey: [...queryKeys.inboundBlacklist.all, { search: searchQuery }],
     queryFn: () => inboundBlacklistService.getAll({
       search: searchQuery || undefined,
       per_page: 100,
@@ -138,7 +131,7 @@ const InboundBlacklistPage: React.FC = () => {
     data: phoneNumbersData,
     refetch: refetchPhoneNumbers,
   } = useQuery({
-    queryKey: ['phone-numbers'],
+    queryKey: queryKeys.phoneNumbers.list({ per_page: 100 }),
     queryFn: () => phoneNumbersService.getAll({ per_page: 100 }),
   });
 
@@ -148,7 +141,7 @@ const InboundBlacklistPage: React.FC = () => {
   const toggleStatusMutation = useMutation({
     mutationFn: (id: number) => inboundBlacklistService.toggleStatus(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       toast.success('Status updated successfully');
     },
     onError: (error: any) => {
@@ -160,7 +153,7 @@ const InboundBlacklistPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: (data: CreateInboundBlacklistRequest) => inboundBlacklistService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setIsCreateDialogOpen(false);
       setFormData(emptyFormData);
       setFormErrors({});
@@ -184,7 +177,7 @@ const InboundBlacklistPage: React.FC = () => {
     mutationFn: ({ id, data }: { id: number; data: UpdateInboundBlacklistRequest }) =>
       inboundBlacklistService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setIsEditDialogOpen(false);
       setEditingItem(null);
       setFormData(emptyFormData);
@@ -208,7 +201,7 @@ const InboundBlacklistPage: React.FC = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => inboundBlacklistService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inbound-blacklist'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboundBlacklist.all });
       setDeleteItem(null);
       toast.success('Blacklist entry deleted successfully');
     },
@@ -221,6 +214,12 @@ const InboundBlacklistPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors({});
+
+    // Mirrors the server: a rule for specific numbers needs at least one number
+    if (!formData.is_global && formData.did_number_ids.length === 0) {
+      setFormErrors({ did_number_ids: 'Please select at least one phone number when not using global scope.' });
+      return;
+    }
 
     const data: CreateInboundBlacklistRequest = {
       caller_id_pattern: formData.caller_id_pattern,
@@ -279,7 +278,7 @@ const InboundBlacklistPage: React.FC = () => {
   };
 
   const paginatedData = useMemo(() => {
-    let result = [...blacklist];
+    const result = [...blacklist];
 
     // Client-side sorting
     if (sortField) {
@@ -330,6 +329,10 @@ const InboundBlacklistPage: React.FC = () => {
       return { ...prev, did_number_ids: newIds };
     });
   };
+
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load inbound blacklist" error={loadError} onRetry={() => void retryLoad()} />;
+  }
 
   return (
     <div className="space-y-6">

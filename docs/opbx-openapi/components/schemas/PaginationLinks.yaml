@@ -1,0 +1,19 @@
+type: object
+description: Top-level pagination links of a Laravel resource collection
+properties:
+  first:
+    type:
+      - string
+      - 'null'
+  last:
+    type:
+      - string
+      - 'null'
+  prev:
+    type:
+      - string
+      - 'null'
+  next:
+    type:
+      - string
+      - 'null'

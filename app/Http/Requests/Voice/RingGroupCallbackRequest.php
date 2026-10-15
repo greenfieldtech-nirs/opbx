@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Voice;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -28,7 +29,7 @@ class RingGroupCallbackRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -57,8 +58,8 @@ class RingGroupCallbackRequest extends FormRequest
             // Domain - optional, hostname format
             'Domain' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/', 'max:255'],
 
-            // Call status - optional
-            'CallStatus' => ['nullable', 'string', 'in:ringing,answered,completed,failed,busy,no-answer', 'max:20'],
+            // Dial outcome when DialCallStatus is absent - optional (Cloudonix CallStatus values, plus answered)
+            'CallStatus' => ['nullable', 'string', 'in:queued,ringing,in-progress,answered,completed,busy,canceled,failed,no-answer,unknown', 'max:20'],
 
             // Organization ID - set by middleware
             '_organization_id' => ['nullable', 'integer', 'min:1'],

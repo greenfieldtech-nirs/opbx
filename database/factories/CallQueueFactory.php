@@ -7,11 +7,12 @@ namespace Database\Factories;
 use App\Enums\CallQueueStatus;
 use App\Enums\CallQueueStrategy;
 use App\Enums\RingGroupFallbackAction;
+use App\Models\CallQueue;
 use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CallQueue>
+ * @extends Factory<CallQueue>
  */
 class CallQueueFactory extends Factory
 {
@@ -34,6 +35,7 @@ class CallQueueFactory extends Factory
             'announce_position_timeout' => 60,
             'announce_position_language' => null,
             'immediate_connect' => false,
+            'conference_ring_all' => false,
             'moh_recording_id' => null,
             'fallback_action' => RingGroupFallbackAction::HANGUP,
             'fallback_extension_id' => null,

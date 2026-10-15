@@ -15,7 +15,7 @@ paths:
         - Users
       summary: Get user embed token settings
       description: |
-        Get the [Embedded Dialer](/modules/embedded-dialer) settings for a
+        Get the [Embedded Dialer](/opbx/modules/embedded-dialer) settings for a
         user's embed token (icon position/color, last-used timestamp). Never
         returns the plaintext token — only the initial generate/regenerate
         response does.
@@ -24,11 +24,11 @@ paths:
         settings) on first access.
 
         Caller must be Owner or PBX Admin, in the same organization as the
-        target user.
+        target user (only an Owner can manage an Owner's token; a user of another
+        organization returns 403). Not available to API keys.
       operationId: getUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Embed token settings
@@ -56,11 +56,11 @@ paths:
         `regenerate` endpoint for that.
 
         Caller must be Owner or PBX Admin, in the same organization as the
-        target user.
+        target user (only an Owner can manage an Owner's token; a user of another
+        organization returns 403). Not available to API keys.
       operationId: updateUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       requestBody:
         required: true
         content:
@@ -122,13 +122,13 @@ paths:
         again after this response.
 
         Caller must be Owner or PBX Admin, in the same organization as the
-        target user. See the
-        [Embedded Dialer guide](/modules/embedded-dialer) for how to install
+        target user (only an Owner can manage an Owner's token; a user of another
+        organization returns 403). Not available to API keys. See the
+        [Embedded Dialer guide](/opbx/modules/embedded-dialer) for how to install
         the snippet.
       operationId: regenerateUserEmbedToken
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Token regenerated. `token` and `snippet` are one-time values.

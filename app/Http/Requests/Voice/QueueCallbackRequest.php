@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Voice;
 
+use App\Services\CxmlBuilder\CxmlBuilder;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
  * Validation for call queue voice callback payloads (poll + dial callback).
@@ -25,10 +28,10 @@ class QueueCallbackRequest extends FormRequest
      * Cloudonix's UA does not send Accept: application/json, so a default
      * validation failure would surface as a 302 redirect (and drop the call).
      */
-    protected function failedValidation(\Illuminate\Contracts\Validation\Validator $validator): void
+    protected function failedValidation(Validator $validator): void
     {
-        throw new \Illuminate\Http\Exceptions\HttpResponseException(response(
-            \App\Services\CxmlBuilder\CxmlBuilder::unavailable('Invalid queue callback request.'),
+        throw new HttpResponseException(response(
+            CxmlBuilder::unavailable('Invalid queue callback request.'),
             200,
             ['Content-Type' => 'application/xml']
         ));
@@ -59,7 +62,7 @@ class QueueCallbackRequest extends FormRequest
      * poll redirects. Only treat SessionData as queue context when it actually
      * carries call_queue_id; otherwise fall through to session_data / top-level.
      *
-     * @return array{call_queue_id: int, call_id: string, organization_id: int|null}|null
+     * @return array{call_queue_id: int, call_id: string, organization_id: int, moh_idx: int}|null
      */
     public function queueContext(): ?array
     {
@@ -72,14 +75,19 @@ class QueueCallbackRequest extends FormRequest
         $queueId = (int) ($data['call_queue_id'] ?? 0);
         $callId = (string) ($data['call_id'] ?? $this->input('CallSid'));
 
-        if ($queueId < 1 || $callId === '') {
+        // Tenant comes only from the authenticated webhook (merged by the auth middleware), never the payload.
+        $orgId = (int) $this->input('_organization_id');
+
+        if ($queueId < 1 || $callId === '' || $orgId < 1) {
             return null;
         }
 
         return [
             'call_queue_id' => $queueId,
             'call_id' => $callId,
-            'organization_id' => isset($data['organization_id']) ? (int) $data['organization_id'] : null,
+            'organization_id' => $orgId,
+            // MOH segment index for the segmented hold loop (WP1); absent = start at 0.
+            'moh_idx' => max(0, (int) ($data['moh_idx'] ?? 0)),
         ];
     }
 }

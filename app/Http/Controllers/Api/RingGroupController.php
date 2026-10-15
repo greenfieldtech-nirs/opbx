@@ -7,11 +7,16 @@ namespace App\Http\Controllers\Api;
 use App\Enums\RingGroupStatus;
 use App\Enums\RingGroupStrategy;
 use App\Http\Controllers\Traits\AppliesFilters;
+use App\Http\Requests\RingGroup\StoreRingGroupRequest;
+use App\Http\Requests\RingGroup\UpdateRingGroupRequest;
 use App\Http\Resources\RingGroupResource;
 use App\Models\RingGroup;
 use App\Models\RingGroupMember;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +47,7 @@ class RingGroupController extends AbstractApiCrudController
 
     protected function getAllowedFilters(): array
     {
-        return ['strategy', 'status', 'search'];
+        return ['strategy', 'status', 'search', 'unprovisioned'];
     }
 
     protected function getAllowedSortFields(): array
@@ -58,6 +63,16 @@ class RingGroupController extends AbstractApiCrudController
     protected function getDefaultSortOrder(): string
     {
         return 'desc';
+    }
+
+    protected function getStoreRequestClass(): ?string
+    {
+        return StoreRingGroupRequest::class;
+    }
+
+    protected function getUpdateRequestClass(): ?string
+    {
+        return UpdateRingGroupRequest::class;
     }
 
     protected function getRouteParameterName(): string
@@ -119,6 +134,11 @@ class RingGroupController extends AbstractApiCrudController
             'search' => [
                 'type' => 'search',
                 'scope' => 'search',
+            ],
+            'unprovisioned' => [
+                'type' => 'column',
+                'scope' => 'unprovisioned',
+                'require_filled' => true,
             ],
         ];
     }
@@ -216,7 +236,7 @@ class RingGroupController extends AbstractApiCrudController
         $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
-    private array $tempMembersData = [];
+    private ?array $tempMembersData = [];
 
     protected function afterShow(Model $model, Request $request): void
     {
@@ -224,7 +244,7 @@ class RingGroupController extends AbstractApiCrudController
         $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
     }
 
-    protected function acquireUpdateLock(Model $model, Request $request): ?\Illuminate\Contracts\Cache\Lock
+    protected function acquireUpdateLock(Model $model, Request $request): ?Lock
     {
         $lockKey = "lock:ring_group:{$model->id}";
         $lock = Cache::lock($lockKey, self::LOCK_TIMEOUT_SECONDS);
@@ -232,8 +252,10 @@ class RingGroupController extends AbstractApiCrudController
         $requestId = $this->getRequestId();
         $user = $this->getAuthenticatedUser($request);
 
-        // Try to acquire lock with timeout
-        if (! $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS)) {
+        // block() throws when the lock stays taken; the hook must return ?Lock, so the 409 is thrown.
+        try {
+            $lock->block(self::DEFAULT_LOCK_BLOCK_SECONDS);
+        } catch (LockTimeoutException) {
             Log::warning('Failed to acquire ring group lock', [
                 'request_id' => $requestId,
                 'user_id' => $user->id,
@@ -241,10 +263,10 @@ class RingGroupController extends AbstractApiCrudController
                 'lock_key' => $lockKey,
             ]);
 
-            return response()->json([
+            throw new HttpResponseException(response()->json([
                 'error' => 'Conflict',
                 'message' => 'Ring group is currently being modified. Please try again.',
-            ], 409);
+            ], 409));
         }
 
         Log::debug('Ring group lock acquired', [
@@ -256,7 +278,7 @@ class RingGroupController extends AbstractApiCrudController
         return $lock;
     }
 
-    protected function releaseUpdateLock(?\Illuminate\Contracts\Cache\Lock $lock, Model $model, Request $request): void
+    protected function releaseUpdateLock(?Lock $lock, Model $model, Request $request): void
     {
         if ($lock) {
             $lock->release();
@@ -272,8 +294,8 @@ class RingGroupController extends AbstractApiCrudController
 
     protected function beforeUpdate(Model $model, array $validated, Request $request): array
     {
-        // Extract members data
-        $this->tempMembersData = $validated['members'] ?? [];
+        // Extract members data; null means "not sent, leave members untouched" (e.g. status toggle)
+        $this->tempMembersData = $validated['members'] ?? null;
         unset($validated['members']);
 
         // Normalize fallback fields based on action
@@ -284,6 +306,12 @@ class RingGroupController extends AbstractApiCrudController
 
     protected function afterUpdate(Model $model, Request $request): void
     {
+        if ($this->tempMembersData === null) {
+            $model->loadMissing(RingGroup::DEFAULT_RELATIONSHIP_FIELDS);
+
+            return;
+        }
+
         // Delete existing members
         RingGroupMember::where('ring_group_id', $model->id)->delete();
 

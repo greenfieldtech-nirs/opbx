@@ -1,0 +1,142 @@
+paths:
+  /callbacks/voice/ring-group-member-connect:
+    get:
+      tags:
+        - Voice Routing
+      summary: Simultaneous ring group member answered
+      description: |
+        Fetched by a member's own session when that member answers a Simultaneous ring
+        group call. Every member of a Simultaneous group is rung in a separate Cloudonix
+        session (`POST /calls/{domain}/application`, destination = the member's extension
+        number, or a Forward member's forward-to target; caller ID = the caller's number;
+        timeout = the group's ring timeout) while the caller waits alone in a conference
+        room with hold music. The first member session to arrive claims the call (member
+        from `extension` in `sd`, session from the `Session` or `CallSid` request field):
+        it gets `<Dial><Conference>` into the caller's room, the other members' sessions are
+        ended, and the member is recorded as the extension that answered the call (the call
+        record's `extension_number`). Every other request gets `<Hangup/>`: a later member,
+        a session that is not part of the current offer, or a call that already went to the
+        fallback or whose caller hung up.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the ring
+        group's ring timeout plus 60 seconds after it is issued. The route is registered with
+        `Route::any`, so every HTTP method is accepted; GET and POST are documented. Not
+        rate-limited.
+      operationId: ringGroupMemberConnectGet
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token` = the caller's session token, `extension` = the member's extension number, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML: `<Dial><Conference>` into the caller's room for the member that claims the call; `<Hangup/>` otherwise, or when the signature is invalid or expired"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+    post:
+      tags:
+        - Voice Routing
+      summary: Simultaneous ring group member answered
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
+      operationId: ringGroupMemberConnectPost
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token` = the caller's session token, `extension` = the member's extension number, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML: `<Dial><Conference>` into the caller's room for the member that claims the call; `<Hangup/>` otherwise, or when the signature is invalid or expired"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+
+  /callbacks/voice/ring-group-fallback:
+    get:
+      tags:
+        - Voice Routing
+      summary: Simultaneous ring group fallback
+      description: |
+        Fetched by the caller's session when nobody answered a Simultaneous ring group call:
+        every member session ended unanswered (no answer, busy, rejected), or the ring
+        timeout plus 10 seconds passed (the members still ringing are then ended). OPBX
+        switches the caller's session to this URL (`POST
+        /calls/{domain}/sessions/{token}/application`); the response is the ring group's
+        fallback action (extension, ring group, IVR menu, AI assistant, AI load balancer,
+        call queue, hangup or unavailable), exactly as for the other strategies.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires 120 seconds
+        after it is issued. The route is registered with `Route::any`, so every HTTP method
+        is accepted; GET and POST are documented. Not rate-limited.
+      operationId: ringGroupFallbackGet
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token`, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML of the ring group's fallback action; `<Hangup/>` when the signature is invalid or expired, or the ring group is no longer active"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+    post:
+      tags:
+        - Voice Routing
+      summary: Simultaneous ring group fallback
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
+      operationId: ringGroupFallbackPost
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`ring_group_id`, `organization_id`, `caller_token`, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML of the ring group's fallback action; `<Hangup/>` when the signature is invalid or expired, or the ring group is no longer active"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'

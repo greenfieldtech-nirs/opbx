@@ -9,7 +9,8 @@
     "build:embed": "vite build --config vite.embed.config.ts && mkdir -p ../public/embed/assets && cp dist-embed/embed-widget.js dist-embed/embed-widget.css ../public/embed/assets/",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -35,7 +36,6 @@
     "@radix-ui/react-toast": "^1.2.2",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.56.2",
-    "@textea/json-viewer": "^4.0.1",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vscode/codicons": "^0.0.45",
     "axios": "^1.20.0",
@@ -43,13 +43,13 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "i18n-iso-countries": "^7.14.0",
+    "jssip": "3.10.0",
     "laravel-echo": "^1.16.1",
     "libphonenumber-js": "^1.12.33",
     "lucide-react": "^0.447.0",
     "pusher-js": "^8.4.0-rc2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-google-recaptcha": "^3.1.0",
     "react-hook-form": "^7.53.0",
     "react-router-dom": "^7.18.0",
     "react-syntax-highlighter": "^16.1.0",
@@ -61,20 +61,24 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/forms": "^0.5.9",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^25.0.3",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "^8.8.1",
     "@typescript-eslint/parser": "^8.8.1",
     "@vitejs/plugin-react": "^4.3.2",
-    "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^4.6.2",
     "eslint-plugin-react-refresh": "^0.4.12",
+    "jsdom": "^26.1.0",
     "playwright": "^1.58.2",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.13",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.2",
-    "vite": "^7.3.0"
+    "vite": "^7.3.0",
+    "vitest": "^4.1.11"
   }
 }

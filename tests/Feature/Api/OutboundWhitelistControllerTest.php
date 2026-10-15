@@ -282,7 +282,7 @@ class OutboundWhitelistControllerTest extends TestCase
         $response->assertStatus(404)
             ->assertJson([
                 'error' => 'NotFoundHttpException',
-                'message' => 'No query results for model [App\Models\OutboundWhitelist] '.$otherOrgOutboundWhitelist->id,
+                'message' => 'Resource not found.',
             ]);
     }
 

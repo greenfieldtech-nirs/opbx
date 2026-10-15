@@ -25,6 +25,7 @@ export function DestinationSelector({
   placeholder = 'Select destination',
   disabled = false,
   extensionTypes,
+  excludeIds,
   showBadges = true,
   showSubLabel = true,
   emptyMessage,
@@ -32,7 +33,8 @@ export function DestinationSelector({
   className,
 }: DestinationSelectorProps) {
   // Get destination options for the selected type
-  const { options, isLoading } = useDestinationOptions(type, extensionTypes);
+  const { options: allOptions, isLoading } = useDestinationOptions(type, extensionTypes);
+  const options = excludeIds?.length ? allOptions.filter((o) => !excludeIds.includes(o.id)) : allOptions;
 
   // Handle selection change
   const handleChange = (selectedValue: string) => {

@@ -1,0 +1,104 @@
+type: object
+description: |
+  IVR menu create/update request (update uses the same rules; full replacement).
+  Exactly one greeting source is required: `recording_id`, `audio_file_path` or `tts_text`
+  (422 on `recording_id`, `audio_file_path` or `audio_configuration` otherwise). With
+  `recording_id` (or a numeric `audio_file_path`) the stored `audio_file_path` becomes the
+  recording's playback URL (null when the recording is not active) and the TTS fields are
+  cleared; with a URL in `audio_file_path` or with `tts_text`, the other sources are cleared.
+properties:
+  name:
+    type: string
+    maxLength: 255
+  description:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  audio_file_path:
+    description: Greeting audio as a URL (max 500 chars) or a recording ID of this organization
+    oneOf:
+      - type: string
+        maxLength: 500
+      - type: integer
+      - type: 'null'
+  recording_id:
+    type:
+      - integer
+      - 'null'
+    description: Recording of this organization
+  tts_text:
+    type:
+      - string
+      - 'null'
+    maxLength: 1000
+  tts_voice:
+    type:
+      - string
+      - 'null'
+    maxLength: 50
+  max_timeout:
+    type: integer
+    minimum: 1
+    maximum: 30
+  inter_digit_timeout:
+    type: integer
+    minimum: 1
+    maximum: 30
+  max_turns:
+    type: integer
+    minimum: 1
+    maximum: 9
+  failover_destination_type:
+    type: string
+    enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, hangup, unavailable]
+    description: '`unavailable` is rejected on create (422) and accepted on update'
+  failover_destination_id:
+    type:
+      - integer
+      - 'null'
+    description: Optional. When sent and the type is not hangup/unavailable, it must be a destination of that type in this organization.
+  status:
+    type: string
+    enum: [active, inactive]
+  options:
+    type: array
+    minItems: 1
+    maxItems: 20
+    items:
+      type: object
+      properties:
+        input_digits:
+          type: string
+          maxLength: 10
+          description: >-
+            Digits the caller presses. Must differ between the options of a menu; a repeated
+            value is a 422 on `options.N.input_digits` ("Each menu option must use a different key.")
+        description:
+          type:
+            - string
+            - 'null'
+          maxLength: 255
+        destination_type:
+          type: string
+          enum: [extension, ring_group, conference_room, ivr_menu, ai_assistant, ai_load_balancer, business_hours, call_queue, unavailable]
+          description: '`unavailable` is rejected on create (422) and accepted on update'
+        destination_id:
+          description: Required. ID of a destination of that type in this organization; for `unavailable` it may be omitted and is stored as 0
+          type:
+            - integer
+            - string
+            - 'null'
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 20
+      required: [input_digits, destination_type, priority]
+required:
+  - name
+  - max_timeout
+  - inter_digit_timeout
+  - max_turns
+  - failover_destination_type
+  - status
+  - options

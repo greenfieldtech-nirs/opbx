@@ -1,0 +1,28 @@
+type: object
+description: |
+  A resource that still references the resource being deleted. Produced by
+  `ResourceReferenceChecker`. The `type` value uses the checker's aliases
+  (for example `business_hours` for a business hours schedule, `did_number`
+  for a phone number).
+required:
+  - type
+  - id
+  - name
+  - detail
+properties:
+  type:
+    type: string
+    description: Kind of the referencing resource.
+    example: ivr_menu
+  id:
+    type: integer
+    description: ID of the referencing resource.
+    example: 4
+  name:
+    type: string
+    description: Display name of the referencing resource.
+    example: Main menu
+  detail:
+    type: string
+    description: Human-readable context of the reference (for example the routing slot or field that points at the resource).
+    example: option 1

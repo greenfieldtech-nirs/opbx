@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BusinessHoursController;
 use App\Http\Controllers\Api\CallDetailRecordController;
 use App\Http\Controllers\Api\CallNotificationsSettingsController;
+use App\Http\Controllers\Api\CallQueueAgentController;
+use App\Http\Controllers\Api\CallQueueController;
 use App\Http\Controllers\Api\CallTrackingAdPlatformIntegrationController;
 use App\Http\Controllers\Api\CallTrackingAnalyticsController;
 use App\Http\Controllers\Api\CallTrackingCampaignController;
@@ -31,14 +33,13 @@ use App\Http\Controllers\Api\OrganizationJoinRequestController;
 use App\Http\Controllers\Api\OutboundWhitelistController;
 use App\Http\Controllers\Api\PhoneNumberController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicQueuesDashboardController;
+use App\Http\Controllers\Api\PublicStatusController;
+use App\Http\Controllers\Api\QueueCallController;
+use App\Http\Controllers\Api\QueuesDashboardLinkController;
+use App\Http\Controllers\Api\QueueStatsController;
 use App\Http\Controllers\Api\RecordingsController;
 use App\Http\Controllers\Api\RegisterController;
-use App\Http\Controllers\Api\CallQueueAgentController;
-use App\Http\Controllers\Api\PublicQueuesDashboardController;
-use App\Http\Controllers\Api\CallQueueController;
-use App\Http\Controllers\Api\QueueCallController;
-use App\Http\Controllers\Api\QueueStatsController;
-use App\Http\Controllers\Api\QueuesDashboardLinkController;
 use App\Http\Controllers\Api\RingGroupController;
 use App\Http\Controllers\Api\SessionUpdateController;
 use App\Http\Controllers\Api\SettingsController;
@@ -158,7 +159,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
             $pusher = new Pusher(
                 config('broadcasting.connections.pusher.key'),
                 config('broadcasting.connections.pusher.secret'),
-                config('broadcasting.connections.pusher.options.app_id'),
+                config('broadcasting.connections.pusher.app_id'),
                 config('broadcasting.connections.pusher.options')
             );
 
@@ -169,7 +170,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
                 'status' => 'ok',
                 'timestamp' => now()->toIso8601String(),
             ]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) { // missing Pusher config is a TypeError, not an Exception
             return response()->json([
                 'status' => 'error',
                 'timestamp' => now()->toIso8601String(),
@@ -197,6 +198,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('{token}/queues/{queue}/stats', [PublicQueuesDashboardController::class, 'stats'])->name('public.queues.stats');
     });
 
+    // Public platform status page (no auth, cached 30s, rate limited)
+    Route::get('public/status', [PublicStatusController::class, 'show'])
+        ->middleware('throttle:60,1')
+        ->name('public.status');
 
     // Broadcasting authentication routes (for WebSocket presence channels)
     // Must be accessible to authenticated users for Laravel Echo
@@ -246,7 +251,7 @@ Route::prefix('v1')->group(function (): void {
     // Authentication routes (public)
     Route::prefix('auth')->group(function (): void {
         // Login with rate limiting: 5 attempts per minute per IP
-        // Supports both token-based (returns token in JSON) and cookie-based (for SPA) authentication
+        // Always returns a Bearer token (no cookie session mode)
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:auth')
             ->name('auth.login');
@@ -316,6 +321,8 @@ Route::prefix('v1')->group(function (): void {
 
         // Users
         Route::apiResource('users', UsersController::class);
+        Route::get('users/{user}/delete-impact', [UsersController::class, 'deleteImpact'])
+            ->name('users.delete-impact');
         Route::patch('users/{user}/password', [UsersController::class, 'updatePassword'])
             ->name('users.password.update');
 
@@ -540,7 +547,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Session Updates - NOT rate limited (real-time polling endpoints)
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'enforce.api.key.scope'])->prefix('session-updates')->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'operate.as', 'enforce.api.key.scope'])->prefix('session-updates')->group(function (): void {
         Route::get('/active', [SessionUpdateController::class, 'getActiveCalls'])->name('session-updates.active');
         Route::get('/active/stats', [SessionUpdateController::class, 'getActiveCallsStats'])->name('session-updates.active.stats');
         Route::get('/{sessionId}', [SessionUpdateController::class, 'getSessionDetails'])->name('session-updates.details');
@@ -549,7 +556,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Call Notifications Settings
-    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'rate_limit_org:api', 'enforce.api.key.scope'])->prefix('call-notifications')->group(function (): void {
+    Route::middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'operate.as', 'rate_limit_org:api', 'enforce.api.key.scope'])->prefix('call-notifications')->group(function (): void {
         Route::get('/settings', [CallNotificationsSettingsController::class, 'show'])->name('call-notifications.settings.show');
         Route::post('/settings', [CallNotificationsSettingsController::class, 'store'])->name('call-notifications.settings.store');
         Route::put('/settings', [CallNotificationsSettingsController::class, 'update'])->name('call-notifications.settings.update');
@@ -562,7 +569,7 @@ Route::prefix('v1')->group(function (): void {
 });
 
 // Auto Dialer Campaigns — no rate limiting (high-frequency monitor polling)
-Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'enforce.api.key.scope'])->group(function (): void {
+Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scope', 'operate.as', 'enforce.api.key.scope'])->group(function (): void {
     // Monitor (MUST be before apiResource to avoid 'monitor' matching {campaign})
     Route::get('auto-dialer-campaigns/monitor/summary', [AutoDialerCampaignController::class, 'monitorSummary'])
         ->name('auto-dialer-campaigns.monitor.summary');
@@ -598,6 +605,14 @@ Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scop
         ->name('distribution-lists.destinations');
     Route::get('auto-dialer-campaigns/lists/{list}/versions', [DistributionListController::class, 'getVersions'])
         ->name('distribution-lists.versions');
+    Route::get('auto-dialer-campaigns/lists/{list}/versions/{version}/destinations', [DistributionListController::class, 'getVersionDestinations'])
+        ->scopeBindings()
+        ->name('distribution-lists.versions.destinations');
+    Route::get('auto-dialer-campaigns/lists/{list}/versions/{version}/download', [DistributionListController::class, 'downloadVersion'])
+        ->scopeBindings()
+        ->name('distribution-lists.versions.download');
+    Route::get('auto-dialer-campaigns/lists/{list}/parts', [DistributionListController::class, 'getParts'])
+        ->name('distribution-lists.parts');
     Route::post('auto-dialer-campaigns/lists/{list}/copy', [DistributionListController::class, 'copy'])
         ->name('distribution-lists.copy');
     Route::patch('auto-dialer-campaigns/lists/{list}/archive', [DistributionListController::class, 'archive'])
@@ -634,7 +649,7 @@ Route::prefix('v1')->middleware(['resolve.api.key', 'auth:sanctum', 'tenant.scop
         ->name('auto-dialer-campaigns.list.upload');
     Route::get('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'getList'])
         ->name('auto-dialer-campaigns.list.get');
-    Route::delete('auto-dialer-campaigns/{campaign}/list', [AutoDialerCampaignController::class, 'deleteList'])
+    Route::delete('auto-dialer-campaigns/{campaign}/list/{list}', [AutoDialerCampaignController::class, 'deleteList'])
         ->name('auto-dialer-campaigns.list.delete');
     Route::get('auto-dialer-campaigns/{campaign}/destinations', [AutoDialerCampaignController::class, 'getDestinations'])
         ->name('auto-dialer-campaigns.destinations');

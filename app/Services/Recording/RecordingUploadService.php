@@ -6,6 +6,7 @@ namespace App\Services\Recording;
 
 use App\Models\Recording;
 use App\Models\User;
+use Aws\S3\Exception\S3Exception;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -81,7 +82,7 @@ class RecordingUploadService
             // Check if storage is accessible before attempting to store
             try {
                 $disk->files();
-            } catch (\Aws\S3\Exception\S3Exception $e) {
+            } catch (S3Exception $e) {
                 if (str_contains($e->getMessage(), 'NoSuchBucket')) {
                     Log::error('RecordingUploadService: MinIO bucket does not exist', [
                         'bucket' => config('filesystems.disks.recordings.bucket'),
@@ -108,7 +109,7 @@ class RecordingUploadService
                 'file_size' => strlen($fileContent),
             ]);
 
-        } catch (\Aws\S3\Exception\S3Exception $e) {
+        } catch (S3Exception $e) {
             // Handle S3/MinIO specific errors with more context
             $errorCode = $e->getAwsErrorCode();
             $errorMessage = $e->getMessage();

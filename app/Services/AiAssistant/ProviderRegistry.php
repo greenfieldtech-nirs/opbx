@@ -12,6 +12,12 @@ namespace App\Services\AiAssistant;
  */
 class ProviderRegistry
 {
+    /** A SIP assistant number in E.164: '+' and 2-15 digits. */
+    public const E164_REGEX = '/^\+[1-9]\d{1,14}$/';
+
+    /** A SIP assistant number marked non-E.164 (configuration.enable_non_e164): digits, + and #, as for phone numbers. */
+    public const NON_E164_REGEX = '/^[\d+#]{1,20}$/';
+
     /**
      * @var array<string, ProviderDefinition>
      */
@@ -187,8 +193,8 @@ class ProviderRegistry
             type: 'tel',
             required: true,
             placeholder: '+12125551234',
-            description: 'Phone number in E.164 format',
-            validationRules: ['regex:/^\+[1-9]\d{1,14}$/'],
+            description: 'Phone number in E.164 format, or mark it as non-E.164',
+            validationRules: ['regex:'.self::E164_REGEX],
         );
     }
 }

@@ -156,7 +156,7 @@ export default function Settings() {
           domain_requests_api_key: data.domain_requests_api_key || '',
           webhook_base_url: data.webhook_base_url || '',
           no_answer_timeout: data.no_answer_timeout,
-          call_recording_mode: data.call_recording_mode,
+          call_recording_mode: data.call_recording_mode || 'disabled',
           recording_format: data.recording_format,
         });
 
@@ -207,8 +207,6 @@ export default function Settings() {
       });
 
       if (result.valid) {
-        setValidationStatus('valid');
-
         // Step 2: Populate form fields with Cloudonix profile settings if available
         const formValues = watch();
         const updateData: UpdateCloudonixSettingsRequest = {
@@ -243,16 +241,23 @@ export default function Settings() {
           const savedSettings = await settingsService.updateCloudonixSettings(updateData);
 
           setSettingsData(savedSettings);
+          // The "Saved" badge only appears once the save request has succeeded.
+          setValidationStatus('valid');
 
           const settingsApplied = result.profile_settings &&
             (result.profile_settings.no_answer_timeout !== undefined ||
               result.profile_settings.recording_format !== undefined);
 
-          toast.success('Settings validated and saved successfully', {
-            description: settingsApplied
-              ? 'Settings from your Cloudonix domain have been applied and synced.'
-              : 'Your Cloudonix integration settings have been saved and synced.',
-          });
+          if (savedSettings.warning) {
+            // Saved locally, but the push to Cloudonix failed: do not claim success.
+            toast.warning('Settings saved, but not synced to Cloudonix', { description: savedSettings.warning });
+          } else {
+            toast.success('Settings validated and saved successfully', {
+              description: settingsApplied
+                ? 'Settings from your Cloudonix domain have been applied and synced.'
+                : 'Your Cloudonix integration settings have been saved and synced.',
+            });
+          }
 
           // Refresh settings to verify persistence
           try {
@@ -353,7 +358,7 @@ export default function Settings() {
       <div className="container mx-auto py-8 px-4 max-w-4xl relative">
         {/* Loading overlay during validation/save */}
         {isValidating && (
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-xs z-50 flex items-center justify-center rounded-lg">
             <div className="bg-background border rounded-lg p-6 shadow-lg flex flex-col items-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <div className="text-center">
@@ -587,7 +592,7 @@ export default function Settings() {
                       <p className="text-sm font-medium text-amber-900 mb-1">
                         New API Key Generated
                       </p>
-                      <div className="font-mono text-xs break-all text-amber-800 bg-white p-2 rounded">
+                      <div className="font-mono text-xs break-all text-amber-800 bg-white p-2 rounded-sm">
                         {generatedKey}
                       </div>
                     </div>
@@ -597,13 +602,13 @@ export default function Settings() {
                        size="sm"
                        onClick={() => handleCopyToClipboard(generatedKey, 'API Key')}
                        disabled={isValidating}
-                       className="flex-shrink-0"
+                       className="shrink-0"
                      >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                   <p className="text-xs text-amber-800 flex items-start gap-1">
-                    <AlertCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
                     Save this key now - it will not be shown again after you save settings.
                   </p>
                 </div>
@@ -814,7 +819,7 @@ export default function Settings() {
                         disabled={isValidating}
                       >
                         <SelectTrigger id="call_recording_mode">
-                          <SelectValue placeholder="Select call recording mode" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="disabled">Do not record calls</SelectItem>

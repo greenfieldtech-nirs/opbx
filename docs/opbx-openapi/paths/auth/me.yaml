@@ -7,10 +7,16 @@ paths:
       description: |
         Returns current authenticated user details including organization information.
         Validates that the user belongs to an active organization.
+
+        The `user` object is the same subset returned by login (`id`,
+        `organization_id`, `name`, `email`, `role`, `status`,
+        `is_platform_manager`, `social_identities`) plus `organization`.
+        When a platform owner is operating as another organization
+        (`X-Operate-As-Organization`), the fields describe the effective owner
+        of the target organization and an `operate_as` block is added.
       operationId: getCurrentUser
       security:
         - bearerAuth: []
-        - cookieAuth: []
       responses:
         '200':
           description: Current user details
@@ -42,6 +48,25 @@ paths:
                               timezone:
                                 type: string
                                 example: America/New_York
+                          operate_as:
+                            type: object
+                            description: Present only while operate-as (platform-owner impersonation) is active
+                            properties:
+                              active:
+                                type: boolean
+                                example: true
+                              organization:
+                                type:
+                                  - object
+                                  - 'null'
+                                properties:
+                                  id:
+                                    type: integer
+                                  name:
+                                    type: string
+                              real_user_id:
+                                type: integer
+                                description: ID of the real platform-manager user
               example:
                 user:
                   id: 123
@@ -51,6 +76,7 @@ paths:
                   role: owner
                   status: active
                   is_platform_manager: false
+                  social_identities: []
                   organization:
                     id: 1
                     name: Acme Corporation
@@ -69,10 +95,10 @@ paths:
                 invalidOrg:
                   summary: Invalid organization
                   value:
-                    error: INVALID_ORGANIZATION
+                    error: Invalid organization
                     message: Your account is not associated with a valid organization
                 orgInactive:
                   summary: Organization inactive
                   value:
-                    error: ORGANIZATION_INACTIVE
+                    error: Organization inactive
                     message: Your organization is not active. Please contact support.

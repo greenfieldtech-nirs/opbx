@@ -3,33 +3,97 @@
  * Full CRUD operations with backend API integration
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { useState,useEffect,useMemo } from 'react';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
 
 import { toast } from 'sonner';
-import { ringGroupsService, aiAssistantLoadBalancersService } from '@/services/createResourceService';
+import { ringGroupsService,aiAssistantLoadBalancersService } from '@/services/createResourceService';
 import { callQueuesService } from '@/services/callQueues.service';
 import { extensionsService } from '@/services/extensions.service';
+import aiAssistantsService from '@/services/aiAssistants.service';
 import { ivrMenusService } from '@/services/createResourceService';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  StandardDataTable,
-  Column,
-  EmptyState,
-  RingGroupStrategySelector,
+StandardDataTable,EmptyState,
+RingGroupStrategySelector
 } from '@/components/design-system';
 import type {
-  RingGroup,
-  RingGroupStrategy,
-  RingGroupFallbackAction,
-  Status
+RingGroup,
+RingGroupStrategy,
+RingGroupFallbackAction,
+Status
 } from '@/types';
 import type {
-  CreateRingGroupRequest,
-  UpdateRingGroupRequest,
+CreateRingGroupRequest,
+UpdateRingGroupRequest,
 } from '@/types/api.types';
-import type { Extension, RingGroupMember } from '@/types';
-import { getErrorMessage } from '@/types/api';
+import type { Extension,RingGroupMember } from '@/types';
+import { getApiErrorMessage } from '@/services/api';
+import { cn } from '@/lib/utils';
+import { Card,CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from '@/components/ui/select';
+import {
+Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Alert,AlertDescription } from '@/components/ui/alert';
+import {
+AlertCircle,
+Plus,
+Search,
+Filter,
+Users,
+UserPlus,
+PhoneForwarded,
+PhoneOff,ChevronUp,
+ChevronDown,
+X,
+Info,
+RefreshCw,
+GripVertical,
+Menu,
+Bot,
+Phone,
+ListOrdered
+} from 'lucide-react';
+import {
+DndContext,
+closestCenter,
+KeyboardSensor,
+PointerSensor,
+useSensor,
+useSensors,
+} from '@dnd-kit/core';
+import {
+arrayMove,
+SortableContext,
+sortableKeyboardCoordinates,
+verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
+import { QueryErrorState } from '@/components/design-system/QueryErrorState';
 
 // Extended RingGroup type with additional fallback fields
 interface ExtendedRingGroup extends RingGroup {
@@ -38,91 +102,6 @@ interface ExtendedRingGroup extends RingGroup {
   fallback_ai_assistant_id?: string;
   fallback_ai_load_balancer_id?: string;
 }
-import {
-  getStrategyDisplayName,
-  getStrategyDescription,
-  getFallbackDisplayText,
-} from '@/utils/ringGroups';
-import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
-import {
-  AlertCircle,
-  Plus,
-  Search,
-  Filter,
-  Users,
-  UserPlus,
-  RotateCw,
-  List,
-  PhoneForwarded,
-  PhoneOff,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  X,
-  Info,
-  RefreshCw,
-  GripVertical,
-  Menu,
-  Bot,
-  Phone,
-  ArrowRight,
-  ListOrdered,
-} from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 // Sortable item component for drag-and-drop
 interface SortableItemProps {
@@ -172,10 +151,11 @@ export default function RingGroups() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [strategyFilter, setStrategyFilter] = useState<RingGroupStrategy | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all');
+  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
   const [sortField, setSortField] = useState<'name' | 'strategy' | 'members' | 'status'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
+  const [perPage] = useState(25);
 
   // Debounce search input
   useEffect(() => {
@@ -217,7 +197,6 @@ export default function RingGroups() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<Partial<ExtendedRingGroup>>({
@@ -239,13 +218,14 @@ export default function RingGroups() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Fetch ring groups with React Query
-  const { data: ringGroupsData, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['ring-groups', {
+  const { isError: loadFailed, error: loadError, refetch: retryLoad, data: ringGroupsData, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: [...queryKeys.ringGroups.all, {
       page: currentPage,
       per_page: perPage,
       search: debouncedSearch,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }],
@@ -255,6 +235,7 @@ export default function RingGroups() {
       search: debouncedSearch || undefined,
       strategy: strategyFilter !== 'all' ? strategyFilter : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      unprovisioned: unprovisionedOnly ? 1 : undefined,
       sort_by: sortField,
       sort_direction: sortDirection,
     }),
@@ -268,30 +249,26 @@ export default function RingGroups() {
 
   // Fetch available extensions (type: user or forward, status: active)
   const { data: userExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'user', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'user', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'user', status: 'active', per_page: 100 }),
   });
 
   const { data: forwardExtensionsData } = useQuery({
-    queryKey: ['extensions', { type: 'forward', status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.extensions.all, { type: 'forward', status: 'active', per_page: 100 }],
     queryFn: () => extensionsService.getAll({ type: 'forward', status: 'active', per_page: 100 }),
   });
 
-  // Fetch available AI Assistants (type: ai_assistant, status: active)
+  // Fetch available AI Assistants (status: active)
   const { data: aiAssistantsData } = useQuery({
-    queryKey: ['extensions', { type: 'ai_assistant', status: 'active', per_page: 100 }],
-    queryFn: () => extensionsService.getAll({ type: 'ai_assistant', status: 'active', per_page: 100 }),
+    queryKey: [...queryKeys.aiAssistants.all, { status: 'active', per_page: 100 }],
+    queryFn: () => aiAssistantsService.getAll({ status: 'active', per_page: 100 }),
   });
 
-  // Filter to only include ai_assistant type (client-side safety)
-  const availableAiAssistants = useMemo(() => {
-    const allAssistants = aiAssistantsData?.data || [];
-    return allAssistants.filter((ext) => ext.type === 'ai_assistant');
-  }, [aiAssistantsData]);
+  const availableAiAssistants = aiAssistantsData?.data || [];
 
   // Fetch available AI Load Balancers (status: active)
   const { data: aiLoadBalancersData } = useQuery({
-    queryKey: ['ai-load-balancers', { status: 'active', per_page: 100 }],
+    queryKey: [...queryKeys.aiLoadBalancers.all, { status: 'active', per_page: 100 }],
     queryFn: () => aiAssistantLoadBalancersService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -300,7 +277,7 @@ export default function RingGroups() {
   }, [aiLoadBalancersData]);
 
   const { data: callQueuesData } = useQuery({
-    queryKey: ['ring-groups-form', 'call-queues'],
+    queryKey: queryKeys.ringGroups.formCallQueues(),
     queryFn: () => callQueuesService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -309,8 +286,8 @@ export default function RingGroups() {
   }, [callQueuesData]);
 
   // Fetch all ring groups for fallback destinations (unfiltered, all active)
-  const { data: allRingGroupsData, isLoading: isLoadingAllRingGroups } = useQuery({
-    queryKey: ['ring-groups-all'],
+  const { data: allRingGroupsData } = useQuery({
+    queryKey: queryKeys.ringGroups.lookup(),
     queryFn: () => ringGroupsService.getAll({ status: 'active', per_page: 1000 }), // Load many
     staleTime: 60000, // 1 minute - keep fresh for form usage
   });
@@ -345,7 +322,7 @@ export default function RingGroups() {
 
   // Fetch available IVR menus (status: active)
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus', { status: 'active', per_page: 100 }],
+    queryKey: queryKeys.ivrMenus.list({ status: 'active', per_page: 100 }),
     queryFn: () => ivrMenusService.getAll({ status: 'active', per_page: 100 }),
   });
 
@@ -355,13 +332,13 @@ export default function RingGroups() {
   const createMutation = useMutation({
     mutationFn: (data: CreateRingGroupRequest) => ringGroupsService.create(data as Partial<RingGroup>),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsCreateDialogOpen(false);
       resetForm();
       toast.success('Ring group created successfully');
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'Failed to create ring group';
+      const message = getApiErrorMessage(error) || 'Failed to create ring group';
       toast.error(message);
     },
   });
@@ -371,28 +348,34 @@ export default function RingGroups() {
     mutationFn: ({ id, data }: { id: string; data: UpdateRingGroupRequest }) =>
       ringGroupsService.update(id, data as Partial<RingGroup>),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsEditDialogOpen(false);
       setSelectedGroup(null);
       resetForm();
       toast.success('Ring group updated successfully');
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'Failed to update ring group';
+      const message = getApiErrorMessage(error) || 'Failed to update ring group';
       toast.error(message);
     },
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => ringGroupsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ring-groups'] });
+      void invalidateRoutingResources(queryClient);
       setIsDeleteDialogOpen(false);
       setSelectedGroup(null);
       toast.success('Ring group deleted successfully');
     },
     onError: (error: unknown) => {
-      const message = getErrorMessage(error) || 'Failed to delete ring group';
+      if (showIfInUse(error)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
+      const message = getApiErrorMessage(error) || 'Failed to delete ring group';
       toast.error(message);
     },
   });
@@ -410,109 +393,16 @@ export default function RingGroups() {
   };
 
   // Badge configuration for destination types
-  const getDestinationBadgeConfig = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension') => {
-    const configs = {
-      ring_group: { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Users },
-      ivr_menu: { color: 'bg-green-100 text-green-800 border-green-200', icon: Menu },
-      ai_assistant: { color: 'bg-cyan-100 text-cyan-800 border-cyan-200', icon: Bot },
-      extension: { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Phone },
-    };
-    return configs[type] || configs.extension;
-  };
 
   // Get destination display name
-  const getDestinationDisplayName = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant', id: string, name?: string) => {
-    if (name) return name;
-    return `ID ${id}`;
-  };
 
   // Create formatted destination badge
-  const getDestinationBadge = (type: 'ring_group' | 'ivr_menu' | 'ai_assistant' | 'extension', content: string) => {
-    const config = getDestinationBadgeConfig(type);
-    const Icon = config.icon;
-
-    return (
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className={cn('flex items-center gap-1.5 w-fit', config.color)}>
-          <Icon className="h-3.5 w-3.5" />
-          {content}
-        </Badge>
-      </div>
-    );
-  };
 
   // Strategy icon mapping
-  const getStrategyIcon = (strategy: RingGroupStrategy) => {
-    switch (strategy) {
-      case 'simultaneous':
-        return <Users className="h-4 w-4" />;
-      case 'round_robin':
-        return <RotateCw className="h-4 w-4" />;
-      case 'sequential':
-        return <List className="h-4 w-4" />;
-    }
-  };
 
   // Fallback icon mapping
-  const getFallbackIcon = (action: RingGroupFallbackAction) => {
-    switch (action) {
-      case 'extension':
-        return <PhoneForwarded className="h-4 w-4" />;
-      case 'ring_group':
-        return <ArrowRight className="h-4 w-4" />;
-      case 'ivr_menu':
-        return <Menu className="h-4 w-4" />;
-      case 'ai_assistant':
-        return <Bot className="h-4 w-4" />;
-      case 'hangup':
-        return <PhoneOff className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
-    }
-  };
 
   // Enhanced fallback display text with actual destination names
-  const getFallbackDisplayText = (
-    group: ExtendedRingGroup,
-    ringGroups: any[],
-    ivrMenus: any[]
-  ): string => {
-    switch (group.fallback_action) {
-      case 'extension':
-        return group.fallback_extension_number
-          ? `→ Extension: ${group.fallback_extension_number}`
-          : '→ Extension';
-
-      case 'ring_group':
-        if (group.fallback_ring_group_id) {
-          const targetRingGroup = ringGroups.find(rg => rg.id.toString() === group.fallback_ring_group_id);
-          return targetRingGroup ? `→ Ring Group: ${targetRingGroup.name}` : '→ Ring Group';
-        }
-        return '→ Ring Group';
-
-      case 'ivr_menu':
-        if (group.fallback_ivr_menu_id) {
-          const targetIvrMenu = ivrMenus.find(ivr => ivr.id.toString() === group.fallback_ivr_menu_id);
-          return targetIvrMenu ? `→ IVR Menu: ${targetIvrMenu.name}` : '→ IVR Menu';
-        }
-        return '→ IVR Menu';
-
-      case 'ai_assistant':
-        if (group.fallback_ai_assistant_id) {
-          const targetAiAssistant = availableExtensions.find(ext =>
-            ext.id === group.fallback_ai_assistant_id && ext.type === 'ai_assistant'
-          );
-          return targetAiAssistant ? `→ AI Assistant: ${targetAiAssistant.user?.name || 'AI Assistant'}` : '→ AI Assistant';
-        }
-        return '→ AI Assistant';
-
-      case 'hangup':
-        return 'Hangup';
-
-      default:
-        return 'Unknown';
-    }
-  };
 
   // API handles filtering and sorting, so we use ringGroups directly
 
@@ -797,10 +687,6 @@ export default function RingGroups() {
   };
 
   // Open detail sheet
-  const openDetailSheet = (group: RingGroup) => {
-    setSelectedGroup(group);
-    setIsDetailSheetOpen(true);
-  };
 
   // Member management functions
   const addMember = () => {
@@ -933,7 +819,7 @@ export default function RingGroups() {
     return (
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>{title}{isEdit && selectedGroup?.is_unprovisioned && <UnprovisionedBadge className="ml-2" />}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
@@ -1233,9 +1119,17 @@ export default function RingGroups() {
                     <SelectItem value="hangup">
                       <div className="flex items-center gap-2">
                         <PhoneOff className="h-4 w-4" />
-                        <span>Hangup</span>
+                        <span>Hang Up</span>
                       </div>
                     </SelectItem>
+                    {(formData.fallback_action === 'unavailable' || isEdit) && (
+                      <SelectItem value="unavailable" disabled={formData.fallback_action === 'unavailable'}>
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>{formData.fallback_action === 'unavailable' ? 'Destination unavailable' : 'Disconnect'}</span>
+                        </div>
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1339,12 +1233,8 @@ export default function RingGroups() {
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="flex items-center gap-1.5 bg-cyan-100 text-cyan-800 border-cyan-200">
                               <Bot className="h-3.5 w-3.5" />
-                              Ext {assistant.extension_number} - {assistant.ai_assistant?.name || 'Unnamed Assistant'}
-                              {assistant.configuration?.phone_number && (
-                                <span className="text-muted-foreground text-xs">
-                                  ({assistant.configuration?.phone_number} @ {assistant.configuration?.provider || 'Unknown'})
-                                </span>
-                              )}
+                              {assistant.name}
+                              <span className="text-muted-foreground text-xs">({assistant.provider})</span>
                             </Badge>
                           </div>
                         </SelectItem>
@@ -1446,8 +1336,13 @@ export default function RingGroups() {
     );
   };
 
+  if (loadFailed) {
+    return <QueryErrorState title="Failed to load ring groups" error={loadError} onRetry={() => void retryLoad()} />;
+  }
+
   return (
     <div className="space-y-6">
+      {inUseDialog}
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
@@ -1524,6 +1419,7 @@ export default function RingGroups() {
                 <SelectItem value="inactive">Disabled</SelectItem>
               </SelectContent>
             </Select>
+            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
           </div>
         </CardContent>
       </Card>
@@ -1624,8 +1520,8 @@ export default function RingGroups() {
               <EmptyState
                 icon={Users}
                 title="No ring groups found"
-                description={searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first ring group'}
-                action={canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' ? {
+                description={searchQuery || strategyFilter !== 'all' || statusFilter !== 'all' || unprovisionedOnly ? 'Try adjusting your filters' : 'Get started by creating your first ring group'}
+                action={canManage && !searchQuery && strategyFilter === 'all' && statusFilter === 'all' && !unprovisionedOnly ? {
                   label: "Create Ring Group",
                   onClick: openCreateDialog
                 } : undefined}
@@ -1694,109 +1590,6 @@ export default function RingGroups() {
         </DialogContent>
       </Dialog>
 
-      {/* Detail Sheet */}
-      <Sheet open={isDetailSheetOpen} onOpenChange={setIsDetailSheetOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedGroup && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selectedGroup.name}</SheetTitle>
-                <SheetDescription>
-                  {selectedGroup.description || 'No description provided'}
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6 mt-6">
-                {/* Strategy */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Ring Strategy</h3>
-                  <div className="flex items-center gap-2">
-                    {getStrategyIcon(selectedGroup.strategy)}
-                    <Badge variant="outline">{getStrategyDisplayName(selectedGroup.strategy)}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {getStrategyDescription(selectedGroup.strategy)}
-                  </p>
-                </div>
-
-                {/* Timeout, Ring Turns & Status */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Extension Timeout</h3>
-                    <p className="text-sm">{selectedGroup.timeout} seconds</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Ring Turns</h3>
-                    <p className="text-sm">{selectedGroup.ring_turns} {selectedGroup.ring_turns === 1 ? 'turn' : 'turns'}</p>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Status</h3>
-                    <Badge variant={selectedGroup.status === 'active' ? 'default' : 'secondary'}>
-                      {selectedGroup.status === 'active' ? 'Active' : 'Disabled'}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Fallback Action</h3>
-                  <div className="flex items-center gap-2">
-                    {getFallbackIcon(selectedGroup.fallback_action)}
-                    <span className="text-sm">
-                      {getFallbackDisplayText(
-                        selectedGroup as ExtendedRingGroup,
-                        ringGroups || [],
-                        availableIvrMenus || []
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Members */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">
-                    Members ({selectedGroup.members.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedGroup.members.map((member, index) => {
-                      // Look up the extension to get type and configuration
-                      const ext = availableExtensions.find((e) => e.id === member.extension_id);
-                      const isForward = ext?.type === 'forward';
-                      const forwardTo = ext?.configuration?.forward_to;
-
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              Ext {member.extension_number}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {isForward && forwardTo
-                                ? `Forward to ${forwardTo}`
-                                : (member.user_name || 'Unassigned')}
-                            </p>
-                          </div>
-                          {selectedGroup.strategy === 'sequential' && (
-                            <Badge variant="outline">Priority {member.priority}</Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Timestamps */}
-                <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
-                  <p>Created: {new Date(selectedGroup.created_at).toLocaleString()}</p>
-                  <p>Updated: {new Date(selectedGroup.updated_at).toLocaleString()}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div >
   );
 }

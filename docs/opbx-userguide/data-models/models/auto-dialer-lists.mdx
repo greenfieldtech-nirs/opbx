@@ -1,0 +1,266 @@
+---
+sidebar_position: 13
+slug: /data-models/models/auto-dialer-lists
+sidebar_class_name: cxGuidesSidebar
+title: "Auto Dialer Lists and Sessions"
+---
+
+# Auto Dialer Lists and Sessions
+
+Distribution lists, their destinations, and the call sessions the dialer creates. Campaign settings are on [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign).
+
+## AutoDialerList
+
+A distribution list of phone numbers. Uploading a new file over a list's numbers keeps the list row and increases `version_number`; the replaced numbers are kept as an [AutoDialerListVersion](#autodialerlistversion). `parent_list_id` links a "(Part N)" list to the list a large upload was split from.
+
+**Table:** `auto_dialer_lists`  
+**Model:** `App\Models\AutoDialerList`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `campaign_id` | bigint unsigned | Yes | null | Campaign the list is assigned to; several lists can share a campaign. Foreign key to `auto_dialer_campaigns`, on delete set null |
+| `name` | varchar(255) | No | - | List name |
+| `description` | text | Yes | null | Description |
+| `version_number` | int unsigned | No | `1` | Version number, starting at 1 |
+| `parent_list_id` | bigint unsigned | Yes | null | List this "(Part N)" list was split from (rows of a retired versioning flow also use it). Foreign key to `auto_dialer_lists`, on delete set null |
+| `is_latest_version` | boolean | No | `true` | True on the newest version of a list |
+| `status` | enum | Yes | `draft` | List state. Values: `draft`, `pending`, `processing`, `ready`, `failed`, `in_use`, `used`, `archived` (cast to `ListStatus`) |
+| `used_by_campaign_id` | bigint unsigned | Yes | null | Campaign that used the list. Foreign key to `auto_dialer_campaigns`, on delete set null |
+| `used_at` | timestamp | Yes | null | When the list was marked used |
+| `original_filename` | varchar(255) | Yes | null | Uploaded CSV file name |
+| `uploaded_by` | bigint unsigned | Yes | null | User who uploaded the current file. Foreign key to `users`, on delete set null |
+| `uploaded_at` | timestamp | Yes | null | When the current file was uploaded |
+| `processed_at` | timestamp | Yes | null | When CSV processing finished |
+| `total_rows` | int unsigned | No | `0` | Rows in the uploaded CSV |
+| `valid_rows` | int unsigned | No | `0` | Rows imported as destinations |
+| `invalid_rows` | int unsigned | No | `0` | Rows rejected by validation |
+| `validation_errors` | json | Yes | null | Per-row validation errors |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+| `archived_at` | timestamp | Yes | null | When the list was archived |
+
+**Indexes**
+
+- `auto_dialer_lists_campaign_id_foreign`: `campaign_id`
+- `auto_dialer_lists_used_by_campaign_id_foreign`: `used_by_campaign_id`
+- `idx_latest`: `organization_id`, `is_latest_version`
+- `idx_org_status`: `organization_id`, `status`
+- `idx_version`: `parent_list_id`, `version_number`
+
+**Casts:** `validation_errors` (array), `uploaded_at` (datetime)  
+
+**Relationships**
+
+```php
+$autoDialerList->campaign() → AutoDialerCampaign (campaign_id) [BelongsTo]
+$autoDialerList->destinations() → AutoDialerDestination (list_id) [HasMany]
+$autoDialerList->organization() → Organization (organization_id) [BelongsTo]
+$autoDialerList->parentList() → AutoDialerList (parent_list_id) [BelongsTo]
+$autoDialerList->versions() → AutoDialerListVersion (list_id) [HasMany]
+$autoDialerList->parts() → AutoDialerList (parent_list_id, name like '% (Part %)') [HasMany]
+$autoDialerList->usedByCampaign() → AutoDialerCampaign (used_by_campaign_id) [BelongsTo]
+```
+
+**Scopes:** `ready()`, `processing()`, `archived()`, `latestVersion()`, `assignable()`  
+**Methods:** `canBeArchived()`, `isReady()`, `allDestinationsArePendingAndFresh()`, `canDelete()`, `isAssigned()`, `canUnassign()`, `isLocked()`, `allParts()`, `markAsInUse()`, `markAsUsed()`, `archive()`, `copy()`  
+
+`canUnassign()` is true while the list is assigned and every destination is still `pending` with zero `dial_attempts` (`allDestinationsArePendingAndFresh()`); once the campaign has started processing the list's entries, the list can no longer be unassigned.
+
+`ready()`, `processing()` and `archived()` filter by status, `latestVersion()` by `is_latest_version`, and `assignable()` returns `ready` lists. The `ListStatus` rules (which states can be assigned, uploaded to, archived, copied or versioned) are listed in [Enumerations](/opbx/data-models/enums/index#liststatus).
+
+## AutoDialerListVersion
+
+A previous version of a distribution list: the numbers one re-upload replaced, kept until `expires_at`. Written by `ListManagementService::updateListWithBackup()` in the same transaction that deletes the replaced destinations.
+
+**Table:** `auto_dialer_list_versions`  
+**Model:** `App\Models\AutoDialerListVersion`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `list_id` | bigint unsigned | No | - | The list. Foreign key to `auto_dialer_lists`, on delete cascade |
+| `version_number` | int unsigned | No | - | The list's `version_number` while these numbers were current |
+| `original_filename` | varchar(255) | Yes | null | File the version came from, when known |
+| `uploaded_by` | bigint unsigned | Yes | null | User who uploaded that file, when known. Foreign key to `users`, on delete set null |
+| `uploaded_at` | timestamp | Yes | null | When that file was uploaded (for lists uploaded before uploads were recorded, when processing finished) |
+| `replaced_at` | timestamp | No | - | When a new upload replaced the version |
+| `expires_at` | timestamp | Yes | null | When the version is deleted: `replaced_at` plus `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` (default 30); null when that setting is empty (kept until the list is deleted) |
+| `entries_count` | int unsigned | No | `0` | Numbers kept |
+| `total_rows` | int unsigned | Yes | null | Rows in that version's CSV |
+| `valid_rows` | int unsigned | Yes | null | Rows imported from it |
+| `invalid_rows` | int unsigned | Yes | null | Rows rejected from it |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `auto_dialer_list_versions_list_id_version_number_unique`: `list_id`, `version_number` (unique)
+- `auto_dialer_list_versions_expires_at_index`: `expires_at`
+
+**Casts:** `uploaded_at`, `replaced_at`, `expires_at` (datetime)
+
+**Relationships**
+
+```php
+$autoDialerListVersion->list() → AutoDialerList (list_id) [BelongsTo]
+$autoDialerListVersion->uploader() → User (uploaded_by) [BelongsTo]
+$autoDialerListVersion->destinations() → AutoDialerListVersionDestination (version_id) [HasMany]
+```
+
+`distribution-lists:prune-versions` (daily at 03:15) deletes versions whose `expires_at` has passed; their entries go by cascade. It also deletes files on the `list_backups` disk (`storage/app/backups/lists`, JSON backups written by older releases) older than the retention period.
+
+## AutoDialerListVersionDestination
+
+One number of a previous list version, copied from `auto_dialer_destinations` when the version was replaced. Rows are only inserted (chunked `INSERT ... SELECT`), never updated.
+
+**Table:** `auto_dialer_list_version_destinations`  
+**Model:** `App\Models\AutoDialerListVersionDestination`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key; ascending in the order of the original list |
+| `version_id` | bigint unsigned | No | - | The version. Foreign key to `auto_dialer_list_versions`, on delete cascade |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `phone_number` | varchar(50) | No | - | Number |
+| `name` | varchar(255) | Yes | null | Contact name |
+| `batch_identifier` | varchar(255) | Yes | null | Batch label from the CSV |
+| `metadata` | json | Yes | null | Extra CSV columns |
+| `status` | varchar(20) | No | - | Dialing state at the time (cast to `DestinationStatus`) |
+| `dial_attempts` | int unsigned | No | `0` | Dial attempts made |
+| `last_dialed_at` | timestamp | Yes | null | When the last attempt started |
+| `last_disposition` | varchar(50) | Yes | null | Disposition of the last attempt |
+| `duration` | int unsigned | No | `0` | Duration of the last call, seconds |
+| `created_at` | timestamp | Yes | null | Copied from the destination |
+| `updated_at` | timestamp | Yes | null | Copied from the destination |
+
+**Indexes**
+
+- `adlvd_version_phone_idx`: `version_id`, `phone_number`
+
+**Casts:** `status` (`DestinationStatus`), `metadata` (array), `last_dialed_at` (datetime)
+
+## AutoDialerDestination
+
+One phone number in a distribution list, with its dialing state.
+
+**Table:** `auto_dialer_destinations`  
+**Model:** `App\Models\AutoDialerDestination`  
+**Tenant scoped:** yes (`OrganizationScope`)
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `list_id` | bigint unsigned | No | - | Distribution list. Foreign key to `auto_dialer_lists`, on delete cascade |
+| `phone_number` | varchar(50) | No | - | Number to dial |
+| `name` | varchar(255) | Yes | null | Contact name |
+| `batch_identifier` | varchar(255) | Yes | null | Optional batch label from the CSV |
+| `metadata` | json | Yes | null | Extra CSV columns |
+| `status` | enum | No | `pending` | Dialing state. Values: `pending`, `dialing`, `connected`, `failed`, `completed`, `invalid` (cast to `DestinationStatus`) |
+| `dial_attempts` | tinyint unsigned | No | `0` | Dial attempts made |
+| `consecutive_initiate_failures` | smallint unsigned | No | `0` | Consecutive failures to start a call. Reset to 0 after a successful start; at 3 the destination is marked `failed`, otherwise it is retried after 2^(failures-1) minutes |
+| `priority` | int unsigned | No | `1` | Dial priority |
+| `last_session_token` | varchar(255) | Yes | null | Cloudonix session token of the last attempt |
+| `last_call_id` | varchar(255) | Yes | null | Call ID of the last attempt |
+| `last_dialed_at` | timestamp | Yes | null | When the last attempt started |
+| `next_retry_at` | timestamp | Yes | null | Earliest time of the next attempt |
+| `last_disposition` | varchar(50) | Yes | null | Disposition of the last attempt |
+| `duration` | int unsigned | No | `0` | Duration of the last call, seconds |
+| `billsec` | int unsigned | No | `0` | Billed seconds of the last call |
+| `last_cdr_id` | bigint unsigned | Yes | null | Last call detail record |
+| `last_error` | varchar(500) | Yes | null | Last error message |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `add_list_status_idx`: `list_id`, `status`
+- `add_org_phone_idx`: `organization_id`, `phone_number`
+- `add_retry_at_idx`: `status`, `next_retry_at`
+- `add_session_token_idx`: `last_session_token`
+
+**Casts:** `metadata` (array)  
+
+**Relationships**
+
+```php
+$autoDialerDestination->list() → AutoDialerList (list_id) [BelongsTo]
+$autoDialerDestination->campaign() → ? [BelongsTo]
+$autoDialerDestination->organization() → Organization (organization_id) [BelongsTo]
+```
+
+**Scopes:** `pending()`, `completed()`, `failed()`, `invalid()`  
+**Methods:** `canDial()`, `incrementDialAttempts()`, `markAsInvalid()`, `markAsFailed()`, `markAsCompleted()`  
+
+`campaign()` is resolved through the list (`$destination->list->belongsTo(AutoDialerCampaign::class)`), so it needs the list loaded. Scopes `pending()`, `completed()`, `failed()` and `invalid()` filter by status.
+
+## AutoDialerCallSession
+
+One call attempt placed by the dialer worker for a campaign destination.
+
+**Table:** `auto_dialer_call_sessions`  
+**Model:** `App\Models\AutoDialerCallSession`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `PrunesByRetention`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `campaign_id` | bigint unsigned | No | - | Campaign. Foreign key to `auto_dialer_campaigns`, on delete cascade |
+| `destination_id` | bigint unsigned | No | - | Destination dialed. Foreign key to `auto_dialer_destinations`, on delete cascade |
+| `caller_id` | varchar(50) | Yes | null | Caller ID used |
+| `caller_did_id` | bigint unsigned | Yes | null | Pool DID used as Caller ID. Foreign key to `did_numbers`, on delete set null |
+| `phone_number` | varchar(50) | Yes | null | Number dialed |
+| `worker_id` | varchar(255) | Yes | null | Dialer worker that placed the call |
+| `session_token` | varchar(255) | No | - | Cloudonix session token |
+| `call_id` | varchar(255) | Yes | null | Cloudonix call ID |
+| `status` | enum | No | `initiated` | Call state. Values: `initiated`, `ringing`, `answered`, `completed`, `failed` |
+| `disposition` | varchar(50) | Yes | null | Final disposition |
+| `duration` | int unsigned | No | `0` | Duration, seconds |
+| `billsec` | int unsigned | No | `0` | Billed seconds |
+| `recording_url` | text | Yes | null | Recording URL |
+| `initiated_at` | timestamp | No | `CURRENT_TIMESTAMP` | When the call was placed |
+| `answered_at` | timestamp | Yes | null | When it was answered |
+| `completed_at` | timestamp | Yes | null | When it ended |
+| `amd_result` | enum | Yes | null | Voicemail detection result. Values: `human`, `voicemail`, `unknown` |
+| `amd_confidence` | decimal(5,2) | Yes | null | Voicemail detection confidence |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `adcs_campaign_status_idx`: `campaign_id`, `status`
+- `adcs_destination_idx`: `destination_id`
+- `adcs_session_token_idx`: `session_token`
+- `adcs_worker_id_idx`: `worker_id`
+- `auto_dialer_call_sessions_caller_did_id_foreign`: `caller_did_id`
+- `auto_dialer_call_sessions_organization_id_foreign`: `organization_id`
+
+**Casts:** `amd_confidence` (decimal:2)  
+**Not mass assignable:** `caller_id`, `caller_did_id`  
+
+**Relationships**
+
+```php
+$autoDialerCallSession->campaign() → AutoDialerCampaign (campaign_id) [BelongsTo]
+$autoDialerCallSession->destination() → AutoDialerDestination (destination_id) [BelongsTo]
+$autoDialerCallSession->organization() → Organization (organization_id) [BelongsTo]
+```
+
+**Scopes:** `active()`  
+**Methods:** `markAsAnswered()`, `markAsCompleted()`, `markAsFailed()`, `setAmdResult()`, `getDuration()`  
+
+`active()` returns sessions in `initiated`, `ringing` or `answered`. Rows whose `created_at` is older than `RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS` (default 183) are deleted daily by `model:prune`.
+
+## Related Documentation
+
+- [Auto Dialer Distribution Lists](/opbx/modules/distribution-lists)
+- [AutoDialerCampaign](/opbx/data-models/models/auto-dialer-campaign)
+- [Dialer Worker](/opbx/workers/dialer-worker)

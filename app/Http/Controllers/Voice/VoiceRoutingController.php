@@ -9,8 +9,10 @@ use App\Http\Requests\Voice\IvrInputRequest;
 use App\Http\Requests\Voice\RingGroupCallbackRequest;
 use App\Http\Requests\Voice\VoiceRoutingRequest;
 use App\Scopes\OrganizationScope;
+use App\Services\VoiceRouting\Strategies\ConferenceRoutingStrategy;
 use App\Services\VoiceRouting\VoiceRoutingManager;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -49,7 +51,7 @@ class VoiceRoutingController extends Controller
         // *45{queue_id} dial-in agent login/logout feature code.
         if (preg_match('/^\*45(\d+)$/', (string) $request->input('To'), $matches)) {
             return OrganizationScope::bypass(
-                fn () => app(\App\Http\Controllers\Voice\QueueAgentDialController::class)
+                fn () => app(QueueAgentDialController::class)
                     ->handle($request, (int) $matches[1])
             );
         }
@@ -81,6 +83,14 @@ class VoiceRoutingController extends Controller
         ]);
 
         return $response;
+    }
+
+    /**
+     * Handle the PIN digits collected for a conference room.
+     */
+    public function handleConferencePin(Request $request): Response
+    {
+        return OrganizationScope::bypass(fn () => app(ConferenceRoutingStrategy::class)->handlePinCallback($request));
     }
 
     /**

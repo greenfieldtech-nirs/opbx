@@ -7,7 +7,6 @@
 
 import React from 'react';
 import { Phone, Menu, Users, Bot, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -146,6 +145,12 @@ export const ActionSelector: React.FC<ActionSelectorProps> = ({
           <SelectValue placeholder="Select action type" />
         </SelectTrigger>
         <SelectContent>
+          {/* Set by the server when a deleted user's extension was the target; shown so it can be fixed */}
+          {value?.type === 'unavailable' && (
+            <SelectItem value="unavailable" disabled>
+              Destination unavailable
+            </SelectItem>
+          )}
           {actionTypes.map((type) => {
             const Icon = type.icon;
             return (
@@ -160,7 +165,7 @@ export const ActionSelector: React.FC<ActionSelectorProps> = ({
         </SelectContent>
       </Select>
 
-      {value?.type && (
+      {value?.type && value.type !== 'unavailable' && (
         <Select
           value={getCurrentTargetValue()}
           onValueChange={handleTargetChange}

@@ -4,6 +4,30 @@ properties:
   resource:
     type: string
     description: Grantable resource slug (see GET /v1/api-keys/grantable-resources).
+    enum:
+      - users
+      - extensions
+      - conference-rooms
+      - ai-assistants
+      - ai-assistant-providers
+      - ring-groups
+      - call-queues
+      - queue-calls
+      - ai-assistant-load-balancers
+      - ivr-menus
+      - business-hours
+      - phone-numbers
+      - outbound-whitelist
+      - inbound-blacklist
+      - call-detail-records
+      - recordings
+      - supervisors
+      - auto-dialer-campaigns
+      - distribution-lists
+      - session-updates
+      - call-notifications
+      - dashboard
+      - trunks
     example: business-hours
   level:
     type: string

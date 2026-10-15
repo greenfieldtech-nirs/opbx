@@ -12,16 +12,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Tests for cookie-based (SPA) authentication.
- *
- * Verifies httpOnly session cookie authentication works correctly
- * alongside token-based authentication.
+ * Session cookie hardening. Login itself is Bearer-token only (no cookie mode);
+ * see LoginRememberMeTest for the AJAX / X-Auth-Mode: cookie cases.
  */
 class CookieAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
     private User $user;
+
     private Organization $organization;
 
     protected function setUp(): void
@@ -51,51 +50,6 @@ class CookieAuthenticationTest extends TestCase
         $response->assertCookie('XSRF-TOKEN');
     }
 
-    public function test_cookie_login_with_ajax_header(): void
-    {
-        // Get CSRF cookie first
-        $this->get('/api/sanctum/csrf-cookie');
-
-        // Login with X-Requested-With header (indicates AJAX/SPA request)
-        $response = $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], [
-            'X-Requested-With' => 'XMLHttpRequest',
-        ]);
-
-        $response->assertStatus(200);
-
-        // Should return message and user, but NOT access_token
-        $response->assertJsonStructure([
-            'message',
-            'user' => ['id', 'organization_id', 'name', 'email', 'role', 'status'],
-        ]);
-
-        $response->assertJsonMissing(['access_token']);
-
-        // Should have session cookie
-        $this->assertAuthenticatedAs($this->user, 'web');
-    }
-
-    public function test_cookie_login_with_explicit_header(): void
-    {
-        // Get CSRF cookie first
-        $this->get('/api/sanctum/csrf-cookie');
-
-        // Login with explicit X-Auth-Mode header
-        $response = $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], [
-            'X-Auth-Mode' => 'cookie',
-        ]);
-
-        $response->assertStatus(200);
-        $response->assertJsonMissing(['access_token']);
-        $this->assertAuthenticatedAs($this->user, 'web');
-    }
-
     public function test_token_login_without_ajax_header(): void
     {
         // Login with explicit token mode (overrides postJson's X-Requested-With header)
@@ -119,119 +73,6 @@ class CookieAuthenticationTest extends TestCase
         $response->assertJson([
             'token_type' => 'Bearer',
         ]);
-    }
-
-    public function test_cookie_logout_clears_session(): void
-    {
-        // Login with cookie auth
-        $this->get('/api/sanctum/csrf-cookie');
-        $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], ['X-Requested-With' => 'XMLHttpRequest']);
-
-        $this->assertAuthenticatedAs($this->user, 'web');
-
-        // Logout
-        $response = $this->postJson('/api/v1/auth/logout');
-
-        $response->assertStatus(200);
-        $response->assertJson([
-            'message' => 'Successfully logged out.',
-        ]);
-
-        // Should no longer be authenticated
-        $this->assertGuest('web');
-    }
-
-    public function test_cookie_authenticated_request(): void
-    {
-        // Login with cookie auth
-        $this->get('/api/sanctum/csrf-cookie');
-        $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], ['X-Requested-With' => 'XMLHttpRequest']);
-
-        // Make authenticated request
-        $response = $this->getJson('/api/v1/auth/me');
-
-        $response->assertStatus(200);
-        $response->assertJsonStructure([
-            'user' => ['id', 'organization_id', 'name', 'email', 'role', 'status', 'organization'],
-        ]);
-
-        $response->assertJson([
-            'user' => [
-                'id' => $this->user->id,
-                'email' => $this->user->email,
-            ],
-        ]);
-    }
-
-    public function test_cookie_refresh_regenerates_session(): void
-    {
-        // Login with cookie auth
-        $this->get('/api/sanctum/csrf-cookie');
-        $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], ['X-Requested-With' => 'XMLHttpRequest']);
-
-        // Get current session ID
-        $oldSession = session()->getId();
-
-        // Refresh
-        $response = $this->postJson('/api/v1/auth/refresh');
-
-        $response->assertStatus(200);
-        $response->assertJsonStructure([
-            'message',
-            'user',
-        ]);
-
-        $response->assertJsonMissing(['access_token']);
-
-        // Session should be regenerated (new ID)
-        $newSession = session()->getId();
-        $this->assertNotEquals($oldSession, $newSession);
-
-        // Should still be authenticated
-        $this->assertAuthenticatedAs($this->user, 'web');
-    }
-
-    public function test_cookie_and_token_auth_work_independently(): void
-    {
-        // Token-based login (explicitly request token mode)
-        $tokenResponse = $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], [
-            'X-Auth-Mode' => 'token',
-        ]);
-
-        $token = $tokenResponse->json('access_token');
-        $this->assertNotNull($token);
-
-        // Cookie-based login (same user)
-        $this->get('/api/sanctum/csrf-cookie');
-        $cookieResponse = $this->postJson('/api/v1/auth/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ], ['X-Requested-With' => 'XMLHttpRequest']);
-
-        $cookieResponse->assertStatus(200);
-
-        // Both should work independently
-        // Token auth
-        $response1 = $this->getJson('/api/v1/auth/me', [
-            'Authorization' => "Bearer {$token}",
-        ]);
-        $response1->assertStatus(200);
-
-        // Cookie auth
-        $response2 = $this->getJson('/api/v1/auth/me');
-        $response2->assertStatus(200);
     }
 
     public function test_httponly_cookie_prevents_javascript_access(): void

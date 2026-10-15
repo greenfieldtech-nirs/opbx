@@ -1,3 +1,4 @@
+import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 import React, { ReactNode } from 'react';
 import {
     Table,
@@ -57,6 +58,10 @@ export interface StandardDataTableProps<T> {
     canView?: boolean;
     canEdit?: boolean;
     canDelete?: boolean;
+    /** Per-row override: return false to hide Delete for a specific row. */
+    canDeleteItem?: (item: T) => boolean;
+    /** Show the Unprovisioned badge next to the name (default). Off when a page shows it elsewhere. */
+    showUnprovisionedBadge?: boolean;
     // Empty state
     emptyState?: ReactNode;
 }
@@ -82,6 +87,8 @@ export function StandardDataTable<T extends { id: string | number }>({
     canView = true,
     canEdit = true,
     canDelete = true,
+    canDeleteItem,
+    showUnprovisionedBadge = true,
     emptyState
 }: StandardDataTableProps<T>) {
 
@@ -170,12 +177,15 @@ export function StandardDataTable<T extends { id: string | number }>({
                                             onIdentityClick && "hover:underline"
                                         )}
                                     >
-                                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0", identityIconBg)}>
+                                        <div className={cn("h-10 w-10 rounded-full flex items-center justify-center shrink-0", identityIconBg)}>
                                             <IdentityIcon className={cn("h-5 w-5", identityIconColor)} />
                                         </div>
                                         <div>
-                                            <div className="font-medium text-primary">{getIdentityPrimary(item)}</div>
-                                            <div className="text-xs text-muted-foreground capitalize">
+                                            <div className="font-medium text-primary">
+                                                {getIdentityPrimary(item)}
+                                                {showUnprovisionedBadge && (item as { is_unprovisioned?: boolean }).is_unprovisioned && <UnprovisionedBadge className="ml-2" />}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
                                                 {getIdentitySecondary(item)}
                                             </div>
                                         </div>
@@ -228,7 +238,7 @@ export function StandardDataTable<T extends { id: string | number }>({
                                             <TooltipContent>Edit</TooltipContent>
                                         </Tooltip>
                                     )}
-                                    {canDelete && (
+                                    {canDelete && (canDeleteItem?.(item) ?? true) && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Button

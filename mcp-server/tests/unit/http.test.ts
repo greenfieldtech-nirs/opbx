@@ -156,3 +156,37 @@ function parseJsonRpcResponse(raw: string): {
   if (!text) throw new Error(`unparseable response: ${raw}`);
   return JSON.parse(text);
 }
+
+describe("http edge limits", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("per-IP limit blocks bad-credential floods before upstream", async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 401 }));
+    const cfg = loadConfig({ OPBX_BASE_URL: "https://opbx.test", LOG_LEVEL: "fatal", RATE_LIMIT_IP_PER_MIN: "3" });
+    const logger = createLogger(cfg);
+    const app = await buildHttpServer({
+      config: cfg,
+      logger,
+      identityResolver: new IdentityResolver(cfg, logger),
+      rateLimiter: new RateLimiter(cfg),
+    });
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/mcp",
+        headers: { "content-type": "application/json", authorization: `Bearer bad-${i}` },
+        payload: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+      });
+      codes.push(res.statusCode);
+    }
+    expect(codes).toEqual([401, 401, 401, 429, 429, 429]);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await app.close();
+  });
+});

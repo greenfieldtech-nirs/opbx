@@ -6,6 +6,7 @@ namespace App\Services\VoiceRouting;
 
 use App\Models\DidNumber;
 use App\Models\Extension;
+use App\Models\Organization;
 use App\Models\OutboundWhitelist;
 use App\Scopes\OrganizationScope;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,9 @@ use Illuminate\Support\Facades\Log;
  * Resolution order:
  *   1. The from-extension's selected default caller ID DID (active).
  *   2. The matched whitelist rule's selected default caller ID DID (active).
- *   3. The literal "Unknown" — no caller ID configured anywhere.
+ *   3. The organization's default outbound caller ID DID
+ *      (organizations.settings['default_outbound_caller_id_did_id'], active).
+ *   4. The literal "Unknown" — no caller ID configured anywhere.
  *
  * Runs outside an authenticated tenant context (voice routing webhooks), so all
  * queries bypass OrganizationScope and filter by organization_id explicitly,
@@ -67,8 +70,22 @@ final class OutboundCallerIdResolver
             return ['callerId' => $whitelistCallerId, 'callerName' => null];
         }
 
-        // Step 3 — nothing configured; present the zero caller ID.
-        Log::info('OutboundCallerIdResolver: no caller ID configured, presenting zeros', [
+        // Step 3 — the organization's default outbound caller ID DID.
+        $orgDefaultDidId = Organization::find($orgId)?->settings['default_outbound_caller_id_did_id'] ?? null;
+        $orgCallerId = $this->activeDidPhoneNumber($orgDefaultDidId !== null ? (int) $orgDefaultDidId : null, $orgId);
+
+        if ($orgCallerId !== null) {
+            Log::info('OutboundCallerIdResolver: resolved from organization default caller ID', [
+                'org_id' => $orgId,
+                'did_id' => (int) $orgDefaultDidId,
+                'caller_id' => $orgCallerId,
+            ]);
+
+            return ['callerId' => $orgCallerId, 'callerName' => null];
+        }
+
+        // Step 4 — nothing configured; present "Unknown".
+        Log::info('OutboundCallerIdResolver: no caller ID configured, presenting Unknown', [
             'org_id' => $orgId,
             'extension_id' => $fromExtension->id,
             'whitelist_entry_id' => $whitelistEntry->id,

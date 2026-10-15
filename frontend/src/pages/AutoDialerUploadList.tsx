@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { useUploadCampaignList, useAutoDialerCampaign } from '@/hooks/useAutoDialerCampaigns';
+import { getApiErrorMessage } from '@/services/api';
 
 export default function AutoDialerUploadList() {
   const { id } = useParams<{ id: string }>();
@@ -76,8 +77,8 @@ export default function AutoDialerUploadList() {
       });
       toast.success('List uploaded successfully');
       navigate(`/ui/auto-dialer/campaigns/${id}`);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to upload list');
+    } catch (error) {
+      toast.error(getApiErrorMessage(error) || 'Failed to upload list');
     }
   };
 
@@ -233,20 +234,20 @@ export default function AutoDialerUploadList() {
           <div>
             <h4 className="font-medium mb-2">Required Column</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><code className="bg-muted px-1 rounded">phone</code> or <code className="bg-muted px-1 rounded">phone_number</code> - Phone number in E.164 format</li>
+              <li><code className="bg-muted px-1 rounded-sm">phone</code> or <code className="bg-muted px-1 rounded-sm">phone_number</code> - Phone number in E.164 format</li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium mb-2">Optional Columns</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><code className="bg-muted px-1 rounded">name</code> - Contact name</li>
-              <li><code className="bg-muted px-1 rounded">description</code> - Contact description</li>
-              <li><code className="bg-muted px-1 rounded">priority</code> - Priority (1-10, higher = dialed first)</li>
+              <li><code className="bg-muted px-1 rounded-sm">name</code> - Contact name</li>
+              <li><code className="bg-muted px-1 rounded-sm">description</code> - Contact description</li>
+              <li><code className="bg-muted px-1 rounded-sm">priority</code> - Priority (1-10, higher = dialed first)</li>
             </ul>
           </div>
           <div>
             <h4 className="font-medium mb-2">Example CSV</h4>
-            <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+            <pre className="bg-muted p-3 rounded-sm text-sm overflow-x-auto">
 {`phone,name,description,priority
 +14155551212,John Doe,Sales Lead,5
 +14155551213,Jane Smith,Customer,3

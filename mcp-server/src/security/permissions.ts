@@ -25,6 +25,8 @@ export interface AuthenticatedIdentity {
   /** OPBX role (user principals only; apikey principals are upstream-scoped). */
   role?: UserRole;
   isPlatformManager?: boolean;
+  /** Rate-limiter subject for apikey principals: sha256(credential) prefix. Never the raw key. */
+  credentialKey?: string;
 }
 
 /**

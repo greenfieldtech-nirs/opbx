@@ -47,5 +47,8 @@
         "tailwind-merge": "^2.2.0",
         "tailwindcss-animate": "^1.0.0",
         "zod": "^3.22.0"
+    },
+    "overrides": {
+        "shell-quote": "^1.11.0"
     }
 }

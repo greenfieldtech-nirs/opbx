@@ -4,14 +4,19 @@ paths:
       tags:
         - Session Updates
       summary: Get session details
+      description: |
+        All session-update events of one session in the organization, oldest first. Any role;
+        for a Supervisor, a session outside their scope answers 404.
       operationId: getSessionDetails
       security:
         - bearerAuth: []
-        - cookieAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: session-updates:read
       parameters:
         - name: sessionId
           in: path
           required: true
+          description: Cloudonix numeric session ID
           schema:
             type: integer
       responses:
@@ -44,6 +49,11 @@ paths:
                               type: string
                             created_at:
                               type: string
+                              format: date-time
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          $ref: '../../openapi.yaml#/components/responses/Forbidden'
         '404':
           description: Session not found
           content:
@@ -53,5 +63,6 @@ paths:
                 properties:
                   message:
                     type: string
+                    example: Session not found
                   session_id:
                     type: integer

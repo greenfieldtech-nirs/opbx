@@ -224,7 +224,7 @@ export function Hero() {
       <div className="container mx-auto px-4 py-24 md:py-32 relative">
         <div className="grid grid-cols-1 lg:grid-cols-[65%_35%] gap-12 items-center">
           <div className="text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/50 backdrop-blur mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-card/50 backdrop-blur-sm mb-6">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ring-pulse absolute inline-flex h-full w-full rounded-full bg-primary" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />

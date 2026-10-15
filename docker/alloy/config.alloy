@@ -1,4 +1,4 @@
-// OPBX log collector: tails OPBX containers over the Docker socket and pushes
+// OPBX log collector: tails OPBX containers through the read-only docker-socket-proxy and pushes
 // to Loki. Containers opt in via the compose label `logging.opbx/collect=true`.
 //
 // Cardinality rule (see spec): session_token / call_id are STRUCTURED
@@ -6,7 +6,7 @@
 // org_id, container.
 
 discovery.docker "opbx" {
-	host = "unix:///var/run/docker.sock"
+	host = "tcp://docker-socket-proxy:2375"
 }
 
 discovery.relabel "opbx" {
@@ -53,7 +53,7 @@ discovery.relabel "opbx" {
 }
 
 loki.source.docker "opbx" {
-	host          = "unix:///var/run/docker.sock"
+	host          = "tcp://docker-socket-proxy:2375"
 	targets       = discovery.relabel.opbx.output
 	forward_to    = [loki.process.opbx.receiver]
 	relabel_rules = discovery.relabel.opbx.rules
@@ -79,18 +79,6 @@ loki.process "opbx" {
 	stage.template {
 		source   = "level"
 		template = "{{ ToLower .Value }}"
-	}
-
-	// Render call-related lines as "[<session_token>] <json>" for human
-	// scanning. Extraction happened above, so labels/structured-metadata are
-	// unaffected; this only changes the displayed line.
-	stage.template {
-		source   = "_rendered"
-		template = "{{ if .session_token }}[{{ .session_token }}] {{ .Entry }}{{ else }}{{ .Entry }}{{ end }}"
-	}
-
-	stage.output {
-		source = "_rendered"
 	}
 
 	stage.labels {

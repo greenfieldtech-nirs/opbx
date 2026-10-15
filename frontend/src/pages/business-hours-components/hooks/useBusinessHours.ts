@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
+import { invalidateRoutingResources } from '@/lib/invalidation';
+import { queryKeys } from '@/lib/queryKeys';
+import { useResourceInUse } from '@/components/ResourceInUseDialog';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { businessHoursService } from '@/services/businessHours.service';
 import { extensionsService } from '@/services/extensions.service';
 import { ringGroupsService, ivrMenusService, conferenceRoomsService } from '@/services/createResourceService';
 import api from '@/services/api';
-import { useAuth } from '@/context/AuthContext';
 import type {
   BusinessHoursSchedule,
   ScheduleStatus,
@@ -17,7 +19,6 @@ import { createEmptyWeeklySchedule, getNextTimeRangeId, getNextExceptionId } fro
 
 export function useBusinessHours() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   
   // Get organization timezone, fallback to UTC
   const organizationTimezone = 'UTC';
@@ -25,14 +26,26 @@ export function useBusinessHours() {
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleStatus>('all');
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name');
+  const [sortBy, setSortByField] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Table header click: same column toggles the direction, a new column starts ascending.
+  // The identity (name) column reports itself as 'identity'.
+  const setSortBy = (field: string) => {
+    const next = (field === 'identity' ? 'name' : field) as typeof sortBy;
+    if (next === sortBy) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortByField(next);
+      setSortDirection('asc');
+    }
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(10);
 
   // Dialog states
   const [isCreateEditDialogOpen, setIsCreateEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<BusinessHoursSchedule | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<BusinessHoursSchedule | null>(null);
 
@@ -56,7 +69,7 @@ export function useBusinessHours() {
 
   // Fetch business hours schedules
   const { data: schedulesData, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey: ['business-hours'],
+    queryKey: queryKeys.businessHours.all,
     queryFn: () => businessHoursService.getAll(),
   });
 
@@ -64,28 +77,28 @@ export function useBusinessHours() {
 
   // Fetch related data
   const { data: extensionsData } = useQuery({
-    queryKey: ['extensions'],
+    queryKey: queryKeys.extensions.all,
     queryFn: () => extensionsService.getAll({ per_page: 1000 }),
   });
 
   const extensions = extensionsData?.data || [];
 
   const { data: ringGroupsData } = useQuery({
-    queryKey: ['ring-groups'],
+    queryKey: queryKeys.ringGroups.all,
     queryFn: () => ringGroupsService.getAll({ per_page: 1000 }),
   });
 
   const ringGroups = ringGroupsData?.data || [];
 
   const { data: ivrMenusData } = useQuery({
-    queryKey: ['ivr-menus'],
+    queryKey: queryKeys.ivrMenus.list({ per_page: 1000 }),
     queryFn: () => ivrMenusService.getAll({ per_page: 1000 }),
   });
 
   const ivrMenus = ivrMenusData?.data || [];
 
   const { data: conferenceRoomsData } = useQuery({
-    queryKey: ['conference-rooms'],
+    queryKey: queryKeys.conferenceRooms.all,
     queryFn: () => conferenceRoomsService.getAll({ per_page: 1000 }),
   });
 
@@ -108,21 +121,22 @@ export function useBusinessHours() {
       filtered = filtered.filter((schedule) => schedule.status === statusFilter);
     }
 
+    const dir = sortDirection === 'asc' ? 1 : -1;
     filtered = [...filtered].sort((a, b) => {
       if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
+        return dir * a.name.localeCompare(b.name);
       } else if (sortBy === 'created_at') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       } else if (sortBy === 'status') {
-        return a.status.localeCompare(b.status);
+        return dir * a.status.localeCompare(b.status);
       } else if (sortBy === 'updated_at') {
-        return new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime();
+        return dir * (new Date(a.updated_at || '').getTime() - new Date(b.updated_at || '').getTime());
       }
       return 0;
     });
 
     return filtered;
-  }, [allSchedules, searchQuery, statusFilter, sortBy]);
+  }, [allSchedules, searchQuery, statusFilter, sortBy, sortDirection]);
 
   const totalPages = Math.ceil(filteredSchedules.length / perPage);
   const schedules = useMemo(() => {
@@ -136,7 +150,7 @@ export function useBusinessHours() {
     mutationFn: (data: { name: string; status: ScheduleStatus; open_hours_action: BusinessHoursAction; closed_hours_action: BusinessHoursAction; schedule: any; exceptions: any[]; timezone: string }) =>
       businessHoursService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been created successfully.');
       setIsCreateEditDialogOpen(false);
     },
@@ -149,7 +163,7 @@ export function useBusinessHours() {
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       businessHoursService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been updated successfully.');
       setIsCreateEditDialogOpen(false);
     },
@@ -158,14 +172,17 @@ export function useBusinessHours() {
     },
   });
 
+  const { showIfInUse, inUseDialog } = useResourceInUse();
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => businessHoursService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule has been deleted.');
       setIsDeleteDialogOpen(false);
     },
     onError: (error: Error | unknown) => {
+      if (showIfInUse(error)) return;
       toast.error((error as any).response?.data?.message || 'Failed to delete business hours schedule.');
     },
   });
@@ -174,7 +191,7 @@ export function useBusinessHours() {
     mutationFn: ({ id, status }: { id: string; status: 'active' | 'inactive' }) =>
       api.patch(`/business-hours/${id}/toggle-status`, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['business-hours'] });
+      void invalidateRoutingResources(queryClient);
       toast.success('Business hours schedule status updated');
     },
     onError: (error: Error | unknown) => {
@@ -433,11 +450,6 @@ export function useBusinessHours() {
     deleteMutation.mutate(selectedSchedule.id);
   };
 
-  const handleOpenDetail = (schedule: BusinessHoursSchedule) => {
-    setSelectedSchedule(schedule);
-    setIsDetailSheetOpen(true);
-  };
-
   const handleToggleStatus = (schedule: BusinessHoursSchedule) => {
     if (toggleStatusMutation.isPending) return;
     const newStatus = schedule.status === 'active' ? 'inactive' : 'active';
@@ -470,6 +482,7 @@ export function useBusinessHours() {
     statusFilter,
     setStatusFilter,
     sortBy,
+    sortDirection,
     setSortBy,
 
     // Dialog states
@@ -477,8 +490,6 @@ export function useBusinessHours() {
     setIsCreateEditDialogOpen,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    isDetailSheetOpen,
-    setIsDetailSheetOpen,
     isExceptionDialogOpen,
     setIsExceptionDialogOpen,
     isCopyHoursDialogOpen,
@@ -505,6 +516,7 @@ export function useBusinessHours() {
     createMutation,
     updateMutation,
     deleteMutation,
+    inUseDialog,
     toggleStatusMutation,
 
     // Handlers
@@ -525,7 +537,6 @@ export function useBusinessHours() {
     handleSaveSchedule,
     handleOpenDelete,
     handleConfirmDelete,
-    handleOpenDetail,
     handleToggleStatus,
     setOpenHoursAction,
     setClosedHoursAction,

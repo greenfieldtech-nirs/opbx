@@ -6,7 +6,8 @@ paths:
       summary: Validate registration fields
       description: |
         Check availability of organization name, slug, and admin email
-        before submitting registration form.
+        before submitting registration form. Each `*_available` key is
+        returned only when its query parameter is sent. Not rate limited.
       operationId: validateRegistration
       security: []
       parameters:

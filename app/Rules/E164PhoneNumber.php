@@ -6,6 +6,7 @@ namespace App\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
 
 /**
  * Validates that a string is a valid E.164 phone number.
@@ -16,17 +17,18 @@ class E164PhoneNumber implements ValidationRule
     /**
      * Run the validation rule.
      *
-     * @param  \Closure(string): \Illuminate\Translation\PotentiallyTranslatedString  $fail
+     * @param  Closure(string): PotentiallyTranslatedString  $fail
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             $fail('The :attribute must be a string.');
+
             return;
         }
 
         // E.164 Regex: Starts with +, followed by 1-9 (country code), then 1-14 digits
-        if (!preg_match('/^\+[1-9]\d{1,14}$/', $value)) {
+        if (! preg_match('/^\+[1-9]\d{1,14}$/', $value)) {
             $fail('The :attribute must be in valid E.164 format (e.g., +12125551234).');
         }
     }

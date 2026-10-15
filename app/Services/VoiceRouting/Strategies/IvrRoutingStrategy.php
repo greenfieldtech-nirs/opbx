@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\VoiceRouting\Strategies;
 
 use App\Enums\ExtensionType;
+use App\Http\Controllers\Api\RecordingsController;
 use App\Models\DidNumber;
 use App\Models\IvrMenu;
+use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\IvrStateService;
 use Illuminate\Http\Request;
@@ -45,11 +47,7 @@ class IvrRoutingStrategy implements RoutingStrategy
             );
         }
 
-        // Get the organization's webhook base URL for consistent callback URLs
-        $cloudonixSettings = \App\Models\CloudonixSettings::where('organization_id', $orgId)->first();
-        $baseUrl = $cloudonixSettings
-            ? rtrim($cloudonixSettings->effective_webhook_base_url ?? config('app.url'), '/')
-            : rtrim(config('app.url'), '/');
+        $baseUrl = app(CloudonixSettingsResolver::class)->webhookBaseUrl($orgId);
 
         // Initialize or get current call state
         $callState = $this->ivrStateService->initializeCallState($callSid, $ivrMenu->id);
@@ -82,7 +80,8 @@ class IvrRoutingStrategy implements RoutingStrategy
             $gatherFinishOnKey,
             1, // min digits
             10, // max digits
-            $maxTimeout
+            $maxTimeout,
+            true // no input posts back too, so it counts as a turn and the menu replays
         );
 
         Log::info('IVR Routing: Presenting menu to caller', [
@@ -138,7 +137,7 @@ class IvrRoutingStrategy implements RoutingStrategy
         // For MinIO-stored files, generate a signed URL with 1-hour expiry
         $orgId = (int) $request->input('_organization_id');
 
-        return \App\Http\Controllers\Api\RecordingsController::generateSignedRecordingUrl(
+        return RecordingsController::generateSignedRecordingUrl(
             $baseUrl,
             $orgId,
             $audioPath,
