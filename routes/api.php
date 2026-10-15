@@ -159,7 +159,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
             $pusher = new Pusher(
                 config('broadcasting.connections.pusher.key'),
                 config('broadcasting.connections.pusher.secret'),
-                config('broadcasting.connections.pusher.options.app_id'),
+                config('broadcasting.connections.pusher.app_id'),
                 config('broadcasting.connections.pusher.options')
             );
 
@@ -170,7 +170,7 @@ Route::middleware(['auth:sanctum'])->group(function (): void {
                 'status' => 'ok',
                 'timestamp' => now()->toIso8601String(),
             ]);
-        } catch (Exception $e) {
+        } catch (Throwable $e) { // missing Pusher config is a TypeError, not an Exception
             return response()->json([
                 'status' => 'error',
                 'timestamp' => now()->toIso8601String(),

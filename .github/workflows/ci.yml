@@ -60,6 +60,8 @@ jobs:
       # phpunit.xml pins DB_HOST=mysql and the Redis host to the compose service names.
       - run: echo "127.0.0.1 mysql redis" | sudo tee -a /etc/hosts
       - run: echo "APP_KEY=base64:$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      # Empty .env: dotenv's suppressed read of a missing file is reported as a warning on every test.
+      - run: touch .env
       - run: php -d memory_limit=1024M artisan test
 
   frontend:

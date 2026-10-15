@@ -44,7 +44,7 @@ final class CallPresenceTest extends TestCase
         config(['broadcasting.default' => 'pusher']);
         config(['broadcasting.connections.pusher.key' => 'test-key']);
         config(['broadcasting.connections.pusher.secret' => 'test-secret']);
-        config(['broadcasting.connections.pusher.options.app_id' => 'test-app']);
+        config(['broadcasting.connections.pusher.app_id' => 'test-app']);
 
         // Re-register channels on the active broadcaster; the test runner sets
         // BROADCAST_CONNECTION=null, so channels loaded during boot were bound
