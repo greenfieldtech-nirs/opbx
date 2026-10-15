@@ -16,6 +16,18 @@ interface UseAudioPlayerReturn {
   isPlaying: (recordingId: number) => boolean;
 }
 
+/**
+ * Stop an audio element on purpose. Handlers are detached first: clearing the
+ * source makes the browser fire an 'error' event that is not a playback failure.
+ */
+function stopAudio(audio: HTMLAudioElement): void {
+  audio.onended = null;
+  audio.onerror = null;
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+}
+
 export function useAudioPlayer(): UseAudioPlayerReturn {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<number | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
@@ -24,16 +36,14 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
   useEffect(() => {
     return () => {
       if (audioElement) {
-        audioElement.pause();
-        audioElement.src = '';
-        setAudioElement(null);
+        stopAudio(audioElement);
       }
     };
   }, [audioElement]);
 
   const pause = useCallback(() => {
     if (audioElement) {
-      audioElement.pause();
+      stopAudio(audioElement);
       setCurrentlyPlaying(null);
       setAudioElement(null);
     }
@@ -43,29 +53,31 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       // Stop any currently playing audio
       if (audioElement) {
-        audioElement.pause();
-        audioElement.src = '';
+        stopAudio(audioElement);
         setAudioElement(null);
       }
 
       const audio = new Audio(audioSrc);
 
-      audio.addEventListener('ended', () => {
+      audio.onended = () => {
         setCurrentlyPlaying(null);
         setAudioElement(null);
-      });
+      };
 
-      audio.addEventListener('error', () => {
+      audio.onerror = () => {
         toast.error('Failed to play recording');
         setCurrentlyPlaying(null);
         setAudioElement(null);
-      });
+      };
 
       setAudioElement(audio);
       await audio.play();
       setCurrentlyPlaying(recordingId);
     } catch (error) {
-      toast.error('Failed to start playback');
+      // A play() interrupted by pause/stop rejects with AbortError: not a failure.
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        toast.error('Failed to start playback');
+      }
     }
   }, [audioElement]);
 
