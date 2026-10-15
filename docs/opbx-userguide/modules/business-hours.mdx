@@ -47,25 +47,25 @@ Use this module to:
 **Who can do this:** Owner, PBX Admin.
 
 1. Open **Business Hours** in the sidebar (under **PBX Configuration**).
-2. Click **New Schedule**. The **Create Schedule** dialog opens.
+2. Click **New Schedule**. The **Create Schedule** dialog opens on its first tab, **Basic Information**.
 3. Enter the **Name**.
 4. Under **Open Hours Action**, choose the type, then the **Destination**.
 5. Under **Closed Hours Action**, choose the type, then the **Destination**.
-6. Set the weekly hours (see [Set the weekly hours](#set-the-weekly-hours)).
-7. Optionally add exception dates (see [Add an exception date](#add-an-exception-date) and [Import public holidays](#import-public-holidays)).
-8. Click **Create Schedule**.
+6. Open the **Weekly Schedule** tab and set the weekly hours (see [Set the weekly hours](#set-the-weekly-hours)).
+7. Optionally open the **Exception Dates** tab and add exception dates (see [Add an exception date](#add-an-exception-date) and [Import public holidays](#import-public-holidays)).
+8. Click **Create Schedule**. The button saves all three tabs at once.
 
-The toast "Business hours schedule has been created successfully." appears and the schedule is listed as **Active**. It becomes available as a routing type on phone numbers. If the name or an action is missing, the dialog marks the field and shows "Please fix the errors in the form."
+The toast "Business hours schedule has been created successfully." appears and the schedule is listed as **Active**. It becomes available as a routing type on phone numbers. If the name or an action is missing, the dialog switches back to **Basic Information**, marks the tab with a red dot and the field with its error, and shows "Please fix the errors in the form."
 
 ![Business Hours list with Holiday Hotline Hours showing Unprovisioned in the Status column, and Main Office Hours and Support Desk Hours Active, with timezone, exception count and last-modified date; the toolbar has search, refresh and the status filter](../img/screens/business-hours-list.jpg)
 
-![Schedule dialog for Main Office Hours with the open-hours action IVR Menu Main Menu, the closed-hours action IVR Menu After Hours Menu and the weekly calendar](../img/screens/business-hours-create-dialog.jpg)
+{/* SCREENSHOT: business-hours-create-dialog — Edit Schedule dialog for Main Office Hours on the Basic Information tab: name, open-hours action IVR Menu Main Menu, closed-hours action IVR Menu After Hours Menu; the three tabs visible */}
 
 ### Set the weekly hours
 
 **Who can do this:** Owner, PBX Admin.
 
-The **Weekly Schedule** section of the schedule dialog is a grid with one column per weekday and one row per hour (`0:00 - 1:00` to `23:00 - 24:00`). Open hours are green with a check mark.
+The **Weekly Schedule** tab of the schedule dialog is a grid with one column per weekday and one row per hour (`0:00 - 1:00` to `23:00 - 24:00`). Open hours are green with a check mark.
 
 1. To start from a common pattern, pick one under **Template:** (see [Weekly schedule](#weekly-schedule)). It replaces the whole week.
 2. Click an hour cell to open or close that hour. Adjacent open hours join into one time range. Closing the last open hour of a day closes the day.
@@ -77,23 +77,23 @@ The **Weekly Schedule** section of the schedule dialog is a grid with one column
 
 **Who can do this:** Owner, PBX Admin.
 
-1. In the schedule dialog, under **Exception Dates**, click **Add Exception**. The **Add Exception Date** dialog opens.
+1. In the schedule dialog, open the **Exception Dates** tab and click **Add Exception**. The **Add Exception Date** dialog opens.
 2. Pick the **Date** and enter the **Name**, for example `Christmas Day`.
 3. Choose the **Type**: **Closed All Day** or **Special Hours**. For Special Hours, set the times under **Time Ranges:**; click **Add Time Range** for more.
-4. Click **Add Exception**. The toast "Exception date has been added." appears and the date is listed in the **Exception Dates** table.
+4. Click **Add Exception**. The toast "Exception date has been added." appears and the date is listed in the tab's table. The tab title shows the number of exceptions, for example **Exception Dates (3)**.
 5. Save the schedule. Exception dates are only stored when you save.
 
 To change a date, click its edit (pencil) icon, change it and click **Update Exception** ("Exception date has been updated."). To remove one, click its delete icon ("Exception date has been removed."). Both take effect when you save the schedule.
 
 ![Add Exception Date dialog with date 24/12/2026, name Christmas Eve and type Special Hours with the range 09:00 to 13:00](../img/screens/business-hours-exception-dialog.jpg)
 
-![Exception Dates table of Main Office Hours with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed)](../img/screens/business-hours-exceptions.jpg)
+{/* SCREENSHOT: business-hours-exceptions — Exception Dates tab of Main Office Hours (tab title Exception Dates (3)) with Christmas Eve (Special Hours 09:00-13:00), Christmas Day (Closed) and New Year's Day (Closed) */}
 
 ### Import public holidays
 
 **Who can do this:** Owner, PBX Admin.
 
-1. In the schedule dialog, under **Exception Dates**, click **Import Holidays**.
+1. In the schedule dialog, open the **Exception Dates** tab and click **Import Holidays**.
 2. Choose the **Country** and the **Year**. The list of public holidays loads.
 3. Tick the holidays to add under **Select Holidays** (**Select All** and **Clear** help).
 4. Click **Import (*n*)**. The toast "Imported *n* holidays" appears. Each holiday is added as a **Closed** exception; dates already in the list are skipped.
@@ -108,7 +108,7 @@ The holidays come from the public `date.nager.at` service. The browser calls it 
 **Who can do this:** Owner, PBX Admin.
 
 1. Click the schedule's row or name in the list. The **Edit Schedule** dialog opens.
-2. Change the fields, hours or exception dates.
+2. Change what you need on the **Basic Information**, **Weekly Schedule** and **Exception Dates** tabs.
 3. Click **Save Changes**.
 
 The toast "Business hours schedule has been updated successfully." appears. Editing keeps the schedule's time zone.
