@@ -423,7 +423,7 @@ export default function PhoneNumbers() {
               <SelectContent>
                 <SelectItem value={NONE_VALUE}>None (Unknown)</SelectItem>
                 {/* Ensure the current default is selectable even if absent from the active list */}
-                {defaultCallerId && !activeDids.some((d) => d.id === String(defaultCallerId.did_id)) && (
+                {defaultCallerId && !activeDids.some((d) => String(d.id) === String(defaultCallerId.did_id)) && (
                   <SelectItem value={String(defaultCallerId.did_id)}>
                     {defaultCallerId.friendly_name
                       ? `${defaultCallerId.friendly_name} (${formatPhoneNumber(defaultCallerId.phone_number)})`
