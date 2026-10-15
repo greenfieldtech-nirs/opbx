@@ -423,7 +423,7 @@ export default function AutoDialerCampaignDetail() {
                       <div className="py-2 border-b">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-muted-foreground">Caller ID Pool</span>
-                          <span className="text-xs text-muted-foreground">{callerIdPool.length} numbers</span>
+                          <span className="text-xs text-muted-foreground">{callerIdPool.length} {callerIdPool.length === 1 ? 'number' : 'numbers'}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {callerIdPool.map((item: any) => (

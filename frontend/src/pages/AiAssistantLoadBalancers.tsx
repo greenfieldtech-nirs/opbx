@@ -64,6 +64,7 @@ arrayMove} from '@dnd-kit/sortable';
 import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 import { UnprovisionedBadge } from '@/components/UnprovisionedBadge';
 import { QueryErrorState } from '@/components/design-system/QueryErrorState';
+import { labelForRoutingType } from '@/components/destinations/utils/destination-config';
 
 
 
@@ -795,7 +796,7 @@ export default function AiAssistantLoadBalancers() {
                 header: 'Fallback',
                 cell: (lb) => (
                   <Badge variant="secondary" className="text-[10px] py-0">
-                    {lb.fallback_action.replace('_', ' ')}
+                    {labelForRoutingType(lb.fallback_action)}
                   </Badge>
                 )
               },
