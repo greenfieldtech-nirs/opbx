@@ -89,6 +89,8 @@ export function DestinationTypeSelector({
               <SelectItem
                 key={config.value}
                 value={config.value}
+                // Destination unavailable is only ever set by the server: shown as the current value, never chosen.
+                disabled={config.value === 'unavailable' && value === 'unavailable'}
                 className="cursor-pointer"
               >
                 <div className="flex items-start gap-3 py-1">

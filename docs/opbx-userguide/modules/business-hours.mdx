@@ -123,16 +123,6 @@ The toast "Business hours schedule status updated" appears and the badge switche
 
 An unprovisioned schedule shows **Unprovisioned** in the **Status** column instead. That badge is not a switch: open the schedule, choose a destination for the action that has none, and save; the status badge then comes back.
 
-### Disconnect an action
-
-**Who can do this:** Owner, PBX Admin.
-
-1. Open the schedule (click its row).
-2. In **Open Hours Action** or **Closed Hours Action**, choose **Disconnect** as the type.
-3. Click **Save Changes**.
-
-The action now stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule's **Status** column shows **Unprovisioned**, and the dialog title shows the same badge. See [Disconnect and unprovisioned schedules](#disconnect-and-unprovisioned-schedules).
-
 ### Find a schedule
 
 **Who can do this:** Owner, PBX Admin.
@@ -155,13 +145,11 @@ The toast "Business hours schedule has been deleted." appears and the row disapp
 
 ![Cannot delete: still in use dialog for Main Office Hours listing the phone number +12025550100 as a routing target](../img/screens/business-hours-in-use-dialog.jpg)
 
-## Disconnect and unprovisioned schedules
+## Unprovisioned schedules
 
-On the edit dialog only, each action's type list has a **Disconnect** choice. It stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows **Unprovisioned** in the list's **Status** column and in the dialog title, and its status can't be switched from the list until every action has a destination again.
+An action becomes **Destination unavailable** when its destination is removed, for example when a user is deleted and the action pointed at that user's extension. Callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows **Unprovisioned** in the list's **Status** column and in the dialog title, and its status can't be switched from the list until every action has a destination again.
 
-The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
-
-An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Look for **Unprovisioned** in the list's **Status** column to find these schedules, then choose a new destination.
+**Destination unavailable** is never a choice in the dialog: it only appears, greyed out, as the current type of an action that lost its destination. To fix the schedule, open it, choose a new type and destination for that action, and save. The create dialog and the API refuse it on create with "Choose a destination.
 
 ## Duplicate a schedule
 
@@ -190,9 +178,8 @@ The API and the MCP server (`duplicate_business_hours`) can copy a schedule with
 | AI Assistant | An AI assistant |
 | AI Load Balancer | An AI load balancer |
 | Call Queue | A call queue |
-| Disconnect (edit only) | Stores **Destination unavailable**. See [Disconnect](#disconnect-and-unprovisioned-schedules) |
 
-There is no "Hang Up" action. Use Disconnect on an existing schedule, or route to a destination that ends the call.
+There is no "Hang Up" action. Route the period to a destination that ends the call if callers should not be connected.
 
 :::caution Things to check before relying on a schedule
 - **Time zone.** The hours are evaluated in the schedule's own time zone (the `timezone` field, `UTC` by default), including daylight-saving changes. The dialog has no time-zone field, so a schedule created in it is saved as **UTC**: enter the hours in UTC or set `timezone` through the API.
