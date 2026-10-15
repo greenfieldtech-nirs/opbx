@@ -110,4 +110,17 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      # amd-worker pulls a ~139 MB onnxruntime jar; a dropped connection to Maven Central
+      # used to fail the whole job ("Premature end of Content-Length delimited message body").
+      # Resolve everything up front with Maven's HTTP retries on, and retry the step itself.
+      - name: Resolve dependencies
+        run: |
+          for attempt in 1 2 3; do
+            mvn -B -q dependency:go-offline \
+              -Daether.transport.http.retryHandler.count=5 \
+              -Dmaven.wagon.http.retryHandler.count=5 && exit 0
+            echo "Dependency download failed (attempt $attempt), retrying in 20 s..."
+            sleep 20
+          done
+          exit 1
       - run: mvn -B test
