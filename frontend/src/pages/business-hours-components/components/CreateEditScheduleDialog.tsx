@@ -264,6 +264,7 @@ export const CreateEditScheduleDialog: React.FC<CreateEditScheduleDialogProps> =
             <div className="flex items-center justify-end">
               <div className="flex gap-2">
                 <Button
+                  size="sm"
                   onClick={onAddException}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
