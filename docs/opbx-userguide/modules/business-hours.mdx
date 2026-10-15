@@ -57,7 +57,7 @@ Use this module to:
 
 The toast "Business hours schedule has been created successfully." appears and the schedule is listed as **Active**. It becomes available as a routing type on phone numbers. If the name or an action is missing, the dialog marks the field and shows "Please fix the errors in the form."
 
-![Business Hours list with Holiday Hotline Hours (Unprovisioned), Main Office Hours and Support Desk Hours, showing timezone, exception count, last-modified date and status, with the Unprovisioned filter in the toolbar](../img/screens/business-hours-list.jpg)
+{/* SCREENSHOT: business-hours-list — Business Hours list with Holiday Hotline Hours (Unprovisioned badge), Main Office Hours and Support Desk Hours, showing timezone, exception count, last-modified date and status; toolbar with search, refresh and the status filter only */}
 
 ![Schedule dialog for Main Office Hours with the open-hours action IVR Menu Main Menu, the closed-hours action IVR Menu After Hours Menu and the weekly calendar](../img/screens/business-hours-create-dialog.jpg)
 
@@ -131,13 +131,16 @@ The toast "Business hours schedule status updated" appears and the badge switche
 
 The action now stores **Destination unavailable**: callers in that period hear "Destination doesn't exist" and the call ends. The schedule shows the **Unprovisioned** badge in the list and in the dialog title. See [Disconnect and unprovisioned schedules](#disconnect-and-unprovisioned-schedules).
 
-### Find unprovisioned schedules
+### Find a schedule
 
 **Who can do this:** Owner, PBX Admin.
 
-1. Click the **Unprovisioned** button in the filter bar.
+1. Type in the search box to filter by name.
+2. Narrow the list with the status filter (**All Statuses**, **Active**, **Inactive**).
+3. Click a column title (**Name**, **Last Modified** or **Status**) to sort by it; click it again to reverse the order.
+4. Click the refresh button to reload the list.
 
-Only schedules with an action set to Destination unavailable are listed. Open each one and choose a new destination. Click **Unprovisioned** again to show all schedules. The bar also has a search box, a status filter (**All Statuses**, **Active**, **Inactive**), a sort menu (**Name**, **Created Date**, **Status**, **Last Modified**) and a **Refresh** button.
+A schedule with an action set to Destination unavailable shows the **Unprovisioned** badge next to its name; open it and choose a new destination.
 
 ### Delete a schedule
 
@@ -156,7 +159,7 @@ On the edit dialog only, each action's type list has a **Disconnect** choice. It
 
 The create dialog never offers Disconnect, and the API refuses it on create with "Choose a destination."
 
-An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Use the **Unprovisioned** filter to find these schedules, then choose a new destination.
+An action can also become Destination unavailable when a user is deleted and the action pointed at that user's extension. The type list then shows **Destination unavailable**. Look for the **Unprovisioned** badge in the list to find these schedules, then choose a new destination.
 
 ## Duplicate a schedule
 
@@ -257,7 +260,7 @@ Target prefixes checked by the API: `ext-` (extension), `rg-` (ring group), `que
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/v1/business-hours` | List. Filters: `status`, `search`, `unprovisioned=1` |
+| GET | `/v1/business-hours` | List. Filters: `status`, `search`, `unprovisioned=1` (API only) |
 | POST | `/v1/business-hours` | Create. Rejects `unavailable` actions |
 | GET | `/v1/business-hours/{businessHour}` | One schedule with days and exceptions |
 | PUT or PATCH | `/v1/business-hours/{businessHour}` | Update only the fields sent; omitted fields, days not sent and (when `exceptions` is omitted) the exceptions keep their stored values |

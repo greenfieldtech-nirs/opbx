@@ -36,7 +36,6 @@ CreateEditScheduleDialog,
 ExceptionDialog,
 CopyHoursDialog,getActionDisplayNameSimple
 } from './business-hours-components';
-import { UnprovisionedFilter } from '@/components/UnprovisionedBadge';
 
 const BusinessHours: React.FC = () => {
   const { user } = useAuth();
@@ -63,9 +62,8 @@ const BusinessHours: React.FC = () => {
     setSearchQuery,
     statusFilter,
     setStatusFilter,
-    unprovisionedOnly,
-    setUnprovisionedOnly,
     sortBy,
+    sortDirection,
     setSortBy,
     isCreateEditDialogOpen,
     setIsCreateEditDialogOpen,
@@ -201,19 +199,6 @@ const BusinessHours: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <UnprovisionedFilter value={unprovisionedOnly} onChange={setUnprovisionedOnly} />
-
-            <Select value={sortBy} onValueChange={(value: string) => setSortBy(value as 'status' | 'name' | 'created_at' | 'updated_at')}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="created_at">Created Date</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-                <SelectItem value="updated_at">Last Modified</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -231,9 +216,9 @@ const BusinessHours: React.FC = () => {
             getIdentityPrimary={(schedule) => schedule.name}
             getIdentitySecondary={(schedule) => `${schedule.timezone} • ${getActionDisplayNameSimple(schedule.open_hours_action?.type)} when open`}
             onIdentityClick={handleEdit}
-            sortField={sortBy}
-            sortDirection="asc"
-            onSort={(field) => setSortBy(field as any)}
+            sortField={sortBy === 'name' ? 'identity' : sortBy}
+            sortDirection={sortDirection}
+            onSort={setSortBy}
             canView={false}
             canEdit={false}
             onDelete={handleOpenDelete}
@@ -299,8 +284,8 @@ const BusinessHours: React.FC = () => {
               <EmptyState
                 icon={Clock}
                 title="No business hours found"
-                description={searchQuery || statusFilter !== 'all' || unprovisionedOnly ? 'Try adjusting your filters' : 'Get started by creating your first business hours schedule'}
-                action={canManage && !searchQuery && statusFilter === 'all' && !unprovisionedOnly ? {
+                description={searchQuery || statusFilter !== 'all' ? 'Try adjusting your filters' : 'Get started by creating your first business hours schedule'}
+                action={canManage && !searchQuery && statusFilter === 'all' ? {
                   label: "Create Schedule",
                   onClick: () => setIsCreateEditDialogOpen(true)
                 } : undefined}

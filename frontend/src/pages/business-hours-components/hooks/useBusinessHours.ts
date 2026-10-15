@@ -26,8 +26,20 @@ export function useBusinessHours() {
   // State for filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ScheduleStatus>('all');
-  const [unprovisionedOnly, setUnprovisionedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name');
+  const [sortBy, setSortByField] = useState<'name' | 'created_at' | 'status' | 'updated_at'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Table header click: same column toggles the direction, a new column starts ascending.
+  // The identity (name) column reports itself as 'identity'.
+  const setSortBy = (field: string) => {
+    const next = (field === 'identity' ? 'name' : field) as typeof sortBy;
+    if (next === sortBy) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortByField(next);
+      setSortDirection('asc');
+    }
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage] = useState(10);
 
@@ -109,25 +121,22 @@ export function useBusinessHours() {
       filtered = filtered.filter((schedule) => schedule.status === statusFilter);
     }
 
-    if (unprovisionedOnly) {
-      filtered = filtered.filter((schedule) => schedule.is_unprovisioned);
-    }
-
+    const dir = sortDirection === 'asc' ? 1 : -1;
     filtered = [...filtered].sort((a, b) => {
       if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
+        return dir * a.name.localeCompare(b.name);
       } else if (sortBy === 'created_at') {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return dir * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       } else if (sortBy === 'status') {
-        return a.status.localeCompare(b.status);
+        return dir * a.status.localeCompare(b.status);
       } else if (sortBy === 'updated_at') {
-        return new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime();
+        return dir * (new Date(a.updated_at || '').getTime() - new Date(b.updated_at || '').getTime());
       }
       return 0;
     });
 
     return filtered;
-  }, [allSchedules, searchQuery, statusFilter, unprovisionedOnly, sortBy]);
+  }, [allSchedules, searchQuery, statusFilter, sortBy, sortDirection]);
 
   const totalPages = Math.ceil(filteredSchedules.length / perPage);
   const schedules = useMemo(() => {
@@ -472,9 +481,8 @@ export function useBusinessHours() {
     setSearchQuery,
     statusFilter,
     setStatusFilter,
-    unprovisionedOnly,
-    setUnprovisionedOnly,
     sortBy,
+    sortDirection,
     setSortBy,
 
     // Dialog states
