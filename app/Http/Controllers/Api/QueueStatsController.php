@@ -9,7 +9,6 @@ use App\Models\CallQueue;
 use App\Services\CallQueue\QueueDashboardDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 /**
  * Call queue statistics: history aggregates from queue_calls and the
@@ -54,5 +53,4 @@ class QueueStatsController extends Controller
             'data' => app(QueueDashboardDataService::class)->livePayload($callQueue),
         ]);
     }
-
 }

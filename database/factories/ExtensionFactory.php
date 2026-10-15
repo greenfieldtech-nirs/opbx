@@ -6,12 +6,13 @@ namespace Database\Factories;
 
 use App\Enums\ExtensionType;
 use App\Enums\UserStatus;
+use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Extension>
+ * @extends Factory<Extension>
  */
 class ExtensionFactory extends Factory
 {
@@ -31,7 +32,7 @@ class ExtensionFactory extends Factory
             'voicemail_enabled' => false,
             'password' => 'secret',
             'configuration' => [
-                'sip_uri' => 'sip:' . fake()->unique()->numberBetween(1000, 9999) . '@example.com',
+                'sip_uri' => 'sip:'.fake()->unique()->numberBetween(1000, 9999).'@example.com',
             ],
             'default_caller_id_did_id' => null,
         ];
@@ -42,7 +43,7 @@ class ExtensionFactory extends Factory
      */
     public function withUser(?User $user = null): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'user_id' => $user?->id ?? User::factory(),
         ]);
     }
@@ -52,7 +53,7 @@ class ExtensionFactory extends Factory
      */
     public function inactive(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'status' => UserStatus::INACTIVE,
         ]);
     }
@@ -62,7 +63,7 @@ class ExtensionFactory extends Factory
      */
     public function withVoicemail(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'voicemail_enabled' => true,
         ]);
     }
@@ -72,7 +73,7 @@ class ExtensionFactory extends Factory
      */
     public function withoutConfiguration(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'configuration' => null,
         ]);
     }
@@ -82,7 +83,7 @@ class ExtensionFactory extends Factory
      */
     public function withEmptyConfiguration(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'configuration' => [],
         ]);
     }

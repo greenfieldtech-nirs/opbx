@@ -26,7 +26,7 @@ class OutboundWhitelistPolicy
      *
      * All authenticated users can view outbound whitelist entries within their organization.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to view outbound whitelist list
      */
     public function viewAny(User $user): bool
@@ -40,8 +40,8 @@ class OutboundWhitelistPolicy
      *
      * Users can view any outbound whitelist entry within their organization.
      *
-     * @param User $user The authenticated user
-     * @param OutboundWhitelist $outboundWhitelist The outbound whitelist entry being viewed
+     * @param  User  $user  The authenticated user
+     * @param  OutboundWhitelist  $outboundWhitelist  The outbound whitelist entry being viewed
      * @return bool True if authorized to view the outbound whitelist entry
      */
     public function view(User $user, OutboundWhitelist $outboundWhitelist): bool
@@ -55,7 +55,7 @@ class OutboundWhitelistPolicy
      *
      * Only Owner and PBX Admin can create outbound whitelist entries.
      *
-     * @param User $user The authenticated user
+     * @param  User  $user  The authenticated user
      * @return bool True if authorized to create outbound whitelist entries
      */
     public function create(User $user): bool
@@ -68,8 +68,8 @@ class OutboundWhitelistPolicy
      *
      * Only Owner and PBX Admin can update outbound whitelist entries.
      *
-     * @param User $user The authenticated user
-     * @param OutboundWhitelist $outboundWhitelist The outbound whitelist entry being updated
+     * @param  User  $user  The authenticated user
+     * @param  OutboundWhitelist  $outboundWhitelist  The outbound whitelist entry being updated
      * @return bool True if authorized to update the outbound whitelist entry
      */
     public function update(User $user, OutboundWhitelist $outboundWhitelist): bool
@@ -88,8 +88,8 @@ class OutboundWhitelistPolicy
      *
      * Only Owner and PBX Admin can delete outbound whitelist entries.
      *
-     * @param User $user The authenticated user
-     * @param OutboundWhitelist $outboundWhitelist The outbound whitelist entry being deleted
+     * @param  User  $user  The authenticated user
+     * @param  OutboundWhitelist  $outboundWhitelist  The outbound whitelist entry being deleted
      * @return bool True if authorized to delete the outbound whitelist entry
      */
     public function delete(User $user, OutboundWhitelist $outboundWhitelist): bool

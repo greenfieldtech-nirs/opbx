@@ -6,6 +6,7 @@ namespace Tests\Feature\ApiKey;
 
 use App\Enums\GrantableResource;
 use App\Http\Middleware\EnforceApiKeyScope;
+use App\Models\CallQueue;
 use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\Organization;
@@ -155,7 +156,7 @@ class ApiKeyCoverageTest extends TestCase
         );
 
         $org = Organization::factory()->create();
-        $queue = \App\Models\CallQueue::factory()->create(['organization_id' => $org->id]);
+        $queue = CallQueue::factory()->create(['organization_id' => $org->id]);
 
         $this->withToken($token)->getJson('/api/v1/call-queues')->assertStatus(200);
         $this->withToken($token)->getJson('/api/v1/queue-calls')->assertStatus(200);

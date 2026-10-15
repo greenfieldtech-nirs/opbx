@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Http\Controllers\Voice\VoiceRoutingController;
 use Illuminate\Console\Command;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Test voice routing logic by simulating webhook requests.
@@ -43,30 +42,32 @@ class TestVoiceRouting extends Command
         $to = $this->option('to');
         $from = $this->option('from');
         $orgId = (int) $this->option('organization-id');
-        $callSid = $this->option('call-sid') ?: 'CA' . md5(uniqid('test-', true));
+        $callSid = $this->option('call-sid') ?: 'CA'.md5(uniqid('test-', true));
         $debug = $this->option('debug');
 
         // Validate required parameters
-        if (!$to || !$from) {
+        if (! $to || ! $from) {
             $this->error('Both --to and --from parameters are required');
+
             return 1;
         }
 
-        if (!$orgId) {
+        if (! $orgId) {
             $this->error('--organization-id parameter is required');
+
             return 1;
         }
 
         $this->info('🧪 Testing Voice Routing Logic');
-        $this->line('Direction: ' . $direction);
-        $this->line('To: ' . $to);
-        $this->line('From: ' . $from);
-        $this->line('Organization ID: ' . $orgId);
-        $this->line('Call SID: ' . $callSid);
+        $this->line('Direction: '.$direction);
+        $this->line('To: '.$to);
+        $this->line('From: '.$from);
+        $this->line('Organization ID: '.$orgId);
+        $this->line('Call SID: '.$callSid);
         $this->line('');
 
         // Create request object
-        $request = new Request();
+        $request = new Request;
         $request->merge([
             'Direction' => $direction,
             'To' => $to,
@@ -88,13 +89,11 @@ class TestVoiceRouting extends Command
             $controller = app(VoiceRoutingController::class);
             $response = $controller->handleInbound($request);
 
-            $this->info('📞 Response Status: ' . $response->status());
-            $this->line('Content-Type: ' . $response->headers->get('Content-Type'));
+            $this->info('📞 Response Status: '.$response->status());
+            $this->line('Content-Type: '.$response->headers->get('Content-Type'));
             $this->line('');
 
             $content = $response->getContent();
-
-
 
             if ($response->headers->get('Content-Type') === 'text/xml') {
                 $this->info('📋 CXML Response:');
@@ -116,9 +115,9 @@ class TestVoiceRouting extends Command
             return 0;
 
         } catch (\Exception $e) {
-            $this->error('❌ Exception occurred: ' . $e->getMessage());
-            $this->line('File: ' . $e->getFile() . ':' . $e->getLine());
-            $this->line('Trace: ' . $e->getTraceAsString());
+            $this->error('❌ Exception occurred: '.$e->getMessage());
+            $this->line('File: '.$e->getFile().':'.$e->getLine());
+            $this->line('Trace: '.$e->getTraceAsString());
 
             return 1;
         }
@@ -133,10 +132,8 @@ class TestVoiceRouting extends Command
         $this->info('🔍 Response Analysis:');
 
         if ($status !== 200) {
-            $this->warn('⚠️  Non-200 status code: ' . $status);
+            $this->warn('⚠️  Non-200 status code: '.$status);
         }
-
-
 
         // Check for common patterns
         if (preg_match('/<Say[^>]*>.*<\/Say>/s', $content) && str_contains($content, '<Hangup')) {
@@ -144,22 +141,22 @@ class TestVoiceRouting extends Command
 
             // Extract error message
             if (preg_match('/<Say[^>]*>(.*?)<\/Say>/s', $content, $matches)) {
-                $this->line('Error message: "' . trim($matches[1]) . '"');
+                $this->line('Error message: "'.trim($matches[1]).'"');
             }
         } elseif (str_contains($content, '<Dial')) {
             $this->info('✅ Call routing response - call will be connected');
 
             // Extract dial targets
             if (preg_match_all('/<Number[^>]*>([^<]+)<\/Number>/', $content, $matches)) {
-                $this->line('Dialing numbers: ' . implode(', ', $matches[1]));
+                $this->line('Dialing numbers: '.implode(', ', $matches[1]));
             }
 
             if (preg_match_all('/<Sip[^>]*>([^<]+)<\/Sip>/', $content, $matches)) {
-                $this->line('Dialing SIP URIs: ' . implode(', ', $matches[1]));
+                $this->line('Dialing SIP URIs: '.implode(', ', $matches[1]));
             }
 
             if (preg_match_all('/<Service[^>]*>([^<]+)<\/Service>/', $content, $matches)) {
-                $this->line('Dialing services: ' . implode(', ', $matches[1]));
+                $this->line('Dialing services: '.implode(', ', $matches[1]));
             }
         } elseif (str_contains($content, '<Gather>')) {
             $this->info('✅ IVR response - waiting for user input');
@@ -171,7 +168,7 @@ class TestVoiceRouting extends Command
 
         // Check for timeout
         if (preg_match('/timeout="(\d+)"/', $content, $matches)) {
-            $this->line('Timeout: ' . $matches[1] . ' seconds');
+            $this->line('Timeout: '.$matches[1].' seconds');
         }
     }
 }

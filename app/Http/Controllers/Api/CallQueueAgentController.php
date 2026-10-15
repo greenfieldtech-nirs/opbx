@@ -7,11 +7,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CallQueue;
 use App\Models\CallQueueAgent;
-use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
-use App\Services\Logging\AuditLogger;
 use App\Services\CallQueue\AcdWorkerClient;
 use App\Services\CallQueue\QueueAgentStateService;
+use App\Services\Logging\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

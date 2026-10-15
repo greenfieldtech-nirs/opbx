@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -44,7 +46,7 @@ return [
     'url_timeout' => env('RECORDINGS_URL_TIMEOUT', 10), // seconds
 
     'allowed_domains' => env('RECORDINGS_ALLOWED_DOMAINS')
-        ? explode(',', env('RECORDINGS_ALLOWED_DOMAINS'))
+        ? explode(',', (string) env('RECORDINGS_ALLOWED_DOMAINS'))
         : [], // Empty array means allow all domains
 
     /*

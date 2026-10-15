@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\Organization;
 use App\Services\CloudonixClient\CloudonixSubscriberService;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -77,9 +78,10 @@ class CloudonixSyncSubscribers extends Command
                 // Check if Cloudonix is configured
                 $settings = $organization->cloudonixSettings;
 
-                if (!$settings || !$settings->isConfigured()) {
-                    $this->warn("  ⚠ Skipped - Cloudonix not configured");
+                if (! $settings || ! $settings->isConfigured()) {
+                    $this->warn('  ⚠ Skipped - Cloudonix not configured');
                     $this->newLine();
+
                     continue;
                 }
 
@@ -115,7 +117,7 @@ class CloudonixSyncSubscribers extends Command
             }
 
             // Display summary
-            if (!$dryRun) {
+            if (! $dryRun) {
                 $this->info('Summary');
                 $this->info('=======');
                 $this->info("Total Success: {$totalStats['success']}");
@@ -137,7 +139,7 @@ class CloudonixSyncSubscribers extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('An error occurred during sync: ' . $e->getMessage());
+            $this->error('An error occurred during sync: '.$e->getMessage());
 
             Log::error('Cloudonix bulk sync failed', [
                 'command' => 'cloudonix:sync-subscribers',
@@ -152,17 +154,14 @@ class CloudonixSyncSubscribers extends Command
 
     /**
      * Get the organizations to sync.
-     *
-     * @param string|null $organizationId
-     * @return \Illuminate\Database\Eloquent\Collection
      */
-    private function getOrganizations(?string $organizationId): \Illuminate\Database\Eloquent\Collection
+    private function getOrganizations(?string $organizationId): Collection
     {
         if ($organizationId !== null) {
             // Sync specific organization
             $organization = Organization::with('cloudonixSettings')->find($organizationId);
 
-            if (!$organization) {
+            if (! $organization) {
                 return collect();
             }
 

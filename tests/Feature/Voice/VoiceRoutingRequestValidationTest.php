@@ -11,8 +11,7 @@ use Tests\TestCase;
 final class VoiceRoutingRequestValidationTest extends TestCase
 {
     /**
-     * @param array<string, mixed> $overrides
-     *
+     * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
     private function baseData(array $overrides = []): array
@@ -27,11 +26,11 @@ final class VoiceRoutingRequestValidationTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     private function validate(array $data): \Illuminate\Contracts\Validation\Validator
     {
-        return Validator::make($data, (new VoiceRoutingRequest())->rules());
+        return Validator::make($data, (new VoiceRoutingRequest)->rules());
     }
 
     public function test_normal_extension_destination_passes(): void

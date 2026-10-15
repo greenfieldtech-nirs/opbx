@@ -49,6 +49,7 @@ class CleanupStaleSessionUpdates extends Command
 
         if ($staleCount === 0) {
             $this->info('No stale session updates found.');
+
             return self::SUCCESS;
         }
 
@@ -66,11 +67,13 @@ class CleanupStaleSessionUpdates extends Command
 
         if ($dryRun) {
             $this->info('Dry run mode - no changes made.');
+
             return self::SUCCESS;
         }
 
         if (! $this->option('force') && ! $this->confirm('Do you want to mark these records as deleted?', false)) {
             $this->info('Operation cancelled.');
+
             return self::SUCCESS;
         }
 

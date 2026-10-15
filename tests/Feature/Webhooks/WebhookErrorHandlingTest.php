@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Webhooks;
 
 use App\Exceptions\Webhook\WebhookBusinessLogicException;
+use App\Exceptions\Webhook\WebhookException;
 use App\Exceptions\Webhook\WebhookTransientException;
 use App\Exceptions\Webhook\WebhookValidationException;
 use App\Models\Organization;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -80,14 +79,14 @@ class WebhookErrorHandlingTest extends TestCase
      */
     public function test_webhook_exception_hierarchy(): void
     {
-        $validationException = new WebhookValidationException();
-        $businessException = new WebhookBusinessLogicException();
-        $transientException = new WebhookTransientException();
+        $validationException = new WebhookValidationException;
+        $businessException = new WebhookBusinessLogicException;
+        $transientException = new WebhookTransientException;
 
         // All extend WebhookException
-        $this->assertInstanceOf(\App\Exceptions\Webhook\WebhookException::class, $validationException);
-        $this->assertInstanceOf(\App\Exceptions\Webhook\WebhookException::class, $businessException);
-        $this->assertInstanceOf(\App\Exceptions\Webhook\WebhookException::class, $transientException);
+        $this->assertInstanceOf(WebhookException::class, $validationException);
+        $this->assertInstanceOf(WebhookException::class, $businessException);
+        $this->assertInstanceOf(WebhookException::class, $transientException);
 
         // All extend base Exception
         $this->assertInstanceOf(\Exception::class, $validationException);
@@ -152,7 +151,7 @@ class WebhookErrorHandlingTest extends TestCase
      */
     public function test_transient_exception_default_retry_after(): void
     {
-        $exception = new WebhookTransientException(); // Using defaults
+        $exception = new WebhookTransientException; // Using defaults
 
         $this->assertEquals(30, $exception->getRetryAfter());
         $this->assertEquals('Service temporarily unavailable', $exception->getMessage());
@@ -163,8 +162,8 @@ class WebhookErrorHandlingTest extends TestCase
      */
     public function test_non_retryable_exceptions_have_null_retry_after(): void
     {
-        $validationException = new WebhookValidationException();
-        $businessException = new WebhookBusinessLogicException();
+        $validationException = new WebhookValidationException;
+        $businessException = new WebhookBusinessLogicException;
 
         $this->assertNull($validationException->getRetryAfter());
         $this->assertNull($businessException->getRetryAfter());

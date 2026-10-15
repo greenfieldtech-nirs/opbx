@@ -57,7 +57,7 @@ class GenerateSecurePassword extends Command
         }
 
         // Validate format
-        if (!in_array($format, ['base64', 'hex', 'raw'], true)) {
+        if (! in_array($format, ['base64', 'hex', 'raw'], true)) {
             $this->error('Invalid format. Use: base64, hex, or raw');
 
             return 1;
@@ -78,9 +78,9 @@ class GenerateSecurePassword extends Command
             $password = $this->generatePassword($length, $format);
 
             if ($count > 1) {
-                $this->line("<fg=bright-green>Password " . ($i + 1) . ':</> ' . $password);
+                $this->line('<fg=bright-green>Password '.($i + 1).':</> '.$password);
             } else {
-                $this->line('<fg=bright-green>Password:</> ' . $password);
+                $this->line('<fg=bright-green>Password:</> '.$password);
             }
         }
 
@@ -98,8 +98,8 @@ class GenerateSecurePassword extends Command
     /**
      * Generate a cryptographically secure password.
      *
-     * @param int $length Length in bytes
-     * @param string $format Output format
+     * @param  int  $length  Length in bytes
+     * @param  string  $format  Output format
      * @return string Generated password
      */
     private function generatePassword(int $length, string $format): string

@@ -23,15 +23,18 @@ class RecordingAccessServiceTest extends TestCase
     use RefreshDatabase;
 
     private RecordingAccessService $service;
+
     private Organization $organization;
+
     private User $user;
+
     private Recording $recording;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->service = new RecordingAccessService();
+        $this->service = new RecordingAccessService;
         $this->organization = Organization::factory()->create();
         $this->user = User::factory()->create([
             'organization_id' => $this->organization->id,
@@ -207,7 +210,7 @@ class RecordingAccessServiceTest extends TestCase
      */
     public function test_secure_delete_handles_non_existent_files(): void
     {
-        $nonExistentFile = '/tmp/non-existent-file-' . uniqid() . '.tmp';
+        $nonExistentFile = '/tmp/non-existent-file-'.uniqid().'.tmp';
 
         $result = $this->service->secureDelete($nonExistentFile);
 

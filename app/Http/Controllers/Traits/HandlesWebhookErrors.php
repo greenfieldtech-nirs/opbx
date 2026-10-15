@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Traits;
 
-use App\Exceptions\Webhook\WebhookBusinessLogicException;
 use App\Exceptions\Webhook\WebhookException;
-use App\Exceptions\Webhook\WebhookTransientException;
-use App\Exceptions\Webhook\WebhookValidationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -27,9 +24,8 @@ trait HandlesWebhookErrors
     /**
      * Handle an exception and return appropriate webhook response.
      *
-     * @param \Exception $exception The exception to handle
-     * @param string|null $callId Optional call ID for logging context
-     * @return JsonResponse|Response
+     * @param  \Exception  $exception  The exception to handle
+     * @param  string|null  $callId  Optional call ID for logging context
      */
     protected function handleWebhookException(\Exception $exception, ?string $callId = null): JsonResponse|Response
     {
@@ -79,7 +75,7 @@ trait HandlesWebhookErrors
                 'type' => 'RedisConnectionException',
                 'retryable' => true,
             ], 503)
-            ->header('Retry-After', '30');
+                ->header('Retry-After', '30');
         }
 
         // Database query errors -> check if transient or permanent
@@ -157,7 +153,7 @@ trait HandlesWebhookErrors
                 'type' => 'DatabaseConnectionError',
                 'retryable' => true,
             ], 503)
-            ->header('Retry-After', '30');
+                ->header('Retry-After', '30');
         }
 
         // Permanent database errors (constraint violations, syntax errors)
@@ -178,17 +174,16 @@ trait HandlesWebhookErrors
     /**
      * Return CXML error response for voice routing errors.
      *
-     * @param string $message Error message to speak to caller
-     * @param int $statusCode HTTP status code
-     * @return Response
+     * @param  string  $message  Error message to speak to caller
+     * @param  int  $statusCode  HTTP status code
      */
     protected function cxmlErrorResponse(string $message, int $statusCode = 200): Response
     {
-        $cxml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" .
-                "<Response>\n" .
-                "  <Say language=\"en-US\">{$message}</Say>\n" .
-                "  <Hangup/>\n" .
-                "</Response>";
+        $cxml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+                "<Response>\n".
+                "  <Say language=\"en-US\">{$message}</Say>\n".
+                "  <Hangup/>\n".
+                '</Response>';
 
         return response($cxml, $statusCode)
             ->header('Content-Type', 'application/xml');

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Services\Fallback\ResilientCacheService;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ class ResilientCacheServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->service = new ResilientCacheService();
+        $this->service = new ResilientCacheService;
 
         // Clear any existing locks
         DB::table('locks')->delete();
@@ -154,7 +155,7 @@ class ResilientCacheServiceTest extends TestCase
                 }, 1, 0); // 0 wait time = immediate fail
 
                 $lock2Failed = false; // Should not reach here
-            } catch (\Illuminate\Contracts\Cache\LockTimeoutException | \RuntimeException $e) {
+            } catch (LockTimeoutException|\RuntimeException $e) {
                 $lock2Failed = true; // Expected - lock is held
             }
 

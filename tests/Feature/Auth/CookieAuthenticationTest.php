@@ -20,6 +20,7 @@ class CookieAuthenticationTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Organization $organization;
 
     protected function setUp(): void

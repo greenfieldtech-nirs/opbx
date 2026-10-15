@@ -11,7 +11,7 @@ enum IvrMenuStatus: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::ACTIVE => 'Active',
             self::INACTIVE => 'Inactive',
         };
@@ -19,7 +19,7 @@ enum IvrMenuStatus: string
 
     public function description(): string
     {
-        return match($this) {
+        return match ($this) {
             self::ACTIVE => 'IVR menu is active and can receive calls',
             self::INACTIVE => 'IVR menu is temporarily disabled',
         };

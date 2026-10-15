@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /**
  * Factory for CallNotificationsSettings model.
  *
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\CallNotificationsSettings>
+ * @extends Factory<CallNotificationsSettings>
  */
 class CallNotificationsSettingsFactory extends Factory
 {

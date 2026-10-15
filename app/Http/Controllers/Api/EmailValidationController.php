@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\EmailValidation\Contracts\EmailValidatorInterface;
+use App\Services\EmailValidation\DTOs\EmailValidationResult;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -96,7 +97,7 @@ class EmailValidationController extends Controller
     /**
      * Get the error message based on the validation result.
      *
-     * @param  \App\Services\EmailValidation\DTOs\EmailValidationResult  $result
+     * @param  EmailValidationResult  $result
      */
     private function getErrorMessage($result): string
     {

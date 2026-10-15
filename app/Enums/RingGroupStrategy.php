@@ -12,7 +12,7 @@ enum RingGroupStrategy: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::SIMULTANEOUS => 'Ring All (Simultaneous)',
             self::ROUND_ROBIN => 'Round Robin',
             self::SEQUENTIAL => 'Sequential (Hunt Group)',
@@ -21,7 +21,7 @@ enum RingGroupStrategy: string
 
     public function description(): string
     {
-        return match($this) {
+        return match ($this) {
             self::SIMULTANEOUS => 'Ring all extensions at the same time',
             self::ROUND_ROBIN => 'Distribute calls evenly across extensions',
             self::SEQUENTIAL => 'Try extensions one after another',

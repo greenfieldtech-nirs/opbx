@@ -13,7 +13,7 @@ use App\Models\RingGroup;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<CallLog>
+ * @extends Factory<CallLog>
  */
 class CallLogFactory extends Factory
 {

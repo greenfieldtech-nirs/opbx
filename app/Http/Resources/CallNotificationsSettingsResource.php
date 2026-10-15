@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\CallNotificationsSettings;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Call Notifications Settings Resource.
  *
- * @mixin \App\Models\CallNotificationsSettings
+ * @mixin CallNotificationsSettings
  */
 class CallNotificationsSettingsResource extends JsonResource
 {

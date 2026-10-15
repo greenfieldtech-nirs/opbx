@@ -14,6 +14,8 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -39,7 +41,7 @@ class QueueAgentDialInTest extends TestCase
         parent::setUp();
 
         $this->organization = Organization::factory()->create(['status' => 'active']);
-        $this->token = (string) \Illuminate\Support\Str::random(32);
+        $this->token = (string) Str::random(32);
         CloudonixSettings::factory()->create([
             'organization_id' => $this->organization->id,
             'domain_name' => 'test.example.com',
@@ -68,7 +70,7 @@ class QueueAgentDialInTest extends TestCase
         ]);
     }
 
-    private function dial(string $to, string $from = '1001'): \Illuminate\Testing\TestResponse
+    private function dial(string $to, string $from = '1001'): TestResponse
     {
         return $this->postJson('/api/voice/route', [
             'To' => $to,

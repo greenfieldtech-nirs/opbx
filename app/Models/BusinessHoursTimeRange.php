@@ -54,13 +54,12 @@ class BusinessHoursTimeRange extends Model
     /**
      * Check if the given time falls within this time range.
      *
-     * @param string $time Format: HH:mm:ss or HH:mm
-     * @return bool
+     * @param  string  $time  Format: HH:mm:ss or HH:mm
      */
     public function includes(string $time): bool
     {
         // Ensure consistent format for comparison
-        $normalizedTime = strlen($time) === 5 ? $time . ':00' : $time;
+        $normalizedTime = strlen($time) === 5 ? $time.':00' : $time;
 
         return $normalizedTime >= $this->start_time && $normalizedTime < $this->end_time;
     }

@@ -1,6 +1,9 @@
 <?php
 
 declare(strict_types=1);
+use BeyondCode\LaravelWebSockets\Statistics\Logger\HttpStatisticsLogger;
+use BeyondCode\LaravelWebSockets\Statistics\Models\WebSocketsStatisticsEntry;
+use BeyondCode\LaravelWebSockets\WebSockets\Channels\ChannelManagers\LocalChannelManager;
 
 return [
 
@@ -39,8 +42,8 @@ return [
     'max_request_size_in_kb' => 250,
 
     'statistics' => [
-        'model' => \BeyondCode\LaravelWebSockets\Statistics\Models\WebSocketsStatisticsEntry::class,
-        'logger' => \BeyondCode\LaravelWebSockets\Statistics\Logger\HttpStatisticsLogger::class,
+        'model' => WebSocketsStatisticsEntry::class,
+        'logger' => HttpStatisticsLogger::class,
         'interval_in_seconds' => 60,
         'delete_statistics_older_than_days' => 60,
     ],
@@ -48,8 +51,8 @@ return [
     'replication' => [
         'mode' => env('WEBSOCKETS_REPLICATION_MODE', 'none'),
         'modes' => [
-            'local' => \BeyondCode\LaravelWebSockets\WebSockets\Channels\ChannelManagers\LocalChannelManager::class,
-            'none' => \BeyondCode\LaravelWebSockets\WebSockets\Channels\ChannelManagers\LocalChannelManager::class,
+            'local' => LocalChannelManager::class,
+            'none' => LocalChannelManager::class,
         ],
     ],
 

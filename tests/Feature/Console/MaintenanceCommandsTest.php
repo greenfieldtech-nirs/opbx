@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Enums\DestinationStatus;
+use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\Organization;
 use App\Models\SessionUpdate;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\StringInput;
 use Tests\TestCase;
 
 class MaintenanceCommandsTest extends TestCase
@@ -50,7 +55,7 @@ class MaintenanceCommandsTest extends TestCase
         $campaignId = DB::table('auto_dialer_lists')->where('id', $destination->list_id)->value('campaign_id');
         $this->assertNull($campaignId, 'fixture: list without campaign is skipped by the command');
 
-        $campaign = \App\Models\AutoDialerCampaign::factory()->create(['organization_id' => $destination->organization_id]);
+        $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $destination->organization_id]);
         DB::table('auto_dialer_lists')->where('id', $destination->list_id)->update(['campaign_id' => $campaign->id]);
 
         $this->artisan('auto-dialer:reset-pending-destinations', ['--no-interaction' => true])->assertSuccessful();
@@ -81,17 +86,17 @@ class MaintenanceCommandsTest extends TestCase
     /** Every scheduled command line must parse against its command's options (e.g. no --force='1' on a flag). */
     public function test_every_scheduled_command_line_binds_to_its_definition(): void
     {
-        $artisan = $this->app->make(\Illuminate\Contracts\Console\Kernel::class);
+        $artisan = $this->app->make(Kernel::class);
 
         foreach ($this->app->make(Schedule::class)->events() as $event) {
-            $args = trim(\Illuminate\Support\Str::after((string) $event->command, "'artisan'"));
+            $args = trim(Str::after((string) $event->command, "'artisan'"));
             $name = strtok($args, ' ');
             $command = $artisan->all()[$name] ?? null;
             $this->assertNotNull($command, "Scheduled command [{$name}] is not registered");
 
-            $input = new \Symfony\Component\Console\Input\StringInput($args);
+            $input = new StringInput($args);
             $definition = clone $command->getDefinition();
-            $definition->addArgument(new \Symfony\Component\Console\Input\InputArgument('command'));
+            $definition->addArgument(new InputArgument('command'));
             $input->bind($definition); // throws on --flag='1' or unknown options
         }
     }

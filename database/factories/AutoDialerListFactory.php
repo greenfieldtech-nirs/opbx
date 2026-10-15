@@ -11,7 +11,7 @@ use App\Models\Organization;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<AutoDialerList>
+ * @extends Factory<AutoDialerList>
  */
 class AutoDialerListFactory extends Factory
 {

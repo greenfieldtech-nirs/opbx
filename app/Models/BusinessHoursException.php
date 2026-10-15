@@ -83,9 +83,6 @@ class BusinessHoursException extends Model
 
     /**
      * Check if this exception is open at the given time.
-     *
-     * @param Carbon $dateTime
-     * @return bool
      */
     public function isOpen(Carbon $dateTime): bool
     {

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static string getDriverName()
  * @method static bool healthCheck()
  *
- * @see \App\Services\Email\Contracts\TransactionalEmailInterface
+ * @see TransactionalEmailInterface
  */
 class TransactionalEmail extends Facade
 {

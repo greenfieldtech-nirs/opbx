@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Models\BusinessHoursSchedule;
 use App\Models\ConferenceRoom;
+use App\Models\DidNumber;
 use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\RingGroup;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /**
  * Factory for DID Number (Phone Number) model.
  *
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\DidNumber>
+ * @extends Factory<DidNumber>
  */
 class DidNumberFactory extends Factory
 {
@@ -26,7 +27,7 @@ class DidNumberFactory extends Factory
     public function definition(): array
     {
         // Generate a random E.164 phone number
-        $phoneNumber = '+1' . fake()->unique()->numerify('##########');
+        $phoneNumber = '+1'.fake()->unique()->numerify('##########');
 
         return [
             'organization_id' => Organization::factory(),

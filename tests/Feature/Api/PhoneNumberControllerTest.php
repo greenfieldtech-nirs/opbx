@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\BusinessHoursStatus;
 use App\Enums\RingGroupStatus;
-use App\Enums\RingGroupStrategy;
 use App\Enums\UserRole;
 use App\Enums\UserStatus;
 use App\Models\BusinessHoursSchedule;
@@ -31,14 +31,23 @@ class PhoneNumberControllerTest extends TestCase
     use RefreshDatabase;
 
     private Organization $organization;
+
     private Organization $otherOrganization;
+
     private User $owner;
+
     private User $admin;
+
     private User $user;
+
     private User $otherOrgOwner;
+
     private Extension $extension;
+
     private RingGroup $ringGroup;
+
     private BusinessHoursSchedule $businessHours;
+
     private ConferenceRoom $conferenceRoom;
 
     protected function setUp(): void
@@ -452,7 +461,7 @@ class PhoneNumberControllerTest extends TestCase
         // Create inactive business hours schedule
         $inactiveSchedule = BusinessHoursSchedule::factory()->create([
             'organization_id' => $this->organization->id,
-            'status' => \App\Enums\BusinessHoursStatus::INACTIVE,
+            'status' => BusinessHoursStatus::INACTIVE,
         ]);
 
         $data = [
@@ -541,7 +550,7 @@ class PhoneNumberControllerTest extends TestCase
             ],
         ];
 
-        $response = $this->putJson('/api/v1/phone-numbers/' . $phoneNumber->id, $data);
+        $response = $this->putJson('/api/v1/phone-numbers/'.$phoneNumber->id, $data);
 
         $response->assertStatus(200)
             ->assertJsonFragment([
@@ -570,7 +579,7 @@ class PhoneNumberControllerTest extends TestCase
             'phone_number' => '+12125559999',
         ];
 
-        $response = $this->putJson('/api/v1/phone-numbers/' . $phoneNumber->id, $data);
+        $response = $this->putJson('/api/v1/phone-numbers/'.$phoneNumber->id, $data);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['phone_number']);
@@ -593,7 +602,7 @@ class PhoneNumberControllerTest extends TestCase
             'organization_id' => $this->organization->id,
         ]);
 
-        $response = $this->deleteJson('/api/v1/phone-numbers/' . $phoneNumber->id);
+        $response = $this->deleteJson('/api/v1/phone-numbers/'.$phoneNumber->id);
 
         $response->assertStatus(204);
 
@@ -613,7 +622,7 @@ class PhoneNumberControllerTest extends TestCase
             'organization_id' => $this->organization->id,
         ]);
 
-        $response = $this->deleteJson('/api/v1/phone-numbers/' . $phoneNumber->id);
+        $response = $this->deleteJson('/api/v1/phone-numbers/'.$phoneNumber->id);
 
         $response->assertStatus(403);
 
@@ -710,7 +719,7 @@ class PhoneNumberControllerTest extends TestCase
             'routing_config' => ['extension_id' => $this->extension->id],
         ]);
 
-        $response = $this->getJson('/api/v1/phone-numbers/' . $phoneNumber->id);
+        $response = $this->getJson('/api/v1/phone-numbers/'.$phoneNumber->id);
 
         $response->assertStatus(200)
             ->assertJsonStructure([

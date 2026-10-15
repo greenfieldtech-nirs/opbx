@@ -7,11 +7,12 @@ namespace Database\Factories;
 use App\Enums\QueueCallDisposition;
 use App\Models\CallQueue;
 use App\Models\Organization;
+use App\Models\QueueCall;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\QueueCall>
+ * @extends Factory<QueueCall>
  */
 class QueueCallFactory extends Factory
 {

@@ -23,8 +23,7 @@ class ExtensionCloudonixController extends Controller
 
     public function __construct(
         protected CloudonixSubscriberService $cloudonixSubscriberService
-    ) {
-    }
+    ) {}
 
     /**
      * Compare local extensions with Cloudonix subscribers.
@@ -46,7 +45,7 @@ class ExtensionCloudonixController extends Controller
             $result = $this->cloudonixSubscriberService->compareWithCloudonix($user->organization);
 
             // Log details if successful
-            if (!isset($result['error'])) {
+            if (! isset($result['error'])) {
                 Log::info('Comparison completed successfully', [
                     'request_id' => $requestId,
                     'user_id' => $user->id,
@@ -90,7 +89,7 @@ class ExtensionCloudonixController extends Controller
             // Use the service's bidirectional sync which handles both directions
             $result = $this->cloudonixSubscriberService->bidirectionalSync($user->organization);
 
-            if (!$result['success']) {
+            if (! $result['success']) {
                 throw new \Exception($result['error'] ?? 'Unknown error during sync');
             }
 

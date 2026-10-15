@@ -43,8 +43,9 @@ class DebugVoiceRoutingCache extends Command
         $clear = $this->option('clear');
         $showAll = $this->option('show-all');
 
-        if (!$orgId) {
+        if (! $orgId) {
             $this->error('Organization ID is required. Use --organization-id=<id>');
+
             return 1;
         }
 
@@ -59,7 +60,7 @@ class DebugVoiceRoutingCache extends Command
         if ($clear) {
             $this->clearExtensionCaches($orgId);
             $cacheService->clearOrganizationCache($orgId);
-            $this->info('✅ Cleared all voice routing caches for organization ' . $orgId);
+            $this->info('✅ Cleared all voice routing caches for organization '.$orgId);
         }
 
         // Check specific extension
@@ -84,6 +85,7 @@ class DebugVoiceRoutingCache extends Command
 
         if ($extensions->isEmpty()) {
             $this->warn('No extensions found in database');
+
             return;
         }
 
@@ -127,7 +129,7 @@ class DebugVoiceRoutingCache extends Command
         $cached = Cache::has($cacheKey);
 
         $this->line("Cache key: {$cacheKey}");
-        $this->line("In cache: " . ($cached ? '✅ Yes' : '❌ No'));
+        $this->line('In cache: '.($cached ? '✅ Yes' : '❌ No'));
 
         // Get from cache service
         $extension = $cacheService->getExtension($orgId, $extensionNumber);
@@ -140,7 +142,7 @@ class DebugVoiceRoutingCache extends Command
             $this->line("  Type: {$typeValue}");
             $statusValue = $extension->status?->value ?? $extension->status;
             $this->line("  Status: {$statusValue}");
-            $this->line("  Config: " . json_encode($extension->configuration));
+            $this->line('  Config: '.json_encode($extension->configuration));
         } else {
             $this->error('❌ Extension not found');
         }
@@ -167,9 +169,9 @@ class DebugVoiceRoutingCache extends Command
             }
         }
 
-        $this->info("📊 Cache Status:");
+        $this->info('📊 Cache Status:');
         $this->line("  Total extensions: {$total}");
         $this->line("  Cached extensions: {$cached}");
-        $this->line("  Cache hit rate: " . ($total > 0 ? round(($cached / $total) * 100, 1) : 0) . "%");
+        $this->line('  Cache hit rate: '.($total > 0 ? round(($cached / $total) * 100, 1) : 0).'%');
     }
 }

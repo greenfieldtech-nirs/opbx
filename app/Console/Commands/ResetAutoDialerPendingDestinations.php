@@ -59,6 +59,7 @@ class ResetAutoDialerPendingDestinations extends Command
 
             if (empty($listIds)) {
                 $this->warn('  No lists found for this campaign.');
+
                 continue;
             }
 

@@ -41,9 +41,9 @@ trait AppliesFilters
     /**
      * Apply filters to an Eloquent query based on the provided configuration.
      *
-     * @param Builder $query The query builder to apply filters to
-     * @param Request $request The HTTP request containing filter parameters
-     * @param array $filterConfig Configuration array defining how to apply filters
+     * @param  Builder  $query  The query builder to apply filters to
+     * @param  Request  $request  The HTTP request containing filter parameters
+     * @param  array  $filterConfig  Configuration array defining how to apply filters
      * @return Builder The modified query builder
      */
     protected function applyFilters(Builder $query, Request $request, array $filterConfig): Builder
@@ -72,22 +72,17 @@ trait AppliesFilters
 
     /**
      * Apply an enum-based filter with validation.
-     *
-     * @param Builder $query
-     * @param Request $request
-     * @param string $filterName
-     * @param array $config
      */
     private function applyEnumFilter(Builder $query, Request $request, string $filterName, array $config): void
     {
-        if (!$request->has($filterName)) {
+        if (! $request->has($filterName)) {
             return;
         }
 
         $enumClass = $config['enum'] ?? null;
         $scopeMethod = $config['scope'] ?? null;
 
-        if (!$enumClass || !$scopeMethod) {
+        if (! $enumClass || ! $scopeMethod) {
             return;
         }
 
@@ -101,15 +96,10 @@ trait AppliesFilters
 
     /**
      * Apply a search filter with filled() validation.
-     *
-     * @param Builder $query
-     * @param Request $request
-     * @param string $filterName
-     * @param array $config
      */
     private function applySearchFilter(Builder $query, Request $request, string $filterName, array $config): void
     {
-        if (!$request->has($filterName) || !$request->filled($filterName)) {
+        if (! $request->has($filterName) || ! $request->filled($filterName)) {
             return;
         }
 
@@ -120,21 +110,16 @@ trait AppliesFilters
 
     /**
      * Apply a column-based filter with optional filled() validation.
-     *
-     * @param Builder $query
-     * @param Request $request
-     * @param string $filterName
-     * @param array $config
      */
     private function applyColumnFilter(Builder $query, Request $request, string $filterName, array $config): void
     {
         $requireFilled = $config['require_filled'] ?? false;
 
-        if (!$request->has($filterName)) {
+        if (! $request->has($filterName)) {
             return;
         }
 
-        if ($requireFilled && !$request->filled($filterName)) {
+        if ($requireFilled && ! $request->filled($filterName)) {
             return;
         }
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Logging\CallSiteProcessor;
 use App\Logging\LogTypeEnricher;
 use App\Logging\MaskCredentialsProcessor;

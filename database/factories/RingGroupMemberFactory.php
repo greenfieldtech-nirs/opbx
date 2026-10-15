@@ -6,10 +6,11 @@ namespace Database\Factories;
 
 use App\Models\Extension;
 use App\Models\RingGroup;
+use App\Models\RingGroupMember;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\RingGroupMember>
+ * @extends Factory<RingGroupMember>
  */
 class RingGroupMemberFactory extends Factory
 {

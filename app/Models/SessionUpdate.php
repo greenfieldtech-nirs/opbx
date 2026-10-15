@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\PrunesByRetention;
 use App\Scopes\OrganizationScope;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,12 +29,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $destination
  * @property string $direction
  * @property string $status
- * @property \Carbon\Carbon $session_created_at
- * @property \Carbon\Carbon $session_modified_at
+ * @property Carbon $session_created_at
+ * @property Carbon $session_modified_at
  * @property int|null $call_start_time
- * @property \Carbon\Carbon|null $start_time
+ * @property Carbon|null $start_time
  * @property int|null $call_answer_time
- * @property \Carbon\Carbon|null $answer_time
+ * @property Carbon|null $answer_time
  * @property int|null $time_limit
  * @property string|null $vapp_server
  * @property string $action
@@ -41,9 +42,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $last_error
  * @property array $call_ids
  * @property array $profile
- * @property \Carbon\Carbon $processed_at
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon $processed_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  * @property-read Organization $organization
  */
 #[ScopedBy([OrganizationScope::class])]

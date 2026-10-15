@@ -51,8 +51,8 @@ class ResetCacCounter extends Command
             $redis->set($key, 0);
 
             $this->info("CAC counter reset for campaign {$campaignId}");
-            $this->line("  Previous value: " . ($currentValue ?? 'not set'));
-            $this->line("  New value: 0");
+            $this->line('  Previous value: '.($currentValue ?? 'not set'));
+            $this->line('  New value: 0');
 
             return self::SUCCESS;
         } catch (\Exception $e) {
