@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /worker ./cmd/worker
 
 # Final stage
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk --no-cache add ca-certificates wget \
     && addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
