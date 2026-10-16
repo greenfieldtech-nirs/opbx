@@ -228,11 +228,12 @@ class ConferenceRingAllTest extends TestCase
         // The SECOND offered agent answers first: it must be the one credited.
         $response = $this->agentAnswers($queueCall, $this->secondAgent, 'agent-tok-2');
 
+        // The winner holds until the caller is in the room (it never starts the room itself).
         $content = (string) $response->getContent();
-        $room = 'q'.$queueCall->id;
         $this->assertLessThanOrEqual(16, strlen(app(ConferenceOfferService::class)->roomName($queueCall)));
-        $this->assertStringContainsString('<Conference', $content);
-        $this->assertStringContainsString($room, $content);
+        $this->assertStringNotContainsString('<Conference', $content);
+        $this->assertStringContainsString('<Pause length="1"/>', $content);
+        $this->assertStringContainsString('/voice/queue-agent-join?sd=', $content);
 
         $queueCall->refresh();
         $this->assertNotNull($queueCall->answered_at);
@@ -310,6 +311,75 @@ class ConferenceRingAllTest extends TestCase
         $after = (string) $this->post($joinUrl)->getContent();
         $this->assertStringContainsString('<Conference', $after);
         $this->assertStringContainsString('endConferenceOnExit="true"', $after);
+    }
+
+    private function agentJoinUrl(QueueCall $queueCall, User $agent, int $check = 2): string
+    {
+        return $this->relative(app(ConferenceOfferService::class)
+            ->signedUrl('voice.queue-agent-join', $this->queue, $queueCall, $agent->id, ['check' => $check]));
+    }
+
+    public function test_winner_joins_the_room_only_after_the_caller_was_sent_into_it(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+
+        $waiting = (string) $this->post($this->agentJoinUrl($queueCall, $this->owner), ['Session' => 'agent-tok-1'])->getContent();
+        $this->assertStringNotContainsString('<Conference', $waiting, 'caller not in the room yet: agent keeps holding');
+        $this->assertStringContainsString('<Pause length="1"/>', $waiting);
+        preg_match('#<Redirect>([^<]+)</Redirect>#', $waiting, $next);
+        $context = $offers->verifiedContext(...$this->signedParts(html_entity_decode($next[1])));
+        $this->assertSame(3, $context['check'], 'each hold carries the next check number');
+
+        // The caller is served the room join (application switch or poll).
+        $this->post($this->relative($offers->signedUrl('voice.queue-conference-join', $this->queue, $queueCall)));
+
+        $joined = (string) $this->post($this->agentJoinUrl($queueCall, $this->owner), ['Session' => 'agent-tok-1'])->getContent();
+        $this->assertStringContainsString('>q'.$queueCall->id.'</Conference>', $joined);
+    }
+
+    public function test_agent_join_hangs_up_a_leg_that_is_not_the_winner_or_whose_caller_left(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        app(ConferenceOfferService::class)->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+
+        $notWinner = (string) $this->post($this->agentJoinUrl($queueCall, $this->secondAgent), ['Session' => 'agent-tok-2'])->getContent();
+        $this->assertStringContainsString('<Hangup/>', $notWinner);
+
+        $queueCall->update(['disposition' => 'abandoned']);
+        $callerGone = (string) $this->post($this->agentJoinUrl($queueCall, $this->owner), ['Session' => 'agent-tok-1'])->getContent();
+        $this->assertStringContainsString('<Hangup/>', $callerGone);
+    }
+
+    public function test_agent_waiting_too_long_is_released_and_the_call_re_offered(): void
+    {
+        $this->fakeCloudonix();
+        $queueCall = $this->queueCall();
+        $offers = app(ConferenceOfferService::class);
+        $offers->offer($this->queue, $queueCall, $this->agents());
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
+
+        $response = (string) $this->post($this->agentJoinUrl($queueCall, $this->owner, 30), ['Session' => 'agent-tok-1'])->getContent();
+
+        $this->assertStringContainsString('<Hangup/>', $response);
+        $this->assertNull($offers->winnerOf(self::CALL_ID));
+        $this->assertNull($queueCall->fresh()->answered_at);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'acd-worker:8084/events') && $request['type'] === 'requeue');
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function signedParts(string $url): array
+    {
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        return [(string) $query['sd'], (string) $query['sig']];
     }
 
     private function dialDecision(): array
@@ -625,8 +695,9 @@ class ConferenceRingAllTest extends TestCase
         $queueCall = $this->queueCall();
         $offers = app(ConferenceOfferService::class);
         $offers->offer($this->queue, $queueCall, $this->agents());
-        $agentCxml = (string) $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1')->getContent();
+        $this->agentAnswers($queueCall, $this->owner, 'agent-tok-1');
         $callerCxml = (string) $this->post($this->relative($offers->signedUrl('voice.queue-conference-join', $this->queue, $queueCall)))->getContent();
+        $agentCxml = (string) $this->post($this->agentJoinUrl($queueCall, $this->owner), ['Session' => 'agent-tok-1'])->getContent();
 
         // The agent leaving ends the room, and the caller has no verb after the room: the call ends
         // instead of returning to the queue.

@@ -21,13 +21,19 @@ use Illuminate\Support\Facades\Log;
  * originated and application-switched fetches may not carry it).
  *
  * - agentConnect: fetched by an originated agent session once the agent
- *   answers. The first leg claims the call and joins the room; every other
- *   leg hangs up.
+ *   answers. The first leg claims the call and waits for the caller; every
+ *   other leg hangs up.
+ * - agentJoin: the winner's wait loop. The agent joins the room only once the
+ *   caller was sent into it, so the room starts on the caller's leg: a room
+ *   started by the agent dropped callers arriving from an inbound trunk.
  * - callerJoin: fetched by the caller session after the winner claimed the
  *   call (application switch, or the next poll cycle).
  */
 class QueueConferenceController extends Controller
 {
+    // One-second checks: the caller join is served within ~10s (switch, else the next MOH poll).
+    private const AGENT_WAIT_CHECKS = 30;
+
     public function __construct(
         private readonly ConferenceOfferService $offers,
     ) {}
@@ -49,8 +55,53 @@ class QueueConferenceController extends Controller
             return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
         }
 
+        return $this->agentWait($callQueue, $queueCall, $agentUserId, 1);
+    }
+
+    public function agentJoin(Request $request): Response
+    {
+        [$callQueue, $queueCall, $context] = $this->resolve($request);
+
+        $agentUserId = (int) ($context['agent_user_id'] ?? 0);
+
+        // Caller gone (queue call finalized) or this leg no longer holds the call.
+        if (! $callQueue || ! $queueCall || $agentUserId === 0 || $this->offers->winnerOf($queueCall->call_id) !== $agentUserId) {
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        if ($this->offers->callerJoined($queueCall->call_id)) {
+            return (new CxmlBuilder)
+                ->dialQueueConference($this->offers->roomName($queueCall))
+                ->toResponse();
+        }
+
+        $check = (int) ($context['check'] ?? 1);
+
+        if ($check >= self::AGENT_WAIT_CHECKS) {
+            Log::warning('QueueConferenceController: caller never joined the room, releasing the agent', [
+                'call_id' => $queueCall->call_id,
+                'agent_user_id' => $agentUserId,
+            ]);
+
+            $agentSessionToken = (string) ($request->input('Session') ?: $request->input('CallSid'));
+            if ($agentSessionToken !== '') {
+                $this->offers->releaseWinnerIfUnjoined($queueCall->organization_id, $agentSessionToken);
+            }
+
+            return response(CxmlBuilder::simpleHangup(), 200, ['Content-Type' => 'application/xml']);
+        }
+
+        return $this->agentWait($callQueue, $queueCall, $agentUserId, $check + 1);
+    }
+
+    /**
+     * Silent one-second hold for the winning agent, then the next check.
+     */
+    private function agentWait(CallQueue $callQueue, QueueCall $queueCall, int $agentUserId, int $check): Response
+    {
         return (new CxmlBuilder)
-            ->dialQueueConference($this->offers->roomName($queueCall))
+            ->pause(1)
+            ->redirect($this->offers->signedUrl('voice.queue-agent-join', $callQueue, $queueCall, $agentUserId, ['check' => $check]))
             ->toResponse();
     }
 

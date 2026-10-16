@@ -267,6 +267,11 @@ class ConferenceOfferService
         Redis::setex(self::JOINED_PREFIX.$callId, self::WINNER_TTL_SECONDS, '1');
     }
 
+    public function callerJoined(string $callId): bool
+    {
+        return (bool) Redis::exists(self::JOINED_PREFIX.$callId);
+    }
+
     /**
      * A session ended. If it is the winning agent leg and the caller has not
      * joined the room yet, the pick-up failed: release the winner, undo the
@@ -319,7 +324,7 @@ class ConferenceOfferService
      * HMAC-signed, self-validating URL: originated and application-switched
      * fetches may not carry the voice Bearer auth.
      */
-    public function signedUrl(string $routeName, CallQueue $callQueue, QueueCall $queueCall, ?int $agentUserId = null): string
+    public function signedUrl(string $routeName, CallQueue $callQueue, QueueCall $queueCall, ?int $agentUserId = null, array $extra = []): string
     {
         $payload = json_encode(array_filter([
             'call_queue_id' => $callQueue->id,
@@ -327,7 +332,7 @@ class ConferenceOfferService
             'organization_id' => $callQueue->organization_id,
             'agent_user_id' => $agentUserId,
             'exp' => now()->addSeconds($callQueue->agent_ring_timeout + self::SIGNATURE_GRACE_SECONDS)->getTimestamp(),
-        ], fn ($value) => $value !== null));
+        ] + $extra, fn ($value) => $value !== null));
 
         $baseUrl = rtrim($this->settings($callQueue)?->effective_webhook_base_url ?? config('app.url'), '/');
 
