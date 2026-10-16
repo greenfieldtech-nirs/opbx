@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       const message = getApiErrorMessage(error);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   };
 
@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       const message = getApiErrorMessage(error);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   };
 

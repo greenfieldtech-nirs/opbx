@@ -1051,7 +1051,7 @@ export default function ExtensionsComplete() {
 
     // Handle configuration parsing
     const config = extension.configuration;
-    let ivrId: string | null = null;
+    let ivrId: string | null;
     if (typeof config === 'object' && config) {
       // Configuration is an object
       ivrId = config.ivr_id || config.ivr_menu_id;

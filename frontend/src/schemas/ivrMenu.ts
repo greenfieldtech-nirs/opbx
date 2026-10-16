@@ -35,7 +35,7 @@ const optionSchema = z
   .object({
     input_digits: z.string().min(1, 'Each menu option needs digits').max(IVR_LIMITS.inputDigits, `Digits may not exceed ${IVR_LIMITS.inputDigits} characters`),
     description: z.string().max(IVR_LIMITS.optionDescription, `Option description may not exceed ${IVR_LIMITS.optionDescription} characters`).nullish(),
-    destination_type: z.enum(optionTypes as [string, ...string[]], { errorMap: () => ({ message: 'Invalid option destination type' }) }),
+    destination_type: z.enum(optionTypes as [string, ...string[]], { error: 'Invalid option destination type' }),
     destination_id: z.union([z.string(), z.number()]).nullish(),
     priority: z.number().int().min(1).max(IVR_LIMITS.options.max),
   })

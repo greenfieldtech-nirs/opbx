@@ -6,7 +6,7 @@ This document provides essential information for AI coding agents working in thi
 
 OPBX is an open-source business PBX platform built on Laravel (PHP 8.4) and React (TypeScript).
 - **Backend**: Laravel 12 API with MySQL + Redis
-- **Frontend**: React 18 SPA with Vite, TanStack Query, shadcn/ui
+- **Frontend**: React 19 SPA with Vite, TanStack Query, shadcn/ui
 - **Dialer Worker**: Go-based service for outbound campaigns
 - **AMD Worker**: Java (Vert.x 5) service for stream-based voicemail detection
 - **ACD Worker**: Java (Vert.x 5) service for stateful call queues (FIFO, agent states)
@@ -63,8 +63,8 @@ npm run type-check           # TypeScript check only (tsc --noEmit)
 cd dialer-worker
 make build                   # Build binary
 make run                     # Run locally
-# Local Go older than 1.25? Its go commands rewrite go.mod/go.sum. Use Docker instead:
-docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.25-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
+# Local Go older than 1.27? Its go commands rewrite go.mod/go.sum. Use Docker instead:
+docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.27-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
 ```
 
 ### AMD Worker (Java)

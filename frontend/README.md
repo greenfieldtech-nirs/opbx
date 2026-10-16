@@ -21,9 +21,9 @@ OPBX is a multi-tenant business PBX platform built on Laravel (backend) and Reac
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Framework** | React 18 | UI library with concurrent features |
+| **Framework** | React 19 | UI library with concurrent features |
 | **Language** | TypeScript | Type-safe development (strict mode: off) |
-| **Build Tool** | Vite 7 | Fast dev server and optimized production builds |
+| **Build Tool** | Vite 8 | Fast dev server and optimized production builds |
 | **Routing** | React Router 6 | Declarative routing with lazy loading |
 | **Server State** | TanStack Query 5 | Data fetching, caching, and synchronization |
 | **Client State** | React Context | Global state for Auth and Config |
@@ -167,7 +167,7 @@ Output is written to `frontend/dist/` with:
 ```mermaid
 graph TB
     subgraph "Browser"
-        A[React 18 SPA]
+        A[React 19 SPA]
         B[TanStack Query]
         C[React Context]
         D[React Router]

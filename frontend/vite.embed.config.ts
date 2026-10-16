@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   define: {
@@ -25,12 +25,12 @@ export default defineConfig({
     sourcemap: false,
     cssCodeSplit: false,
     lib: {
-      entry: path.resolve(__dirname, 'src/embed/main.tsx'),
+      entry: path.resolve(import.meta.dirname, 'src/embed/main.tsx'),
       formats: ['iife'],
       name: 'OpbxEmbedWidget',
       fileName: () => 'embed-widget.js',
     },
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         // Stable, unhashed names the iframe HTML can reference directly.
         assetFileNames: (info) =>
