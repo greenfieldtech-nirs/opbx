@@ -224,6 +224,7 @@ final class RingGroupSimultaneousConferenceTest extends TestCase
         $winnerXml = $this->memberAnswers('1006', 'leg-tok-2');
 
         $this->assertStringContainsString('>'.$room[1].'</Conference>', $winnerXml);
+        $this->assertLessThanOrEqual(16, strlen($room[1]));
         $this->assertSame(['leg-tok-1', 'leg-tok-3'], $this->endedSessions());
 
         // A late answer from another member loses.

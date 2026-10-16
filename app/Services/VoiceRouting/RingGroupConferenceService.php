@@ -194,11 +194,12 @@ class RingGroupConferenceService
     }
 
     /**
-     * Room shared by the caller and the member who answers (letters/digits only).
+     * Room shared by the caller and the member who answers: 'r' + 15 hex chars of a hash of the group and
+     * the caller's session, kept within Cloudonix's 16-character conference name limit.
      */
     public function roomName(int $ringGroupId, string $callerToken): string
     {
-        return 'rg'.$ringGroupId.'c'.preg_replace('/[^A-Za-z0-9]/', '', $callerToken);
+        return 'r'.substr(hash('sha256', $ringGroupId.':'.$callerToken), 0, 15);
     }
 
     /**

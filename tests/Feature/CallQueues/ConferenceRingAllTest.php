@@ -229,7 +229,8 @@ class ConferenceRingAllTest extends TestCase
         $response = $this->agentAnswers($queueCall, $this->secondAgent, 'agent-tok-2');
 
         $content = (string) $response->getContent();
-        $room = 'q'.$this->queue->id.'c'.self::CALL_ID;
+        $room = 'q'.$queueCall->id;
+        $this->assertLessThanOrEqual(16, strlen(app(ConferenceOfferService::class)->roomName($queueCall)));
         $this->assertStringContainsString('<Conference', $content);
         $this->assertStringContainsString($room, $content);
 
@@ -411,7 +412,7 @@ class ConferenceRingAllTest extends TestCase
         $content = (string) app(QueuePollController::class)->handle($this->pollRequest())->getContent();
 
         $this->assertStringContainsString('<Conference', $content);
-        $this->assertStringContainsString('q'.$this->queue->id.'c'.self::CALL_ID, $content);
+        $this->assertStringContainsString('>q'.$queueCall->id.'</Conference>', $content);
         $this->assertStringNotContainsString('<Number>', $content);
         Http::assertNotSent(fn ($request) => str_contains($request->url(), '/queue/poll'));
     }

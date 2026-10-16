@@ -307,11 +307,12 @@ class ConferenceOfferService
     }
 
     /**
-     * Room shared by the caller and the winning agent (letters/digits only).
+     * Room shared by the caller and the winning agent: 'q' + the queue call's id (unique per call),
+     * kept within Cloudonix's 16-character conference name limit.
      */
     public function roomName(QueueCall $queueCall): string
     {
-        return 'q'.$queueCall->call_queue_id.'c'.preg_replace('/[^A-Za-z0-9]/', '', $queueCall->call_id);
+        return 'q'.$queueCall->getKey();
     }
 
     /**
