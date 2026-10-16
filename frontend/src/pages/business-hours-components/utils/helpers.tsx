@@ -4,6 +4,7 @@
  * Utility functions for displaying and formatting business hours data.
  */
 
+import type { ReactElement } from 'react';
 import { Phone, Users, Menu, Bot, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -194,7 +195,7 @@ export const getActionDisplayName = (
   extensions: Extension[],
   ringGroups: RingGroup[],
   ivrMenus: IvrMenu[]
-): JSX.Element => {
+): ReactElement => {
   if (!action) return <span className="text-muted-foreground">Not set</span>;
 
   if (typeof action === 'object' && (action as BusinessHoursAction).type && (action as BusinessHoursAction).target_id) {

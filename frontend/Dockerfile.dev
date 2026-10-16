@@ -1,7 +1,7 @@
 # Development Dockerfile for OPBX Frontend
 # Runs Vite dev server with hot-reload for testing
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 # Set working directory
 WORKDIR /app
