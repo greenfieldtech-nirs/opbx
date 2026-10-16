@@ -68,7 +68,7 @@ Who can do this: Owner, PBX Admin, Reporter and Supervisor (Supervisors see only
 |--------|---------------|
 | Caller (first column) | The calling number, with "To: *destination*" underneath. Internal parties are shown as plain extension numbers, external ones in E.164 |
 | Direction | Incoming or outgoing |
-| User | The user whose extension is on the call, or *Unassigned* when the extension has no user (or the call has no extension) |
+| User | The user whose extension is on the call, or *Unassigned* when the extension has no user (or the call has no extension). For a call queue or simultaneous ring group call, the agent or member who answered |
 | Status | Processing, Ringing or Connected |
 | Duration | Time since the session started, for example `4m 12s` |
 | Started | Local time the session started |
@@ -78,6 +78,8 @@ Who can do this: Owner, PBX Admin, Reporter and Supervisor (Supervisors see only
 #### Which calls count as active
 
 A call is listed when its latest session update is **processing**, **ringing** or **connected** and arrived in the **last 30 minutes**. A call that Cloudonix has reported as finished (final CDR or deleted session) in the last 24 hours never comes back, even if a late "active" update arrives. At most 100 calls are returned.
+
+A call queue that rings agents in separate calls, and a simultaneous ring group, start one extra Cloudonix session per agent or member for each caller. These sessions are part of the caller's call, so the list shows one row: the caller's. Spy, Whisper, Barge and Disconnect on that row act on the caller's session, and a Supervisor sees the call when the answering agent is in their scope. The active-call count on the Dashboard counts such a call once.
 
 A call that gets no update for 30 minutes drops off the list even if it is still up. Very long calls with no state change can therefore disappear from the page; they still appear in [Call Logs](/opbx/modules/call-logs) when they end.
 

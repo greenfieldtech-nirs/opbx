@@ -18,6 +18,7 @@ use App\Models\RingGroup;
 use App\Models\RingGroupMember;
 use App\Models\User;
 use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\ConferenceLegLinks;
 use App\Services\VoiceRouting\RingGroupConferenceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -213,6 +214,11 @@ final class RingGroupSimultaneousConferenceTest extends TestCase
         }
         $this->assertCount(3, $this->originations());
         Queue::assertPushed(ExpireRingGroupOfferJob::class);
+        // Live Calls folds the member legs into the caller's row.
+        $this->assertSame(
+            array_fill_keys(['leg-tok-1', 'leg-tok-2', 'leg-tok-3'], $this->token),
+            app(ConferenceLegLinks::class)->callersOf(['leg-tok-1', 'leg-tok-2', 'leg-tok-3'])
+        );
     }
 
     public function test_first_member_to_answer_joins_the_callers_room_and_the_others_are_hung_up(): void

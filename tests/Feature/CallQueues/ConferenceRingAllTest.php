@@ -23,6 +23,7 @@ use App\Services\CallQueue\ConferenceOfferService;
 use App\Services\CallQueue\ExtensionPresenceTracker;
 use App\Services\CallQueue\ImmediateConnectService;
 use App\Services\CallQueue\QueueCallLifecycleService;
+use App\Services\ConferenceLegLinks;
 use App\Services\VoiceRouting\Strategies\QueueRoutingStrategy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -455,6 +456,11 @@ class ConferenceRingAllTest extends TestCase
         $this->assertStringNotContainsString('<Number>', $content);
         $this->assertStringContainsString('<Redirect', $content);
         $this->assertSame(2, $this->originations());
+        // Live Calls folds the agent legs into the caller's row.
+        $this->assertSame(
+            ['agent-tok-1' => self::CALL_ID, 'agent-tok-2' => self::CALL_ID],
+            app(ConferenceLegLinks::class)->callersOf(['agent-tok-1', 'agent-tok-2'])
+        );
     }
 
     public function test_poll_while_offer_pending_holds_without_new_offer(): void

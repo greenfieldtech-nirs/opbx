@@ -10,6 +10,7 @@ use App\Models\CloudonixSettings;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
 use App\Services\CloudonixClient\CloudonixCallsClient;
+use App\Services\ConferenceLegLinks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -108,6 +109,7 @@ class ConferenceOfferService
         $key = self::OFFER_PREFIX.$queueCall->call_id;
         Redis::hmset($key, $sessions);
         Redis::expire($key, $callQueue->agent_ring_timeout + self::OFFER_GRACE_SECONDS);
+        app(ConferenceLegLinks::class)->link($sessions, $queueCall->call_id);
 
         return true;
     }

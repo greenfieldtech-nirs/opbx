@@ -10,6 +10,7 @@ use App\Models\CloudonixSettings;
 use App\Models\RingGroup;
 use App\Services\CloudonixClient\CloudonixCallsClient;
 use App\Services\CloudonixSettingsResolver;
+use App\Services\ConferenceLegLinks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -89,6 +90,7 @@ class RingGroupConferenceService
         foreach ($legs as $extension => $legToken) {
             Redis::setex('rg:leg:'.$legToken, self::TTL_SECONDS, "{$ringGroup->id}|{$callerToken}|{$extension}");
         }
+        app(ConferenceLegLinks::class)->link($legs, $callerToken);
 
         ExpireRingGroupOfferJob::dispatch($ringGroup->id, $ringGroup->organization_id, $callerToken)
             ->delay(now()->addSeconds($timeout + self::GRACE_SECONDS));
