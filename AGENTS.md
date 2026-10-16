@@ -63,8 +63,8 @@ npm run type-check           # TypeScript check only (tsc --noEmit)
 cd dialer-worker
 make build                   # Build binary
 make run                     # Run locally
-# Local Go older than 1.25? Its go commands rewrite go.mod/go.sum. Use Docker instead:
-docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.25-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
+# Local Go older than 1.27? Its go commands rewrite go.mod/go.sum. Use Docker instead:
+docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.27-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
 ```
 
 ### AMD Worker (Java)
