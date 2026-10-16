@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, type FieldPath } from 'react-hook-form';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { Target, ArrowLeft } from 'lucide-react';
@@ -132,8 +132,8 @@ export default function CallTrackingCampaignForm() {
     }
   };
 
-  function FieldError({ name }: { name: string }) {
-    const { error } = form.getFieldState(name as never, form.formState);
+  function FieldError({ name }: { name: FieldPath<FormData> }) {
+    const { error } = form.getFieldState(name, form.formState);
     if (!error) return null;
     return <p className="text-sm text-red-600">{error.message?.toString()}</p>;
   }
