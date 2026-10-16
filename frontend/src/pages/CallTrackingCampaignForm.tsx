@@ -87,7 +87,7 @@ export default function CallTrackingCampaignForm() {
   const createMutation = useCreateCallTrackingCampaign();
   const updateMutation = useUpdateCallTrackingCampaign();
 
-  const form = useForm<FormData>({
+  const form = useForm<z.input<typeof schema>, unknown, FormData>({
     resolver: zodResolver(schema),
     defaultValues: DEFAULT_VALUES,
   });

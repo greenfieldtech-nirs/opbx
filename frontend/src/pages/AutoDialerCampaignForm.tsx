@@ -76,7 +76,7 @@ const campaignSchema = z.object({
       friendly_name: z.string().optional().nullable().transform(val => val || undefined),
       weight: z.number().int().min(1).max(100).optional(),
     })
-  ).max(100, 'Maximum 100 Caller IDs allowed') as z.ZodType<CallerIdPoolItem[]>,
+  ).max(100, 'Maximum 100 Caller IDs allowed') as z.ZodType<CallerIdPoolItem[], CallerIdPoolItem[]>,
   max_dial_attempts: z.number().min(1).max(5).default(1),
   concurrent_active_calls: z.number().min(1).max(50).default(1),
   calls_per_second: z.number().min(1).max(30).default(1),
@@ -100,6 +100,8 @@ const campaignSchema = z.object({
 });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
+// Before defaults/transforms run: what the form fields hold.
+type CampaignFormInput = z.input<typeof campaignSchema>;
 
 
 const timezoneGroups = getTimezonesByRegion();
@@ -197,7 +199,7 @@ export default function AutoDialerCampaignForm() {
     setValue,
     formState: { errors, isDirty },
     reset,
-  } = useForm<CampaignFormData>({
+  } = useForm<CampaignFormInput, unknown, CampaignFormData>({
     resolver: zodResolver(campaignSchema),
     defaultValues: {
       name: '',
