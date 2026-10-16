@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "build:embed": "vite build --config vite.embed.config.ts && mkdir -p ../public/embed/assets && cp dist-embed/embed-widget.js dist-embed/embed-widget.css ../public/embed/assets/",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -59,6 +59,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/vite": "^4.3.3",
@@ -68,16 +69,15 @@
     "@types/node": "^25.0.3",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
-    "@typescript-eslint/eslint-plugin": "^8.8.1",
-    "@typescript-eslint/parser": "^8.8.1",
     "@vitejs/plugin-react": "^4.3.2",
-    "eslint": "^8.57.1",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.12",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
     "jsdom": "^26.1.0",
     "playwright": "^1.58.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.6.2",
+    "typescript-eslint": "^8.71.2",
     "vite": "^7.3.0",
     "vitest": "^4.1.11"
   }

@@ -201,8 +201,8 @@ export const getActionDisplayName = (
     const actionObj = action as BusinessHoursAction;
 
     let targetOption: Extension | RingGroup | IvrMenu | undefined = undefined;
-    let displayName = '';
-    let displayType = '';
+    let displayName: string;
+    let displayType: string;
 
     const numericId = extractNumericId(actionObj.target_id);
 
