@@ -62,7 +62,7 @@ graph TB
 
 | Component | Technology | Role |
 |-----------|------------|------|
-| React SPA | React 18 + TypeScript | User interface for PBX configuration, live calls, reporting, and administration. |
+| React SPA | React 19 + TypeScript | User interface for PBX configuration, live calls, reporting, and administration. |
 | Nginx | nginx:1.27-alpine | Reverse proxy, static asset delivery, WebSocket upgrade routing, and worker proxying. |
 | Laravel | Laravel 12 (PHP 8.4) | REST API, voice routing decisions, webhook processing, multi-tenancy, queues, and broadcasting. |
 | Queue workers and scheduler | Laravel (same image) | `queue-worker` and `queue-worker-long` run background jobs; `scheduler` runs `schedule:run` every minute (retention, CDR tiering, platform health checks). |
