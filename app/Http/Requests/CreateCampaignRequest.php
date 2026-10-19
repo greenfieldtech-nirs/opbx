@@ -106,6 +106,7 @@ class CreateCampaignRequest extends FormRequest
             // Optional Parameters
             'time_limit' => ['nullable', 'integer', 'min:30', 'max:14400'],
             'record_calls' => ['boolean'],
+            'wait_for_available_agents' => ['sometimes', 'boolean'],
 
             // Answering Machine Detection (WebSocket-based)
             'action_voicemail' => ['nullable', 'string', 'in:HANGUP,CONTINUE'],

@@ -89,6 +89,7 @@ const campaignSchema = z.object({
   timezone: z.string().default('UTC'),
   time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 600),
   record_calls: z.boolean().nullish().transform(v => v ?? false),
+  wait_for_available_agents: z.boolean().nullish().transform(v => v ?? false),
   amd_enabled: z.boolean().nullish().transform(v => v ?? false),
   action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
   action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
@@ -220,6 +221,7 @@ export default function AutoDialerCampaignForm() {
       timezone: 'UTC',
       time_limit: 600,
       record_calls: false,
+      wait_for_available_agents: false,
       amd_enabled: false,
       action_voicemail: undefined,
       action_human: undefined,
@@ -234,6 +236,7 @@ export default function AutoDialerCampaignForm() {
   // Watch values for conditional fields
   const callerIdPool = watch('caller_id_pool');
   const callerIdStrategy = watch('caller_id_strategy');
+  const routingType = watch('routing_destination_type');
 
   // An active campaign is never edited: the server answers 409 until it is paused
   const isActiveCampaign = isEditing && existingCampaign?.status === 'active';
@@ -278,6 +281,7 @@ export default function AutoDialerCampaignForm() {
         timezone: existingCampaign.timezone,
         time_limit: existingCampaign.time_limit ?? 600,
         record_calls: existingCampaign.record_calls ?? false,
+        wait_for_available_agents: existingCampaign.wait_for_available_agents ?? false,
         amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
         action_human: (existingCampaign as any).action_human || undefined,
@@ -341,6 +345,8 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
+          // Only meaningful for ring group routing.
+          wait_for_available_agents: data.routing_destination_type === 'ring_group' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -389,6 +395,8 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
+          // Only meaningful for ring group routing.
+          wait_for_available_agents: data.routing_destination_type === 'ring_group' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -531,11 +539,36 @@ export default function AutoDialerCampaignForm() {
 
                   <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
                     {/* Strategy Selector - Left Column */}
-                    <StrategySelector
-                      value={callerIdStrategy}
-                      onChange={(value) => setValue('caller_id_strategy', value)}
-                      disabled={!canModifyPool}
-                    />
+                    <div className="space-y-4">
+                      <StrategySelector
+                        value={callerIdStrategy}
+                        onChange={(value) => setValue('caller_id_strategy', value)}
+                        disabled={!canModifyPool}
+                      />
+
+                      {/* Ring group pacing: hold dialing while every agent is busy */}
+                      <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+                        <div className="space-y-0.5">
+                          <Label
+                            htmlFor="wait_for_available_agents"
+                            className={routingType === 'ring_group' ? '' : 'text-muted-foreground'}
+                          >
+                            Wait for available agents
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {routingType === 'ring_group'
+                              ? 'When every agent in the ring group is on a call, stop dialing until one is available.'
+                              : 'Available when routing to a Ring Group.'}
+                          </p>
+                        </div>
+                        <Switch
+                          id="wait_for_available_agents"
+                          checked={routingType === 'ring_group' && !!watch('wait_for_available_agents')}
+                          onCheckedChange={(checked) => setValue('wait_for_available_agents', checked)}
+                          disabled={routingType !== 'ring_group'}
+                        />
+                      </div>
+                    </div>
 
                     {/* Pool Selector - Right Column */}
                     <div className="space-y-2">

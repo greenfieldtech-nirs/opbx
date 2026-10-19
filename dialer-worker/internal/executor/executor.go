@@ -118,9 +118,10 @@ func (e *Executor) ExecuteCall(ctx context.Context, campaign *models.Campaign, d
 		if _, decErr := e.limiter.DecrementActive(ctx, campaign.ID); decErr != nil {
 			logger.Error("failed to decrement active count after initiation failure", "error", decErr)
 		}
-		// 409: another claim owns this destination. Not a failure; just skip it.
+		// 409: another claim owns this destination, or the ring group has no available agent.
+		// Not a failure; the destination stays pending for a later cycle.
 		if errors.Is(err, apierrors.ErrDestinationConflict) {
-			logger.Info("destination already claimed, skipping")
+			logger.Info("destination not dialable now (claimed elsewhere or waiting for an agent), skipping")
 			return nil
 		}
 		logger.Error("failed to initiate call", "error", err)

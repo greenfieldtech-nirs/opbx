@@ -38,6 +38,7 @@ export interface AutoDialerCampaign {
   // Optional/advanced fields
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
   action_human?: 'HANGUP' | 'CONTINUE' | string;
@@ -85,6 +86,7 @@ export interface CreateCampaignRequest {
   timezone: string;
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
   action_human?: 'HANGUP' | 'CONTINUE' | string;
@@ -120,6 +122,7 @@ export interface UpdateCampaignRequest {
   timezone?: string;
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   action_human?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it

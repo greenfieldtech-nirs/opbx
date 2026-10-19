@@ -61,6 +61,13 @@ OPBX asks the load balancer for an assistant according to its strategy, consider
 
 When the contact answers, OPBX routes the live call to the ring group or queue exactly as it routes an inbound call to it. Agents and members see the **contact's number** as the caller (on a simultaneous ring group and on a queue that rings agents in separate calls), and the call appears in Live Calls and the queue's statistics like any other. Distribution-list metadata is not passed to people. If voicemail detection is on, it runs first, as for any other destination.
 
+#### Wait for available agents
+
+For a ring group, turn on **Wait for available agents** (Basic Info tab, under **Strategy** in Caller ID Configuration; the switch is greyed out for other destinations). While every active member of the ring group is on a call or ringing, the dialer stops placing new calls; the numbers stay pending. When an agent finishes a call, dialing resumes on the dialer's next cycle, so there can be a short gap before the next call.
+
+- The check is "at least one agent is free", not "one call per free agent": with one agent free the dialer can still place up to the campaign's concurrent-call limit (CAC). Lower the CAC to match the size of the team.
+- An agent counts as busy only for calls to their extension (including ringing). Calls the agent places and members that forward to an outside number count as free.
+
 ## Passing list data to the assistant
 
 The **Full Name**, **Batch Identifier** and **metadata columns** you mapped when uploading the [distribution list](/opbx/applications/auto-dialer/distribution-lists) are stored with each number. The metadata is handed to the assistant with each call:

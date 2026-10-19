@@ -117,6 +117,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 | Calls per second (CPS) | 1 to 30. Default: 1 |
 | Max dial attempts | 1 to 5. Form default: 1 |
 | Record calls | Off by default |
+| Wait for available agents | Ring Group routing only, off by default. While every active member extension of the ring group is on a call (or ringing), the dialer places no new calls; dialing resumes on the next dialer cycle after an agent frees up |
 | Voicemail, human and unknown actions | `HANGUP` or `CONTINUE`, or empty (treated as Hang up while any action is set). Empty on all three means no detection |
 | Retry on voicemail | Off by default |
 | Retry on busy / no-answer | `retry_on_busy_no_answer`, off by default. Cancelled and failed calls are never retried |
@@ -154,7 +155,7 @@ Remove the reference from the campaign first. See [Phone Numbers](/opbx/modules/
 | `auto_start` | Boolean |
 | `routing_destination_type`, `routing_destination_id` | `ai_assistant`, `ai_load_balancer`, `ring_group`, `call_queue` or `hangup`, and the target id |
 | `caller_id`, `caller_id_strategy`, `caller_id_pool_enabled` | Main caller ID and pool settings |
-| `dial_timeout`, `time_limit`, `destination_connect`, `record_calls` | Call settings |
+| `dial_timeout`, `time_limit`, `destination_connect`, `record_calls`, `wait_for_available_agents` | Call settings |
 | `max_dial_attempts`, `concurrent_active_calls`, `calls_per_second` | Limits |
 | `timezone`, `start_date`, `end_date`, `schedule` | The schedule. `schedule` is the weekly JSON that the dialer reads |
 | `days_active`, `start_time`, `end_time` | Older single-window fields derived from `schedule`; used by auto-start |
