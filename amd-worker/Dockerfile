@@ -7,7 +7,7 @@ COPY src ./src
 RUN mvn package -DskipTests -B
 
 # Runtime stage
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:23-jre
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/target/amd-worker-1.0.0.jar ./app.jar
