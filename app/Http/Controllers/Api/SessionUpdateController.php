@@ -122,21 +122,32 @@ class SessionUpdateController extends Controller
             // extension or an external phone number. Strip the "+" back off for
             // display when the value is actually one of this organization's
             // extension numbers, so internal legs read as plain extensions.
-            $extensionNumbers = Extension::pluck('extension_number')
-                ->map(fn ($number) => (string) $number)
-                ->flip();
+            $userNamesByExtension = Extension::with('user:id,name')
+                ->get(['id', 'extension_number', 'user_id'])
+                ->mapWithKeys(fn ($extension) => [(string) $extension->extension_number => $extension->user?->name]);
 
-            $formatParty = function (?string $value) use ($extensionNumbers) {
+            $formatParty = function (?string $value) use ($userNamesByExtension) {
                 if ($value === null) {
                     return $value;
                 }
 
                 $stripped = ltrim($value, '+');
 
-                return $extensionNumbers->has($stripped) ? $stripped : $value;
+                return $userNamesByExtension->has($stripped) ? $stripped : $value;
             };
 
-            $calls = array_map(function ($call) use ($userNamesBySubscriberId, $formatParty) {
+            // A queue/ring group call shows the agent who answered its originated leg.
+            $answeredBy = function ($call) use ($userNamesByExtension): ?string {
+                foreach ($call->legs ?? [] as $leg) {
+                    if (in_array($leg->status, ['connected', 'answer'], true)) {
+                        return $userNamesByExtension->get(ltrim((string) $leg->destination, '+'));
+                    }
+                }
+
+                return null;
+            };
+
+            $calls = array_map(function ($call) use ($userNamesBySubscriberId, $formatParty, $answeredBy) {
                 try {
                     $callIds = json_decode($call->call_ids ?? '[]', true);
                     $profile = json_decode($call->profile ?? '{}', true);
@@ -161,9 +172,9 @@ class SessionUpdateController extends Controller
                         'subscriber_id' => $call->subscriber_id,
                         'call_ids' => is_array($callIds) ? $callIds : [],
                         'has_qos_data' => isset($profile['qos']),
-                        'user_full_name' => $call->subscriber_id
+                        'user_full_name' => $answeredBy($call) ?? ($call->subscriber_id
                             ? ($userNamesBySubscriberId->get((string) $call->subscriber_id) ?? 'Unassigned')
-                            : 'Unassigned',
+                            : 'Unassigned'),
                     ];
                 } catch (\Exception $e) {
                     // Log the error and return a minimal response for this call
@@ -225,9 +236,7 @@ class SessionUpdateController extends Controller
 
         // A Supervisor only sees sessions that involve their scope (anything else reads as not found).
         $identifiers = app(SupervisorFilterService::class)->scopeFor(auth()->user());
-        if ($identifiers !== null && ! SessionUpdate::where('session_id', $sessionId)
-            ->where(fn ($q) => $q->whereIn('caller_id', $identifiers)->orWhereIn('destination', $identifiers))
-            ->exists()) {
+        if (! $this->inSupervisorScope($sessionId, $identifiers)) {
             return response()->json(['message' => 'Session not found', 'session_id' => $sessionId], 404);
         }
 
@@ -307,6 +316,26 @@ class SessionUpdateController extends Controller
                 'longest_call' => (int) $longestCall,
             ],
         ]);
+    }
+
+    /**
+     * Supervisor scope for one session: one of its own rows matches the scope, or it is an active
+     * call listed for the supervisor (where the match can be a folded leg, e.g. the queue agent).
+     *
+     * @param  array<int, string>|null  $identifiers  null = unrestricted
+     */
+    private function inSupervisorScope(int $sessionId, ?array $identifiers): bool
+    {
+        if ($identifiers === null) {
+            return true;
+        }
+
+        return ($identifiers !== [] && SessionUpdate::where('session_id', $sessionId)
+            ->where(fn ($q) => $q->whereIn('caller_id', $identifiers)->orWhereIn('destination', $identifiers))
+            ->exists())
+            || app(ActiveCallsService::class)
+                ->forOrganization((int) auth()->user()->organization_id, $identifiers)
+                ->contains('session_id', $sessionId);
     }
 
     /**
@@ -572,11 +601,7 @@ class SessionUpdateController extends Controller
 
         // Supervisors may only coach sessions within their assigned scope.
         if ($roleValue === 'supervisor') {
-            $identifiers = $filter->resourceIdentifiers($user);
-            $inScope = in_array((string) $session->caller_id, $identifiers, true)
-                || in_array((string) $session->destination, $identifiers, true);
-
-            if (! $inScope) {
+            if (! $this->inSupervisorScope($sessionId, $filter->resourceIdentifiers($user))) {
                 return response()->json([
                     'error' => 'Forbidden',
                     'message' => 'This call is outside your supervised scope',
@@ -593,7 +618,10 @@ class SessionUpdateController extends Controller
         }
 
         $policy = $request->validated('policy');
-        $token = $session->session_token;
+        // An originated queue agent / ring group member leg is coached through the caller it serves.
+        $caller = app(ActiveCallsService::class)->forOrganization((int) $user->organization_id)
+            ->first(fn ($call) => collect($call->legs)->contains('session_id', $sessionId));
+        $token = $caller->session_token ?? $session->session_token;
 
         $destination = match ($policy) {
             'spy' => "spy_{$token}",

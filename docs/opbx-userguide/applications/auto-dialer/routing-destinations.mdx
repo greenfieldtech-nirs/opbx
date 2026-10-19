@@ -3,12 +3,12 @@ sidebar_position: 8
 slug: /applications/auto-dialer/routing-destinations
 sidebar_class_name: cxGuidesSidebar
 title: Campaign Routing
-description: Where an answered auto-dialer call goes - AI assistant, AI load balancer or hangup - and how list metadata reaches it
+description: Where an answered auto-dialer call goes - AI assistant, AI load balancer, ring group, call queue or hangup - and how list metadata reaches it
 ---
 
 # Campaign Routing
 
-Every campaign has one **routing destination**. When a callee answers, Cloudonix connects the call there. A campaign can route to an **AI assistant**, an **AI load balancer**, or **Hang Up**.
+Every campaign has one **routing destination**. When a callee answers, Cloudonix connects the call there. A campaign can route to an **AI assistant**, an **AI load balancer**, a **ring group**, a **call queue**, or **Hang Up**.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Choose the routing destination to decide who talks to the people your campaign c
 
 ## Prerequisites
 
-- The destination exists in your organization: an [AI assistant](/opbx/modules/ai-assistants) or an [AI load balancer](/opbx/modules/ai-load-balancers) with active members.
+- The destination exists in your organization: an [AI assistant](/opbx/modules/ai-assistants), an [AI load balancer](/opbx/modules/ai-load-balancers) with active members, a [ring group](/opbx/modules/ring-groups) or a [call queue](/opbx/modules/call-queues).
 - A campaign in **Draft** or **Paused** status. See [Managing Campaigns](/opbx/applications/auto-dialer/campaigns).
 
 ## Set the destination
@@ -25,15 +25,15 @@ Who can do this: Owner and PBX Admin.
 
 1. Open **Auto Dialer → Campaign Manager**. Pause the campaign if it is Running.
 2. Click **Edit** on the campaign (or **Create Campaign** for a new one). The form opens on the **Basic Info** tab.
-3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer** or **Hang Up**. Changing the type clears the previous selection.
-4. Under **Select Destination**, choose the assistant or load balancer. **Hang Up** needs no selection.
+3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer**, **Ring Group**, **Call Queue** or **Hang Up**. Changing the type clears the previous selection.
+4. Under **Select Destination**, choose the assistant, load balancer, ring group or queue. **Hang Up** needs no selection.
 5. Click **Update Campaign** (or **Create Campaign**).
 
-Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears and the **Routing** column of Campaign Manager shows **AI Assistant**, **AI Load Balancer** or **Hang Up**. Without a selection for an assistant or load balancer the save is refused with "A destination ID is required when routing to AI Assistant or AI Load Balancer." on create.
+Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears and the **Routing** column of Campaign Manager shows the type you chose. Without a destination (any type except **Hang Up**) the save is refused with "A destination is required unless the campaign hangs up." on create.
 
 ![Basic Info tab with Routing Destination = AI Assistant and Select Destination open, listing Aria - Front Desk Receptionist and Max - Support Triage](../../img/screens/auto-dialer-routing-selector.jpg)
 
-The campaign form has no **Disconnect** or "Destination unavailable" choice: a campaign is always routed to one of the three types below.
+The campaign form has no **Disconnect** or "Destination unavailable" choice: a campaign is always routed to one of the types below.
 
 ## Destination types
 
@@ -41,6 +41,8 @@ The campaign form has no **Disconnect** or "Destination unavailable" choice: a c
 |------|-------------------------|-------------|
 | AI Assistant | One AI assistant, over SIP or WebSocket depending on how the assistant is set up | A single assistant handles the campaign |
 | AI Load Balancer | One of the load balancer's active assistants, picked by its strategy, with failover to the next one | Higher volume, redundancy |
+| Ring Group | The ring group's members, rung with the ring group's own strategy, timeout and fallback | Hand answered contacts to a team of people |
+| Call Queue | The call queue: the contact waits on hold until an agent takes the call, as an inbound caller would | Callback and outreach campaigns staffed by agents |
 | Hang Up | The call is ended as soon as it is answered | Testing the dialer, schedule and rates without using an assistant |
 
 ### AI assistant over SIP
@@ -54,6 +56,18 @@ The call audio is streamed to the provider's WebSocket address, built from the p
 ### AI load balancer
 
 OPBX asks the load balancer for an assistant according to its strategy, considering only **active** members whose assistant is **active**. It also gives Cloudonix a follow-through address: if that assistant fails (busy, no answer and so on), the next assistant is tried. If no member is available, the call is hung up.
+
+### Ring group and call queue
+
+When the contact answers, OPBX routes the live call to the ring group or queue exactly as it routes an inbound call to it. Agents and members see the **contact's number** as the caller (on a simultaneous ring group and on a queue that rings agents in separate calls), and the call appears in Live Calls and the queue's statistics like any other. Distribution-list metadata is not passed to people. If voicemail detection is on, it runs first, as for any other destination.
+
+#### Wait for available agents
+
+For a call queue, turn on **Wait for available agents** (Basic Info tab, under **Strategy** in Caller ID Configuration; the switch is greyed out for other destinations). While no agent of the queue is available, the dialer stops placing new calls and the numbers stay pending. When an agent becomes available, dialing resumes on the dialer's next cycle, so there can be a short gap before the next call.
+
+- An agent is available when the queue shows them **Available** (logged in, not on a queue call, not in wrap-up) and their extension is not on another call. Logged-out agents never count, so a campaign with no agent logged in does not dial.
+- The check is "at least one agent is available", not "one call per available agent": with one agent available the dialer can still place up to the campaign's concurrent-call limit (CAC). Contacts beyond that wait in the queue on hold; lower the CAC to match the size of the team.
+- If the queue service is unreachable, the campaign keeps dialing as if the setting were off.
 
 ## Passing list data to the assistant
 
@@ -69,11 +83,11 @@ The metadata is kept when a load balancer fails over to another assistant. Numbe
 
 ## What happens if the destination is missing
 
-The destination is checked when the call is placed, not when you save the campaign. If the assistant or load balancer no longer exists, belongs to another organization, or (for a load balancer) has no available member, the callee answers and the call is **hung up at once**. Check the campaign's routing before you start it.
+The destination is checked when the call is placed, not when you save the campaign. If the assistant, load balancer, ring group or queue no longer exists, belongs to another organization, or (for a load balancer) has no available member, the callee answers and the call is **hung up at once**. An inactive ring group or queue plays its unavailable message instead. Check the campaign's routing before you start it.
 
 ## Deleting a destination that a campaign uses
 
-An AI assistant or AI load balancer that a campaign routes to cannot be deleted. The delete is refused and the **Cannot delete: still in use** dialog lists the campaign. Change the campaign's routing (pause it first if it is running), then delete again. Archived and completed campaigns count too.
+An AI assistant, AI load balancer, ring group or call queue that a campaign routes to cannot be deleted. The delete is refused and the **Cannot delete: still in use** dialog lists the campaign. Change the campaign's routing (pause it first if it is running), then delete again. Archived and completed campaigns count too.
 
 ![Cannot delete: still in use dialog for the AI assistant Aria, listing the auto-dialer campaign Fall Webinar Follow-up among its references](../../img/screens/ai-assistants-in-use-dialog.jpg)
 

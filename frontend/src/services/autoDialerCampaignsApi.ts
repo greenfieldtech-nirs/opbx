@@ -16,7 +16,7 @@ export interface AutoDialerCampaign {
   status: 'draft' | 'active' | 'paused' | 'completed' | 'archived';
   status_label: string;
   auto_start: boolean;
-  routing_destination_type: 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+  routing_destination_type: 'ai_assistant' | 'ai_load_balancer' | 'ring_group' | 'call_queue' | 'hangup';
   routing_destination_label: string;
   routing_destination_id: string | null;
   dial_timeout: number;
@@ -38,6 +38,7 @@ export interface AutoDialerCampaign {
   // Optional/advanced fields
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
   action_human?: 'HANGUP' | 'CONTINUE' | string;
@@ -63,7 +64,7 @@ export interface AutoDialerCampaign {
 export interface CreateCampaignRequest {
   name: string;
   description?: string;
-  routing_destination_type: 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+  routing_destination_type: 'ai_assistant' | 'ai_load_balancer' | 'ring_group' | 'call_queue' | 'hangup';
   routing_destination_id?: string;
   dial_timeout: number;
   destination_connect: 'connected' | 'immediately';
@@ -85,6 +86,7 @@ export interface CreateCampaignRequest {
   timezone: string;
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string;
   action_human?: 'HANGUP' | 'CONTINUE' | string;
@@ -98,7 +100,7 @@ export interface CreateCampaignRequest {
 export interface UpdateCampaignRequest {
   name?: string;
   description?: string;
-  routing_destination_type?: 'ai_assistant' | 'ai_load_balancer' | 'hangup';
+  routing_destination_type?: 'ai_assistant' | 'ai_load_balancer' | 'ring_group' | 'call_queue' | 'hangup';
   routing_destination_id?: string;
   dial_timeout?: number;
   destination_connect?: 'connected' | 'immediately';
@@ -120,6 +122,7 @@ export interface UpdateCampaignRequest {
   timezone?: string;
   time_limit?: number;
   record_calls?: boolean;
+  wait_for_available_agents?: boolean;
   // WebSocket-based AMD action fields
   action_voicemail?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it
   action_human?: 'HANGUP' | 'CONTINUE' | string | null; // null clears it

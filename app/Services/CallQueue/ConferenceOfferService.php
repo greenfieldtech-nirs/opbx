@@ -10,6 +10,7 @@ use App\Models\CloudonixSettings;
 use App\Models\QueueCall;
 use App\Scopes\OrganizationScope;
 use App\Services\CloudonixClient\CloudonixCallsClient;
+use App\Services\ConferenceLegLinks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -108,6 +109,7 @@ class ConferenceOfferService
         $key = self::OFFER_PREFIX.$queueCall->call_id;
         Redis::hmset($key, $sessions);
         Redis::expire($key, $callQueue->agent_ring_timeout + self::OFFER_GRACE_SECONDS);
+        app(ConferenceLegLinks::class)->link($sessions, $queueCall->call_id);
 
         return true;
     }
@@ -267,6 +269,11 @@ class ConferenceOfferService
         Redis::setex(self::JOINED_PREFIX.$callId, self::WINNER_TTL_SECONDS, '1');
     }
 
+    public function callerJoined(string $callId): bool
+    {
+        return (bool) Redis::exists(self::JOINED_PREFIX.$callId);
+    }
+
     /**
      * A session ended. If it is the winning agent leg and the caller has not
      * joined the room yet, the pick-up failed: release the winner, undo the
@@ -307,18 +314,19 @@ class ConferenceOfferService
     }
 
     /**
-     * Room shared by the caller and the winning agent (letters/digits only).
+     * Room shared by the caller and the winning agent: 'q' + the queue call's id (unique per call),
+     * kept within Cloudonix's 16-character conference name limit.
      */
     public function roomName(QueueCall $queueCall): string
     {
-        return 'q'.$queueCall->call_queue_id.'c'.preg_replace('/[^A-Za-z0-9]/', '', $queueCall->call_id);
+        return 'q'.$queueCall->getKey();
     }
 
     /**
      * HMAC-signed, self-validating URL: originated and application-switched
      * fetches may not carry the voice Bearer auth.
      */
-    public function signedUrl(string $routeName, CallQueue $callQueue, QueueCall $queueCall, ?int $agentUserId = null): string
+    public function signedUrl(string $routeName, CallQueue $callQueue, QueueCall $queueCall, ?int $agentUserId = null, array $extra = []): string
     {
         $payload = json_encode(array_filter([
             'call_queue_id' => $callQueue->id,
@@ -326,7 +334,7 @@ class ConferenceOfferService
             'organization_id' => $callQueue->organization_id,
             'agent_user_id' => $agentUserId,
             'exp' => now()->addSeconds($callQueue->agent_ring_timeout + self::SIGNATURE_GRACE_SECONDS)->getTimestamp(),
-        ], fn ($value) => $value !== null));
+        ] + $extra, fn ($value) => $value !== null));
 
         $baseUrl = rtrim($this->settings($callQueue)?->effective_webhook_base_url ?? config('app.url'), '/');
 

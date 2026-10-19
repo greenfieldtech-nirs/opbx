@@ -113,6 +113,7 @@ class UpdateCampaignRequest extends FormRequest
             // Optional Parameters
             'time_limit' => ['sometimes', 'nullable', 'integer', 'min:30', 'max:14400'],
             'record_calls' => ['sometimes', 'boolean'],
+            'wait_for_available_agents' => ['sometimes', 'boolean'],
 
             // Answering Machine Detection (WebSocket-based)
             'action_voicemail' => ['sometimes', 'nullable', 'string', 'in:HANGUP,CONTINUE'],
@@ -140,6 +141,8 @@ class UpdateCampaignRequest extends FormRequest
         $table = match ($this->input('routing_destination_type') ?? $this->route('campaign')?->routing_destination_type?->value) {
             'ai_assistant' => 'ai_assistants',
             'ai_load_balancer' => 'ai_assistant_load_balancers',
+            'ring_group' => 'ring_groups',
+            'call_queue' => 'call_queues',
             default => null,
         };
 

@@ -61,7 +61,7 @@ import {
 // for nullable database fields, but react-hook-form/zod need clean defaults.
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
-  routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
+  routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'ring_group', 'call_queue', 'hangup']),
   routing_destination_id: z.string().nullish(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
@@ -89,6 +89,7 @@ const campaignSchema = z.object({
   timezone: z.string().default('UTC'),
   time_limit: z.number().min(30).max(14400).nullish().transform(v => v ?? 600),
   record_calls: z.boolean().nullish().transform(v => v ?? false),
+  wait_for_available_agents: z.boolean().nullish().transform(v => v ?? false),
   amd_enabled: z.boolean().nullish().transform(v => v ?? false),
   action_voicemail: z.enum(['HANGUP', 'CONTINUE']).optional(),
   action_human: z.enum(['HANGUP', 'CONTINUE']).optional(),
@@ -220,6 +221,7 @@ export default function AutoDialerCampaignForm() {
       timezone: 'UTC',
       time_limit: 600,
       record_calls: false,
+      wait_for_available_agents: false,
       amd_enabled: false,
       action_voicemail: undefined,
       action_human: undefined,
@@ -234,6 +236,7 @@ export default function AutoDialerCampaignForm() {
   // Watch values for conditional fields
   const callerIdPool = watch('caller_id_pool');
   const callerIdStrategy = watch('caller_id_strategy');
+  const routingType = watch('routing_destination_type');
 
   // An active campaign is never edited: the server answers 409 until it is paused
   const isActiveCampaign = isEditing && existingCampaign?.status === 'active';
@@ -278,6 +281,7 @@ export default function AutoDialerCampaignForm() {
         timezone: existingCampaign.timezone,
         time_limit: existingCampaign.time_limit ?? 600,
         record_calls: existingCampaign.record_calls ?? false,
+        wait_for_available_agents: existingCampaign.wait_for_available_agents ?? false,
         amd_enabled: !!(existingCampaign as any).action_voicemail || !!(existingCampaign as any).action_human || !!(existingCampaign as any).action_unknown,
         action_voicemail: (existingCampaign as any).action_voicemail || undefined,
         action_human: (existingCampaign as any).action_human || undefined,
@@ -341,6 +345,8 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
+          // Only meaningful for call queue routing.
+          wait_for_available_agents: data.routing_destination_type === 'call_queue' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -389,6 +395,8 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
+          // Only meaningful for call queue routing.
+          wait_for_available_agents: data.routing_destination_type === 'call_queue' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -492,7 +500,7 @@ export default function AutoDialerCampaignForm() {
                     typeValue={watch('routing_destination_type') as DestinationType}
                     destinationValue={watch('routing_destination_id') || undefined}
                     onChange={(type, destinationId) => {
-                      setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
+                      setValue('routing_destination_type', type as CampaignFormData['routing_destination_type']);
                       setValue('routing_destination_id', destinationId || null);
                     }}
                     layout="horizontal"
@@ -500,7 +508,7 @@ export default function AutoDialerCampaignForm() {
                     destinationClassName="flex-1 min-w-0"
                     typeLabel="Routing Destination"
                     destinationLabel="Select Destination"
-                    allowedTypes={['ai_assistant', 'ai_load_balancer']}
+                    allowedTypes={['ai_assistant', 'ai_load_balancer', 'ring_group', 'call_queue']}
                     includeHangup={true}
                   />
                 </div>
@@ -531,11 +539,36 @@ export default function AutoDialerCampaignForm() {
 
                   <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
                     {/* Strategy Selector - Left Column */}
-                    <StrategySelector
-                      value={callerIdStrategy}
-                      onChange={(value) => setValue('caller_id_strategy', value)}
-                      disabled={!canModifyPool}
-                    />
+                    <div className="space-y-4">
+                      <StrategySelector
+                        value={callerIdStrategy}
+                        onChange={(value) => setValue('caller_id_strategy', value)}
+                        disabled={!canModifyPool}
+                      />
+
+                      {/* Call queue pacing: hold dialing while no queue agent is available */}
+                      <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+                        <div className="space-y-0.5">
+                          <Label
+                            htmlFor="wait_for_available_agents"
+                            className={routingType === 'call_queue' ? '' : 'text-muted-foreground'}
+                          >
+                            Wait for available agents
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {routingType === 'call_queue'
+                              ? 'When no agent in the queue is available (all are on calls, in wrap-up or logged out), stop dialing until one is.'
+                              : 'Available when routing to a Call Queue.'}
+                          </p>
+                        </div>
+                        <Switch
+                          id="wait_for_available_agents"
+                          checked={routingType === 'call_queue' && !!watch('wait_for_available_agents')}
+                          onCheckedChange={(checked) => setValue('wait_for_available_agents', checked)}
+                          disabled={routingType !== 'call_queue'}
+                        />
+                      </div>
+                    </div>
 
                     {/* Pool Selector - Right Column */}
                     <div className="space-y-2">

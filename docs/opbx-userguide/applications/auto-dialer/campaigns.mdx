@@ -274,7 +274,7 @@ For an Owner or PBX Admin each assigned list has **Unassign**, which takes the l
 | The caller ID field is required | No number is in the caller-ID pool | Add at least one number to the pool |
 | Caller ID must be in E.164 format | The main caller ID sent through the API is not E.164 | Use `+` and the country code |
 | Invalid Caller ID pool: some DIDs do not exist, do not belong to your organization, or are not active | A pool number is inactive or not yours | Activate the number or remove it |
-| A destination ID is required when routing to AI Assistant or AI Load Balancer | No destination picked | Pick the assistant or load balancer |
+| A destination is required unless the campaign hangs up | No destination picked | Pick the assistant, load balancer, ring group or call queue |
 | The start date must be a date after or equal to today | Start date in the past on create | Pick today or later |
 | Pause the campaign before editing it. | Edit sent while Running; nothing was changed | Pause, then edit |
 | Cannot start campaign without a destination list | No list assigned, or the assigned list is not Ready or In Use | Assign a Ready list |

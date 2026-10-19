@@ -72,6 +72,8 @@ properties:
           enum:
           - ai_assistant
           - ai_load_balancer
+          - ring_group
+          - call_queue
           - hangup
           description: Routing destination type
           example: ai_assistant

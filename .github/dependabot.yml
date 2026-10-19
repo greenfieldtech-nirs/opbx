@@ -1,7 +1,10 @@
 version: 2
+# Feature work lands on develop, which is merged into main; dependency PRs follow the same path.
+# Dependabot reads this file from the default branch (main), so changes here apply once merged there.
 updates:
   - package-ecosystem: composer
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     groups:
@@ -10,6 +13,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /frontend
+    target-branch: develop
     schedule:
       interval: weekly
     groups:
@@ -18,6 +22,7 @@ updates:
 
   - package-ecosystem: npm
     directory: /mcp-server
+    target-branch: develop
     schedule:
       interval: weekly
     groups:
@@ -26,6 +31,7 @@ updates:
 
   - package-ecosystem: gomod
     directory: /dialer-worker
+    target-branch: develop
     schedule:
       interval: weekly
     groups:
@@ -34,40 +40,48 @@ updates:
 
   - package-ecosystem: maven
     directory: /amd-worker
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: maven
     directory: /acd-worker
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /dialer-worker
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /amd-worker
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /acd-worker
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: docker
     directory: /mcp-server
+    target-branch: develop
     schedule:
       interval: weekly
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly

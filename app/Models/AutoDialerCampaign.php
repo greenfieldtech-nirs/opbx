@@ -76,6 +76,7 @@ class AutoDialerCampaign extends Model
         'schedule', // Full weekly schedule
         'time_limit',
         'record_calls',
+        'wait_for_available_agents',
         'action_voicemail',
         'action_human',
         'action_unknown',
@@ -110,6 +111,7 @@ class AutoDialerCampaign extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'record_calls' => 'boolean',
+        'wait_for_available_agents' => 'boolean',
         'retry_on_voicemail' => 'boolean',
         'retry_on_busy_no_answer' => 'boolean',
         'retry_delay_minutes' => 'integer',

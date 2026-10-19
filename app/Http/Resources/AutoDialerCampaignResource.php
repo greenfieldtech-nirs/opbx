@@ -57,6 +57,7 @@ class AutoDialerCampaignResource extends JsonResource
             // Recording, Time Limit & AMD Actions
             'time_limit' => $this->time_limit,
             'record_calls' => $this->record_calls,
+            'wait_for_available_agents' => (bool) $this->wait_for_available_agents,
             'action_voicemail' => $this->action_voicemail,
             'action_human' => $this->action_human,
             'action_unknown' => $this->action_unknown,

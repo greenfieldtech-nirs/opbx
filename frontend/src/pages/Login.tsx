@@ -91,9 +91,8 @@ export default function Login() {
         <div className="min-h-screen bg-white" style={{fontFamily: 'Roboto, sans-serif'}}>
             <div className="grid lg:grid-cols-2 min-h-screen">
                 {/* Left Side - Branding & Welcome */}
-                <div className="relative flex flex-col justify-center bg-gray-900">
+                <div className="relative bg-gray-900">
                     <AuroraBackgroundProvider
-                        className="flex items-center justify-center"
                         colors={['#3A29FF', '#00003a', '#030118']}
                         numBubbles={2}
                         animDuration={3}
@@ -101,20 +100,23 @@ export default function Login() {
                         bgColor="#000000"
                         useRandomness={true}
                     >
-                        <div className="relative z-10 max-w-lg mx-auto space-y-8">
-                            {/* Logo */}
-                            <div className="flex items-center justify-center mb-8">
-                                <img src={opbxLogo} alt="OPBX Logo" className="h-32 w-auto"/>
-                            </div>
+                        {/* aurora-background 2.x fills the column; center the content inside it. */}
+                        <div className="flex h-full items-center justify-center p-12">
+                            <div className="relative z-10 max-w-lg mx-auto space-y-8">
+                                {/* Logo */}
+                                <div className="flex items-center justify-center mb-8">
+                                    <img src={opbxLogo} alt="OPBX Logo" className="h-32 w-auto"/>
+                                </div>
 
-                            {/* Welcome Message */}
-                            <div className="space-y-4 text-center">
-                                <p className="text-xl text-blue-200 mt-4">
-                                    Open-source Business PBX powered by Cloudonix
-                                </p>
-                                <p className="text-lg text-gray-400">
-                                    Professional PBX solution for modern businesses
-                                </p>
+                                {/* Welcome Message */}
+                                <div className="space-y-4 text-center">
+                                    <p className="text-xl text-blue-200 mt-4">
+                                        Open-source Business PBX powered by Cloudonix
+                                    </p>
+                                    <p className="text-lg text-gray-400">
+                                        Professional PBX solution for modern businesses
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </AuroraBackgroundProvider>

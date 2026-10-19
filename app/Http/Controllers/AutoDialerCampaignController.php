@@ -523,6 +523,7 @@ class AutoDialerCampaignController extends Controller
             'timezone' => $data['timezone'],
             'time_limit' => $data['time_limit'] ?? AutoDialerCampaign::DEFAULT_TIME_LIMIT,
             'record_calls' => $data['record_calls'] ?? false,
+            'wait_for_available_agents' => $data['wait_for_available_agents'] ?? false,
             'action_voicemail' => $data['action_voicemail'] ?? null,
             'action_human' => $data['action_human'] ?? null,
             'action_unknown' => $data['action_unknown'] ?? null,

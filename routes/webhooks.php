@@ -53,6 +53,7 @@ Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function 
 
 use App\Http\Controllers\Voice\AlbsFollowThroughController;
 use App\Http\Controllers\Voice\AmdActionController;
+use App\Http\Controllers\Voice\CampaignRouteController;
 use App\Http\Controllers\Voice\QueueConferenceController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
 use App\Http\Controllers\Voice\QueueImmediateDialController;
@@ -119,6 +120,8 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
     // originated agent legs claim the call; the caller joins the winner's room.
     Route::any('/voice/queue-agent-connect', [QueueConferenceController::class, 'agentConnect'])
         ->name('voice.queue-agent-connect');
+    Route::any('/voice/queue-agent-join', [QueueConferenceController::class, 'agentJoin'])
+        ->name('voice.queue-agent-join');
     Route::any('/voice/queue-conference-join', [QueueConferenceController::class, 'callerJoin'])
         ->name('voice.queue-conference-join');
 
@@ -128,6 +131,10 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
         ->name('voice.ring-group-member-connect');
     Route::any('/voice/ring-group-fallback', [RingGroupConferenceController::class, 'fallback'])
         ->name('voice.ring-group-fallback');
+
+    // Answered auto-dialer call routed to a ring group or call queue (signed URL, no Bearer auth).
+    Route::any('/voice/campaign-route', CampaignRouteController::class)
+        ->name('voice.campaign-route');
 });
 
 /*

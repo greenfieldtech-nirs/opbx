@@ -10,6 +10,7 @@ use App\Models\CloudonixSettings;
 use App\Models\RingGroup;
 use App\Services\CloudonixClient\CloudonixCallsClient;
 use App\Services\CloudonixSettingsResolver;
+use App\Services\ConferenceLegLinks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -89,6 +90,7 @@ class RingGroupConferenceService
         foreach ($legs as $extension => $legToken) {
             Redis::setex('rg:leg:'.$legToken, self::TTL_SECONDS, "{$ringGroup->id}|{$callerToken}|{$extension}");
         }
+        app(ConferenceLegLinks::class)->link($legs, $callerToken);
 
         ExpireRingGroupOfferJob::dispatch($ringGroup->id, $ringGroup->organization_id, $callerToken)
             ->delay(now()->addSeconds($timeout + self::GRACE_SECONDS));
@@ -194,11 +196,12 @@ class RingGroupConferenceService
     }
 
     /**
-     * Room shared by the caller and the member who answers (letters/digits only).
+     * Room shared by the caller and the member who answers: 'r' + 15 hex chars of a hash of the group and
+     * the caller's session, kept within Cloudonix's 16-character conference name limit.
      */
     public function roomName(int $ringGroupId, string $callerToken): string
     {
-        return 'rg'.$ringGroupId.'c'.preg_replace('/[^A-Za-z0-9]/', '', $callerToken);
+        return 'r'.substr(hash('sha256', $ringGroupId.':'.$callerToken), 0, 15);
     }
 
     /**

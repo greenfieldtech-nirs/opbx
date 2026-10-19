@@ -12,6 +12,7 @@ use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\AutoDialer\CallSessionService;
+use App\Services\AutoDialer\CampaignAgentAvailability;
 use App\Services\AutoDialer\CampaignQueryService;
 use App\Services\AutoDialer\CxmlGenerationService;
 use App\Services\AutoDialer\DestinationManagementService;
@@ -69,7 +70,7 @@ class DialerWorkerController extends Controller
      * Returns destinations from lists assigned to the campaign
      * that are in 'pending' status and haven't exceeded max dial attempts.
      */
-    public function getPendingDestinations(Request $request, int $campaign): JsonResponse
+    public function getPendingDestinations(Request $request, int $campaign, CampaignAgentAvailability $agents): JsonResponse
     {
         $this->authorizeWorker($request);
 
@@ -83,7 +84,9 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        $destinations = $this->destinationService->getPendingDestinations($campaign, $limit);
+        // No agent of the campaign's call queue is available: nothing to dial until one is.
+        $waitingForAgents = $agents->isWaitingForAgents($campaignModel);
+        $destinations = $waitingForAgents ? collect() : $this->destinationService->getPendingDestinations($campaign, $limit);
 
         return response()->json([
             'data' => ListDestinationResource::collection($destinations),
@@ -91,6 +94,7 @@ class DialerWorkerController extends Controller
                 'total' => $destinations->count(),
                 'limit' => $limit,
                 'offset' => 0,
+                'waiting_for_agents' => $waitingForAgents,
             ],
         ]);
     }
@@ -130,7 +134,7 @@ class DialerWorkerController extends Controller
     /**
      * Initiate a call - creates a call session record.
      */
-    public function initiateCall(Request $request, AutoDialerCloudonixService $cloudonixService): JsonResponse
+    public function initiateCall(Request $request, AutoDialerCloudonixService $cloudonixService, CampaignAgentAvailability $agents): JsonResponse
     {
         $this->authorizeWorker($request);
 
@@ -181,6 +185,13 @@ class DialerWorkerController extends Controller
         // Generate webhook callback URL for Cloudonix
         $webhookBaseUrl = $cloudonixSettings->webhook_base_url ?? config('app.webhook_base_url') ?? config('app.url');
         $callbackUrl = rtrim($webhookBaseUrl, '/').'/api/webhooks/cloudonix/call-status';
+
+        // A batch fetched before every agent got busy: skip (409, the destination stays pending).
+        if ($agents->isWaitingForAgents($campaign)) {
+            return response()->json([
+                'message' => 'Waiting for an available agent in the call queue',
+            ], 409);
+        }
 
         // Claim before placing the call: the loser of a race gets 409 and never dials.
         if (! $this->destinationService->claimForDialing($destination->id)) {
