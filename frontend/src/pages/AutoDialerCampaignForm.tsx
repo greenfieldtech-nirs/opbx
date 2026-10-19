@@ -345,8 +345,8 @@ export default function AutoDialerCampaignForm() {
           time_limit: data.time_limit,
           auto_start: data.auto_start,
           record_calls: data.record_calls,
-          // Only meaningful for ring group routing.
-          wait_for_available_agents: data.routing_destination_type === 'ring_group' && data.wait_for_available_agents,
+          // Only meaningful for call queue routing.
+          wait_for_available_agents: data.routing_destination_type === 'call_queue' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -395,8 +395,8 @@ export default function AutoDialerCampaignForm() {
           timezone: data.timezone,
           time_limit: data.time_limit,
           record_calls: data.record_calls,
-          // Only meaningful for ring group routing.
-          wait_for_available_agents: data.routing_destination_type === 'ring_group' && data.wait_for_available_agents,
+          // Only meaningful for call queue routing.
+          wait_for_available_agents: data.routing_destination_type === 'call_queue' && data.wait_for_available_agents,
           retry_on_busy_no_answer: data.retry_on_busy_no_answer,
           retry_delay_minutes: data.retry_delay_minutes,
           // Only include AMD actions if AMD is enabled
@@ -546,26 +546,26 @@ export default function AutoDialerCampaignForm() {
                         disabled={!canModifyPool}
                       />
 
-                      {/* Ring group pacing: hold dialing while every agent is busy */}
+                      {/* Call queue pacing: hold dialing while no queue agent is available */}
                       <div className="flex items-start justify-between gap-4 rounded-md border p-3">
                         <div className="space-y-0.5">
                           <Label
                             htmlFor="wait_for_available_agents"
-                            className={routingType === 'ring_group' ? '' : 'text-muted-foreground'}
+                            className={routingType === 'call_queue' ? '' : 'text-muted-foreground'}
                           >
                             Wait for available agents
                           </Label>
                           <p className="text-xs text-muted-foreground">
-                            {routingType === 'ring_group'
-                              ? 'When every agent in the ring group is on a call, stop dialing until one is available.'
-                              : 'Available when routing to a Ring Group.'}
+                            {routingType === 'call_queue'
+                              ? 'When no agent in the queue is available (all are on calls, in wrap-up or logged out), stop dialing until one is.'
+                              : 'Available when routing to a Call Queue.'}
                           </p>
                         </div>
                         <Switch
                           id="wait_for_available_agents"
-                          checked={routingType === 'ring_group' && !!watch('wait_for_available_agents')}
+                          checked={routingType === 'call_queue' && !!watch('wait_for_available_agents')}
                           onCheckedChange={(checked) => setValue('wait_for_available_agents', checked)}
-                          disabled={routingType !== 'ring_group'}
+                          disabled={routingType !== 'call_queue'}
                         />
                       </div>
                     </div>

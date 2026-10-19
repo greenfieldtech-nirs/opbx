@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Ring group campaigns can hold dialing while every agent of the ring group is on a call.
+ * Call queue campaigns can hold dialing while no agent of the queue is available.
  */
 return new class extends Migration
 {

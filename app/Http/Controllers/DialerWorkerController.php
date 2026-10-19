@@ -84,7 +84,7 @@ class DialerWorkerController extends Controller
             ], 404);
         }
 
-        // Every agent of the campaign's ring group is busy: nothing to dial until one frees up.
+        // No agent of the campaign's call queue is available: nothing to dial until one is.
         $waitingForAgents = $agents->isWaitingForAgents($campaignModel);
         $destinations = $waitingForAgents ? collect() : $this->destinationService->getPendingDestinations($campaign, $limit);
 
@@ -189,7 +189,7 @@ class DialerWorkerController extends Controller
         // A batch fetched before every agent got busy: skip (409, the destination stays pending).
         if ($agents->isWaitingForAgents($campaign)) {
             return response()->json([
-                'message' => 'Waiting for an available agent in the ring group',
+                'message' => 'Waiting for an available agent in the call queue',
             ], 409);
         }
 

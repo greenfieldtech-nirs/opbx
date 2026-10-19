@@ -117,7 +117,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 | Calls per second (CPS) | 1 to 30. Default: 1 |
 | Max dial attempts | 1 to 5. Form default: 1 |
 | Record calls | Off by default |
-| Wait for available agents | Ring Group routing only, off by default. While every active member extension of the ring group is on a call (or ringing), the dialer places no new calls; dialing resumes on the next dialer cycle after an agent frees up |
+| Wait for available agents | Call Queue routing only, off by default. While no agent of the queue is available (all on calls, in wrap-up or logged out), the dialer places no new calls; dialing resumes on the next dialer cycle after an agent becomes available |
 | Voicemail, human and unknown actions | `HANGUP` or `CONTINUE`, or empty (treated as Hang up while any action is set). Empty on all three means no detection |
 | Retry on voicemail | Off by default |
 | Retry on busy / no-answer | `retry_on_busy_no_answer`, off by default. Cancelled and failed calls are never retried |

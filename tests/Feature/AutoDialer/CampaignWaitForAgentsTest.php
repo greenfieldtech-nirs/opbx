@@ -12,14 +12,15 @@ use App\Enums\UserRole;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
 use App\Models\AutoDialerList;
+use App\Models\CallQueue;
+use App\Models\CallQueueAgent;
 use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\Organization;
-use App\Models\RingGroup;
-use App\Models\RingGroupMember;
 use App\Models\User;
 use App\Services\CallQueue\ExtensionPresenceTracker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
@@ -27,8 +28,8 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * "Wait for available agents": a ring group campaign hands out no destinations, and refuses to place
- * a call, while every agent of its ring group is on a call.
+ * "Wait for available agents": a call queue campaign hands out no destinations, and refuses to place
+ * a call, while no agent of its queue is available.
  */
 final class CampaignWaitForAgentsTest extends TestCase
 {
@@ -36,11 +37,14 @@ final class CampaignWaitForAgentsTest extends TestCase
 
     private const WORKER_TOKEN = 'wait-for-agents-worker-token';
 
-    private const AGENTS = ['3101', '3102'];
-
     private Organization $org;
 
-    private RingGroup $group;
+    private CallQueue $queue;
+
+    /** @var array<string, string> extension number => ACD worker state reported by the fake /queue/live */
+    private array $states = ['3101' => 'BUSY', '3102' => 'WRAP_UP'];
+
+    private bool $workerDown = false;
 
     protected function setUp(): void
     {
@@ -49,28 +53,39 @@ final class CampaignWaitForAgentsTest extends TestCase
 
         $this->org = Organization::factory()->create();
         CloudonixSettings::factory()->create(['organization_id' => $this->org->id]);
-        $this->group = RingGroup::factory()->create(['organization_id' => $this->org->id]);
-        foreach (self::AGENTS as $i => $number) {
-            $extension = Extension::factory()->create([
-                'organization_id' => $this->org->id, 'type' => ExtensionType::USER, 'status' => 'active', 'extension_number' => $number,
+        $this->queue = CallQueue::factory()->create(['organization_id' => $this->org->id]);
+        foreach (array_keys($this->states) as $number) {
+            $agent = User::factory()->create(['organization_id' => $this->org->id, 'role' => UserRole::PBX_USER]);
+            Extension::factory()->create([
+                'organization_id' => $this->org->id, 'user_id' => $agent->id, 'type' => ExtensionType::USER,
+                'status' => 'active', 'extension_number' => $number,
             ]);
-            RingGroupMember::create(['ring_group_id' => $this->group->id, 'extension_id' => $extension->id, 'priority' => $i + 1]);
+            CallQueueAgent::factory()->create(['organization_id' => $this->org->id, 'call_queue_id' => $this->queue->id, 'user_id' => $agent->id]);
             Redis::del("acd:presence:{$this->org->id}:{$number}");
         }
-    }
 
-    private function onCall(string $extensionNumber): void
-    {
-        app(ExtensionPresenceTracker::class)->handleSessionUpdate($this->org->id, '+'.$extensionNumber, 'connected');
+        // ACD worker: /queue/live reports $this->states for the roster it is sent; Cloudonix answers 200.
+        Http::fake(function (HttpRequest $request) {
+            if (! str_ends_with($request->url(), '/queue/live')) {
+                return Http::response(['token' => 'sess-1', 'id' => 'call-1'], 200);
+            }
+            if ($this->workerDown) {
+                return Http::response([], 503);
+            }
+
+            return Http::response(['waiting' => [], 'agents' => array_map(fn (array $agent) => [
+                'userId' => $agent['userId'], 'extensionNumber' => $agent['extensionNumber'], 'state' => $this->states[$agent['extensionNumber']],
+            ], $request['agents'])], 200);
+        });
     }
 
     /** @return array{AutoDialerCampaign, AutoDialerDestination} */
-    private function campaign(bool $wait, RoutingDestinationType $type = RoutingDestinationType::RING_GROUP): array
+    private function campaign(bool $wait, RoutingDestinationType $type = RoutingDestinationType::CALL_QUEUE): array
     {
         $campaign = AutoDialerCampaign::factory()->create([
             'organization_id' => $this->org->id,
             'routing_destination_type' => $type,
-            'routing_destination_id' => $this->group->id,
+            'routing_destination_id' => $this->queue->id,
             'wait_for_available_agents' => $wait,
         ]);
         $list = AutoDialerList::factory()->create([
@@ -90,46 +105,54 @@ final class CampaignWaitForAgentsTest extends TestCase
             ->json($method, '/api/v1/dialer/worker'.$uri, $data);
     }
 
-    public function test_no_destinations_while_every_agent_is_busy_and_dialing_resumes_when_one_frees_up(): void
+    private function pending(AutoDialerCampaign $campaign): TestResponse
+    {
+        return $this->worker('GET', "/campaigns/{$campaign->id}/destinations/pending")->assertOk();
+    }
+
+    public function test_no_destinations_while_no_agent_is_available_and_dialing_resumes_when_one_is(): void
     {
         [$campaign, $destination] = $this->campaign(wait: true);
 
-        $this->onCall('3101');
-        $this->worker('GET', "/campaigns/{$campaign->id}/destinations/pending")
-            ->assertOk()->assertJsonPath('meta.waiting_for_agents', false)->assertJsonCount(1, 'data');
+        // Busy, in wrap-up, and (below) logged out are all unavailable.
+        $this->pending($campaign)->assertJsonPath('meta.waiting_for_agents', true)->assertJsonCount(0, 'data');
+        $this->states['3102'] = 'LOGGED_OUT';
+        $this->pending($campaign)->assertJsonPath('meta.waiting_for_agents', true)->assertJsonCount(0, 'data');
 
-        $this->onCall('3102');
-        $this->worker('GET', "/campaigns/{$campaign->id}/destinations/pending")
-            ->assertOk()->assertJsonPath('meta.waiting_for_agents', true)->assertJsonCount(0, 'data');
+        $this->states['3102'] = 'AVAILABLE';
+        $this->pending($campaign)->assertJsonPath('meta.waiting_for_agents', false)->assertJsonPath('data.0.id', $destination->id);
+    }
 
-        app(ExtensionPresenceTracker::class)->handleSessionUpdate($this->org->id, '+3102', 'completed', 'deleted');
-        $this->worker('GET', "/campaigns/{$campaign->id}/destinations/pending")
-            ->assertOk()->assertJsonPath('meta.waiting_for_agents', false)->assertJsonPath('data.0.id', $destination->id);
+    public function test_an_available_agent_on_another_call_does_not_count(): void
+    {
+        [$campaign] = $this->campaign(wait: true);
+        $this->states['3102'] = 'AVAILABLE';
+        app(ExtensionPresenceTracker::class)->handleSessionUpdate($this->org->id, '+3102', 'connected');
+
+        $this->pending($campaign)->assertJsonPath('meta.waiting_for_agents', true)->assertJsonCount(0, 'data');
     }
 
     public function test_initiate_is_refused_while_waiting_and_the_destination_stays_pending(): void
     {
         [$campaign, $destination] = $this->campaign(wait: true);
-        array_map(fn ($n) => $this->onCall($n), self::AGENTS);
-        Http::fake();
 
         $this->worker('POST', '/calls/initiate', [
             'campaign_id' => $campaign->id, 'destination_id' => $destination->id, 'phone_number' => $destination->phone_number,
             'worker_id' => 'worker-1', 'initiated_at' => now()->toIso8601String(),
         ])->assertStatus(409);
 
-        Http::assertNothingSent();
+        Http::assertNotSent(fn (HttpRequest $request) => ! str_ends_with($request->url(), '/queue/live'));
         $this->assertSame(DestinationStatus::PENDING, $destination->fresh()->status);
     }
 
-    public function test_setting_off_or_not_a_ring_group_never_waits(): void
+    public function test_setting_off_not_a_queue_or_worker_unreachable_never_waits(): void
     {
-        array_map(fn ($n) => $this->onCall($n), self::AGENTS);
-
-        foreach ([$this->campaign(wait: false)[0], $this->campaign(wait: true, type: RoutingDestinationType::CALL_QUEUE)[0]] as $campaign) {
-            $this->worker('GET', "/campaigns/{$campaign->id}/destinations/pending")
-                ->assertOk()->assertJsonPath('meta.waiting_for_agents', false)->assertJsonCount(1, 'data');
+        foreach ([$this->campaign(wait: false)[0], $this->campaign(wait: true, type: RoutingDestinationType::RING_GROUP)[0]] as $campaign) {
+            $this->pending($campaign)->assertJsonPath('meta.waiting_for_agents', false)->assertJsonCount(1, 'data');
         }
+
+        $this->workerDown = true;
+        $this->pending($this->campaign(wait: true)[0])->assertJsonPath('meta.waiting_for_agents', false)->assertJsonCount(1, 'data');
     }
 
     public function test_the_setting_is_saved_and_returned(): void

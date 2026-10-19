@@ -63,10 +63,11 @@ When the contact answers, OPBX routes the live call to the ring group or queue e
 
 #### Wait for available agents
 
-For a ring group, turn on **Wait for available agents** (Basic Info tab, under **Strategy** in Caller ID Configuration; the switch is greyed out for other destinations). While every active member of the ring group is on a call or ringing, the dialer stops placing new calls; the numbers stay pending. When an agent finishes a call, dialing resumes on the dialer's next cycle, so there can be a short gap before the next call.
+For a call queue, turn on **Wait for available agents** (Basic Info tab, under **Strategy** in Caller ID Configuration; the switch is greyed out for other destinations). While no agent of the queue is available, the dialer stops placing new calls and the numbers stay pending. When an agent becomes available, dialing resumes on the dialer's next cycle, so there can be a short gap before the next call.
 
-- The check is "at least one agent is free", not "one call per free agent": with one agent free the dialer can still place up to the campaign's concurrent-call limit (CAC). Lower the CAC to match the size of the team.
-- An agent counts as busy only for calls to their extension (including ringing). Calls the agent places and members that forward to an outside number count as free.
+- An agent is available when the queue shows them **Available** (logged in, not on a queue call, not in wrap-up) and their extension is not on another call. Logged-out agents never count, so a campaign with no agent logged in does not dial.
+- The check is "at least one agent is available", not "one call per available agent": with one agent available the dialer can still place up to the campaign's concurrent-call limit (CAC). Contacts beyond that wait in the queue on hold; lower the CAC to match the size of the team.
+- If the queue service is unreachable, the campaign keeps dialing as if the setting were off.
 
 ## Passing list data to the assistant
 

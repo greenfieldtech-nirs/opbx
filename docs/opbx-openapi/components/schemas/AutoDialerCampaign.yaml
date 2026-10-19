@@ -313,7 +313,7 @@ properties:
   wait_for_available_agents:
     type: boolean
     default: false
-    description: Ring group campaigns only: while every agent of the ring group is on a call, the dialer places no new calls
+    description: Call queue campaigns only: while no agent of the queue is available, the dialer places no new calls
     example: false
   action_voicemail:
     type:
