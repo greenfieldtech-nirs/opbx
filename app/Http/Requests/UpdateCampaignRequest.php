@@ -140,6 +140,8 @@ class UpdateCampaignRequest extends FormRequest
         $table = match ($this->input('routing_destination_type') ?? $this->route('campaign')?->routing_destination_type?->value) {
             'ai_assistant' => 'ai_assistants',
             'ai_load_balancer' => 'ai_assistant_load_balancers',
+            'ring_group' => 'ring_groups',
+            'call_queue' => 'call_queues',
             default => null,
         };
 

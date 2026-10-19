@@ -134,6 +134,8 @@ class CreateCampaignRequest extends FormRequest
         $table = match ($this->input('routing_destination_type')) {
             'ai_assistant' => 'ai_assistants',
             'ai_load_balancer' => 'ai_assistant_load_balancers',
+            'ring_group' => 'ring_groups',
+            'call_queue' => 'call_queues',
             default => null,
         };
 
@@ -150,7 +152,7 @@ class CreateCampaignRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'routing_destination_id.required' => 'A destination ID is required when routing to AI Assistant or AI Load Balancer.',
+            'routing_destination_id.required' => 'A destination is required unless the campaign hangs up.',
             'end_time.gt' => 'End time must be later than start time.',
             'caller_id.regex' => 'Caller ID must be in E.164 format (e.g., +14155551212).',
         ];

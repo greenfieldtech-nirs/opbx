@@ -61,7 +61,7 @@ import {
 // for nullable database fields, but react-hook-form/zod need clean defaults.
 const campaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
-  routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'hangup']),
+  routing_destination_type: z.enum(['ai_assistant', 'ai_load_balancer', 'ring_group', 'call_queue', 'hangup']),
   routing_destination_id: z.string().nullish(),
   dial_timeout: z.number().min(1).max(300).default(60),
   destination_connect: z.enum(['connected', 'immediately']).default('connected'),
@@ -492,7 +492,7 @@ export default function AutoDialerCampaignForm() {
                     typeValue={watch('routing_destination_type') as DestinationType}
                     destinationValue={watch('routing_destination_id') || undefined}
                     onChange={(type, destinationId) => {
-                      setValue('routing_destination_type', type as 'ai_assistant' | 'ai_load_balancer' | 'hangup');
+                      setValue('routing_destination_type', type as CampaignFormData['routing_destination_type']);
                       setValue('routing_destination_id', destinationId || null);
                     }}
                     layout="horizontal"
@@ -500,7 +500,7 @@ export default function AutoDialerCampaignForm() {
                     destinationClassName="flex-1 min-w-0"
                     typeLabel="Routing Destination"
                     destinationLabel="Select Destination"
-                    allowedTypes={['ai_assistant', 'ai_load_balancer']}
+                    allowedTypes={['ai_assistant', 'ai_load_balancer', 'ring_group', 'call_queue']}
                     includeHangup={true}
                   />
                 </div>

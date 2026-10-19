@@ -111,6 +111,8 @@ paths:
                   enum:
                   - ai_assistant
                   - ai_load_balancer
+                  - ring_group
+                  - call_queue
                   - hangup
                   description: Where answered calls are sent
                   example: ai_assistant
@@ -591,6 +593,8 @@ paths:
                   enum:
                   - ai_assistant
                   - ai_load_balancer
+                  - ring_group
+                  - call_queue
                   - hangup
                   description: Where answered calls are sent
                   example: ai_assistant
@@ -1004,6 +1008,8 @@ paths:
                   enum:
                   - ai_assistant
                   - ai_load_balancer
+                  - ring_group
+                  - call_queue
                   - hangup
                   description: Where answered calls are sent
                   example: ai_assistant

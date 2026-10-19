@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\AutoDialer;
 
 use App\Enums\RoutingDestinationType;
+use App\Http\Controllers\Voice\CampaignRouteController;
 use App\Models\AiAssistant;
 use App\Models\AiAssistantLoadBalancer;
 use App\Models\AutoDialerCampaign;
@@ -13,7 +14,6 @@ use App\Models\CloudonixSettings;
 use App\Models\ConferenceRoom;
 use App\Models\Extension;
 use App\Models\IvrMenu;
-use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
@@ -262,7 +262,13 @@ class AutoDialerCloudonixService
                     break;
 
                 case 'ring_group':
-                    $innerCxml = $this->generateRingGroupCxml($campaign);
+                case 'call_queue':
+                    // Routed once answered, when the live session exists (queues and ring groups need it).
+                    $innerCxml = (new CxmlBuilder)->redirect(CampaignRouteController::signedUrl(
+                        $campaign->organization_id,
+                        RoutingDestinationType::from($routingType),
+                        (int) $campaign->routing_destination_id
+                    ))->build();
                     break;
 
                 case 'conference_room':
@@ -695,70 +701,6 @@ class AutoDialerCloudonixService
         ]);
 
         return CxmlBuilder::dialExtension($sipUri, $campaign->dial_timeout ?? 30);
-    }
-
-    /**
-     * Generate CXML for Ring Group routing.
-     *
-     * @param  AutoDialerCampaign  $campaign  The campaign
-     * @return string The generated CXML
-     */
-    private function generateRingGroupCxml(AutoDialerCampaign $campaign): string
-    {
-        $ringGroup = RingGroup::withoutGlobalScope(OrganizationScope::class)
-            ->where('id', $campaign->routing_destination_id)
-            ->where('organization_id', $campaign->organization_id)
-            ->first();
-
-        if (! $ringGroup) {
-            Log::error('AutoDialer: Ring group not found for campaign', [
-                'campaign_id' => $campaign->id,
-                'ring_group_id' => $campaign->routing_destination_id,
-            ]);
-
-            return $this->buildHangupCxml();
-        }
-
-        if (! $ringGroup->isActive()) {
-            Log::error('AutoDialer: Ring group is not active', [
-                'campaign_id' => $campaign->id,
-                'ring_group_id' => $ringGroup->id,
-            ]);
-
-            return $this->buildHangupCxml();
-        }
-
-        // Get members' SIP URIs
-        $sipUris = [];
-        foreach ($ringGroup->members as $member) {
-            if ($member->extension && $member->extension->isActive()) {
-                $sipUri = $member->extension->getSipUri();
-                if ($sipUri) {
-                    $sipUris[] = $sipUri;
-                }
-            }
-        }
-
-        if (empty($sipUris)) {
-            Log::error('AutoDialer: Ring group has no active members', [
-                'campaign_id' => $campaign->id,
-                'ring_group_id' => $ringGroup->id,
-            ]);
-
-            return $this->buildHangupCxml();
-        }
-
-        Log::debug('AutoDialer: Generated ring group CXML', [
-            'campaign_id' => $campaign->id,
-            'ring_group_id' => $ringGroup->id,
-            'member_count' => count($sipUris),
-        ]);
-
-        // Generate webhook callback URL for ring group fallback
-        $webhookBaseUrl = config('app.webhook_base_url') ?? config('app.url');
-        $actionUrl = rtrim($webhookBaseUrl, '/').'/api/voice/ring-group-callback?ring_group_id='.$ringGroup->id;
-
-        return CxmlBuilder::dialRingGroup($sipUris, $campaign->dial_timeout ?? 30, $actionUrl);
     }
 
     /**

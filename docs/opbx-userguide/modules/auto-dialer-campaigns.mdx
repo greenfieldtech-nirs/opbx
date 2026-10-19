@@ -8,7 +8,7 @@ description: "Outbound calling campaigns: fields, statuses, permissions, data an
 
 # Auto Dialer Campaigns
 
-An auto-dialer campaign dials every number on its [distribution lists](/opbx/modules/distribution-lists) (a campaign can hold several) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant or AI load balancer. This page is the reference and the list of workflows. The step-by-step screen walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
+An auto-dialer campaign dials every number on its [distribution lists](/opbx/modules/distribution-lists) (a campaign can hold several) inside a weekly schedule, at a controlled rate, and connects answered calls to an AI assistant, an AI load balancer, a ring group or a call queue. This page is the reference and the list of workflows. The step-by-step screen walk-through is in the **Auto Dialer** application guide, starting at [Auto Dialer Overview](/opbx/applications/auto-dialer).
 
 ## Purpose
 
@@ -23,7 +23,7 @@ Use this module to:
 ## Prerequisites
 
 - **Owner** or **PBX Admin** role to change anything; **Reporter** may view.
-- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers), unless you route to Hang Up for testing.
+- An [AI assistant](/opbx/modules/ai-assistants), [AI load balancer](/opbx/modules/ai-load-balancers), [ring group](/opbx/modules/ring-groups) or [call queue](/opbx/modules/call-queues), unless you route to Hang Up for testing.
 - At least one **active** [phone number](/opbx/modules/phone-numbers) for the caller ID.
 - The [dialer worker](/opbx/workers/dialer-worker) running (single replica), and the [AMD worker](/opbx/workers/amd-worker) for voicemail detection.
 
@@ -103,7 +103,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 |-------|--------------------|
 | Name | Required, up to 255 characters |
 | Description | Up to 1000 characters (API only; the form does not show it) |
-| Routing destination | AI Assistant, AI Load Balancer or Hang Up. A destination ID is required except for Hang Up |
+| Routing destination | AI Assistant, AI Load Balancer, Ring Group, Call Queue or Hang Up. A destination ID is required except for Hang Up |
 | Caller ID | Required, E.164. The form uses the first number of the pool |
 | Caller-ID pool | 1 to 100 active numbers of your organization; weight 1 to 100 per number (API only, default 1) |
 | Caller-ID strategy | Round Robin (default), Random, Least Recently Used |
@@ -138,7 +138,7 @@ Assigning a Ready list does not start a campaign: it stays **Draft** until someo
 ## What a campaign blocks
 
 - A **phone number** in a campaign's caller-ID pool cannot be deleted ("caller ID pool" in the in-use dialog).
-- An **AI assistant** or **AI load balancer** that a campaign routes to cannot be deleted ("routing" in the in-use dialog), whatever the campaign's status.
+- An **AI assistant**, **AI load balancer**, **ring group** or **call queue** that a campaign routes to cannot be deleted ("routing" in the in-use dialog), whatever the campaign's status.
 
 Remove the reference from the campaign first. See [Phone Numbers](/opbx/modules/phone-numbers#delete) and [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations#deleting-a-destination-that-a-campaign-uses).
 
@@ -152,7 +152,7 @@ Remove the reference from the campaign first. See [Phone Numbers](/opbx/modules/
 | `name`, `description` | |
 | `status` | `draft`, `active`, `paused`, `completed`, `archived` |
 | `auto_start` | Boolean |
-| `routing_destination_type`, `routing_destination_id` | `ai_assistant`, `ai_load_balancer` or `hangup`, and the target id |
+| `routing_destination_type`, `routing_destination_id` | `ai_assistant`, `ai_load_balancer`, `ring_group`, `call_queue` or `hangup`, and the target id |
 | `caller_id`, `caller_id_strategy`, `caller_id_pool_enabled` | Main caller ID and pool settings |
 | `dial_timeout`, `time_limit`, `destination_connect`, `record_calls` | Call settings |
 | `max_dial_attempts`, `concurrent_active_calls`, `calls_per_second` | Limits |

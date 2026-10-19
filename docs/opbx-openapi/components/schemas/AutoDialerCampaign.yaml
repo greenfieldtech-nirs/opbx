@@ -43,6 +43,8 @@ properties:
     enum:
     - ai_assistant
     - ai_load_balancer
+    - ring_group
+    - call_queue
     - hangup
     description: Type of destination for connected calls
     example: ai_assistant
