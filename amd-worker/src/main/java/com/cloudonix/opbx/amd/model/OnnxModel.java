@@ -16,6 +16,8 @@ public class OnnxModel {
 
     public void load() throws OrtException {
         this.env = OrtEnvironment.getEnvironment();
+        // onnxruntime 1.31 ships a telemetry client; a PBX worker sends nothing to third parties.
+        this.env.setTelemetry(false);
         OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
         this.session = env.createSession(modelPath, opts);
     }

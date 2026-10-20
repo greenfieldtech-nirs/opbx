@@ -7,9 +7,6 @@
 
 import api from './api';
 import { extensionsService as baseExtensionsService } from './createResourceService';
-import type {
-  Extension,
-} from '@/types';
 
 export interface ExtensionPasswordResponse {
   data: {
@@ -18,6 +15,12 @@ export interface ExtensionPasswordResponse {
     password: string;
     warning: string;
   };
+}
+
+/** The new password is already synced to Cloudonix (the API answers 502 when that sync fails). */
+interface ResetPasswordResponse {
+  message: string;
+  data: { extension_id: string; extension_number: string; new_password: string; warning: string };
 }
 
 export const extensionsService = {
@@ -51,8 +54,8 @@ export const extensionsService = {
    * Reset extension password
    * PUT /extensions/:id/reset-password
    */
-  resetPassword: (id: string): Promise<{ message: string; new_password: string; extension: Extension; cloudonix_warning?: any }> => {
-    return api.put<{ message: string; new_password: string; extension: Extension; cloudonix_warning?: any }>(`/extensions/${id}/reset-password`)
+  resetPassword: (id: string): Promise<ResetPasswordResponse> => {
+    return api.put<ResetPasswordResponse>(`/extensions/${id}/reset-password`)
       .then(res => res.data);
   },
 

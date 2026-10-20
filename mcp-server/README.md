@@ -15,7 +15,7 @@ OPBX database and without exposing execution-plane internals.
 MCP Client (Claude, MCP Inspector, …)
     |  MCP over HTTP (Streamable HTTP, stateless)
     v
-opbx-mcp  (Fastify, Node 24, TypeScript)
+opbx-mcp  (Fastify, Node 26, TypeScript)
     |  HTTPS REST (Bearer pass-through)
     v
 OPBX REST API  (/api/v1/…)

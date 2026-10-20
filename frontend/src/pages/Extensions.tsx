@@ -193,7 +193,6 @@ export default function ExtensionsComplete() {
   const [selectedExtension, setSelectedExtension] = useState<Extension | null>(null);
   const [showResetPasswordDialog, setShowResetPasswordDialog] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
-  const [tempPasswords, setTempPasswords] = useState<Map<string, string>>(new Map());
   const [fetchedPasswords, setFetchedPasswords] = useState<Map<string, string | null>>(new Map());
   const [isFetchingPassword, setIsFetchingPassword] = useState<Set<string>>(new Set());
 
@@ -334,37 +333,24 @@ export default function ExtensionsComplete() {
     onSuccess: (data, extensionId) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.extensions.all });
 
-      // Store the new password temporarily for display
-      setTempPasswords(prev => new Map(prev.set(extensionId, data.new_password)));
-
-      // Automatically hide the password after 30 seconds for security
-      setTimeout(() => {
-        setTempPasswords(prev => {
-          const next = new Map(prev);
-          next.delete(extensionId);
-          return next;
-        });
-      }, 30000);
+      // Replace the cached password so the column shows the new one (the API synced it to Cloudonix).
+      const newPassword = data.data.new_password;
+      setFetchedPasswords(prev => new Map(prev).set(extensionId, newPassword));
 
       toast.success(
-        `Password reset successfully! New password: ${data.new_password}`,
+        `Password reset successfully! New password: ${newPassword}`,
         {
           duration: 10000,
           action: {
             label: 'Copy',
             onClick: () => {
-              navigator.clipboard.writeText(data.new_password).then(() => {
+              navigator.clipboard.writeText(newPassword).then(() => {
                 toast.success('Password copied to clipboard!');
               });
             },
           },
         }
       );
-
-      // Show Cloudonix warning if present
-      if (data.cloudonix_warning) {
-        toast.warning(data.cloudonix_warning.message, { duration: 8000 });
-      }
     },
     onError: (error: Error | unknown) => {
       const err = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
@@ -997,8 +983,8 @@ export default function ExtensionsComplete() {
       return;
     }
 
-    // If we already have a fresh temp or fetched password, just show it
-    if (tempPasswords.has(extensionId) || fetchedPasswords.has(extensionId)) {
+    // If we already have the password, just show it
+    if (fetchedPasswords.has(extensionId)) {
       setVisiblePasswords(prev => new Set(prev).add(extensionId));
 
       return;
@@ -1036,7 +1022,7 @@ export default function ExtensionsComplete() {
   };
 
   const getExtensionPassword = (extensionId: string): string | null => {
-    return tempPasswords.get(extensionId) ?? fetchedPasswords.get(extensionId) ?? null;
+    return fetchedPasswords.get(extensionId) ?? null;
   };
 
   // Open create dialog

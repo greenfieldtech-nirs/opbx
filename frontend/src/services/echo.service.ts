@@ -6,7 +6,7 @@
  */
 
 import Echo from 'laravel-echo';
-import Pusher from 'pusher-js';
+import Pusher, { type ChannelAuthorizationCallback } from 'pusher-js';
 import logger from '@/utils/logger';
 import api from '@/services/api';
 import { storage } from '@/utils/storage';
@@ -81,18 +81,18 @@ export interface CallPresenceCallbacks {
  * current Bearer token and operate-as header, not the ones captured when the socket was created.
  */
 export const channelAuthorizer = (channel: { name: string }) => ({
-  authorize: (socketId: string, callback: (error: Error | null, data?: unknown) => void) => {
+  authorize: (socketId: string, callback: ChannelAuthorizationCallback) => {
     api
       .post('/broadcasting/auth', { socket_id: socketId, channel_name: channel.name })
       .then((response) => callback(null, response.data))
-      .catch((error) => callback(error instanceof Error ? error : new Error('Channel authorization failed')));
+      .catch((error) => callback(error instanceof Error ? error : new Error('Channel authorization failed'), null));
   },
 });
 
 /**
  * Create Echo instance with configuration
  */
-export const createEchoInstance = (): Echo<any> => {
+export const createEchoInstance = (): Echo<'pusher'> => {
   logger.debug('[Echo] Creating Echo instance with config:', {
     host: WS_CONFIG.wsHost,
     port: WS_CONFIG.wsPort,
@@ -131,7 +131,7 @@ const calculateRetryDelay = (attempt: number): number => {
  * Laravel Echo Service Singleton
  */
 export class EchoService {
-  private echo: Echo<any> | null = null;
+  private echo: Echo<'pusher'> | null = null;
   private currentOrganizationId: string | null = null;
   private isConnecting = false;
   private connectionState: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
@@ -405,7 +405,7 @@ export class EchoService {
   /**
    * Get Echo instance (for advanced usage)
    */
-  getInstance(): Echo<any> | null {
+  getInstance(): Echo<'pusher'> | null {
     return this.echo;
   }
 }

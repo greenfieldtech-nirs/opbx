@@ -75,7 +75,8 @@ final class ExtensionPasswordControllerTest extends TestCase
         $mock = Mockery::mock(CloudonixSubscriberService::class);
         $mock->shouldReceive('syncToCloudnonix')
             ->once()
-            ->with(Mockery::on(fn ($ext) => $ext->id === $extension->id), true)
+            // Synced after the reset: Cloudonix receives the new password, not the old one.
+            ->with(Mockery::on(fn ($ext) => $ext->id === $extension->id && $ext->password !== 'old-password'), true)
             ->andReturn(['success' => true]);
         $this->app->instance(CloudonixSubscriberService::class, $mock);
 
@@ -87,6 +88,8 @@ final class ExtensionPasswordControllerTest extends TestCase
         // Local password must have changed.
         $extension->refresh();
         $this->assertNotSame('old-password', $extension->password);
+        // The Extensions page shows data.new_password: it must be the stored (and synced) password.
+        $response->assertJsonPath('data.new_password', $extension->password);
     }
 
     public function test_reset_password_returns_502_when_cloudonix_sync_fails(): void
