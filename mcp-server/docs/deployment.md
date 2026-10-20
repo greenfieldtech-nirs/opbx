@@ -45,5 +45,5 @@ No secrets are configured server-side; credentials arrive per-request from MCP c
   per-organization limiter is the backstop.
 - **TLS**: terminate at your load balancer/reverse proxy; the container speaks plain HTTP.
 - **Graceful shutdown**: SIGTERM/SIGINT close Fastify and flush OTel before exit.
-- **Non-root**: the runtime image runs as user `opbx`; Node 24 Alpine, prod deps only.
+- **Non-root**: the runtime image runs as user `opbx`; Node 26 Alpine, prod deps only.
 - **Health**: `/health` (liveness), `/ready` (readiness incl. OPBX reachability probe).
