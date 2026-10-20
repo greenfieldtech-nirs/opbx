@@ -1,5 +1,10 @@
 [
   {
+    "date": "2026-10-20",
+    "type": "New Release",
+    "text": "Version 0.1.1-rc2 is now available for download, with improved queues and reporting features."
+  },
+  {
     "date": "2026-09-22",
     "type": "New Feature",
     "text": "Call Queues and Call Queue Dashboards are now available in OPBX Cloud and OPBX OSS."
