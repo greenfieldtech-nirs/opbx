@@ -120,7 +120,7 @@ The dialer, AMD and ACD worker images run as a non-root user (uid 10001).
 docker/
 ├── php/
 │   ├── Dockerfile          # PHP 8.4-FPM image build
-│   ├── entrypoint.sh       # Container startup: validation, migrations, cache clear
+│   ├── entrypoint.sh       # Container startup: validation, migrations, seeding, bucket creation, cache clear
 │   ├── scheduler.sh        # Laravel scheduler loop (runs every 60s)
 │   ├── php.ini             # PHP runtime configuration
 │   ├── opcache.ini         # OPcache + JIT settings for production
@@ -183,6 +183,12 @@ docker compose build app
 docker compose up -d --build
 ```
 
+The PHP images are built from the repository root (`COPY . .`). `.dockerignore` keeps runtime data out of them: `volumes/` (MySQL, Redis, SeaweedFS data), `backups/` (database dumps), `.env`, `vendor/`, `node_modules/` and `tests/`. Never remove those entries: the data would be baked into every image.
+
+### Start-up Order After an Upgrade
+
+`app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./scripts/upgrade.sh` (add `--prod` with `docker-compose.prod.yml`), which starts the stack in order and shows the `app` log until it is ready.
+
 ---
 
 ## Configuration Details
@@ -237,11 +243,11 @@ After pulling a new version, bring your `docker-compose.yml` up to date with the
 ./scripts/update-compose.sh --yes       # unattended: take the new version of every changed service
 ```
 
-New services are added, services that exist only in your file are always kept, and services removed upstream (e.g. `minio`) are removed only when you confirm (`--yes` keeps them). The result is validated with `docker compose config` before it is written, and the old file is kept as `docker-compose.yml.bak-<timestamp>`. Nothing is restarted; the script prints the `build` / `up -d` commands to run. Needs only Docker (YAML is handled by the `mikefarah/yq` image).
+New services are added, services that exist only in your file are always kept, and services removed upstream (e.g. `minio`) are removed only when you confirm (`--yes` keeps them). The result is validated with `docker compose config` before it is written, and the old file is kept as `docker-compose.yml.bak-<timestamp>`. Nothing is restarted. Then start the new version with `./scripts/upgrade.sh` (see [Start-up Order After an Upgrade](#start-up-order-after-an-upgrade)). Needs only Docker (YAML is handled by the `mikefarah/yq` image).
 
 ### SeaweedFS Configuration
 
-> **Upgrading an install that used MinIO?** Run `./scripts/migrate-minio-to-seaweedfs.sh` before switching `MINIO_ENDPOINT`. It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).
+> **Upgrading an install that used MinIO?** `./scripts/upgrade.sh` runs `./scripts/migrate-minio-to-seaweedfs.sh` once when `./volumes/minio` holds data (it can also be run by hand before switching `MINIO_ENDPOINT`). It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).
 
 SeaweedFS replaces MinIO as the S3-compatible store. The app still reads the `MINIO_*` variables; they are only the S3 endpoint and keys. On AWS, point `MINIO_ENDPOINT` and the keys at real S3 instead.
 
@@ -383,9 +389,9 @@ All critical services define Docker health checks:
 
 | Service | Check Method | Interval | Timeout | Retries |
 |---------|-------------|----------|---------|---------|
-| `app` | `pgrep php-fpm` | 10s | 5s | 5 |
-| `queue-worker`, `queue-worker-long` | `pgrep -f 'artisan queue:work'` | 30s | 5s | 3 |
-| `scheduler` | heartbeat file touched within 3 minutes | 30s | 5s | 3 |
+| `app` | `pgrep php-fpm` (start period 15m, for migrations on the first start after an upgrade) | 10s | 5s | 5 |
+| `queue-worker`, `queue-worker-long` | `pgrep -f 'artisan queue:work'` (start after `app` is healthy) | 30s | 5s | 3 |
+| `scheduler` | heartbeat file touched within 3 minutes (starts after `app` is healthy) | 30s | 5s | 3 |
 | `mysql` | `mysqladmin ping` | 10s | 5s | 5 |
 | `redis` | `redis-cli ping` | 10s | 5s | 5 |
 | `seaweedfs` | `wget http://localhost:9333/cluster/status` | 30s | 10s | 3 |

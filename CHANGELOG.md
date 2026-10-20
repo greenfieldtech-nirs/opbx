@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-10-20
+
+#### Upgrades and storage
+- First start after an upgrade no longer fails the stack: the `app` health check has a 15-minute `start_period`, so nginx waits while migrations run instead of failing with "dependency app is unhealthy". Queue workers and the scheduler now start only once `app` is healthy (never against a half-migrated schema). The entrypoint prints a progress banner and the migration time.
+- New `scripts/upgrade.sh [--prod]`: copies MinIO data to SeaweedFS once, starts MySQL, Redis, SeaweedFS and `app`, shows the `app` start-up log until it is healthy, then starts the rest.
+- `storage:initialize` creates the `recordings` and `cdr-archive` buckets when they are missing (the previous creation path never worked, and `cdr-archive` was only checked) and waits for SeaweedFS (`STORAGE_WAIT_TIMEOUT`, default 120 s).
+- `scripts/migrate-minio-to-seaweedfs.sh` no longer reports a mismatch for objects that exist only in SeaweedFS (recordings made after the switch), and lists the objects when there is a real mismatch.
+
+### Security - 2026-10-20
+
+- `.dockerignore` now excludes `volumes/` and `backups/`: PHP images built before this included the MySQL data directory, binlogs and database dumps. Rebuild the images and remove old ones (including copies in any registry).
+
 ### Security - 2026-05-04
 
 #### Dependency Vulnerability Remediation
