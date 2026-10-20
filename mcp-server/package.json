@@ -4,7 +4,7 @@
   "description": "Semantic MCP facade over the OPBX REST API",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "packageManager": "npm@11",
   "scripts": {
