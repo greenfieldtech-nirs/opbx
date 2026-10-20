@@ -6,7 +6,16 @@
 # Docker
 .dockerignore
 docker-compose.yml
+docker-compose.yml.bak-*
+.compose-update.*
 Dockerfile*
+
+# Runtime data and backups (bind-mounted at run time; never bake MySQL data, object storage or dumps into an image)
+volumes/
+backups/
+
+# Agent workspace
+.my_agent/
 
 # Documentation
 *.md
@@ -58,9 +67,11 @@ storage/logs/*
 tests/
 phpunit.xml
 
-# Package managers
+# Package managers and build output
 vendor/
 node_modules/
+**/node_modules
+**/target
 
 # OS
 .DS_Store
