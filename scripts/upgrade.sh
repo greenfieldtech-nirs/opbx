@@ -45,13 +45,15 @@ fi
 
 # 2. The app first: it runs the database migrations and prepares storage before anything else starts.
 echo "▶ Building and starting the database, Redis, SeaweedFS and the app..."
+# Taken before the start so the app's log is shown from its first line.
+since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 "${COMPOSE[@]}" up -d --build mysql redis seaweedfs app
 
 echo "▶ Waiting for the app to finish its startup tasks (migrations, seeding, storage)."
 echo "  The first start after an upgrade can take several minutes; its log follows."
 started=$(date +%s)
-since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-docker logs --since "$since" -f "$APP_CONTAINER" 2>&1 | sed 's/^/  │ /' &
+# Process substitution, so $! is `docker logs` itself and stopping it ends the follower quietly.
+docker logs --since "$since" -f "$APP_CONTAINER" > >(sed 's/^/  │ /') 2>&1 &
 log_pid=$!
 trap 'kill $log_pid 2>/dev/null || true' EXIT
 
