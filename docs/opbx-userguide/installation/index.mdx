@@ -296,11 +296,20 @@ git pull
 ./scripts/update-compose.sh --dry-run   # report only
 ./scripts/update-compose.sh             # asks per changed service
 
-# Update PHP dependencies, rebuild and restart
+# Update PHP dependencies, then rebuild and start in order
 composer install
-docker compose build
-docker compose up -d
+./scripts/upgrade.sh          # add --prod when you deploy with docker-compose.prod.yml
 ```
+
+`scripts/upgrade.sh` starts the stack in the right order and shows progress instead of failing:
+
+1. If `./volumes/minio` still holds data from an older installation, it runs `./scripts/migrate-minio-to-seaweedfs.sh` once (see below). With many recordings this takes a while.
+2. It builds and starts MySQL, Redis, SeaweedFS and `app`, then shows the `app` log (database migrations, seeding, bucket creation) until the container is healthy. The first start after an upgrade can take several minutes; that is expected.
+3. It starts the rest of the stack and prints `docker compose ps`.
+
+It stops with an error only if `app` exits, turns unhealthy, or is not ready after 30 minutes (`UPGRADE_TIMEOUT`, in seconds). A plain `docker compose up -d` also works: nginx, the queue workers and the scheduler wait while `app` is still starting (its health check allows up to 15 minutes for the first start); follow it with `docker compose logs -f app`.
+
+On every start `app` waits up to 2 minutes for SeaweedFS (`STORAGE_WAIT_TIMEOUT`, in seconds) and creates the `recordings` and `cdr-archive` buckets if they are missing.
 
 `scripts/update-compose.sh` compares your `docker-compose.yml` with the new example service by service (all profiles). New services are added, services that exist only in your file are kept, and services removed upstream (such as `minio`) are removed only when you confirm. It validates the result with `docker compose config`, keeps the old file as `docker-compose.yml.bak-<timestamp>`, and restarts nothing. `--yes` runs it unattended. It needs only Docker.
 
@@ -313,7 +322,7 @@ Older installations stored objects in MinIO (`./volumes/minio`). SeaweedFS repla
 ./scripts/migrate-minio-to-seaweedfs.sh             # copy and verify every bucket
 ```
 
-The script starts SeaweedFS and a temporary MinIO container on the old data, mirrors every bucket, verifies it, and leaves `./volumes/minio` in place as a fallback. It is safe to re-run. When it succeeds, set `MINIO_ENDPOINT=http://seaweedfs:8333` in `.env`, recreate `app`, restart the queue workers and scheduler, and run `docker compose exec app php artisan storage:initialize`. Copied objects get a new modification date, so recording retention counts from the migration date.
+`./scripts/upgrade.sh` runs this for you the first time (and records it in `./volumes/.minio-migrated-to-seaweedfs`); run it by hand only to check first or to re-run. The script starts SeaweedFS and a temporary MinIO container on the old data, mirrors every bucket, verifies it, and leaves `./volumes/minio` in place as a fallback. It is safe to re-run. When it succeeds, make sure `.env` has `MINIO_ENDPOINT=http://seaweedfs:8333` and start the stack (`./scripts/upgrade.sh`). A bucket that MinIO never had (for example `cdr-archive`) is created when `app` starts. Copied objects get a new modification date, so recording retention counts from the migration date.
 
 ### Upgrading from MySQL 8.0
 

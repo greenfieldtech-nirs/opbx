@@ -107,11 +107,15 @@ services:
     networks:
       - opbx
     healthcheck:
+      # php-fpm starts only after the entrypoint has run migrations, seeding and storage:initialize.
+      # The first start after an upgrade can take minutes; the long start_period keeps the container
+      # "starting" (dependants wait) instead of "unhealthy" (dependants fail). It turns healthy within
+      # one interval of php-fpm starting.
       test: ["CMD-SHELL", "pgrep php-fpm > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 15m
 
   queue-worker:
     build:
@@ -146,8 +150,11 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
-      - redis
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - opbx
     healthcheck:
@@ -192,8 +199,11 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
-      - redis
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - opbx
     healthcheck:
@@ -238,7 +248,9 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
     networks:
       - opbx
     healthcheck:

@@ -253,7 +253,7 @@ SeaweedFS replaces MinIO as the S3-compatible store. The app still reads the `MI
 
 #### Creating the Buckets
 
-The app expects two private buckets: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold CDR tier). Ops creates them; `storage:initialize` on startup only verifies they are reachable and writable.
+The app expects two private buckets: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold CDR tier). On every start of `app`, `storage:initialize` waits up to `STORAGE_WAIT_TIMEOUT` seconds (default 120) for SeaweedFS, creates either bucket if it is missing, and verifies both are writable. To create them by hand instead:
 
 ```bash
 # Option 1: SeaweedFS shell inside the container
