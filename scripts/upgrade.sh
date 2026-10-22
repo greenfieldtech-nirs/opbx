@@ -10,7 +10,8 @@
 #   1. MinIO -> SeaweedFS: if ./volumes/minio still holds data and has not been migrated yet,
 #      runs ./scripts/migrate-minio-to-seaweedfs.sh (can take a long time with many recordings)
 #      and records completion in ./volumes/.minio-migrated-to-seaweedfs. Stops on a mismatch.
-#   2. Builds and starts mysql, redis, seaweedfs and app, then follows the app's startup log
+#   2. Builds every image, pulling fresh base images (a cached base can miss a security release),
+#      starts mysql, redis, seaweedfs and app, then follows the app's startup log
 #      (database migrations, seeding, bucket creation) until it is healthy. A slow first start is
 #      expected and is shown, not reported as an error.
 #   3. Starts the rest of the stack and prints `docker compose ps`.
@@ -44,10 +45,13 @@ if [ -d volumes/minio ] && [ -n "$(ls -A volumes/minio 2>/dev/null | grep -v '^\
 fi
 
 # 2. The app first: it runs the database migrations and prepares storage before anything else starts.
-echo "▶ Building and starting the database, Redis, SeaweedFS and the app..."
+echo "▶ Building the images (pulling fresh base images)..."
+"${COMPOSE[@]}" build --pull
+
+echo "▶ Starting the database, Redis, SeaweedFS and the app..."
 # Taken before the start so the app's log is shown from its first line.
 since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-"${COMPOSE[@]}" up -d --build mysql redis seaweedfs app
+"${COMPOSE[@]}" up -d mysql redis seaweedfs app
 
 echo "▶ Waiting for the app to finish its startup tasks (migrations, seeding, storage)."
 echo "  The first start after an upgrade can take several minutes; its log follows."
@@ -85,6 +89,6 @@ echo "✓ App ready after $(( $(date +%s) - started ))s."
 
 # 3. Everything else (nginx, workers, scheduler, ...).
 echo "▶ Starting the rest of the stack..."
-"${COMPOSE[@]}" up -d --build
+"${COMPOSE[@]}" up -d
 "${COMPOSE[@]}" ps
 echo "✓ Upgrade complete."

@@ -304,7 +304,7 @@ composer install
 `scripts/upgrade.sh` starts the stack in the right order and shows progress instead of failing:
 
 1. If `./volumes/minio` still holds data from an older installation, it runs `./scripts/migrate-minio-to-seaweedfs.sh` once (see below). With many recordings this takes a while.
-2. It builds and starts MySQL, Redis, SeaweedFS and `app`, then shows the `app` log (database migrations, seeding, bucket creation) until the container is healthy. The first start after an upgrade can take several minutes; that is expected.
+2. It builds every image, pulling fresh base images (so a security release of PHP or another base image is picked up), starts MySQL, Redis, SeaweedFS and `app`, then shows the `app` log (database migrations, seeding, bucket creation) until the container is healthy. The first start after an upgrade can take several minutes; that is expected.
 3. It starts the rest of the stack and prints `docker compose ps`.
 
 It stops with an error only if `app` exits, turns unhealthy, or is not ready after 30 minutes (`UPGRADE_TIMEOUT`, in seconds). A plain `docker compose up -d` also works: nginx, the queue workers and the scheduler wait while `app` is still starting (its health check allows up to 15 minutes for the first start); follow it with `docker compose logs -f app`.

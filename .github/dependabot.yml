@@ -51,7 +51,10 @@ updates:
       interval: weekly
 
   - package-ecosystem: docker
-    directory: /
+    # The repository root has no Dockerfile: watch the PHP image (app, queue workers, scheduler) and the frontend.
+    directories:
+      - /docker/php
+      - /frontend
     target-branch: develop
     schedule:
       interval: weekly
