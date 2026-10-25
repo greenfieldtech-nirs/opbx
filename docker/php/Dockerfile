@@ -1,6 +1,6 @@
 # Exact version: a floating tag lets a cached build stay on a vulnerable patch release (8.4.27 fixes
 # CVE-2026-109618 / CVE-2026-109619). Dependabot watches this directory for the next one.
-FROM php:8.4.27-fpm-alpine3.24
+FROM php:8.5.11-fpm-alpine3.24
 
 # Install system dependencies
 RUN apk add --no-cache \
