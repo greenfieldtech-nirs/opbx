@@ -9,6 +9,7 @@ use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class SessionUpdatePruneTest extends TestCase
@@ -27,5 +28,11 @@ class SessionUpdatePruneTest extends TestCase
 
         $remaining = SessionUpdate::withoutGlobalScope(OrganizationScope::class)->pluck('id')->all();
         $this->assertSame([$recent->id], $remaining);
+    }
+
+    public function test_retention_columns_are_indexed_so_model_prune_does_not_scan_the_table(): void
+    {
+        $this->assertTrue(Schema::hasIndex('session_updates', ['updated_at']));
+        $this->assertTrue(Schema::hasIndex('auto_dialer_call_sessions', ['created_at']));
     }
 }
