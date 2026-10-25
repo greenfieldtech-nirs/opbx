@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - 2026-10-25
+
+- Removed the legacy root Laravel/Vite scaffold (root `package.json`, `package-lock.json`, `vite.config.js`, `tsconfig*.json`, `resources/js`, `resources/css`, `welcome.blade.php`). It was never built into an image or served (nginx sends `/` to the frontend), but its lockfile carried Dependabot alerts for vite (launch-editor, GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv) and follow-redirects (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) and was never updated by Dependabot. Laravel's `/` now redirects to `/ui`; `composer setup` / `composer dev` use the `frontend/` app.
+- MCP server: hono 4.13.14 (GHSA-5r4p-p66f-jhc7), body-parser 2.4.0, fast-uri 3.1.9 / 4.2.3 and ip-address 10.7.5 (lockfile-only); `npm audit` is clean for every lockfile.
+
 ### Security - 2026-10-22
 
 - PHP image upgraded to **PHP 8.4.27** (`php:8.4.27-fpm-alpine3.24`), fixing the critical unauthenticated RCE issues CVE-2026-109618 and CVE-2026-109619 ("PHP2Shell", exploited in the wild) plus a heap overflow in the bundled Lexbor parser. Affects `app`, both queue workers and the scheduler; rebuild with `./scripts/upgrade.sh` (it now pulls fresh base images) or `docker compose build --pull`.
