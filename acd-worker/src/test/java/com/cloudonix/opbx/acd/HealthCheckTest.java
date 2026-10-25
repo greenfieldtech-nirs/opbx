@@ -45,12 +45,16 @@ class HealthCheckTest {
         assertEquals(503, statusFor(down));
     }
 
+    // Bind and connect to the same literal address: "localhost" can resolve to ::1 on CI runners and reach
+    // another process listening on that port over IPv6 (HttpClosedException instead of our response).
+    private static final String LOOPBACK = "127.0.0.1";
+
     private int statusFor(QueueStore store) throws Exception {
         HttpServer server = await(vertx.createHttpServer()
                 .requestHandler(AcdWorkerVerticle.healthHandler(store))
-                .listen(0));
+                .listen(0, LOOPBACK));
         return await(vertx.createHttpClient()
-                .request(HttpMethod.GET, server.actualPort(), "localhost", "/")
+                .request(HttpMethod.GET, server.actualPort(), LOOPBACK, "/")
                 .compose(req -> req.send())
                 .map(resp -> resp.statusCode()));
     }

@@ -60,7 +60,7 @@ class StreamHandlerAuthTest {
                     req.response().end("{}");
                 }
             });
-        }).listen(0)).actualPort();
+        }).listen(0, "127.0.0.1")).actualPort();
     }
 
     @AfterEach
@@ -192,7 +192,7 @@ class StreamHandlerAuthTest {
 
     /** Deploys a StreamHandler on its own verticle context, as AmdWorkerVerticle does; returns the WS port. */
     private int startAmd(int detectionTimeoutMs) throws Exception {
-        String base = "http://localhost:" + laravelPort + "/api/voice/amd-action";
+        String base = "http://127.0.0.1:" + laravelPort + "/api/voice/amd-action";
         int[] port = new int[1];
         await(vertx.deployVerticle(new VerticleBase() {
             @Override
@@ -200,7 +200,7 @@ class StreamHandlerAuthTest {
                 StreamHandler handler = new StreamHandler(vertx, 10, detectionTimeoutMs, List.of("tone_energy"),
                     null, new MetricsService(), new ObjectMapper(), false, "/tmp", "test-token",
                     base, Config.deriveSessionCheckUrl(base, null), 2000);
-                return vertx.createHttpServer().webSocketHandler(handler::handleConnection).listen(0)
+                return vertx.createHttpServer().webSocketHandler(handler::handleConnection).listen(0, "127.0.0.1")
                     .onSuccess(s -> port[0] = s.actualPort());
             }
         }));
@@ -208,7 +208,7 @@ class StreamHandlerAuthTest {
     }
 
     private WebSocket connect(int port) throws Exception {
-        return await(wsClient.connect(port, "localhost", "/ws/detect"));
+        return await(wsClient.connect(port, "127.0.0.1", "/ws/detect"));
     }
 
     private static CompletableFuture<Short> closeCode(WebSocket ws) {
