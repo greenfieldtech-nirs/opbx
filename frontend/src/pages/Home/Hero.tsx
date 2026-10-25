@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Github } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 import { useEffect, useRef } from 'react';
 import opbxLogo from '@/assets/opbx_logo.png';
 
@@ -254,7 +255,7 @@ export function Hero() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Github className="mr-2 h-5 w-5" />
+                  <GithubIcon className="mr-2 h-5 w-5" />
                   View on GitHub
                 </a>
               </Button>
