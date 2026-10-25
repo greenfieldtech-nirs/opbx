@@ -4,7 +4,7 @@ This document provides essential information for AI coding agents working in thi
 
 ## Project Overview
 
-OPBX is an open-source business PBX platform built on Laravel (PHP 8.4) and React (TypeScript).
+OPBX is an open-source business PBX platform built on Laravel (PHP 8.5) and React (TypeScript).
 - **Backend**: Laravel 12 API with MySQL + Redis
 - **Frontend**: React 19 SPA with Vite, TanStack Query, shadcn/ui
 - **Dialer Worker**: Go-based service for outbound campaigns

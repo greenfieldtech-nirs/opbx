@@ -4,7 +4,7 @@ This directory contains the complete Docker-based infrastructure for the **OPBX*
 
 ## Overview
 
-OPBX is a multi-tenant business PBX built on **Laravel 12 (PHP 8.4)** and **React 18 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack runs 14 services on a single bridge network: the web frontend, API backend, queue workers, scheduler, real-time WebSocket messaging, the data stores, an MCP server, and workers for outbound dialing, voicemail detection and call queues. Five more are optional and start only with a profile: `ngrok` (profile `dev`) and the log stack `loki`, `alloy`, `grafana`, `docker-socket-proxy` (profile `logs`).
+OPBX is a multi-tenant business PBX built on **Laravel 12 (PHP 8.5)** and **React 18 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack runs 14 services on a single bridge network: the web frontend, API backend, queue workers, scheduler, real-time WebSocket messaging, the data stores, an MCP server, and workers for outbound dialing, voicemail detection and call queues. Five more are optional and start only with a profile: `ngrok` (profile `dev`) and the log stack `loki`, `alloy`, `grafana`, `docker-socket-proxy` (profile `logs`).
 
 ---
 
@@ -90,7 +90,7 @@ graph TB
 
 | # | Service | Image / Build | Purpose | Host Ports |
 |---|---------|--------------|---------|------------|
-| 1 | **app** | `docker/php/Dockerfile` (PHP 8.4-FPM) | Main Laravel API application server | None (FPM 9000 internal) |
+| 1 | **app** | `docker/php/Dockerfile` (PHP 8.5-FPM) | Main Laravel API application server | None (FPM 9000 internal) |
 | 2 | **queue-worker** | Same as `app` | Laravel queue worker (`auto-dialer`, `default` queues) | None |
 | 3 | **queue-worker-long** | Same as `app` | Long jobs on the `auto-dialer-long` queue (list uploads, hold-music segmentation), 2-hour timeout | None |
 | 4 | **scheduler** | Same as `app` | Runs `schedule:run` every 60 seconds | None |
@@ -119,7 +119,7 @@ The dialer, AMD and ACD worker images run as a non-root user (uid 10001).
 ```
 docker/
 ├── php/
-│   ├── Dockerfile          # PHP 8.4-FPM image build
+│   ├── Dockerfile          # PHP 8.5-FPM image build
 │   ├── entrypoint.sh       # Container startup: validation, migrations, seeding, bucket creation, cache clear
 │   ├── scheduler.sh        # Laravel scheduler loop (runs every 60s)
 │   ├── php.ini             # PHP runtime configuration
@@ -189,7 +189,7 @@ The PHP images are built from the repository root (`COPY . .`). `.dockerignore` 
 
 `app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./scripts/upgrade.sh` (add `--prod` with `docker-compose.prod.yml`), which builds the images with fresh base images (`build --pull`), starts the stack in order and shows the `app` log until it is ready.
 
-The PHP image is pinned to an exact base (`php:8.4.27-fpm-alpine3.24` in `docker/php/Dockerfile`); Dependabot proposes the next patch release. A plain `docker compose build` reuses a cached base image, so use `docker compose build --pull` (or `./scripts/upgrade.sh`) after a base image change.
+The PHP image is pinned to an exact base (`php:8.5.12-fpm-alpine3.24` in `docker/php/Dockerfile`); Dependabot proposes the next patch release. A plain `docker compose build` reuses a cached base image, so use `docker compose build --pull` (or `./scripts/upgrade.sh`) after a base image change.
 
 ---
 
@@ -211,7 +211,7 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 
 ### PHP-FPM Configuration
 
-- **Base image**: `php:8.4.27-fpm-alpine3.24` (exact version; see [Rebuilding After Code Changes](#rebuilding-after-code-changes))
+- **Base image**: `php:8.5.12-fpm-alpine3.24` (exact version; see [Rebuilding After Code Changes](#rebuilding-after-code-changes))
 - **Extensions installed**: `pdo_mysql`, `mbstring`, `zip`, `exif`, `pcntl`, `bcmath`, `opcache`, `intl`, `redis`
 - **OPcache**: Enabled with JIT tracing (`opcache.jit=tracing`, `opcache.jit_buffer_size=128M`)
 - **Memory limit**: 256M per process

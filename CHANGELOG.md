@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - 2026-10-25
+
+- PHP image upgraded to **PHP 8.5.12** (`php:8.5.12-fpm-alpine3.24`) for `app`, both queue workers and the scheduler; CI runs on PHP 8.5. Dependabot proposed 8.5.11, which is still affected by CVE-2026-109618 / CVE-2026-109619, so the image is pinned to 8.5.12. OPcache is built into PHP 8.5 and is no longer installed as an extension (`docker/php/opcache.ini` still configures it). Rebuild with `./scripts/upgrade.sh` or `docker compose build --pull`.
+- Dependency updates: Vert.x 5.2.2 (ACD and AMD workers); MCP server OpenTelemetry 0.300 / API 1.10, eslint 10.13, typescript-eslint 8.72; frontend vite 8.3.5, TanStack Query 5.104.5, @hookform/resolvers 6, @testing-library/jest-dom 7, lucide-react 1.61 (the GitHub mark, dropped from lucide 1.x, is now `components/icons/GithubIcon`).
+
 ### Security - 2026-10-25
 
 - Removed the legacy root Laravel/Vite scaffold (root `package.json`, `package-lock.json`, `vite.config.js`, `tsconfig*.json`, `resources/js`, `resources/css`, `welcome.blade.php`). It was never built into an image or served (nginx sends `/` to the frontend), but its lockfile carried Dependabot alerts for vite (launch-editor, GHSA-r825-w8mm-5pxw, GHSA-587h-7wmj-h5pm, GHSA-698v-4r3x-3vcv) and follow-redirects (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) and was never updated by Dependabot. Laravel's `/` now redirects to `/ui`; `composer setup` / `composer dev` use the `frontend/` app.
