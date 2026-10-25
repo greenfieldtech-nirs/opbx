@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import OPBXLogo from '@/assets/opbx_logo.png';
-import { Menu, X, Github, Star } from 'lucide-react';
+import { Menu, X, Star } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 import { useEffect, useState } from 'react';
 
 const navLinks: { href: string; label: string; external?: boolean; internal?: boolean }[] = [
@@ -108,7 +109,7 @@ export function HomeHeader() {
             className="border-border hover:bg-card"
           >
             <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" aria-label="View OPBX on GitHub">
-              <Github className="h-5 w-5" />
+              <GithubIcon className="h-5 w-5" />
             </a>
           </Button>
           <GithubStars />
@@ -178,7 +179,7 @@ export function HomeHeader() {
                   className="flex-1 border-border hover:bg-card"
                 >
                   <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer">
-                    <Github className="mr-2 h-5 w-5" />
+                    <GithubIcon className="mr-2 h-5 w-5" />
                     GitHub
                   </a>
                 </Button>

@@ -1,4 +1,4 @@
-import { Github } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
@@ -72,7 +72,7 @@ export function Pricing() {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <Github className="mr-2 h-5 w-5" />
+                      <GithubIcon className="mr-2 h-5 w-5" />
                       View on GitHub
                     </a>
                   </Button>

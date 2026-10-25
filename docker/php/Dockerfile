@@ -1,6 +1,6 @@
-# Exact version: a floating tag lets a cached build stay on a vulnerable patch release (8.4.27 fixes
-# CVE-2026-109618 / CVE-2026-109619). Dependabot watches this directory for the next one.
-FROM php:8.4.27-fpm-alpine3.24
+# Exact version: a floating tag lets a cached build stay on a vulnerable patch release (8.5.12 fixes
+# CVE-2026-109618 / CVE-2026-109619; 8.5.0-8.5.11 are affected). Dependabot watches this directory.
+FROM php:8.5.12-fpm-alpine3.24
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -22,7 +22,6 @@ RUN apk add --no-cache \
     exif \
     pcntl \
     bcmath \
-    opcache \
     intl
 
 # Install Redis extension

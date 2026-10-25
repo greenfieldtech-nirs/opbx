@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Github } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 
 export function FinalCTA() {
   return (
@@ -8,7 +9,7 @@ export function FinalCTA() {
       <div className="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
       <div className="container mx-auto px-4 text-center relative">
         <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-8">
-          <Github className="h-8 w-8 text-primary" />
+          <GithubIcon className="h-8 w-8 text-primary" />
         </div>
         <h2 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
           Ready to Transform Your Business Communications?
@@ -30,7 +31,7 @@ export function FinalCTA() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Github className="mr-2 h-5 w-5" />
+              <GithubIcon className="mr-2 h-5 w-5" />
               View Documentation
             </a>
           </Button>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Github, Phone } from 'lucide-react';
+import { Phone } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 
 export function Footer() {
   return (
@@ -127,7 +128,7 @@ export function Footer() {
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Github className="h-5 w-5" />
+              <GithubIcon className="h-5 w-5" />
             </a>
           </div>
         </div>

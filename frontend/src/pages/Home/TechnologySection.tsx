@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Code, Github, Lock, Phone, Server, Shield, Zap } from 'lucide-react';
+import { Code, Lock, Phone, Server, Shield, Zap } from 'lucide-react';
+import { GithubIcon } from '@/components/icons/GithubIcon';
 
 const highlights = [
   {
@@ -18,7 +19,7 @@ const highlights = [
     description: 'Full control over your data and infrastructure. No vendor lock-in.',
   },
   {
-    icon: Github,
+    icon: GithubIcon,
     title: 'Open Source',
     description: 'MIT licensed. Active development with community contributions.',
   },

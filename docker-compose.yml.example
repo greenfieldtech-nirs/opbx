@@ -226,7 +226,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # The nightly model:prune / cdr:tier runs need headroom over the per-minute jobs.
+          memory: 512M
         reservations:
           memory: 128M
     command: /usr/local/bin/scheduler.sh
