@@ -187,7 +187,9 @@ The PHP images are built from the repository root (`COPY . .`). `.dockerignore` 
 
 ### Start-up Order After an Upgrade
 
-`app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./scripts/upgrade.sh` (add `--prod` with `docker-compose.prod.yml`), which starts the stack in order and shows the `app` log until it is ready.
+`app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./scripts/upgrade.sh` (add `--prod` with `docker-compose.prod.yml`), which builds the images with fresh base images (`build --pull`), starts the stack in order and shows the `app` log until it is ready.
+
+The PHP image is pinned to an exact base (`php:8.4.27-fpm-alpine3.24` in `docker/php/Dockerfile`); Dependabot proposes the next patch release. A plain `docker compose build` reuses a cached base image, so use `docker compose build --pull` (or `./scripts/upgrade.sh`) after a base image change.
 
 ---
 
@@ -209,7 +211,7 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 
 ### PHP-FPM Configuration
 
-- **Base image**: `php:8.4-fpm-alpine`
+- **Base image**: `php:8.4.27-fpm-alpine3.24` (exact version; see [Rebuilding After Code Changes](#rebuilding-after-code-changes))
 - **Extensions installed**: `pdo_mysql`, `mbstring`, `zip`, `exif`, `pcntl`, `bcmath`, `opcache`, `intl`, `redis`
 - **OPcache**: Enabled with JIT tracing (`opcache.jit=tracing`, `opcache.jit_buffer_size=128M`)
 - **Memory limit**: 256M per process

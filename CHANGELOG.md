@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - 2026-10-22
+
+- PHP image upgraded to **PHP 8.4.27** (`php:8.4.27-fpm-alpine3.24`), fixing the critical unauthenticated RCE issues CVE-2026-109618 and CVE-2026-109619 ("PHP2Shell", exploited in the wild) plus a heap overflow in the bundled Lexbor parser. Affects `app`, both queue workers and the scheduler; rebuild with `./scripts/upgrade.sh` (it now pulls fresh base images) or `docker compose build --pull`.
+- The PHP base image is pinned to an exact version and watched by Dependabot (`/docker/php`, `/frontend`; the old root entry watched no Dockerfile).
+
 ### Fixed - 2026-10-20
 
 #### Upgrades and storage
