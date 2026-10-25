@@ -44,7 +44,7 @@ The `/.my_agent/` directory is the agent's workspace and is gitignored:
 vendor/bin/pint                            # Lint/fix all PHP (PSR-12)
 vendor/bin/pint --dirty                    # Fix only changed files
 
-composer dev                               # Dev server + queue + logs + Vite
+composer dev                               # Dev server + queue + logs + frontend Vite (outside Docker)
 php artisan serve                          # API only
 php artisan queue:listen                   # Queue worker
 ```
@@ -110,8 +110,8 @@ docker compose exec app php artisan migrate # Run migrations
 
 ### TypeScript / React
 - 2-space indentation for TSX/TS files
-- `@/` path alias for imports from `src/` (configured in tsconfig.json)
-- TypeScript strict mode is **off** (`strict: false` in tsconfig.json)
+- `@/` path alias for imports from `src/` (configured in frontend/tsconfig.json)
+- TypeScript strict mode is **off** (`strict: false` in frontend/tsconfig.json)
 - Components: `PascalCase` filenames (e.g., `BusinessHoursForm.tsx`)
 - Hooks: `camelCase` starting with `use` (e.g., `useAuth()`)
 - Types/Interfaces: `PascalCase` (e.g., `BusinessHoursConfig`)
