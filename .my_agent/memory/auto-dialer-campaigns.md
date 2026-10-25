@@ -27,7 +27,6 @@ Outbound calling campaigns that automatically dial phone numbers from distributi
 | `app/Enums/DestinationStatus.php` | PENDING, DIALING, CONNECTED, FAILED, COMPLETED, INVALID |
 | `app/Services/AutoDialer/AutoDialerCloudonixService.php` | Cloudonix API calls + CXML generation with AMD stream wrapper (~937 lines). Outbound payload built in `buildPayload()` (POST `/calls/{domain}/application`); always includes `deadline` = now+5min (ISO-8601) so Cloudonix rejects the call if not started within 5 minutes. |
 | `app/Services/AutoDialer/CampaignLifecycleManager.php` | State transitions (~197 lines) |
-| `app/Services/AutoDialer/CampaignProcessor.php` | Batch processing (~156 lines) |
 | `app/Services/AutoDialer/CampaignStatistics.php` | Stats with caching |
 | `app/Services/AutoDialer/DialingScheduler.php` | Schedule checking |
 | `app/Services/AutoDialer/CallerIdPoolService.php` | Caller ID pool management |
@@ -86,7 +85,7 @@ organization_id, campaign_id, destination_id, phone_number, worker_id, session_t
 ### CAC Counter Lifecycle
 - **Increment**: Go worker calls `Redis INCR dialer:cac:{id}:active` after successful call initiation
 - **Decrement**: Laravel webhook controllers call `Redis DECR dialer:cac:{id}:active` when processing call completion/failure events from Cloudonix (floor at 0 to prevent negative drift)
-- **Important**: The Go worker does NOT subscribe to any Redis Pub/Sub channel. The `CDRPublisher` publishes to `cdr:completed` but has no subscriber — Laravel handles the decrement directly.
+- **Important**: The Go worker does NOT subscribe to any Redis Pub/Sub channel. `CDRPublisher` no longer publishes `cdr:completed` (removed 2026-10-14, it had no subscriber); it only keeps `decrementCacCounter`. Laravel handles the decrement directly.
 
 ---
 
@@ -218,3 +217,9 @@ Exponential backoff: `5 * 2^(attempt-1)` minutes, capped at 60 minutes. Retryabl
 - Metadata is preserved across AI Load Balancer follow-through failover by looking up the `AutoDialerCallSession` from the `CallSid`.
 - Empty metadata is omitted entirely.
 - Implementation files: `AutoDialerCloudonixService`, `AlbsFollowThroughController`, `CxmlBuilder`, `MetadataHelper`.
+
+## Ring Group / Call Queue routing (2026-10-19)
+`RoutingDestinationType` gained RING_GROUP / CALL_QUEUE (migration 2026_10_19_090000 widens the MySQL ENUM column). Campaign CXML is fixed at origination, before the session exists, so for these types `AutoDialerCloudonixService::generateCxmlForCampaign` emits `<Redirect>` (AMD stream wrap still applies) to `voice.campaign-route` = `CampaignRouteController` (Laravel relative temporary signed route, 15 min; params organization_id/type/destination_id). On answer it swaps From/To (contact becomes the caller), sets `_organization_id`, `_call_category=outbound`, and calls `VoiceRoutingManager::executeStrategy(RING_GROUP|QUEUE, …)` under `OrganizationScope::bypass` — same path as IVR → ring group / queue. Do NOT bind `VoiceRoutingStrategyExecutor` as a container singleton: its constructor collects the tagged strategies, one depends on the executor → infinite recursion (artisan exits 255 silently). The old inline `<Dial>` ring-group CXML in the service was removed; `CxmlGenerationService` (generate-cxml worker endpoint, unused by the Go worker) still has its own legacy ring_group branch. Unverified live: follow-up callbacks (queue-poll, ring-group-callback, queue-dial-callback) use Bearer `voice.webhook.auth` — relies on Cloudonix sending the domain `authorization-api-key` for dialer-originated sessions. Sequential ring group / non-conference queue `<Dial>` shows agents the campaign caller ID, not the contact. Tests: `tests/Feature/AutoDialer/CampaignRingGroupAndQueueRoutingTest.php`.
+
+## Wait for available agents (2026-10-19)
+`auto_dialer_campaigns.wait_for_available_agents` (bool, default false; migration 2026_10_19_120000). Only for CALL_QUEUE routing (first built for ring groups by mistake, switched same day). Form toggle under Caller ID "Strategy", disabled otherwise; payload sends false for other types. `App\Services\AutoDialer\CampaignAgentAvailability::isWaitingForAgents()` = flag on + queue exists + no agent with ACD worker `/queue/live` state AVAILABLE whose extension is not `ExtensionPresenceTracker::isBusy` (roster from `QueueDialOfferService::roster`). Worker unreachable → fail open (keeps dialing). Gates in `DialerWorkerController`: `getPendingDestinations` returns [] with `meta.waiting_for_agents`, `initiateCall` returns 409 before the claim (Go worker treats 409 as skip, rolls back CAC, destination stays pending). Not per-agent pacing: one available agent still allows up to CAC calls (extra contacts wait in queue). Tests: `tests/Feature/AutoDialer/CampaignWaitForAgentsTest.php`. Pre-existing flake: `QueueStatsAndAgentTest::test_live_combines_worker_snapshot_with_rolling_counts` (second-boundary `now()`).

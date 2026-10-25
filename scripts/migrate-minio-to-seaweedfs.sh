@@ -17,9 +17,8 @@
 # does not match. Copied objects get a new "last modified" date (S3 cannot preserve it),
 # so recording retention counts from the migration date.
 #
-# After it succeeds: set MINIO_ENDPOINT=http://seaweedfs:8333 in .env, then
-#   docker compose up -d app && docker compose restart queue-worker queue-worker-long scheduler
-#   docker compose exec app php artisan storage:initialize
+# After it succeeds: make sure .env has MINIO_ENDPOINT=http://seaweedfs:8333, then start the stack with
+#   ./scripts/upgrade.sh   (it also runs this script once by itself when ./volumes/minio has data)
 #
 
 set -euo pipefail
@@ -117,11 +116,15 @@ for b in $buckets; do
     mc mb --ignore-existing "dst/$b" >/dev/null
     mc mirror --overwrite --quiet "src/$b" "dst/$b" >/dev/null
     m=$(count "dst/$b")
-    diffs=$(mc diff "src/$b" "dst/$b" | grep -c . || true)
+    # Objects only in SeaweedFS (">", e.g. recordings made after an earlier switch) are fine; anything
+    # missing from it ("<") or different ("!") is a mismatch.
+    mc diff "src/$b" "dst/$b" | grep -v '^>' > /tmp/diff.txt || true
+    diffs=$(grep -c . /tmp/diff.txt || true)
     if [ "$diffs" -eq 0 ] && [ "$m" -ge "$n" ]; then
-        echo "  ✓ $b verified: $m objects in SeaweedFS, no differences"
+        echo "  ✓ $b verified: $m objects in SeaweedFS ($n from MinIO), nothing missing or different"
     else
-        echo "  ✗ $b MISMATCH: source $n, SeaweedFS $m, $diffs differing objects"
+        echo "  ✗ $b MISMATCH: source $n, SeaweedFS $m, $diffs missing or differing objects:"
+        head -20 /tmp/diff.txt | sed 's/^/      /'
         failed=1
     fi
 done
@@ -134,6 +137,6 @@ elif [ "$DRY_RUN" = "true" ]; then
     echo "✓ Dry run finished. Nothing was copied."
 else
     echo "✓ Migration complete. ./volumes/minio was left untouched as a fallback."
-    echo "  Next: set MINIO_ENDPOINT=http://seaweedfs:8333 in .env, recreate app, restart workers, run storage:initialize."
+    echo "  Next: make sure .env has MINIO_ENDPOINT=http://seaweedfs:8333, then start the stack: ./scripts/upgrade.sh"
 fi
 exit $status

@@ -123,8 +123,16 @@ run_as_app php artisan view:clear 2>/dev/null || echo "View cache clear skipped"
 
 # Run migrations only from the main app container (not from queue-worker or scheduler)
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    echo "================================================================================"
+    echo " Preparing OPBX: database migrations, seeding and storage."
+    echo " The first start after an upgrade can take several minutes. This is expected:"
+    echo " nginx, the queue workers and the scheduler start once this container is healthy."
+    echo " Follow progress with: docker compose logs -f app"
+    echo "================================================================================"
     echo "Running database migrations..."
+    migrate_started=$(date +%s)
     run_as_app php artisan migrate --force --no-interaction || echo "Migration failed or already up to date"
+    echo "Database migrations finished in $(( $(date +%s) - migrate_started ))s."
 
     # Seed only on fresh installations (creates default organization + admin user).
     # Seeders are bootstrap-only: one-off data fixes belong in migrations
@@ -132,16 +140,18 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Checking if database seeding is needed..."
     run_as_app php artisan db:seed-if-fresh --no-interaction || echo "Seeding skipped or already completed"
 
-    # Initialize storage (verifies S3 / SeaweedFS bucket access).
-    # The bucket itself is provisioned by ops (`weed shell` s3.bucket.create, see docker/README.md); this must never
-    # abort startup, so failures are logged and swallowed (matches migrate/seed).
+    # Storage: wait for SeaweedFS (it may still be starting), create any missing bucket (recordings, cdr-archive)
+    # and verify access. Must never abort startup, so failures are logged and swallowed (matches migrate/seed).
     echo "Initializing storage..."
-    run_as_app php artisan storage:initialize || echo "⚠️  Storage initialization failed (recordings uploads may not work until SeaweedFS is reachable)."
+    run_as_app php artisan storage:initialize --wait="${STORAGE_WAIT_TIMEOUT:-120}" || echo "⚠️  Storage initialization failed (recordings uploads may not work until SeaweedFS is reachable)."
 
     echo "Validating configuration..."
     run_as_app php artisan config:validate --silent || echo "⚠️  Configuration warnings detected. Run 'php artisan config:validate' for details."
 fi
 
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    echo "OPBX is ready; starting php-fpm (the container turns healthy within 10s)."
+fi
 echo "Starting: $*"
 
 # Launch the workload.

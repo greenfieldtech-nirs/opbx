@@ -16,7 +16,7 @@
 - **Control Plane**: React + Laravel API + MySQL (CRUD/config)
 - **Execution Plane**: Webhook ingestion + Redis state + CXML responses + Laravel queue workers
 - **Real-time**: Soketi WebSocket server (Laravel Echo/Pusher protocol)
-- **Storage**: MySQL (source of truth) + Redis (ephemeral: state, locks, queues) + MinIO (audio recordings)
+- **Storage**: MySQL (source of truth) + Redis (ephemeral: state, locks, queues) + SeaweedFS, S3 API (audio recordings; replaced MinIO)
 
 ---
 

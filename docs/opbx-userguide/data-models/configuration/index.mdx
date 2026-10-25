@@ -115,8 +115,9 @@ The `MINIO_*` variable names are kept for the S3 client. The S3 store is Seaweed
 | `MINIO_EXPOSE_PORT` | — | Expose the S3 API on loopback port 8333 (dev only, needs `docker-compose.ports.yml`) |
 | `MINIO_CONSOLE_EXPOSE_PORT` | — | Expose the SeaweedFS master UI on loopback port 9333 (dev only, needs `docker-compose.ports.yml`) |
 | `CDR_ARCHIVE_BUCKET` | `cdr-archive` | Private bucket for the cold call-record archive. Same credentials as above |
+| `STORAGE_WAIT_TIMEOUT` | `120` | Seconds the `app` container waits at start for the S3 endpoint before it creates any missing bucket (`recordings`, `cdr-archive`) and verifies both |
 
-The `MINIO_*` names are kept for compatibility. Existing installations that used MinIO move their objects with `scripts/migrate-minio-to-seaweedfs.sh`. The upgrade steps are in `docs/DATABASE-PERSISTENCE.md` in the repository.
+The `MINIO_*` names are kept for compatibility. Existing installations that used MinIO move their objects with `scripts/migrate-minio-to-seaweedfs.sh`, which `scripts/upgrade.sh` runs once by itself. The upgrade steps are in [Updating OPBX](/opbx/installation#updating-opbx).
 
 ### Cloudonix CPaaS
 

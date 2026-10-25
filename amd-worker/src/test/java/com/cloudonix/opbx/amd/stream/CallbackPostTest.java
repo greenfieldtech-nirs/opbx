@@ -31,7 +31,7 @@ class CallbackPostTest {
     @Test
     void postsOverHttp() throws Exception {
         HttpServer server = await(server(new HttpServerOptions(), 200));
-        String url = "http://localhost:" + server.actualPort() + "/api/voice/amd-action";
+        String url = "http://127.0.0.1:" + server.actualPort() + "/api/voice/amd-action";
 
         client = vertx.createHttpClient();
         assertEquals(200, await(StreamHandler.postCallback(vertx, client, url, "t", "{}")));
@@ -41,28 +41,30 @@ class CallbackPostTest {
     void postsOverHttpsWhenTheUrlSaysSo() throws Exception {
         SelfSignedCertificate cert = SelfSignedCertificate.create();
         HttpServer server = await(server(new HttpServerOptions().setSsl(true).setKeyCertOptions(cert.keyCertOptions()), 200));
-        String url = "https://localhost:" + server.actualPort() + "/api/voice/amd-action";
+        String url = "https://127.0.0.1:" + server.actualPort() + "/api/voice/amd-action";
 
-        // Test-only trust of the self-signed cert; SSL itself must come from the https scheme.
-        client = vertx.createHttpClient(new HttpClientOptions().setTrustOptions(cert.trustOptions()));
+        // Test-only trust of the self-signed cert; SSL itself must come from the https scheme. The cert names
+        // "localhost", the server is reached by IP (see server()), so only the hostname check is relaxed.
+        client = vertx.createHttpClient(new HttpClientOptions().setTrustOptions(cert.trustOptions()).setVerifyHost(false));
         assertEquals(200, await(StreamHandler.postCallback(vertx, client, url, "t", "{}")));
     }
 
     @Test
     void retriesOnceOn5xx() throws Exception {
         HttpServer server = await(server(new HttpServerOptions(), 503));
-        String url = "http://localhost:" + server.actualPort() + "/";
+        String url = "http://127.0.0.1:" + server.actualPort() + "/";
 
         client = vertx.createHttpClient();
         assertEquals(503, await(StreamHandler.postCallback(vertx, client, url, "t", "{}")));
         assertEquals(2, hits.get());
     }
 
+    // Bound to and called on 127.0.0.1: "localhost" can resolve to ::1 on CI runners and reach another process.
     private Future<HttpServer> server(HttpServerOptions options, int status) {
         return vertx.createHttpServer(options).requestHandler(req -> {
             hits.incrementAndGet();
             req.body().onSuccess(b -> req.response().setStatusCode(status).end());
-        }).listen(0);
+        }).listen(0, "127.0.0.1");
     }
 
     private static <T> T await(Future<T> f) throws Exception {

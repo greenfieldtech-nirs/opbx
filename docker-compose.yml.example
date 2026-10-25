@@ -96,6 +96,7 @@ services:
       - MINIO_BUCKET=recordings
       - MINIO_ENDPOINT=http://seaweedfs:8333
       - MINIO_USE_PATH_STYLE=true
+      - STORAGE_WAIT_TIMEOUT=${STORAGE_WAIT_TIMEOUT:-120}  # seconds storage:initialize waits for SeaweedFS at start
       - MCP_PORT=${MCP_PORT:-8080}
       # Auto Dialer Worker authentication (must match DIALER_WORKER_API_TOKEN env var)
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
@@ -107,11 +108,15 @@ services:
     networks:
       - opbx
     healthcheck:
+      # php-fpm starts only after the entrypoint has run migrations, seeding and storage:initialize.
+      # The first start after an upgrade can take minutes; the long start_period keeps the container
+      # "starting" (dependants wait) instead of "unhealthy" (dependants fail). It turns healthy within
+      # one interval of php-fpm starting.
       test: ["CMD-SHELL", "pgrep php-fpm > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 40s
+      start_period: 15m
 
   queue-worker:
     build:
@@ -146,8 +151,11 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
-      - redis
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - opbx
     healthcheck:
@@ -192,8 +200,11 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
-      - redis
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - opbx
     healthcheck:
@@ -238,7 +249,9 @@ services:
       # Auto Dialer Worker authentication
       - DIALER_WORKER_API_TOKEN=${DIALER_WORKER_API_TOKEN:?set DIALER_WORKER_API_TOKEN}
     depends_on:
-      - app
+      # Start once app has run the migrations, never against a half-migrated schema.
+      app:
+        condition: service_healthy
     networks:
       - opbx
     healthcheck:

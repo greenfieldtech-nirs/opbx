@@ -5,9 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\EmbedDialerController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// nginx serves the site root from the frontend; this only answers direct hits on the PHP app.
+Route::redirect('/', '/ui');
 
 // Embedded dialer: iframe document (per-token frame-ancestors CSP) + host loader.
 Route::get('/embed/dialer', [EmbedDialerController::class, 'dialer'])->name('embed.dialer');

@@ -148,15 +148,13 @@ cp docker-compose.yml.example docker-compose.yml    # or merge the SeaweedFS ser
 
 The script starts SeaweedFS, runs a temporary MinIO container on `./volumes/minio` with the same `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`, mirrors every bucket (all organisations, since each one is a folder inside the bucket), and verifies each bucket with `mc diff` and object counts. It exits non-zero on any mismatch and is safe to re-run. `./volumes/minio` is never modified, so it stays as a fallback.
 
-When it reports success, switch the app over:
+When it reports success, switch the app over (`./scripts/upgrade.sh` runs the copy and these steps for you):
 
 ```bash
 # .env
 MINIO_ENDPOINT=http://seaweedfs:8333
 
-docker compose up -d app
-docker compose restart queue-worker queue-worker-long scheduler
-docker compose exec app php artisan storage:initialize
+./scripts/upgrade.sh      # starts app, waits for its migrations and bucket checks, then the rest
 ```
 
 Copied objects get the migration date as their last-modified time (S3 cannot keep the original), so recording retention counts from the migration date.
@@ -564,7 +562,7 @@ For stricter RPO/RTO requirements, consider:
 - Foreign keys follow the `{singular_table}_id` convention.
 - MySQL is the source of truth for schema state; run migrations with `docker compose exec app php artisan migrate`.
 - Redis does not require schema migrations, but changes to key formats between application versions may temporarily coexist during rolling updates.
-- The `recordings` and `cdr-archive` buckets are created by ops (see [docker/README.md](../docker/README.md#creating-the-buckets)). On startup with `RUN_MIGRATIONS=true`, `storage:initialize` (`app/Console/Commands/InitializeStorage.php`) verifies both buckets are reachable and writable.
+- On startup with `RUN_MIGRATIONS=true`, `storage:initialize --wait` (`app/Console/Commands/InitializeStorage.php`) waits for the S3 endpoint, creates the `recordings` and `cdr-archive` buckets if they are missing (private), and verifies both are writable. They can also be created by hand (see [docker/README.md](../docker/README.md#creating-the-buckets)).
 
 ---
 

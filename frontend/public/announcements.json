@@ -1,17 +1,26 @@
 [
   {
+    "date": "2026-10-26",
+    "type": "Emergency Security Release",
+    "text": "Version 0.1.2-rc1 is now available for download, addressing the PHP2Shell issue (CVE-2026-109618 and CVE-2026-109619).",
+    "badge": "critical"
+  },
+  {
     "date": "2026-10-20",
     "type": "New Release",
-    "text": "Version 0.1.1-rc2 is now available for download, with improved queues and reporting features."
+    "text": "Version 0.1.1-rc2 is now available for download, with improved queues and reporting features.",
+    "badge": "new_release"
   },
   {
     "date": "2026-09-22",
     "type": "New Feature",
-    "text": "Call Queues and Call Queue Dashboards are now available in OPBX Cloud and OPBX OSS."
+    "text": "Call Queues and Call Queue Dashboards are now available in OPBX Cloud and OPBX OSS.",
+    "badge": "feature"
   },
   {
     "date": "2026-09-01",
     "type": "New Feature",
-    "text": "OPBX MCP server is now available, use your favorite AI agent to build and configure your PBX or Contact Center."
+    "text": "OPBX MCP server is now available, use your favorite AI agent to build and configure your PBX or Contact Center.",
+    "badge": "feature"
   }
 ]
