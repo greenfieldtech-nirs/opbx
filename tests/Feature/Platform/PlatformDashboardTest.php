@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -44,9 +45,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard returns correct organization counts
      */
+    #[Test]
     public function dashboard_returns_correct_organization_counts(): void
     {
         // Create organizations with different statuses
@@ -66,9 +67,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard returns correct user counts
      */
+    #[Test]
     public function dashboard_returns_correct_user_counts(): void
     {
         // Create users across different organizations
@@ -102,9 +103,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard returns correct extension counts
      */
+    #[Test]
     public function dashboard_returns_correct_extension_counts(): void
     {
         $org2 = Organization::factory()->create();
@@ -124,9 +125,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard returns recent organizations ordered by created_at
      */
+    #[Test]
     public function dashboard_returns_recent_organizations_ordered(): void
     {
         // Create organizations with specific dates
@@ -156,9 +157,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard includes organization counts in recent organizations
      */
+    #[Test]
     public function dashboard_includes_organization_counts(): void
     {
         $org = Organization::factory()->create();
@@ -181,9 +182,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard returns recent audit logs
      */
+    #[Test]
     public function dashboard_returns_recent_audit_logs(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -211,9 +212,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard limits recent organizations to 10
      */
+    #[Test]
     public function dashboard_limits_recent_organizations_to_10(): void
     {
         // Create 15 organizations
@@ -230,9 +231,9 @@ class PlatformDashboardTest extends TestCase
     }
 
     /**
-     * @test
      * Dashboard limits recent audit logs to 10
      */
+    #[Test]
     public function dashboard_limits_recent_audit_logs_to_10(): void
     {
         Sanctum::actingAs($this->platformManager);

@@ -12,6 +12,7 @@ use App\Models\PlatformAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -75,9 +76,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform managers can access dashboard
      */
+    #[Test]
     public function platform_manager_can_access_dashboard(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -98,9 +99,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Non-platform manager owners cannot access platform endpoints
      */
+    #[Test]
     public function non_platform_manager_owner_gets_forbidden(): void
     {
         Sanctum::actingAs($this->regularOwner);
@@ -114,9 +115,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * PBX admins cannot access platform endpoints
      */
+    #[Test]
     public function pbx_admin_gets_forbidden(): void
     {
         Sanctum::actingAs($this->admin);
@@ -127,9 +128,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * PBX users cannot access platform endpoints
      */
+    #[Test]
     public function pbx_user_gets_forbidden(): void
     {
         Sanctum::actingAs($this->pbxUser);
@@ -140,9 +141,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Unauthenticated users cannot access platform endpoints
      */
+    #[Test]
     public function unauthenticated_user_gets_unauthorized(): void
     {
         $response = $this->getJson('/api/v1/platform/dashboard');
@@ -151,9 +152,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform manager can list all organizations
      */
+    #[Test]
     public function platform_manager_can_list_all_organizations(): void
     {
         // Create additional organizations
@@ -168,9 +169,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform manager can view organizations from other tenants
      */
+    #[Test]
     public function platform_manager_can_view_cross_tenant_organization(): void
     {
         $otherOrg = Organization::factory()->create([
@@ -191,9 +192,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform manager can update organization status
      */
+    #[Test]
     public function platform_manager_can_suspend_organization(): void
     {
         $targetOrg = Organization::factory()->create([
@@ -215,9 +216,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Suspending organization creates audit log entry
      */
+    #[Test]
     public function suspending_organization_creates_audit_log(): void
     {
         $targetOrg = Organization::factory()->create([
@@ -240,9 +241,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Non-platform manager cannot update organization status
      */
+    #[Test]
     public function non_pm_cannot_update_organization_status(): void
     {
         $targetOrg = Organization::factory()->create([
@@ -264,9 +265,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform manager can grant platform manager status
      */
+    #[Test]
     public function platform_manager_can_grant_pm_status(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -284,9 +285,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Granting PM status creates audit log
      */
+    #[Test]
     public function granting_pm_status_creates_audit_log(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -306,9 +307,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Revoking PM status revokes all tokens
      */
+    #[Test]
     public function revoking_pm_status_revokes_tokens(): void
     {
         // Create a user with PM status and tokens
@@ -337,9 +338,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Cannot revoke last platform manager
      */
+    #[Test]
     public function cannot_revoke_last_platform_manager(): void
     {
         // Ensure only one PM exists
@@ -361,9 +362,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Non-PM cannot grant PM status
      */
+    #[Test]
     public function non_pm_cannot_grant_pm_status(): void
     {
         Sanctum::actingAs($this->regularOwner);
@@ -381,9 +382,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform manager can view audit logs
      */
+    #[Test]
     public function platform_manager_can_view_audit_logs(): void
     {
         // Create some audit logs
@@ -400,9 +401,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Non-PM cannot view audit logs
      */
+    #[Test]
     public function non_pm_cannot_view_audit_logs(): void
     {
         Sanctum::actingAs($this->regularOwner);
@@ -413,9 +414,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * is_platform_manager is not mass assignable
      */
+    #[Test]
     public function is_platform_manager_not_mass_assignable(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -442,9 +443,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * Platform endpoints require authentication
      */
+    #[Test]
     public function all_platform_endpoints_require_auth(): void
     {
         $endpoints = [
@@ -461,9 +462,9 @@ class PlatformManagerSecurityTest extends TestCase
     }
 
     /**
-     * @test
      * All platform mutations are audited
      */
+    #[Test]
     public function all_mutations_create_audit_logs(): void
     {
         Sanctum::actingAs($this->platformManager);

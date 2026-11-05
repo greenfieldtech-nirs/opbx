@@ -10,6 +10,7 @@ use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DistributionListApiTest extends TestCase
@@ -30,7 +31,7 @@ class DistributionListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_list(): void
     {
         $response = $this->actingAs($this->user)
@@ -52,7 +53,7 @@ class DistributionListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_requires_name_when_creating_list(): void
     {
         $response = $this->actingAs($this->user)
@@ -64,7 +65,7 @@ class DistributionListApiTest extends TestCase
             ->assertJsonValidationErrors(['name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_all_lists(): void
     {
         AutoDialerList::factory()->count(3)->create([
@@ -78,7 +79,7 @@ class DistributionListApiTest extends TestCase
             ->assertJsonCount(3, 'data');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_single_list(): void
     {
         $list = AutoDialerList::factory()->create([
@@ -93,7 +94,7 @@ class DistributionListApiTest extends TestCase
             ->assertJsonPath('data.name', 'Test List');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_archive_a_list(): void
     {
         $list = AutoDialerList::factory()->create([
@@ -112,7 +113,7 @@ class DistributionListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function archiving_an_assigned_list_is_refused_and_names_the_campaign(): void
     {
         $campaign = AutoDialerCampaign::factory()->create([
@@ -138,7 +139,7 @@ class DistributionListApiTest extends TestCase
             ->assertJsonPath('data.0.can_delete', false);
     }
 
-    /** @test */
+    #[Test]
     public function delete_flag_and_endpoint_follow_assignment_only(): void
     {
         $campaign = AutoDialerCampaign::factory()->create(['organization_id' => $this->organization->id]);
@@ -156,7 +157,7 @@ class DistributionListApiTest extends TestCase
         $this->actingAs($this->user)->deleteJson("/api/v1/auto-dialer-campaigns/lists/{$free->id}")->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function status_filter_lists_archived_lists_and_default_view_hides_them(): void
     {
         $ready = AutoDialerList::factory()->create(['organization_id' => $this->organization->id, 'status' => ListStatus::READY]);
@@ -172,7 +173,7 @@ class DistributionListApiTest extends TestCase
         $this->assertSame([$ready->id], $ids('?status=ready'));
     }
 
-    /** @test */
+    #[Test]
     public function it_can_copy_a_list(): void
     {
         $list = AutoDialerList::factory()->create([
@@ -195,7 +196,7 @@ class DistributionListApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function unauthorized_users_cannot_create_lists(): void
     {
         $regularUser = User::factory()->create([
@@ -211,7 +212,7 @@ class DistributionListApiTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function users_can_only_see_their_organization_lists(): void
     {
         $otherOrg = Organization::factory()->create();

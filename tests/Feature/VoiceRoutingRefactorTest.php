@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class VoiceRoutingRefactorTest extends TestCase
@@ -103,7 +104,7 @@ class VoiceRoutingRefactorTest extends TestCase
         ], $overrides);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_inbound_call_to_user_extension()
     {
         $response = $this->postJson(route('voice.route'), $this->getBasePayload(), $this->getAuthHeaders());
@@ -116,7 +117,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString($this->extension->extension_number, $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_to_ring_group()
     {
         $ringGroup = RingGroup::factory()->create([
@@ -152,7 +153,7 @@ class VoiceRoutingRefactorTest extends TestCase
         Http::assertSent(fn ($request) => $request['destination'] === $this->extension->extension_number && $request['timeout'] === 20);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_internal_extension_call()
     {
         $this->mock(RoutingSentryService::class, function ($mock) {
@@ -172,7 +173,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString($this->extension->extension_number, $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_to_ai_assistant_extension()
     {
         $aiAssistant = AiAssistant::factory()->create([
@@ -215,7 +216,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('language="en"', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_unavailable_for_ai_assistant_without_service_url()
     {
         $aiAssistant = AiAssistant::factory()->create([
@@ -251,7 +252,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('AI Agent provider or phone number not configured', $content);
     }
 
-    /** @test */
+    #[Test]
     public function ai_assistant_extension_has_service_configuration()
     {
         $aiExtension = Extension::factory()->create([
@@ -269,7 +270,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertEquals(['model' => 'gpt-4', 'language' => 'en'], $aiExtension->service_params);
     }
 
-    /** @test */
+    #[Test]
     public function ai_agent_routing_strategy_generates_correct_cxml()
     {
         $aiAssistant = AiAssistant::factory()->create([
@@ -306,7 +307,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('language="en"', $content);
     }
 
-    /** @test */
+    #[Test]
     public function ai_agent_routing_strategy_handles_legacy_configuration()
     {
         $aiAssistant = AiAssistant::factory()->create([
@@ -345,7 +346,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('+12127773456</Service>', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_to_forward_extension()
     {
         $forwardExtension = Extension::factory()->create([
@@ -377,7 +378,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('<Number>1001</Number>', $content);
     }
 
-    /** @test */
+    #[Test]
     public function forward_extension_returns_unavailable_when_target_not_found()
     {
         $forwardExtension = Extension::factory()->create([
@@ -406,7 +407,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('Target extension 9999 not found', $content);
     }
 
-    /** @test */
+    #[Test]
     public function forward_extension_returns_unavailable_when_target_inactive()
     {
         $inactiveExtension = Extension::factory()->create([
@@ -442,7 +443,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('Target extension 1005 is inactive', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_forward_to_external_phone_number()
     {
         $forwardExtension = Extension::factory()->create([
@@ -474,7 +475,7 @@ class VoiceRoutingRefactorTest extends TestCase
         $this->assertStringContainsString('<Number>+12127773456</Number>', $content);
     }
 
-    /** @test */
+    #[Test]
     public function it_routes_forward_to_sip_uri()
     {
         $forwardExtension = Extension::factory()->create([

@@ -13,6 +13,7 @@ use App\Services\AutoDialer\ListValidationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DistributionListCsvMappingTest extends TestCase
@@ -42,7 +43,7 @@ class DistributionListCsvMappingTest extends TestCase
         Storage::fake('local');
     }
 
-    /** @test */
+    #[Test]
     public function it_previews_csv_headers_and_rows(): void
     {
         $csv = "phone,full_name,batch_id,account\n+14155551212,John Doe,batch-1,ACC-123\n";
@@ -58,7 +59,7 @@ class DistributionListCsvMappingTest extends TestCase
             ->assertJsonPath('data.total_rows', 1);
     }
 
-    /** @test */
+    #[Test]
     public function it_accepts_has_header_as_string_from_form_data(): void
     {
         $csv = "phone,full_name\n+14155551212,John Doe\n";
@@ -74,7 +75,7 @@ class DistributionListCsvMappingTest extends TestCase
             ->assertJsonPath('data.total_rows', 1);
     }
 
-    /** @test */
+    #[Test]
     public function it_uploads_csv_with_mapping_and_creates_destinations(): void
     {
         $csv = "phone,full_name,batch_id,account\n+14155551212,John Doe,batch-1,ACC-123\n+14155551213,Jane Smith,batch-2,ACC-456\n";
@@ -104,7 +105,7 @@ class DistributionListCsvMappingTest extends TestCase
         $this->assertSame(['account' => 'ACC-123'], $destination->metadata);
     }
 
-    /** @test */
+    #[Test]
     public function it_records_the_original_filename_and_exposes_it_on_the_list(): void
     {
         $file = UploadedFile::fake()->createWithContent('webinar-leads.csv', "phone\n+14155551212\n");
@@ -128,7 +129,7 @@ class DistributionListCsvMappingTest extends TestCase
             ->assertJsonPath('data.original_filename', 'webinar-leads.csv');
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_upload_without_phone_mapping(): void
     {
         $csv = "phone\n+14155551212\n";
@@ -143,7 +144,7 @@ class DistributionListCsvMappingTest extends TestCase
             ->assertJsonValidationErrors(['mapping.phone']);
     }
 
-    /** @test */
+    #[Test]
     public function it_processes_upload_job_without_authenticated_user(): void
     {
         $csv = "phone,full_name\n+14155551212,John Doe\n";
@@ -178,7 +179,7 @@ class DistributionListCsvMappingTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_previews_and_uploads_a_headerless_csv_keeping_the_first_row(): void
     {
         $csv = "+14155551212,John Doe\n+14155551213,Jane Smith\n";

@@ -10,6 +10,7 @@ use App\Models\IvrMenu;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -49,7 +50,7 @@ class IvrMenuControllerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_ivr_menu_with_valid_data(): void
     {
         $data = [
@@ -99,7 +100,7 @@ class IvrMenuControllerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_destination_exists(): void
     {
         $data = [
@@ -127,7 +128,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertDatabaseMissing('ivr_menus', ['name' => 'Test Menu']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_ivr_menu(): void
     {
         $ivrMenu = IvrMenu::factory()->create([
@@ -165,7 +166,7 @@ class IvrMenuControllerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_self_referencing_failover_and_options(): void
     {
         $ivrMenu = IvrMenu::factory()->create([
@@ -204,7 +205,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertDatabaseHas('ivr_menus', ['id' => $ivrMenu->id, 'failover_destination_id' => $ivrMenu->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_delete_unreferenced_ivr_menu(): void
     {
         $ivrMenu = IvrMenu::factory()->create([
@@ -218,7 +219,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertDatabaseMissing('ivr_menus', ['id' => $ivrMenu->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_deleting_referenced_ivr_menu(): void
     {
         $referencedMenu = IvrMenu::factory()->create([
@@ -255,7 +256,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertDatabaseHas('ivr_menus', ['id' => $referencedMenu->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_get_tts_voices(): void
     {
         $this->markTestSkipped(
@@ -264,7 +265,7 @@ class IvrMenuControllerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function it_enforces_tenant_isolation(): void
     {
         $otherOrganization = Organization::factory()->create();
@@ -306,7 +307,7 @@ class IvrMenuControllerTest extends TestCase
         ];
     }
 
-    /** @test */
+    #[Test]
     public function it_forbids_non_admin_roles_from_writing(): void
     {
         $menu = IvrMenu::factory()->create(['organization_id' => $this->organization->id]);
@@ -324,7 +325,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertDatabaseHas('ivr_menus', ['id' => $menu->id, 'status' => $menu->status->value ?? $menu->status]);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_the_index_by_status(): void
     {
         $active = IvrMenu::factory()->create(['organization_id' => $this->organization->id, 'status' => 'active']);
@@ -337,7 +338,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertNotContains($active->id, $ids);
     }
 
-    /** @test */
+    #[Test]
     public function it_ignores_organization_id_on_update(): void
     {
         $other = Organization::factory()->create();
@@ -350,7 +351,7 @@ class IvrMenuControllerTest extends TestCase
         $this->assertSame($this->organization->id, $menu->fresh()->organization_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_rejects_cross_tenant_destinations(): void
     {
         $other = Organization::factory()->create();
@@ -362,7 +363,7 @@ class IvrMenuControllerTest extends TestCase
             ->assertJsonValidationErrors(['options.0.destination_id']);
     }
 
-    /** @test */
+    #[Test]
     public function admin_can_create_update_and_toggle(): void
     {
         $admin = User::factory()->create(['organization_id' => $this->organization->id, 'role' => UserRole::PBX_ADMIN]);

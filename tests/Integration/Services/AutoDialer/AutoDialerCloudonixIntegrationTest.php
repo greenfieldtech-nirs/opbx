@@ -7,6 +7,7 @@ namespace Tests\Integration\Services\AutoDialer;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\CloudonixClient\CloudonixClient;
 use Illuminate\Support\Facades\Config;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -18,10 +19,9 @@ use Tests\TestCase;
  * - CLOUDONIX_TEST_API_KEY
  *
  * To skip this test, run: php artisan test --exclude-group=integration
- *
- * @group integration
- * @group cloudonix
  */
+#[Group('integration')]
+#[Group('cloudonix')]
 class AutoDialerCloudonixIntegrationTest extends TestCase
 {
     private ?AutoDialerCloudonixService $service = null;

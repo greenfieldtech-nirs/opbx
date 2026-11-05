@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -20,9 +21,9 @@ class OrganizationScopeTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * @test
      * Scope is bypassed when flag is set
      */
+    #[Test]
     public function scope_is_bypassed_when_flag_is_set(): void
     {
         $org1 = Organization::factory()->create();
@@ -45,9 +46,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Bypass works with nested calls
      */
+    #[Test]
     public function bypass_works_with_nested_calls(): void
     {
         $org1 = Organization::factory()->create();
@@ -66,9 +67,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Bypass restores scope after exception
      */
+    #[Test]
     public function bypass_restores_scope_after_exception(): void
     {
         $org = Organization::factory()->create();
@@ -88,18 +89,18 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Bypass flag is initially false
      */
+    #[Test]
     public function bypass_flag_is_initially_false(): void
     {
         $this->assertFalse(OrganizationScope::isBypassed());
     }
 
     /**
-     * @test
      * Bypass flag is true inside callback
      */
+    #[Test]
     public function bypass_flag_is_true_inside_callback(): void
     {
         OrganizationScope::bypass(function () {
@@ -110,9 +111,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Bypass returns callback result
      */
+    #[Test]
     public function bypass_returns_callback_result(): void
     {
         $result = OrganizationScope::bypass(function () {
@@ -123,9 +124,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Bypass works with complex queries
      */
+    #[Test]
     public function bypass_works_with_complex_queries(): void
     {
         $org1 = Organization::factory()->create();
@@ -155,9 +156,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Multiple sequential bypass calls work correctly
      */
+    #[Test]
     public function multiple_sequential_bypass_calls_work(): void
     {
         $org = Organization::factory()->create();
@@ -174,9 +175,9 @@ class OrganizationScopeTest extends TestCase
     }
 
     /**
-     * @test
      * Scope applies whereRaw 1=0 when unauthenticated
      */
+    #[Test]
     public function scope_applies_zero_filter_when_unauthenticated(): void
     {
         // Ensure no user is authenticated

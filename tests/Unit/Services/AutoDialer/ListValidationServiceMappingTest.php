@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\AutoDialer;
 
 use App\Services\AutoDialer\ListValidationService;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ListValidationServiceMappingTest extends TestCase
@@ -17,7 +18,7 @@ class ListValidationServiceMappingTest extends TestCase
         $this->service = new ListValidationService;
     }
 
-    /** @test */
+    #[Test]
     public function it_maps_name_batch_and_metadata(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'csv_');
@@ -39,7 +40,7 @@ class ListValidationServiceMappingTest extends TestCase
         unlink($path);
     }
 
-    /** @test */
+    #[Test]
     public function it_fails_when_phone_column_missing(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'csv_');
@@ -53,7 +54,7 @@ class ListValidationServiceMappingTest extends TestCase
         unlink($path);
     }
 
-    /** @test */
+    #[Test]
     public function it_previews_headers_and_rows(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'csv_');
