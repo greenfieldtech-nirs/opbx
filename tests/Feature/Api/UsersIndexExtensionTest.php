@@ -9,6 +9,7 @@ use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -34,7 +35,7 @@ class UsersIndexExtensionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function users_index_includes_assigned_extension_number(): void
     {
         $user = User::factory()->create([
@@ -61,7 +62,7 @@ class UsersIndexExtensionTest extends TestCase
         $this->assertSame('4242', $target['extension']['extension_number']);
     }
 
-    /** @test */
+    #[Test]
     public function users_index_returns_null_extension_when_unassigned(): void
     {
         $user = User::factory()->create([
@@ -78,7 +79,7 @@ class UsersIndexExtensionTest extends TestCase
         $this->assertNull($target['extension'] ?? null);
     }
 
-    /** @test */
+    #[Test]
     public function user_show_includes_assigned_extension_number(): void
     {
         $user = User::factory()->create([

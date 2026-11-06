@@ -10,6 +10,7 @@ use App\Models\AutoDialerList;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class AutoDialerReadAccessTest extends TestCase
@@ -30,9 +31,7 @@ final class AutoDialerReadAccessTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider roles
-     */
+    #[DataProvider('roles')]
     public function test_read_endpoints_per_role(UserRole $role, int $expected): void
     {
         $org = Organization::factory()->create();

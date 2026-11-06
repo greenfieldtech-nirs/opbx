@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Enums;
 
 use App\Enums\ListStatus;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class ListStatusTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_has_all_required_statuses(): void
     {
         $statuses = ListStatus::cases();
@@ -24,7 +25,7 @@ class ListStatusTest extends TestCase
         $this->assertContains(ListStatus::ARCHIVED, $statuses);
     }
 
-    /** @test */
+    #[Test]
     public function it_provides_labels_for_all_statuses(): void
     {
         foreach (ListStatus::cases() as $status) {
@@ -33,7 +34,7 @@ class ListStatusTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function it_provides_colors_for_all_statuses(): void
     {
         foreach (ListStatus::cases() as $status) {
@@ -42,13 +43,13 @@ class ListStatusTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function ready_status_can_be_assigned(): void
     {
         $this->assertTrue(ListStatus::READY->canAssign());
     }
 
-    /** @test */
+    #[Test]
     public function non_ready_statuses_cannot_be_assigned(): void
     {
         $this->assertFalse(ListStatus::DRAFT->canAssign());
@@ -59,7 +60,7 @@ class ListStatusTest extends TestCase
         $this->assertFalse(ListStatus::ARCHIVED->canAssign());
     }
 
-    /** @test */
+    #[Test]
     public function ready_failed_used_can_be_archived(): void
     {
         $this->assertTrue(ListStatus::READY->canArchive());
@@ -67,14 +68,14 @@ class ListStatusTest extends TestCase
         $this->assertTrue(ListStatus::USED->canArchive());
     }
 
-    /** @test */
+    #[Test]
     public function in_use_and_processing_cannot_be_archived(): void
     {
         $this->assertFalse(ListStatus::IN_USE->canArchive());
         $this->assertFalse(ListStatus::PROCESSING->canArchive());
     }
 
-    /** @test */
+    #[Test]
     public function draft_and_failed_can_upload(): void
     {
         $this->assertTrue(ListStatus::DRAFT->canUpload());
@@ -82,27 +83,27 @@ class ListStatusTest extends TestCase
         $this->assertTrue(ListStatus::FAILED->canUpload());
     }
 
-    /** @test */
+    #[Test]
     public function in_use_and_used_are_locked(): void
     {
         $this->assertTrue(ListStatus::IN_USE->isLocked());
         $this->assertTrue(ListStatus::USED->isLocked());
     }
 
-    /** @test */
+    #[Test]
     public function archived_is_final_state(): void
     {
         $this->assertTrue(ListStatus::ARCHIVED->isFinal());
     }
 
-    /** @test */
+    #[Test]
     public function non_archived_are_not_final(): void
     {
         $this->assertFalse(ListStatus::READY->isFinal());
         $this->assertFalse(ListStatus::DRAFT->isFinal());
     }
 
-    /** @test */
+    #[Test]
     public function it_converts_to_array(): void
     {
         $array = ListStatus::toArray();

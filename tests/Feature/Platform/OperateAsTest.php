@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -87,9 +88,7 @@ class OperateAsTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function platform_manager_with_header_reads_target_org_data(): void
     {
         [$ownerA, $userB] = $this->seedTargetOrg();
@@ -123,9 +122,8 @@ class OperateAsTest extends TestCase
      * With a REAL bearer token (not Sanctum::actingAs, which seeds all guards and
      * masks the bug), the two must resolve to the SAME effective org, otherwise
      * globally-scoped reads leak the platform owner's home-org data.
-     *
-     * @test
      */
+    #[Test]
     public function real_token_operate_as_scopes_globally_scoped_reads_to_target_org(): void
     {
         // A DID (globally scoped by OrganizationScope) in each org.
@@ -159,9 +157,7 @@ class OperateAsTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function non_platform_manager_sending_header_is_forbidden(): void
     {
         $regularOwner = User::factory()->create([
@@ -181,9 +177,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('error.code', 'OPERATE_AS_FORBIDDEN');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function suspended_target_org_is_forbidden(): void
     {
         $suspended = Organization::factory()->suspended()->create();
@@ -198,9 +192,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('error.code', 'OPERATE_AS_ORG_INACTIVE');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deleted_target_org_is_forbidden(): void
     {
         $deleted = Organization::factory()->deleted()->create();
@@ -215,9 +207,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('error.code', 'OPERATE_AS_ORG_INACTIVE');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function nonexistent_target_org_returns_not_found(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -230,9 +220,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('error.code', 'OPERATE_AS_ORG_NOT_FOUND');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function start_endpoint_writes_operate_as_started_audit_log(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -254,9 +242,7 @@ class OperateAsTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function start_endpoint_rejects_inactive_org(): void
     {
         $suspended = Organization::factory()->suspended()->create();
@@ -269,9 +255,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('error.code', 'OPERATE_AS_ORG_INACTIVE');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function stop_endpoint_writes_operate_as_stopped_audit_log(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -290,9 +274,7 @@ class OperateAsTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function me_reflects_operate_as_context(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -311,9 +293,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('user.operate_as.real_user_id', $this->platformManager->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function me_has_no_operate_as_block_when_not_operating_as(): void
     {
         Sanctum::actingAs($this->platformManager);
@@ -325,9 +305,7 @@ class OperateAsTest extends TestCase
         $response->assertJsonPath('user.is_platform_manager', true);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function effective_user_changes_are_not_persisted(): void
     {
         $this->seedTargetOrg();
@@ -349,9 +327,7 @@ class OperateAsTest extends TestCase
         $this->assertTrue($fresh->is_platform_manager);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function self_mutating_profile_write_is_blocked_while_operating_as(): void
     {
         $this->seedTargetOrg();
@@ -382,9 +358,7 @@ class OperateAsTest extends TestCase
         $this->assertTrue($fresh->is_platform_manager);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function password_change_is_blocked_while_operating_as(): void
     {
         $this->seedTargetOrg();

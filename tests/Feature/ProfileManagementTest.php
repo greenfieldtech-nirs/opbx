@@ -10,6 +10,7 @@ use App\Models\Extension;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -62,7 +63,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function profile_includes_the_users_extension_number(): void
     {
         Extension::factory()->create([
@@ -76,7 +77,7 @@ class ProfileManagementTest extends TestCase
             ->assertOk()->assertJsonPath('user.extension.extension_number', '1042');
     }
 
-    /** @test */
+    #[Test]
     public function it_can_retrieve_user_profile_with_contact_fields(): void
     {
         $response = $this->actingAs($this->owner)
@@ -110,7 +111,7 @@ class ProfileManagementTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_profile_with_basic_fields(): void
     {
         $response = $this->actingAs($this->owner)
@@ -135,7 +136,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_update_profile_with_contact_fields(): void
     {
         $response = $this->actingAs($this->owner)
@@ -169,7 +170,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_partially_update_profile(): void
     {
         $this->owner->update([
@@ -191,7 +192,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_email_uniqueness_on_profile_update(): void
     {
         $response = $this->actingAs($this->owner)
@@ -203,7 +204,7 @@ class ProfileManagementTest extends TestCase
             ->assertJsonValidationErrors(['email']);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_phone_length(): void
     {
         $response = $this->actingAs($this->owner)
@@ -215,7 +216,7 @@ class ProfileManagementTest extends TestCase
             ->assertJsonValidationErrors(['phone']);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_nullable_contact_fields(): void
     {
         $response = $this->actingAs($this->owner)
@@ -228,7 +229,7 @@ class ProfileManagementTest extends TestCase
         $response->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function owner_can_update_organization(): void
     {
         $response = $this->actingAs($this->owner)
@@ -253,7 +254,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function owner_can_partially_update_organization(): void
     {
         $response = $this->actingAs($this->owner)
@@ -270,7 +271,7 @@ class ProfileManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function admin_cannot_update_organization(): void
     {
         $response = $this->actingAs($this->admin)
@@ -281,7 +282,7 @@ class ProfileManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function agent_cannot_update_organization(): void
     {
         $response = $this->actingAs($this->agent)
@@ -292,7 +293,7 @@ class ProfileManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_timezone_on_organization_update(): void
     {
         $response = $this->actingAs($this->owner)
@@ -304,7 +305,7 @@ class ProfileManagementTest extends TestCase
             ->assertJsonValidationErrors(['timezone']);
     }
 
-    /** @test */
+    #[Test]
     public function unauthenticated_users_cannot_access_profile(): void
     {
         $response = $this->getJson('/api/v1/profile');

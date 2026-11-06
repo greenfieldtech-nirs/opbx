@@ -26,8 +26,6 @@ class TagCallFlowLogsTest extends TestCase
     /**
      * Every call_flow line must carry the session token so the aggregation
      * stack can prefix it. The middleware resolves it once for the request.
-     *
-     * @dataProvider tokenSources
      */
     #[DataProvider('tokenSources')]
     public function test_shares_session_token_from_all_known_payload_shapes(array $payload, string $expected): void

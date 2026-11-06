@@ -52,7 +52,6 @@ final class CdrRecordingStreamTest extends TestCase
         ];
     }
 
-    /** @dataProvider roles */
     #[DataProvider('roles')]
     public function test_recording_access_follows_recordings_rule(UserRole $role, int $status): void
     {

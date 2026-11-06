@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -62,7 +63,7 @@ class RoleManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function owner_can_change_any_users_role(): void
     {
         $this->actingAs($this->owner);
@@ -87,7 +88,7 @@ class RoleManagementTest extends TestCase
         // For a full user management system, you'd want a separate endpoint like PATCH /api/users/{id}
     }
 
-    /** @test */
+    #[Test]
     public function pbx_admin_cannot_change_roles(): void
     {
         $this->actingAs($this->pbxAdmin);
@@ -99,7 +100,7 @@ class RoleManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function pbx_user_cannot_change_roles(): void
     {
         $this->actingAs($this->pbxUser);
@@ -111,7 +112,7 @@ class RoleManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function reporter_cannot_change_roles(): void
     {
         $this->actingAs($this->reporter);
@@ -123,7 +124,7 @@ class RoleManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function user_cannot_change_own_role(): void
     {
         $this->actingAs($this->owner);
@@ -136,7 +137,7 @@ class RoleManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function invalid_role_values_are_rejected(): void
     {
         $this->actingAs($this->owner);
@@ -149,7 +150,7 @@ class RoleManagementTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[Test]
     public function owner_role_has_correct_permissions(): void
     {
         $role = UserRole::OWNER;
@@ -165,7 +166,7 @@ class RoleManagementTest extends TestCase
         $this->assertFalse($role->isReporter());
     }
 
-    /** @test */
+    #[Test]
     public function pbx_admin_role_has_correct_permissions(): void
     {
         $role = UserRole::PBX_ADMIN;
@@ -181,7 +182,7 @@ class RoleManagementTest extends TestCase
         $this->assertFalse($role->isReporter());
     }
 
-    /** @test */
+    #[Test]
     public function pbx_user_role_has_correct_permissions(): void
     {
         $role = UserRole::PBX_USER;
@@ -197,7 +198,7 @@ class RoleManagementTest extends TestCase
         $this->assertFalse($role->isReporter());
     }
 
-    /** @test */
+    #[Test]
     public function reporter_role_has_correct_permissions(): void
     {
         $role = UserRole::REPORTER;
@@ -213,7 +214,7 @@ class RoleManagementTest extends TestCase
         $this->assertTrue($role->isReporter());
     }
 
-    /** @test */
+    #[Test]
     public function role_labels_are_correct(): void
     {
         $this->assertEquals('Owner', UserRole::OWNER->label());
@@ -222,7 +223,7 @@ class RoleManagementTest extends TestCase
         $this->assertEquals('Reporter', UserRole::REPORTER->label());
     }
 
-    /** @test */
+    #[Test]
     public function user_model_role_helper_methods_work_correctly(): void
     {
         $this->assertTrue($this->owner->isOwner());
@@ -246,7 +247,7 @@ class RoleManagementTest extends TestCase
         $this->assertTrue($this->reporter->isReporter());
     }
 
-    /** @test */
+    #[Test]
     public function only_owner_can_update_organization_details(): void
     {
         // Owner can update
@@ -278,7 +279,7 @@ class RoleManagementTest extends TestCase
         $response->assertForbidden();
     }
 
-    /** @test */
+    #[Test]
     public function user_policy_view_any_authorization_works(): void
     {
         // Owner can view any
@@ -294,7 +295,7 @@ class RoleManagementTest extends TestCase
         $this->assertFalse($this->reporter->role->canManageUsers());
     }
 
-    /** @test */
+    #[Test]
     public function role_change_is_logged(): void
     {
         $this->actingAs($this->owner);
@@ -311,7 +312,7 @@ class RoleManagementTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[Test]
     public function profile_update_without_role_change_works(): void
     {
         $this->actingAs($this->pbxUser);
@@ -331,7 +332,7 @@ class RoleManagementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function all_roles_can_update_own_profile_data(): void
     {
         // Owner

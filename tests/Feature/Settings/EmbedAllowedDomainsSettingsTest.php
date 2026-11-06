@@ -9,6 +9,7 @@ use App\Models\CloudonixSettings;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class EmbedAllowedDomainsSettingsTest extends TestCase
@@ -71,9 +72,7 @@ final class EmbedAllowedDomainsSettingsTest extends TestCase
             ->assertJsonValidationErrors('embed_allowed_domains.0');
     }
 
-    /**
-     * @dataProvider validDevDomainProvider
-     */
+    #[DataProvider('validDevDomainProvider')]
     public function test_dev_domains_with_localhost_ip_and_port_are_accepted(string $domain): void
     {
         $owner = $this->owner();
@@ -102,9 +101,7 @@ final class EmbedAllowedDomainsSettingsTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider invalidDomainProvider
-     */
+    #[DataProvider('invalidDomainProvider')]
     public function test_invalid_domains_are_rejected(string $domain): void
     {
         $owner = $this->owner();

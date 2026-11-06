@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -87,10 +88,9 @@ class BusinessHoursUiTimeRangesTest extends TestCase
     }
 
     /**
-     * @dataProvider calendarSelections
-     *
      * @param  array<int, array{0: string, 1: string}>  $ranges
      */
+    #[DataProvider('calendarSelections')]
     public function test_calendar_selection_is_accepted_and_round_trips(array $ranges): void
     {
         $response = $this->postJson('/api/v1/business-hours', $this->uiPayload($ranges))->assertCreated();
