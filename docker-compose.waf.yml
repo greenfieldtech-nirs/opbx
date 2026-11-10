@@ -1,0 +1,44 @@
+# Opt-in SafeLine WAF for the edge nginx (PoC). Requires the SafeLine stack
+# (docker/safeline, project "safeline") to be up: it owns the external
+# `safeline-ce` network and the detector this nginx calls on port 8000.
+#
+#   docker compose --project-directory docker/safeline -p safeline up -d
+#   docker compose -f docker-compose.yml -f docker-compose.waf.yml up -d nginx
+#
+# WAF_MODE: off | monitor (default: log would-be blocks) | block.
+services:
+  nginx:
+    image: opbx-nginx-waf:poc
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile.waf
+    environment:
+      WAF_MODE: ${WAF_MODE:-monitor}
+      WAF_DETECTOR_HOST: ${WAF_DETECTOR_HOST:-safeline-detector}
+    volumes:
+      - ./docker/nginx/waf:/etc/nginx/templates/waf.d:ro
+    networks:
+      - opbx
+      - safeline-ce
+    # Base render loop plus the WAF hook (http context, so it lands in conf.d).
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        RESOLVER=$$(awk '/^nameserver/ {print $$2; exit}' /etc/resolv.conf)
+        : "$${RESOLVER:?could not determine DNS resolver from /etc/resolv.conf}"
+        case "$$WAF_MODE" in off|monitor|block) ;; *) echo "WAF_MODE must be off|monitor|block" >&2; exit 1;; esac
+        mkdir -p /etc/nginx/conf.d
+        for f in /etc/nginx/templates/conf.d/*.conf; do
+          sed "s/__NGINX_RESOLVER__/$${RESOLVER}/g" "$$f" > "/etc/nginx/conf.d/$$(basename "$$f")"
+        done
+        for f in /etc/nginx/templates/waf.d/*.conf; do
+          sed -e "s/__WAF_MODE__/$${WAF_MODE}/g" -e "s/__WAF_DETECTOR_HOST__/$${WAF_DETECTOR_HOST}/g" \
+            "$$f" > "/etc/nginx/conf.d/$$(basename "$$f")"
+        done
+        exec nginx -g 'daemon off;'
+
+networks:
+  safeline-ce:
+    external: true
