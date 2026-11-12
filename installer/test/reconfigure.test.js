@@ -5,6 +5,7 @@ import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { runReconfigure } from '../src/modes/reconfigure.js';
+import { state as uiState, cancelMessage } from '../src/ui.js';
 import { resolveAction } from '../src/main.js';
 import { parseEnv, renderEnv } from '../src/envfile.js';
 import { deriveEnv, OWNED_KEYS } from '../src/derive.js';
@@ -46,6 +47,7 @@ function harness({ select = [], confirm = [], over = {}, composeCode = () => 0 }
     checkSafelineState: async () => ({ ok: true, missing: [] }),
     runChecks: async (_d, a) => { log.steps.push('checks'); log.checkedWaf = a.waf; return over.checks ?? [{ name: 'services', ok: true }, { name: 'waf detection', ok: true }]; },
     resetSafelineAdmin: async () => { log.steps.push('wafadmin'); return { username: 'admin', password: 'WafPw' }; },
+    isPortFree: async () => over.portFree ?? true,
     askPublicUrl: async () => 'https://new.example.org',
     askWaf: async () => ({ mode: 'monitor', stateDir: '/var/lib/safeline', consoleAllow: '10.1.0.0/24' }),
     ...over.steps,
@@ -73,7 +75,7 @@ test('domain change rewrites only domain keys, keeps secrets and every other lin
   assert.ok(touched.every((l) => OWNED_KEYS.domain.some((k) => l.startsWith(`${k}=`))), 'only owned lines differ');
   assert.equal(lines(text).length, lines(after).length);
   assert.equal(statSync(join(dir, '.env')).mode & 0o777, 0o600);
-  assert.deepEqual(h.log.compose, [['build', 'frontend'], ['up', '-d']]);
+  assert.deepEqual(h.log.compose, [['build', 'frontend'], ['up', '-d'], ['restart', 'queue-worker', 'queue-worker-long']]);
   assert.deepEqual(h.log.steps, ['checks']);
   const out = h.log.notes.join('\n');
   assert.match(out, /new\.example\.org/);
@@ -143,6 +145,9 @@ test('WAF off removes the overlay, keeps the state dir and secrets, down has no 
   assert.deepEqual(h.log.compose, [['up', '-d', 'nginx'], ['--project-directory', 'docker/safeline', '-p', 'safeline', 'down']]);
   assert.ok(!h.log.compose.flat().includes('-v') && !h.log.compose.flat().includes('--volumes'));
   assert.ok(existsSync(join(state, 'keep')));
+  const cmds = [...h.log.run, ...h.log.compose].map((a) => a.join(' '));
+  assert.ok(!cmds.some((c) => /\brm\b|\bdelete\b|--volumes| -v\b/.test(c)), 'no delete command');
+  assert.equal(uiState.reconfigure, 'wafoff');
 });
 
 test('WAF off leaves SafeLine running when the user declines', async () => {
@@ -166,11 +171,24 @@ test('WAF on: host step, SafeLine env + start, rewrite, nginx, checks, admin log
   for (const [k, v] of Object.entries(SECRETS)) assert.equal(env.get(k), v);
   const sl = parseEnv(readFileSync(join(dir, 'docker/safeline/.env'), 'utf8'));
   assert.equal(sl.get('SAFELINE_DIR'), '/var/lib/safeline');
-  assert.deepEqual(h.log.compose, [['--project-directory', 'docker/safeline', '-p', 'safeline', 'up', '-d'], ['up', '-d', 'nginx']]);
+  assert.deepEqual(h.log.compose, [['-f', 'docker-compose.yml', '-f', 'docker-compose.prod.yml', '-f', 'docker-compose.waf.yml', 'build', 'nginx'], ['--project-directory', 'docker/safeline', '-p', 'safeline', 'up', '-d'], ['up', '-d', 'nginx']]);
   assert.deepEqual(h.log.steps, ['hoststep', 'checks', 'wafadmin']);
   assert.match(h.log.notes.join('\n'), /WafPw/);
-  assert.match(h.log.notes.join('\n'), /9443/);
+  assert.match(h.log.notes.join('\n'), /listen 9443 ssl/);
+  uiState.reconfigure = 'wafoff';
+  assert.match(cancelMessage(), /already off.*still running.*down/s);
+  uiState.reconfigure = null;
 });
+
+for (const [name, over, code] of [['port busy', { portFree: false }, () => 0], ['image build fails', {}, (a) => (a.includes('build') ? 1 : 0)]]) {
+  test(`WAF on stops before touching .env: ${name}`, async () => {
+    const { dir, text } = setup();
+    const h = harness({ select: ['wafon'], over, composeCode: code });
+    await assert.rejects(run(h, dir), /not changed/);
+    assert.equal(readFileSync(join(dir, '.env'), 'utf8'), text);
+    assert.ok(!h.log.compose.some((a) => a.includes('safeline')));
+  });
+}
 
 test('WAF on: SafeLine start failure stops before .env is touched', async () => {
   const { dir, text } = setup();

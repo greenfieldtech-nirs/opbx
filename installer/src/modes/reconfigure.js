@@ -8,6 +8,7 @@ import { hostStep } from '../hoststep.js';
 import { safelineHostCommands, checkSafelineState, writeSafelineEnv, checkDetector } from '../safeline.js';
 import { resetSafelineAdmin, waitHealthy } from '../stack.js';
 import { runChecks } from '../verify.js';
+import { isPortFree } from '../platform.js';
 import { proxySnippet } from '../summary.js';
 import { state as uiState } from '../ui.js';
 
@@ -19,7 +20,7 @@ const real = { now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeo
 
 // `steps` replaces collaborators in unit tests.
 export async function runReconfigure({ ui, docker, repoDir, platform, steps = {} }) {
-  const S = { askPublicUrl, askWaf, hostStep, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
+  const S = { askPublicUrl, askWaf, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
   const envPath = join(repoDir, '.env');
   const readEnv = (p) => (existsSync(p) ? parseEnv(readFileSync(p, 'utf8')) : new Map());
   const { HOST_UID, HOST_GID } = process.env;
@@ -83,6 +84,8 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     apply(pick(deriveEnv({ ...current, publicUrl }), OWNED_KEYS.domain));
     must(await docker.compose(['build', 'frontend']), 'Rebuilding the frontend');
     must(await docker.compose(['up', '-d']), 'Restarting the services');
+    // long-running workers read .env once at start and `up -d` does not recreate them
+    must(await docker.compose(['restart', 'queue-worker', 'queue-worker-long']), 'Restarting the queue workers');
     const a = fresh();
     await report(a);
     ui.note('New reverse proxy settings', `Point your proxy at OPBX like this and use a certificate for ${new URL(a.publicUrl).hostname}:\n\n${proxySnippet(a)}`);
@@ -107,6 +110,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   if (choice === 'wafoff') {
     apply(wafValues({ ...current, waf: null }));
     must(await docker.compose(['up', '-d', 'nginx']), 'Recreating nginx');
+    uiState.reconfigure = 'wafoff';
     if (await ui.confirm({ message: 'Stop the SafeLine containers too?', initialValue: true })) {
       must(await docker.compose([...SAFELINE, 'down']), 'Stopping SafeLine');
     }
@@ -124,6 +128,12 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     check: () => S.checkSafelineState(docker, waf.stateDir),
   });
   const next = { ...current, waf };
+  let free;
+  try { free = await S.isPortFree(docker, 9443); } catch (e) { throw new Error(`Could not check port 9443 for the firewall console: ${e.message}\nThe settings in .env were not changed.`); }
+  if (!free) throw new Error('Port 9443 (the firewall console) is already used by another program. Free it and run this again.\nThe settings in .env were not changed.');
+  // build the WAF nginx image now so a build error happens before .env is rewritten
+  const files = [...(env.get('COMPOSE_FILE') || '').split(':').filter((f) => f && f !== OVERLAY), OVERLAY];
+  must(await docker.compose([...files.flatMap((f) => ['-f', f]), 'build', 'nginx']), 'Building the firewall nginx image');
   S.writeSafelineEnv(repoDir, next, {}, platform);
   const s = ui.spinner();
   s.start('Starting SafeLine');
@@ -142,5 +152,6 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     const w = await S.resetSafelineAdmin(docker);
     login = `Username: ${w.username}\nPassword: ${w.password}`;
   } catch (e) { login = `Could not read the admin login (${e.message}).\nRun \`docker exec safeline-mgt /app/mgt reset-admin\` to set the firewall admin password.`; }
-  ui.note('Firewall admin login', `Console: ${prod ? `https://${new URL(a.publicUrl).hostname}:9443` : 'http://localhost:9443'} (your proxy must forward port 9443)\n${login}`);
+  ui.note('Firewall admin login', `Console: ${prod ? `https://${new URL(a.publicUrl).hostname}:9443` : 'http://localhost:9443'}\n${login}`);
+  if (prod) ui.note('New reverse proxy settings', `Your proxy must also forward port 9443 with the same certificate:\n\n${proxySnippet(a)}`);
 }
