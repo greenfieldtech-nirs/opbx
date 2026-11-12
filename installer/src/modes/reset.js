@@ -24,7 +24,7 @@ export async function confirmPhrase(ui, expected) {
 
 // Streams mysqldump -> gzip -> file (no in-memory buffering). Validity: exit code 0 AND "CREATE TABLE" seen in the stream.
 // The archive DB is included only when it exists (checked inside the container, password never on a command line).
-async function backup(docker, repoDir, dbNames) {
+async function backup(docker, ui, repoDir, dbNames) {
   const dir = join(repoDir, 'backups');
   const file = join(dir, `opbx-backup-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}.sql.gz`);
   try {
@@ -34,7 +34,9 @@ async function backup(docker, repoDir, dbNames) {
     if (extra && /^[A-Za-z0-9_]+$/.test(extra)) {
       const q = await docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
         'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root -N -e "SHOW DATABASES LIKE \'$1\'"', 'sh', extra]);
-      if (q.code === 0 && q.stdout.trim() === extra) dbs.push(extra);
+      // LIKE treats "_" as a wildcard, so compare the listed names exactly.
+      if (q.code !== 0) ui.note('Archive database not backed up', `Could not check whether ${extra} exists, so it is NOT in this backup.`);
+      else if (q.stdout.split('\n').map((l) => l.trim()).includes(extra)) dbs.push(extra);
     }
     let seen = false;
     let tail = '';
@@ -114,7 +116,7 @@ export async function runReset({ ui, docker, repoDir, platform, steps = {} }) {
   if (ps.code === 0 && ps.stdout.trim()) {
     if (await ui.confirm({ message: 'Back up the database to ./backups/ first?', initialValue: true })) {
       const dbs = [env.get('DB_DATABASE') || 'opbx', env.get('DB_CDR_ARCHIVE_DATABASE')].filter(Boolean);
-      ui.note('Backup', `Saved ${await backup(docker, repoDir, dbs)}`);
+      ui.note('Backup', `Saved ${await backup(docker, ui, repoDir, dbs)}`);
     }
   } else {
     ui.note('No backup', "MySQL isn't running, so no backup can be taken. To back up first: cancel, run `docker compose up -d mysql`, then `./install.sh reset` again.");
@@ -152,7 +154,8 @@ export async function runReset({ ui, docker, repoDir, platform, steps = {} }) {
 
   for (const f of CONFIG_FILES) rmSync(join(repoDir, f), { force: true });
 
-  uiState.resetStarted = false; // from here on a cancel is an install cancel (reset would refuse: nothing left to reset)
+  uiState.resetStarted = false;
+  uiState.resetDone = true; // from here on a cancel is an install cancel (reset would refuse: nothing left to reset)
   const reuse = await ui.confirm({ message: 'Reuse my previous answers?', initialValue: true });
   await S.runInstall({ ui, docker, repoDir, platform, resume: false, defaults: reuse ? previousAnswers : undefined });
 }

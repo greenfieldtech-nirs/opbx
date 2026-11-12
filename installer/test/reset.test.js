@@ -33,7 +33,7 @@ function harness({ phrases = [], mysqlUp = false, backupYes = false, reuse = tru
       calls.push(['compose', ...a]);
       if (a[0] === 'config') return fail.config ? { code: 1, stdout: '', stderr: 'bad' } : { code: 0, stdout: JSON.stringify({ name: 'opbx' }), stderr: '' };
       if (a[0] === 'ps') return { code: 0, stdout: mysqlUp ? 'abc\n' : '', stderr: '' };
-      if (a[0] === 'exec' && /SHOW DATABASES/.test(a[5])) return { code: 0, stdout: fail.noArchive ? '' : `${a.at(-1)}\n`, stderr: '' };
+      if (a[0] === 'exec' && /SHOW DATABASES/.test(a[5])) return fail.queryFails ? { code: 1, stdout: '', stderr: 'denied' } : { code: 0, stdout: fail.noArchive ? '' : fail.lookalike ? `${a.at(-1).replace('_', 'X')}\n${a.at(-1)}\n` : `${a.at(-1)}\n`, stderr: '' };
       if (a[0] === 'exec') {
         if (fail.exec) { opts.stdoutTo.end('partial'); return { code: 1, stdout: '', stderr: 'boom' }; }
         opts.stdoutTo.write('-- dump\nCREATE '); opts.stdoutTo.end('TABLE t (id int);');
@@ -276,7 +276,7 @@ test('unwritable backups/ fails cleanly with nothing destructive', async () => {
 });
 
 test('after the wipe, cancel messages follow install state, not reset state', async () => {
-  uiState.resetStarted = false; uiState.configWritten = false;
+  uiState.resetStarted = false; uiState.configWritten = false; uiState.resetDone = false;
   const seen = [];
   const h = harness({ phrases: ['pbx.example.com'] });
   h.steps.runInstall = async () => {
@@ -284,7 +284,17 @@ test('after the wipe, cancel messages follow install state, not reset state', as
     uiState.configWritten = true;
     seen.push(cancelMessage());
   };
-  try { await go(h, setup()); } finally { uiState.configWritten = false; uiState.resetStarted = false; }
-  assert.match(seen[0], /Nothing was changed/);
+  try { await go(h, setup()); } finally { uiState.configWritten = false; uiState.resetStarted = false; uiState.resetDone = false; }
+  assert.match(seen[0], /reset and all its data deleted/);
   assert.match(seen[1], /run \.\/install\.sh again to resume/);
+});
+
+test('archive DB check: look-alike name does not hide the real one; failed check is reported', async () => {
+  const env = ENV + 'DB_CDR_ARCHIVE_DATABASE=opbx_cdr\n';
+  const h = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true, fail: { lookalike: true } });
+  await go(h, setup({ env }));
+  assert.equal(h.calls.find((c) => c[0] === 'compose' && /mysqldump/.test(c[6])).at(-1), 'opbx_cdr');
+  const h2 = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true, fail: { queryFails: true } });
+  await go(h2, setup({ env }));
+  assert.ok(h2.calls.some((c) => c[0] === 'note' && /NOT in this backup/.test(c[2])));
 });
