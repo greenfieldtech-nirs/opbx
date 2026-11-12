@@ -2,6 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { createDocker } from './docker.js';
 import { detectPlatform } from './platform.js';
 import { detectInstall } from './detect.js';
+import { runInstall } from './modes/install.js';
+import { ui } from './ui.js';
 
 export function chooseAction(mode, state) {
   switch (mode) {
@@ -19,25 +21,21 @@ export function chooseAction(mode, state) {
 const MESSAGES = {
   install: 'No installation found: would run a fresh install.',
   resume: 'Incomplete installation found: would resume it.',
-  'offer-reset-or-reconfigure': 'Existing installation found: would offer reset or reconfigure.',
-  reset: 'Would reset the installation.',
-  reconfigure: 'Would reconfigure the installation.',
+  'offer-reset-or-reconfigure': 'Existing installation found. Reset and reconfigure are not available yet.',
+  reset: 'Reset is not available yet.',
+  reconfigure: 'Reconfigure is not available yet.',
   'nothing-to-reconfigure': 'Nothing to reconfigure: no installation found.',
 };
 
 async function main() {
   const mode = process.argv[2] || 'install';
   const repo = process.env.OPBX_REPO || process.cwd();
-  const docker = createDocker();
   const action = chooseAction(mode, detectInstall(repo));
-  console.log(MESSAGES[action]);
-  // Stub diagnostics, replaced by the real modes in later tasks.
-  console.log('platform:', JSON.stringify(await detectPlatform(docker)));
-  const v = await docker.run(['version', '--format', '{{.Server.Version}}']);
-  const c = await docker.compose(['version', '--short']);
-  console.log(`daemon ${v.stdout.trim()} (exit ${v.code}), compose ${c.stdout.trim()} (exit ${c.code})`);
+  if (action !== 'install' && action !== 'resume') { console.log(MESSAGES[action]); return; }
+  const docker = createDocker();
+  await runInstall({ ui, docker, repoDir: repo, platform: await detectPlatform(docker), resume: action === 'resume' });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => { console.error(e.message); process.exit(1); });
+  main().catch((e) => { console.error(process.env.OPBX_DEBUG === '1' ? e.stack : e.message); process.exit(1); });
 }

@@ -83,3 +83,51 @@ export function deriveEnv(a) {
 
   return { ...env, ...a.advanced };
 }
+
+const EMAIL_FIELDS = {
+  mailgun: [['MAILGUN_DOMAIN'], ['MAILGUN_SECRET', true], ['MAILGUN_ENDPOINT'], ['MAILGUN_REGION']],
+  mailjet: [['MAILJET_APIKEY'], ['MAILJET_APISECRET', true]],
+  mailerlite: [['MAILERLITE_API_KEY', true]],
+  sendinblue: [['SENDINBLUE_API_KEY', true]],
+};
+
+// Inverse of deriveEnv for what the .env can tell; owner email/name/org and advanced limits are not recovered.
+export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = false } = {}) {
+  const g = (k) => env.get(k) || '';
+  const on = (k) => g(k) === 'true';
+  const sec = (v) => (includeSecrets ? v : undefined);
+  const a = {
+    mode: g('APP_ENV') === 'production' ? 'production' : 'development',
+    publicUrl: g('APP_URL'),
+    httpPort: Number(g('APP_PORT')) || 80,
+    trustedProxyCidr: g('TRUSTED_PROXY_CIDR'),
+    tenancy: g('OPBX_APPLICATION_MODE') === 'production' ? 'multi' : 'single',
+    logs: g('COMPOSE_PROFILES').split(',').includes('logs'),
+    ngrokToken: sec(g('NGROK_AUTHTOKEN')) ?? '',
+    auth0: null, recaptcha: null, usercheck: null, waf: null,
+    email: { provider: 'none', fields: {}, fromAddress: '', fromName: '' },
+  };
+  const provider = g('EMAIL_PROVIDER');
+  if (EMAIL_FIELDS[provider] && on(`${provider.toUpperCase()}_ENABLED`)) {
+    a.email = { provider, fields: {}, fromAddress: g('MAIL_FROM_ADDRESS'), fromName: g('MAIL_FROM_NAME') };
+    for (const [k, secret] of EMAIL_FIELDS[provider]) if (g(k) && (!secret || includeSecrets)) a.email.fields[k] = g(k);
+  }
+  if (on('OPBX_SAAS_ENABLED')) {
+    a.auth0 = { domain: g('AUTH0_DOMAIN'), clientId: g('AUTH0_CLIENT_ID'), providers: g('AUTH0_PROVIDERS').split(',').filter(Boolean) };
+    if (includeSecrets) a.auth0.clientSecret = g('AUTH0_CLIENT_SECRET');
+  }
+  if (on('RECAPTCHA_ENABLED')) {
+    a.recaptcha = { siteKey: g('RECAPTCHA_SITE_KEY'), minScore: Number(g('RECAPTCHA_MIN_SCORE')) };
+    if (includeSecrets) a.recaptcha.secretKey = g('RECAPTCHA_SECRET_KEY');
+  }
+  if (on('USERCHECK_ENABLED')) {
+    a.usercheck = { block: {} };
+    if (includeSecrets) a.usercheck.token = g('USERCHECK_API_TOKEN');
+    for (const [k, v] of env) if (k.startsWith('USERCHECK_BLOCK_')) a.usercheck.block[k.slice(16).toLowerCase()] = v === 'true';
+  }
+  const wafMode = g('WAF_MODE');
+  if (wafMode && wafMode !== 'off') {
+    a.waf = { mode: wafMode, stateDir: safelineEnv.get('SAFELINE_DIR') || '', consoleAllow: g('WAF_CONSOLE_ALLOW') };
+  }
+  return a;
+}

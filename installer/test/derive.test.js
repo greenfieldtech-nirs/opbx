@@ -94,3 +94,33 @@ test('OWNED_KEYS', () => {
   const e = deriveEnv(base());
   for (const k of ['APP_URL', 'FRONTEND_URL', 'SANCTUM_STATEFUL_DOMAINS', 'SESSION_DOMAIN', 'VITE_WS_HOST', 'GRAFANA_ROOT_URL']) assert.ok(k in e && OWNED_KEYS.domain.includes(k), k);
 });
+
+import { answersFromEnv } from '../src/derive.js';
+import { parseEnv, renderEnv } from '../src/envfile.js';
+
+test('answersFromEnv round-trips deriveEnv', () => {
+  const a = base({
+    tenancy: 'multi', trustedProxyCidr: '10.0.0.0/8', logs: true,
+    auth0: { domain: 't.auth0.com', clientId: 'cid', clientSecret: 's3c', providers: ['google'] },
+    recaptcha: { siteKey: 'sk', secretKey: 'rs', minScore: 0.7 },
+    usercheck: { token: 'tok', block: { disposable: true, spam: false } },
+    email: { provider: 'mailgun', fields: { MAILGUN_DOMAIN: 'mg.example.com', MAILGUN_SECRET: 'key' }, fromAddress: 'a@example.com', fromName: 'Acme' },
+    waf: { mode: 'block', stateDir: '/var/lib/safeline', consoleAllow: '198.51.100.0/24' },
+  });
+  const env = new Map(Object.entries(deriveEnv(a)));
+  const back = answersFromEnv(env, new Map([['SAFELINE_DIR', '/var/lib/safeline']]), { includeSecrets: true });
+  const { orgName, ownerName, ownerEmail, advanced, ...want } = a;
+  assert.deepEqual(back, want);
+  const bare = answersFromEnv(env, new Map(), { includeSecrets: false });
+  assert.equal(bare.auth0.clientSecret, undefined);
+  assert.equal(bare.email.fields.MAILGUN_SECRET, undefined);
+  assert.equal(bare.email.fields.MAILGUN_DOMAIN, 'mg.example.com');
+});
+
+test('answersFromEnv round-trips development with ngrok', () => {
+  const a = base({ mode: 'development', publicUrl: 'http://localhost', ngrokToken: 'ng' });
+  const back = answersFromEnv(new Map(Object.entries(deriveEnv(a))), new Map(), { includeSecrets: true });
+  assert.equal(back.mode, 'development');
+  assert.equal(back.ngrokToken, 'ng');
+  assert.equal(back.publicUrl, 'http://localhost');
+});

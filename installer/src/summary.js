@@ -43,7 +43,8 @@ export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
   if (a.waf) add(`  WAF console: ${prod ? `https://${new URL(a.publicUrl).hostname}:9443` : 'http://localhost:9443'}`);
   if (a.logs) add(`  Grafana:  ${a.publicUrl}/logs/`);
   if (!prod && a.ngrokToken) add('  ngrok dashboard: http://localhost:4040');
-  add('', 'Owner login', `  Email:    ${a.ownerEmail}`, `  Password: ${ownerPassword}`, '  This password will not be shown again.', '');
+  add('', 'Owner login', `  Email:    ${a.ownerEmail}`,
+    ...(ownerPassword ? [`  Password: ${ownerPassword}`, '  This password will not be shown again.'] : ['  Owner account already existed; password unchanged.']), '');
   if (a.waf) {
     add('WAF admin login');
     add(...(wafAdmin
