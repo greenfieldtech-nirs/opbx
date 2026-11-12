@@ -67,5 +67,15 @@ check "console on, allow-list" "grep -q 'listen 8443;' $C && grep -q 'allow 198.
 check "console on, no allow-list" "grep -q 'listen 8443;' $C && ! grep -q 'deny all' $C" y -e WAF_MODE=block -e WAF_CONSOLE_ENABLED=true
 reject "bad TRUSTED_PROXY_CIDR rejected" "TRUSTED_PROXY_CIDR=10.0.0.0/8,evil;x" "evil;x"
 reject "bad octet-count rejected" "TRUSTED_PROXY_CIDR=10.0.0/8" "10.0.0/8"
+reject "rejects 999.1.1.1" "TRUSTED_PROXY_CIDR=999.1.1.1" "999.1.1.1"
+reject "rejects 1.2.3.4/99" "TRUSTED_PROXY_CIDR=1.2.3.4/99" "1.2.3.4/99"
+reject "rejects ::::" "TRUSTED_PROXY_CIDR=::::" "::::"
+reject "rejects abc:" "TRUSTED_PROXY_CIDR=abc:" "abc:"
+reject "rejects dead:beef" "TRUSTED_PROXY_CIDR=dead:beef" "dead:beef"
+reject "rejects :" "TRUSTED_PROXY_CIDR=:" ":"
+reject "rejects *" "TRUSTED_PROXY_CIDR=*" "*"
+check "valid entries accepted" "grep -c set_real_ip_from $R | grep -qx 5" n -e TRUSTED_PROXY_CIDR=10.0.0.0/8,192.168.1.5,fd00::/8,2001:db8::1,::1
+out=$($DOCKER run --rm $HOSTS -e RENDER_ONLY=1 -e WAF_MODE=monitor -e WAF_CONSOLE_ENABLED=true -v "$PWD/docker/nginx/render.sh:/opt/opbx/render.sh:ro" opbx-nginx-waf:test /bin/sh /opt/opbx/render.sh 2>&1)
+if echo "$out" | grep -q "no IP allowlist"; then echo "PASS console warns without allowlist"; else echo "FAIL console warns without allowlist"; fail=1; fi
 reject "bad WAF_CONSOLE_ALLOW rejected" "WAF_CONSOLE_ALLOW=1.2.3.4/abc" "1.2.3.4/abc"
 exit $fail

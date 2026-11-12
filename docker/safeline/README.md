@@ -71,8 +71,12 @@ WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml 
    a `lua_shared_dict` that skips detection for N seconds after a failure.
 5. **Bodies over 1 MB are inspected only partially** (nginx accepts up to 50 MB). Raise `req_body_size`
    on the routes that matter, or cap body size there.
-6. **Client IP = last `X-Forwarded-For` hop.** This is correct only when nginx is reachable solely
-   through the TLS proxy. On a directly exposed port, the client chooses the IP that gets logged.
+6. **Client IP comes from `X-Forwarded-For` only for trusted proxies.** nginx rewrites the client IP
+   (`realip`, recursive) only when the sender is in `TRUSTED_PROXY_CIDR`; otherwise the socket address
+   is used. The console allowlist (`WAF_CONSOLE_ALLOW`) sees the same address, so it is only as real
+   as that list. Never trust a NAT or gateway address that direct traffic also arrives from (rootless
+   Podman and Docker Desktop port publishing): a client could then spoof `X-Forwarded-For` to bypass
+   both rate limits and the allowlist.
 7. **Host requirements.** The state directory must be outside a read-only root (`/data` fails on Fedora
    CoreOS), SELinux hosts need the `container_file_t` relabel, and the detector's TCP listener is a
    manual edit to `detector.yml`.

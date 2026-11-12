@@ -10,14 +10,39 @@ WAF_MODE=${WAF_MODE:-off}
 WAF_DETECTOR_HOST=${WAF_DETECTOR_HOST:-safeline-detector}
 case "$WAF_MODE" in off|monitor|block) ;; *) echo "WAF_MODE must be off|monitor|block (got '$WAF_MODE')" >&2; exit 1;; esac
 
+# Exit 0 only for an IPv4/IPv6 address with optional prefix length.
+valid_addr() {
+  awk -v e="$1" 'function grp(x,  n,i,g,c){ if (x=="") return 0; n=split(x,g,":"); for(i=1;i<=n;i++) if (g[i] !~ /^[0-9a-fA-F]{1,4}$/) return -1; return n }
+  BEGIN {
+    n = split(e, pa, "/"); if (n > 2) exit 1
+    a = pa[1]; max = 32
+    if (n == 2 && pa[2] !~ /^[0-9]{1,3}$/) exit 1
+    if (a ~ /^[0-9.]+$/) {
+      if (split(a, o, ".") != 4) exit 1
+      for (i = 1; i <= 4; i++) if (o[i] !~ /^[0-9]{1,3}$/ || o[i] + 0 > 255) exit 1
+    } else if (a ~ /^[0-9a-fA-F:]+$/ && a ~ /:/) {
+      max = 128
+      if (a ~ /:::/) exit 1
+      if (a ~ /::/) {
+        i = index(a, "::"); l = substr(a, 1, i - 1); r = substr(a, i + 2)
+        if (r ~ /::/) exit 1
+        x = grp(l); y = grp(r)
+        if (x < 0 || y < 0 || x + y > 7) exit 1
+      } else if (grp(a) != 8) exit 1
+    } else exit 1
+    if (n == 2 && pa[2] + 0 > max) exit 1
+  }'
+}
+
 # Comma-separated IPv4/IPv6 addresses or CIDRs; prints one per line, exits on a bad entry.
 addr_list() { # var-name value
   [ -n "$2" ] || return 0
+  set -f # a "*" entry must be reported as itself, not glob-expanded
   for e in $(echo "$2" | tr -d ' ' | tr ',' ' '); do
-    echo "$e" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$|^[0-9a-fA-F:]*:[0-9a-fA-F:.]*(/[0-9]{1,3})?$' \
-      || { echo "$1: '$e' is not an IPv4/IPv6 address or CIDR" >&2; exit 1; }
+    valid_addr "$e" || { echo "$1: '$e' is not an IPv4/IPv6 address or CIDR" >&2; exit 1; }
     echo "$e"
   done
+  set +f
 }
 PROXIES=$(addr_list TRUSTED_PROXY_CIDR "${TRUSTED_PROXY_CIDR:-}") || exit 1
 CONSOLE_ALLOW=$(addr_list WAF_CONSOLE_ALLOW "${WAF_CONSOLE_ALLOW:-}") || exit 1
@@ -50,6 +75,7 @@ fi
 # SafeLine's console can't live under a path, so it gets its own port. Lazy DNS keeps nginx starting without safeline-mgt.
 if [ "$WAF_MODE" != off ] && [ "${WAF_CONSOLE_ENABLED:-}" = true ]; then
   {
+    [ -n "$CONSOLE_ALLOW" ] || echo "render.sh: WARNING: WAF console on :8443 has no IP allowlist; only SafeLine's login protects it." >&2
     echo "server {"
     echo "    listen 8443;"
     echo "    resolver ${RESOLVER} valid=10s ipv6=off;"
