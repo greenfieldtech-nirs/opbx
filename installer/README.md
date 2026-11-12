@@ -35,7 +35,7 @@ Set `OPBX_DEBUG=1` to print stack traces on failure.
 Unit tests use `node --test` and need no daemon. Run them with the repository mounted:
 
 ```bash
-docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
 ```
 
 `npm ci` writes `installer/node_modules/` on the host (git-ignored); `--user` keeps it owned by you on Linux. Tests use fakes for
