@@ -50,6 +50,15 @@ test('isPortFree: true on exit 0, false on in-use, throws otherwise', async () =
   await assert.rejects(isPortFree(f(125, 'pull access denied'), 80), /pull access denied/);
 });
 
+test('isPortFree: a bind host is part of the published port', async () => {
+  const seen = [];
+  const d = { run: async (a) => (seen.push(a), { code: 0, stdout: '', stderr: '' }) };
+  await isPortFree(d, 9333, '127.0.0.1');
+  await isPortFree(d, 80);
+  assert.ok(seen[0].includes('127.0.0.1:9333:80'));
+  assert.ok(seen[1].includes('80:80'));
+});
+
 test('detectPlatform throws docker info stderr on failure', async () => {
   const d = createDocker({ exec: async () => ({ code: 1, stdout: '', stderr: 'Cannot connect to the daemon' }) });
   await assert.rejects(detectPlatform(d), /Cannot connect to the daemon/);

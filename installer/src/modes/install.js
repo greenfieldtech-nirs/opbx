@@ -28,15 +28,15 @@ function generateSharedSecrets(repoDir) {
 
 // Development publishes fixed loopback ports (docker-compose.ports.yml); a busy one fails `compose up` after the build.
 // Returns env overrides for ports the user moved.
-async function resolveOverlayPorts({ ui, docker, repoDir, existing, isPortFree: free }) {
+async function resolveOverlayPorts({ answers, ui, docker, repoDir, existing, isPortFree: free }) {
   const file = join(repoDir, 'docker-compose.ports.yml');
   if (!existsSync(file)) return {};
   const out = {};
-  for (const [, key, def] of readFileSync(file, 'utf8').matchAll(/\$\{(\w+):-(\d+)\}/g)) {
+  for (const [, host, key, def] of readFileSync(file, 'utf8').matchAll(/"([\d.]+):\$\{(\w+):-(\d+)\}:/g)) {
     const port = Number(existing.get(key) || def);
-    if (await free(docker, port)) continue;
+    if (await free(docker, port, host)) continue;
     let alt = port + 10000;
-    while (alt < 65535 && !(await free(docker, alt))) alt++;
+    while (alt < 65535 && !(await free(docker, alt, host))) alt++;
     const choice = await ui.select({
       message: `Port ${port} (${key}) is already in use on this machine.`,
       options: [{ value: 'alt', label: `Use port ${alt} instead (sets ${key} in .env)` }, { value: 'abort', label: 'Abort' }],
@@ -44,6 +44,9 @@ async function resolveOverlayPorts({ ui, docker, repoDir, existing, isPortFree: 
     if (choice !== 'alt') throw new Error(`Port ${port} (${key}) is in use; free it or set ${key} in .env, then run ./install.sh again.`);
     out[key] = String(alt);
   }
+  // development binds the firewall console to loopback only (derive.js WAF_CONSOLE_BIND)
+  const cp = answers.waf?.consolePort ?? 9443;
+  if (answers.waf && !(await free(docker, cp, '127.0.0.1'))) throw new Error(`Port ${cp} (the firewall console) is in use on 127.0.0.1. Free it and run ./install.sh again, choosing another console port.`);
   return out;
 }
 
@@ -96,7 +99,7 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
   const template = resume && existsSync(envPath) ? readFileSync(envPath, 'utf8') : readFileSync(join(repoDir, '.env.example'), 'utf8');
   const secrets = Object.fromEntries(Object.entries(generateOpbxSecrets()).map(([k, v]) => [k, existing.get(k) || v]));
   const portEnv = {};
-  if (!resume && answers.mode !== 'production') Object.assign(portEnv, await resolveOverlayPorts({ ui, docker, repoDir, existing, isPortFree: S.isPortFree }));
+  if (!resume && answers.mode !== 'production') Object.assign(portEnv, await resolveOverlayPorts({ answers, ui, docker, repoDir, existing, isPortFree: S.isPortFree }));
   const write = (values) => writeFileAtomic(envPath, renderEnv(template, values), envFileOpts());
   write({ ...deriveEnv(answers), ...portEnv, ...secrets, OPBX_INSTALL_STATE: 'incomplete' });
   uiState.configWritten = true;

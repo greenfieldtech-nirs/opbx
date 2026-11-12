@@ -24,8 +24,8 @@ export async function detectPlatform(docker) {
 
 // shortcut: only sees ports bound inside the daemon's network namespace; a host process outside the
 // VM may go undetected on Podman machine / Docker Desktop.
-export async function isPortFree(docker, port) {
-  const r = await docker.run(['run', '--rm', '-p', `${port}:80`, 'alpine', 'true']);
+export async function isPortFree(docker, port, host) {
+  const r = await docker.run(['run', '--rm', '-p', `${host ? `${host}:` : ''}${port}:80`, 'alpine', 'true']);
   if (r.code === 0) return true;
   if (/address already in use|port is already allocated/i.test(r.stderr)) return false;
   throw new Error(`could not probe port ${port}: ${r.stderr.trim() || `exit ${r.code}`}`);

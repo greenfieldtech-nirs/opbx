@@ -230,11 +230,13 @@ const withPortsFile = (dir) => writeFileSync(join(dir, 'docker-compose.ports.yml
 const dev = () => answers({ mode: 'development', publicUrl: 'http://localhost' });
 
 test('development install: a busy overlay port is moved to a free one, written to .env', async () => {
+  const hosts = [];
   const dir = setup(); withPortsFile(dir);
-  const h = harness({ answers: dev(), steps: { isPortFree: async (_d, p) => p !== 9333 } });
+  const h = harness({ answers: dev(), steps: { isPortFree: async (_d, p, host) => { hosts.push(host); return p !== 9333; } } });
   const picked = [];
   h.ui.select = async (o) => (picked.push(o.message), 'alt');
   await run(h, dir);
+  assert.ok(hosts.length && hosts.every((x) => x === '127.0.0.1'));
   assert.match(picked[0], /9333.*MINIO_CONSOLE_EXPOSE_PORT/);
   const env = parseEnv(readFileSync(join(dir, '.env'), 'utf8'));
   assert.equal(env.get('MINIO_CONSOLE_EXPOSE_PORT'), '19333');
