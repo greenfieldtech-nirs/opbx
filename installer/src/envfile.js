@@ -34,7 +34,10 @@ function format(v) {
   if (/[\r\n]/.test(v)) throw new Error('env values cannot contain newlines');
   if (/^[A-Za-z0-9_@%+=:,./-]*$/.test(v)) return v;
   // single quotes: neither dotenv nor compose expands "$" there
-  if (v.includes('$') && !v.includes("'")) return `'${v}'`;
+  if (v.includes('$')) {
+    if (v.includes("'")) throw new Error("env values cannot contain both '$' and a single quote");
+    return `'${v}'`;
+  }
   return `"${v.replace(/[\\"]/g, '\\$&')}"`;
 }
 

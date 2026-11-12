@@ -17,6 +17,7 @@ export function normalizePublicUrl(input, mode) {
   if (!isIp && !host.split('.').every((l) => LABEL.test(l))) return { ok: false, reason: 'That is not a valid host name.' };
   if (mode === 'production') {
     if (u.protocol !== 'https:') return { ok: false, reason: 'A production server must use HTTPS (https://).' };
+    if (!host.includes('.') && !host.startsWith('[')) return { ok: false, reason: 'Use the real domain name your users will open (for example pbx.example.com), not localhost or a single-word name.' };
     if (isIp) return { ok: false, reason: 'Use a domain name, not an IP address: HTTPS certificates are issued for names.' };
   }
   return { ok: true, value: u.origin };
@@ -40,7 +41,7 @@ function validAddr(e) {
   if (halves.length > 2) return false;
   const groups = halves.flatMap((h) => (h === '' ? [] : h.split(':')));
   if (!groups.every((g) => /^[0-9a-fA-F]{1,4}$/.test(g))) return false;
-  if (halves.length === 1 ? groups.length !== 8 : groups.length > 8) return false;
+  if (halves.length === 1 ? groups.length !== 8 : groups.length > 7) return false;
   return bits === undefined || +bits <= 128;
 }
 

@@ -44,6 +44,10 @@ test('renderEnv replaces, keeps comments, appends unknown, idempotent', () => {
   assert.equal(back.get('DB_PASSWORD'), 'abc123');
 });
 
+test('renderEnv rejects values with both $ and a single quote', () => {
+  assert.throws(() => renderEnv(TEMPLATE, { A: "a$b'c" }), /single quote/);
+});
+
 test('renderEnv rejects newlines in values', () => {
   assert.throws(() => renderEnv(TEMPLATE, { A: 'x\ny' }));
 });

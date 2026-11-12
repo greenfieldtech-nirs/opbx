@@ -21,6 +21,14 @@ test('normalizePublicUrl: refusals', () => {
   assert.equal(normalizePublicUrl('https://exa mple.com', 'production').ok, false);
 });
 
+test('normalizePublicUrl: production refuses localhost and single-label hosts', () => {
+  for (const s of ['https://localhost', 'intranet', 'https://pbx:8443']) {
+    const r = normalizePublicUrl(s, 'production');
+    assert.equal(r.ok, false, s);
+    assert.match(r.reason, /real domain name/);
+  }
+});
+
 test('normalizePublicUrl: development', () => {
   assert.deepEqual(normalizePublicUrl('http://localhost', 'development'), { ok: true, value: 'http://localhost' });
   assert.deepEqual(normalizePublicUrl('http://localhost:8080/', 'development'), { ok: true, value: 'http://localhost:8080' });
@@ -47,7 +55,7 @@ test('parseCidrList accepts', () => {
 });
 
 test('parseCidrList rejects', () => {
-  for (const s of ['10.0.0/8', '999.1.1.1', '1.2.3.4/99', '::::', 'abc:', 'dead:beef', ':', '1.2.3.4,', 'evil;x', '::1/129', '1::2::3']) {
+  for (const s of ['10.0.0/8', '999.1.1.1', '1.2.3.4/99', '::::', 'abc:', 'dead:beef', ':', '1.2.3.4,', 'evil;x', '::1/129', '1::2::3', '1:2:3:4::5:6:7:8']) {
     const r = parseCidrList(s);
     assert.equal(r.ok, false, s);
     assert.ok(r.reason, s);

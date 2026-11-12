@@ -51,7 +51,8 @@ export function deriveEnv(a) {
     OPBX_APPLICATION_MODE: a.tenancy === 'multi' ? 'production' : 'development',
   };
   if (a.waf) env.WAF_CONSOLE_PORT = '9443';
-  if (a.tenancy === 'multi') env.OPBX_APPLICATION_WEBHOOK_BASEURL = a.publicUrl;
+  // empty (not absent) for single so a re-render clears a stale multi value
+  env.OPBX_APPLICATION_WEBHOOK_BASEURL = a.tenancy === 'multi' ? a.publicUrl : '';
   if (!prod && a.ngrokToken) env.NGROK_AUTHTOKEN = a.ngrokToken;
 
   const au = a.auth0;

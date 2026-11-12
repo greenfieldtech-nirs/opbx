@@ -23,7 +23,7 @@ test('production + single', () => {
     OPBX_APPLICATION_MODE: 'development', OPBX_SAAS_ENABLED: 'false', RECAPTCHA_ENABLED: 'false', USERCHECK_ENABLED: 'false',
     MAILGUN_ENABLED: 'false', MAILJET_ENABLED: 'false', MAILERLITE_ENABLED: 'false', SENDINBLUE_ENABLED: 'false',
   });
-  assert.ok(!('OPBX_APPLICATION_WEBHOOK_BASEURL' in e));
+  assert.equal(e.OPBX_APPLICATION_WEBHOOK_BASEURL, '');
   assert.ok(!('WAF_CONSOLE_PORT' in e));
   assert.ok(!('NGROK_AUTHTOKEN' in e));
 });
