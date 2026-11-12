@@ -102,7 +102,7 @@ class InstallOwnerCommand extends Command
                 ])->save();
 
                 return true;
-            });
+            }, attempts: 2); // one retry on deadlock re-runs the locked check
         } catch (\Throwable $e) {
             $this->error('Failed to create owner: '.$e->getMessage());
 
