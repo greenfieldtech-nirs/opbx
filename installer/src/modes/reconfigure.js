@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseEnv, renderEnv, writeFileAtomic } from '../envfile.js';
+import { parseEnv, renderEnv, writeFileAtomic, envFileOpts } from '../envfile.js';
 import { deriveEnv, answersFromEnv, OWNED_KEYS } from '../derive.js';
 import { askPublicUrl, askWaf } from '../questions.js';
 import { detectInstall } from '../detect.js';
@@ -23,8 +23,6 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   const S = { askPublicUrl, askWaf, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
   const envPath = join(repoDir, '.env');
   const readEnv = (p) => (existsSync(p) ? parseEnv(readFileSync(p, 'utf8')) : new Map());
-  const { HOST_UID, HOST_GID } = process.env;
-  const own = HOST_UID && HOST_GID ? { uid: Number(HOST_UID), gid: Number(HOST_GID) } : {};
 
   if (detectInstall(repoDir) !== 'complete' || !existsSync(envPath)) {
     ui.note('Nothing to reconfigure', 'OPBX is not installed (or the installation is not complete). Run ./install.sh first.');
@@ -51,7 +49,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
 
   // Rewrites only the given owned keys over the CURRENT .env; every other byte stays.
   const apply = (values) => {
-    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), values), { mode: 0o644, ...own }); // app container reads it as www-data
+    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), values), envFileOpts());
     uiState.reconfigure = 'written';
   };
   const must = (r, what) => {

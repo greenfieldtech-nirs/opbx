@@ -61,8 +61,9 @@ test('fresh install writes a complete .env; owner password only in the summary',
   const env = parseEnv(envText);
   assert.equal(env.get('OPBX_INSTALL_STATE'), 'complete');
   assert.equal(env.get('OPBX_INSTALLER_MANAGED'), 'true');
-  // www-data (uid 82) in the app container reads the bind-mounted .env
-  assert.equal(statSync(join(dir, '.env')).mode & 0o777, 0o644);
+  // www-data (gid 82) in the app container reads the bind-mounted .env
+  assert.equal(statSync(join(dir, '.env')).mode & 0o777, 0o640);
+  if (process.getuid() === 0) assert.equal(statSync(join(dir, '.env')).gid, 82);
   for (const k of ['APP_KEY', 'DB_PASSWORD', 'DB_ROOT_PASSWORD', 'REDIS_PASSWORD']) assert.ok(env.get(k), k);
   assert.ok(existsSync(join(dir, 'docker-compose.yml')));
   assert.deepEqual(h.log.steps, ['secrets', 'build', 'composer', 'start', 'owner', 'checks']);

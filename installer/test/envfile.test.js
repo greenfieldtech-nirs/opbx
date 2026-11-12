@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, writeFileSync, readdirSync, statSync } from 
 import * as realFs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseEnv, renderEnv, writeFileAtomic } from '../src/envfile.js';
+import { parseEnv, renderEnv, writeFileAtomic, envFileOpts } from '../src/envfile.js';
 
 const TEMPLATE = `# ═══ APPLICATION
 APP_NAME="OPBX - Open Source Business PBX"
@@ -69,4 +69,10 @@ test('writeFileAtomic: failure between write and rename keeps old content', () =
   assert.throws(() => writeFileAtomic(p, 'new', { mode: 0o600 }, boom), /boom/);
   assert.equal(readFileSync(p, 'utf8'), 'old');
   assert.deepEqual(readdirSync(d), ['.env']);
+});
+
+test('envFileOpts: 0640, host user + gid 82 (www-data in the app image) when root, mode only otherwise', () => {
+  assert.deepEqual(envFileOpts({ HOST_UID: '1000', HOST_GID: '1000' }, true), { mode: 0o640, uid: 1000, gid: 82 });
+  assert.deepEqual(envFileOpts({}, true), { mode: 0o640, uid: 0, gid: 82 });
+  assert.deepEqual(envFileOpts({ HOST_UID: '1000' }, false), { mode: 0o640 });
 });

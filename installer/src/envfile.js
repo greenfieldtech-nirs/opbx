@@ -71,3 +71,10 @@ export function writeFileAtomic(path, text, { mode = 0o600, uid, gid } = {}, fs 
     throw e;
   }
 }
+
+// .env: the host user owns it, www-data (gid 82 in the app image) reads the bind mount through the
+// group, nobody else. Only root (the installer container) can give the file to gid 82; tests run unprivileged.
+export function envFileOpts(env = process.env, isRoot = process.getuid?.() === 0) {
+  if (!isRoot) return { mode: 0o640 };
+  return { mode: 0o640, uid: env.HOST_UID ? Number(env.HOST_UID) : 0, gid: 82 };
+}
