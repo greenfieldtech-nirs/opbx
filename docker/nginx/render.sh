@@ -49,17 +49,12 @@ CONSOLE_ALLOW=$(addr_list WAF_CONSOLE_ALLOW "${WAF_CONSOLE_ALLOW:-}") || exit 1
 
 mkdir -p /etc/nginx/conf.d
 
-# The WAF hook's client address: with realip $remote_addr already is the client (nil = t1k's default);
-# without it the last X-Forwarded-For hop, what the TLS proxy saw (the first hop is client-controlled).
-if [ -n "$PROXIES" ]; then WAF_REMOTE_ADDR=nil; else WAF_REMOTE_ADDR='"http_x_forwarded_for: -1"'; fi
-
 render() { # src-dir dest-dir
   for f in "$1"/*.conf; do
     [ -e "$f" ] || continue
     sed -e "s/__NGINX_RESOLVER__/${RESOLVER}/g" \
         -e "s/__WAF_MODE__/${WAF_MODE}/g" \
         -e "s/__WAF_DETECTOR_HOST__/${WAF_DETECTOR_HOST}/g" \
-        -e "s/__WAF_REMOTE_ADDR__/${WAF_REMOTE_ADDR}/g" \
         "$f" > "$2/$(basename "$f")"
   done
 }

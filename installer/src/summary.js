@@ -64,7 +64,7 @@ export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
   if (prod) {
     add('Reverse proxy (nginx example; replace <this-server> with the address of this machine)', '', proxySnippet(a), '',
       `Make port ${a.httpPort}${a.waf ? ` and ${consolePort(a)}` : ''} reachable only from this proxy.`, '');
-    if (!a.trustedProxyCidr) add('No proxy IP was given: rate limits and logs will see the proxy address, not the real client address.', '');
+    if (!a.trustedProxyCidr) add('No proxy IP was given: rate limits, logs and firewall events will see the proxy address, not the real client address.', '');
   }
   add('Next steps');
   if (a.tenancy === 'single') add('  - In OPBX go to Settings -> Cloudonix and set up the Cloudonix connection and webhooks.');

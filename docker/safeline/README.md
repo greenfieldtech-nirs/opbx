@@ -84,9 +84,8 @@ WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml 
    as that list. Never trust a NAT or gateway address that direct traffic also arrives from (rootless
    Podman and Docker Desktop port publishing): a client could then spoof `X-Forwarded-For` to bypass
    both rate limits and the allowlist.
-   The WAF hook sends the detector the same client address: `$remote_addr` when realip is on; without
-   `TRUSTED_PROXY_CIDR`, the last `X-Forwarded-For` hop (what the TLS proxy saw), since the socket
-   address is then the proxy's.
+   The WAF hook sends the detector the same address (`$remote_addr`). Without `TRUSTED_PROXY_CIDR`,
+   WAF events therefore show the proxy's IP, as rate limits do; set it to see real clients.
 7. **Host requirements.** The state directory must be outside a read-only root (`/data` fails on Fedora
    CoreOS), SELinux hosts need the `container_file_t` relabel, and the detector's TCP listener is a
    manual edit to `detector.yml`.

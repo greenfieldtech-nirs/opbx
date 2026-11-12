@@ -39,7 +39,7 @@ test('no proxy IP + WAF, no WAF admin, email none', () => {
   const s = renderSummary({ ...base, trustedProxyCidr: '', email: { provider: 'none' } }, { ...res, wafAdmin: undefined });
   assert.ok(s.includes('protected only by SafeLine'));
   assert.ok(s.includes('docker exec safeline-mgt /app/mgt reset-admin'));
-  assert.ok(s.includes('rate limit'));
+  assert.ok(s.includes('rate limit') && s.includes('firewall events'));
   assert.ok(s.includes('invitations'));
 });
 
