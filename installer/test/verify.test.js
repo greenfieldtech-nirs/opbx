@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { runChecks } from '../src/verify.js';
 
 const ok = (stdout = '') => ({ code: 0, stdout, stderr: '' });
+const ps = (rows) => rows.map(([Service, State, Health]) => JSON.stringify({ Service, State, Health })).join('\n');
 const NET = JSON.stringify({ proj_opbx: {}, other_net: {} });
 const ENV = new Map([['PUSHER_APP_KEY', 'k123']]);
 
@@ -12,9 +13,10 @@ function fake(over = {}) {
     const s = args.join(' ');
     for (const [pat, res] of Object.entries(over)) if (s.includes(pat)) return typeof res === 'function' ? res(args) : res;
     if (s.includes('inspect opbx_nginx')) return ok(NET);
-    if (s.includes('ps --all')) return ok('opbx_app running healthy\nopbx_nginx running ');
+    if (s.includes('config --services')) return ok('app\nnginx\n');
+    if (s.includes('ps --all')) return ok(ps([['app', 'running', 'healthy'], ['nginx', 'running', ''], ['ngrok', 'exited', '']]));
     if (s.includes('logs/api/health')) return ok('{"database":"ok"}');
-    if (s.includes('/up')) return ok('OK');
+    if (s.includes('/up')) return ok('<html><body>Application up</body></html>');
     if (s.includes('/api/v1/')) return ok('  HTTP/1.1 401 Unauthorized');
     if (s.includes('wget') && s.includes('127.0.0.1/')) return ok('<!doctype html><html>');
     if (s.includes('node:26-alpine')) return ok('HTTP/1.1 101 Switching Protocols');
@@ -48,11 +50,18 @@ test('a thrown error becomes a failed check', async () => {
   assert.equal(byName(r, 'config:validate').ok, false);
 });
 
+test('SPA html on /up fails; inactive-profile exited container does not fail services', async () => {
+  const d = fake({ '/up': ok('<!doctype html><html><div id="root"></div>') });
+  const r = await runChecks(d, { waf: null, logs: false }, { env: ENV });
+  assert.equal(byName(r, 'nginx /up').ok, false);
+  assert.equal(byName(r, 'services').ok, true); // ngrok exited but not in config --services
+});
+
 test('not-running or unhealthy services fail', async () => {
-  const d = fake({ 'ps --all': ok('opbx_app running starting\nopbx_queue exited ') });
+  const d = fake({ 'ps --all': ok(ps([['app', 'running', 'starting'], ['nginx', 'exited', '']])) });
   const c = byName(await runChecks(d, { waf: null, logs: false }, { env: ENV }), 'services');
   assert.equal(c.ok, false);
-  assert.match(c.detail, /opbx_queue|opbx_app/);
+  assert.match(c.detail, /app.*nginx/);
 });
 
 test('websocket check uses discovered network and Pusher key; non-101 fails', async () => {
@@ -71,10 +80,14 @@ test('WAF block mode expects 403; monitor mode looks for safeline-waf in the err
   assert.equal(byName(rb, 'waf detection').ok, true);
   assert.ok(byName(rb, 'waf console'));
 
-  const mon = fake({ opbx_error: ok('safeline-waf: would block (monitor)') });
+  let n = 0;
+  const mon = fake({ 'grep -c': () => ok(String(n++ === 0 ? 3 : 4)) });
   const rm = await runChecks(mon, { waf: { mode: 'monitor' }, logs: false }, { env: new Map([...ENV, ['WAF_CONSOLE_ENABLED', 'false']]) });
   assert.equal(byName(rm, 'waf detection').ok, true);
   assert.ok(!byName(rm, 'waf console'));
+
+  const stale = fake({ 'grep -c': ok('3') });
+  assert.equal(byName(await runChecks(stale, { waf: { mode: 'monitor' }, logs: false }, { env: ENV }), 'waf detection').ok, false);
 
   const bad = fake({ '%27': { code: 0, stdout: 'hi', stderr: '  HTTP/1.1 200 OK' } });
   assert.equal(byName(await runChecks(bad, { waf: { mode: 'block' }, logs: false }, { env: ENV }), 'waf detection').ok, false);

@@ -28,8 +28,11 @@ export async function composerInstall(docker, answers) {
 async function waitHealthy(docker, name, { now, sleep, timeoutMs, intervalMs, onTick }) {
   const deadline = now() + timeoutMs;
   for (;;) {
-    const r = await docker.run(['inspect', '--format', '{{.State.Health.Status}}', name]);
-    if (r.stdout.trim() === 'healthy') return;
+    const r = await docker.run(['inspect', '--format', '{{.State.Status}} {{.State.Health.Status}}', name]);
+    if (r.code !== 0) throw new Error(`Cannot inspect ${name}: ${tail(r, 3)}`);
+    const [state, health] = r.stdout.trim().split(' ');
+    if (health === 'healthy') return;
+    if (state === 'exited' || state === 'dead') throw new Error(`${name} stopped (${state}); check: docker logs ${name}`);
     if (now() >= deadline) throw new Error(`${name} did not become healthy within ${Math.round(timeoutMs / 60000)} minutes.`);
     if (onTick) await onTick();
     await sleep(intervalMs);
@@ -40,10 +43,12 @@ export async function startStack(docker, ui, answers, { now = real.now, sleep = 
   const s = ui.spinner();
   if (answers.waf) {
     s.start('Starting SafeLine');
-    const r = await docker.compose(['--project-directory', 'docker/safeline', '-p', 'safeline', 'up', '-d']);
-    if (r.code !== 0) { s.stop('SafeLine failed to start'); throw new Error(`SafeLine start failed:\n${tail(r)}`); }
-    await waitHealthy(docker, 'safeline-detector', { now, sleep, timeoutMs: 5 * 60_000 > timeoutMs ? timeoutMs : 5 * 60_000, intervalMs });
-    if (!(await checkDetector(docker))) throw new Error('SafeLine detector is healthy but not reachable on the safeline-ce network.');
+    try {
+      const r = await docker.compose(['--project-directory', 'docker/safeline', '-p', 'safeline', 'up', '-d']);
+      if (r.code !== 0) throw new Error(`SafeLine start failed:\n${tail(r)}`);
+      await waitHealthy(docker, 'safeline-detector', { now, sleep, timeoutMs: Math.min(timeoutMs, 5 * 60_000), intervalMs });
+      if (!(await checkDetector(docker))) throw new Error('SafeLine detector is healthy but not reachable on the safeline-ce network.');
+    } catch (e) { s.stop('SafeLine failed'); throw e; }
     s.stop('SafeLine is up');
   }
   s.start('Starting OPBX');
@@ -64,7 +69,7 @@ export async function createOwner(docker, answers, password) {
     `--org-name=${answers.orgName}`, `--name=${answers.ownerName}`, `--email=${answers.ownerEmail}`], { input: `${password}\n` });
   if (r.code === 0) return 'created';
   if (r.code === 2) return 'exists';
-  throw new Error(`Creating the owner failed:\n${tail(r).replaceAll(password, '***')}`);
+  throw new Error(`Creating the owner failed:\n${password ? tail(r).replaceAll(password, '***') : tail(r)}`);
 }
 
 // ANSI stripped; accepts ASCII or full-width colon, on stdout or stderr

@@ -63,7 +63,7 @@ test('composerInstall: non-zero throws with output', async () => {
 const healthDocker = (statuses) => {
   let i = 0;
   return fake((kind, args) => {
-    if (args[0] === 'inspect') return ok(statuses[Math.min(i++, statuses.length - 1)]);
+    if (args[0] === 'inspect') return ok(`running ${statuses[Math.min(i++, statuses.length - 1)]}`);
     if (args[0] === 'logs') return ok('last log line');
     return ok();
   });
@@ -84,7 +84,7 @@ test('startStack: never healthy rejects after the timeout', async () => {
 
 test('startStack: WAF starts safeline first, waits for detector, checks it', async () => {
   const d = fake((kind, args) => {
-    if (args[0] === 'inspect') return ok('healthy');
+    if (args[0] === 'inspect') return ok('running healthy');
     if (args.includes('nc')) return ok(); // checkDetector
     return ok('x');
   });
@@ -97,7 +97,7 @@ test('startStack: WAF starts safeline first, waits for detector, checks it', asy
 });
 
 test('startStack: WAF with unreachable detector throws', async () => {
-  const d = fake((kind, args) => (args.includes('nc') ? { code: 1, stdout: '', stderr: '' } : ok('healthy')));
+  const d = fake((kind, args) => (args.includes('nc') ? { code: 1, stdout: '', stderr: '' } : ok('running healthy')));
   await assert.rejects(startStack(d, fakeUi(), { waf: { mode: 'block' } }, clock()), /detector/i);
 });
 
@@ -128,4 +128,24 @@ test('resetSafelineAdmin: ASCII colon, ANSI and stderr output also parse; garbag
   const d = fake(() => ({ code: 0, stdout: '', stderr: '\x1b[32m[SafeLine] Initial username: admin\x1b[0m\n[SafeLine] Initial password: abc123XYZ\n' }));
   assert.deepEqual(await resetSafelineAdmin(d), { username: 'admin', password: 'abc123XYZ' });
   await assert.rejects(resetSafelineAdmin(fake(() => ok('nothing'))), /parse/i);
+});
+
+test('startStack: spinner is stopped when the SafeLine path fails', async () => {
+  const stops = [];
+  const ui = { ...fakeUi(), spinner: () => ({ start() {}, message() {}, stop: (m) => stops.push(m) }) };
+  const d = fake((kind, args) => (args.includes('nc') ? { code: 1, stdout: '', stderr: '' } : ok('running healthy')));
+  await assert.rejects(startStack(d, ui, { waf: { mode: 'block' } }, clock()), /detector/i);
+  assert.equal(stops.length, 1);
+  assert.match(stops[0], /failed/i);
+});
+
+test('startStack: fails fast when the container is exited or inspect fails', async () => {
+  const exited = fake((k, a) => (a[0] === 'inspect' ? ok('exited unhealthy') : ok()));
+  await assert.rejects(startStack(exited, fakeUi(), { waf: null }, clock()), /stopped/);
+  const gone = fake((k, a) => (a[0] === 'inspect' ? { code: 1, stdout: '', stderr: 'No such object' } : ok()));
+  await assert.rejects(startStack(gone, fakeUi(), { waf: null }, clock()), /No such object/);
+});
+
+test('createOwner: empty password does not blow up the error path', async () => {
+  await assert.rejects(createOwner(fake(() => ({ code: 1, stdout: '', stderr: 'bad' })), A, ''), /bad/);
 });

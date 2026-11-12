@@ -20,14 +20,22 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
   const inNginx = (cmd) => docker.run(['exec', 'opbx_nginx', 'sh', '-c', cmd]);
   const status = (r) => Number(/HTTP\/\d(?:\.\d)?\s+(\d{3})/.exec(`${r.stderr}\n${r.stdout}`)?.[1]) || 0;
 
-  await check('services', async () => {
-    const r = await docker.compose(['ps', '--all', '--format', '{{.Name}} {{.State}} {{.Health}}']);
-    const bad = r.stdout.split('\n').filter(Boolean).map((l) => l.split(' ')).filter(([, st, h]) => st !== 'running' || (h && h !== 'healthy'));
-    const app = r.stdout.split('\n').some((l) => l.startsWith('opbx_app running healthy'));
-    if (r.code !== 0) return { ok: false, detail: detail(r) };
-    return bad.length || !app ? { ok: false, detail: bad.length ? `not running/healthy: ${bad.map((b) => b[0]).join(', ')}` : 'opbx_app is not healthy' } : { ok: true, detail: '' };
+  await check('services', async () => { // only services of the active COMPOSE_FILE/PROFILES; leftovers of inactive profiles are ignored
+    const [cfg, ps] = await Promise.all([docker.compose(['config', '--services']), docker.compose(['ps', '--all', '--format', 'json'])]);
+    if (cfg.code !== 0 || ps.code !== 0) return { ok: false, detail: detail(cfg.code !== 0 ? cfg : ps) };
+    const t = ps.stdout.trim();
+    const rows = t.startsWith('[') ? JSON.parse(t) : t.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const bad = [];
+    for (const svc of cfg.stdout.split('\n').map((x) => x.trim()).filter(Boolean)) {
+      const mine = rows.filter((r) => r.Service === svc);
+      if (!mine.some((r) => r.State === 'running' && (!r.Health || r.Health === 'healthy'))) bad.push(`${svc} (${mine.map((r) => `${r.State}${r.Health ? `/${r.Health}` : ''}`).join(',') || 'no container'})`);
+    }
+    return bad.length ? { ok: false, detail: `not running/healthy: ${bad.join(', ')}` } : { ok: true, detail: '' };
   });
-  await check('nginx /up', async () => { const r = await inNginx('wget -qO- http://127.0.0.1/up'); return { ok: r.code === 0, detail: detail(r) }; });
+  await check('nginx /up', async () => { // Laravel's health page; the SPA must not answer here
+    const r = await inNginx('wget -qO- http://127.0.0.1/up');
+    return { ok: r.code === 0 && r.stdout.includes('Application up'), detail: detail(r).slice(-200) };
+  });
   await check('SPA /', async () => { const r = await inNginx('wget -qO- http://127.0.0.1/'); return { ok: r.code === 0 && /<html|<!doctype/i.test(r.stdout), detail: detail(r).slice(0, 200) }; });
   await check('API /api/v1/', async () => { // any HTTP answer below 500 counts (wget exits non-zero on 401/404)
     const r = await inNginx('wget -S -qO /dev/null http://127.0.0.1/api/v1/ 2>&1');
@@ -50,9 +58,11 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
         const r = await inNginx(`wget -S -qO /dev/null '${SQLI}' 2>&1`);
         return { ok: status(r) === 403, detail: detail(r) };
       }
+      const count = async () => Number((await inNginx('grep -c safeline-waf /var/log/nginx/opbx_error.log')).stdout.trim()) || 0;
+      const before = await count();
       await inNginx(`wget -qO /dev/null '${SQLI}'`);
-      const r = await inNginx('grep safeline-waf /var/log/nginx/opbx_error.log | tail -n 1');
-      return { ok: /safeline-waf/.test(r.stdout), detail: r.stdout.trim() || 'no safeline-waf line in opbx_error.log' };
+      const after = await count();
+      return { ok: after > before, detail: after > before ? `${after - before} new safeline-waf line(s)` : 'no new safeline-waf line in opbx_error.log' };
     });
     if (env.get('WAF_CONSOLE_ENABLED') !== 'false') {
       await check('waf console', async () => { const r = await inNginx('wget -qO- http://127.0.0.1:8443/'); return { ok: r.code === 0 && r.stdout.length > 0, detail: detail(r).slice(0, 200) }; });
