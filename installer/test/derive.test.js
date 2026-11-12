@@ -61,7 +61,14 @@ test('production + multi + auth0 + WAF block + logs + proxy + mailgun + advanced
 
 test('production + WAF without proxy: console allow-list stays empty', () => {
   const e = deriveEnv(base({ waf: { mode: 'monitor', stateDir: '/x', consoleAllow: '1.2.3.4' } }));
-  has(e, { WAF_MODE: 'monitor', WAF_CONSOLE_ENABLED: 'true', WAF_CONSOLE_PORT: '9443', WAF_CONSOLE_ALLOW: '', TRUSTED_PROXY_CIDR: '' });
+  has(e, { WAF_MODE: 'monitor', WAF_CONSOLE_ENABLED: 'true', WAF_CONSOLE_PORT: '9443', WAF_CONSOLE_ALLOW: '', TRUSTED_PROXY_CIDR: '', WAF_CONSOLE_BIND: '0.0.0.0' });
+});
+
+test('WAF console port is the chosen one; development publishes it on loopback only', () => {
+  has(deriveEnv(base({ waf: { mode: 'monitor', stateDir: '/x', consolePort: 9555, consoleAllow: '' } })), { WAF_CONSOLE_PORT: '9555', WAF_CONSOLE_BIND: '0.0.0.0' });
+  has(deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost', waf: { mode: 'monitor', stateDir: '/x', consolePort: 9555, consoleAllow: '' } })),
+    { WAF_CONSOLE_PORT: '9555', WAF_CONSOLE_BIND: '127.0.0.1' });
+  assert.ok(OWNED_KEYS.waf.includes('WAF_CONSOLE_BIND'));
 });
 
 test('email provider sendinblue enables only its flag', () => {
@@ -105,7 +112,7 @@ test('answersFromEnv round-trips deriveEnv', () => {
     recaptcha: { siteKey: 'sk', secretKey: 'rs', minScore: 0.7 },
     usercheck: { token: 'tok', block: { disposable: true, spam: false } },
     email: { provider: 'mailgun', fields: { MAILGUN_DOMAIN: 'mg.example.com', MAILGUN_SECRET: 'key' }, fromAddress: 'a@example.com', fromName: 'Acme' },
-    waf: { mode: 'block', stateDir: '/var/lib/safeline', consoleAllow: '198.51.100.0/24' },
+    waf: { mode: 'block', stateDir: '/var/lib/safeline', consolePort: 9555, consoleAllow: '198.51.100.0/24' },
   });
   const env = new Map(Object.entries(deriveEnv(a)));
   const back = answersFromEnv(env, new Map([['SAFELINE_DIR', '/var/lib/safeline']]), { includeSecrets: true });

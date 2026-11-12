@@ -31,7 +31,7 @@ const FULL = [
   true, 't.auth0.com', 'cid', 'sec', ['google'],
   true, 'sitekey', 'secretkey', '0.7',
   true, 'tok', ['disposable', 'spam'],
-  true, 'block', '/var/lib/safeline', '198.51.100.0/24',
+  true, 'block', '/var/lib/safeline', '9443', '198.51.100.0/24',
   false,
 ];
 
@@ -46,13 +46,13 @@ test('full production run produces the Answers shape', async () => {
     auth0: { domain: 't.auth0.com', clientId: 'cid', clientSecret: 'sec', providers: ['google'] },
     recaptcha: { siteKey: 'sitekey', secretKey: 'secretkey', minScore: 0.7 },
     usercheck: { token: 'tok', block: { disposable: true, blocklisted: false, spam: true, role_accounts: false, relay_domains: false, public_domains: false } },
-    logs: true, waf: { mode: 'block', stateDir: '/var/lib/safeline', consoleAllow: '198.51.100.0/24' }, ngrokToken: '', advanced: {},
+    logs: true, waf: { mode: 'block', stateDir: '/var/lib/safeline', consolePort: 9443, consoleAllow: '198.51.100.0/24' }, ngrokToken: '', advanced: {},
   });
   deriveEnv(a); // derive accepts it
 });
 
-test('port is re-asked while portCheck says false; throw shows message and re-asks', async () => {
-  const script = ['production', 'pbx.example.com', '80', '81', '82', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false];
+test('port is re-asked while portCheck says false; throw shows message, offers to keep it, re-asks on no', async () => {
+  const script = ['production', 'pbx.example.com', '80', '81', false, '82', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false];
   const seen = [];
   const { ui, log } = fakeUi(script);
   const checks = [false, 'throw', true];
@@ -60,6 +60,30 @@ test('port is re-asked while portCheck says false; throw shows message and re-as
   assert.deepEqual(seen, [80, 81, 82]);
   assert.equal(a.httpPort, 82);
   assert.ok(log.notes.some((n) => n.includes('docker not reachable')));
+  assert.ok(log.messages.includes('Use port 81 anyway?'));
+});
+
+test('a probe that keeps failing does not loop: the user can keep the port', async () => {
+  const { ui, left } = fakeUi(['production', 'pbx.example.com', '8080', true, '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  let probes = 0;
+  const a = await askAnswers(ui, { platform: {}, portCheck: async () => { probes++; throw new Error('docker not reachable'); } });
+  assert.equal(a.httpPort, 8080);
+  assert.equal(probes, 1);
+  assert.equal(left(), 0);
+});
+
+test('WAF console port: asked only with the WAF, re-asked while busy, cannot be the OPBX port', async () => {
+  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '8080', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false,
+    'monitor', '/var/lib/safeline', '8080', '9443', '9555', false]);
+  const seen = [];
+  const a = await askAnswers(ui, { platform: {}, portCheck: async (p) => { seen.push(p); return p !== 9443; } });
+  assert.equal(left(), 0);
+  assert.equal(a.waf.consolePort, 9555);
+  assert.deepEqual(seen, [8080, 9443, 9555]);
+  assert.match(log.rejected[0][1], /OPBX/);
+  const off = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  await askAnswers(off.ui, { platform: {}, portCheck: null });
+  assert.ok(!off.log.messages.some((m) => /console use/.test(m)));
 });
 
 test('portCheck null skips the check', async () => {
@@ -70,11 +94,11 @@ test('portCheck null skips the check', async () => {
 });
 
 test('console allowlist not asked without a proxy; the login-only note is shown', async () => {
-  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'monitor', '/var/lib/safeline', false]);
+  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'monitor', '/var/lib/safeline', '9443', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(left(), 0);
-  assert.deepEqual(a.waf, { mode: 'monitor', stateDir: '/var/lib/safeline', consoleAllow: '' });
-  assert.ok(!log.messages.some((m) => m.includes('firewall console')));
+  assert.deepEqual(a.waf, { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleAllow: '' });
+  assert.ok(!log.messages.some((m) => m.includes('may open the firewall console')));
   assert.ok(log.notes.some((n) => /login only/.test(n)));
 });
 
@@ -104,7 +128,7 @@ test('defaults pre-fill every non-secret answer', async () => {
     orgName: 'Acme', ownerName: 'Ann', ownerEmail: 'ann@example.com', tenancy: 'multi',
     email: { provider: 'mailjet', fields: { MAILJET_APIKEY: 'pub' }, fromAddress: 'n@example.com', fromName: 'Acme' },
     auth0: { domain: 't.auth0.com', clientId: 'cid', providers: ['github'] }, recaptcha: { siteKey: 'sk', minScore: 0.9 },
-    usercheck: { block: { spam: true } }, logs: true, waf: { mode: 'block', stateDir: '/srv/sl', consoleAllow: '1.2.3.4' },
+    usercheck: { block: { spam: true } }, logs: true, waf: { mode: 'block', stateDir: '/srv/sl', consolePort: 9555, consoleAllow: '1.2.3.4' },
   }));
   const initial = [];
   const ui = {
@@ -120,7 +144,7 @@ test('defaults pre-fill every non-secret answer', async () => {
   assert.equal(a.auth0.domain, 't.auth0.com');
   assert.deepEqual(a.auth0.providers, ['github']);
   assert.equal(a.recaptcha.minScore, 0.9);
-  assert.deepEqual(a.waf, { mode: 'block', stateDir: '/srv/sl', consoleAllow: '1.2.3.4' });
+  assert.deepEqual(a.waf, { mode: 'block', stateDir: '/srv/sl', consolePort: 9555, consoleAllow: '1.2.3.4' });
   assert.equal(a.logs, true);
 });
 

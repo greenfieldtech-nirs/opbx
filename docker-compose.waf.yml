@@ -18,7 +18,8 @@ services:
       WAF_MODE: ${WAF_MODE:-monitor}
       WAF_DETECTOR_HOST: ${WAF_DETECTOR_HOST:-safeline-detector}
     ports:
-      - "${WAF_CONSOLE_PORT:-9443}:8443"
+      # WAF_CONSOLE_BIND: the installer sets 127.0.0.1 for development (this computer only).
+      - "${WAF_CONSOLE_BIND:-0.0.0.0}:${WAF_CONSOLE_PORT:-9443}:8443"
     volumes:
       - ./docker/nginx/waf:/etc/nginx/templates/waf.d:ro
     networks:

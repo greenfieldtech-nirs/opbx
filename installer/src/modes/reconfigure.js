@@ -9,7 +9,7 @@ import { safelineHostCommands, checkSafelineState, writeSafelineEnv, checkDetect
 import { resetSafelineAdmin, waitHealthy } from '../stack.js';
 import { runChecks } from '../verify.js';
 import { isPortFree } from '../platform.js';
-import { proxySnippet } from '../summary.js';
+import { proxySnippet, consoleUrl } from '../summary.js';
 import { state as uiState } from '../ui.js';
 
 const OVERLAY = 'docker-compose.waf.yml';
@@ -117,7 +117,9 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   }
 
   // wafon
-  const waf = await S.askWaf(ui, { waf: { stateDir: slEnv().get('SAFELINE_DIR') || undefined } }, current.trustedProxyCidr);
+  // a console port from an earlier WAF-on is kept in .env (wafoff leaves it) and offered again
+  const waf = await S.askWaf(ui, { waf: { stateDir: slEnv().get('SAFELINE_DIR') || undefined, consolePort: Number(env.get('WAF_CONSOLE_PORT')) || undefined } },
+    current.trustedProxyCidr, { httpPort: current.httpPort });
   if (!waf) { ui.note('Nothing changed', 'The firewall stays off.'); uiState.reconfigure = null; return; }
   await S.hostStep(ui, {
     title: 'Prepare the firewall data folder',
@@ -126,9 +128,10 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     check: () => S.checkSafelineState(docker, waf.stateDir),
   });
   const next = { ...current, waf };
+  const port = waf.consolePort ?? 9443;
   let free;
-  try { free = await S.isPortFree(docker, 9443); } catch (e) { throw new Error(`Could not check port 9443 for the firewall console: ${e.message}\nThe settings in .env were not changed.`); }
-  if (!free) throw new Error('Port 9443 (the firewall console) is already used by another program. Free it and run this again.\nThe settings in .env were not changed.');
+  try { free = await S.isPortFree(docker, port); } catch (e) { throw new Error(`Could not check port ${port} for the firewall console: ${e.message}\nThe settings in .env were not changed.`); }
+  if (!free) throw new Error(`Port ${port} (the firewall console) is already used by another program. Free it or choose another port, and run this again.\nThe settings in .env were not changed.`);
   // build the WAF nginx image now so a build error happens before .env is rewritten
   const files = [...(env.get('COMPOSE_FILE') || '').split(':').filter((f) => f && f !== OVERLAY), OVERLAY];
   must(await docker.compose([...files.flatMap((f) => ['-f', f]), 'build', 'nginx']), 'Building the firewall nginx image');
@@ -150,6 +153,6 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     const w = await S.resetSafelineAdmin(docker);
     login = `Username: ${w.username}\nPassword: ${w.password}`;
   } catch (e) { login = `Could not read the admin login (${e.message}).\nRun \`docker exec safeline-mgt /app/mgt reset-admin\` to set the firewall admin password.`; }
-  ui.note('Firewall admin login', `Console: ${prod ? `https://${new URL(a.publicUrl).hostname}:9443` : 'http://localhost:9443'}\n${login}`);
-  if (prod) ui.note('New reverse proxy settings', `Your proxy must also forward port 9443 with the same certificate:\n\n${proxySnippet(a)}`);
+  ui.note('Firewall admin login', `Console: ${consoleUrl(a)}\n${login}`);
+  if (prod) ui.note('New reverse proxy settings', `Your proxy must also forward port ${a.waf.consolePort} with the same certificate:\n\n${proxySnippet(a)}`);
 }

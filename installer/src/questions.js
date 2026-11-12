@@ -59,6 +59,26 @@ const intCheck = (s) => (/^\d+$/.test(s) ? undefined : 'Enter a whole number.');
 const cidrCheck = (s) => { const r = parseCidrList(s); return r.ok ? undefined : r.reason; };
 const joinCidrs = (s) => parseCidrList(s).value.join(',');
 
+// Re-asks while the port is taken; when the probe itself fails the user may keep the port (no endless loop).
+async function askPort(ui, message, def, portCheck, reserved) {
+  for (;;) {
+    const port = Number(await text(ui, message, {
+      def: String(def),
+      check: (s) => (!(isPortNumber(Number(s)) && /^\d+$/.test(s)) ? 'Enter a port number between 1 and 65535.'
+        : Number(s) === reserved ? `Port ${s} is already the OPBX web port. Choose another one.` : undefined),
+    }));
+    if (!portCheck) return port;
+    try {
+      if (await portCheck(port)) return port;
+      ui.note('Port in use', `Port ${port} is already used by another program. Choose a different port.`);
+    } catch (e) {
+      ui.note('Could not check the port', e.message);
+      if (await ui.confirm({ message: `Use port ${port} anyway?`, initialValue: false })) return port;
+    }
+    def = port;
+  }
+}
+
 export async function askPublicUrl(ui, d, mode) {
   ui.note('Public address', 'Enter the address people will type in their browser, for example https://pbx.example.com.\nIt must use https:// and a real domain name: the browser phone only works over HTTPS.');
   return normalizePublicUrl(await text(ui, 'What is your server\'s public address?', {
@@ -66,7 +86,7 @@ export async function askPublicUrl(ui, d, mode) {
   }), mode).value;
 }
 
-export async function askWaf(ui, d, trustedProxyCidr) {
+export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPort } = {}) {
   const wafMode = await ui.select({
     message: 'Put a web application firewall in front of OPBX?',
     options: [{ value: 'off', label: 'No' }, { value: 'monitor', label: 'Yes, monitor only', hint: 'recommended to start' },
@@ -78,6 +98,8 @@ export async function askWaf(ui, d, trustedProxyCidr) {
       def: d.waf?.stateDir ?? '/var/lib/safeline',
       check: (s) => (isSafeAbsolutePath(s) ? undefined : 'Please type a full path such as /var/lib/safeline, using only letters, digits and . _ - /'),
     });
+    const consolePort = await askPort(ui, 'Which port should the firewall console use? (choose one your reverse proxy does not listen on)',
+      d.waf?.consolePort ?? 9443, portCheck, httpPort);
     let consoleAllow = '';
     if (trustedProxyCidr) {
       consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {
@@ -86,7 +108,7 @@ export async function askWaf(ui, d, trustedProxyCidr) {
     } else {
       ui.note('Firewall console', 'Without a proxy address, OPBX cannot tell visitors apart by IP, so the firewall console will be protected by its own login only.');
     }
-    return { mode: wafMode, stateDir, consoleAllow };
+    return { mode: wafMode, stateDir, consolePort, consoleAllow };
   }
   return null;
 }
@@ -109,20 +131,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     a.publicUrl = 'http://localhost';
   }
 
-  for (;;) {
-    const raw = await text(ui, 'Which port on this machine should OPBX listen on?', {
-      def: String(d.httpPort ?? 80), check: (s) => (isPortNumber(Number(s)) && /^\d+$/.test(s) ? undefined : 'Enter a port number between 1 and 65535.'),
-    });
-    a.httpPort = Number(raw);
-    if (!portCheck) break;
-    try {
-      if (await portCheck(a.httpPort)) break;
-      ui.note('Port in use', `Port ${a.httpPort} is already used by another program. Choose a different port.`);
-    } catch (e) {
-      ui.note('Could not check the port', e.message);
-    }
-    d.httpPort = a.httpPort;
-  }
+  a.httpPort = await askPort(ui, 'Which port on this machine should OPBX listen on?', d.httpPort ?? 80, portCheck);
 
   a.trustedProxyCidr = '';
   if (prod) {
@@ -210,7 +219,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
 
   a.logs = await ui.confirm({ message: 'Collect logs in Grafana?', initialValue: d.logs ?? false });
 
-  a.waf = await askWaf(ui, d, a.trustedProxyCidr);
+  a.waf = await askWaf(ui, d, a.trustedProxyCidr, { portCheck, httpPort: a.httpPort });
 
   a.ngrokToken = '';
   if (!prod) a.ngrokToken = await secret(ui, 'ngrok auth token, to receive calls from Cloudonix (optional, press Enter to skip)', d.ngrokToken, { optional: true });
@@ -243,7 +252,7 @@ export async function reviewAnswers(ui, a) {
     `Email service: ${a.email.provider === 'none' ? 'none for now' : `${EMAIL[a.email.provider][0]} (credentials set)`}`,
     `Auth0 sign-in: ${a.auth0 ? `${a.auth0.domain} (${a.auth0.providers.join(', ')})` : 'no'}`,
     `reCAPTCHA: ${yn(a.recaptcha)}`, `UserCheck: ${yn(a.usercheck)}`, `Grafana logs: ${yn(a.logs)}`,
-    `Firewall: ${a.waf ? `${a.waf.mode === 'monitor' ? 'monitor only' : 'blocking'}${a.waf.consoleAllow ? `, console open to ${a.waf.consoleAllow}` : ''}` : 'no'}`,
+    `Firewall: ${a.waf ? `${a.waf.mode === 'monitor' ? 'monitor only' : 'blocking'}, console on port ${a.waf.consolePort}${a.waf.consoleAllow ? `, console open to ${a.waf.consoleAllow}` : ''}` : 'no'}`,
     ...(a.mode === 'production' ? [] : [`ngrok: ${a.ngrokToken ? 'token set' : 'no'}`]),
     `Advanced settings changed: ${Object.keys(a.advanced).length}`,
   ];

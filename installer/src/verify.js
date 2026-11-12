@@ -65,7 +65,14 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
       return { ok: after > before, detail: after > before ? `${after - before} new safeline-waf line(s)` : 'no new safeline-waf line in opbx_error.log' };
     });
     if (env.get('WAF_CONSOLE_ENABLED') !== 'false') {
-      await check('waf console', async () => { const r = await inNginx('wget -qO- http://127.0.0.1:8443/'); return { ok: r.code === 0 && r.stdout.length > 0, detail: detail(r).slice(0, 200) }; });
+      await check('waf console', async () => {
+        const r = await inNginx('wget -qO- http://127.0.0.1:8443/');
+        if (r.code !== 0 || !r.stdout.length) return { ok: false, detail: detail(r).slice(0, 200) };
+        const port = String(answers.waf.consolePort ?? (env.get('WAF_CONSOLE_PORT') || 9443));
+        const p = await docker.run(['port', 'opbx_nginx', '8443/tcp']); // published host side, e.g. 0.0.0.0:9443
+        const ok = p.stdout.split('\n').some((l) => l.trim().endsWith(`:${port}`));
+        return { ok, detail: ok ? `published on ${port}` : `expected host port ${port}, got: ${detail(p) || 'not published'}` };
+      });
     }
   }
   if (answers.logs) {

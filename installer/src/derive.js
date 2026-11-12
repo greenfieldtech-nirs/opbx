@@ -7,7 +7,7 @@ export const OWNED_KEYS = {
     'VITE_WS_SCHEME', 'VITE_ALLOWED_HOSTS', 'GRAFANA_ROOT_URL', 'AUTH0_REDIRECT_URI', 'OPBX_APPLICATION_WEBHOOK_BASEURL',
   ],
   waf: [
-    'WAF_MODE', 'WAF_CONSOLE_ENABLED', 'WAF_CONSOLE_PORT', 'WAF_CONSOLE_ALLOW', 'TRUSTED_PROXY_CIDR', 'COMPOSE_FILE',
+    'WAF_MODE', 'WAF_CONSOLE_ENABLED', 'WAF_CONSOLE_PORT', 'WAF_CONSOLE_BIND', 'WAF_CONSOLE_ALLOW', 'TRUSTED_PROXY_CIDR', 'COMPOSE_FILE',
   ],
 };
 
@@ -50,7 +50,10 @@ export function deriveEnv(a) {
     WAF_CONSOLE_ALLOW: a.waf && a.trustedProxyCidr ? a.waf.consoleAllow || '' : '',
     OPBX_APPLICATION_MODE: a.tenancy === 'multi' ? 'production' : 'development',
   };
-  if (a.waf) env.WAF_CONSOLE_PORT = '9443';
+  if (a.waf) {
+    env.WAF_CONSOLE_PORT = String(a.waf.consolePort ?? 9443);
+    env.WAF_CONSOLE_BIND = prod ? '0.0.0.0' : '127.0.0.1'; // development: this computer only
+  }
   // empty (not absent) for single so a re-render clears a stale multi value
   env.OPBX_APPLICATION_WEBHOOK_BASEURL = a.tenancy === 'multi' ? a.publicUrl : '';
   if (!prod && a.ngrokToken) env.NGROK_AUTHTOKEN = a.ngrokToken;
@@ -127,7 +130,7 @@ export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = 
   }
   const wafMode = g('WAF_MODE');
   if (wafMode && wafMode !== 'off') {
-    a.waf = { mode: wafMode, stateDir: safelineEnv.get('SAFELINE_DIR') || '', consoleAllow: g('WAF_CONSOLE_ALLOW') };
+    a.waf = { mode: wafMode, stateDir: safelineEnv.get('SAFELINE_DIR') || '', consolePort: Number(g('WAF_CONSOLE_PORT')) || 9443, consoleAllow: g('WAF_CONSOLE_ALLOW') };
   }
   return a;
 }

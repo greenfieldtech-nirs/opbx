@@ -9,22 +9,30 @@ const HEADERS = `proxy_set_header Host $host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";`;
 
+export const consolePort = (a) => a.waf?.consolePort ?? 9443;
+export const consoleUrl = (a) => (a.mode === 'production' ? `https://${new URL(a.publicUrl).hostname}:${consolePort(a)}` : `http://localhost:${consolePort(a)}`);
+
 export function proxySnippet(a) {
   const host = new URL(a.publicUrl).hostname;
-  let t = `location / {
+  let t = `# Inside your existing server { } block for ${host} (the one with its TLS certificate):
+    client_max_body_size 50m;
+    location / {
         proxy_pass http://<this-server>:${a.httpPort};
         ${HEADERS}
         proxy_read_timeout 3600s;
     }`;
   if (a.waf) {
+    const port = consolePort(a);
     t += `
 
-# WAF console: needs the same certificate as the site above.
+# WAF console: a separate server { } block, with the same certificate as the site above.
+# If this proxy runs on the OPBX server itself, OPBX already uses port ${port}: run
+# ./install.sh reconfigure and pick a console port the proxy does not listen on.
 server {
-    listen 9443 ssl;
+    listen ${port} ssl;
     server_name ${host};
     location / {
-        proxy_pass http://<this-server>:9443;
+        proxy_pass http://<this-server>:${port};
         ${HEADERS}
         proxy_read_timeout 3600s;
     }
@@ -40,7 +48,7 @@ export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
   add('OPBX installation summary', '');
   if (checks.length) add('Checks', ...checks.map((c) => `  ${c.name}: ${c.ok ? 'ok' : 'FAIL'} - ${c.detail ?? ''}`), '');
   add('URLs', `  Web app:  ${a.publicUrl}`, `  API:      ${a.publicUrl}/api/v1`);
-  if (a.waf) add(`  WAF console: ${prod ? `https://${new URL(a.publicUrl).hostname}:9443` : 'http://localhost:9443'}`);
+  if (a.waf) add(`  WAF console: ${consoleUrl(a)}`);
   if (a.logs) add(`  Grafana:  ${a.publicUrl}/logs/`);
   if (!prod && a.ngrokToken) add('  ngrok dashboard: http://localhost:4040');
   add('', 'Owner login', `  Email:    ${a.ownerEmail}`,
@@ -55,7 +63,7 @@ export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
   }
   if (prod) {
     add('Reverse proxy (nginx example; replace <this-server> with the address of this machine)', '', proxySnippet(a), '',
-      `Make port ${a.httpPort}${a.waf ? ' and 9443' : ''} reachable only from this proxy.`, '');
+      `Make port ${a.httpPort}${a.waf ? ` and ${consolePort(a)}` : ''} reachable only from this proxy.`, '');
     if (!a.trustedProxyCidr) add('No proxy IP was given: rate limits and logs will see the proxy address, not the real client address.', '');
   }
   add('Next steps');

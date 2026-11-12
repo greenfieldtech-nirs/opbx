@@ -222,3 +222,25 @@ test('install on a complete installation offers change settings / start over / e
   assert.equal(await resolveAction('install', ui), 'install');
   assert.equal(await resolveAction('reconfigure', ui), 'reconfigure');
 });
+
+test('WAF console port: the chosen port is checked, written and shown; wafoff keeps it for next time', async () => {
+  const { dir } = setup();
+  const probed = [];
+  const h = harness({ select: ['wafon'], over: { steps: {
+    askWaf: async (_u, d) => { probed.push(['default', d.waf.consolePort]); return { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9555, consoleAllow: '' }; },
+    isPortFree: async (_d, p) => { probed.push(['free', p]); return true; },
+  } } });
+  await run(h, dir);
+  assert.deepEqual(probed, [['default', undefined], ['free', 9555]]);
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('WAF_CONSOLE_PORT'), '9555');
+  const out = h.log.notes.join('\n');
+  assert.match(out, /pbx\.example\.com:9555/);
+  assert.match(out, /listen 9555 ssl/);
+  const off = harness({ select: ['wafoff'], confirm: [false] });
+  await run(off, dir);
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('WAF_CONSOLE_PORT'), '9555');
+  let def;
+  const on = harness({ select: ['wafon'], over: { steps: { askWaf: async (_u, d) => { def = d.waf.consolePort; return null; } } } });
+  await run(on, dir);
+  assert.equal(def, 9555);
+});

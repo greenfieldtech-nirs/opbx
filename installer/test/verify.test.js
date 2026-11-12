@@ -21,6 +21,7 @@ function fake(over = {}) {
     if (s.includes('wget') && s.includes('127.0.0.1/')) return ok('<!doctype html><html>');
     if (s.includes('node:26-alpine')) return ok('HTTP/1.1 101 Switching Protocols');
     if (s.includes('config:validate')) return ok('ok');
+    if (s.startsWith('port opbx_nginx')) return ok('0.0.0.0:9443\n');
     if (s.includes('8443')) return ok('<html>');
     return ok('');
   };
@@ -103,4 +104,13 @@ test('waf console is checked from 127.0.0.1 inside nginx also with an allowlist 
   const r = await runChecks(d, { waf: { mode: 'block' }, logs: false }, { env: new Map([...ENV, ['WAF_CONSOLE_ALLOW', '198.51.100.0/24']]) });
   assert.equal(byName(r, 'waf console').ok, true);
   assert.ok(d.calls.some((a) => a[0] === 'exec' && a[1] === 'opbx_nginx' && a.join(' ').includes('http://127.0.0.1:8443/')));
+});
+
+test('waf console: the published host port must be WAF_CONSOLE_PORT', async () => {
+  const good = fake({ 'port opbx_nginx': ok('127.0.0.1:9555\n') });
+  assert.equal(byName(await runChecks(good, { waf: { mode: 'block', consolePort: 9555 }, logs: false }, { env: ENV }), 'waf console').ok, true);
+  const bad = fake({ 'port opbx_nginx': ok('0.0.0.0:9443\n') });
+  const c = byName(await runChecks(bad, { waf: { mode: 'block', consolePort: 9555 }, logs: false }, { env: ENV }), 'waf console');
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /9555/);
 });
