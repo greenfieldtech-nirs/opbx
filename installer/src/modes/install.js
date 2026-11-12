@@ -64,7 +64,8 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
   // Reusing a resumed .env as the template keeps every secret MySQL may already be initialised with.
   const template = resume && existsSync(envPath) ? readFileSync(envPath, 'utf8') : readFileSync(join(repoDir, '.env.example'), 'utf8');
   const secrets = Object.fromEntries(Object.entries(generateOpbxSecrets()).map(([k, v]) => [k, existing.get(k) || v]));
-  const write = (values) => writeFileAtomic(envPath, renderEnv(template, values), { mode: 0o600, ...own });
+  // 0644: www-data in the app container must read the bind-mounted .env (the host user owns it).
+  const write = (values) => writeFileAtomic(envPath, renderEnv(template, values), { mode: 0o644, ...own });
   write({ ...deriveEnv(answers), ...secrets, OPBX_INSTALL_STATE: 'incomplete' });
   uiState.configWritten = true;
   S.generateSharedSecrets(repoDir);
@@ -129,7 +130,7 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
     }
     if (ownerPassword || !priorSummary) saveSummary(repoDir, text, own);
     ui.note('Installation complete', text);
-    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), { OPBX_INSTALL_STATE: 'complete' }), { mode: 0o600, ...own });
+    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), { OPBX_INSTALL_STATE: 'complete' }), { mode: 0o644, ...own });
   } catch (e) {
     if (shown) shown();
     throw e;

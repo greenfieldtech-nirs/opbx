@@ -64,6 +64,9 @@ check "realip off when empty" "[ ! -e $R ]" n -e TRUSTED_PROXY_CIDR=
 check "console off by default" "[ ! -e $C ]" y -e WAF_MODE=block
 check "console off when WAF off" "[ ! -e $C ]" n -e WAF_CONSOLE_ENABLED=true
 check "console on, allow-list" "grep -q 'listen 8443;' $C && grep -q 'allow 198.51.100.0/24;' $C && grep -q 'deny all;' $C && grep -q 'proxy_ssl_verify off;' $C && grep -q 'proxy_pass \$console;' $C" y -e WAF_MODE=monitor -e WAF_CONSOLE_ENABLED=true -e WAF_CONSOLE_ALLOW=198.51.100.0/24
+# The installer's own check fetches the console from 127.0.0.1 inside nginx: an allowlist must not deny it.
+# safeline-mgt does not resolve here, so "let in" means a 50x from the proxy, not a 403 from the allowlist.
+check "console allow-list lets 127.0.0.1 in" "[ \"\$(grep -m1 'allow ' $C)\" = '    allow 127.0.0.1;' ] && nginx && r=\$(wget -qO- http://127.0.0.1:8443/ 2>&1); echo \"\$r\"; echo \"\$r\" | grep -q ' 50[0-9]' && ! echo \"\$r\" | grep -q 403" y -e WAF_MODE=monitor -e WAF_CONSOLE_ENABLED=true -e WAF_CONSOLE_ALLOW=198.51.100.0/24
 check "console on, no allow-list" "grep -q 'listen 8443;' $C && ! grep -q 'deny all' $C" y -e WAF_MODE=block -e WAF_CONSOLE_ENABLED=true
 reject "bad TRUSTED_PROXY_CIDR rejected" "TRUSTED_PROXY_CIDR=10.0.0.0/8,evil;x" "evil;x"
 reject "bad octet-count rejected" "TRUSTED_PROXY_CIDR=10.0.0/8" "10.0.0/8"

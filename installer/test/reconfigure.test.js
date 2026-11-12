@@ -74,7 +74,7 @@ test('domain change rewrites only domain keys, keeps secrets and every other lin
   const touched = lines(text).filter((l, i) => l !== lines(after)[i]);
   assert.ok(touched.every((l) => OWNED_KEYS.domain.some((k) => l.startsWith(`${k}=`))), 'only owned lines differ');
   assert.equal(lines(text).length, lines(after).length);
-  assert.equal(statSync(join(dir, '.env')).mode & 0o777, 0o600);
+  assert.equal(statSync(join(dir, '.env')).mode & 0o777, 0o644);
   assert.deepEqual(h.log.compose, [['build', 'frontend'], ['up', '-d'], ['restart', 'queue-worker', 'queue-worker-long']]);
   assert.deepEqual(h.log.steps, ['checks']);
   const out = h.log.notes.join('\n');

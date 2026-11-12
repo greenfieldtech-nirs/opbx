@@ -97,3 +97,10 @@ test('logs: Grafana health check only when logs on', async () => {
   const r = await runChecks(fake(), { waf: null, logs: true }, { env: ENV });
   assert.equal(byName(r, 'grafana').ok, true);
 });
+
+test('waf console is checked from 127.0.0.1 inside nginx also with an allowlist (render.sh always allows 127.0.0.1)', async () => {
+  const d = fake();
+  const r = await runChecks(d, { waf: { mode: 'block' }, logs: false }, { env: new Map([...ENV, ['WAF_CONSOLE_ALLOW', '198.51.100.0/24']]) });
+  assert.equal(byName(r, 'waf console').ok, true);
+  assert.ok(d.calls.some((a) => a[0] === 'exec' && a[1] === 'opbx_nginx' && a.join(' ').includes('http://127.0.0.1:8443/')));
+});

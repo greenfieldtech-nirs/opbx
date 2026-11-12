@@ -51,7 +51,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
 
   // Rewrites only the given owned keys over the CURRENT .env; every other byte stays.
   const apply = (values) => {
-    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), values), { mode: 0o600, ...own });
+    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), values), { mode: 0o644, ...own }); // app container reads it as www-data
     uiState.reconfigure = 'written';
   };
   const must = (r, what) => {

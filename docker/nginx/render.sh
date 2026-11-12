@@ -79,7 +79,9 @@ if [ "$WAF_MODE" != off ] && [ "${WAF_CONSOLE_ENABLED:-}" = true ]; then
     echo "server {"
     echo "    listen 8443;"
     echo "    resolver ${RESOLVER} valid=10s ipv6=off;"
-    [ -z "$CONSOLE_ALLOW" ] || { echo "$CONSOLE_ALLOW" | sed 's/.*/    allow &;/'; echo "    deny all;"; }
+    # 127.0.0.1 first: the installer checks the console from inside this container. A client can't
+    # become 127.0.0.1 through realip: the recursive walk stops at the hop our trusted proxy appended.
+    [ -z "$CONSOLE_ALLOW" ] || { echo "    allow 127.0.0.1;"; echo "$CONSOLE_ALLOW" | sed 's/.*/    allow &;/'; echo "    deny all;"; }
     cat <<'EOF'
     location / {
         set $console https://safeline-mgt:1443;
