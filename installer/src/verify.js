@@ -11,6 +11,37 @@ function loadEnv() {
   try { return parseEnv(readFileSync(join(process.env.OPBX_REPO || process.cwd(), '.env'), 'utf8')); } catch { return new Map(); }
 }
 
+// Only services of the active COMPOSE_FILE/PROFILES count; leftovers of inactive profiles are ignored.
+export async function notReadyServices(docker) {
+  const [cfg, ps] = await Promise.all([docker.compose(['config', '--services']), docker.compose(['ps', '--all', '--format', 'json'])]);
+  const failed = cfg.code !== 0 ? cfg : ps;
+  if (failed.code !== 0) throw new Error(`${failed.stdout}\n${failed.stderr}`.trim().slice(-400));
+  const t = ps.stdout.trim();
+  const rows = t.startsWith('[') ? JSON.parse(t) : t.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const bad = [];
+  for (const svc of cfg.stdout.split('\n').map((x) => x.trim()).filter(Boolean)) {
+    const mine = rows.filter((r) => r.Service === svc);
+    if (!mine.some((r) => r.State === 'running' && (!r.Health || r.Health === 'healthy'))) bad.push(`${svc} (${mine.map((r) => `${r.State}${r.Health ? `/${r.Health}` : ''}`).join(',') || 'no container'})`);
+  }
+  return bad;
+}
+
+// After the app is healthy the other services may still be inside their start period: wait (bounded) so the
+// checks do not report a false failure. Returns the list still not ready ([] when all are).
+export async function waitServicesReady(docker, ui, { now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)), timeoutMs = 3 * 60_000, intervalMs = 5000 } = {}) {
+  const s = ui.spinner();
+  s.start('Waiting for all services');
+  const deadline = now() + timeoutMs;
+  for (;;) {
+    let bad;
+    try { bad = await notReadyServices(docker); } catch (e) { s.stop('Service status unavailable'); return [String(e.message || e)]; }
+    if (!bad.length) { s.stop('All services are up'); return []; }
+    if (now() >= deadline) { s.stop(`Services not ready after ${Math.round(timeoutMs / 60000)} minutes`); return bad; }
+    s.message(`Waiting for: ${bad.join(', ')}`.slice(0, 120));
+    await sleep(intervalMs);
+  }
+}
+
 export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
   const out = [];
   const check = async (name, fn) => {
@@ -20,16 +51,8 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
   const inNginx = (cmd) => docker.run(['exec', 'opbx_nginx', 'sh', '-c', cmd]);
   const status = (r) => Number(/HTTP\/\d(?:\.\d)?\s+(\d{3})/.exec(`${r.stderr}\n${r.stdout}`)?.[1]) || 0;
 
-  await check('services', async () => { // only services of the active COMPOSE_FILE/PROFILES; leftovers of inactive profiles are ignored
-    const [cfg, ps] = await Promise.all([docker.compose(['config', '--services']), docker.compose(['ps', '--all', '--format', 'json'])]);
-    if (cfg.code !== 0 || ps.code !== 0) return { ok: false, detail: detail(cfg.code !== 0 ? cfg : ps) };
-    const t = ps.stdout.trim();
-    const rows = t.startsWith('[') ? JSON.parse(t) : t.split('\n').filter(Boolean).map((l) => JSON.parse(l));
-    const bad = [];
-    for (const svc of cfg.stdout.split('\n').map((x) => x.trim()).filter(Boolean)) {
-      const mine = rows.filter((r) => r.Service === svc);
-      if (!mine.some((r) => r.State === 'running' && (!r.Health || r.Health === 'healthy'))) bad.push(`${svc} (${mine.map((r) => `${r.State}${r.Health ? `/${r.Health}` : ''}`).join(',') || 'no container'})`);
-    }
+  await check('services', async () => {
+    const bad = await notReadyServices(docker);
     return bad.length ? { ok: false, detail: `not running/healthy: ${bad.join(', ')}` } : { ok: true, detail: '' };
   });
   await check('nginx /up', async () => { // Laravel's health page; the SPA must not answer here

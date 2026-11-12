@@ -9,6 +9,7 @@ die() { echo "install.sh: $*" >&2; exit 1; }
 mode="${1:-install}"
 case "$mode" in install|reset|reconfigure) ;; *) die "unknown mode '$mode' (use install, reset or reconfigure)" ;; esac
 
+[ -t 0 ] || die "run ./install.sh in an interactive terminal"
 command -v docker >/dev/null 2>&1 || die "docker is not installed or not in PATH"
 docker version >/dev/null 2>&1 || die "'docker version' failed: is the Docker/Podman daemon running?"
 docker compose version >/dev/null 2>&1 || die "'docker compose' is not available: install the Docker Compose plugin"
@@ -28,7 +29,7 @@ client_os=$(uname -s | tr '[:upper:]' '[:lower:]')
 docker build -q -t opbx-installer:local installer >/dev/null || die "building the installer image failed"
 
 tty=-i
-[ -t 0 ] && [ -t 1 ] && tty=-it
+[ -t 1 ] && tty=-it
 exec docker run --rm --init $tty --security-opt label=disable \
   -v "$PWD:$PWD" -w "$PWD" -v "$sock:/var/run/docker.sock" \
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e OPBX_REPO="$PWD" -e OPBX_CLIENT_OS="$client_os" \

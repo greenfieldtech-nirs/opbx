@@ -46,6 +46,7 @@ function harness(over = {}) {
     startStack: async () => log.steps.push('start'),
     createOwner: async (_d, _a, pw) => { log.pw = pw; log.steps.push('owner'); return over.owner ?? 'created'; },
     resetSafelineAdmin: async () => { log.steps.push('wafadmin'); return ({ username: 'admin', password: 'WafPw' }); },
+    waitServicesReady: async () => over.notReady ?? [],
     runChecks: async () => { log.steps.push('checks'); return over.checks ?? [{ name: 'up', ok: true, detail: 'ok' }]; },
     ...over.steps,
   };
@@ -191,4 +192,61 @@ test('fresh install: declining keeps the old docker-compose.yml; an identical on
   const h3 = harness({ owner: 'exists' });
   await run(h3, res, { resume: true });
   assert.ok(!h3.log.notes.some((n) => /differs/.test(n)));
+});
+
+test('services not ready after the wait: a note is shown, then the checks decide', async () => {
+  const h = harness({ notReady: ['grafana (running/starting)'] });
+  await run(h, setup());
+  assert.ok(h.log.notes.some((n) => /still not ready[\s\S]*grafana/.test(n)));
+});
+
+const resumeEnv = 'APP_ENV=production\nAPP_URL=https://pbx.example.com\nOPBX_INSTALL_STATE=incomplete\n';
+const PRIOR = 'OPBX installation still in progress.\n\nOwner login\n  Email:    ann@example.com\n  Password: OldOwnerPw\n';
+
+test('resume with an existing owner saves the final summary and carries the earlier owner password', async () => {
+  const dir = setup(resumeEnv);
+  writeFileSync(join(dir, 'opbx-install-summary.txt'), PRIOR);
+  const h = harness({ owner: 'exists' });
+  await run(h, dir, { resume: true });
+  const saved = readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8');
+  assert.ok(saved.includes('OPBX installation summary') && !saved.includes('still in progress'));
+  assert.match(saved, /Owner login \(from the earlier run\)\n  Email:    ann@example.com\n  Password: OldOwnerPw/);
+  assert.ok(saved.includes('WafPw') === false); // no WAF in this run, summary still complete
+  assert.ok(saved.includes('https://pbx.example.com/api/v1'));
+});
+
+test('resume with an existing owner and no password in the earlier file says so', async () => {
+  const dir = setup(resumeEnv);
+  writeFileSync(join(dir, 'opbx-install-summary.txt'), 'OPBX installation still in progress.\n');
+  const h = harness({ owner: 'exists' });
+  await run(h, dir, { resume: true });
+  const saved = readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8');
+  assert.ok(saved.includes('OPBX installation summary'));
+  assert.match(saved, /No owner password from the earlier run was found/);
+  assert.ok(!saved.includes('(from the earlier run)\n'));
+});
+
+const withPortsFile = (dir) => writeFileSync(join(dir, 'docker-compose.ports.yml'), 'services:\n  seaweedfs:\n    ports:\n      - "127.0.0.1:${MINIO_CONSOLE_EXPOSE_PORT:-9333}:9333"\n      - "127.0.0.1:${DB_EXPOSE_PORT:-3306}:3306"\n');
+const dev = () => answers({ mode: 'development', publicUrl: 'http://localhost' });
+
+test('development install: a busy overlay port is moved to a free one, written to .env', async () => {
+  const dir = setup(); withPortsFile(dir);
+  const h = harness({ answers: dev(), steps: { isPortFree: async (_d, p) => p !== 9333 } });
+  const picked = [];
+  h.ui.select = async (o) => (picked.push(o.message), 'alt');
+  await run(h, dir);
+  assert.match(picked[0], /9333.*MINIO_CONSOLE_EXPOSE_PORT/);
+  const env = parseEnv(readFileSync(join(dir, '.env'), 'utf8'));
+  assert.equal(env.get('MINIO_CONSOLE_EXPOSE_PORT'), '19333');
+  assert.ok(!env.has('DB_EXPOSE_PORT') || env.get('DB_EXPOSE_PORT') !== '13306');
+});
+
+test('development install: busy port and abort stops before the build; override var in .env is honoured', async () => {
+  const dir = setup('DB_EXPOSE_PORT=4406\n'); withPortsFile(dir);
+  const probed = [];
+  const h = harness({ answers: dev(), steps: { isPortFree: async (_d, p) => (probed.push(p), p !== 4406) } });
+  h.ui.select = async () => 'abort';
+  await assert.rejects(run(h, dir), /4406.*DB_EXPOSE_PORT/);
+  assert.ok(probed.includes(4406) && !probed.includes(3306));
+  assert.ok(!h.log.steps.includes('build'));
 });

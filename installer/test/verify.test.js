@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runChecks } from '../src/verify.js';
+import { runChecks, waitServicesReady } from '../src/verify.js';
 
 const ok = (stdout = '') => ({ code: 0, stdout, stderr: '' });
 const ps = (rows) => rows.map(([Service, State, Health]) => JSON.stringify({ Service, State, Health })).join('\n');
@@ -124,4 +124,20 @@ test('storage: buckets checked with storage:initialize (idempotent); a failure i
   const c = byName(await runChecks(bad, { waf: null, logs: false }, { env: ENV }), 'storage');
   assert.equal(c.ok, false);
   assert.match(c.detail, /S3 endpoint/);
+});
+
+const spin = () => ({ spinner: () => ({ start() {}, message() {}, stop() {} }) });
+const clk = () => { let t = 0; return { now: () => t, sleep: async (ms) => { t += ms; } }; };
+
+test('waitServicesReady: polls until a starting service turns healthy', async () => {
+  let n = 0;
+  const d = fake({ 'ps --all': () => ok(ps([['app', 'running', 'healthy'], ['nginx', 'running', ++n < 3 ? 'starting' : 'healthy']])) });
+  assert.deepEqual(await waitServicesReady(d, spin(), clk()), []);
+  assert.equal(n, 3);
+});
+
+test('waitServicesReady: times out with the services still not ready', async () => {
+  const d = fake({ 'ps --all': ok(ps([['app', 'running', 'healthy'], ['nginx', 'running', 'starting']])) });
+  const bad = await waitServicesReady(d, spin(), { ...clk(), timeoutMs: 30_000 });
+  assert.deepEqual(bad, ['nginx (running/starting)']);
 });

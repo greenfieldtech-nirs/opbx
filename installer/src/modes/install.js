@@ -8,7 +8,7 @@ import { askAnswers, reviewAnswers } from '../questions.js';
 import { hostStep } from '../hoststep.js';
 import { safelineHostCommands, checkSafelineState, writeSafelineEnv } from '../safeline.js';
 import { buildImages, composerInstall, startStack, createOwner, resetSafelineAdmin } from '../stack.js';
-import { runChecks } from '../verify.js';
+import { runChecks, waitServicesReady } from '../verify.js';
 import { renderSummary, saveSummary } from '../summary.js';
 import { isPortFree } from '../platform.js';
 import { state as uiState } from '../ui.js';
@@ -26,6 +26,27 @@ function generateSharedSecrets(repoDir) {
   if (r.status !== 0) throw new Error(`generate-secrets.sh failed: ${r.stderr || r.error?.message || ''}`.trim());
 }
 
+// Development publishes fixed loopback ports (docker-compose.ports.yml); a busy one fails `compose up` after the build.
+// Returns env overrides for ports the user moved.
+async function resolveOverlayPorts({ ui, docker, repoDir, existing, isPortFree: free }) {
+  const file = join(repoDir, 'docker-compose.ports.yml');
+  if (!existsSync(file)) return {};
+  const out = {};
+  for (const [, key, def] of readFileSync(file, 'utf8').matchAll(/\$\{(\w+):-(\d+)\}/g)) {
+    const port = Number(existing.get(key) || def);
+    if (await free(docker, port)) continue;
+    let alt = port + 10000;
+    while (alt < 65535 && !(await free(docker, alt))) alt++;
+    const choice = await ui.select({
+      message: `Port ${port} (${key}) is already in use on this machine.`,
+      options: [{ value: 'alt', label: `Use port ${alt} instead (sets ${key} in .env)` }, { value: 'abort', label: 'Abort' }],
+    });
+    if (choice !== 'alt') throw new Error(`Port ${port} (${key}) is in use; free it or set ${key} in .env, then run ./install.sh again.`);
+    out[key] = String(alt);
+  }
+  return out;
+}
+
 // `steps` replaces collaborators in unit tests.
 export async function runInstall(opts) {
   try { return await runInstallInner(opts); } catch (e) {
@@ -37,7 +58,7 @@ export async function runInstall(opts) {
 async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults, steps = {} }) {
   const S = {
     askAnswers, reviewAnswers, isPortFree, hostStep, checkSafelineState, safelineHostCommands, writeSafelineEnv,
-    buildImages, composerInstall, startStack, createOwner, resetSafelineAdmin, runChecks, freeBytes, generateSharedSecrets,
+    buildImages, composerInstall, startStack, createOwner, resetSafelineAdmin, runChecks, waitServicesReady, freeBytes, generateSharedSecrets,
     ...steps,
   };
   const envPath = join(repoDir, '.env');
@@ -74,8 +95,10 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
   // Reusing a resumed .env as the template keeps every secret MySQL may already be initialised with.
   const template = resume && existsSync(envPath) ? readFileSync(envPath, 'utf8') : readFileSync(join(repoDir, '.env.example'), 'utf8');
   const secrets = Object.fromEntries(Object.entries(generateOpbxSecrets()).map(([k, v]) => [k, existing.get(k) || v]));
+  const portEnv = {};
+  if (!resume && answers.mode !== 'production') Object.assign(portEnv, await resolveOverlayPorts({ ui, docker, repoDir, existing, isPortFree: S.isPortFree }));
   const write = (values) => writeFileAtomic(envPath, renderEnv(template, values), envFileOpts());
-  write({ ...deriveEnv(answers), ...secrets, OPBX_INSTALL_STATE: 'incomplete' });
+  write({ ...deriveEnv(answers), ...portEnv, ...secrets, OPBX_INSTALL_STATE: 'incomplete' });
   uiState.configWritten = true;
   S.generateSharedSecrets(repoDir);
 
@@ -114,6 +137,9 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
       try { wafAdmin = await S.resetSafelineAdmin(docker); } catch (e) { ui.note('Firewall admin', `Could not create the firewall admin login: ${e.message}`); }
     }
 
+    const notReady = await S.waitServicesReady(docker, ui);
+    if (notReady.length) ui.note('Some services are still not ready', `${notReady.join(', ')}\nThe checks below will show the details.`);
+
     let checks;
     for (;;) {
       checks = await S.runChecks(docker, answers);
@@ -131,13 +157,16 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
       } catch (e) { ui.note('Test email', `Failed: ${e.message}`); }
     }
 
-    const priorSummary = existsSync(summaryPath);
     let text = renderSummary(answers, { ownerPassword, wafAdmin, checks });
     if (!ownerPassword) {
-      text += `\n\nTo set a new owner password: docker compose exec app php artisan user:reset-password ${answers.ownerEmail}`
-        + (priorSummary ? `\nThe password from the earlier run may still be in ${summaryPath} (kept as it is).` : '');
+      text += `\n\nTo set a new owner password: docker compose exec app php artisan user:reset-password ${answers.ownerEmail}`;
+      const prior = existsSync(summaryPath) ? readFileSync(summaryPath, 'utf8') : '';
+      const block = /Owner login(?: \(from the earlier run\))?\n  Email:.*\n  Password: .*/.exec(prior)?.[0];
+      text += block
+        ? `\n\nOwner login (from the earlier run)${block.slice(block.indexOf('\n'))}`
+        : '\nNo owner password from the earlier run was found in the previous summary file.';
     }
-    if (ownerPassword || !priorSummary) saveSummary(repoDir, text, own);
+    saveSummary(repoDir, text, own);
     ui.note('Installation complete', text);
     writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), { OPBX_INSTALL_STATE: 'complete' }), envFileOpts());
   } catch (e) {
