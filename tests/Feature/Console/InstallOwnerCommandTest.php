@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Scopes\OrganizationScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Testing\PendingCommand;
 use Tests\TestCase;
 
 class InstallOwnerCommandTest extends TestCase
@@ -24,7 +25,7 @@ class InstallOwnerCommandTest extends TestCase
         parent::tearDown();
     }
 
-    private function run_install(string $stdin, string $email = 'jane@acme.com'): \Illuminate\Testing\PendingCommand
+    private function runInstall(string $stdin, string $email = 'jane@acme.com'): PendingCommand
     {
         InstallOwnerCommand::$stdinReader = fn () => $stdin."\n";
 
@@ -35,7 +36,7 @@ class InstallOwnerCommandTest extends TestCase
 
     public function test_creates_org_and_platform_owner_from_stdin_password(): void
     {
-        $this->run_install(self::PASSWORD)->expectsOutput('Owner created: jane@acme.com')->assertExitCode(0);
+        $this->runInstall(self::PASSWORD)->expectsOutput('Owner created: jane@acme.com')->assertExitCode(0);
 
         $org = Organization::withoutGlobalScope(OrganizationScope::class)->where('slug', 'acme-inc')->firstOrFail();
         $this->assertSame('UTC', $org->timezone);
@@ -49,28 +50,37 @@ class InstallOwnerCommandTest extends TestCase
 
     public function test_refuses_when_a_user_exists(): void
     {
-        $this->run_install(self::PASSWORD)->assertExitCode(0);
+        $this->runInstall(self::PASSWORD)->assertExitCode(0);
         $orgs = Organization::withoutGlobalScope(OrganizationScope::class)->count();
 
-        $this->run_install(self::PASSWORD, 'other@acme.com')->assertExitCode(2);
+        $this->runInstall(self::PASSWORD, 'other@acme.com')->assertExitCode(2);
 
         $this->assertSame($orgs, Organization::withoutGlobalScope(OrganizationScope::class)->count());
     }
 
     public function test_rejects_short_password(): void
     {
-        $this->run_install('short')->assertExitCode(1);
+        $this->runInstall('short')->assertExitCode(1);
         $this->assertSame(0, User::withoutGlobalScope(OrganizationScope::class)->count());
     }
 
     public function test_rejects_invalid_email(): void
     {
-        $this->run_install(self::PASSWORD, 'not-an-email')->assertExitCode(1);
+        $this->runInstall(self::PASSWORD, 'not-an-email')->assertExitCode(1);
+        $this->assertSame(0, User::withoutGlobalScope(OrganizationScope::class)->count());
+    }
+
+    public function test_rejects_org_name_with_empty_slug(): void
+    {
+        InstallOwnerCommand::$stdinReader = fn () => self::PASSWORD."\n";
+
+        $this->artisan('opbx:install-owner', ['--org-name' => '###', '--name' => 'Jane', '--email' => 'jane@acme.com'])
+            ->assertExitCode(1);
         $this->assertSame(0, User::withoutGlobalScope(OrganizationScope::class)->count());
     }
 
     public function test_rejects_empty_stdin(): void
     {
-        $this->run_install('')->assertExitCode(1);
+        $this->runInstall('')->assertExitCode(1);
     }
 }

@@ -45,6 +45,12 @@ class InstallOwnerCommand extends Command
             return 2;
         }
 
+        if (! static::$stdinReader && function_exists('posix_isatty') && posix_isatty(STDIN)) {
+            $this->error('Pipe the password on stdin.');
+
+            return self::FAILURE;
+        }
+
         $line = static::$stdinReader ? (static::$stdinReader)() : fgets(STDIN);
         $password = rtrim((string) $line, "\r\n");
 
@@ -63,11 +69,23 @@ class InstallOwnerCommand extends Command
             return self::FAILURE;
         }
 
+        $slug = Str::slug($orgName);
+        if ($slug === '') {
+            $this->error('Invalid input: organization name must contain letters or digits.');
+
+            return self::FAILURE;
+        }
+
         try {
-            DB::transaction(function () use ($email, $name, $orgName, $password): void {
+            $created = DB::transaction(function () use ($email, $name, $orgName, $slug, $password): bool {
+                // Re-check under lock so concurrent runs cannot both create an owner.
+                if (OrganizationScope::bypass(fn () => User::query()->lockForUpdate()->exists())) {
+                    return false;
+                }
+
                 $org = Organization::create([
                     'name' => $orgName,
-                    'slug' => Str::slug($orgName),
+                    'slug' => $slug,
                     'timezone' => 'UTC',
                     'status' => 'active',
                 ]);
@@ -82,11 +100,19 @@ class InstallOwnerCommand extends Command
                     'email_verified_at' => now(),
                     'is_platform_manager' => true,
                 ])->save();
+
+                return true;
             });
         } catch (\Throwable $e) {
             $this->error('Failed to create owner: '.$e->getMessage());
 
             return self::FAILURE;
+        }
+
+        if (! $created) {
+            $this->error('A user already exists; refusing to create an owner.');
+
+            return 2;
         }
 
         $this->info("Owner created: {$email}");
