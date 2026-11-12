@@ -2,7 +2,7 @@ import { existsSync, readFileSync, rmSync, mkdirSync, chownSync, createWriteStre
 import { join } from 'node:path';
 import { createGzip } from 'node:zlib';
 import { Transform } from 'node:stream';
-import { finished } from 'node:stream/promises';
+import { pipeline } from 'node:stream/promises';
 import { parseEnv } from '../envfile.js';
 import { answersFromEnv } from '../derive.js';
 import { isSafeAbsolutePath } from '../validate.js';
@@ -23,35 +23,45 @@ export async function confirmPhrase(ui, expected) {
 }
 
 // Streams mysqldump -> gzip -> file (no in-memory buffering). Validity: exit code 0 AND "CREATE TABLE" seen in the stream.
+// The archive DB is included only when it exists (checked inside the container, password never on a command line).
 async function backup(docker, repoDir, dbNames) {
   const dir = join(repoDir, 'backups');
-  mkdirSync(dir, { recursive: true });
   const file = join(dir, `opbx-backup-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}.sql.gz`);
-  let seen = false;
-  let tail = '';
-  const scan = new Transform({
-    transform(chunk, _e, cb) {
-      const t = tail + chunk.toString('latin1');
-      if (t.includes('CREATE TABLE')) seen = true;
-      tail = t.slice(-12);
-      cb(null, chunk);
-    },
-  });
-  const out = createWriteStream(file, { mode: 0o600 });
-  scan.pipe(createGzip()).pipe(out);
-  // The password stays inside the container (MYSQL_ROOT_PASSWORD), never on a command line.
-  const r = await docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
-    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --single-transaction --routines --triggers --databases "$@"', 'sh', ...dbNames], { stdoutTo: scan });
-  scan.end();
-  await finished(out);
-  if (r.code !== 0 || !seen) {
-    rmSync(file, { force: true });
-    throw new Error(`Backup failed, nothing was changed:\n${(r.stderr || '').trim()}`);
+  try {
+    mkdirSync(dir, { recursive: true });
+    const dbs = [dbNames[0]];
+    const extra = dbNames[1];
+    if (extra && /^[A-Za-z0-9_]+$/.test(extra)) {
+      const q = await docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
+        'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root -N -e "SHOW DATABASES LIKE \'$1\'"', 'sh', extra]);
+      if (q.code === 0 && q.stdout.trim() === extra) dbs.push(extra);
+    }
+    let seen = false;
+    let tail = '';
+    const scan = new Transform({
+      transform(chunk, _e, cb) {
+        const t = tail + chunk.toString('latin1');
+        if (t.includes('CREATE TABLE')) seen = true;
+        tail = t.slice(-12);
+        cb(null, chunk);
+      },
+    });
+    const done = pipeline(scan, createGzip(), createWriteStream(file, { mode: 0o600 }));
+    const failed = new Promise((_, rej) => { done.catch(rej); });
+    const run = docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
+      'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --single-transaction --routines --triggers --databases "$@"', 'sh', ...dbs], { stdoutTo: scan });
+    const r = await Promise.race([run, failed]);
+    scan.end();
+    await done;
+    if (r.code !== 0 || !seen) throw new Error((r.stderr || 'no table definitions in the dump').trim());
+    chmodSync(file, 0o600);
+    const { HOST_UID, HOST_GID } = process.env;
+    if (HOST_UID && HOST_GID) { chownSync(dir, Number(HOST_UID), Number(HOST_GID)); chownSync(file, Number(HOST_UID), Number(HOST_GID)); }
+    return file;
+  } catch (e) {
+    try { rmSync(file, { force: true }); } catch { /* nothing to clean up */ }
+    throw new Error(`Backup failed, nothing was changed:\n${e.message}`);
   }
-  chmodSync(file, 0o600);
-  const { HOST_UID, HOST_GID } = process.env;
-  if (HOST_UID && HOST_GID) { chownSync(dir, Number(HOST_UID), Number(HOST_GID)); chownSync(file, Number(HOST_UID), Number(HOST_GID)); }
-  return file;
 }
 
 const stderrOf = (r) => (r.stderr || '').trim();
@@ -115,10 +125,10 @@ export async function runReset({ ui, docker, repoDir, platform, steps = {} }) {
   // ---- destructive from here on ----
   uiState.resetStarted = true;
   const down = await docker.compose(['--profile', '*', 'down', '--remove-orphans', '-v']);
-  if (down.code !== 0) throw new Error(`Reset stopped: could not stop OPBX, nothing was deleted.\n${stderrOf(down)}`);
+  if (down.code !== 0) throw new Error(`Reset stopped: could not stop OPBX; containers may be partly stopped, but your data was not deleted.\n${stderrOf(down)}`);
   if (hasSafeline) {
     const sd = await docker.compose(['--project-directory', 'docker/safeline', '-p', 'safeline', 'down']);
-    if (sd.code !== 0) throw new Error(`Reset stopped: could not stop SafeLine, nothing was deleted.\n${stderrOf(sd)}`);
+    if (sd.code !== 0) throw new Error(`Reset stopped: could not stop SafeLine; OPBX is stopped and SafeLine may be partly stopped, but your data was not deleted.\n${stderrOf(sd)}`);
   }
   const vr = await docker.run(['volume', 'rm', '-f', `${project}_loki_data`, `${project}_grafana_data`]);
   if (vr.code !== 0 && !/no such volume/i.test(vr.stderr || '')) throw new Error(`Reset stopped: could not remove the log volumes.\n${stderrOf(vr)}`);
@@ -142,6 +152,7 @@ export async function runReset({ ui, docker, repoDir, platform, steps = {} }) {
 
   for (const f of CONFIG_FILES) rmSync(join(repoDir, f), { force: true });
 
+  uiState.resetStarted = false; // from here on a cancel is an install cancel (reset would refuse: nothing left to reset)
   const reuse = await ui.confirm({ message: 'Reuse my previous answers?', initialValue: true });
   await S.runInstall({ ui, docker, repoDir, platform, resume: false, defaults: reuse ? previousAnswers : undefined });
 }

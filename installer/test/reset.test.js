@@ -33,6 +33,7 @@ function harness({ phrases = [], mysqlUp = false, backupYes = false, reuse = tru
       calls.push(['compose', ...a]);
       if (a[0] === 'config') return fail.config ? { code: 1, stdout: '', stderr: 'bad' } : { code: 0, stdout: JSON.stringify({ name: 'opbx' }), stderr: '' };
       if (a[0] === 'ps') return { code: 0, stdout: mysqlUp ? 'abc\n' : '', stderr: '' };
+      if (a[0] === 'exec' && /SHOW DATABASES/.test(a[5])) return { code: 0, stdout: fail.noArchive ? '' : `${a.at(-1)}\n`, stderr: '' };
       if (a[0] === 'exec') {
         if (fail.exec) { opts.stdoutTo.end('partial'); return { code: 1, stdout: '', stderr: 'boom' }; }
         opts.stdoutTo.write('-- dump\nCREATE '); opts.stdoutTo.end('TABLE t (id int);');
@@ -130,7 +131,7 @@ test('backup streams a gzip (mode 0600), includes the archive DB; notice when my
   const dir = setup({ env: ENV + 'DB_CDR_ARCHIVE_DATABASE=opbx_cdr\n' });
   const h = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true });
   await go(h, dir);
-  const exec = h.calls.find((c) => c[0] === 'compose' && c[1] === 'exec');
+  const exec = h.calls.find((c) => c[0] === 'compose' && c[1] === 'exec' && /mysqldump/.test(c[6]));
   assert.ok(!exec.join(' ').includes('SuperSecretRoot'));
   assert.deepEqual(exec.slice(-3), ['sh', 'opbx', 'opbx_cdr']);
   const f = require_backup(dir);
@@ -144,10 +145,12 @@ test('backup streams a gzip (mode 0600), includes the archive DB; notice when my
 });
 
 test('failed backup aborts before anything destructive', async () => {
+  const dir = setup();
   const h = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true });
   const orig = h.docker.compose;
   h.docker.compose = async (a, o) => (a[0] === 'exec' ? (o.stdoutTo.end('CREATE TABLE x'), { code: 1, stdout: '', stderr: 'boom' }) : orig(a, o));
-  await assert.rejects(go(h, setup()), /Backup failed/);
+  await assert.rejects(go(h, dir), /Backup failed/);
+  assert.deepEqual(readdirSync(join(dir, 'backups')), []);
   assert.deepEqual(destructive(h.calls), []);
   assert.ok(!h.calls.some((c) => c[0] === 'text'));
 });
@@ -172,7 +175,7 @@ const intact = (dir) => existsSync(join(dir, '.env')) && existsSync(join(dir, 'v
 test('failed OPBX down: nothing deleted, .env intact, no reinstall', async () => {
   const dir = setup();
   const h = harness({ phrases: ['pbx.example.com'], fail: { down: 'opbx' } });
-  await assert.rejects(go(h, dir), /could not stop OPBX, nothing was deleted/);
+  await assert.rejects(go(h, dir), /could not stop OPBX; containers may be partly stopped, but your data was not deleted/);
   assert.ok(!h.calls.some((c) => c[0] === 'run' || c[0] === 'runInstall'));
   assert.ok(intact(dir));
 });
@@ -255,4 +258,33 @@ test('failed compose config: no destructive calls', async () => {
   await assert.rejects(go(h, dir), /compose project name/);
   assert.deepEqual(destructive(h.calls), []);
   assert.ok(intact(dir));
+});
+
+test('archive DB is left out of the dump when it does not exist', async () => {
+  const h = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true, fail: { noArchive: true } });
+  await go(h, setup({ env: ENV + 'DB_CDR_ARCHIVE_DATABASE=opbx_cdr\n' }));
+  const dump = h.calls.find((c) => c[0] === 'compose' && c[1] === 'exec' && /mysqldump/.test(c[6]));
+  assert.deepEqual(dump.slice(-2), ['sh', 'opbx']);
+});
+
+test('unwritable backups/ fails cleanly with nothing destructive', async () => {
+  const dir = setup();
+  writeFileSync(join(dir, 'backups'), 'i am a file');
+  const h = harness({ phrases: ['pbx.example.com'], mysqlUp: true, backupYes: true });
+  await assert.rejects(go(h, dir), /Backup failed, nothing was changed/);
+  assert.deepEqual(destructive(h.calls), []);
+});
+
+test('after the wipe, cancel messages follow install state, not reset state', async () => {
+  uiState.resetStarted = false; uiState.configWritten = false;
+  const seen = [];
+  const h = harness({ phrases: ['pbx.example.com'] });
+  h.steps.runInstall = async () => {
+    seen.push(cancelMessage());
+    uiState.configWritten = true;
+    seen.push(cancelMessage());
+  };
+  try { await go(h, setup()); } finally { uiState.configWritten = false; uiState.resetStarted = false; }
+  assert.match(seen[0], /Nothing was changed/);
+  assert.match(seen[1], /run \.\/install\.sh again to resume/);
 });
