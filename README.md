@@ -350,8 +350,8 @@ Use this only if you do not want the installer. It starts the stack with the def
    cp .env.example .env
    docker/scripts/generate-secrets.sh .env            # worker tokens, Pusher/Soketi secret, Grafana, S3 keys
    ```
-   Set `APP_KEY` in `.env` to `base64:` followed by the output of `openssl rand -base64 32`. The
-   containers refuse to start with a missing `APP_KEY` or placeholder secrets.
+   Both this script and the `APP_KEY` value need `openssl` on the host. Set `APP_KEY` in `.env` to `base64:` followed
+   by the output of `openssl rand -base64 32`. The containers refuse to start with a missing `APP_KEY` or placeholder secrets.
 
    Then edit `.env` and set the values the script cannot choose for you. Use strong random passwords; `secret`,
    `rootsecret`, `password`, `minioadmin` and `admin` are rejected at startup:
@@ -364,19 +364,28 @@ Use this only if you do not want the installer. It starts the stack with the def
    REDIS_PASSWORD=...     # openssl rand -base64 32
    ```
 
-3. **Start all services**
+3. **Install the PHP dependencies** (the repository is bind-mounted into the containers, and the `app` container
+   exits without `vendor/autoload.php`)
+   ```bash
+   docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer \
+     --entrypoint composer app install --no-interaction --prefer-dist --optimize-autoloader
+   ```
+   `--user` keeps `vendor/` owned by you instead of root, and `COMPOSER_HOME` points Composer at a writable
+   directory for that user. The installer runs the same command (adding `--no-dev` for production).
+
+4. **Start all services**
    ```bash
    docker compose up -d
    ```
 
-4. **Initialize the database**
+5. **Initialize the database**
    ```bash
    docker compose exec app php artisan migrate --seed
    ```
    The seeder creates the default `admin@example.com` / `password` account (see Default Credentials). Change it
    before exposing the system.
 
-5. **Access the application**
+6. **Access the application**
    - **Frontend**: http://localhost:3000
    - **API**: http://localhost/api/v1
    - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
@@ -425,8 +434,8 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 
 | Service | Description | Port |
 |---------|-------------|------|
-| `frontend` | React SPA (Vite dev server) | 3000 |
-| `nginx` | Web server / API gateway (`APP_PORT`) | 80 |
+| `frontend` | React SPA (Vite dev server) | 3000 (dev only) |
+| `nginx` | Web server / API gateway | `APP_PORT` (default 80) |
 | `app` | Laravel PHP-FPM application | - |
 | `queue-worker` | Laravel queue processor | - |
 | `scheduler` | Laravel cron scheduler | - |
@@ -437,7 +446,7 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `mysql` | MySQL 8.4 LTS database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `seaweedfs` | S3-compatible storage (SeaweedFS) | 8333, 9333 (loopback, opt-in) |
-| `soketi` | WebSocket server (not published in production; reached through nginx at `/app/`) | 6001 |
+| `soketi` | WebSocket server (reached through nginx at `/app/`) | 6001 (dev only) |
 | `nginx` WAF console | SafeLine console, only with the WAF overlay and `WAF_CONSOLE_ENABLED=true` (`WAF_CONSOLE_PORT`) | 9443 |
 | `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |
@@ -561,7 +570,7 @@ For detailed security implementation, see [`docs/architecture/security-implement
 # Login
 curl -X POST http://localhost/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@example.com", "password": "password"}'
+  -d '{"email": "<your-email>", "password": "<your-password>"}'
 
 # Response: {"token": "YOUR_TOKEN", "user": {...}}
 

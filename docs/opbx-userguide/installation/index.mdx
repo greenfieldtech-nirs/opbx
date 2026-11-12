@@ -10,6 +10,10 @@ description: "Install OPBX using Docker Compose"
 
 This guide installs OPBX with Docker Compose. The same compose file is used for local development and, with the production overlay, for production.
 
+:::tip Guided installer
+`./install.sh` does the whole installation for you. It needs only Docker with Compose (or Podman). It asks for the public address, the company and owner details, the email provider and whether to enable the WAF and the log viewer, then generates the secrets, starts the stack, creates the owner and prints a summary. Production needs an `https://` address: your own reverse proxy terminates TLS and forwards one domain to the OPBX nginx port, and the installer prints a proxy snippet. `./install.sh reconfigure` changes the public address or the WAF, and `./install.sh reset` deletes all data. The steps below are the manual setup, for people who do not use the installer.
+:::
+
 ## Prerequisites
 
 | Requirement | Minimum | Recommended |
@@ -65,8 +69,8 @@ cp docker-compose.yml.example docker-compose.yml
 
 `docker-compose.yml` is ignored by git, so you can adapt it to your host.
 
-:::tip Bootstrap script
-`./opbx_bootstrap.sh` does steps 2 and 3 for you and runs a few checks. It verifies that Docker and Docker Compose are installed and running, copies `docker-compose.yml` and `.env` from the examples when they are missing, generates `APP_KEY` when it is empty, runs `docker/scripts/generate-secrets.sh`, creates `config/broadcasting.php` if it is missing, creates the `storage/` and `bootstrap/cache` directories, and warns when `APP_NAME`, `APP_KEY`, `DB_DATABASE`, `DB_USERNAME` or `DB_PASSWORD` is empty. You still set `DB_PASSWORD`, `DB_ROOT_PASSWORD` and `REDIS_PASSWORD` by hand. Ignore its warning about `CLOUDONIX_API_TOKEN`: Cloudonix credentials are entered per organization in the web UI.
+:::note Manual setup
+The old `./opbx_bootstrap.sh` now only runs `./install.sh`. Do steps 2 and 3 by hand as described here. Ignore any warning about `CLOUDONIX_API_TOKEN`: Cloudonix credentials are entered per organization in the web UI.
 :::
 
 ### 3. Set the Secrets
@@ -211,7 +215,7 @@ curl http://localhost/api/health
 | `http://localhost/logs/` | Grafana log viewer (`logs` profile) |
 
 :::tip Next Steps
-Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
+Proceed to [First Login](/opbx/installation/first-login). If you used the installer, the owner account it created is ready: the generated password was shown once and saved to `opbx-install-summary.txt` (delete that file after storing the password). With the manual setup, a fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Troubleshooting

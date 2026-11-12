@@ -8,11 +8,19 @@ description: "Create your first organization and admin account"
 
 # First Login
 
-After installing OPBX, you either log in with the seeded owner account or register a new organization. This guide walks you through both.
+After installing OPBX, you either log in with the owner account or register a new organization. This guide walks you through both.
 
-## The Seeded Owner Account
+## The Installer-Created Owner
 
-On a fresh database, the `app` container seeds one organization and one owner:
+If you installed with `./install.sh`, the installer created the organization owner (who is also a platform manager) with the email you gave it. It generated the password, showed it once at the end, and saved it to `opbx-install-summary.txt` in the repository folder (mode 600). Store the password, then delete that file. There is no `admin@example.com` account on these systems. If you lose the password, reset it:
+
+```bash
+docker compose exec app php artisan user:reset-password <email>
+```
+
+## The Seeded Owner Account (manual setup)
+
+If you installed by hand, on a fresh database, the `app` container seeds one organization and one owner:
 
 | Item | Value |
 |------|-------|

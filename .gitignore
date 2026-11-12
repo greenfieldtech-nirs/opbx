@@ -205,3 +205,6 @@ docker-compose.yml.bak-*
 
 # First-time installer output (contains the owner password)
 opbx-install-summary.txt
+
+# Installer dev dependencies
+installer/node_modules/

@@ -35,10 +35,10 @@ Set `OPBX_DEBUG=1` to print stack traces on failure.
 Unit tests use `node --test` and need no daemon. Run them with the repository mounted:
 
 ```bash
-docker run --rm -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
 ```
 
-`npm ci` writes `installer/node_modules/` on the host (it is not git-ignored; do not commit it). Tests use fakes for
+`npm ci` writes `installer/node_modules/` on the host (git-ignored); `--user` keeps it owned by you on Linux. Tests use fakes for
 Docker and the UI (see `test/fixtures/` for the SafeLine env template and a `reset-admin` sample output). To try
 changes end to end, run `./install.sh` against a scratch checkout, never against a stack that holds data you need.
 
