@@ -134,12 +134,71 @@ test('advanced settings keep only changed values', async () => {
   assert.deepEqual(a.advanced, { RATE_LIMIT_API: '120', LOG_LEVEL: 'debug' });
 });
 
-test('review hides secrets and returns the choice', async () => {
+test('development + email provider: no unusable From default, address accepted', async () => {
+  const seen = [];
+  const { ui } = fakeUi(['development', '8080', 'Acme', 'A', 'a@b.co', 'single', 'mailerlite', 'k', 'me@example.com', 'Acme', false, false, false, false, 'off', '', false]);
+  const orig = ui.text; ui.text = (o) => { seen.push(o.initialValue); return orig(o); };
+  const a = await askAnswers(ui, { platform: {}, portCheck: null });
+  assert.equal(a.email.fromAddress, 'me@example.com');
+  assert.ok(!seen.some((v) => /localhost/.test(v ?? '')));
+});
+
+test('blank secret keeps the default; blank without default stays invalid', async () => {
+  const defaults = { mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 80, orgName: 'Acme', ownerName: 'A', ownerEmail: 'a@b.co',
+    email: { provider: 'sendinblue', fields: { SENDINBLUE_API_KEY: 'brevo-key' }, fromAddress: 'n@example.com', fromName: 'Acme' },
+    auth0: { domain: 'd', clientId: 'c', clientSecret: 'a0-secret', providers: ['google'] },
+    recaptcha: { siteKey: 's', secretKey: 'rc-secret', minScore: 0.5 }, usercheck: { token: 'uc-token', block: {} } };
+  const prompts = [];
+  const ui = {
+    select: async (o) => o.initialValue, text: async (o) => o.initialValue, confirm: async () => true, multiselect: async (o) => o.initialValues, note() {},
+    password: async (o) => { prompts.push(o); assert.equal(o.validate(''), undefined); return ''; },
+  };
+  const a = await askAnswers(ui, { platform: {}, defaults, portCheck: null });
+  assert.equal(a.email.fields.SENDINBLUE_API_KEY, 'brevo-key');
+  assert.equal(a.auth0.clientSecret, 'a0-secret');
+  assert.equal(a.recaptcha.secretKey, 'rc-secret');
+  assert.equal(a.usercheck.token, 'uc-token');
+  assert.ok(prompts.every((o) => /leave blank to keep/.test(o.message)));
+  // no default: blank is refused
+  const { ui: f, log } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'sendinblue', '', 'real', 'n@example.com', 'Acme', false, false, false, false, 'off', false]);
+  await askAnswers(f, { platform: {}, portCheck: null });
+  assert.equal(log.rejected.length, 1);
+});
+
+test('defaults are not mutated; port re-ask defaults to the last entry', async () => {
+  const defaults = Object.freeze({ httpPort: 80 });
+  const initials = [];
+  const { ui } = fakeUi(['production', 'pbx.example.com', '8081', '8082', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const orig = ui.text; ui.text = (o) => { initials.push(o.initialValue); return orig(o); };
+  const checks = [false, true];
+  await askAnswers(ui, { platform: {}, defaults, portCheck: async () => checks.shift() });
+  assert.deepEqual(defaults, { httpPort: 80 });
+  assert.equal(initials[1], '80');
+  assert.equal(initials[2], '8081');
+});
+
+const review = async (answers) => {
   const { ui, log } = fakeUi(['edit']);
-  const a = { ...(await askAnswers(fakeUi(FULL).ui, { platform: {}, portCheck: null })) };
-  const r = await reviewAnswers(ui, a);
-  assert.equal(r, 'edit');
-  const shown = log.notes.join('\n');
-  for (const s of ['key-1', 'secretkey', 'tok', '"sec"']) assert.ok(!shown.includes(s), s);
-  assert.match(shown, /pbx\.example\.com/);
+  const r = await reviewAnswers(ui, answers);
+  return { r, text: log.notes.join('\n') };
+};
+const SECRETS = ['SEKRET-mailgun-9', 'SEKRET-auth0-9', 'SEKRET-recaptcha-9', 'SEKRET-usercheck-9', 'SEKRET-ngrok-9'];
+const withSecrets = (a) => ({ ...a, email: { ...a.email, fields: { ...a.email.fields, MAILGUN_SECRET: SECRETS[0] } },
+  auth0: { ...a.auth0, clientSecret: SECRETS[1] }, recaptcha: { ...a.recaptcha, secretKey: SECRETS[2] }, usercheck: { ...a.usercheck, token: SECRETS[3] }, ngrokToken: SECRETS[4] });
+
+test('review shows no secret value, maps select to edit/confirm, covers development', async () => {
+  const prodAns = withSecrets(await askAnswers(fakeUi(FULL).ui, { platform: {}, portCheck: null }));
+  const p = await review(prodAns);
+  assert.equal(p.r, 'edit');
+  for (const s of SECRETS) assert.ok(!p.text.includes(s), s);
+  assert.match(p.text, /pbx\.example\.com/);
+  const { ui } = fakeUi(['confirm']);
+  assert.equal(await reviewAnswers(ui, prodAns), 'confirm');
+
+  const dev = withSecrets({ ...prodAns, mode: 'development', publicUrl: 'http://localhost', trustedProxyCidr: '' });
+  const d = await review(dev);
+  for (const s of SECRETS) assert.ok(!d.text.includes(s), s);
+  assert.match(d.text, /Development/);
+  assert.match(d.text, /ngrok: token set/);
+  assert.doesNotMatch(d.text, /Proxy:/);
 });

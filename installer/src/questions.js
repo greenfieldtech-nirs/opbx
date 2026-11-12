@@ -49,13 +49,18 @@ const ask = (kind) => async (ui, message, o = {}) => {
   return String(v ?? '').trim();
 };
 const text = ask('text');
-const secret = ask('password');
+const password = ask('password');
+// A secret already in defaults is kept when the answer is left blank.
+const secret = async (ui, message, current, o = {}) => {
+  if (!current) return password(ui, message, o);
+  return (await password(ui, `${message} (leave blank to keep the current value)`, { ...o, optional: true })) || current;
+};
 const intCheck = (s) => (/^\d+$/.test(s) ? undefined : 'Enter a whole number.');
 const cidrCheck = (s) => { const r = parseCidrList(s); return r.ok ? undefined : r.reason; };
 const joinCidrs = (s) => parseCidrList(s).value.join(',');
 
 export async function askAnswers(ui, { platform, defaults = {}, portCheck = null } = {}) {
-  const d = defaults;
+  const d = { ...defaults };
   const a = {};
 
   a.mode = await ui.select({
@@ -87,15 +92,15 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     } catch (e) {
       ui.note('Could not check the port', e.message);
     }
-    d.httpPort = undefined;
+    d.httpPort = a.httpPort;
   }
 
   a.trustedProxyCidr = '';
   if (prod) {
+    ui.note('Why we ask', 'With the proxy address, OPBX can see each visitor\'s real IP address, which makes rate limits, logs and firewall events accurate.');
     const proxy = await text(ui, 'What is the IP address or network of the proxy that forwards traffic to OPBX? (optional, press Enter to skip)', {
       def: d.trustedProxyCidr, optional: true, placeholder: '10.0.0.5 or 10.0.0.0/24', check: cidrCheck,
     });
-    ui.note('Why we ask', 'With the proxy address, OPBX can see each visitor\'s real IP address, which makes rate limits, logs and firewall events accurate.');
     a.trustedProxyCidr = proxy && joinCidrs(proxy);
   }
 
@@ -126,11 +131,11 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     const [label, fields] = EMAIL[provider];
     const prev = d.email?.provider === provider ? d.email.fields ?? {} : {};
     for (const [key, q, def] of fields) {
-      a.email.fields[key] = def === null ? await secret(ui, `${q}`) : await text(ui, q, { def: prev[key] ?? def, optional: def !== '' });
+      a.email.fields[key] = def === null ? await secret(ui, q, prev[key]) : await text(ui, q, { def: prev[key] ?? def, optional: def !== '' });
     }
-    const host = new URL(a.publicUrl).hostname;
+    const host = new URL(a.publicUrl).hostname; // development has no real domain: no default
     a.email.fromAddress = await text(ui, `Which address should emails from ${label} come from?`, {
-      def: d.email?.fromAddress || `noreply@${host}`, check: (s) => (isEmail(s) ? undefined : 'That does not look like an email address.'),
+      def: d.email?.fromAddress || (prod ? `noreply@${host}` : ''), check: (s) => (isEmail(s) ? undefined : 'That does not look like an email address.'),
     });
     a.email.fromName = await text(ui, 'Which sender name should recipients see?', { def: d.email?.fromName || a.orgName });
   }
@@ -142,7 +147,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     a.auth0 = {
       domain: await text(ui, 'Auth0 domain', { def: o.domain, placeholder: 'your-tenant.auth0.com' }),
       clientId: await text(ui, 'Auth0 client ID', { def: o.clientId }),
-      clientSecret: await secret(ui, 'Auth0 client secret'),
+      clientSecret: await secret(ui, 'Auth0 client secret', o.clientSecret),
       providers: await ui.multiselect({
         message: 'Which sign-in providers should be offered?', required: true,
         options: [{ value: 'google', label: 'Google' }, { value: 'github', label: 'GitHub' }], initialValues: o.providers ?? ['google', 'github'],
@@ -155,7 +160,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     const o = d.recaptcha ?? {};
     a.recaptcha = {
       siteKey: await text(ui, 'reCAPTCHA site key', { def: o.siteKey }),
-      secretKey: await secret(ui, 'reCAPTCHA secret key'),
+      secretKey: await secret(ui, 'reCAPTCHA secret key', o.secretKey),
       minScore: Number(await text(ui, 'Minimum score to accept (0 to 1; higher is stricter)', {
         def: String(o.minScore ?? 0.5), check: (s) => (Number(s) >= 0 && Number(s) <= 1 ? undefined : 'Enter a number between 0 and 1.'),
       })),
@@ -165,7 +170,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
   a.usercheck = null;
   if (await ui.confirm({ message: 'Check sign-up email addresses with UserCheck?', initialValue: !!d.usercheck })) {
     const o = d.usercheck ?? {};
-    const token = await secret(ui, 'UserCheck API token');
+    const token = await secret(ui, 'UserCheck API token', o.token);
     const chosen = await ui.multiselect({
       message: 'Which kinds of email address should be refused?', required: false,
       options: BLOCKS.map(([value, label]) => ({ value, label })),
@@ -197,7 +202,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
   }
 
   a.ngrokToken = '';
-  if (!prod) a.ngrokToken = await secret(ui, 'ngrok auth token, to receive calls from Cloudonix (optional, press Enter to skip)', { optional: true });
+  if (!prod) a.ngrokToken = await secret(ui, 'ngrok auth token, to receive calls from Cloudonix (optional, press Enter to skip)', d.ngrokToken, { optional: true });
 
   a.advanced = {};
   if (await ui.confirm({ message: 'Review advanced settings (limits, retention, caches, log detail)?', initialValue: false })) {
