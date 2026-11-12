@@ -1,0 +1,11 @@
+{
+  "name": "opbx-installer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OPBX first-time installer",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {}
+}
