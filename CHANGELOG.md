@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-12
+
+- **Guided installer**: `./install.sh` (needs only Docker with Compose, or Podman) replaces the manual bootstrap. It asks for production or development, the public address, tenancy, company and owner, the email provider (Mailgun, Mailjet, MailerLite, Brevo (Sendinblue) or none), optional Auth0, reCAPTCHA and UserCheck, log collection and the SafeLine WAF; generates all secrets; starts the stack; creates the platform owner; runs post-install checks; and prints a summary (saved to `opbx-install-summary.txt`, mode 600, git-ignored). `.env` carries `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2`, so `docker compose up -d` stays the everyday command. Source and developer notes: `installer/README.md`.
+- `./install.sh reconfigure` changes the public address and the WAF (off, monitor, block). `./install.sh reset` lists what it destroys, offers a database backup into `./backups/`, requires typing the domain (production) or `RESET` (development), and removes data and generated config. A plain `./install.sh` on an existing install offers Change settings, Start over or Exit, and resumes an interrupted install.
+- Production installs require an `https://` address. TLS is terminated by your own reverse proxy, which forwards one domain to the OPBX nginx port; the installer prints a ready-to-paste snippet. `TRUSTED_PROXY_CIDR` enables real client IPs (nginx realip).
+- Installer-made systems (`OPBX_INSTALLER_MANAGED=true`) have no `admin@example.com` account; the owner is created with a generated password shown once.
+
+### Changed - 2026-11-12
+
+- `opbx_bootstrap.sh` now only prints that it has been replaced and runs `./install.sh`.
+- The SafeLine WAF console is served by the OPBX nginx on port 9443 (`WAF_CONSOLE_PORT`); SafeLine's own `127.0.0.1:9443` mapping is removed. Behind a TLS proxy, forward port 9443 as well. The console allowlist is set only when a proxy IP is given; otherwise SafeLine's login is the only protection.
+- `/up` is routed to Laravel's health check through nginx.
+
 ### Changed - 2026-10-25
 
 - PHP image upgraded to **PHP 8.5.12** (`php:8.5.12-fpm-alpine3.24`) for `app`, both queue workers and the scheduler; CI runs on PHP 8.5. Dependabot proposed 8.5.11, which is still affected by CVE-2026-109618 / CVE-2026-109619, so the image is pinned to 8.5.12. OPcache is built into PHP 8.5 and is no longer installed as an extension (`docker/php/opcache.ini` still configures it). Rebuild with `./scripts/upgrade.sh` or `docker compose build --pull`.

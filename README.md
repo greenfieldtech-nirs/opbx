@@ -280,6 +280,64 @@ sequenceDiagram
 
 ### Quick Start
 
+The host needs only Docker with the Compose plugin (or Podman with a Docker-compatible socket). Node.js, PHP and
+Composer are not needed on the host: the installer runs in a container.
+
+```bash
+git clone https://github.com/greenfieldtech-nirs/opbx.cloudonix.com.git
+cd opbx.cloudonix.com
+./install.sh
+```
+
+The installer asks for the deployment type (production or development), the public address, whether the server
+hosts one company or many organizations, the company and owner details, the email provider (Mailgun, Mailjet,
+MailerLite, Brevo (Sendinblue) or none), optional Auth0 sign-in, reCAPTCHA and UserCheck, whether to collect logs in
+Grafana, and whether to put the SafeLine WAF in front. It then generates all secrets, writes `.env` and the compose files, starts the stack,
+creates the platform owner and runs a few checks. At the end it prints the URLs, the owner login and, for production,
+a reverse proxy snippet.
+
+- **Production needs an `https://` address.** OPBX does not terminate TLS. Your own reverse proxy or HTTPS accelerator
+  must terminate TLS and forward one domain to the OPBX nginx port (`APP_PORT`, default 80). The installer prints a
+  ready-to-paste proxy snippet. If you give it the proxy IP or CIDR (`TRUSTED_PROXY_CIDR`), nginx uses the real client
+  IP from `X-Forwarded-For`. Without it, rate limits and logs see the proxy's address.
+- **WAF (SafeLine CE)** can be off, monitor (log only) or block. The installer shows the host steps it needs and waits
+  for you to confirm each one. The WAF console is served by the OPBX nginx on port 9443 (`WAF_CONSOLE_PORT`), so your
+  proxy must forward that port too (a second block in the snippet). The console is limited to the proxy IP when you
+  gave one; otherwise only SafeLine's own login protects it.
+- **Owner account.** The installer creates the organization owner (who is also a platform manager) with a generated
+  password. The password is shown once and saved to `opbx-install-summary.txt` (mode 600, git-ignored). Store the
+  password, then delete that file. The seeded `admin@example.com` account does not exist on installer-made systems.
+- **Everyday use.** The installer writes `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2` to `.env`, so
+  starting the stack afterwards is `docker compose up -d`.
+
+Other modes:
+
+```bash
+./install.sh                # install; on an existing install offers Change settings / Start over / Exit.
+                            # An interrupted install is resumed.
+./install.sh reconfigure    # change the public address, or turn the WAF on/off or switch its mode
+./install.sh reset          # delete all data and generated config (see below)
+```
+
+`reset` lists what it will destroy, offers a database backup into `./backups/`, and asks you to type the domain
+(production) or `RESET` (development). It then deletes `volumes/mysql`, `volumes/redis`, `volumes/seaweedfs`,
+`volumes/amd-dumps`, the Loki and Grafana volumes, the SafeLine `resources/` and `logs/` directories under its state
+directory (a host step, shown for you to run) and the generated config files. Afterwards it offers to reuse your
+previous answers.
+
+To set a new owner password later:
+
+```bash
+docker compose exec app php artisan user:reset-password <email>
+```
+
+The old `./opbx_bootstrap.sh` now just runs `./install.sh`. See [installer/README.md](installer/README.md) for how the
+installer works.
+
+### Advanced: manual setup
+
+Use this only if you do not want the installer. It starts the stack with the default (development) compose file.
+
 1. **Clone the repository**
    ```bash
    git clone https://github.com/greenfieldtech-nirs/opbx.cloudonix.com.git
@@ -288,11 +346,12 @@ sequenceDiagram
 
 2. **Prepare the configuration (before the first start)**
    ```bash
-   ./opbx_bootstrap.sh
+   cp docker-compose.yml.example docker-compose.yml   # git-ignored
+   cp .env.example .env
+   docker/scripts/generate-secrets.sh .env            # worker tokens, Pusher/Soketi secret, Grafana, S3 keys
    ```
-   The script creates `docker-compose.yml` (git-ignored, from `docker-compose.yml.example`) and `.env` (from `.env.example`),
-   generates `APP_KEY` and fills in the shared secrets (worker API tokens, Pusher/Soketi secret, Grafana, S3 keys) with
-   `docker/scripts/generate-secrets.sh`. The containers refuse to start with a missing `APP_KEY` or placeholder secrets.
+   Set `APP_KEY` in `.env` to `base64:` followed by the output of `openssl rand -base64 32`. The
+   containers refuse to start with a missing `APP_KEY` or placeholder secrets.
 
    Then edit `.env` and set the values the script cannot choose for you. Use strong random passwords; `secret`,
    `rootsecret`, `password`, `minioadmin` and `admin` are rejected at startup:
@@ -314,6 +373,8 @@ sequenceDiagram
    ```bash
    docker compose exec app php artisan migrate --seed
    ```
+   The seeder creates the default `admin@example.com` / `password` account (see Default Credentials). Change it
+   before exposing the system.
 
 5. **Access the application**
    - **Frontend**: http://localhost:3000
@@ -365,7 +426,7 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | Service | Description | Port |
 |---------|-------------|------|
 | `frontend` | React SPA (Vite dev server) | 3000 |
-| `nginx` | Web server / API gateway | 80 |
+| `nginx` | Web server / API gateway (`APP_PORT`) | 80 |
 | `app` | Laravel PHP-FPM application | - |
 | `queue-worker` | Laravel queue processor | - |
 | `scheduler` | Laravel cron scheduler | - |
@@ -376,7 +437,8 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 | `mysql` | MySQL 8.4 LTS database | 3306 |
 | `redis` | Redis 7 cache/queue/CAC | 6379 |
 | `seaweedfs` | S3-compatible storage (SeaweedFS) | 8333, 9333 (loopback, opt-in) |
-| `soketi` | WebSocket server | 6001 |
+| `soketi` | WebSocket server (not published in production; reached through nginx at `/app/`) | 6001 |
+| `nginx` WAF console | SafeLine console, only with the WAF overlay and `WAF_CONSOLE_ENABLED=true` (`WAF_CONSOLE_PORT`) | 9443 |
 | `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |
 | `alloy` | Log collector — *profile `logs`* | - |
@@ -384,7 +446,11 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 
 ### Default Credentials
 
-After running `migrate --seed`, the following admin user is created:
+On a system made by `./install.sh` there are no default credentials. The installer creates the owner you specified and
+shows the generated password once (it is also saved to `opbx-install-summary.txt`; delete that file after storing the
+password). A lost owner password is reset with `docker compose exec app php artisan user:reset-password <email>`.
+
+Only the manual setup seeds an account (`php artisan migrate --seed`):
 
 - **Email**: `admin@example.com`
 - **Password**: `password`

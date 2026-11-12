@@ -1,5 +1,9 @@
 # SafeLine WAF — proof of concept (branch `poc/safeline-waf`)
 
+`./install.sh` sets all of this up when you answer yes to the WAF question, and `./install.sh reconfigure` turns it
+on or off or changes its mode. It shows the host steps (state directory, SELinux relabel, detector listener) and waits
+for you to complete them. The manual steps below are kept as reference.
+
 The edge nginx (`opbx_nginx`) becomes OpenResty and asks the SafeLine CE
 detector about every request through
 [lua-resty-t1k](https://github.com/chaitin/lua-resty-t1k) (T1K protocol, TCP 8000).
@@ -22,7 +26,7 @@ client ─TLS─▶ ssl-proxy ─▶ opbx_nginx (OpenResty + t1k) ─▶ fronten
 | `docker/nginx/waf/00-safeline-waf.conf` | http-level hook: mode, exemptions, fail-open |
 | `docker-compose.waf.yml` | Overlay: WAF image, `safeline-ce` network, `WAF_MODE` |
 
-## Run it
+## Run it (manual reference)
 
 ```bash
 # 1. SafeLine (once): env, state dir, detector TCP listener
@@ -37,8 +41,11 @@ docker compose --project-directory docker/safeline -p safeline up -d
 # 2. OPBX with the WAF hook
 WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml up -d   # off|monitor|block
 
-# Console: http://<host>:9443 through opbx_nginx, needs WAF_CONSOLE_ENABLED=true (restrict with
-# WAF_CONSOLE_ALLOW, WAF_CONSOLE_PORT moves it)  (credentials: docker exec safeline-mgt /app/mgt reset-admin)
+# Console: needs WAF_CONSOLE_ENABLED=true. opbx_nginx serves it on port 9443 (WAF_CONSOLE_PORT moves it);
+# SafeLine's own port mapping is removed in compose.override.yaml. Restrict it with WAF_CONSOLE_ALLOW
+# (comma-separated IPs/CIDRs); the installer sets that only when you give a proxy IP.
+# Behind a TLS proxy, forward port 9443 as well as the main port.
+# Credentials: docker exec safeline-mgt /app/mgt reset-admin
 # Would-block events: docker exec opbx_nginx grep safeline-waf /var/log/nginx/opbx_error.log
 ```
 
