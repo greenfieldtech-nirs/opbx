@@ -3,7 +3,7 @@ import { createDocker } from './docker.js';
 import { detectPlatform } from './platform.js';
 import { detectInstall } from './detect.js';
 import { runInstall } from './modes/install.js';
-import { ui } from './ui.js';
+import { ui, handleSigint } from './ui.js';
 
 export function chooseAction(mode, state) {
   switch (mode) {
@@ -32,6 +32,7 @@ async function main() {
   const repo = process.env.OPBX_REPO || process.cwd();
   const action = chooseAction(mode, detectInstall(repo));
   if (action !== 'install' && action !== 'resume') { console.log(MESSAGES[action]); return; }
+  process.on('SIGINT', () => handleSigint());
   const docker = createDocker();
   await runInstall({ ui, docker, repoDir: repo, platform: await detectPlatform(docker), resume: action === 'resume' });
 }

@@ -41,17 +41,17 @@ function harness(over = {}) {
     reviewAnswers: async () => reviews.shift() ?? 'confirm',
     isPortFree: async () => true,
     generateSharedSecrets: () => log.steps.push('secrets'),
-    buildImages: async () => log.steps.push('build'),
+    buildImages: async () => { log.steps.push('build'); log.stateAtBuild = parseEnv(readFileSync(join(log.dir, '.env'), 'utf8')).get('OPBX_INSTALL_STATE'); },
     composerInstall: async () => log.steps.push('composer'),
     startStack: async () => log.steps.push('start'),
     createOwner: async (_d, _a, pw) => { log.pw = pw; log.steps.push('owner'); return over.owner ?? 'created'; },
-    resetSafelineAdmin: async () => ({ username: 'admin', password: 'WafPw' }),
-    runChecks: async () => over.checks ?? [{ name: 'up', ok: true, detail: 'ok' }],
+    resetSafelineAdmin: async () => { log.steps.push('wafadmin'); return ({ username: 'admin', password: 'WafPw' }); },
+    runChecks: async () => { log.steps.push('checks'); return over.checks ?? [{ name: 'up', ok: true, detail: 'ok' }]; },
     ...over.steps,
   };
   return { ui, docker, steps, log };
 }
-const run = (h, dir, o = {}) => runInstall({ ui: h.ui, docker: h.docker, repoDir: dir, platform: { arch: 'amd64' }, resume: false, steps: h.steps, ...o });
+const run = (h, dir, o = {}) => (h.log.dir = dir, runInstall({ ui: h.ui, docker: h.docker, repoDir: dir, platform: { arch: 'amd64' }, resume: false, steps: h.steps, ...o }));
 
 test('fresh install writes a complete .env; owner password only in the summary', async () => {
   const dir = setup();
@@ -63,7 +63,8 @@ test('fresh install writes a complete .env; owner password only in the summary',
   assert.equal(env.get('OPBX_INSTALLER_MANAGED'), 'true');
   for (const k of ['APP_KEY', 'DB_PASSWORD', 'DB_ROOT_PASSWORD', 'REDIS_PASSWORD']) assert.ok(env.get(k), k);
   assert.ok(existsSync(join(dir, 'docker-compose.yml')));
-  assert.deepEqual(h.log.steps, ['secrets', 'build', 'composer', 'start', 'owner']);
+  assert.deepEqual(h.log.steps, ['secrets', 'build', 'composer', 'start', 'owner', 'checks']);
+  assert.equal(h.log.stateAtBuild, 'incomplete');
   assert.ok(h.log.pw);
   assert.ok(!envText.includes(h.log.pw));
   assert.ok(readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8').includes(h.log.pw));
@@ -74,15 +75,19 @@ test('fresh install writes a complete .env; owner password only in the summary',
 test('failed check stops before the summary and leaves state incomplete', async () => {
   const dir = setup();
   const h = harness({ checks: [{ name: 'ws', ok: false, detail: 'down' }], selectAnswer: 'abort' });
-  await assert.rejects(run(h, dir), /Checks failed/);
+  await assert.rejects(run(h, dir), /Checks failed.*\n.*run \.\/install\.sh again|Checks failed[\s\S]*resume/i);
+  const saved = readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8');
+  assert.ok(saved.includes(h.log.pw));
+  assert.equal(h.log.notes.filter((n) => n.includes(h.log.pw)).length, 2); // shown after creation and again on failure
   assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('OPBX_INSTALL_STATE'), 'incomplete');
-  assert.ok(!existsSync(join(dir, 'opbx-install-summary.txt')));
+  assert.ok(!saved.includes('installation summary'));
 });
 
 test('resume keeps DB_PASSWORD, skips port check, tolerates existing owner', async () => {
   const dir = setup('APP_ENV=production\nAPP_URL=https://pbx.example.com\nDB_PASSWORD=keepme\nOPBX_INSTALL_STATE=incomplete\nPUSHER_APP_SECRET=sharedkeep\n');
   const h = harness({ owner: 'exists' });
   await run(h, dir, { resume: true });
+  assert.ok(readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8').includes('user:reset-password ann@example.com'));
   const env = parseEnv(readFileSync(join(dir, '.env'), 'utf8'));
   assert.equal(env.get('DB_PASSWORD'), 'keepme');
   assert.equal(env.get('PUSHER_APP_SECRET'), 'sharedkeep');
@@ -93,8 +98,11 @@ test('resume keeps DB_PASSWORD, skips port check, tolerates existing owner', asy
 });
 
 test('existing owner on a fresh install is an error', async () => {
+  const dir = setup();
   const h = harness({ owner: 'exists' });
-  await assert.rejects(run(h, setup()), /already exists/);
+  await assert.rejects(run(h, dir), /already exists/);
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('OPBX_INSTALL_STATE'), 'incomplete');
+  assert.ok(!existsSync(join(dir, 'opbx-install-summary.txt')));
 });
 
 test('edit loops back with previous answers as defaults', async () => {
@@ -124,7 +132,19 @@ test('WAF runs the host step and writes the SafeLine env', async () => {
   const waf = { mode: 'monitor', stateDir: '/var/lib/safeline', consoleAllow: '' };
   const h = harness({ answers: answers({ waf }), steps: { hostStep: async (_u, o) => h.log.steps.push(`host:${o.commands.length > 0}`) } });
   await run(h, dir);
-  assert.ok(h.log.steps.includes('host:true'));
+  assert.deepEqual(h.log.steps.slice(0, 3), ['secrets', 'host:true', 'build']);
+  assert.ok(h.log.steps.indexOf('wafadmin') > h.log.steps.indexOf('owner') && h.log.steps.indexOf('wafadmin') < h.log.steps.indexOf('checks'));
   assert.ok(existsSync(join(dir, 'docker/safeline/.env')));
   assert.ok(readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8').includes('WafPw'));
+});
+
+import { handleSigint, state as uiState } from '../src/ui.js';
+test('handleSigint prints the config-aware message and exits 130', () => {
+  for (const [written, re] of [[false, /Nothing was changed/], [true, /run \.\/install\.sh again/]]) {
+    uiState.configWritten = written;
+    let msg; let code;
+    handleSigint({ out: (m) => { msg = m; }, exit: (c) => { code = c; } });
+    assert.match(msg, re);
+    assert.equal(code, 130);
+  }
 });

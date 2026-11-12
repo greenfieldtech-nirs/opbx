@@ -18,7 +18,7 @@ const MIN_FREE_BYTES = 10e9;
 function freeBytes(dir) {
   const r = spawnSync('df', ['-Pk', dir], { encoding: 'utf8' });
   const kb = Number(r.stdout?.split('\n')[1]?.trim().split(/\s+/)[3]);
-  return r.status === 0 && kb ? kb * 1024 : null; // unknown: do not block
+  return r.status === 0 && Number.isFinite(kb) ? kb * 1024 : null; // unknown: do not block
 }
 
 function generateSharedSecrets(repoDir) {
@@ -27,7 +27,14 @@ function generateSharedSecrets(repoDir) {
 }
 
 // `steps` replaces collaborators in unit tests.
-export async function runInstall({ ui, docker, repoDir, platform, resume, defaults, steps = {} }) {
+export async function runInstall(opts) {
+  try { return await runInstallInner(opts); } catch (e) {
+    if (uiState.configWritten) e.message += '\nRun ./install.sh again to resume.';
+    throw e;
+  }
+}
+
+async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults, steps = {} }) {
   const S = {
     askAnswers, reviewAnswers, isPortFree, hostStep, checkSafelineState, safelineHostCommands, writeSafelineEnv,
     buildImages, composerInstall, startStack, createOwner, resetSafelineAdmin, runChecks, freeBytes, generateSharedSecrets,
@@ -77,36 +84,54 @@ export async function runInstall({ ui, docker, repoDir, platform, resume, defaul
   await S.composerInstall(docker, answers);
   await S.startStack(docker, ui, answers);
 
+  const summaryPath = join(repoDir, 'opbx-install-summary.txt');
   let ownerPassword = generateOwnerPassword();
+  let shown = null;
   if ((await S.createOwner(docker, answers, ownerPassword)) === 'exists') {
     if (!resume) throw new Error('A user already exists in this fresh installation. Someone else created it: stopping so nothing is overwritten.');
     ownerPassword = null;
+  } else {
+    // The password is shown nowhere else: persist and display it before anything can fail.
+    const creds = `Owner login\n  Email:    ${answers.ownerEmail}\n  Password: ${ownerPassword}`;
+    saveSummary(repoDir, `OPBX installation still in progress.\n\n${creds}\n`, own);
+    shown = () => ui.note('Write this down now', `${creds}\n\nIt is also saved in ${summaryPath}`);
+    shown();
   }
 
-  let wafAdmin = null;
-  if (answers.waf) {
-    try { wafAdmin = await S.resetSafelineAdmin(docker); } catch (e) { ui.note('Firewall admin', `Could not create the firewall admin login: ${e.message}`); }
-  }
+  try {
+    let wafAdmin = null;
+    if (answers.waf) {
+      try { wafAdmin = await S.resetSafelineAdmin(docker); } catch (e) { ui.note('Firewall admin', `Could not create the firewall admin login: ${e.message}`); }
+    }
 
-  let checks;
-  for (;;) {
-    checks = await S.runChecks(docker, answers);
-    const bad = checks.filter((c) => !c.ok);
-    if (!bad.length) break;
-    ui.note('Some checks failed', bad.map((c) => `- ${c.name}: ${c.detail ?? ''}`).join('\n'));
-    const choice = await ui.select({ message: 'What now?', options: [{ value: 'retry', label: 'Check again' }, { value: 'abort', label: 'Stop here' }] });
-    if (choice !== 'retry') throw new Error('Checks failed; the installation is left incomplete. Fix the problem and run ./install.sh to resume.');
-  }
+    let checks;
+    for (;;) {
+      checks = await S.runChecks(docker, answers);
+      const bad = checks.filter((c) => !c.ok);
+      if (!bad.length) break;
+      ui.note('Some checks failed', bad.map((c) => `- ${c.name}: ${c.detail ?? ''}`).join('\n'));
+      const choice = await ui.select({ message: 'What now?', options: [{ value: 'retry', label: 'Check again' }, { value: 'abort', label: 'Stop here' }] });
+      if (choice !== 'retry') throw new Error('Checks failed.');
+    }
 
-  if (answers.email.provider !== 'none' && await ui.confirm({ message: `Send a test email to ${answers.ownerEmail}?`, initialValue: true })) {
-    try {
-      const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'email:send-test', `--to=${answers.ownerEmail}`]);
-      ui.note('Test email', r.code === 0 ? 'Sent. Check your inbox.' : `Failed:\n${`${r.stdout}\n${r.stderr}`.trim().slice(-400)}`);
-    } catch (e) { ui.note('Test email', `Failed: ${e.message}`); }
-  }
+    if (answers.email.provider !== 'none' && await ui.confirm({ message: `Send a test email to ${answers.ownerEmail}?`, initialValue: true })) {
+      try {
+        const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'email:send-test', `--to=${answers.ownerEmail}`]);
+        ui.note('Test email', r.code === 0 ? 'Sent. Check your inbox.' : `Failed:\n${`${r.stdout}\n${r.stderr}`.trim().slice(-400)}`);
+      } catch (e) { ui.note('Test email', `Failed: ${e.message}`); }
+    }
 
-  writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), { OPBX_INSTALL_STATE: 'complete' }), { mode: 0o600, ...own });
-  const text = renderSummary(answers, { ownerPassword, wafAdmin, checks });
-  saveSummary(repoDir, text, own);
-  ui.note('Installation complete', text);
+    const priorSummary = existsSync(summaryPath);
+    let text = renderSummary(answers, { ownerPassword, wafAdmin, checks });
+    if (!ownerPassword) {
+      text += `\n\nTo set a new owner password: docker compose exec app php artisan user:reset-password ${answers.ownerEmail}`
+        + (priorSummary ? `\nThe password from the earlier run may still be in ${summaryPath} (kept as it is).` : '');
+    }
+    if (ownerPassword || !priorSummary) saveSummary(repoDir, text, own);
+    ui.note('Installation complete', text);
+    writeFileAtomic(envPath, renderEnv(readFileSync(envPath, 'utf8'), { OPBX_INSTALL_STATE: 'complete' }), { mode: 0o600, ...own });
+  } catch (e) {
+    if (shown) shown();
+    throw e;
+  }
 }
