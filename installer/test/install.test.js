@@ -97,6 +97,7 @@ test('resume keeps DB_PASSWORD, skips port check, tolerates existing owner', asy
   assert.ok(env.get('DB_ROOT_PASSWORD'));
   assert.equal(h.log.asked[0].portCheck, null);
   assert.equal(h.log.asked[0].defaults.publicUrl, 'https://pbx.example.com');
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('OPBX_OWNER_EMAIL'), 'ann@example.com');
   assert.ok(readFileSync(join(dir, 'opbx-install-summary.txt'), 'utf8').includes('Owner account already existed; password unchanged'));
 });
 
@@ -150,4 +151,44 @@ test('handleSigint prints the config-aware message and exits 130', () => {
     assert.match(msg, re);
     assert.equal(code, 130);
   }
+});
+
+test('resume pre-fills the owner email saved by the first run', async () => {
+  const dir = setup('APP_ENV=production\nAPP_URL=https://pbx.example.com\nOPBX_OWNER_EMAIL=first@example.com\nOPBX_INSTALL_STATE=incomplete\n');
+  const h = harness({ owner: 'exists' });
+  await run(h, dir, { resume: true });
+  assert.equal(h.log.asked[0].defaults.ownerEmail, 'first@example.com');
+});
+
+test('fresh install: a docker-compose.yml that differs from the example is backed up and replaced on yes', async () => {
+  const dir = setup();
+  writeFileSync(join(dir, 'docker-compose.yml'), 'services: {} # old\n');
+  const h = harness();
+  await run(h, dir);
+  const example = readFileSync(join(dir, 'docker-compose.yml.example'), 'utf8');
+  assert.equal(readFileSync(join(dir, 'docker-compose.yml'), 'utf8'), example);
+  const bak = readdirSync(dir).filter((f) => f.startsWith('docker-compose.yml.bak-'));
+  assert.equal(bak.length, 1);
+  assert.equal(readFileSync(join(dir, bak[0]), 'utf8'), 'services: {} # old\n');
+  assert.ok(h.log.notes.some((n) => /differs/.test(n)));
+});
+
+test('fresh install: declining keeps the old docker-compose.yml; an identical one is not touched; resume does not ask', async () => {
+  const dir = setup();
+  writeFileSync(join(dir, 'docker-compose.yml'), 'services: {} # old\n');
+  const h = harness();
+  h.ui.confirm = async () => false;
+  await run(h, dir);
+  assert.equal(readFileSync(join(dir, 'docker-compose.yml'), 'utf8'), 'services: {} # old\n');
+  assert.ok(!readdirSync(dir).some((f) => f.includes('.bak-')));
+  const same = setup();
+  copyFileSync(join(same, 'docker-compose.yml.example'), join(same, 'docker-compose.yml'));
+  const h2 = harness();
+  await run(h2, same);
+  assert.ok(!h2.log.notes.some((n) => /differs/.test(n)));
+  const res = setup('APP_ENV=production\nAPP_URL=https://pbx.example.com\nOPBX_INSTALL_STATE=incomplete\n');
+  writeFileSync(join(res, 'docker-compose.yml'), 'services: {} # old\n');
+  const h3 = harness({ owner: 'exists' });
+  await run(h3, res, { resume: true });
+  assert.ok(!h3.log.notes.some((n) => /differs/.test(n)));
 });

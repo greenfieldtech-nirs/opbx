@@ -116,7 +116,7 @@ test('answersFromEnv round-trips deriveEnv', () => {
   });
   const env = new Map(Object.entries(deriveEnv(a)));
   const back = answersFromEnv(env, new Map([['SAFELINE_DIR', '/var/lib/safeline']]), { includeSecrets: true });
-  const { orgName, ownerName, ownerEmail, advanced, ...want } = a;
+  const { orgName, ownerName, advanced, ...want } = a;
   assert.deepEqual(back, want);
   const bare = answersFromEnv(env, new Map(), { includeSecrets: false });
   assert.equal(bare.auth0.clientSecret, undefined);
@@ -130,4 +130,15 @@ test('answersFromEnv round-trips development with ngrok', () => {
   assert.equal(back.mode, 'development');
   assert.equal(back.ngrokToken, 'ng');
   assert.equal(back.publicUrl, 'http://localhost');
+});
+
+test('development on another port: APP_URL, Sanctum and Grafana carry the port', () => {
+  const e = deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost:8080', httpPort: 8080 }));
+  has(e, { APP_URL: 'http://localhost:8080', APP_PORT: '8080', GRAFANA_ROOT_URL: 'http://localhost:8080/logs/', SANCTUM_STATEFUL_DOMAINS: 'localhost,localhost:3000,localhost:8080' });
+});
+
+test('the owner email is kept in .env (not a secret) and recovered for a resume', () => {
+  const e = deriveEnv(base());
+  assert.equal(e.OPBX_OWNER_EMAIL, 'ann@example.com');
+  assert.equal(answersFromEnv(new Map(Object.entries(e))).ownerEmail, 'ann@example.com');
 });

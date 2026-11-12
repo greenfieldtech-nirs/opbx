@@ -114,3 +114,14 @@ test('waf console: the published host port must be WAF_CONSOLE_PORT', async () =
   assert.equal(c.ok, false);
   assert.match(c.detail, /9555/);
 });
+
+test('storage: buckets checked with storage:initialize (idempotent); a failure is reported', async () => {
+  const d = fake();
+  const r = await runChecks(d, { waf: null, logs: false }, { env: ENV });
+  assert.equal(byName(r, 'storage').ok, true);
+  assert.ok(d.calls.some((a) => a.join(' ') === 'compose exec -T app php artisan storage:initialize --wait=10'));
+  const bad = fake({ 'storage:initialize': { code: 1, stdout: '', stderr: 'Cannot reach the S3 endpoint' } });
+  const c = byName(await runChecks(bad, { waf: null, logs: false }, { env: ENV }), 'storage');
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /S3 endpoint/);
+});

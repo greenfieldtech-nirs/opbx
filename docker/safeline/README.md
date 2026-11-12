@@ -84,10 +84,13 @@ WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml 
    as that list. Never trust a NAT or gateway address that direct traffic also arrives from (rootless
    Podman and Docker Desktop port publishing): a client could then spoof `X-Forwarded-For` to bypass
    both rate limits and the allowlist.
+   The WAF hook sends the detector the same client address: `$remote_addr` when realip is on; without
+   `TRUSTED_PROXY_CIDR`, the last `X-Forwarded-For` hop (what the TLS proxy saw), since the socket
+   address is then the proxy's.
 7. **Host requirements.** The state directory must be outside a read-only root (`/data` fails on Fedora
    CoreOS), SELinux hosts need the `container_file_t` relabel, and the detector's TCP listener is a
    manual edit to `detector.yml`.
-8. **The upstream console listens on every interface** by default (publishing removed here; opbx_nginx serves it on :9443, gated by `WAF_CONSOLE_ENABLED`/`WAF_CONSOLE_ALLOW`), and
+8. **The upstream console listens on every interface** by default (publishing removed here; opbx_nginx serves it on `WAF_CONSOLE_PORT` (default 9443), gated by `WAF_CONSOLE_ENABLED`/`WAF_CONSOLE_ALLOW`), and
    `mgt` mounts `${SAFELINE_DIR}/resources/run`. 9.4.3 no longer mounts the host's `/var/run`.
 9. **Footprint.** 7 more containers, including a second Postgres; images are about 480 MB on arm64.
 10. **Restarts are slow under Podman.** Recreating `opbx_nginx` took about 100 s.

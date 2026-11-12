@@ -90,7 +90,7 @@ test('portCheck null skips the check', async () => {
   const { ui } = fakeUi(['development', '8080', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', '', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(a.httpPort, 8080);
-  assert.equal(a.publicUrl, 'http://localhost');
+  assert.equal(a.publicUrl, 'http://localhost:8080'); // development on another port: the address carries it
 });
 
 test('console allowlist not asked without a proxy; the login-only note is shown', async () => {
@@ -225,4 +225,9 @@ test('review shows no secret value, maps select to edit/confirm, covers developm
   assert.match(d.text, /Development/);
   assert.match(d.text, /ngrok: token set/);
   assert.doesNotMatch(d.text, /Proxy:/);
+});
+
+test('development on port 80 keeps http://localhost', async () => {
+  const { ui } = fakeUi(['development', '80', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', '', false]);
+  assert.equal((await askAnswers(ui, { platform: {}, portCheck: null })).publicUrl, 'http://localhost');
 });

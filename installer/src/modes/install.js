@@ -59,7 +59,17 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
   }
 
   const composePath = join(repoDir, 'docker-compose.yml');
-  if (!existsSync(composePath)) writeFileAtomic(composePath, readFileSync(`${composePath}.example`, 'utf8'), { mode: 0o644, ...own });
+  const example = readFileSync(`${composePath}.example`, 'utf8');
+  if (!existsSync(composePath)) writeFileAtomic(composePath, example, { mode: 0o644, ...own });
+  else if (!resume && readFileSync(composePath, 'utf8') !== example) {
+    ui.note('Your docker-compose.yml is out of date', 'docker-compose.yml differs from docker-compose.yml.example. An older copy misses settings this version needs (the real client IP and the firewall console).');
+    if (await ui.confirm({ message: 'Back it up and replace it with docker-compose.yml.example?', initialValue: true })) {
+      const backup = `${composePath}.bak-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}`;
+      writeFileAtomic(backup, readFileSync(composePath, 'utf8'), { mode: 0o644, ...own });
+      writeFileAtomic(composePath, example, { mode: 0o644, ...own });
+      ui.note('docker-compose.yml replaced', `Your old file is saved as ${backup.slice(repoDir.length + 1)}.`);
+    }
+  }
 
   // Reusing a resumed .env as the template keeps every secret MySQL may already be initialised with.
   const template = resume && existsSync(envPath) ? readFileSync(envPath, 'utf8') : readFileSync(join(repoDir, '.env.example'), 'utf8');

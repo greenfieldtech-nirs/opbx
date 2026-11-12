@@ -132,6 +132,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
   }
 
   a.httpPort = await askPort(ui, 'Which port on this machine should OPBX listen on?', d.httpPort ?? 80, portCheck);
+  if (!prod && a.httpPort !== 80) a.publicUrl = `http://localhost:${a.httpPort}`;
 
   a.trustedProxyCidr = '';
   if (prod) {

@@ -18,7 +18,7 @@ function parseValue(raw) {
     }
     return out; // unterminated: take the rest
   }
-  return v.replace(/\s+#.*$/, '').trim();
+  return v.replace(/(^|\s+)#.*$/, '').trim(); // raw was trimStart()ed: "KEY=   # note" is empty
 }
 
 export function parseEnv(text) {

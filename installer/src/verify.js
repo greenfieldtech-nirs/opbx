@@ -50,6 +50,10 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
     const r = await docker.run(['run', '--rm', '--network', net, 'node:26-alpine', 'node', '-e', wsScript(key)]);
     return { ok: / 101 /.test(r.stdout), detail: detail(r) };
   });
+  await check('storage', async () => { // creates missing buckets, then a write/read/delete probe; safe to repeat
+    const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'storage:initialize', '--wait=10']);
+    return { ok: r.code === 0, detail: detail(r) };
+  });
   await check('config:validate', async () => { const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'config:validate']); return { ok: r.code === 0, detail: detail(r) }; });
 
   if (answers.waf) {

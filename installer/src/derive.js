@@ -30,7 +30,7 @@ export function deriveEnv(a) {
     APP_PORT: String(a.httpPort),
     SANCTUM_STATEFUL_DOMAINS: prod
       ? [host, u.port && `${host}:${u.port}`].filter(Boolean).join(',')
-      : `${host},${host}:3000`,
+      : [host, `${host}:3000`, u.port && `${host}:${u.port}`].filter(Boolean).join(','),
     SESSION_DOMAIN: prod ? host : 'null',
     VITE_API_BASE_URL: '/api/v1',
     VITE_WS_HOST: host,
@@ -40,6 +40,7 @@ export function deriveEnv(a) {
     GRAFANA_ROOT_URL: `${a.publicUrl}/logs/`,
     OPCACHE_VALIDATE_TIMESTAMPS: prod ? '0' : '1',
     OPBX_INSTALLER_MANAGED: 'true',
+    OPBX_OWNER_EMAIL: a.ownerEmail, // not a secret: lets a resume pre-fill it and print the reset-password hint
     COMPOSE_FILE: files.join(':'),
     COMPOSE_PROFILES: profiles.join(','),
     COMPOSE_PARALLEL_LIMIT: '2',
@@ -94,7 +95,7 @@ const EMAIL_FIELDS = {
   sendinblue: [['SENDINBLUE_API_KEY', true]],
 };
 
-// Inverse of deriveEnv for what the .env can tell; owner email/name/org and advanced limits are not recovered.
+// Inverse of deriveEnv for what the .env can tell; owner name/org and advanced limits are not recovered.
 export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = false } = {}) {
   const g = (k) => env.get(k) || '';
   const on = (k) => g(k) === 'true';
@@ -104,6 +105,7 @@ export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = 
     publicUrl: g('APP_URL'),
     httpPort: Number(g('APP_PORT')) || 80,
     trustedProxyCidr: g('TRUSTED_PROXY_CIDR'),
+    ownerEmail: g('OPBX_OWNER_EMAIL') || undefined,
     tenancy: g('OPBX_APPLICATION_MODE') === 'production' ? 'multi' : 'single',
     logs: g('COMPOSE_PROFILES').split(',').includes('logs'),
     ngrokToken: sec(g('NGROK_AUTHTOKEN')) ?? '',

@@ -47,7 +47,11 @@ addr_list() { # var-name value
 PROXIES=$(addr_list TRUSTED_PROXY_CIDR "${TRUSTED_PROXY_CIDR:-}") || exit 1
 CONSOLE_ALLOW=$(addr_list WAF_CONSOLE_ALLOW "${WAF_CONSOLE_ALLOW:-}") || exit 1
 
-mkdir -p /etc/nginx/conf.d /etc/nginx/opbx.d
+mkdir -p /etc/nginx/conf.d
+
+# The WAF hook's client address: with realip $remote_addr already is the client (nil = t1k's default);
+# without it the last X-Forwarded-For hop, what the TLS proxy saw (the first hop is client-controlled).
+if [ -n "$PROXIES" ]; then WAF_REMOTE_ADDR=nil; else WAF_REMOTE_ADDR='"http_x_forwarded_for: -1"'; fi
 
 render() { # src-dir dest-dir
   for f in "$1"/*.conf; do
@@ -55,12 +59,13 @@ render() { # src-dir dest-dir
     sed -e "s/__NGINX_RESOLVER__/${RESOLVER}/g" \
         -e "s/__WAF_MODE__/${WAF_MODE}/g" \
         -e "s/__WAF_DETECTOR_HOST__/${WAF_DETECTOR_HOST}/g" \
+        -e "s/__WAF_REMOTE_ADDR__/${WAF_REMOTE_ADDR}/g" \
         "$f" > "$2/$(basename "$f")"
   done
 }
 
 # Stale output from a previous start (restart keeps the container filesystem) must not survive.
-rm -f /etc/nginx/conf.d/*.conf /etc/nginx/opbx.d/*.conf
+rm -f /etc/nginx/conf.d/*.conf
 
 render /etc/nginx/templates/conf.d /etc/nginx/conf.d
 # The WAF hook needs Lua, so it is rendered only when the WAF is on (stock nginx can't load it).

@@ -76,3 +76,10 @@ test('envFileOpts: 0640, host user + gid 82 (www-data in the app image) when roo
   assert.deepEqual(envFileOpts({}, true), { mode: 0o640, uid: 0, gid: 82 });
   assert.deepEqual(envFileOpts({ HOST_UID: '1000' }, false), { mode: 0o640 });
 });
+
+test('parseEnv: an empty value followed by a comment is empty (lines from .env.example)', () => {
+  const m = parseEnv('DB_CDR_ARCHIVE_DATABASE=            # e.g. opbx_cdr_archive (create it and GRANT the app user first)\nAPP_KEY=                             # Generate: php artisan key:generate\nX=#notacomment\n');
+  assert.equal(m.get('DB_CDR_ARCHIVE_DATABASE'), '');
+  assert.equal(m.get('APP_KEY'), '');
+  assert.equal(m.get('X'), '');
+});

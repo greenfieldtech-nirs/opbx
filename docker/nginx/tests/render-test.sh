@@ -68,6 +68,11 @@ check "console on, allow-list" "grep -q 'listen 8443;' $C && grep -q 'allow 198.
 # safeline-mgt does not resolve here, so "let in" means a 50x from the proxy, not a 403 from the allowlist.
 check "console allow-list lets 127.0.0.1 in" "[ \"\$(grep -m1 'allow ' $C)\" = '    allow 127.0.0.1;' ] && nginx && r=\$(wget -qO- http://127.0.0.1:8443/ 2>&1); echo \"\$r\"; echo \"\$r\" | grep -q ' 50[0-9]' && ! echo \"\$r\" | grep -q 403" y -e WAF_MODE=monitor -e WAF_CONSOLE_ENABLED=true -e WAF_CONSOLE_ALLOW=198.51.100.0/24
 check "console on, no allow-list" "grep -q 'listen 8443;' $C && ! grep -q 'deny all' $C" y -e WAF_MODE=block -e WAF_CONSOLE_ENABLED=true
+W=/etc/nginx/conf.d/00-safeline-waf.conf
+# With realip, $remote_addr already is the client; without it the last XFF hop (what the proxy saw) is.
+check "waf hook uses \$remote_addr when realip is on" "grep -q 'remote_addr = nil' $W && ! grep -q http_x_forwarded_for $W" y -e WAF_MODE=monitor -e TRUSTED_PROXY_CIDR=10.0.0.0/8
+check "waf hook uses the last XFF hop without realip" "grep -q 'remote_addr = \"http_x_forwarded_for: -1\"' $W" y -e WAF_MODE=monitor
+check "no opbx.d hook directory" "[ ! -e /etc/nginx/opbx.d ] && ! grep -rq opbx.d /etc/nginx/conf.d" n
 reject "bad TRUSTED_PROXY_CIDR rejected" "TRUSTED_PROXY_CIDR=10.0.0.0/8,evil;x" "evil;x"
 reject "bad octet-count rejected" "TRUSTED_PROXY_CIDR=10.0.0/8" "10.0.0/8"
 reject "rejects 999.1.1.1" "TRUSTED_PROXY_CIDR=999.1.1.1" "999.1.1.1"
