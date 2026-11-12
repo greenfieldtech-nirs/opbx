@@ -21,6 +21,12 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
+        if (config('app.installer_managed')) {
+            $this->command->info('Installer-managed system, skipping default admin user.');
+
+            return;
+        }
+
         // Bypass tenant scope: seeders run unauthenticated and must see all rows.
         $organization = Organization::withoutGlobalScope(OrganizationScope::class)
             ->firstOrCreate(

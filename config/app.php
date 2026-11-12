@@ -17,6 +17,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Set by the guided installer; suppresses the default admin@example.com seed.
+    'installer_managed' => (bool) env('OPBX_INSTALLER_MANAGED', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment
