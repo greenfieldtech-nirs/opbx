@@ -29,6 +29,12 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     return;
   }
   const env = readEnv(envPath);
+  // a hand-made .env has no COMPOSE_FILE of ours: rewriting it would drop the stack's compose files
+  if (env.get('OPBX_INSTALLER_MANAGED') !== 'true' || !env.get('COMPOSE_FILE')) {
+    ui.note('Cannot change settings here', 'This OPBX was not set up by the installer, so the installer cannot change its settings safely. Nothing was changed.\n'
+      + 'For a manual installation, edit .env yourself and run `docker compose up -d`. For a new installation, use ./install.sh on a fresh checkout.');
+    return;
+  }
   const slEnv = () => readEnv(join(repoDir, 'docker/safeline/.env'));
   const current = answersFromEnv(env, slEnv());
   const prod = current.mode === 'production';

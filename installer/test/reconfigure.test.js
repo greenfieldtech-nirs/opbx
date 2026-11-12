@@ -244,3 +244,21 @@ test('WAF console port: the chosen port is checked, written and shown; wafoff ke
   await run(on, dir);
   assert.equal(def, 9555);
 });
+
+for (const [name, edit] of [
+  ['not installer-managed', (t) => t.replace(/^OPBX_INSTALLER_MANAGED=.*$/m, 'OPBX_INSTALLER_MANAGED=false')],
+  ['no COMPOSE_FILE', (t) => t.replace(/^COMPOSE_FILE=.*$/m, 'COMPOSE_FILE=')],
+]) {
+  test(`refuses a hand-configured installation: ${name}`, async () => {
+    const { dir, text } = setup();
+    const edited = edit(text);
+    assert.notEqual(edited, text);
+    writeFileSync(join(dir, '.env'), edited);
+    const h = harness({ select: ['wafon'] });
+    await run(h, dir);
+    assert.equal(readFileSync(join(dir, '.env'), 'utf8'), edited);
+    assert.deepEqual(h.log.compose, []);
+    assert.deepEqual(h.log.steps, []);
+    assert.match(h.log.notes.join('\n'), /not set up by the installer[\s\S]*edit \.env/);
+  });
+}
