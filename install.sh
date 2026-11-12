@@ -23,7 +23,7 @@ fi
 docker run --rm --security-opt label=disable -v "$sock:/var/run/docker.sock:ro" alpine test -S /var/run/docker.sock >/dev/null 2>&1 \
   || die "cannot reach the container daemon socket '$sock' from inside a container (is it a socket the daemon host can mount?)"
 
-client_os=$(docker version --format '{{.Client.Os}}' 2>/dev/null || echo linux)
+client_os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 docker build -q -t opbx-installer:local installer >/dev/null || die "building the installer image failed"
 

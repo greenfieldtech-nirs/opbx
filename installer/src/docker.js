@@ -3,6 +3,9 @@ import { spawn } from 'node:child_process';
 function defaultExec(cmd, args, { input, stream, cwd } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd, stdio: [input !== undefined ? 'pipe' : (stream ? 'inherit' : 'ignore'), stream ? 'inherit' : 'pipe', stream ? 'inherit' : 'pipe'] });
+    child.stdout?.setEncoding('utf8');
+    child.stderr?.setEncoding('utf8');
+    child.stdin?.on('error', () => {}); // EPIPE when the child exits without reading input
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (d) => { stdout += d; });
@@ -14,8 +17,8 @@ function defaultExec(cmd, args, { input, stream, cwd } = {}) {
 }
 
 // run(args, {input, stream}) -> {code, stdout, stderr}; compose() runs in OPBX_REPO.
-export function createDocker({ exec = defaultExec } = {}) {
-  const run = (args, opts = {}) => exec('docker', args, opts);
+export function createDocker({ exec = defaultExec, bin = 'docker' } = {}) {
+  const run = (args, opts = {}) => exec(bin, args, opts);
   const compose = (args, opts = {}) =>
     run(['compose', ...args], { ...opts, cwd: process.env.OPBX_REPO || process.cwd() });
   return { run, compose };

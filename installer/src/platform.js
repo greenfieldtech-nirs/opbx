@@ -1,8 +1,9 @@
 // Reads either Docker-format `docker info` JSON (what the installer container sees, also via
 // Podman's compat API) or Podman-native JSON (`host` key).
 export async function detectPlatform(docker) {
-  const { stdout } = await docker.run(['info', '--format', 'json']);
-  const info = JSON.parse(stdout);
+  const r = await docker.run(['info', '--format', 'json']);
+  if (r.code !== 0) throw new Error(`docker info failed: ${r.stderr.trim()}`);
+  const info = JSON.parse(r.stdout);
   const host = info.host;
   const os = (host ? host.os : info.OSType) || 'linux';
   const archRaw = (host ? host.arch : info.Architecture) || '';
@@ -21,7 +22,11 @@ export async function detectPlatform(docker) {
   };
 }
 
+// shortcut: only sees ports bound inside the daemon's network namespace; a host process outside the
+// VM may go undetected on Podman machine / Docker Desktop.
 export async function isPortFree(docker, port) {
   const r = await docker.run(['run', '--rm', '-p', `${port}:80`, 'alpine', 'true']);
-  return r.code === 0;
+  if (r.code === 0) return true;
+  if (/address already in use|port is already allocated/i.test(r.stderr)) return false;
+  throw new Error(`could not probe port ${port}: ${r.stderr.trim() || `exit ${r.code}`}`);
 }
