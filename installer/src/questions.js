@@ -1,4 +1,4 @@
-import { normalizePublicUrl, isEmail, parseCidrList, isPortNumber } from './validate.js';
+import { normalizePublicUrl, isEmail, parseCidrList, isPortNumber, isSafeAbsolutePath } from './validate.js';
 
 // Defaults are the template's own (.env.example); only values the user changes are returned.
 const ADVANCED = [
@@ -189,7 +189,10 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
     initialValue: d.waf?.mode ?? 'off',
   });
   if (wafMode !== 'off') {
-    const stateDir = await text(ui, 'Where on this machine should the firewall keep its data?', { def: d.waf?.stateDir ?? '/var/lib/safeline' });
+    const stateDir = await text(ui, 'Where on this machine should the firewall keep its data?', {
+      def: d.waf?.stateDir ?? '/var/lib/safeline',
+      check: (s) => (isSafeAbsolutePath(s) ? undefined : 'Please type a full path such as /var/lib/safeline, using only letters, digits and . _ - /'),
+    });
     let consoleAllow = '';
     if (a.trustedProxyCidr) {
       consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {

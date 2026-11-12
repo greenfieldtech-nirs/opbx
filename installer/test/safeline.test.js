@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, existsSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { safelineHostCommands, checkSafelineState, writeSafelineEnv, checkDetector } from '../src/safeline.js';
 
+const FIXTURE = new URL('./fixtures/safeline.env.example', import.meta.url);
+const REAL = new URL('../../docker/safeline/.env.example', import.meta.url);
 const plain = { selinux: false, podmanMachine: false, arch: 'amd64' };
 
 test('host commands: mkdir, detector.yml, chcon only on SELinux', () => {
@@ -48,12 +50,13 @@ test('checkDetector true/false', async () => {
 test('writeSafelineEnv: arch images, keeps existing secrets, mode 600', () => {
   const repo = mkdtempSync(join(tmpdir(), 'sl-'));
   mkdirSync(join(repo, 'docker/safeline'), { recursive: true });
-  writeFileSync(join(repo, 'docker/safeline/.env.example'), 'SAFELINE_DIR=/x\nARCH_SUFFIX=-arm\nPOSTGRES_IMAGE=a\nPOSTGRES_PASSWORD=\nMGT_INTERNAL_TOKEN=\nDETECTOR_MGMT_TOKEN=\nDETECTOR_AES_KEY=\n');
+  copyFileSync(FIXTURE, join(repo, 'docker/safeline/.env.example'));
   const answers = { waf: { stateDir: '/var/lib/safeline' } };
   const secrets = { POSTGRES_PASSWORD: 'p1', MGT_INTERNAL_TOKEN: 'm1', DETECTOR_MGMT_TOKEN: 'd1', DETECTOR_AES_KEY: 'k1' };
   const envPath = join(repo, 'docker/safeline/.env');
   writeSafelineEnv(repo, answers, secrets, { arch: 'amd64' });
   let t = readFileSync(envPath, 'utf8');
+  assert.ok(!t.includes('# Added by installer'));
   assert.match(t, /^ARCH_SUFFIX=$/m);
   assert.match(t, /^POSTGRES_IMAGE=chaitin\/safeline-postgres:15.18$/m);
   assert.match(t, /^SAFELINE_DIR=\/var\/lib\/safeline$/m);
@@ -63,4 +66,16 @@ test('writeSafelineEnv: arch images, keeps existing secrets, mode 600', () => {
   assert.match(t, /^POSTGRES_PASSWORD=p1$/m);
   assert.match(t, /^ARCH_SUFFIX=-arm$/m);
   assert.match(t, /^POSTGRES_IMAGE=chaitin\/safeline-postgres-arm:15.18$/m);
+});
+
+test('fixture is a verbatim copy of docker/safeline/.env.example', (t) => {
+  if (!existsSync(REAL)) return t.skip('repo not mounted');
+  assert.equal(readFileSync(FIXTURE, 'utf8'), readFileSync(REAL, 'utf8'));
+});
+
+test('unsafe state dirs are refused everywhere', async () => {
+  const bad = '/a;rm -rf /';
+  assert.throws(() => safelineHostCommands(plain, bad));
+  await assert.rejects(() => checkSafelineState(fakeDocker({ code: 0, stdout: '', stderr: '' }), bad));
+  assert.throws(() => writeSafelineEnv('/nonexistent', { waf: { stateDir: bad } }, {}, plain));
 });

@@ -2,11 +2,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv, renderEnv, writeFileAtomic } from './envfile.js';
 import { generateSafelineSecrets } from './secrets.js';
+import { isSafeAbsolutePath } from './validate.js';
+
+const guard = (dir) => { if (!isSafeAbsolutePath(dir)) throw new Error(`Unsafe state directory: ${dir}`); };
 
 const DIRS = ['postgres/data', 'mgt', 'sock', 'detector', 'nginx', 'chaos', 'cache', 'luigi', 'run'].map((d) => `resources/${d}`)
   .concat(['logs/nginx', 'logs/detector']);
 
 export function safelineHostCommands(platform, stateDir) {
+  guard(stateDir);
   const cmds = [
     `sudo mkdir -p ${stateDir}/resources/{postgres/data,mgt,sock,detector,nginx,chaos,cache,luigi,run} ${stateDir}/logs/{nginx,detector}`,
     `printf 'bind_addr: 0.0.0.0\\nlisten_port: 8000\\n' | sudo tee ${stateDir}/resources/detector/detector.yml`,
@@ -18,6 +22,7 @@ export function safelineHostCommands(platform, stateDir) {
 
 // --mount (not -v) fails on a missing source instead of creating it; no label opt-out, so SELinux problems show up.
 export async function checkSafelineState(docker, stateDir) {
+  guard(stateDir);
   const script = [
     ...DIRS.map((d) => `[ -d /s/${d} ] || echo "MISSING ${d}"`),
     `[ "$(cat /s/resources/detector/detector.yml 2>/dev/null)" = "$(printf 'bind_addr: 0.0.0.0\\nlisten_port: 8000')" ] || echo "MISSING resources/detector/detector.yml (absent or wrong content)"`,
@@ -32,6 +37,7 @@ export async function checkSafelineState(docker, stateDir) {
 const POSTGRES = { arm64: 'chaitin/safeline-postgres-arm:15.18', amd64: 'chaitin/safeline-postgres:15.18' };
 
 export function writeSafelineEnv(repoDir, answers, secrets, platform) {
+  guard(answers.waf.stateDir);
   const dir = join(repoDir, 'docker/safeline');
   const target = join(dir, '.env');
   const existing = existsSync(target) ? parseEnv(readFileSync(target, 'utf8')) : new Map();

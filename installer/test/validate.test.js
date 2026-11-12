@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizePublicUrl, isEmail, parseCidrList, isPortNumber } from '../src/validate.js';
+import { normalizePublicUrl, isEmail, parseCidrList, isSafeAbsolutePath, isPortNumber } from '../src/validate.js';
 
 test('normalizePublicUrl: loose production input', () => {
   assert.deepEqual(normalizePublicUrl('PBX.Example.com/', 'production'), { ok: true, value: 'https://pbx.example.com' });
@@ -60,4 +60,9 @@ test('parseCidrList rejects', () => {
     assert.equal(r.ok, false, s);
     assert.ok(r.reason, s);
   }
+});
+
+test('isSafeAbsolutePath', () => {
+  for (const p of ['/var/lib/safeline', '/data/safe_line-2']) assert.equal(isSafeAbsolutePath(p), true, p);
+  for (const p of ['relative/x', '/a,b', '/a b', '/a;rm -rf /', '/../etc', '/a/../b', '/']) assert.equal(isSafeAbsolutePath(p), false, p);
 });

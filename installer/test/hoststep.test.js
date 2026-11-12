@@ -13,3 +13,10 @@ test('check fails twice then passes: three prompts, missing shown each time', as
   assert.ok(notes.some((n) => n.includes('dir a')));
   assert.ok(notes.some((n) => n.includes('dir b')));
 });
+
+test('abort: cancel from the prompt propagates and no check runs', async () => {
+  let checked = false;
+  const ui = { note() {}, text: async () => { throw new Error('cancelled'); } };
+  await assert.rejects(() => hostStep(ui, { title: 'T', explain: 'E', commands: [], check: async () => { checked = true; return { ok: true, missing: [] }; } }), /cancelled/);
+  assert.equal(checked, false);
+});

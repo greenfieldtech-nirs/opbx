@@ -51,3 +51,7 @@ export function parseCidrList(s) {
   const bad = value.find((x) => !validAddr(x));
   return bad === undefined ? { ok: true, value } : { ok: false, value: [], reason: `"${bad}" is not an IP address or network (for example 10.0.0.0/8).` };
 }
+
+// Safe to paste under sudo and to put in a --mount spec: no spaces, commas, quotes, ";" or "..".
+export const isSafeAbsolutePath = (s) =>
+  typeof s === 'string' && /^\/[A-Za-z0-9._/-]+$/.test(s) && !s.split('/').includes('..');
