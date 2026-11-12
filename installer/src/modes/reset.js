@@ -1,12 +1,15 @@
-import { existsSync, readFileSync, rmSync, mkdirSync, writeFileSync, chownSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, mkdirSync, chownSync, createWriteStream, chmodSync } from 'node:fs';
 import { join } from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { createGzip } from 'node:zlib';
+import { Transform } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import { parseEnv } from '../envfile.js';
 import { answersFromEnv } from '../derive.js';
 import { isSafeAbsolutePath } from '../validate.js';
 import { detectInstall } from '../detect.js';
 import { hostStep } from '../hoststep.js';
 import { runInstall } from './install.js';
+import { state as uiState } from '../ui.js';
 
 const DATA_DIRS = ['mysql', 'redis', 'seaweedfs', 'amd-dumps'];
 const CONFIG_FILES = ['.env', 'docker-compose.yml', 'docker/safeline/.env', 'opbx-install-summary.txt'];
@@ -19,18 +22,50 @@ export async function confirmPhrase(ui, expected) {
   return false;
 }
 
-async function backup(docker, repoDir, dbName) {
-  // The password stays inside the container (MYSQL_ROOT_PASSWORD), never on a command line.
-  const r = await docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
-    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --single-transaction --routines --triggers --databases "$1"', 'sh', dbName]);
-  if (r.code !== 0 || !r.stdout.includes('CREATE TABLE')) throw new Error(`Backup failed, nothing was changed:\n${(r.stderr || '').trim()}`);
+// Streams mysqldump -> gzip -> file (no in-memory buffering). Validity: exit code 0 AND "CREATE TABLE" seen in the stream.
+async function backup(docker, repoDir, dbNames) {
   const dir = join(repoDir, 'backups');
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `opbx-backup-${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)}.sql.gz`);
-  writeFileSync(file, gzipSync(r.stdout), { mode: 0o600 });
+  let seen = false;
+  let tail = '';
+  const scan = new Transform({
+    transform(chunk, _e, cb) {
+      const t = tail + chunk.toString('latin1');
+      if (t.includes('CREATE TABLE')) seen = true;
+      tail = t.slice(-12);
+      cb(null, chunk);
+    },
+  });
+  const out = createWriteStream(file, { mode: 0o600 });
+  scan.pipe(createGzip()).pipe(out);
+  // The password stays inside the container (MYSQL_ROOT_PASSWORD), never on a command line.
+  const r = await docker.compose(['exec', '-T', 'mysql', 'sh', '-c',
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqldump -u root --single-transaction --routines --triggers --databases "$@"', 'sh', ...dbNames], { stdoutTo: scan });
+  scan.end();
+  await finished(out);
+  if (r.code !== 0 || !seen) {
+    rmSync(file, { force: true });
+    throw new Error(`Backup failed, nothing was changed:\n${(r.stderr || '').trim()}`);
+  }
+  chmodSync(file, 0o600);
   const { HOST_UID, HOST_GID } = process.env;
   if (HOST_UID && HOST_GID) { chownSync(dir, Number(HOST_UID), Number(HOST_GID)); chownSync(file, Number(HOST_UID), Number(HOST_GID)); }
   return file;
+}
+
+const stderrOf = (r) => (r.stderr || '').trim();
+
+// Gone = the folder is absent, or mounts but holds neither child. Any other docker failure is NOT "gone".
+async function checkSafelineGone(docker, dir) {
+  const r = await docker.run(['run', '--rm', '--mount', `type=bind,src=${dir},dst=/s`, 'alpine', 'sh', '-c',
+    '[ -e /s/resources ] && echo "PRESENT resources"; [ -e /s/logs ] && echo "PRESENT logs"; exit 0']);
+  if (r.code === 0) {
+    const left = r.stdout.split('\n').filter((l) => l.startsWith('PRESENT ')).map((l) => `${dir}/${l.slice(8)} still exists`);
+    return { ok: left.length === 0, missing: left };
+  }
+  if (/does not exist|no such file/i.test(r.stderr || '')) return { ok: true, missing: [] };
+  return { ok: false, missing: [`cannot check ${dir}: ${stderrOf(r)}`] };
 }
 
 // `steps` replaces collaborators in unit tests.
@@ -61,36 +96,47 @@ export async function runReset({ ui, docker, repoDir, platform, steps = {} }) {
     '- all OPBX containers (every profile) and their anonymous volumes',
     ...DATA_DIRS.map((d) => `- ${repoDir}/volumes/${d}`),
     `- Docker volumes ${project}_loki_data and ${project}_grafana_data`,
-    ...(hasSafeline ? ['- the SafeLine firewall project', `- the SafeLine data folder ${stateDir} (you will be asked to remove it)`] : []),
+    ...(hasSafeline ? ['- the SafeLine firewall project', `- ${stateDir}/resources and ${stateDir}/logs (SafeLine data; you will be asked to remove them)`] : []),
     '- .env, docker-compose.yml, docker/safeline/.env, opbx-install-summary.txt',
   ].join('\n'));
 
   const ps = await docker.compose(['ps', '-q', 'mysql']);
   if (ps.code === 0 && ps.stdout.trim()) {
     if (await ui.confirm({ message: 'Back up the database to ./backups/ first?', initialValue: true })) {
-      ui.note('Backup', `Saved ${await backup(docker, repoDir, env.get('DB_DATABASE') || 'opbx')}`);
+      const dbs = [env.get('DB_DATABASE') || 'opbx', env.get('DB_CDR_ARCHIVE_DATABASE')].filter(Boolean);
+      ui.note('Backup', `Saved ${await backup(docker, repoDir, dbs)}`);
     }
+  } else {
+    ui.note('No backup', "MySQL isn't running, so no backup can be taken. To back up first: cancel, run `docker compose up -d mysql`, then `./install.sh reset` again.");
   }
 
   if (!(await confirmPhrase(ui, expected))) throw new Error('Confirmation failed three times. Nothing was changed.');
 
   // ---- destructive from here on ----
-  await docker.compose(['--profile', '*', 'down', '--remove-orphans', '-v']);
-  if (hasSafeline) await docker.compose(['--project-directory', 'docker/safeline', '-p', 'safeline', 'down']);
-  await docker.run(['volume', 'rm', '-f', `${project}_loki_data`, `${project}_grafana_data`]);
-  await docker.run(['run', '--rm', '--mount', `type=bind,src=${repoDir}/volumes,dst=/v`, 'alpine', 'sh', '-c',
-    `rm -rf ${DATA_DIRS.map((d) => `/v/${d}`).join(' ')}`]);
+  uiState.resetStarted = true;
+  const down = await docker.compose(['--profile', '*', 'down', '--remove-orphans', '-v']);
+  if (down.code !== 0) throw new Error(`Reset stopped: could not stop OPBX, nothing was deleted.\n${stderrOf(down)}`);
+  if (hasSafeline) {
+    const sd = await docker.compose(['--project-directory', 'docker/safeline', '-p', 'safeline', 'down']);
+    if (sd.code !== 0) throw new Error(`Reset stopped: could not stop SafeLine, nothing was deleted.\n${stderrOf(sd)}`);
+  }
+  const vr = await docker.run(['volume', 'rm', '-f', `${project}_loki_data`, `${project}_grafana_data`]);
+  if (vr.code !== 0 && !/no such volume/i.test(vr.stderr || '')) throw new Error(`Reset stopped: could not remove the log volumes.\n${stderrOf(vr)}`);
+
+  if (existsSync(join(repoDir, 'volumes'))) {
+    const rm = await docker.run(['run', '--rm', '--mount', `type=bind,src=${repoDir}/volumes,dst=/v`, 'alpine', 'sh', '-c',
+      `rm -rf ${DATA_DIRS.map((d) => `/v/${d}`).join(' ')}`]);
+    if (rm.code !== 0 || DATA_DIRS.some((d) => existsSync(join(repoDir, 'volumes', d)))) {
+      throw new Error(`Data not fully deleted; your .env was kept. Run ./install.sh reset again.\n${stderrOf(rm)}`);
+    }
+  }
 
   if (hasSafeline) {
     await S.hostStep(ui, {
-      title: 'Remove the firewall data folder',
+      title: 'Remove the firewall data',
       explain: 'Run this on this machine (it needs administrator rights), then come back.',
-      commands: [...(platform?.podmanMachine ? ['# Open a shell in the Podman VM first with "podman machine ssh", then run this there:'] : []), `sudo rm -rf ${stateDir}`],
-      // --mount fails on a missing source: failing to mount means it is gone.
-      check: async () => {
-        const r = await docker.run(['run', '--rm', '--mount', `type=bind,src=${stateDir},dst=/s`, 'alpine', 'true']);
-        return r.code !== 0 ? { ok: true, missing: [] } : { ok: false, missing: [`${stateDir} still exists`] };
-      },
+      commands: [...(platform?.podmanMachine ? ['# Open a shell in the Podman VM first with "podman machine ssh", then run this there:'] : []), `sudo rm -rf ${stateDir}/resources ${stateDir}/logs`],
+      check: () => checkSafelineGone(docker, stateDir),
     });
   }
 

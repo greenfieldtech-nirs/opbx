@@ -22,7 +22,7 @@ export function chooseAction(mode, state) {
 const MESSAGES = {
   install: 'No installation found: would run a fresh install.',
   resume: 'Incomplete installation found: would resume it.',
-  'offer-reset-or-reconfigure': 'Existing installation found. Reset and reconfigure are not available yet.',
+  'offer-reset-or-reconfigure': 'Existing installation found. To wipe it and start over, run ./install.sh reset. Reconfigure is not available yet.',
   reconfigure: 'Reconfigure is not available yet.',
   'nothing-to-reconfigure': 'Nothing to reconfigure: no installation found.',
 };

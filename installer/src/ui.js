@@ -1,9 +1,11 @@
 import * as p from '@clack/prompts';
 
 // Thin wrapper over @clack/prompts: every prompt unwraps a Ctrl-C into a clean exit (130).
-export const state = { configWritten: false };
+export const state = { configWritten: false, resetStarted: false };
 
-export const cancelMessage = () => (state.configWritten
+export const cancelMessage = () => (state.resetStarted
+  ? 'Reset was interrupted part-way; run ./install.sh reset again.'
+  : state.configWritten
   ? 'Installation cancelled. Your answers are kept: run ./install.sh again to resume.'
   : 'Installation cancelled. Nothing was changed.');
 

@@ -1,14 +1,15 @@
 import { spawn } from 'node:child_process';
 
-function defaultExec(cmd, args, { input, stream, cwd } = {}) {
+function defaultExec(cmd, args, { input, stream, cwd, stdoutTo } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { cwd, stdio: [input !== undefined ? 'pipe' : (stream ? 'inherit' : 'ignore'), stream ? 'inherit' : 'pipe', stream ? 'inherit' : 'pipe'] });
-    child.stdout?.setEncoding('utf8');
+    if (!stdoutTo) child.stdout?.setEncoding('utf8');
     child.stderr?.setEncoding('utf8');
     child.stdin?.on('error', () => {}); // EPIPE when the child exits without reading input
     let stdout = '';
     let stderr = '';
-    child.stdout?.on('data', (d) => { stdout += d; });
+    if (stdoutTo) child.stdout?.pipe(stdoutTo); // streamed, never buffered; stdoutTo is ended with the child
+    else child.stdout?.on('data', (d) => { stdout += d; });
     child.stderr?.on('data', (d) => { stderr += d; });
     child.on('error', reject);
     child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
@@ -16,7 +17,7 @@ function defaultExec(cmd, args, { input, stream, cwd } = {}) {
   });
 }
 
-// run(args, {input, stream}) -> {code, stdout, stderr}; compose() runs in OPBX_REPO.
+// run(args, {input, stream, stdoutTo}) -> {code, stdout, stderr}; compose() runs in OPBX_REPO.
 export function createDocker({ exec = defaultExec, bin = 'docker' } = {}) {
   const run = (args, opts = {}) => exec(bin, args, opts);
   const compose = (args, opts = {}) =>
