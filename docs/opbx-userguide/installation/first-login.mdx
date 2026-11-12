@@ -12,7 +12,7 @@ After installing OPBX, you either log in with the owner account or register a ne
 
 ## The Installer-Created Owner
 
-If you installed with `./install.sh`, the installer created the organization owner (who is also a platform manager) with the email you gave it. It generated the password, showed it once at the end, and saved it to `opbx-install-summary.txt` in the repository folder (mode 600). Store the password, then delete that file. There is no `admin@example.com` account on these systems. If you lose the password, reset it:
+If you installed with `./install.sh`, the installer created the organization owner (who is also a platform manager) with the email you gave it. It generated the password, showed it once at the end, and saved it to `opbx-install-summary.txt` in the repository folder (mode 600). With the WAF on, the SafeLine admin login is shown and saved the same way. Store the password, then delete that file. There is no `admin@example.com` account on these systems. If you lose the password, reset it:
 
 ```bash
 docker compose exec app php artisan user:reset-password <email>

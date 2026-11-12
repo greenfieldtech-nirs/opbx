@@ -13,12 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `./install.sh reconfigure` changes the public address and the WAF (off, monitor, block). `./install.sh reset` lists what it destroys, offers a database backup into `./backups/`, requires typing the domain (production) or `RESET` (development), and removes data and generated config. A plain `./install.sh` on an existing install offers Change settings, Start over or Exit, and resumes an interrupted install.
 - Production installs require an `https://` address. TLS is terminated by your own reverse proxy, which forwards one domain to the OPBX nginx port; the installer prints a ready-to-paste snippet. `TRUSTED_PROXY_CIDR` enables real client IPs (nginx realip).
 - Installer-made systems (`OPBX_INSTALLER_MANAGED=true`) have no `admin@example.com` account; the owner is created with a generated password shown once.
+- The installer shows progress (elapsed time and the latest output line) while it builds images and installs PHP packages, checks the storage buckets after install, keeps the owner email in `.env` (`OPBX_OWNER_EMAIL`, pre-filled on resume) and offers to back up and replace a `docker-compose.yml` that differs from the example.
 
 ### Changed - 2026-11-12
 
 - `opbx_bootstrap.sh` now only prints that it has been replaced and runs `./install.sh`.
-- The SafeLine WAF console is served by the OPBX nginx on port 9443 (`WAF_CONSOLE_PORT`); SafeLine's own `127.0.0.1:9443` mapping is removed. Behind a TLS proxy, forward port 9443 as well. The console allowlist is set only when a proxy IP is given; otherwise SafeLine's login is the only protection.
+- The SafeLine WAF console is served by the OPBX nginx on a port chosen during install (default 9443, `WAF_CONSOLE_PORT`; development binds it to `127.0.0.1` via `WAF_CONSOLE_BIND`); SafeLine's own `127.0.0.1:9443` mapping is removed. Behind a TLS proxy, forward that port as well. The console allowlist is set only when a proxy IP is given (it always admits `127.0.0.1`, for the installer's own check); otherwise SafeLine's login is the only protection.
+- The WAF hook sends the detector nginx's `$remote_addr` instead of the last `X-Forwarded-For` hop, which a client reaching nginx directly could forge. With `TRUSTED_PROXY_CIDR` that is the real client; without it, WAF events show the proxy's IP, as rate limits do.
 - `/up` is routed to Laravel's health check through nginx.
+
+### Upgrade notes - 2026-11-12
+
+- Run `./scripts/update-compose.sh` to pick up the new nginx command (`docker/nginx/render.sh`) and its environment (`TRUSTED_PROXY_CIDR`, `WAF_CONSOLE_ENABLED`, `WAF_CONSOLE_ALLOW`). An old generated `docker-compose.yml` together with the new `docker-compose.waf.yml` loses the WAF hook.
+- Production no longer publishes Soketi's ports 6001 and 9601. Frontends must use the nginx `/app/` proxy: `VITE_WS_PORT=443`, `VITE_WS_SCHEME=https`, then rebuild the frontend.
+- `opbx_bootstrap.sh` is now interactive (it forwards to `./install.sh`). Automation that ran it must switch to the manual setup steps in the README.
+- `/up` now returns Laravel's health page, not the SPA.
+- SafeLine's own `127.0.0.1:9443` console mapping is gone: the OPBX nginx serves the console on `WAF_CONSOLE_PORT`.
+- The installer writes `.env` with mode 0640, owned by the host user and group 82 (`www-data` in the app container, which reads it). `./install.sh reconfigure` refuses installations without `OPBX_INSTALLER_MANAGED=true` and a `COMPOSE_FILE`; edit `.env` by hand there.
 
 ### Changed - 2026-10-25
 

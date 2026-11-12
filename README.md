@@ -299,10 +299,11 @@ a reverse proxy snippet.
 - **Production needs an `https://` address.** OPBX does not terminate TLS. Your own reverse proxy or HTTPS accelerator
   must terminate TLS and forward one domain to the OPBX nginx port (`APP_PORT`, default 80). The installer prints a
   ready-to-paste proxy snippet. If you give it the proxy IP or CIDR (`TRUSTED_PROXY_CIDR`), nginx uses the real client
-  IP from `X-Forwarded-For`. Without it, rate limits and logs see the proxy's address.
+  IP from `X-Forwarded-For`. Without it, rate limits, logs and WAF events see the proxy's address.
 - **WAF (SafeLine CE)** can be off, monitor (log only) or block. The installer shows the host steps it needs and waits
-  for you to confirm each one. The WAF console is served by the OPBX nginx on port 9443 (`WAF_CONSOLE_PORT`), so your
-  proxy must forward that port too (a second block in the snippet). The console is limited to the proxy IP when you
+  for you to confirm each one. The WAF console is served by the OPBX nginx on a port you choose (default 9443,
+  `WAF_CONSOLE_PORT`), so your proxy must forward that port too (a second block in the snippet). If the proxy runs on
+  the same server, pick a console port the proxy does not listen on. The console is limited to the proxy IP when you
   gave one; otherwise only SafeLine's own login protects it.
 - **Owner account.** The installer creates the organization owner (who is also a platform manager) with a generated
   password. The password is shown once and saved to `opbx-install-summary.txt` (mode 600, git-ignored). Store the
@@ -371,7 +372,8 @@ Use this only if you do not want the installer. It starts the stack with the def
      --entrypoint composer app install --no-interaction --prefer-dist --optimize-autoloader
    ```
    `--user` keeps `vendor/` owned by you instead of root, and `COMPOSER_HOME` points Composer at a writable
-   directory for that user. The installer runs the same command (adding `--no-dev` for production).
+   directory for that user. The installer adds `--no-scripts` (and `--no-dev` for production), then runs
+   `php artisan package:discover` as root, because after the first start `bootstrap/cache` belongs to `www-data`.
 
 4. **Start all services**
    ```bash
@@ -390,6 +392,23 @@ Use this only if you do not want the installer. It starts the stack with the def
    - **API**: http://localhost/api/v1
    - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
    - **SeaweedFS master UI**: http://localhost:9333 (requires `-f docker-compose.ports.yml`)
+
+### Upgrading an existing installation
+
+After pulling a version that includes the guided installer:
+
+- Run `./scripts/update-compose.sh` to bring your `docker-compose.yml` up to date. The nginx service now starts
+  through `docker/nginx/render.sh` and reads `TRUSTED_PROXY_CIDR`, `WAF_CONSOLE_ENABLED` and `WAF_CONSOLE_ALLOW`; an old
+  generated `docker-compose.yml` combined with the new `docker-compose.waf.yml` loses the WAF hook.
+- Production (`docker-compose.prod.yml`) no longer publishes Soketi's ports 6001 and 9601. Browsers reach WebSockets
+  through the nginx `/app/` proxy: set `VITE_WS_PORT=443` and `VITE_WS_SCHEME=https`, then rebuild the frontend.
+- `./opbx_bootstrap.sh` is now interactive (it runs `./install.sh`). Automation that called it must use the manual
+  setup steps above instead.
+- `/up` now returns Laravel's health page instead of the SPA.
+- SafeLine's own `127.0.0.1:9443` console mapping is gone; the OPBX nginx serves the console on `WAF_CONSOLE_PORT`
+  (with `WAF_CONSOLE_ENABLED=true`).
+- `./install.sh reconfigure` only works on installations the installer set up (`OPBX_INSTALLER_MANAGED=true`). For a
+  manual installation, edit `.env` and run `docker compose up -d`.
 
 ### ⚠️ Database Persistence
 

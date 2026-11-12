@@ -25,8 +25,10 @@ from `installer/Dockerfile` (Node 26 on Alpine, with the docker CLI, Compose plu
 
 Inside the container `src/main.js` detects the install state from `.env` (`none`, `incomplete`, `complete`), picks the
 action, and calls the mode in `src/modes/`. The installer runs `docker` and `docker compose` commands against the host
-daemon. It writes `.env`, `docker-compose.yml` and `docker/safeline/.env` atomically with mode 600 and never prints secrets
-except the owner password, once, in the final summary (also saved to `opbx-install-summary.txt`).
+daemon. It writes its files atomically: `.env` with mode 640, owned by the host user and group 82 (`www-data` in the app
+image, which reads the bind-mounted file), `docker-compose.yml` with mode 644, and `docker/safeline/.env` and
+`opbx-install-summary.txt` with mode 600. It never prints secrets except two passwords, once, on the finish screen: the
+owner password and the SafeLine admin password (both also saved to `opbx-install-summary.txt`).
 
 Set `OPBX_DEBUG=1` to print stack traces on failure.
 
@@ -57,8 +59,8 @@ changes end to end, run `./install.sh` against a scratch checkout, never against
 | `src/secrets.js` | Generates OPBX, SafeLine and owner-password secrets |
 | `src/safeline.js` | SafeLine state-dir commands and checks, writes `docker/safeline/.env`, detector check |
 | `src/hoststep.js` | Pause-and-check helper for steps the user must run on the host |
-| `src/stack.js` | Build images, composer install, start the stack and wait for health, create the owner, reset the SafeLine admin |
-| `src/verify.js` | Post-install checks against the running stack (service health, WebSocket upgrade, WAF) |
+| `src/stack.js` | Build images and composer install (with progress), start the stack and wait for health, create the owner, reset the SafeLine admin |
+| `src/verify.js` | Post-install checks against the running stack (service health, storage buckets, WebSocket upgrade, WAF) |
 | `src/summary.js` | Proxy snippet, install summary text, writes `opbx-install-summary.txt` |
 | `src/detect.js` | Install state: `none`, `incomplete` or `complete` |
 | `src/platform.js` | Detects Docker or Podman, SELinux, OS and architecture from `docker info`; `isPortFree` |
