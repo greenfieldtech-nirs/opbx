@@ -39,25 +39,43 @@ test('buildImages: retry choice builds again', async () => {
   assert.equal(n, 4);
 });
 
-test('composerInstall: production uses --no-dev, runs as host user', async () => {
+test('composerInstall: host user, --no-scripts; then package:discover as root after clearing the bootstrap cache', async () => {
   const d = fake(() => ok());
   process.env.HOST_UID = '1000'; process.env.HOST_GID = '1001';
-  await composerInstall(d, { mode: 'production' });
+  await composerInstall(d, fakeUi(), { mode: 'production' });
   const a = d.calls[0].args;
   assert.deepEqual(a.slice(0, 4), ['run', '--rm', '--no-deps', '--user']);
   assert.equal(a[4], '1000:1001');
-  assert.ok(a.includes('--no-dev') && a.includes('COMPOSER_HOME=/tmp/composer'));
+  assert.ok(a.includes('--no-dev') && a.includes('COMPOSER_HOME=/tmp/composer') && a.includes('--no-scripts'));
   assert.equal(a[a.indexOf('--entrypoint') + 1], 'composer');
-  await composerInstall(d, { mode: 'development' });
-  assert.ok(!d.calls[1].args.includes('--no-dev'));
+  // bootstrap/cache belongs to www-data after the first start: the host user cannot write it, root can
+  const b = d.calls[1].args;
+  assert.deepEqual(b.slice(0, 3), ['run', '--rm', '--no-deps']);
+  assert.ok(!b.includes('--user'));
+  assert.match(b.join(' '), /rm -f bootstrap\/cache\/config\.php .*&& php artisan package:discover/);
+  await composerInstall(d, fakeUi(), { mode: 'development' });
+  assert.ok(!d.calls[2].args.includes('--no-dev'));
   delete process.env.HOST_UID; delete process.env.HOST_GID;
-  await composerInstall(d, { mode: 'production' });
-  assert.ok(!d.calls[2].args.includes('--user'));
+  await composerInstall(d, fakeUi(), { mode: 'production' });
+  assert.ok(!d.calls[4].args.includes('--user'));
 });
 
-test('composerInstall: non-zero throws with output', async () => {
+test('composerInstall: non-zero throws with output; a failed discover throws too', async () => {
   const d = fake(() => ({ code: 2, stdout: '', stderr: 'no network' }));
-  await assert.rejects(composerInstall(d, { mode: 'production' }), /no network/);
+  await assert.rejects(composerInstall(d, fakeUi(), { mode: 'production' }), /no network/);
+  const disc = fake((k, args) => (args.join(' ').includes('package:discover') ? { code: 1, stdout: '', stderr: 'Class not found' } : ok()));
+  await assert.rejects(composerInstall(disc, fakeUi(), { mode: 'production' }), /Class not found/);
+});
+
+test('build and composer show progress: elapsed time and the latest output line', async () => {
+  const msgs = [];
+  const ui = { ...fakeUi(), spinner: () => ({ start: (m) => msgs.push(m), message: (m) => msgs.push(m), stop: (m) => msgs.push(m) }) };
+  const d = fake((kind, args, opts) => { opts.onData?.('#5 [app 2/9] RUN apk add\n#6 [app 3/9] COPY . .\n'); return ok(); });
+  await buildImages(d, ui);
+  assert.ok(msgs.some((m) => /Building.*\(\d+m\d\ds\).*#6 \[app 3\/9\] COPY/.test(m)), msgs.join(' | '));
+  msgs.length = 0;
+  await composerInstall(d, ui, { mode: 'production' });
+  assert.ok(msgs.some((m) => /composer/i.test(m) && /COPY/.test(m)), msgs.join(' | '));
 });
 
 const healthDocker = (statuses) => {

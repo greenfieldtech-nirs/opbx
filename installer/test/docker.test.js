@@ -28,3 +28,11 @@ test('stdoutTo streams stdout without buffering it', async () => {
   assert.equal(r.stdout, '');
   assert.equal(Buffer.concat(got).toString(), 'hello');
 });
+
+test('onData sees stdout and stderr chunks; output is still collected', async () => {
+  const seen = [];
+  const r = await sh.run(['-c', 'echo a; echo b >&2'], { onData: (d) => seen.push(String(d)) });
+  assert.equal(r.stdout, 'a\n');
+  assert.equal(r.stderr, 'b\n');
+  assert.deepEqual(seen.sort(), ['a\n', 'b\n']);
+});

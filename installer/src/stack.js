@@ -3,11 +3,34 @@ import { checkDetector } from './safeline.js';
 const tail = (r, n = 40) => `${r.stdout}\n${r.stderr}`.split('\n').filter(Boolean).slice(-n).join('\n');
 const real = { now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
 
+// Spinner with elapsed time and the latest output line: a build or composer run takes 10-30 minutes.
+async function withProgress(ui, title, fn) {
+  const s = ui.spinner();
+  const t0 = Date.now();
+  let last = '';
+  const show = () => {
+    const sec = Math.round((Date.now() - t0) / 1000);
+    s.message(`${title} (${Math.floor(sec / 60)}m${String(sec % 60).padStart(2, '0')}s)${last ? `: ${last}` : ''}`);
+  };
+  const onData = (chunk) => {
+    const line = String(chunk).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean).pop();
+    if (line) { last = line.slice(0, 80); show(); }
+  };
+  s.start(title);
+  const timer = setInterval(show, 1000);
+  timer.unref?.();
+  try {
+    const r = await fn(onData);
+    s.stop(`${title}: ${r.code === 0 ? 'done' : 'failed'}`);
+    return r;
+  } catch (e) { s.stop(`${title}: failed`); throw e; } finally { clearInterval(timer); }
+}
+
 export async function buildImages(docker, ui) {
   for (;;) {
     let r;
     for (let i = 0; i < 3; i++) {
-      r = await docker.compose(['build']);
+      r = await withProgress(ui, 'Building images', (onData) => docker.compose(['build'], { onData }));
       if (r.code === 0) return;
     }
     ui.note('Build failed (last 40 lines)', tail(r));
@@ -16,13 +39,19 @@ export async function buildImages(docker, ui) {
   }
 }
 
-export async function composerInstall(docker, answers) {
+// Composer runs as the host user (vendor/ stays theirs) without scripts: its post-autoload-dump writes
+// bootstrap/cache, which the app entrypoint hands to www-data. Root does that part, the way the script would:
+// drop the stale caches (a --no-dev run would otherwise boot providers that are gone), then discover packages.
+export async function composerInstall(docker, ui, answers) {
   const { HOST_UID, HOST_GID } = process.env;
   const args = ['run', '--rm', '--no-deps', ...(HOST_UID && HOST_GID ? ['--user', `${HOST_UID}:${HOST_GID}`] : []),
     '-e', 'COMPOSER_HOME=/tmp/composer', '--entrypoint', 'composer', 'app', 'install', '--no-interaction', '--prefer-dist',
-    ...(answers.mode === 'production' ? ['--no-dev'] : []), '--optimize-autoloader'];
-  const r = await docker.compose(args);
+    ...(answers.mode === 'production' ? ['--no-dev'] : []), '--optimize-autoloader', '--no-scripts'];
+  const r = await withProgress(ui, 'Installing PHP packages (composer)', (onData) => docker.compose(args, { onData }));
   if (r.code !== 0) throw new Error(`composer install failed:\n${tail(r)}`);
+  const d = await docker.compose(['run', '--rm', '--no-deps', '--entrypoint', 'sh', 'app', '-c',
+    'rm -f bootstrap/cache/config.php bootstrap/cache/services.php bootstrap/cache/packages.php && php artisan package:discover --ansi']);
+  if (d.code !== 0) throw new Error(`package discovery failed:\n${tail(d)}`);
 }
 
 export async function waitHealthy(docker, name, { now, sleep, timeoutMs, intervalMs, onTick }) {

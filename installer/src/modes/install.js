@@ -82,7 +82,7 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
   }
 
   await S.buildImages(docker, ui);
-  await S.composerInstall(docker, answers);
+  await S.composerInstall(docker, ui, answers);
   await S.startStack(docker, ui, answers);
 
   const summaryPath = join(repoDir, 'opbx-install-summary.txt');
