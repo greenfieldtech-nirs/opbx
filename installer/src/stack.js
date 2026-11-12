@@ -25,7 +25,7 @@ export async function composerInstall(docker, answers) {
   if (r.code !== 0) throw new Error(`composer install failed:\n${tail(r)}`);
 }
 
-async function waitHealthy(docker, name, { now, sleep, timeoutMs, intervalMs, onTick }) {
+export async function waitHealthy(docker, name, { now, sleep, timeoutMs, intervalMs, onTick }) {
   const deadline = now() + timeoutMs;
   for (;;) {
     const r = await docker.run(['inspect', '--format', '{{.State.Status}} {{.State.Health.Status}}', name]);

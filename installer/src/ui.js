@@ -1,10 +1,14 @@
 import * as p from '@clack/prompts';
 
 // Thin wrapper over @clack/prompts: every prompt unwraps a Ctrl-C into a clean exit (130).
-export const state = { configWritten: false, resetStarted: false, resetDone: false };
+export const state = { configWritten: false, resetStarted: false, resetDone: false, reconfigure: null }; // reconfigure: null | 'started' | 'written'
 
 export const cancelMessage = () => (state.resetStarted
   ? 'Reset was interrupted part-way; run ./install.sh reset again.'
+  : state.reconfigure === 'written'
+  ? 'Settings were already saved in .env but may not be applied yet: run `docker compose up -d` to apply them.'
+  : state.reconfigure === 'started'
+  ? 'Reconfigure cancelled. The settings in .env were not changed.'
   : state.configWritten
   ? 'Installation cancelled. Your answers are kept: run ./install.sh again to resume.'
   : state.resetDone

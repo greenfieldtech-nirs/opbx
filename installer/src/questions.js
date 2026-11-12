@@ -59,6 +59,38 @@ const intCheck = (s) => (/^\d+$/.test(s) ? undefined : 'Enter a whole number.');
 const cidrCheck = (s) => { const r = parseCidrList(s); return r.ok ? undefined : r.reason; };
 const joinCidrs = (s) => parseCidrList(s).value.join(',');
 
+export async function askPublicUrl(ui, d, mode) {
+  ui.note('Public address', 'Enter the address people will type in their browser, for example https://pbx.example.com.\nIt must use https:// and a real domain name: the browser phone only works over HTTPS.');
+  return normalizePublicUrl(await text(ui, 'What is your server\'s public address?', {
+    def: d.publicUrl, placeholder: 'https://pbx.example.com', check: (s) => { const r = normalizePublicUrl(s, mode); return r.ok ? undefined : r.reason; },
+  }), mode).value;
+}
+
+export async function askWaf(ui, d, trustedProxyCidr) {
+  const wafMode = await ui.select({
+    message: 'Put a web application firewall in front of OPBX?',
+    options: [{ value: 'off', label: 'No' }, { value: 'monitor', label: 'Yes, monitor only', hint: 'recommended to start' },
+      { value: 'block', label: 'Yes, blocking' }],
+    initialValue: d.waf?.mode ?? 'off',
+  });
+  if (wafMode !== 'off') {
+    const stateDir = await text(ui, 'Where on this machine should the firewall keep its data?', {
+      def: d.waf?.stateDir ?? '/var/lib/safeline',
+      check: (s) => (isSafeAbsolutePath(s) ? undefined : 'Please type a full path such as /var/lib/safeline, using only letters, digits and . _ - /'),
+    });
+    let consoleAllow = '';
+    if (trustedProxyCidr) {
+      consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {
+        def: d.waf?.consoleAllow, placeholder: '203.0.113.0/24', check: cidrCheck,
+      }));
+    } else {
+      ui.note('Firewall console', 'Without a proxy address, OPBX cannot tell visitors apart by IP, so the firewall console will be protected by its own login only.');
+    }
+    return { mode: wafMode, stateDir, consoleAllow };
+  }
+  return null;
+}
+
 export async function askAnswers(ui, { platform, defaults = {}, portCheck = null } = {}) {
   const d = { ...defaults };
   const a = {};
@@ -72,10 +104,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
   const prod = a.mode === 'production';
 
   if (prod) {
-    ui.note('Public address', 'Enter the address people will type in their browser, for example https://pbx.example.com.\nIt must use https:// and a real domain name: the browser phone only works over HTTPS.');
-    a.publicUrl = normalizePublicUrl(await text(ui, 'What is your server\'s public address?', {
-      def: d.publicUrl, placeholder: 'https://pbx.example.com', check: (s) => { const r = normalizePublicUrl(s, a.mode); return r.ok ? undefined : r.reason; },
-    }), a.mode).value;
+    a.publicUrl = await askPublicUrl(ui, d, a.mode);
   } else {
     a.publicUrl = 'http://localhost';
   }
@@ -181,28 +210,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
 
   a.logs = await ui.confirm({ message: 'Collect logs in Grafana?', initialValue: d.logs ?? false });
 
-  a.waf = null;
-  const wafMode = await ui.select({
-    message: 'Put a web application firewall in front of OPBX?',
-    options: [{ value: 'off', label: 'No' }, { value: 'monitor', label: 'Yes, monitor only', hint: 'recommended to start' },
-      { value: 'block', label: 'Yes, blocking' }],
-    initialValue: d.waf?.mode ?? 'off',
-  });
-  if (wafMode !== 'off') {
-    const stateDir = await text(ui, 'Where on this machine should the firewall keep its data?', {
-      def: d.waf?.stateDir ?? '/var/lib/safeline',
-      check: (s) => (isSafeAbsolutePath(s) ? undefined : 'Please type a full path such as /var/lib/safeline, using only letters, digits and . _ - /'),
-    });
-    let consoleAllow = '';
-    if (a.trustedProxyCidr) {
-      consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {
-        def: d.waf?.consoleAllow, placeholder: '203.0.113.0/24', check: cidrCheck,
-      }));
-    } else {
-      ui.note('Firewall console', 'Without a proxy address, OPBX cannot tell visitors apart by IP, so the firewall console will be protected by its own login only.');
-    }
-    a.waf = { mode: wafMode, stateDir, consoleAllow };
-  }
+  a.waf = await askWaf(ui, d, a.trustedProxyCidr);
 
   a.ngrokToken = '';
   if (!prod) a.ngrokToken = await secret(ui, 'ngrok auth token, to receive calls from Cloudonix (optional, press Enter to skip)', d.ngrokToken, { optional: true });
