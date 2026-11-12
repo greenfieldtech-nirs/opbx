@@ -6,6 +6,8 @@
 #   docker compose -f docker-compose.yml -f docker-compose.waf.yml up -d nginx
 #
 # WAF_MODE: off | monitor (default: log would-be blocks) | block.
+# Console: WAF_CONSOLE_ENABLED=true serves it at http://<host>:${WAF_CONSOLE_PORT:-9443} through this
+# nginx (plain http: restrict with WAF_CONSOLE_ALLOW, a comma-separated list of IPs/CIDRs).
 services:
   nginx:
     image: opbx-nginx-waf:poc
@@ -15,6 +17,8 @@ services:
     environment:
       WAF_MODE: ${WAF_MODE:-monitor}
       WAF_DETECTOR_HOST: ${WAF_DETECTOR_HOST:-safeline-detector}
+    ports:
+      - "${WAF_CONSOLE_PORT:-9443}:8443"
     volumes:
       - ./docker/nginx/waf:/etc/nginx/templates/waf.d:ro
     networks:

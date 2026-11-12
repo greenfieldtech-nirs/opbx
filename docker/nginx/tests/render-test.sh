@@ -34,4 +34,38 @@ out=$($DOCKER run --rm $HOSTS -e RENDER_ONLY=1 -e WAF_MODE=bogus -v "$PWD/docker
   nginx:1.27-alpine /bin/sh /opt/opbx/render.sh 2>&1); rc=$?
 if [ $rc -ne 0 ] && echo "$out" | grep -q "WAF_MODE must be"; then echo "PASS bogus WAF_MODE rejected"
 else echo "FAIL bogus WAF_MODE accepted"; fail=1; fi
+
+# check name "assertion shell run after render (nginx -t already ran)" waf-mount(y|n) env...
+check() {
+  local name=$1 assertion=$2 waf=$3; shift 3
+  local args=(--rm $HOSTS -e RENDER_ONLY=1 "$@"
+    -v "$PWD/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"
+    -v "$PWD/docker/nginx/conf.d.prod:/etc/nginx/templates/conf.d:ro"
+    -v "$PWD/docker/nginx/waf:/etc/nginx/templates/waf.d:ro"
+    -v "$PWD/docker/nginx/render.sh:/opt/opbx/render.sh:ro")
+  local image=nginx:1.27-alpine; [ "$waf" = y ] && image=opbx-nginx-waf:test
+  if out=$($DOCKER run "${args[@]}" "$image" /bin/sh -c "/bin/sh /opt/opbx/render.sh >/tmp/o 2>&1 || { cat /tmp/o; exit 1; }; $assertion" 2>&1); then
+    echo "PASS $name"
+  else
+    echo "FAIL $name"; echo "$out" | tail -15; fail=1
+  fi
+}
+reject() { # name env-assignment expected-bad-value
+  out=$($DOCKER run --rm $HOSTS -e RENDER_ONLY=1 -e "$2" -v "$PWD/docker/nginx/render.sh:/opt/opbx/render.sh:ro" \
+    nginx:1.27-alpine /bin/sh /opt/opbx/render.sh 2>&1); rc=$?
+  if [ $rc -ne 0 ] && echo "$out" | grep -qF "$3"; then echo "PASS $1"; else echo "FAIL $1"; fail=1; fi
+}
+
+R=/etc/nginx/conf.d/00-real-ip.conf
+C=/etc/nginx/conf.d/zz-waf-console.conf
+check "realip rendered" "[ \"\$(grep -c set_real_ip_from $R)\" = 2 ] && grep -qx 'set_real_ip_from 10.0.0.0/8;' $R && grep -q 'set_real_ip_from 192.168.1.5;' $R && grep -q 'real_ip_header X-Forwarded-For;' $R && grep -q 'real_ip_recursive on;' $R" n -e TRUSTED_PROXY_CIDR=10.0.0.0/8,192.168.1.5
+check "realip ipv6 + spaces" "grep -q 'set_real_ip_from fd00::/8;' $R && grep -q 'set_real_ip_from 172.16.0.0/12;' $R" n -e "TRUSTED_PROXY_CIDR=fd00::/8, 172.16.0.0/12"
+check "realip off when empty" "[ ! -e $R ]" n -e TRUSTED_PROXY_CIDR=
+check "console off by default" "[ ! -e $C ]" y -e WAF_MODE=block
+check "console off when WAF off" "[ ! -e $C ]" n -e WAF_CONSOLE_ENABLED=true
+check "console on, allow-list" "grep -q 'listen 8443;' $C && grep -q 'allow 198.51.100.0/24;' $C && grep -q 'deny all;' $C && grep -q 'proxy_ssl_verify off;' $C && grep -q 'proxy_pass \$console;' $C" y -e WAF_MODE=monitor -e WAF_CONSOLE_ENABLED=true -e WAF_CONSOLE_ALLOW=198.51.100.0/24
+check "console on, no allow-list" "grep -q 'listen 8443;' $C && ! grep -q 'deny all' $C" y -e WAF_MODE=block -e WAF_CONSOLE_ENABLED=true
+reject "bad TRUSTED_PROXY_CIDR rejected" "TRUSTED_PROXY_CIDR=10.0.0.0/8,evil;x" "evil;x"
+reject "bad octet-count rejected" "TRUSTED_PROXY_CIDR=10.0.0/8" "10.0.0/8"
+reject "bad WAF_CONSOLE_ALLOW rejected" "WAF_CONSOLE_ALLOW=1.2.3.4/abc" "1.2.3.4/abc"
 exit $fail

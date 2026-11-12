@@ -10,13 +10,13 @@ reverse proxy is not used for traffic.
 client ─TLS─▶ ssl-proxy ─▶ opbx_nginx (OpenResty + t1k) ─▶ frontend / app / soketi / mcp / grafana
                                  │ access_by_lua, :8000
                                  ▼
-                     safeline-detector ◀── mgt (console :9443, loopback) / fvm / luigi / chaos / pg
+                     safeline-detector ◀── mgt (console, via opbx_nginx :8443) / fvm / luigi / chaos / pg
 ```
 
 | File | Purpose |
 |---|---|
 | `docker/safeline/compose.yaml` | Official SafeLine CE v9.4.3 compose, kept verbatim (see header) |
-| `docker/safeline/compose.override.yaml` | OPBX changes: console bound to 127.0.0.1 |
+| `docker/safeline/compose.override.yaml` | OPBX changes: console port not published (reached through opbx_nginx) |
 | `docker/safeline/.env.example` | Images, secrets, state dir |
 | `docker/nginx/Dockerfile.waf` | OpenResty 1.27.1.2 + lua-resty-t1k 1.2.1 (sha256 pinned) |
 | `docker/nginx/waf/00-safeline-waf.conf` | http-level hook: mode, exemptions, fail-open |
@@ -37,7 +37,8 @@ docker compose --project-directory docker/safeline -p safeline up -d
 # 2. OPBX with the WAF hook
 WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml up -d   # off|monitor|block
 
-# Console: https://127.0.0.1:9443  (credentials: docker exec safeline-mgt /app/mgt reset-admin)
+# Console: http://<host>:9443 through opbx_nginx, needs WAF_CONSOLE_ENABLED=true (restrict with
+# WAF_CONSOLE_ALLOW, WAF_CONSOLE_PORT moves it)  (credentials: docker exec safeline-mgt /app/mgt reset-admin)
 # Would-block events: docker exec opbx_nginx grep safeline-waf /var/log/nginx/opbx_error.log
 ```
 
@@ -75,7 +76,7 @@ WAF_MODE=monitor docker compose -f docker-compose.yml -f docker-compose.waf.yml 
 7. **Host requirements.** The state directory must be outside a read-only root (`/data` fails on Fedora
    CoreOS), SELinux hosts need the `container_file_t` relabel, and the detector's TCP listener is a
    manual edit to `detector.yml`.
-8. **The upstream console listens on every interface** by default (overridden here), and
+8. **The upstream console listens on every interface** by default (publishing removed here; opbx_nginx serves it on :9443, gated by `WAF_CONSOLE_ENABLED`/`WAF_CONSOLE_ALLOW`), and
    `mgt` mounts `${SAFELINE_DIR}/resources/run`. 9.4.3 no longer mounts the host's `/var/run`.
 9. **Footprint.** 7 more containers, including a second Postgres; images are about 480 MB on arm64.
 10. **Restarts are slow under Podman.** Recreating `opbx_nginx` took about 100 s.

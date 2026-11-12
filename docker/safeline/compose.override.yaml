@@ -2,7 +2,6 @@
 # Picked up automatically: docker compose --project-directory docker/safeline -p safeline ...
 services:
   mgt:
-    # Upstream publishes the admin console on every interface. Loopback only;
-    # reach it remotely through an SSH tunnel: ssh -L 9443:127.0.0.1:9443 host
-    ports: !override
-      - 127.0.0.1:${MGT_PORT:-9443}:1443
+    # Upstream publishes the admin console on every interface. Publish nothing:
+    # the console is reached through OPBX nginx (docker-compose.waf.yml, WAF_CONSOLE_ENABLED=true).
+    ports: !reset []
