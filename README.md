@@ -310,7 +310,8 @@ a reverse proxy snippet.
   password, then delete that file. The seeded `admin@example.com` account does not exist on installer-made systems.
 - **Development from another machine.** The Vite dev server only answers to host names it knows (`localhost` always works).
   A development install asks for the other names you use to open it (a Tailscale or other VPN name, the machine's IP, an
-  ngrok domain; `.ts.net` allows every name under it) and writes them to `VITE_ALLOWED_HOSTS`.
+  ngrok domain; `.ts.net` allows every name under it) and writes them to `VITE_ALLOWED_HOSTS`. Live updates connect to
+  the same name on port 6001 (unless `VITE_WS_HOST` is set to something other than `localhost`), so let 6001 through too.
 - **Everyday use.** The installer writes `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2` to `.env`, so
   starting the stack afterwards is `docker compose up -d`.
 

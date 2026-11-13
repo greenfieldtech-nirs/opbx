@@ -14,10 +14,20 @@ import { storage } from '@/utils/storage';
 // Make Pusher available globally for Laravel Echo
 window.Pusher = Pusher;
 
+/**
+ * Development only: a page opened by another allowed name (a VPN name, the machine's IP) reaches
+ * Soketi on that same name, since "localhost" would be the viewer's own computer. An explicitly
+ * configured host other than localhost, and every production build, keep the configured value.
+ */
+export const resolveWsHost = (configured: string | undefined, pageHost: string, dev: boolean): string => {
+  const host = configured || 'localhost';
+  return dev && host === 'localhost' && pageHost && pageHost !== 'localhost' ? pageHost : host;
+};
+
 // Environment configuration
 const WS_CONFIG = {
   key: import.meta.env.VITE_PUSHER_APP_KEY || 'pbxappkey',
-  wsHost: import.meta.env.VITE_WS_HOST || 'localhost',
+  wsHost: resolveWsHost(import.meta.env.VITE_WS_HOST, window.location.hostname, import.meta.env.DEV),
   wsPort: import.meta.env.VITE_WS_PORT ? parseInt(import.meta.env.VITE_WS_PORT) : 6001,
   wssPort: import.meta.env.VITE_WS_PORT ? parseInt(import.meta.env.VITE_WS_PORT) : 6001,
   forceTLS: import.meta.env.VITE_WS_SCHEME === 'https',

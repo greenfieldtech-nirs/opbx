@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Front page choice**: `OPBX_FRONT_PAGE=login` makes the site root (`/`) open the sign-in page (or the dashboard when already signed in) instead of the public homepage. The installer asks and defaults to the sign-in page; `./install.sh reconfigure` switches it. Unset or `home` keeps the homepage, so existing installs do not change.
 - **Allowed host names (development)**: the installer asks for the other names developers use to reach the development UI (a VPN name such as Tailscale, the machine's IP, an ngrok domain) and writes them to `VITE_ALLOWED_HOSTS`; `./install.sh reconfigure` changes them and restarts the frontend.
-- A failed installer WebSocket check now shows nginx's latest error lines instead of only "timeout".
+- In development, a page opened by a name other than `localhost` (VPN, IP) connects its live-update WebSocket to that same name on port 6001, unless `VITE_WS_HOST` names another host. Production builds keep `VITE_WS_HOST`.
+- A failed installer WebSocket check now shows nginx's latest error lines instead of only "timeout". When Soketi does not answer at all, it also names Soketi's address and the commands to find a stale Docker firewall rule (seen on Docker 29 hosts after a network was recreated).
 
 ### Changed - 2026-11-13
 

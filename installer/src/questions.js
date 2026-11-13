@@ -117,7 +117,8 @@ export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPo
 export async function askAllowedHosts(ui, d) {
   ui.note('Allowed host names', 'The development web server only answers to host names it knows; localhost always works.\n'
     + 'List every other name people use to open OPBX on this machine: a VPN name (for example a Tailscale name such as dev-box.tailnet.ts.net), '
-    + 'the machine\'s IP address, or your ngrok domain. Start a name with a dot (.ts.net) to allow every name under it.');
+    + 'the machine\'s IP address, or your ngrok domain. Start a name with a dot (.ts.net) to allow every name under it.\n'
+    + 'Live updates then connect to that same name on port 6001, so the VPN or firewall must let port 6001 through as well as 3000.');
   const v = await text(ui, 'Other host names allowed to open OPBX (comma-separated, optional, press Enter to skip)', {
     def: (d.allowedHosts ?? []).join(','), placeholder: 'dev-box.tailnet.ts.net, .ts.net', optional: true, check: (s) => parseHostList(s).reason,
   });
