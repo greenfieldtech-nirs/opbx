@@ -7,6 +7,23 @@ const SQLI = 'http://127.0.0.1/?id=1%27%20OR%20%271%27=%271';
 // Upgrade request against nginx on the stack network; prints the status line.
 const wsScript = (key) => `const s=require('net').connect(80,'opbx_nginx');s.setTimeout(8000,()=>{console.log('timeout');process.exit(1)});s.on('error',e=>{console.log(e.message);process.exit(1)});s.on('data',d=>{console.log(String(d).split('\\r\\n')[0]);process.exit(0)});s.write('GET /app/${key}?protocol=7 HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Version: 13\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\n\\r\\n')`;
 
+// No answer at all (not a refusal) usually means the host firewall drops the packets. Seen on Docker hosts:
+// a raw-PREROUTING DROP rule left behind for an earlier network that reused soketi's address.
+async function silentDropHint(docker, net) {
+  let ip = '';
+  try {
+    const s = await docker.run(['inspect', 'opbx_websocket', '--format', '{{json .NetworkSettings.Networks}}']);
+    ip = JSON.parse(s.stdout || '{}')[net]?.IPAddress || '';
+  } catch { /* hint without the address */ }
+  const addr = ip || '<soketi IP>';
+  return '\nsoketi did not answer at all: the host firewall may be dropping traffic between the containers,'
+    + ' often a rule Docker left behind for an earlier network. On the host run:'
+    + `\n  sudo iptables-save -t raw | grep -- '-d ${addr}/32'`
+    + '\nA DROP line naming a bridge (br-...) that `ip link show <bridge>` says does not exist is stale.'
+    + ' Delete it by repeating it with -D, for example:'
+    + `\n  sudo iptables -t raw -D PREROUTING -d ${addr}/32 ! -i br-OLD -j DROP`;
+}
+
 function loadEnv() {
   try { return parseEnv(readFileSync(join(process.env.OPBX_REPO || process.cwd(), '.env'), 'utf8')); } catch { return new Map(); }
 }
@@ -74,7 +91,9 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
     if (/ 101 /.test(r.stdout)) return { ok: true, detail: '' };
     // a bare "timeout" hides the cause: add nginx's latest errors (upstream, resolver, WAF hook)
     const log = await inNginx('tail -n 5 /var/log/nginx/opbx_error.log');
-    return { ok: false, detail: `${detail(r)}${log.stdout.trim() ? `\nnginx error log (last lines):\n${log.stdout.trim().slice(-600)}` : ''}` };
+    let out = `${detail(r)}${log.stdout.trim() ? `\nnginx error log (last lines):\n${log.stdout.trim().slice(-600)}` : ''}`;
+    if (/timeout/.test(r.stdout)) out += await silentDropHint(docker, net);
+    return { ok: false, detail: out };
   });
   await check('storage', async () => { // creates missing buckets, then a write/read/delete probe; safe to repeat
     const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'storage:initialize', '--wait=10']);

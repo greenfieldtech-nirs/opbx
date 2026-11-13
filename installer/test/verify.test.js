@@ -82,6 +82,17 @@ test('a failing websocket check carries nginx\'s latest error lines', async () =
   assert.match(ws.detail, /timeout[\s\S]*Host is unreachable/);
 });
 
+test('a websocket timeout explains a silent firewall drop and names soketi\'s address', async () => {
+  const d = fake({ 'node:26-alpine': ok('timeout'), 'inspect opbx_websocket': ok(JSON.stringify({ proj_opbx: { IPAddress: '172.18.0.3' } })) });
+  const ws = byName(await runChecks(d, { waf: null, logs: false }, { env: ENV }), 'websocket');
+  assert.equal(ws.ok, false);
+  assert.match(ws.detail, /iptables-save -t raw \| grep -- '-d 172\.18\.0\.3\/32'/);
+  assert.match(ws.detail, /-D PREROUTING -d 172\.18\.0\.3\/32/);
+  // a refused or non-101 answer is not a silent drop
+  const refused = byName(await runChecks(fake({ 'node:26-alpine': ok('HTTP/1.1 502 Bad Gateway') }), { waf: null, logs: false }, { env: ENV }), 'websocket');
+  assert.doesNotMatch(refused.detail, /iptables/);
+});
+
 test('WAF block mode expects 403; monitor mode looks for safeline-waf in the error log; console check unless disabled', async () => {
   const block = fake({ '%27': { code: 1, stdout: '', stderr: '  HTTP/1.1 403 Forbidden' } });
   const rb = await runChecks(block, { waf: { mode: 'block' }, logs: false }, { env: ENV });
