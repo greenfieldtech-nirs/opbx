@@ -20,6 +20,9 @@ return [
     // Set by the guided installer; suppresses the default admin@example.com seed.
     'installer_managed' => (bool) env('OPBX_INSTALLER_MANAGED', false),
 
+    // What "/" shows: 'home' (public homepage) or 'login' (sign-in, or the dashboard when signed in).
+    'front_page' => env('OPBX_FRONT_PAGE') === 'login' ? 'login' : 'home',
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

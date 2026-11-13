@@ -33,6 +33,15 @@ class ConfigurationControllerTest extends TestCase
         ]);
     }
 
+    public function test_application_config_exposes_the_front_page(): void
+    {
+        Config::set('app.front_page', 'home');
+        $this->getJson('/api/v1/config/application')->assertOk()->assertJsonPath('front_page', 'home');
+
+        Config::set('app.front_page', 'login');
+        $this->getJson('/api/v1/config/application')->assertOk()->assertJsonPath('front_page', 'login');
+    }
+
     public function test_application_config_derives_endpoints_from_request_and_config(): void
     {
         Config::set('services.mcp.port', 9090);

@@ -34,6 +34,8 @@ export interface ApplicationConfig {
   };
   saas_enabled: boolean;
   auth0: Auth0Config;
+  /** What "/" shows; absent on older backends (treated as 'home'). */
+  front_page?: 'home' | 'login';
   /** Present on OPBX >= the endpoints feature; absent on error fallback. */
   endpoints?: ApplicationEndpoints;
 }
