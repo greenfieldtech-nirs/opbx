@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv, renderEnv, writeFileAtomic, envFileOpts } from '../envfile.js';
 import { deriveEnv, answersFromEnv, OWNED_KEYS } from '../derive.js';
-import { askPublicUrl, askWaf } from '../questions.js';
+import { askPublicUrl, askWaf, askAllowedHosts } from '../questions.js';
 import { detectInstall } from '../detect.js';
 import { hostStep } from '../hoststep.js';
 import { safelineHostCommands, checkSafelineState, writeSafelineEnv, checkDetector } from '../safeline.js';
@@ -20,7 +20,7 @@ const real = { now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeo
 
 // `steps` replaces collaborators in unit tests.
 export async function runReconfigure({ ui, docker, repoDir, platform, steps = {} }) {
-  const S = { askPublicUrl, askWaf, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
+  const S = { askPublicUrl, askWaf, askAllowedHosts, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
   const envPath = join(repoDir, '.env');
   const readEnv = (p) => (existsSync(p) ? parseEnv(readFileSync(p, 'utf8')) : new Map());
 
@@ -45,6 +45,8 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     message: 'What would you like to change?',
     options: [
       { value: 'domain', label: 'Change the public address' },
+      { value: 'frontpage', label: `Change the front page (now: ${current.frontPage === 'home' ? 'the OPBX homepage' : 'the sign-in page'})` },
+      ...(prod ? [] : [{ value: 'hosts', label: 'Change the host names allowed to open OPBX (VPN, IP, ngrok)' }]),
       ...(wafOn
         ? [{ value: 'wafmode', label: 'Change the firewall mode (monitor / block)' }, { value: 'wafoff', label: 'Turn the firewall off' }]
         : [{ value: 'wafon', label: 'Turn the firewall on' }]),
@@ -76,6 +78,24 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     v.COMPOSE_FILE = (a.waf ? [...files, OVERLAY] : files).join(':');
     return v;
   };
+
+  if (choice === 'frontpage') {
+    const frontPage = current.frontPage === 'home' ? 'login' : 'home';
+    // the app reads .env on every request (no config cache): nothing to restart
+    apply(pick(deriveEnv({ ...current, frontPage }), OWNED_KEYS.frontPage));
+    ui.note('Front page changed', `${current.publicUrl} now shows ${frontPage === 'home' ? 'the OPBX homepage' : 'the sign-in page'}. Reload the page in your browser to see it.`);
+    return;
+  }
+
+  if (choice === 'hosts') {
+    const allowedHosts = await S.askAllowedHosts(ui, current);
+    if (allowedHosts.join(',') === current.allowedHosts.join(',')) { ui.note('Nothing changed', 'Those are already the allowed host names.'); uiState.reconfigure = null; return; }
+    apply(pick(deriveEnv({ ...current, allowedHosts }), OWNED_KEYS.hosts));
+    // Vite reads VITE_ALLOWED_HOSTS at start; `up -d` recreates the container because its environment changed
+    must(await docker.compose(['up', '-d', 'frontend']), 'Restarting the frontend');
+    ui.note('Allowed host names updated', `OPBX now opens on: ${['localhost', ...allowedHosts].join(', ')}`);
+    return;
+  }
 
   if (choice === 'domain') {
     if (!prod) {

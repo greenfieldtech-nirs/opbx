@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installer-made systems (`OPBX_INSTALLER_MANAGED=true`) have no `admin@example.com` account; the owner is created with a generated password shown once.
 - The installer shows progress (elapsed time and the latest output line) while it builds images and installs PHP packages, checks the storage buckets after install, keeps the owner email in `.env` (`OPBX_OWNER_EMAIL`, pre-filled on resume) and offers to back up and replace a `docker-compose.yml` that differs from the example.
 
+### Added - 2026-11-13
+
+- **Front page choice**: `OPBX_FRONT_PAGE=login` makes the site root (`/`) open the sign-in page (or the dashboard when already signed in) instead of the public homepage. The installer asks and defaults to the sign-in page; `./install.sh reconfigure` switches it. Unset or `home` keeps the homepage, so existing installs do not change.
+- **Allowed host names (development)**: the installer asks for the other names developers use to reach the development UI (a VPN name such as Tailscale, the machine's IP, an ngrok domain) and writes them to `VITE_ALLOWED_HOSTS`; `./install.sh reconfigure` changes them and restarts the frontend.
+- A failed installer WebSocket check now shows nginx's latest error lines instead of only "timeout".
+
+### Changed - 2026-11-13
+
+- `vite.config.ts` no longer allows the OPBX team's `opbx.ngrok.io` by default. Add your own tunnel or VPN names to `VITE_ALLOWED_HOSTS`.
+
 ### Changed - 2026-11-12
 
 - `opbx_bootstrap.sh` now only prints that it has been replaced and runs `./install.sh`.

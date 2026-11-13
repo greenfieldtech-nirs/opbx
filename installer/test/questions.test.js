@@ -26,7 +26,7 @@ function fakeUi(script) {
 }
 
 const FULL = [
-  'production', 'https://pbx.example.com', '80', '10.0.0.0/8', 'Acme', 'Ann Lee', 'ann@example.com', 'multi',
+  'production', 'https://pbx.example.com', '80', '10.0.0.0/8', 'Acme', 'Ann Lee', 'ann@example.com', 'multi', 'login',
   'mailgun', 'mg.example.com', 'key-1', 'api.mailgun.net', 'us', 'noreply@example.com', 'Acme PBX',
   true, 't.auth0.com', 'cid', 'sec', ['google'],
   true, 'sitekey', 'secretkey', '0.7',
@@ -40,8 +40,8 @@ test('full production run produces the Answers shape', async () => {
   const a = await askAnswers(ui, { platform: {}, portCheck: async () => true });
   assert.equal(left(), 0);
   assert.deepEqual(a, {
-    mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 80, trustedProxyCidr: '10.0.0.0/8',
-    orgName: 'Acme', ownerName: 'Ann Lee', ownerEmail: 'ann@example.com', tenancy: 'multi',
+    mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 80, allowedHosts: [], trustedProxyCidr: '10.0.0.0/8',
+    orgName: 'Acme', ownerName: 'Ann Lee', ownerEmail: 'ann@example.com', tenancy: 'multi', frontPage: 'login',
     email: { provider: 'mailgun', fields: { MAILGUN_DOMAIN: 'mg.example.com', MAILGUN_SECRET: 'key-1', MAILGUN_ENDPOINT: 'api.mailgun.net', MAILGUN_REGION: 'us' }, fromAddress: 'noreply@example.com', fromName: 'Acme PBX' },
     auth0: { domain: 't.auth0.com', clientId: 'cid', clientSecret: 'sec', providers: ['google'] },
     recaptcha: { siteKey: 'sitekey', secretKey: 'secretkey', minScore: 0.7 },
@@ -52,7 +52,7 @@ test('full production run produces the Answers shape', async () => {
 });
 
 test('port is re-asked while portCheck says false; throw shows message, offers to keep it, re-asks on no', async () => {
-  const script = ['production', 'pbx.example.com', '80', '81', false, '82', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false];
+  const script = ['production', 'pbx.example.com', '80', '81', false, '82', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false];
   const seen = [];
   const { ui, log } = fakeUi(script);
   const checks = [false, 'throw', true];
@@ -64,7 +64,7 @@ test('port is re-asked while portCheck says false; throw shows message, offers t
 });
 
 test('a probe that keeps failing does not loop: the user can keep the port', async () => {
-  const { ui, left } = fakeUi(['production', 'pbx.example.com', '8080', true, '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const { ui, left } = fakeUi(['production', 'pbx.example.com', '8080', true, '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   let probes = 0;
   const a = await askAnswers(ui, { platform: {}, portCheck: async () => { probes++; throw new Error('docker not reachable'); } });
   assert.equal(a.httpPort, 8080);
@@ -73,7 +73,7 @@ test('a probe that keeps failing does not loop: the user can keep the port', asy
 });
 
 test('WAF console port: asked only with the WAF, re-asked while busy, cannot be the OPBX port', async () => {
-  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '8080', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false,
+  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '8080', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false,
     'monitor', '/var/lib/safeline', '8080', '9443', '9555', false]);
   const seen = [];
   const a = await askAnswers(ui, { platform: {}, portCheck: async (p) => { seen.push(p); return p !== 9443; } });
@@ -81,20 +81,20 @@ test('WAF console port: asked only with the WAF, re-asked while busy, cannot be 
   assert.equal(a.waf.consolePort, 9555);
   assert.deepEqual(seen, [8080, 9443, 9555]);
   assert.match(log.rejected[0][1], /OPBX/);
-  const off = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const off = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   await askAnswers(off.ui, { platform: {}, portCheck: null });
   assert.ok(!off.log.messages.some((m) => /console use/.test(m)));
 });
 
 test('portCheck null skips the check', async () => {
-  const { ui } = fakeUi(['development', '8080', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', '', false]);
+  const { ui } = fakeUi(['development', '8080', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', '', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(a.httpPort, 8080);
   assert.equal(a.publicUrl, 'http://localhost:8080'); // development on another port: the address carries it
 });
 
 test('console allowlist not asked without a proxy; the login-only note is shown', async () => {
-  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'monitor', '/var/lib/safeline', '9443', false]);
+  const { ui, log, left } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'monitor', '/var/lib/safeline', '9443', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(left(), 0);
   assert.deepEqual(a.waf, { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleAllow: '' });
@@ -103,20 +103,20 @@ test('console allowlist not asked without a proxy; the login-only note is shown'
 });
 
 test('single-company shows the open sign-up warning', async () => {
-  const { ui, log } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const { ui, log } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   await askAnswers(ui, { platform: {}, portCheck: null });
   assert.ok(log.notes.some((n) => /create their own organization/.test(n)));
 });
 
 test('free text with newline or both $ and apostrophe is rejected at the prompt', async () => {
-  const { ui, log } = fakeUi(['production', 'pbx.example.com', '80', '', "a$'b", 'a\nb', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const { ui, log } = fakeUi(['production', 'pbx.example.com', '80', '', "a$'b", 'a\nb', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(a.orgName, 'Acme');
   assert.equal(log.rejected.length, 2);
 });
 
 test('invalid address, http in production, bad email are rejected', async () => {
-  const { ui, log } = fakeUi(['production', 'http://pbx.example.com', 'localhost', 'pbx.example.com', '80', '', 'Acme', 'A', 'nope', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const { ui, log } = fakeUi(['production', 'http://pbx.example.com', 'localhost', 'pbx.example.com', '80', '', 'Acme', 'A', 'nope', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(a.publicUrl, 'https://pbx.example.com');
   assert.equal(log.rejected.length, 3);
@@ -125,7 +125,7 @@ test('invalid address, http in production, bad email are rejected', async () => 
 test('defaults pre-fill every non-secret answer', async () => {
   const defaults = JSON.parse(JSON.stringify({
     mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 8080, trustedProxyCidr: '10.0.0.0/8',
-    orgName: 'Acme', ownerName: 'Ann', ownerEmail: 'ann@example.com', tenancy: 'multi',
+    orgName: 'Acme', ownerName: 'Ann', ownerEmail: 'ann@example.com', tenancy: 'multi', frontPage: 'home',
     email: { provider: 'mailjet', fields: { MAILJET_APIKEY: 'pub' }, fromAddress: 'n@example.com', fromName: 'Acme' },
     auth0: { domain: 't.auth0.com', clientId: 'cid', providers: ['github'] }, recaptcha: { siteKey: 'sk', minScore: 0.9 },
     usercheck: { block: { spam: true } }, logs: true, waf: { mode: 'block', stateDir: '/srv/sl', consolePort: 9555, consoleAllow: '1.2.3.4' },
@@ -138,7 +138,8 @@ test('defaults pre-fill every non-secret answer', async () => {
     multiselect: async (o) => o.initialValues, note() {},
   };
   const a = await askAnswers(ui, { platform: {}, defaults, portCheck: null });
-  assert.deepEqual(initial.slice(0, 9), ['production', 'https://pbx.example.com', '8080', '10.0.0.0/8', 'Acme', 'Ann', 'ann@example.com', 'multi', 'mailjet']);
+  assert.deepEqual(initial.slice(0, 10), ['production', 'https://pbx.example.com', '8080', '10.0.0.0/8', 'Acme', 'Ann', 'ann@example.com', 'multi', 'home', 'mailjet']);
+  assert.equal(a.frontPage, 'home');
   assert.equal(a.email.fields.MAILJET_APIKEY, 'pub');
   assert.equal(a.email.fromAddress, 'n@example.com');
   assert.equal(a.auth0.domain, 't.auth0.com');
@@ -153,14 +154,14 @@ test('advanced settings keep only changed values', async () => {
   const answers = ['60', '10', '60', '5', '30', '90', '90', '90', '183', '183', '183', '30', '365', '1800', '900', '5', '30', '60'];
   answers[0] = '120'; // API limit changed
   assert.equal(answers.length, items);
-  const { ui } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', true, ...answers, 'debug', 'info', 'info']);
+  const { ui } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', true, ...answers, 'debug', 'info', 'info']);
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.deepEqual(a.advanced, { RATE_LIMIT_API: '120', LOG_LEVEL: 'debug' });
 });
 
 test('development + email provider: no unusable From default, address accepted', async () => {
   const seen = [];
-  const { ui } = fakeUi(['development', '8080', 'Acme', 'A', 'a@b.co', 'single', 'mailerlite', 'k', 'me@example.com', 'Acme', false, false, false, false, 'off', '', false]);
+  const { ui } = fakeUi(['development', '8080', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'mailerlite', 'k', 'me@example.com', 'Acme', false, false, false, false, 'off', '', false]);
   const orig = ui.text; ui.text = (o) => { seen.push(o.initialValue); return orig(o); };
   const a = await askAnswers(ui, { platform: {}, portCheck: null });
   assert.equal(a.email.fromAddress, 'me@example.com');
@@ -184,7 +185,7 @@ test('blank secret keeps the default; blank without default stays invalid', asyn
   assert.equal(a.usercheck.token, 'uc-token');
   assert.ok(prompts.every((o) => /leave blank to keep/.test(o.message)));
   // no default: blank is refused
-  const { ui: f, log } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'sendinblue', '', 'real', 'n@example.com', 'Acme', false, false, false, false, 'off', false]);
+  const { ui: f, log } = fakeUi(['production', 'pbx.example.com', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'sendinblue', '', 'real', 'n@example.com', 'Acme', false, false, false, false, 'off', false]);
   await askAnswers(f, { platform: {}, portCheck: null });
   assert.equal(log.rejected.length, 1);
 });
@@ -192,7 +193,7 @@ test('blank secret keeps the default; blank without default stays invalid', asyn
 test('defaults are not mutated; port re-ask defaults to the last entry', async () => {
   const defaults = Object.freeze({ httpPort: 80 });
   const initials = [];
-  const { ui } = fakeUi(['production', 'pbx.example.com', '8081', '8082', '', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', false]);
+  const { ui } = fakeUi(['production', 'pbx.example.com', '8081', '8082', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', false]);
   const orig = ui.text; ui.text = (o) => { initials.push(o.initialValue); return orig(o); };
   const checks = [false, true];
   await askAnswers(ui, { platform: {}, defaults, portCheck: async () => checks.shift() });
@@ -224,10 +225,24 @@ test('review shows no secret value, maps select to edit/confirm, covers developm
   for (const s of SECRETS) assert.ok(!d.text.includes(s), s);
   assert.match(d.text, /Development/);
   assert.match(d.text, /ngrok: token set/);
+  assert.match(d.text, /Allowed host names: localhost only/);
+  assert.match(p.text, /Front page: the sign-in page/);
   assert.doesNotMatch(d.text, /Proxy:/);
 });
 
+test('development asks for allowed host names, validates them, and they reach VITE_ALLOWED_HOSTS', async () => {
+  const { ui, log, left } = fakeUi(['development', '80', 'http://dev-box:3000', 'Dev-Box.tailnet.ts.net, .ts.net, 100.64.0.7', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', '', false]);
+  const a = await askAnswers(ui, { platform: {}, portCheck: null });
+  assert.equal(left(), 0);
+  assert.equal(log.rejected.length, 1); // a URL with a scheme and port is refused
+  assert.deepEqual(a.allowedHosts, ['dev-box.tailnet.ts.net', '.ts.net', '100.64.0.7']);
+  assert.equal(deriveEnv(a).VITE_ALLOWED_HOSTS, 'localhost,dev-box.tailnet.ts.net,.ts.net,100.64.0.7');
+  const { ui: pui, log: plog } = fakeUi(FULL);
+  assert.deepEqual((await askAnswers(pui, { platform: {}, portCheck: null })).allowedHosts, []);
+  assert.ok(!plog.messages.some((m) => /allowed to open/.test(m)), 'production does not ask');
+});
+
 test('development on port 80 keeps http://localhost', async () => {
-  const { ui } = fakeUi(['development', '80', 'Acme', 'A', 'a@b.co', 'single', 'none', false, false, false, false, 'off', '', false]);
+  const { ui } = fakeUi(['development', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', '', false]);
   assert.equal((await askAnswers(ui, { platform: {}, portCheck: null })).publicUrl, 'http://localhost');
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizePublicUrl, isEmail, parseCidrList, isSafeAbsolutePath, isPortNumber } from '../src/validate.js';
+import { normalizePublicUrl, isEmail, parseCidrList, parseHostList, isSafeAbsolutePath, isPortNumber } from '../src/validate.js';
 
 test('normalizePublicUrl: loose production input', () => {
   assert.deepEqual(normalizePublicUrl('PBX.Example.com/', 'production'), { ok: true, value: 'https://pbx.example.com' });
@@ -65,4 +65,11 @@ test('parseCidrList rejects', () => {
 test('isSafeAbsolutePath', () => {
   for (const p of ['/var/lib/safeline', '/data/safe_line-2']) assert.equal(isSafeAbsolutePath(p), true, p);
   for (const p of ['relative/x', '/a,b', '/a b', '/a;rm -rf /', '/../etc', '/a/../b', '/']) assert.equal(isSafeAbsolutePath(p), false, p);
+});
+
+test('parseHostList: names, IPv4, leading-dot domains; refuses URLs, ports and wildcards', () => {
+  assert.deepEqual(parseHostList(''), { ok: true, value: [] });
+  assert.deepEqual(parseHostList(' Dev-Box.ts.net , .ts.net,10.0.0.7, dev-box.ts.net'), { ok: true, value: ['dev-box.ts.net', '.ts.net', '10.0.0.7'] });
+  for (const bad of ['http://dev-box', 'dev-box:3000', '*.ts.net', '.', 'a..b', 'dev box', 'a/b']) assert.equal(parseHostList(bad).ok, false, bad);
+  assert.match(parseHostList('x, dev-box:3000').reason, /dev-box:3000/);
 });

@@ -290,7 +290,7 @@ cd opbx.cloudonix.com
 ```
 
 The installer asks for the deployment type (production or development), the public address, whether the server
-hosts one company or many organizations, the company and owner details, the email provider (Mailgun, Mailjet,
+hosts one company or many organizations, what the site root shows (the sign-in page by default, or the OPBX homepage), the company and owner details, the email provider (Mailgun, Mailjet,
 MailerLite, Brevo (Sendinblue) or none), optional Auth0 sign-in, reCAPTCHA and UserCheck, whether to collect logs in
 Grafana, and whether to put the SafeLine WAF in front. It then generates all secrets, writes `.env` and the compose files, starts the stack,
 creates the platform owner and runs a few checks. At the end it prints the URLs, the owner login and, for production,
@@ -308,6 +308,9 @@ a reverse proxy snippet.
 - **Owner account.** The installer creates the organization owner (who is also a platform manager) with a generated
   password. The password is shown once and saved to `opbx-install-summary.txt` (mode 600, git-ignored). Store the
   password, then delete that file. The seeded `admin@example.com` account does not exist on installer-made systems.
+- **Development from another machine.** The Vite dev server only answers to host names it knows (`localhost` always works).
+  A development install asks for the other names you use to open it (a Tailscale or other VPN name, the machine's IP, an
+  ngrok domain; `.ts.net` allows every name under it) and writes them to `VITE_ALLOWED_HOSTS`.
 - **Everyday use.** The installer writes `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2` to `.env`, so
   starting the stack afterwards is `docker compose up -d`.
 
@@ -316,7 +319,8 @@ Other modes:
 ```bash
 ./install.sh                # install; on an existing install offers Change settings / Start over / Exit.
                             # An interrupted install is resumed.
-./install.sh reconfigure    # change the public address, or turn the WAF on/off or switch its mode
+./install.sh reconfigure    # change the public address, the front page, the allowed host names (development),
+                            # or turn the WAF on/off or switch its mode
 ./install.sh reset          # delete all data and generated config (see below)
 ```
 

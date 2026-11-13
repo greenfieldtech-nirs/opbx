@@ -6,6 +6,8 @@ export const OWNED_KEYS = {
     'APP_URL', 'FRONTEND_URL', 'SANCTUM_STATEFUL_DOMAINS', 'SESSION_DOMAIN', 'VITE_WS_HOST', 'VITE_WS_PORT',
     'VITE_WS_SCHEME', 'VITE_ALLOWED_HOSTS', 'GRAFANA_ROOT_URL', 'AUTH0_REDIRECT_URI', 'OPBX_APPLICATION_WEBHOOK_BASEURL',
   ],
+  hosts: ['VITE_ALLOWED_HOSTS'],
+  frontPage: ['OPBX_FRONT_PAGE'],
   waf: [
     'WAF_MODE', 'WAF_CONSOLE_ENABLED', 'WAF_CONSOLE_PORT', 'WAF_CONSOLE_BIND', 'WAF_CONSOLE_ALLOW', 'TRUSTED_PROXY_CIDR', 'COMPOSE_FILE',
   ],
@@ -36,7 +38,8 @@ export function deriveEnv(a) {
     VITE_WS_HOST: host,
     VITE_WS_PORT: prod ? u.port || (tls ? '443' : '80') : '6001',
     VITE_WS_SCHEME: prod ? 'https' : 'http',
-    VITE_ALLOWED_HOSTS: host,
+    // only the Vite dev server reads it; production serves a built bundle
+    VITE_ALLOWED_HOSTS: [...new Set([host, ...(prod ? [] : a.allowedHosts ?? [])])].join(','),
     GRAFANA_ROOT_URL: `${a.publicUrl}/logs/`,
     OPCACHE_VALIDATE_TIMESTAMPS: prod ? '0' : '1',
     OPBX_INSTALLER_MANAGED: 'true',
@@ -50,6 +53,7 @@ export function deriveEnv(a) {
     WAF_CONSOLE_ENABLED: String(!!a.waf),
     WAF_CONSOLE_ALLOW: a.waf && a.trustedProxyCidr ? a.waf.consoleAllow || '' : '',
     OPBX_APPLICATION_MODE: a.tenancy === 'multi' ? 'production' : 'development',
+    OPBX_FRONT_PAGE: a.frontPage === 'home' ? 'home' : 'login',
   };
   if (a.waf) {
     env.WAF_CONSOLE_PORT = String(a.waf.consolePort ?? 9443);
@@ -107,11 +111,18 @@ export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = 
     trustedProxyCidr: g('TRUSTED_PROXY_CIDR'),
     ownerEmail: g('OPBX_OWNER_EMAIL') || undefined,
     tenancy: g('OPBX_APPLICATION_MODE') === 'production' ? 'multi' : 'single',
+    frontPage: g('OPBX_FRONT_PAGE') === 'home' ? 'home' : 'login',
     logs: g('COMPOSE_PROFILES').split(',').includes('logs'),
     ngrokToken: sec(g('NGROK_AUTHTOKEN')) ?? '',
+    allowedHosts: [],
     auth0: null, recaptcha: null, usercheck: null, waf: null,
     email: { provider: 'none', fields: {}, fromAddress: '', fromName: '' },
   };
+  if (a.mode === 'development') {
+    let primary = '';
+    try { primary = new URL(a.publicUrl).hostname; } catch { /* no APP_URL: keep every entry */ }
+    a.allowedHosts = g('VITE_ALLOWED_HOSTS').split(',').map((h) => h.trim()).filter((h) => h && h !== primary);
+  }
   const provider = g('EMAIL_PROVIDER');
   if (EMAIL_FIELDS[provider] && on(`${provider.toUpperCase()}_ENABLED`)) {
     a.email = { provider, fields: {}, fromAddress: g('MAIL_FROM_ADDRESS'), fromName: g('MAIL_FROM_NAME') };

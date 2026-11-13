@@ -1,4 +1,4 @@
-import { normalizePublicUrl, isEmail, parseCidrList, isPortNumber, isSafeAbsolutePath } from './validate.js';
+import { normalizePublicUrl, isEmail, parseCidrList, parseHostList, isPortNumber, isSafeAbsolutePath } from './validate.js';
 
 // Defaults are the template's own (.env.example); only values the user changes are returned.
 const ADVANCED = [
@@ -113,6 +113,17 @@ export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPo
   return null;
 }
 
+// Development only: the Vite dev server refuses requests for host names it does not know.
+export async function askAllowedHosts(ui, d) {
+  ui.note('Allowed host names', 'The development web server only answers to host names it knows; localhost always works.\n'
+    + 'List every other name people use to open OPBX on this machine: a VPN name (for example a Tailscale name such as dev-box.tailnet.ts.net), '
+    + 'the machine\'s IP address, or your ngrok domain. Start a name with a dot (.ts.net) to allow every name under it.');
+  const v = await text(ui, 'Other host names allowed to open OPBX (comma-separated, optional, press Enter to skip)', {
+    def: (d.allowedHosts ?? []).join(','), placeholder: 'dev-box.tailnet.ts.net, .ts.net', optional: true, check: (s) => parseHostList(s).reason,
+  });
+  return parseHostList(v).value;
+}
+
 export async function askAnswers(ui, { platform, defaults = {}, portCheck = null } = {}) {
   const d = { ...defaults };
   const a = {};
@@ -133,6 +144,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
 
   a.httpPort = await askPort(ui, 'Which port on this machine should OPBX listen on?', d.httpPort ?? 80, portCheck);
   if (!prod && a.httpPort !== 80) a.publicUrl = `http://localhost:${a.httpPort}`;
+  a.allowedHosts = prod ? [] : await askAllowedHosts(ui, d);
 
   a.trustedProxyCidr = '';
   if (prod) {
@@ -157,6 +169,13 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
   if (a.tenancy === 'single') {
     ui.note('Heads up: sign-up stays open', 'Anyone who can reach this server will be able to create their own organization from the sign-up page (and through Auth0 sign-in, if you enable it). Restrict access to the server if that is not what you want.');
   }
+
+  a.frontPage = await ui.select({
+    message: `What should people see when they open ${a.publicUrl}?`,
+    options: [{ value: 'login', label: 'The sign-in page', hint: 'recommended; people already signed in go straight to the dashboard' },
+      { value: 'home', label: 'The OPBX homepage', hint: 'the public page that describes OPBX' }],
+    initialValue: d.frontPage ?? 'login',
+  });
 
   const provider = await ui.select({
     message: 'Which outgoing email service would you like to use?',
@@ -250,11 +269,12 @@ export async function reviewAnswers(ui, a) {
     ...(a.mode === 'production' ? [`Proxy: ${a.trustedProxyCidr || 'none'}`] : []),
     `Organization: ${a.orgName}`, `Owner: ${a.ownerName} <${a.ownerEmail}>`,
     `Server for: ${a.tenancy === 'single' ? 'just your company' : 'many customer organizations'}`,
+    `Front page: ${a.frontPage === 'home' ? 'the OPBX homepage' : 'the sign-in page'}`,
     `Email service: ${a.email.provider === 'none' ? 'none for now' : `${EMAIL[a.email.provider][0]} (credentials set)`}`,
     `Auth0 sign-in: ${a.auth0 ? `${a.auth0.domain} (${a.auth0.providers.join(', ')})` : 'no'}`,
     `reCAPTCHA: ${yn(a.recaptcha)}`, `UserCheck: ${yn(a.usercheck)}`, `Grafana logs: ${yn(a.logs)}`,
     `Firewall: ${a.waf ? `${a.waf.mode === 'monitor' ? 'monitor only' : 'blocking'}, console on port ${a.waf.consolePort}${a.waf.consoleAllow ? `, console open to ${a.waf.consoleAllow}` : ''}` : 'no'}`,
-    ...(a.mode === 'production' ? [] : [`ngrok: ${a.ngrokToken ? 'token set' : 'no'}`]),
+    ...(a.mode === 'production' ? [] : [`ngrok: ${a.ngrokToken ? 'token set' : 'no'}`, `Allowed host names: ${a.allowedHosts?.length ? a.allowedHosts.join(', ') : 'localhost only'}`]),
     `Advanced settings changed: ${Object.keys(a.advanced).length}`,
   ];
   ui.note('Please review your choices (secrets are hidden)', lines.join('\n'));

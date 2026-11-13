@@ -23,6 +23,14 @@ export function normalizePublicUrl(input, mode) {
   return { ok: true, value: u.origin };
 }
 
+// Vite server.allowedHosts entries: host names or IPv4 addresses; a leading dot (.ts.net) allows every name under it.
+export function parseHostList(s) {
+  const value = [...new Set(String(s ?? '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+  const bad = value.find((h) => !h.replace(/^\./, '').split('.').every((l) => LABEL.test(l)));
+  return bad === undefined ? { ok: true, value }
+    : { ok: false, value: [], reason: `"${bad}" is not a host name. Use names only, without http:// or a port (for example dev-box.tailnet.ts.net, or .ts.net for every name under it).` };
+}
+
 export const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s ?? ''));
 export const isPortNumber = (n) => Number.isInteger(n) && n >= 1 && n <= 65535;
 

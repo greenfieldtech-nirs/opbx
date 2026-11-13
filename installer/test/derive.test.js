@@ -6,7 +6,7 @@ const base = (o = {}) => ({
   mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 80, trustedProxyCidr: '',
   orgName: 'Acme', ownerName: 'Ann', ownerEmail: 'ann@example.com', tenancy: 'single',
   email: { provider: 'none', fields: {}, fromAddress: '', fromName: '' },
-  auth0: null, recaptcha: null, usercheck: null, logs: false, waf: null, ngrokToken: '', advanced: {}, ...o,
+  auth0: null, recaptcha: null, usercheck: null, logs: false, waf: null, ngrokToken: '', allowedHosts: [], frontPage: 'login', advanced: {}, ...o,
 });
 const has = (env, exp) => { for (const [k, v] of Object.entries(exp)) assert.equal(env[k], v, k); };
 
@@ -88,6 +88,19 @@ test('development + ngrok', () => {
   });
 });
 
+test('development allowed host names follow the primary host; production ignores them', () => {
+  assert.equal(deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost', allowedHosts: ['dev.ts.net', '.ts.net'] })).VITE_ALLOWED_HOSTS, 'localhost,dev.ts.net,.ts.net');
+  assert.equal(deriveEnv(base({ allowedHosts: ['dev.ts.net'] })).VITE_ALLOWED_HOSTS, 'pbx.example.com');
+});
+
+test('front page: login unless the homepage was chosen; recovered from .env', () => {
+  assert.equal(deriveEnv(base()).OPBX_FRONT_PAGE, 'login');
+  const e = deriveEnv(base({ frontPage: 'home' }));
+  assert.equal(e.OPBX_FRONT_PAGE, 'home');
+  assert.equal(answersFromEnv(new Map(Object.entries(e))).frontPage, 'home');
+  assert.equal(answersFromEnv(new Map()).frontPage, 'login');
+});
+
 test('development without ngrok has no dev profile', () => {
   const e = deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost' }));
   assert.equal(e.COMPOSE_PROFILES, '');
@@ -130,6 +143,8 @@ test('answersFromEnv round-trips development with ngrok', () => {
   assert.equal(back.mode, 'development');
   assert.equal(back.ngrokToken, 'ng');
   assert.equal(back.publicUrl, 'http://localhost');
+  const hosts = answersFromEnv(new Map(Object.entries(deriveEnv({ ...a, allowedHosts: ['dev.ts.net', '.ts.net'] }))));
+  assert.deepEqual(hosts.allowedHosts, ['dev.ts.net', '.ts.net']);
 });
 
 test('development on another port: APP_URL, Sanctum and Grafana carry the port', () => {

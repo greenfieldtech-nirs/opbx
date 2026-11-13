@@ -14,7 +14,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const base = (o = {}) => ({
   mode: 'production', publicUrl: 'https://pbx.example.com', httpPort: 80, trustedProxyCidr: '10.0.0.5', orgName: 'Acme', ownerName: 'Ann',
   ownerEmail: 'ann@example.com', tenancy: 'single', email: { provider: 'none', fields: {}, fromAddress: '', fromName: '' },
-  auth0: null, recaptcha: null, usercheck: null, logs: false, waf: null, ngrokToken: '', advanced: {}, ...o,
+  auth0: null, recaptcha: null, usercheck: null, logs: false, waf: null, ngrokToken: '', frontPage: 'login', advanced: {}, ...o,
 });
 const SECRETS = { APP_KEY: 'base64:SECRETKEY', DB_PASSWORD: 'dbpw', DB_ROOT_PASSWORD: 'rootpw', REDIS_PASSWORD: 'redispw' };
 
@@ -102,6 +102,45 @@ test('domain change is refused in development', async () => {
   assert.equal(readFileSync(join(dir, '.env'), 'utf8'), text);
   assert.deepEqual(h.log.compose, []);
   assert.match(h.log.notes.join('\n'), /http:\/\/localhost/);
+});
+
+test('front page toggles login <-> home, rewrites OPBX_FRONT_PAGE only, restarts nothing', async () => {
+  const { dir, text } = setup();
+  const h = harness({ select: ['frontpage'] });
+  await run(h, dir);
+  const after = readFileSync(join(dir, '.env'), 'utf8');
+  assert.deepEqual(changed(text, after), ['OPBX_FRONT_PAGE']);
+  assert.equal(parseEnv(after).get('OPBX_FRONT_PAGE'), 'home');
+  assert.deepEqual(h.log.compose, []);
+  const h2 = harness({ select: ['frontpage'] });
+  await run(h2, dir);
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('OPBX_FRONT_PAGE'), 'login');
+});
+
+test('allowed host names (development): rewrites VITE_ALLOWED_HOSTS only and recreates the frontend', async () => {
+  const { dir, text } = setup(base({ mode: 'development', publicUrl: 'http://localhost', trustedProxyCidr: '', allowedHosts: ['old.example.com'] }));
+  let offered;
+  const h = harness({ select: ['hosts'], over: { steps: { askAllowedHosts: async (_ui, d) => { offered = d.allowedHosts; return ['dev-box.tailnet.ts.net', '.ts.net']; } } } });
+  await run(h, dir);
+  const after = readFileSync(join(dir, '.env'), 'utf8');
+  assert.deepEqual(offered, ['old.example.com']);
+  assert.deepEqual(changed(text, after), ['VITE_ALLOWED_HOSTS']);
+  assert.equal(parseEnv(after).get('VITE_ALLOWED_HOSTS'), 'localhost,dev-box.tailnet.ts.net,.ts.net');
+  assert.deepEqual(h.log.compose, [['up', '-d', 'frontend']]);
+});
+
+test('allowed host names: no change writes nothing; production does not offer the option', async () => {
+  const { dir, text } = setup(base({ mode: 'development', publicUrl: 'http://localhost', trustedProxyCidr: '', allowedHosts: ['a.example.com'] }));
+  const h = harness({ select: ['hosts'], over: { steps: { askAllowedHosts: async () => ['a.example.com'] } } });
+  await run(h, dir);
+  assert.equal(readFileSync(join(dir, '.env'), 'utf8'), text);
+  assert.deepEqual(h.log.compose, []);
+  let opts;
+  const p = setup();
+  const h2 = harness();
+  h2.ui.select = async (o) => { opts ??= o.options.map((x) => x.value); return 'exit'; };
+  await run(h2, p.dir);
+  assert.ok(!opts.includes('hosts'));
 });
 
 test('refuses without an installation or when it is incomplete', async () => {
