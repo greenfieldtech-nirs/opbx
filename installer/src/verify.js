@@ -71,7 +71,10 @@ export async function runChecks(docker, answers, { env = loadEnv() } = {}) {
     const net = Object.keys(JSON.parse(n.stdout || '{}')).find((k) => k.endsWith('_opbx'));
     if (!net) return { ok: false, detail: `no *_opbx network on opbx_nginx: ${detail(n)}` };
     const r = await docker.run(['run', '--rm', '--network', net, 'node:26-alpine', 'node', '-e', wsScript(key)]);
-    return { ok: / 101 /.test(r.stdout), detail: detail(r) };
+    if (/ 101 /.test(r.stdout)) return { ok: true, detail: '' };
+    // a bare "timeout" hides the cause: add nginx's latest errors (upstream, resolver, WAF hook)
+    const log = await inNginx('tail -n 5 /var/log/nginx/opbx_error.log');
+    return { ok: false, detail: `${detail(r)}${log.stdout.trim() ? `\nnginx error log (last lines):\n${log.stdout.trim().slice(-600)}` : ''}` };
   });
   await check('storage', async () => { // creates missing buckets, then a write/read/delete probe; safe to repeat
     const r = await docker.compose(['exec', '-T', 'app', 'php', 'artisan', 'storage:initialize', '--wait=10']);

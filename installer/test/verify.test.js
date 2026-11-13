@@ -75,6 +75,13 @@ test('websocket check uses discovered network and Pusher key; non-101 fails', as
   assert.match(call, /k123/);
 });
 
+test('a failing websocket check carries nginx\'s latest error lines', async () => {
+  const d = fake({ 'node:26-alpine': ok('timeout'), 'opbx_error.log': ok('connect() failed (113: Host is unreachable) while connecting to upstream "soketi:6001"\n') });
+  const ws = byName(await runChecks(d, { waf: null, logs: false }, { env: ENV }), 'websocket');
+  assert.equal(ws.ok, false);
+  assert.match(ws.detail, /timeout[\s\S]*Host is unreachable/);
+});
+
 test('WAF block mode expects 403; monitor mode looks for safeline-waf in the error log; console check unless disabled', async () => {
   const block = fake({ '%27': { code: 1, stdout: '', stderr: '  HTTP/1.1 403 Forbidden' } });
   const rb = await runChecks(block, { waf: { mode: 'block' }, logs: false }, { env: ENV });
