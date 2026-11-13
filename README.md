@@ -304,7 +304,9 @@ a reverse proxy snippet.
   for you to confirm each one. The WAF console is served by the OPBX nginx on a port you choose (default 9443,
   `WAF_CONSOLE_PORT`), so your proxy must forward that port too (a second block in the snippet). If the proxy runs on
   the same server, pick a console port the proxy does not listen on. The console is limited to the proxy IP when you
-  gave one; otherwise only SafeLine's own login protects it.
+  gave one; otherwise only SafeLine's own login protects it. On a development install the console is on `localhost` only,
+  unless you choose to let other computers (for example over a VPN) open it, optionally limited to an IP list such as
+  Tailscale's `100.64.0.0/10`. `./install.sh reconfigure` can change this later.
 - **Owner account.** The installer creates the organization owner (who is also a platform manager) with a generated
   password. The password is shown once and saved to `opbx-install-summary.txt` (mode 600, git-ignored). Store the
   password, then delete that file. The seeded `admin@example.com` account does not exist on installer-made systems.

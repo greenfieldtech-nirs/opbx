@@ -101,6 +101,18 @@ test('front page: login unless the homepage was chosen; recovered from .env', ()
   assert.equal(answersFromEnv(new Map()).frontPage, 'login');
 });
 
+test('development WAF console: loopback by default; other computers bind 0.0.0.0 with their allowlist; round-trips', () => {
+  const waf = { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleAllow: '100.64.0.0/10' };
+  const dev = (w) => base({ mode: 'development', publicUrl: 'http://localhost', waf: w });
+  const local = deriveEnv(dev({ ...waf, consoleRemote: false }));
+  has(local, { WAF_CONSOLE_BIND: '127.0.0.1', WAF_CONSOLE_ALLOW: '' });
+  const remote = deriveEnv(dev({ ...waf, consoleRemote: true }));
+  has(remote, { WAF_CONSOLE_BIND: '0.0.0.0', WAF_CONSOLE_ALLOW: '100.64.0.0/10' });
+  const back = answersFromEnv(new Map(Object.entries(remote)), new Map([['SAFELINE_DIR', '/var/lib/safeline']]));
+  assert.deepEqual(back.waf, { ...waf, consoleRemote: true });
+  assert.equal(answersFromEnv(new Map(Object.entries(local))).waf.consoleRemote, false);
+});
+
 test('development without ngrok has no dev profile', () => {
   const e = deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost' }));
   assert.equal(e.COMPOSE_PROFILES, '');

@@ -35,6 +35,12 @@ test('development has no snippet, localhost WAF console and ngrok', () => {
   assert.ok(s.includes('http://localhost:9555') && s.includes('http://localhost:4040'));
 });
 
+test('development console opened to other computers shows an allowed host name', () => {
+  const a = { ...base, mode: 'development', publicUrl: 'http://localhost', allowedHosts: ['.ts.net', 'dev-box.ts.net'], waf: { ...base.waf, consoleRemote: true } };
+  assert.ok(renderSummary(a, res).includes('WAF console: http://dev-box.ts.net:9555'));
+  assert.ok(renderSummary({ ...a, waf: { ...a.waf, consoleRemote: false } }, res).includes('WAF console: http://localhost:9555'));
+});
+
 test('no proxy IP + WAF, no WAF admin, email none', () => {
   const s = renderSummary({ ...base, trustedProxyCidr: '', email: { provider: 'none' } }, { ...res, wafAdmin: undefined });
   assert.ok(s.includes('protected only by SafeLine'));

@@ -104,6 +104,21 @@ test('domain change is refused in development', async () => {
   assert.match(h.log.notes.join('\n'), /http:\/\/localhost/);
 });
 
+test('console access (development): opening to other computers rewrites bind + allowlist and recreates nginx', async () => {
+  const waf = { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleAllow: '', consoleRemote: false };
+  const { dir, text } = setup(base({ mode: 'development', publicUrl: 'http://localhost', trustedProxyCidr: '', allowedHosts: ['dev.ts.net'], waf }));
+  const h = harness({ select: ['consoleaccess'], over: { steps: { askConsoleAccess: async () => ({ consoleRemote: true, consoleAllow: '100.64.0.0/10' }) } } });
+  await run(h, dir);
+  const after = readFileSync(join(dir, '.env'), 'utf8');
+  assert.deepEqual(changed(text, after), ['WAF_CONSOLE_ALLOW', 'WAF_CONSOLE_BIND']);
+  assert.equal(parseEnv(after).get('WAF_CONSOLE_BIND'), '0.0.0.0');
+  assert.deepEqual(h.log.compose, [['up', '-d', 'nginx']]);
+  assert.match(h.log.notes.join('\n'), /http:\/\/dev\.ts\.net:9443/);
+  const same = harness({ select: ['consoleaccess'], over: { steps: { askConsoleAccess: async () => ({ consoleRemote: true, consoleAllow: '100.64.0.0/10' }) } } });
+  await run(same, dir);
+  assert.deepEqual(same.log.compose, []);
+});
+
 test('front page toggles login <-> home, rewrites OPBX_FRONT_PAGE only, restarts nothing', async () => {
   const { dir, text } = setup();
   const h = harness({ select: ['frontpage'] });

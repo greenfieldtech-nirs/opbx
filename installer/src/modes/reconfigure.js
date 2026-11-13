@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv, renderEnv, writeFileAtomic, envFileOpts } from '../envfile.js';
 import { deriveEnv, answersFromEnv, OWNED_KEYS } from '../derive.js';
-import { askPublicUrl, askWaf, askAllowedHosts } from '../questions.js';
+import { askPublicUrl, askWaf, askAllowedHosts, askConsoleAccess } from '../questions.js';
 import { detectInstall } from '../detect.js';
 import { hostStep } from '../hoststep.js';
 import { safelineHostCommands, checkSafelineState, writeSafelineEnv, checkDetector } from '../safeline.js';
@@ -20,7 +20,7 @@ const real = { now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeo
 
 // `steps` replaces collaborators in unit tests.
 export async function runReconfigure({ ui, docker, repoDir, platform, steps = {} }) {
-  const S = { askPublicUrl, askWaf, askAllowedHosts, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
+  const S = { askPublicUrl, askWaf, askAllowedHosts, askConsoleAccess, hostStep, isPortFree, checkSafelineState, safelineHostCommands, writeSafelineEnv, resetSafelineAdmin, runChecks, ...steps };
   const envPath = join(repoDir, '.env');
   const readEnv = (p) => (existsSync(p) ? parseEnv(readFileSync(p, 'utf8')) : new Map());
 
@@ -48,7 +48,8 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
       { value: 'frontpage', label: `Change the front page (now: ${current.frontPage === 'home' ? 'the OPBX homepage' : 'the sign-in page'})` },
       ...(prod ? [] : [{ value: 'hosts', label: 'Change the host names allowed to open OPBX (VPN, IP, ngrok)' }]),
       ...(wafOn
-        ? [{ value: 'wafmode', label: 'Change the firewall mode (monitor / block)' }, { value: 'wafoff', label: 'Turn the firewall off' }]
+        ? [{ value: 'wafmode', label: 'Change the firewall mode (monitor / block)' },
+          { value: 'consoleaccess', label: 'Change who can open the firewall console' }, { value: 'wafoff', label: 'Turn the firewall off' }]
         : [{ value: 'wafon', label: 'Turn the firewall on' }]),
       { value: 'exit', label: 'Exit' },
     ],
@@ -78,6 +79,20 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     v.COMPOSE_FILE = (a.waf ? [...files, OVERLAY] : files).join(':');
     return v;
   };
+
+  if (choice === 'consoleaccess') {
+    const access = await S.askConsoleAccess(ui, current, { mode: current.mode, trustedProxyCidr: current.trustedProxyCidr, consolePort: current.waf.consolePort });
+    const next = { ...current, waf: { ...current.waf, ...access } };
+    const before = wafValues(current);
+    const after = wafValues(next);
+    if (JSON.stringify(before) === JSON.stringify(after)) { ui.note('Nothing changed', 'The firewall console access stays as it is.'); uiState.reconfigure = null; return; }
+    apply(after);
+    must(await docker.compose(['up', '-d', 'nginx']), 'Recreating nginx');
+    const a = fresh();
+    await report(a, (c) => c.name.startsWith('waf'));
+    ui.note('Firewall console', `Console: ${consoleUrl(a)}${after.WAF_CONSOLE_ALLOW ? `\nOpen to: ${after.WAF_CONSOLE_ALLOW}` : ''}`);
+    return;
+  }
 
   if (choice === 'frontpage') {
     const frontPage = current.frontPage === 'home' ? 'login' : 'home';
@@ -145,7 +160,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   // wafon
   // a console port from an earlier WAF-on is kept in .env (wafoff leaves it) and offered again
   const waf = await S.askWaf(ui, { waf: { stateDir: slEnv().get('SAFELINE_DIR') || undefined, consolePort: Number(env.get('WAF_CONSOLE_PORT')) || undefined } },
-    current.trustedProxyCidr, { httpPort: current.httpPort });
+    current.trustedProxyCidr, { httpPort: current.httpPort, mode: current.mode });
   if (!waf) { ui.note('Nothing changed', 'The firewall stays off.'); uiState.reconfigure = null; return; }
   await S.hostStep(ui, {
     title: 'Prepare the firewall data folder',

@@ -242,6 +242,22 @@ test('development asks for allowed host names, validates them, and they reach VI
   assert.ok(!plog.messages.some((m) => /allowed to open/.test(m)), 'production does not ask');
 });
 
+test('development + WAF asks who may open the console; other computers get an optional allowlist', async () => {
+  const dev = (rest) => ['development', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, ...rest, '', false];
+  const local = fakeUi(dev(['monitor', '/var/lib/safeline', '9443', false]));
+  const a = await askAnswers(local.ui, { platform: {}, portCheck: null });
+  assert.equal(local.left(), 0);
+  assert.deepEqual(a.waf, { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleRemote: false, consoleAllow: '' });
+  const remote = fakeUi(dev(['monitor', '/var/lib/safeline', '9443', true, 'nope', '100.64.0.0/10']));
+  const b = await askAnswers(remote.ui, { platform: {}, portCheck: null });
+  assert.equal(remote.left(), 0);
+  assert.equal(remote.log.rejected.length, 1);
+  assert.deepEqual(b.waf, { mode: 'monitor', stateDir: '/var/lib/safeline', consolePort: 9443, consoleRemote: true, consoleAllow: '100.64.0.0/10' });
+  const open = fakeUi(dev(['monitor', '/var/lib/safeline', '9443', true, '']));
+  assert.equal((await askAnswers(open.ui, { platform: {}, portCheck: null })).waf.consoleAllow, '');
+  assert.match(open.log.notes.join('\n'), /Any computer that can reach this machine/);
+});
+
 test('development on port 80 keeps http://localhost', async () => {
   const { ui } = fakeUi(['development', '80', '', 'Acme', 'A', 'a@b.co', 'single', 'login', 'none', false, false, false, false, 'off', '', false]);
   assert.equal((await askAnswers(ui, { platform: {}, portCheck: null })).publicUrl, 'http://localhost');

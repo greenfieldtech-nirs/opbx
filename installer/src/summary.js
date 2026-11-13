@@ -10,7 +10,12 @@ const HEADERS = `proxy_set_header Host $host;
         proxy_set_header Connection "upgrade";`;
 
 export const consolePort = (a) => a.waf?.consolePort ?? 9443;
-export const consoleUrl = (a) => (a.mode === 'production' ? `https://${new URL(a.publicUrl).hostname}:${consolePort(a)}` : `http://localhost:${consolePort(a)}`);
+export const consoleUrl = (a) => {
+  if (a.mode === 'production') return `https://${new URL(a.publicUrl).hostname}:${consolePort(a)}`;
+  // development opened to other computers: show a name they can use (a ".domain" entry is not one)
+  const remote = a.waf?.consoleRemote && (a.allowedHosts ?? []).find((h) => !h.startsWith('.'));
+  return `http://${remote || 'localhost'}:${consolePort(a)}`;
+};
 
 export function proxySnippet(a) {
   const host = new URL(a.publicUrl).hostname;

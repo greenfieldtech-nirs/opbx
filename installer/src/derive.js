@@ -51,13 +51,14 @@ export function deriveEnv(a) {
     TRUSTED_PROXY_CIDR: a.trustedProxyCidr || '',
     WAF_MODE: a.waf ? a.waf.mode : 'off',
     WAF_CONSOLE_ENABLED: String(!!a.waf),
-    WAF_CONSOLE_ALLOW: a.waf && a.trustedProxyCidr ? a.waf.consoleAllow || '' : '',
+    WAF_CONSOLE_ALLOW: a.waf && (a.trustedProxyCidr || a.waf.consoleRemote) ? a.waf.consoleAllow || '' : '',
     OPBX_APPLICATION_MODE: a.tenancy === 'multi' ? 'production' : 'development',
     OPBX_FRONT_PAGE: a.frontPage === 'home' ? 'home' : 'login',
   };
   if (a.waf) {
     env.WAF_CONSOLE_PORT = String(a.waf.consolePort ?? 9443);
-    env.WAF_CONSOLE_BIND = prod ? '0.0.0.0' : '127.0.0.1'; // development: this computer only
+    // development: this computer only, unless other computers (VPN) were allowed
+    env.WAF_CONSOLE_BIND = prod || a.waf.consoleRemote ? '0.0.0.0' : '127.0.0.1';
   }
   // empty (not absent) for single so a re-render clears a stale multi value
   env.OPBX_APPLICATION_WEBHOOK_BASEURL = a.tenancy === 'multi' ? a.publicUrl : '';
@@ -144,6 +145,7 @@ export function answersFromEnv(env, safelineEnv = new Map(), { includeSecrets = 
   const wafMode = g('WAF_MODE');
   if (wafMode && wafMode !== 'off') {
     a.waf = { mode: wafMode, stateDir: safelineEnv.get('SAFELINE_DIR') || '', consolePort: Number(g('WAF_CONSOLE_PORT')) || 9443, consoleAllow: g('WAF_CONSOLE_ALLOW') };
+    if (a.mode === 'development') a.waf.consoleRemote = g('WAF_CONSOLE_BIND') === '0.0.0.0';
   }
   return a;
 }

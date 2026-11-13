@@ -86,7 +86,31 @@ export async function askPublicUrl(ui, d, mode) {
   }), mode).value;
 }
 
-export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPort } = {}) {
+// Who may open the firewall console. Production: an allowlist only when a proxy address is known.
+// Development: this computer only (127.0.0.1), or other computers too (0.0.0.0) with an optional allowlist.
+export async function askConsoleAccess(ui, d, { mode, trustedProxyCidr, consolePort }) {
+  if (mode === 'development') {
+    const consoleRemote = await ui.confirm({
+      message: `Should other computers (over a VPN or the network) be able to open the firewall console on port ${consolePort}?`,
+      initialValue: d.waf?.consoleRemote ?? false,
+    });
+    if (!consoleRemote) return { consoleRemote, consoleAllow: '' };
+    const consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open it? (for example 100.64.0.0/10 for Tailscale; press Enter to rely on its login only)', {
+      def: d.waf?.consoleAllow, placeholder: '100.64.0.0/10', optional: true, check: cidrCheck,
+    }));
+    if (!consoleAllow) ui.note('Firewall console', 'Any computer that can reach this machine will see the firewall console login page (plain HTTP).');
+    return { consoleRemote, consoleAllow };
+  }
+  if (trustedProxyCidr) {
+    return { consoleAllow: joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {
+      def: d.waf?.consoleAllow, placeholder: '203.0.113.0/24', check: cidrCheck,
+    })) };
+  }
+  ui.note('Firewall console', 'Without a proxy address, OPBX cannot tell visitors apart by IP, so the firewall console will be protected by its own login only.');
+  return { consoleAllow: '' };
+}
+
+export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPort, mode = 'production' } = {}) {
   const wafMode = await ui.select({
     message: 'Put a web application firewall in front of OPBX?',
     options: [{ value: 'off', label: 'No' }, { value: 'monitor', label: 'Yes, monitor only', hint: 'recommended to start' },
@@ -100,15 +124,7 @@ export async function askWaf(ui, d, trustedProxyCidr, { portCheck = null, httpPo
     });
     const consolePort = await askPort(ui, 'Which port should the firewall console use? (choose one your reverse proxy does not listen on)',
       d.waf?.consolePort ?? 9443, portCheck, httpPort);
-    let consoleAllow = '';
-    if (trustedProxyCidr) {
-      consoleAllow = joinCidrs(await text(ui, 'Which IPs or networks may open the firewall console?', {
-        def: d.waf?.consoleAllow, placeholder: '203.0.113.0/24', check: cidrCheck,
-      }));
-    } else {
-      ui.note('Firewall console', 'Without a proxy address, OPBX cannot tell visitors apart by IP, so the firewall console will be protected by its own login only.');
-    }
-    return { mode: wafMode, stateDir, consolePort, consoleAllow };
+    return { mode: wafMode, stateDir, consolePort, ...(await askConsoleAccess(ui, d, { mode, trustedProxyCidr, consolePort })) };
   }
   return null;
 }
@@ -240,7 +256,7 @@ export async function askAnswers(ui, { platform, defaults = {}, portCheck = null
 
   a.logs = await ui.confirm({ message: 'Collect logs in Grafana?', initialValue: d.logs ?? false });
 
-  a.waf = await askWaf(ui, d, a.trustedProxyCidr, { portCheck, httpPort: a.httpPort });
+  a.waf = await askWaf(ui, d, a.trustedProxyCidr, { portCheck, httpPort: a.httpPort, mode: a.mode });
 
   a.ngrokToken = '';
   if (!prod) a.ngrokToken = await secret(ui, 'ngrok auth token, to receive calls from Cloudonix (optional, press Enter to skip)', d.ngrokToken, { optional: true });
