@@ -32,7 +32,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   // a hand-made .env has no COMPOSE_FILE of ours: rewriting it would drop the stack's compose files
   if (env.get('OPBX_INSTALLER_MANAGED') !== 'true' || !env.get('COMPOSE_FILE')) {
     ui.note('Cannot change settings here', 'This OPBX was not set up by the installer, so the installer cannot change its settings safely. Nothing was changed.\n'
-      + 'For a manual installation, edit .env yourself and run `docker compose up -d`. For a new installation, use ./install.sh on a fresh checkout.');
+      + 'For a manual installation, edit .env yourself and run `./opbx.sh restart`. For a new installation, use ./install.sh on a fresh checkout.');
     return;
   }
   const slEnv = () => readEnv(join(repoDir, 'docker/safeline/.env'));
@@ -63,7 +63,7 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
   };
   const must = (r, what) => {
     if (r.code === 0) return;
-    const saved = uiState.reconfigure === 'written' ? '\nThe settings in .env were already updated: fix the problem, then run `docker compose up -d` to apply them.' : '\nThe settings in .env were not changed.';
+    const saved = uiState.reconfigure === 'written' ? '\nThe settings in .env were already updated: fix the problem, then run `./opbx.sh start` to apply them.' : '\nThe settings in .env were not changed.';
     throw new Error(`${what} failed:\n${tail(r)}${saved}`);
   };
   const report = async (answers, only) => {

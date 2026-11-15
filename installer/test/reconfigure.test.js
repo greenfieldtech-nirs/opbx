@@ -260,7 +260,7 @@ test('WAF on: SafeLine start failure stops before .env is touched', async () => 
 test('a failing nginx recreate stops and says .env was already updated', async () => {
   const { dir } = setup(base({ waf: { mode: 'monitor', stateDir: '/var/lib/safeline', consoleAllow: '' } }));
   const h = harness({ select: ['wafmode', 'block'], composeCode: () => 1 });
-  await assert.rejects(run(h, dir), /already updated.*docker compose up -d/s);
+  await assert.rejects(run(h, dir), /already updated.*\.\/opbx\.sh start/s);
   assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).get('WAF_MODE'), 'block');
   assert.deepEqual(h.log.steps, []);
 });

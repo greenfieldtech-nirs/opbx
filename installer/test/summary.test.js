@@ -16,7 +16,7 @@ test('production+WAF+single summary has the essentials', () => {
   const s = renderSummary(base, res);
   for (const x of ['https://pbx.example.com/api/v1', 'https://pbx.example.com/logs/', 'https://pbx.example.com:9555', 'owner@example.com', 'Pw-12345',
     'This password will not be shown again.', 'WafPw-9', 'proxy_pass http://<this-server>:8080', 'proxy_pass http://<this-server>:9555',
-    'listen 9555 ssl', 'and 9555', 'client_max_body_size 50m', 'existing server { } block for pbx.example.com', 'separate server { } block', 'only from this proxy', 'sign-up', 'Settings -> Cloudonix', 'webhook', 'reconfigure', 'backup-database.sh', 'docker compose up -d',
+    'listen 9555 ssl', 'and 9555', 'client_max_body_size 50m', 'existing server { } block for pbx.example.com', 'separate server { } block', 'only from this proxy', 'sign-up', 'Settings -> Cloudonix', 'webhook', 'reconfigure', 'backup-database.sh', './opbx.sh start | stop | status',
     'opbx-install-summary.txt', 'Delete it once', 'ws: FAIL']) assert.ok(s.includes(x), x);
   assert.ok(!s.includes('\x1b['));
   assert.ok(!s.includes('protected only by'));

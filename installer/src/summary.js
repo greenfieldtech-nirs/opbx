@@ -80,7 +80,7 @@ export function renderSummary(a, { ownerPassword, wafAdmin, grafana, checks = []
   if (a.tenancy === 'single') add('  - In OPBX go to Settings -> Cloudonix and set up the Cloudonix connection and webhooks.');
   if (prod) add('  - Terminate TLS on the proxy.');
   if (a.waf && a.waf.mode === 'monitor') add('  - WAF is in monitor mode. Once traffic looks clean, switch to block with `./install.sh reconfigure`.');
-  add('  - Take a first backup: ./scripts/backup-database.sh', '  - Everyday start command: docker compose up -d', '');
+  add('  - Take a first backup: ./scripts/backup-database.sh', '  - Start, stop and check the stack: ./opbx.sh start | stop | status', '');
   if (a.tenancy === 'single') add('Warning: single-company mode has open sign-up; anyone who can reach the app can register.', '');
   if (a.email.provider === 'none') add('Email is set to None: invitations and password-reset emails will not be sent.', '');
   add(`This summary is saved in ${FILE} (mode 600). Delete it once the password is stored safely.`);
