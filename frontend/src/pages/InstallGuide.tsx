@@ -34,7 +34,7 @@ export function CodeBlock({ code, copy, label, prompt = true }: { code: string; 
     }
   };
   return (
-    <div className="my-4 overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl shadow-black/50">
+    <div className="my-4 w-full max-w-[52rem] overflow-hidden rounded-xl border border-white/10 bg-[#0d1117] shadow-2xl shadow-black/50">
       <div className="flex items-center gap-3 border-b border-white/10 bg-[#1c2128] px-4 py-2">
         <div className="flex gap-1.5" aria-hidden="true">
           <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
