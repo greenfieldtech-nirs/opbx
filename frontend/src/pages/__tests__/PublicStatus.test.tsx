@@ -37,6 +37,19 @@ describe('PublicStatus page', () => {
     expect(screen.getByTestId('group-a').querySelectorAll('[title]')).toHaveLength(72);
   });
 
+  it('opens with the OPBX Cloud disclaimer, above the title', async () => {
+    get.mockResolvedValue({ status: 'ok', updated_at: null, groups: [g('a', 'ok')] });
+    renderPage();
+    const notice = screen.getByRole('complementary', { name: 'Disclaimer' });
+    for (const clause of ['Demonstration service only', 'No warranty; no service level', 'Use at your own risk', 'Limitation of liability']) {
+      expect(notice).toHaveTextContent(clause);
+    }
+    expect(notice).toHaveTextContent(/without prior notice/);
+    const title = screen.getByRole('heading', { level: 1, name: 'Platform Status' });
+    expect(notice.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
+  });
+
   it('shows a friendly error when the request fails', async () => {
     get.mockRejectedValue(new Error('boom'));
     renderPage();
