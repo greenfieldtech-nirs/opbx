@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-15 (Web Phone)
+
+- **Inbound calls ring and alert.** An inbound call to the Web Phone now plays the country's ringing tone until it is answered, declined or abandoned; the tab title flashes "Incoming call: <caller>"; and when the browser window is not in front, a notification ("Incoming call", with the caller) brings OPBX forward with the Web Phone open when clicked. Notification permission is requested when the user opens the Web Phone. The caller shows as "Name (number)" instead of a SIP address. Not in the embed widget.
+
+### Fixed - 2026-11-15 (Web Phone)
+
+- "Web Phone is active in another tab" showed in a single tab when the Web Phone remounted before its tab lock was granted (always in development under React StrictMode).
+- A second inbound call while one was ringing or in progress replaced the first call's state, and answering it left the call in progress without controls. It is now answered 486 Busy Here, so routing moves on.
+
 ### Added - 2026-11-12
 
 - **Guided installer**: `./install.sh` (needs only Docker with Compose, or Podman) replaces the manual bootstrap. It asks for production or development, the public address, tenancy, company and owner, the email provider (Mailgun, Mailjet, MailerLite, Brevo (Sendinblue) or none), optional Auth0, reCAPTCHA and UserCheck, log collection and the SafeLine WAF; generates all secrets; starts the stack; creates the platform owner; runs post-install checks; and prints a summary (saved to `opbx-install-summary.txt`, mode 600, git-ignored). `.env` carries `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2`, so `docker compose up -d` stays the everyday command. Source and developer notes: `installer/README.md`.

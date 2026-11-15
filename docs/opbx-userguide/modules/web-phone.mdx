@@ -56,6 +56,8 @@ Who can do this: any user with a user extension.
 2. The panel opens. Its header shows **Web Phone** and the registration status: "Initializing...", "Connecting...", "Connected, registering..." and then **Registered**.
 3. When it reads **Registered**, the **Keypad** tab is ready.
 
+The first time you open the Web Phone, the browser asks whether OPBX may show notifications. Allow it to be alerted to incoming calls while you work in another tab or application (see [Answer an incoming call](#answer-an-incoming-call)). You can change this later in the browser's site settings.
+
 Close the panel with **X**. While a call is ringing or active, **X** is disabled ("End the call before closing").
 
 :::note The phone stays registered
@@ -83,12 +85,16 @@ While a call is ringing or active, the rest of the page is dimmed and blocked, t
 
 Who can do this: any user with a user extension.
 
-1. While the phone is registered, an incoming call opens the panel by itself and shows **Incoming call** with the caller's SIP address.
-2. Click the green **Answer** button. The browser asks for microphone access the first time.
+1. While the phone is registered, an incoming call opens the panel by itself, rings with your country's ringing tone, and shows **Incoming call** with the caller: their name and number when the call carries a name (for example `Alice (1001)`), otherwise the number.
+2. Click the green **Answer** button. The ringing stops. The browser asks for microphone access the first time.
 
-The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts.
+The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts. The ringing also stops if the caller hangs up first.
 
-{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller address such as sip:+12025550142@acme.example.com and the green Answer and red Reject buttons */}
+While the call rings, the browser tab title alternates with "Incoming call: …". If you are in another tab or application and allowed notifications, the browser also shows an **Incoming call** notification with the caller. Click it to bring OPBX to the front with the Web Phone open, then click **Answer**.
+
+If a call comes in while you are already on a call (or another call is ringing), the Web Phone answers it as busy, so the call continues to the next step of its routing, such as other ring group members or voicemail.
+
+{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller such as Alice (+12025550142) and the green Answer and red Reject buttons */}
 
 ### Reject an incoming call
 
@@ -96,7 +102,7 @@ Who can do this: any user with a user extension.
 
 1. When the panel shows **Incoming call**, click the red **Reject** button.
 
-The call is ended and the panel returns to **Registered**.
+The ringing stops, the call is ended and the panel returns to **Registered**.
 
 ### Use the call controls
 
