@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In development, a page opened by a name other than `localhost` (VPN, IP) connects its live-update WebSocket to that same name on port 6001, unless `VITE_WS_HOST` names another host. Production builds keep `VITE_WS_HOST`.
 - A failed installer WebSocket check now shows nginx's latest error lines instead of only "timeout". When Soketi does not answer at all, it also names Soketi's address and the commands to find a stale Docker firewall rule (seen on Docker 29 hosts after a network was recreated).
 
+### Added - 2026-11-15
+
+- **`./opbx.sh`** starts and stops the stack in the right order: `start [--no-waf]`, `stop`, `restart`, `status`, `logs`, `upgrade`. It starts SafeLine first and waits for its detector when the WAF is on, then the database, Redis, SeaweedFS and the app, then the rest, and waits until every service is running and healthy. `--no-waf` skips the WAF for one run without changing `.env`. `stop` uses `docker compose stop` (never `down`) for OPBX, every profile included, then SafeLine. `upgrade` also runs `composer install` inside the app image as the host user (`--no-dev` in production), so the host needs no PHP or Composer. It defaults `COMPOSE_PARALLEL_LIMIT` to 2 when `.env` has none. Tests: `scripts/tests/opbx-sh-test.sh`.
+
+### Changed - 2026-11-15
+
+- Installation and upgrade docs (README, user guide, `docker/README.md`) describe `./opbx.sh`, the in-image Composer step, the automatic storage buckets and migrations, Compose 2.24.4+ and the `greenfieldtech-nirs/opbx` repository URL.
+- `./scripts/upgrade.sh` runs `./opbx.sh upgrade`. With an installer-made `.env`, `COMPOSE_FILE` decides the compose files: `--prod` no longer drops the WAF and development port settings.
+
 ### Changed - 2026-11-13
 
 - `vite.config.ts` no longer allows the OPBX team's `opbx.ngrok.io` by default. Add your own tunnel or VPN names to `VITE_ALLOWED_HOSTS`.

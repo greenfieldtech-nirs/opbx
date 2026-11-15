@@ -52,7 +52,7 @@ changes end to end, run `./install.sh` against a scratch checkout, never against
 | `src/modes/install.js` | Install and resume: questions, secrets, config files, SafeLine host steps, build, start, owner, checks, summary |
 | `src/modes/reconfigure.js` | Change the public address and WAF settings; rewrites only owned keys, restarts affected services |
 | `src/modes/reset.js` | List what is destroyed, optional DB backup, confirmation phrase, delete data and config, offer to reuse answers |
-| `src/questions.js` | The interview (mode, address, tenancy, email, Auth0, reCAPTCHA, UserCheck, logs, WAF, advanced) and review |
+| `src/questions.js` | The interview (mode, address, allowed host names, tenancy, front page, email, Auth0, reCAPTCHA, UserCheck, logs, WAF and console access, advanced) and review |
 | `src/validate.js` | Validators: public URL, email, port, CIDR list, safe absolute path |
 | `src/derive.js` | Maps answers to `.env` values and back (`deriveEnv`, `answersFromEnv`); `OWNED_KEYS` for reconfigure |
 | `src/envfile.js` | Parse and render `.env` from the template, atomic write with mode and ownership |

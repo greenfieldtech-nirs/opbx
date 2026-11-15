@@ -148,13 +148,13 @@ cp docker-compose.yml.example docker-compose.yml    # or merge the SeaweedFS ser
 
 The script starts SeaweedFS, runs a temporary MinIO container on `./volumes/minio` with the same `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`, mirrors every bucket (all organisations, since each one is a folder inside the bucket), and verifies each bucket with `mc diff` and object counts. It exits non-zero on any mismatch and is safe to re-run. `./volumes/minio` is never modified, so it stays as a fallback.
 
-When it reports success, switch the app over (`./scripts/upgrade.sh` runs the copy and these steps for you):
+When it reports success, switch the app over (`./opbx.sh upgrade` runs the copy and these steps for you):
 
 ```bash
 # .env
 MINIO_ENDPOINT=http://seaweedfs:8333
 
-./scripts/upgrade.sh      # starts app, waits for its migrations and bucket checks, then the rest
+./opbx.sh upgrade         # starts app, waits for its migrations and bucket checks, then the rest
 ```
 
 Copied objects get the migration date as their last-modified time (S3 cannot keep the original), so recording retention counts from the migration date.

@@ -274,9 +274,10 @@ sequenceDiagram
 
 ### Prerequisites
 
-- **Docker** (20.10+) and **Docker Compose** (2.0+)
+- **Docker** (20.10+) with the **Compose plugin 2.24.4+** (the compose files use `!reset` and `!override`), or
+  **Podman** with its Docker-compatible socket and CLI
 - **Cloudonix CPaaS Account**: [Sign up at cloudonix.com](https://cloudonix.com)
-- **ngrok Account** (for local development): [Get authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+- **ngrok Account** (optional, development only, to receive Cloudonix webhooks): [Get authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
 
 ### Quick Start
 
@@ -284,17 +285,30 @@ The host needs only Docker with the Compose plugin (or Podman with a Docker-comp
 Composer are not needed on the host: the installer runs in a container.
 
 ```bash
-git clone https://github.com/greenfieldtech-nirs/opbx.cloudonix.com.git
-cd opbx.cloudonix.com
+git clone https://github.com/greenfieldtech-nirs/opbx.git
+cd opbx
 ./install.sh
 ```
 
-The installer asks for the deployment type (production or development), the public address, whether the server
-hosts one company or many organizations, what the site root shows (the sign-in page by default, or the OPBX homepage), the company and owner details, the email provider (Mailgun, Mailjet,
-MailerLite, Brevo (Sendinblue) or none), optional Auth0 sign-in, reCAPTCHA and UserCheck, whether to collect logs in
-Grafana, and whether to put the SafeLine WAF in front. It then generates all secrets, writes `.env` and the compose files, starts the stack,
-creates the platform owner and runs a few checks. At the end it prints the URLs, the owner login and, for production,
-a reverse proxy snippet.
+The installer asks, in plain language:
+
+- production server or development machine, and the port OPBX listens on
+- production: the public `https://` address and your reverse proxy's IP (optional)
+- development: other host names allowed to open it (VPN or Tailscale names, the machine's IP, an ngrok domain)
+- the company, the owner's name and email, and whether the server hosts one company or many organizations
+- what the site root shows: the sign-in page (default) or the OPBX homepage
+- the outgoing email service (Mailgun, Mailjet, MailerLite, Brevo (Sendinblue) or none)
+- optional Auth0 sign-in, reCAPTCHA and UserCheck
+- whether to collect logs in Grafana
+- whether to put the SafeLine WAF in front (off, monitor or block), its data folder, its console port and who may
+  open the console
+- development: an optional ngrok token
+- optionally, advanced limits, retention periods and log levels
+
+You review the answers before anything is written. It then generates all secrets, writes `.env` and the compose
+files, builds the images, installs the PHP packages inside the app image, starts the stack, creates the platform
+owner and runs checks (services, web app, API, WebSocket, storage, WAF). The final summary lists the URLs, the owner
+login, the Grafana and WAF admin logins when those are on, a reverse proxy snippet for production, and next steps.
 
 - **Production needs an `https://` address.** OPBX does not terminate TLS. Your own reverse proxy or HTTPS accelerator
   must terminate TLS and forward one domain to the OPBX nginx port (`APP_PORT`, default 80). The installer prints a
@@ -314,8 +328,24 @@ a reverse proxy snippet.
   A development install asks for the other names you use to open it (a Tailscale or other VPN name, the machine's IP, an
   ngrok domain; `.ts.net` allows every name under it) and writes them to `VITE_ALLOWED_HOSTS`. Live updates connect to
   the same name on port 6001 (unless `VITE_WS_HOST` is set to something other than `localhost`), so let 6001 through too.
-- **Everyday use.** The installer writes `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2` to `.env`, so
-  starting the stack afterwards is `docker compose up -d`.
+- **Everyday use.** Start and stop the stack with `./opbx.sh` (below). The installer also writes `COMPOSE_FILE`,
+  `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2` to `.env`, so plain `docker compose` commands use the same files.
+
+Starting and stopping:
+
+```bash
+./opbx.sh start             # SafeLine first when the WAF is on, then the database, Redis, storage and the app,
+                            # then the rest; waits until every service is up and prints the URLs
+./opbx.sh start --no-waf    # this run without the WAF (.env unchanged; the next start brings it back)
+./opbx.sh stop              # stops OPBX, then SafeLine; containers, network and data are kept
+./opbx.sh restart           # stop + start
+./opbx.sh status            # every service's state and health, the WAF, the URLs
+./opbx.sh logs [service]    # follow the logs
+./opbx.sh upgrade           # after git pull: rebuild with fresh base images and start in order
+```
+
+`stop` never runs `docker compose down`. That deletes the Docker network, and recreating it has been seen to leave a
+stale host firewall rule that silently drops traffic to a container. Use `./install.sh reset` to remove everything.
 
 Other modes:
 
@@ -323,7 +353,7 @@ Other modes:
 ./install.sh                # install; on an existing install offers Change settings / Start over / Exit.
                             # An interrupted install is resumed.
 ./install.sh reconfigure    # change the public address, the front page, the allowed host names (development),
-                            # or turn the WAF on/off or switch its mode
+                            # who can open the WAF console, or turn the WAF on/off or switch its mode
 ./install.sh reset          # delete all data and generated config (see below)
 ```
 
@@ -348,8 +378,8 @@ Use this only if you do not want the installer. It starts the stack with the def
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/greenfieldtech-nirs/opbx.cloudonix.com.git
-   cd opbx.cloudonix.com
+   git clone https://github.com/greenfieldtech-nirs/opbx.git
+   cd opbx
    ```
 
 2. **Prepare the configuration (before the first start)**
@@ -384,25 +414,36 @@ Use this only if you do not want the installer. It starts the stack with the def
 
 4. **Start all services**
    ```bash
-   docker compose up -d
+   ./opbx.sh start
    ```
-
-5. **Initialize the database**
-   ```bash
-   docker compose exec app php artisan migrate --seed
-   ```
-   The seeder creates the default `admin@example.com` / `password` account (see Default Credentials). Change it
+   On every start the `app` container runs the database migrations, seeds a fresh database and creates the storage
+   buckets before it reports healthy, so there is no separate database step. The first start takes a few minutes.
+   A fresh database gets the default `admin@example.com` / `password` account (see Default Credentials). Change it
    before exposing the system.
 
-6. **Access the application**
-   - **Frontend**: http://localhost:3000
+5. **Access the application**
+   - **Web app**: http://localhost (nginx; in development it serves the Vite dev server, also on http://localhost:3000)
    - **API**: http://localhost/api/v1
    - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
    - **SeaweedFS master UI**: http://localhost:9333 (requires `-f docker-compose.ports.yml`)
 
 ### Upgrading an existing installation
 
-After pulling a version that includes the guided installer:
+```bash
+./scripts/backup-database.sh        # optional, recommended
+git pull
+./scripts/update-compose.sh         # bring the git-ignored docker-compose.yml up to date (asks per changed service)
+./opbx.sh upgrade                   # rebuild, install PHP packages, start in order
+```
+
+`./opbx.sh upgrade` needs only Docker on the host. It copies MinIO data to SeaweedFS once (older installs), rebuilds
+every image with fresh base images, runs `composer install` inside the app image (`--no-dev` in production), starts
+SafeLine first when the WAF is on, then the database, Redis, SeaweedFS and the app (showing the app's log while the
+migrations run), then the rest, and waits until every service is up. It uses the compose files listed in `.env`
+(`COMPOSE_FILE`); `--prod` is only for a hand-made `.env` without it. `./scripts/upgrade.sh` runs the same thing.
+The first start after an upgrade can take several minutes (`UPGRADE_TIMEOUT`, default 1800 seconds).
+
+When you upgrade to the version with the guided installer:
 
 - Run `./scripts/update-compose.sh` to bring your `docker-compose.yml` up to date. The nginx service now starts
   through `docker/nginx/render.sh` and reads `TRUSTED_PROXY_CIDR`, `WAF_CONSOLE_ENABLED` and `WAF_CONSOLE_ALLOW`; an old
@@ -415,7 +456,14 @@ After pulling a version that includes the guided installer:
 - SafeLine's own `127.0.0.1:9443` console mapping is gone; the OPBX nginx serves the console on `WAF_CONSOLE_PORT`
   (with `WAF_CONSOLE_ENABLED=true`).
 - `./install.sh reconfigure` only works on installations the installer set up (`OPBX_INSTALLER_MANAGED=true`). For a
-  manual installation, edit `.env` and run `docker compose up -d`.
+  manual installation, edit `.env` and run `./opbx.sh restart`.
+- `./scripts/upgrade.sh` now runs `./opbx.sh upgrade`. With an installer-made `.env` it uses `COMPOSE_FILE` (so the
+  WAF and development port settings are kept) and ignores `--prod`. It now also installs the PHP packages, so
+  `composer install` on the host is no longer needed.
+- `vite.config.ts` no longer allows `opbx.ngrok.io` by default. If you open the development UI through ngrok or a VPN
+  name, add it to `VITE_ALLOWED_HOSTS` (comma-separated).
+- Unset `OPBX_FRONT_PAGE` keeps the public homepage at `/`; set `OPBX_FRONT_PAGE=login` to open the sign-in page
+  instead (no rebuild needed).
 
 ### ⚠️ Database Persistence
 
