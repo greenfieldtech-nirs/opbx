@@ -463,9 +463,10 @@ class CloudonixCallsClient extends CloudonixBaseClient
     /**
      * Fork a connected call into two sessions, each running its own voice application
      * (POST /calls/{domain}/sessions/{token}/fork). Used for blind transfer of a call the Web Phone
-     * placed: the caller (the Web Phone) gets a hangup, the callee is sent to the transfer target.
+     * placed. As observed live, `caller` is the voice application for the party that was called
+     * (the session's far end) and `callee` the one for the session's originator (the Web Phone).
      *
-     * @param  array{cxml?: string, url?: string, method?: string}  $caller
+     * @param  array{cxml?: string, url?: string, method?: string, callback?: string}  $caller
      * @param  array{cxml?: string, url?: string, method?: string, callback?: string}  $callee
      */
     public function forkCall(string $sessionToken, array $caller, array $callee): bool

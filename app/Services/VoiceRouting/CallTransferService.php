@@ -124,7 +124,8 @@ final class CallTransferService
         try {
             $transferred = match ($mode) {
                 'conference' => $client->switchVoiceApplication($callerToken, $url),
-                'fork' => $client->forkCall($token, ['cxml' => CxmlBuilder::simpleHangup()], ['url' => $url, 'method' => 'POST']),
+                // Live-verified: Cloudonix runs `callee` on the Web Phone's own leg, `caller` on the far end.
+                'fork' => $client->forkCall($token, ['url' => $url, 'method' => 'POST'], ['cxml' => CxmlBuilder::simpleHangup()]),
                 'switch' => $client->switchVoiceApplication($token, $url),
             };
         } catch (\Throwable $e) {

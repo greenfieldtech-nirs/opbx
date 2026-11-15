@@ -129,8 +129,9 @@ final class WebPhoneTransferTest extends TestCase
         $requests = $this->cloudonixRequests();
         $this->assertCount(1, $requests);
         $this->assertStringEndsWith('/sessions/sess-tok/fork', $requests[0]->url());
-        $this->assertStringContainsString('<Hangup', $requests[0]['caller']['cxml']);
-        $this->assertStringContainsString('/callbacks/voice/transfer?', $requests[0]['callee']['url']);
+        // Cloudonix runs `caller` on the far end (sent on) and `callee` on the Web Phone (hung up).
+        $this->assertStringContainsString('/callbacks/voice/transfer?', $requests[0]['caller']['url']);
+        $this->assertStringContainsString('<Hangup', $requests[0]['callee']['cxml']);
     }
 
     public function test_conference_bridged_call_switches_the_waiting_caller_not_the_agent_leg(): void
