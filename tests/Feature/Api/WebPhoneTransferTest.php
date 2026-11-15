@@ -259,6 +259,9 @@ final class WebPhoneTransferTest extends TestCase
         // the Web Phone's leg appended after the caller's.
         $this->row(['direction' => 'incoming', 'caller_id' => '+15551230000', 'destination' => '+972538450880',
             'subscriber_id' => '5006', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE]]);
+        // The synthetic CDR row (no subscriber, caller leg only) is not the session's current state.
+        $this->row(['direction' => 'incoming', 'action' => 'cdr_final_status', 'status' => 'ANSWER',
+            'destination' => '+972538450880', 'call_ids' => [self::CALL_ID_CALLER]]);
         $this->fakeCloudonix();
         Sanctum::actingAs($this->agent);
 
@@ -278,6 +281,18 @@ final class WebPhoneTransferTest extends TestCase
 
         $this->getJson('/api/v1/webphone/session?call_id='.urlencode(self::CALL_ID_WEBPHONE))->assertNotFound();
         $this->getJson('/api/v1/webphone/session?call_id='.urlencode('bob-leg@pbx.test'))->assertNotFound();
+    }
+
+    public function test_an_older_snapshot_naming_the_extension_proves_nothing_once_the_session_moved_on(): void
+    {
+        // The session first rang 1006 (then its newest leg), then went on to ring 1007.
+        $this->row(['direction' => 'incoming', 'caller_id' => '+15551230000', 'destination' => '+972538450880',
+            'subscriber_id' => '5006', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE]]);
+        $this->row(['direction' => 'incoming', 'caller_id' => '+15551230000', 'destination' => '+972538450880',
+            'subscriber_id' => '5007', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE, 'bob-leg@pbx.test']]);
+        Sanctum::actingAs($this->agent);
+
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode(self::CALL_ID_WEBPHONE))->assertNotFound();
     }
 
     public function test_session_lookup_of_a_call_not_involving_the_users_extension_is_not_found(): void

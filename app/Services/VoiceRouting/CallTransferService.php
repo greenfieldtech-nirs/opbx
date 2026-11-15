@@ -69,7 +69,21 @@ final class CallTransferService
 
         $subscriberId = (string) $extension->cloudonix_subscriber_id;
 
-        return $rows->first(fn (SessionUpdate $row) => $subscriberId !== ''
+        // Each row is a snapshot: test the subscriber against each session's current (newest) row
+        // only, or an older snapshot from when this extension was the last one dialled would
+        // still match after Cloudonix rang, and connected, someone else.
+        $current = $rows->isEmpty() ? collect() : SessionUpdate::withoutGlobalScope(OrganizationScope::class)
+            ->whereIn('id', fn ($query) => $query->selectRaw('max(id)')
+                ->from('session_updates')
+                ->where('organization_id', $extension->organization_id)
+                ->whereIn('session_token', $rows->pluck('session_token')->unique())
+                // The synthetic CDR row written after hangup is not a session snapshot.
+                ->where(fn ($q) => $q->whereNull('action')->orWhere('action', '!=', 'cdr_final_status'))
+                ->groupBy('session_token'))
+            ->latest('id')
+            ->get();
+
+        return $current->first(fn (SessionUpdate $row) => $subscriberId !== ''
                 && (string) $row->subscriber_id === $subscriberId
                 && in_array($callId, [Arr::first($row->call_ids ?? []), Arr::last($row->call_ids ?? [])], true))
             ?? $rows->first(fn (SessionUpdate $row) => ltrim((string) $row->destination, '+') === (string) $extension->extension_number);
