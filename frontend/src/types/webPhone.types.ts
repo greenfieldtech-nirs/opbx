@@ -11,6 +11,8 @@ export interface WebPhoneConfig {
   profile_name: string;
   registration_mode: string;
   country: string;
+  /** False in an embed snippet that does not allow call transfer; absent means allowed. */
+  transfer_enabled?: boolean;
 }
 
 export interface WebPhoneCallLogEntry {
@@ -19,4 +21,10 @@ export interface WebPhoneCallLogEntry {
   duration: number;
   duration_formatted: string;
   disposition: string;
+}
+
+/** An extension the Web Phone can transfer a call to. */
+export interface WebPhoneDirectoryEntry {
+  extension_number: string;
+  name: string | null;
 }

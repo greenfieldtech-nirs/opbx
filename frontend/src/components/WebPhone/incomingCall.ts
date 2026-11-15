@@ -26,3 +26,8 @@ export function callerLabel(session: any): string {
 export function isLive(session: any): boolean {
   return !!session && !(typeof session.isEnded === 'function' && session.isEnded());
 }
+
+/** The SIP Call-ID of a JsSIP session's dialog (the server finds the call by it), or null. */
+export function sipCallId(session: any): string | null {
+  return session?._request?.call_id ?? null;
+}

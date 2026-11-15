@@ -16,13 +16,16 @@ import {
   X,
   Plus,
   Minus,
+  PhoneForwarded,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   getWebPhoneConfig,
+  transferWebPhoneCall,
   type WebPhoneConfigResponse,
   type WebPhoneCallsLogResponse,
+  type WebPhoneDirectoryResponse,
 } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
@@ -33,7 +36,8 @@ import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
-import { callerIdentity, callerLabel, isLive, type CallerIdentity } from './incomingCall';
+import { callerIdentity, callerLabel, isLive, sipCallId, type CallerIdentity } from './incomingCall';
+import { TransferPanel } from './TransferPanel';
 import { requestNotificationPermission, useIncomingCallAlert } from './useIncomingCallAlert';
 import { dtmfTransportFor } from './dtmf';
 import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
@@ -55,6 +59,9 @@ interface WebPhoneProps {
   // Config/calls-log sources; embed overrides these to hit /embed/*.
   configQueryFn?: () => Promise<WebPhoneConfigResponse>;
   callsLogQueryFn?: () => Promise<WebPhoneCallsLogResponse>;
+  // Blind transfer and its extension suggestions; embed overrides these too.
+  transferFn?: (callId: string, destination: string) => Promise<void>;
+  directoryQueryFn?: () => Promise<WebPhoneDirectoryResponse>;
   // Pull-tab placement + color (embed is themable per token).
   iconPosition?: IconPosition;
   iconBackgroundColor?: string;
@@ -157,6 +164,8 @@ export function formatCallDuration(totalSeconds: number): string {
 export function WebPhone({
   configQueryFn,
   callsLogQueryFn,
+  transferFn = transferWebPhoneCall,
+  directoryQueryFn,
   iconPosition = 'bottom-right',
   iconBackgroundColor,
   autoOpen = false,
@@ -189,6 +198,8 @@ export function WebPhone({
   // In-call keypad: shown on demand; digits sent this call are echoed in place of the number.
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfDigits, setDtmfDigits] = useState('');
+  // In-call transfer form, shown in place of the keypad.
+  const [showTransfer, setShowTransfer] = useState(false);
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
   // The answered inbound caller, shown during the call (null for outbound calls).
@@ -250,12 +261,15 @@ export function WebPhone({
   });
 
   const config = configResponse?.data as WebPhoneConfig | undefined;
+  // Coaching calls are never transferred; an embed snippet may disallow transfer.
+  const transferEnabled = config?.transfer_enabled !== false && !coachLabel;
 
   const resetCallState = useCallback(() => {
     setCallState('idle');
     setIsMuted(false);
     setIsHeld(false);
     setShowKeypad(false);
+    setShowTransfer(false);
     setDtmfDigits('');
     setIncomingSession(null);
     setIncomingNumber('');
@@ -664,6 +678,26 @@ export function WebPhone({
     }
   }, [incomingSession, getTonePlayer]);
 
+  // Blind transfer: the server moves the other party to the destination, then this leg hangs up.
+  // Its 'ended' handler resets the call; the idle status then says where the call went.
+  const handleTransfer = useCallback(
+    async (destination: string) => {
+      const session = sessionRef.current;
+      const callId = sipCallId(session);
+      if (!callId) throw new Error('This call cannot be transferred.');
+      await transferFn(callId, destination);
+      if (!session.isEnded()) {
+        try {
+          session.terminate();
+        } catch (error) {
+          console.error('[WebPhone] Hang-up after transfer failed:', error);
+        }
+      }
+      setStatus(`Call transferred to ${destination}`);
+    },
+    [transferFn]
+  );
+
   const handleMute = useCallback(() => {
     if (sessionRef.current) {
       try {
@@ -948,7 +982,7 @@ export function WebPhone({
                             <p className="text-sm text-muted-foreground tabular-nums">
                               {formatCallDuration(callSeconds)}
                             </p>
-                            {!showKeypad && connectedCaller ? (
+                            {showTransfer ? null : !showKeypad && connectedCaller ? (
                               // Inbound: caller ID, then the name in the larger font; the ID alone gets the larger font.
                               connectedCaller.name ? (
                                 <>
@@ -974,6 +1008,14 @@ export function WebPhone({
                           </>
                         )}
                       </div>
+
+                      {showTransfer && (
+                        <TransferPanel
+                          onTransfer={handleTransfer}
+                          onCancel={() => setShowTransfer(false)}
+                          directoryQueryFn={directoryQueryFn}
+                        />
+                      )}
 
                       {showKeypad && (
                         <div className="grid grid-cols-3 gap-x-6 gap-y-2">
@@ -1008,7 +1050,10 @@ export function WebPhone({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShowKeypad((v) => !v)}
+                          onClick={() => {
+                            setShowTransfer(false);
+                            setShowKeypad((v) => !v);
+                          }}
                           className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
                             showKeypad
                               ? 'bg-primary text-primary-foreground'
@@ -1033,6 +1078,25 @@ export function WebPhone({
                           {isHeld ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
                           <span className="text-[10px] font-medium">{isHeld ? 'Resume' : 'Hold'}</span>
                         </button>
+                        {transferEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowKeypad(false); // its key listener would send typed digits as DTMF
+                              setShowTransfer((v) => !v);
+                            }}
+                            className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
+                              showTransfer
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                            }`}
+                            aria-label="Transfer"
+                            aria-pressed={showTransfer}
+                          >
+                            <PhoneForwarded className="h-6 w-6" />
+                            <span className="text-[10px] font-medium">Transfer</span>
+                          </button>
+                        )}
                       </div>
 
                       <button

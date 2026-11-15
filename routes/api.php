@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WebPhoneCallsLogController;
 use App\Http\Controllers\Api\WebPhoneConfigController;
+use App\Http\Controllers\Api\WebPhoneTransferController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
@@ -456,6 +457,12 @@ Route::prefix('v1')->group(function (): void {
         // Web Phone calls log
         Route::get('webphone/calls-log', [WebPhoneCallsLogController::class, 'index'])
             ->name('webphone.calls-log');
+
+        // Web Phone blind transfer, and the extensions its transfer field suggests
+        Route::post('webphone/transfer', [WebPhoneTransferController::class, 'transfer'])
+            ->name('webphone.transfer');
+        Route::get('webphone/directory', [WebPhoneTransferController::class, 'directory'])
+            ->name('webphone.directory');
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);

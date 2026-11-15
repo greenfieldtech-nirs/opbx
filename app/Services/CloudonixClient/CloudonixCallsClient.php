@@ -461,6 +461,45 @@ class CloudonixCallsClient extends CloudonixBaseClient
     }
 
     /**
+     * Fork a connected call into two sessions, each running its own voice application
+     * (POST /calls/{domain}/sessions/{token}/fork). Used for blind transfer of a call the Web Phone
+     * placed: the caller (the Web Phone) gets a hangup, the callee is sent to the transfer target.
+     *
+     * @param  array{cxml?: string, url?: string, method?: string}  $caller
+     * @param  array{cxml?: string, url?: string, method?: string, callback?: string}  $callee
+     */
+    public function forkCall(string $sessionToken, array $caller, array $callee): bool
+    {
+        $this->requireDomainUuid();
+
+        return $this->withCircuitBreaker(
+            callback: function () use ($sessionToken, $caller, $callee) {
+                $response = $this->client()
+                    ->post("/calls/{$this->getDomainUuid()}/sessions/{$sessionToken}/fork", [
+                        'caller' => $caller,
+                        'callee' => $callee,
+                    ]);
+
+                if ($response->successful()) {
+                    Log::info('CloudonixClient: Call forked', ['session_token' => $sessionToken]);
+
+                    return true;
+                }
+
+                Log::warning('CloudonixClient: Failed to fork call', [
+                    'session_token' => $sessionToken,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return false;
+            },
+            cacheKey: null, // No caching for write operations
+            fallbackValue: false
+        );
+    }
+
+    /**
      * Switch an active session to a new voice application.
      *
      * Makes a POST request to /calls/{domain-id}/sessions/{token}/application

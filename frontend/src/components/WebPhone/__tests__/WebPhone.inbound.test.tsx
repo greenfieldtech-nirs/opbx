@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 // Tone player stand-in: records play/stop so the ringer can be checked.
@@ -46,6 +47,7 @@ const makeSession = (user: string, displayName = '') => {
   const session = {
     ...e,
     remote_identity: { display_name: displayName, uri: { user, toString: () => `sip:${user}@pbx.test` } },
+    _request: { call_id: `cid-${user}@pbx.test` },
     isEnded: () => ended,
     answer: vi.fn(),
     terminate: vi.fn(() => { ended = true; e.emit('failed', { cause: 'Rejected' }); }),
@@ -60,12 +62,14 @@ const config: WebPhoneConfig = {
   profile_name: 'p', registration_mode: 'r', country: 'us',
 };
 
-async function renderRegisteredPhone() {
+async function renderRegisteredPhone(props: Partial<ComponentProps<typeof WebPhone>> = {}, cfg: WebPhoneConfig = config) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <WebPhone
-        configQueryFn={() => Promise.resolve({ data: config } as any)}
+        configQueryFn={() => Promise.resolve({ data: cfg } as any)}
         callsLogQueryFn={() => Promise.resolve({ data: [] } as any)}
+        directoryQueryFn={() => Promise.resolve({ data: [{ extension_number: '1007', name: 'Bob Target' }] })}
+        {...props}
       />
     </QueryClientProvider>,
   );
@@ -241,5 +245,73 @@ describe('WebPhone registration status', () => {
     ring(makeSession('1007'));
     await screen.findByRole('button', { name: 'Answer' });
     expect(screen.getByRole('button', { name: 'Re-register' })).toBeDisabled();
+  });
+});
+
+describe('WebPhone blind transfer', () => {
+  async function connectedCall(props: Partial<ComponentProps<typeof WebPhone>> = {}, cfg: WebPhoneConfig = config) {
+    await renderRegisteredPhone(props, cfg);
+    const call = makeSession('1002', 'Alice');
+    ring(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer' }));
+    act(() => call.emit('confirmed'));
+    return call;
+  }
+
+  it('transfers the call by its SIP Call-ID, then hangs up and says where it went', async () => {
+    const transferFn = vi.fn().mockResolvedValue(undefined);
+    const call = await connectedCall({ transferFn });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
+    fireEvent.change(screen.getByLabelText('Transfer to'), { target: { value: '1007' } });
+    fireEvent.click(within(screen.getByRole('form', { name: 'Transfer call' })).getByRole('button', { name: 'Transfer' }));
+
+    await waitFor(() => expect(transferFn).toHaveBeenCalledWith('cid-1002@pbx.test', '1007'));
+    await waitFor(() => expect(call.terminate).toHaveBeenCalled());
+    expect(await screen.findByText('Call transferred to 1007')).toBeInTheDocument();
+    // Back on the idle keypad: the in-call controls are gone.
+    expect(screen.queryByRole('button', { name: 'Transfer' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mute' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the call and shows the reason when the transfer fails', async () => {
+    const transferFn = vi.fn().mockRejectedValue({ response: { data: { message: 'The transfer failed. The call is still connected.' } } });
+    const call = await connectedCall({ transferFn });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
+    const form = screen.getByRole('form', { name: 'Transfer call' });
+    fireEvent.change(screen.getByLabelText('Transfer to'), { target: { value: '+12025550199' } });
+    fireEvent.submit(form);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The transfer failed. The call is still connected.');
+    expect(call.terminate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Hang Up' })).toBeInTheDocument();
+  });
+
+  it('suggests extensions by number or name; picking one fills the field', async () => {
+    await connectedCall();
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
+    fireEvent.change(screen.getByLabelText('Transfer to'), { target: { value: 'bob' } });
+
+    fireEvent.click(await screen.findByRole('button', { name: /1007\s*Bob Target/ }));
+    expect(screen.getByLabelText('Transfer to')).toHaveValue('1007');
+
+    fireEvent.change(screen.getByLabelText('Transfer to'), { target: { value: '9' } });
+    expect(screen.queryByRole('button', { name: /Bob Target/ })).not.toBeInTheDocument();
+  });
+
+  it('opening Transfer closes the keypad, so typed digits are not sent as DTMF', async () => {
+    await connectedCall();
+    fireEvent.click(screen.getByRole('button', { name: 'Show keypad' }));
+    expect(screen.getByRole('button', { name: 'Send 5' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Transfer' }));
+    expect(screen.queryByRole('button', { name: 'Send 5' })).not.toBeInTheDocument();
+  });
+
+  it('is not offered when the embed snippet disallows transfer', async () => {
+    await connectedCall({}, { ...config, transfer_enabled: false });
+    expect(screen.getByRole('button', { name: 'Hang Up' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Transfer' })).not.toBeInTheDocument();
   });
 });
