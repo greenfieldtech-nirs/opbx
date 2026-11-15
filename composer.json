@@ -9,7 +9,7 @@
         "php": "^8.4",
         "giggsey/libphonenumber-for-php": "^9.0",
         "james-heinrich/getid3": "^1.9",
-        "laravel/framework": "^12.0",
+        "laravel/framework": "^13.40",
         "laravel/sanctum": "^4.2",
         "laravel/tinker": "^3.0.2",
         "league/flysystem-aws-s3-v3": "^3.30",
