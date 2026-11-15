@@ -46,7 +46,7 @@ server {
   return t;
 }
 
-export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
+export function renderSummary(a, { ownerPassword, wafAdmin, grafana, checks = [] }) {
   const prod = a.mode === 'production';
   const L = [];
   const add = (...x) => L.push(...x);
@@ -58,6 +58,11 @@ export function renderSummary(a, { ownerPassword, wafAdmin, checks = [] }) {
   if (!prod && a.ngrokToken) add('  ngrok dashboard: http://localhost:4040');
   add('', 'Owner login', `  Email:    ${a.ownerEmail}`,
     ...(ownerPassword ? [`  Password: ${ownerPassword}`, '  This password will not be shown again.'] : ['  Owner account already existed; password unchanged.']), '');
+  if (a.logs) {
+    add('Grafana login', `  Username: ${grafana?.username || 'admin'}`,
+      grafana?.password ? `  Password: ${grafana.password}` : '  Password: GRAFANA_ADMIN_PASSWORD in .env',
+      '  Grafana keeps the password it first started with; change it later inside Grafana.', '');
+  }
   if (a.waf) {
     add('WAF admin login');
     add(...(wafAdmin

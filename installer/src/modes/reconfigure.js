@@ -106,8 +106,8 @@ export async function runReconfigure({ ui, docker, repoDir, platform, steps = {}
     const allowedHosts = await S.askAllowedHosts(ui, current);
     if (allowedHosts.join(',') === current.allowedHosts.join(',')) { ui.note('Nothing changed', 'Those are already the allowed host names.'); uiState.reconfigure = null; return; }
     apply(pick(deriveEnv({ ...current, allowedHosts }), OWNED_KEYS.hosts));
-    // Vite reads VITE_ALLOWED_HOSTS at start; `up -d` recreates the container because its environment changed
-    must(await docker.compose(['up', '-d', 'frontend']), 'Restarting the frontend');
+    // Vite and Grafana read these at start; `up -d` recreates a container whose environment changed
+    must(await docker.compose(['up', '-d', 'frontend', ...(current.logs ? ['grafana'] : [])]), 'Restarting the frontend');
     ui.note('Allowed host names updated', `OPBX now opens on: ${['localhost', ...allowedHosts].join(', ')}`);
     return;
   }

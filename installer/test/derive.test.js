@@ -89,8 +89,11 @@ test('development + ngrok', () => {
 });
 
 test('development allowed host names follow the primary host; production ignores them', () => {
-  assert.equal(deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost', allowedHosts: ['dev.ts.net', '.ts.net'] })).VITE_ALLOWED_HOSTS, 'localhost,dev.ts.net,.ts.net');
+  const dev = deriveEnv(base({ mode: 'development', publicUrl: 'http://localhost', allowedHosts: ['dev.ts.net', '.ts.net', '100.64.0.7'] }));
+  assert.equal(dev.VITE_ALLOWED_HOSTS, 'localhost,dev.ts.net,.ts.net,100.64.0.7');
+  assert.equal(dev.GRAFANA_CSRF_TRUSTED_ORIGINS, 'dev.ts.net 100.64.0.7');
   assert.equal(deriveEnv(base({ allowedHosts: ['dev.ts.net'] })).VITE_ALLOWED_HOSTS, 'pbx.example.com');
+  assert.equal(deriveEnv(base({ allowedHosts: ['dev.ts.net'] })).GRAFANA_CSRF_TRUSTED_ORIGINS, '');
 });
 
 test('front page: login unless the homepage was chosen; recovered from .env', () => {

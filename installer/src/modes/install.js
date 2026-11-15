@@ -160,7 +160,9 @@ async function runInstallInner({ ui, docker, repoDir, platform, resume, defaults
       } catch (e) { ui.note('Test email', `Failed: ${e.message}`); }
     }
 
-    let text = renderSummary(answers, { ownerPassword, wafAdmin, checks });
+    const envNow = readEnv(envPath);
+    const grafana = { username: envNow.get('GRAFANA_ADMIN_USER') || 'admin', password: envNow.get('GRAFANA_ADMIN_PASSWORD') || '' };
+    let text = renderSummary(answers, { ownerPassword, wafAdmin, grafana, checks });
     if (!ownerPassword) {
       text += `\n\nTo set a new owner password: docker compose exec app php artisan user:reset-password ${answers.ownerEmail}`;
       const prior = existsSync(summaryPath) ? readFileSync(summaryPath, 'utf8') : '';

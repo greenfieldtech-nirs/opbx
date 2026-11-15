@@ -139,9 +139,14 @@ test('allowed host names (development): rewrites VITE_ALLOWED_HOSTS only and rec
   await run(h, dir);
   const after = readFileSync(join(dir, '.env'), 'utf8');
   assert.deepEqual(offered, ['old.example.com']);
-  assert.deepEqual(changed(text, after), ['VITE_ALLOWED_HOSTS']);
+  assert.deepEqual(changed(text, after), ['GRAFANA_CSRF_TRUSTED_ORIGINS', 'VITE_ALLOWED_HOSTS']);
   assert.equal(parseEnv(after).get('VITE_ALLOWED_HOSTS'), 'localhost,dev-box.tailnet.ts.net,.ts.net');
+  assert.equal(parseEnv(after).get('GRAFANA_CSRF_TRUSTED_ORIGINS'), 'dev-box.tailnet.ts.net');
   assert.deepEqual(h.log.compose, [['up', '-d', 'frontend']]);
+  const g = setup(base({ mode: 'development', publicUrl: 'http://localhost', trustedProxyCidr: '', logs: true }));
+  const hg = harness({ select: ['hosts'], over: { steps: { askAllowedHosts: async () => ['dev.ts.net'] } } });
+  await run(hg, g.dir);
+  assert.deepEqual(hg.log.compose, [['up', '-d', 'frontend', 'grafana']]);
 });
 
 test('allowed host names: no change writes nothing; production does not offer the option', async () => {

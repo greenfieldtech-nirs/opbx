@@ -41,6 +41,13 @@ test('development console opened to other computers shows an allowed host name',
   assert.ok(renderSummary({ ...a, waf: { ...a.waf, consoleRemote: false } }, res).includes('WAF console: http://localhost:9555'));
 });
 
+test('Grafana login is in the summary when logs are on, and absent otherwise', () => {
+  const s = renderSummary(base, { ...res, grafana: { username: 'admin', password: 'GfPw-42' } });
+  assert.match(s, /Grafana login\n  Username: admin\n  Password: GfPw-42/);
+  assert.match(renderSummary(base, res), /Password: GRAFANA_ADMIN_PASSWORD in \.env/);
+  assert.doesNotMatch(renderSummary({ ...base, logs: false }, res), /Grafana login/);
+});
+
 test('no proxy IP + WAF, no WAF admin, email none', () => {
   const s = renderSummary({ ...base, trustedProxyCidr: '', email: { provider: 'none' } }, { ...res, wafAdmin: undefined });
   assert.ok(s.includes('protected only by SafeLine'));

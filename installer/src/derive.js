@@ -6,7 +6,7 @@ export const OWNED_KEYS = {
     'APP_URL', 'FRONTEND_URL', 'SANCTUM_STATEFUL_DOMAINS', 'SESSION_DOMAIN', 'VITE_WS_HOST', 'VITE_WS_PORT',
     'VITE_WS_SCHEME', 'VITE_ALLOWED_HOSTS', 'GRAFANA_ROOT_URL', 'AUTH0_REDIRECT_URI', 'OPBX_APPLICATION_WEBHOOK_BASEURL',
   ],
-  hosts: ['VITE_ALLOWED_HOSTS'],
+  hosts: ['VITE_ALLOWED_HOSTS', 'GRAFANA_CSRF_TRUSTED_ORIGINS'],
   frontPage: ['OPBX_FRONT_PAGE'],
   waf: [
     'WAF_MODE', 'WAF_CONSOLE_ENABLED', 'WAF_CONSOLE_PORT', 'WAF_CONSOLE_BIND', 'WAF_CONSOLE_ALLOW', 'TRUSTED_PROXY_CIDR', 'COMPOSE_FILE',
@@ -41,6 +41,8 @@ export function deriveEnv(a) {
     // only the Vite dev server reads it; production serves a built bundle
     VITE_ALLOWED_HOSTS: [...new Set([host, ...(prod ? [] : a.allowedHosts ?? [])])].join(','),
     GRAFANA_ROOT_URL: `${a.publicUrl}/logs/`,
+    // Grafana refuses logins from other host names (space-separated names; a ".domain" entry is not one)
+    GRAFANA_CSRF_TRUSTED_ORIGINS: prod ? '' : (a.allowedHosts ?? []).filter((h) => !h.startsWith('.')).join(' '),
     OPCACHE_VALIDATE_TIMESTAMPS: prod ? '0' : '1',
     OPBX_INSTALLER_MANAGED: 'true',
     OPBX_OWNER_EMAIL: a.ownerEmail, // not a secret: lets a resume pre-fill it and print the reset-password hint
