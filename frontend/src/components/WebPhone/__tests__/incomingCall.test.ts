@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { callerLabel, isLive } from '../incomingCall';
+import { callerIdentity, callerLabel, isLive } from '../incomingCall';
 
 const session = (user: string | undefined, displayName?: string, uri = `sip:${user}@pbx.example.com`) => ({
   remote_identity: { display_name: displayName, uri: { user, toString: () => uri } },
@@ -19,6 +19,14 @@ describe('callerLabel', () => {
   it('falls back to the URI, then to "Unknown caller"', () => {
     expect(callerLabel(session(undefined, undefined, 'sip:anonymous.invalid'))).toBe('sip:anonymous.invalid');
     expect(callerLabel({})).toBe('Unknown caller');
+  });
+});
+
+describe('callerIdentity', () => {
+  it('splits the caller ID from the name, dropping a name that only repeats the number', () => {
+    expect(callerIdentity(session('+15551234567', ' Alice '))).toEqual({ id: '+15551234567', name: 'Alice' });
+    expect(callerIdentity(session('1001', '1001'))).toEqual({ id: '1001', name: '' });
+    expect(callerIdentity(session('1001'))).toEqual({ id: '1001', name: '' });
   });
 });
 

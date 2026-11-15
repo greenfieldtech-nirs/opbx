@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Inbound calls ring and alert.** An inbound call to the Web Phone now plays the country's ringing tone until it is answered, declined or abandoned; the tab title flashes "Incoming call: <caller>"; and when the browser window is not in front, a notification ("Incoming call", with the caller) brings OPBX forward with the Web Phone open when clicked. Notification permission is requested when the user opens the Web Phone. The caller shows as "Name (number)" instead of a SIP address. Not in the embed widget.
 
+- **In-call screen redesign.** During a call, Mute, Keypad and Hold sit in one row above a centred red hang-up button at the bottom, and the volume slider is replaced by + / − buttons (10% steps) on the right edge with a bar showing the level. An answered inbound call shows the caller ID, with the caller name below it in larger type (or the caller ID alone, large, when there is no name).
+
 ### Fixed - 2026-11-15 (Web Phone)
 
 - "Web Phone is active in another tab" showed in a single tab when the Web Phone remounted before its tab lock was granted (always in development under React StrictMode).

@@ -14,9 +14,8 @@ import {
   Delete,
   Grid3x3,
   X,
-  Volume1,
-  Volume2,
-  VolumeX,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,7 +32,7 @@ import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
-import { callerLabel, isLive } from './incomingCall';
+import { callerIdentity, callerLabel, isLive, type CallerIdentity } from './incomingCall';
 import { requestNotificationPermission, useIncomingCallAlert } from './useIncomingCallAlert';
 import { dtmfTransportFor } from './dtmf';
 import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
@@ -182,6 +181,8 @@ export function WebPhone({
   const [dtmfDigits, setDtmfDigits] = useState('');
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
+  // The answered inbound caller, shown during the call (null for outbound calls).
+  const [connectedCaller, setConnectedCaller] = useState<CallerIdentity | null>(null);
   const pendingCoachRef = useRef<string | null>(null);
   const isCoachCallRef = useRef(false);
   const [coachLabel, setCoachLabel] = useState<string | null>(null);
@@ -248,6 +249,7 @@ export function WebPhone({
     setDtmfDigits('');
     setIncomingSession(null);
     setIncomingNumber('');
+    setConnectedCaller(null);
     ringingRef.current = null;
     setCoachLabel(null);
     isCoachCallRef.current = false;
@@ -625,6 +627,7 @@ export function WebPhone({
           mediaConstraints: { audio: true, video: false },
         });
         sessionRef.current = incomingSession;
+        setConnectedCaller(callerIdentity(incomingSession));
         setIncomingSession(null);
         setIncomingNumber('');
       } catch (error) {
@@ -879,7 +882,7 @@ export function WebPhone({
                       </div>
                     </div>
                   ) : callState === 'connected' ? (
-                    <div className={`flex flex-col items-center justify-center ${showKeypad ? 'gap-5' : 'gap-10 py-6'}`}>
+                    <div className="relative flex flex-1 min-h-0 flex-col items-center gap-5">
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
@@ -896,7 +899,20 @@ export function WebPhone({
                             <p className="text-sm text-muted-foreground tabular-nums">
                               {formatCallDuration(callSeconds)}
                             </p>
-                            {/* With the keypad open, echo the digits sent (last 18 fit on one line). */}
+                            {!showKeypad && connectedCaller ? (
+                              // Inbound: caller ID, then the name in the larger font; the ID alone gets the larger font.
+                              connectedCaller.name ? (
+                                <>
+                                  <p className="text-base text-muted-foreground break-all px-4">{connectedCaller.id}</p>
+                                  <p className="text-2xl font-semibold break-words px-4">{connectedCaller.name}</p>
+                                </>
+                              ) : (
+                                <p className={`font-medium break-all px-4 ${numberSizeClass(connectedCaller.id.length)}`}>
+                                  {connectedCaller.id}
+                                </p>
+                              )
+                            ) : (
+                            /* With the keypad open, echo the digits sent (last 18 fit on one line). */
                             <p
                               className={`font-medium break-all px-4 ${numberSizeClass(
                                 showKeypad ? Math.min(dtmfDigits.length, 18) : number.length
@@ -905,6 +921,7 @@ export function WebPhone({
                             >
                               {(showKeypad ? dtmfDigits.slice(-18) : number) || ' '}
                             </p>
+                            )}
                           </>
                         )}
                       </div>
@@ -925,7 +942,8 @@ export function WebPhone({
                         </div>
                       )}
 
-                      <div className="flex items-center justify-center gap-4">
+                      {/* Call controls in one row, pushed to the bottom above the hang-up button. */}
+                      <div className="mt-auto flex items-center justify-center gap-4">
                         <button
                           type="button"
                           onClick={handleMute}
@@ -966,42 +984,47 @@ export function WebPhone({
                           {isHeld ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
                           <span className="text-[10px] font-medium">{isHeld ? 'Resume' : 'Hold'}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleHangup}
-                          className="h-16 w-16 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Hang Up"
-                        >
-                          <PhoneOff className="h-7 w-7" />
-                        </button>
                       </div>
 
-                      {/* Volume control */}
-                      <div className="flex w-full max-w-[260px] items-center gap-3 px-2">
+                      <button
+                        type="button"
+                        onClick={handleHangup}
+                        className="h-[72px] w-[72px] shrink-0 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
+                        aria-label="Hang Up"
+                      >
+                        <PhoneOff className="h-8 w-8" />
+                      </button>
+
+                      {/* Speaker volume: +/- on the right edge, in 10% steps. */}
+                      <div
+                        className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
+                        role="group"
+                        aria-label={`Call volume ${Math.round(volume * 100)}%`}
+                      >
                         <button
                           type="button"
-                          onClick={() => setVolume((v) => (v === 0 ? 1 : 0))}
-                          className="text-muted-foreground hover:text-foreground shrink-0"
-                          aria-label={volume === 0 ? 'Unmute speaker' : 'Mute speaker'}
+                          onClick={() => setVolume((v) => Math.min(1, Math.round(v * 10 + 1) / 10))}
+                          disabled={volume >= 1}
+                          className="h-9 w-9 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Volume up"
                         >
-                          {volume === 0 ? (
-                            <VolumeX className="h-5 w-5" />
-                          ) : volume < 0.5 ? (
-                            <Volume1 className="h-5 w-5" />
-                          ) : (
-                            <Volume2 className="h-5 w-5" />
-                          )}
+                          <Plus className="h-4 w-4" />
                         </button>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={volume}
-                          onChange={(e) => setVolume(Number(e.target.value))}
-                          className="h-1.5 w-full cursor-pointer accent-primary"
-                          aria-label="Call volume"
-                        />
+                        <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+                          <div
+                            className="absolute inset-x-0 bottom-0 rounded-full bg-primary transition-[height]"
+                            style={{ height: `${volume * 100}%` }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setVolume((v) => Math.max(0, Math.round(v * 10 - 1) / 10))}
+                          disabled={volume <= 0}
+                          className="h-9 w-9 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Volume down"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
                   ) : activeTab === 'calls' ? (

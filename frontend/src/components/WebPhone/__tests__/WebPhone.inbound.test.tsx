@@ -96,6 +96,23 @@ describe('WebPhone inbound calls', () => {
     expect(tones.stop).toHaveBeenCalled();
     expect(call.answer).toHaveBeenCalledWith({ mediaConstraints: { audio: true, video: false } });
     expect(screen.queryByRole('button', { name: 'Answer' })).not.toBeInTheDocument();
+
+    // Connected: caller ID first, then the name in the larger font.
+    act(() => call.emit('confirmed'));
+    const id = await screen.findByText('+15551234567');
+    const name = screen.getByText('Alice');
+    expect(id.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(name.className).toContain('text-2xl');
+  });
+
+  it('shows the caller ID alone, in the larger font, when the call carries no name', async () => {
+    await renderRegisteredPhone();
+    const call = makeSession('1002');
+    ring(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer' }));
+    act(() => call.emit('confirmed'));
+
+    expect((await screen.findByText('1002')).className).toContain('text-4xl');
   });
 
   it('stops ringing when the caller hangs up before it is answered', async () => {
