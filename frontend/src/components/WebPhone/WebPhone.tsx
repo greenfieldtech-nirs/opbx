@@ -33,6 +33,8 @@ import { TonePlayer } from '@/lib/TonePlayer';
 import type { WebPhoneConfig } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
+import { callerLabel, isLive } from './incomingCall';
+import { requestNotificationPermission, useIncomingCallAlert } from './useIncomingCallAlert';
 import { dtmfTransportFor } from './dtmf';
 import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
 
@@ -155,6 +157,8 @@ export function WebPhone({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
+  // The inbound call that is ringing right now (a ref: the UA's event handlers outlive renders).
+  const ringingRef = useRef<any>(null);
   const tonePlayerRef = useRef<TonePlayer | null>(null);
 
   const cornerClass = CORNER_CLASSES[iconPosition];
@@ -216,6 +220,12 @@ export function WebPhone({
   // dialer cannot be collapsed and the rest of the UI is blocked.
   const inActiveCall = callState !== 'idle' || incomingSession !== null;
 
+  // Title flash + browser notification while an inbound call rings; clicking the notification
+  // brings this tab forward with the panel open. Not in the embed widget (another site's page).
+  const embedded = getEmbedBus() !== undefined;
+  const openPanel = useCallback(() => setOpen(true), []);
+  useIncomingCallAlert(incomingSession !== null, incomingNumber, openPanel, !embedded);
+
   // During a coaching call the header names the coaching function, e.g. "On call - Coaching: Spy".
   const headerStatus =
     coachLabel && callState === 'connected' ? `${status} - Coaching: ${coachLabel}` : status;
@@ -238,6 +248,7 @@ export function WebPhone({
     setDtmfDigits('');
     setIncomingSession(null);
     setIncomingNumber('');
+    ringingRef.current = null;
     setCoachLabel(null);
     isCoachCallRef.current = false;
     stopCallTimer();
@@ -444,15 +455,28 @@ export function WebPhone({
 
         ua.on('newRTCSession', (event: any) => {
           const session = event.session;
-          handleSessionEvents(session);
 
           if (event.originator === 'remote') {
-            const remoteUri = session.remote_identity?.uri?.toString() || 'Unknown';
-            setIncomingNumber(remoteUri);
+            // Already on a call or ringing: answer busy, so routing moves on (other ring group
+            // members, voicemail). Checked before handleSessionEvents, whose failed/ended handlers
+            // would otherwise reset the call that is in progress.
+            if (isLive(sessionRef.current) || isLive(ringingRef.current)) {
+              try {
+                session.terminate({ status_code: 486, reason_phrase: 'Busy Here' });
+              } catch (error) {
+                console.error('[WebPhone] Busy reply failed:', error);
+              }
+              return;
+            }
+            handleSessionEvents(session);
+            ringingRef.current = session;
+            setIncomingNumber(callerLabel(session));
             setIncomingSession(session);
             setStatus('Incoming call');
             setOpen(true); // ring: bring the panel up even if it was closed
+            getTonePlayer().play('ring', config!.country); // stopped on answer, decline, or caller hang-up
           } else {
+            handleSessionEvents(session);
             setCallState('ringing');
             setStatus('Calling...');
           }
@@ -594,6 +618,8 @@ export function WebPhone({
 
   const handleAnswer = useCallback(() => {
     if (incomingSession) {
+      getTonePlayer().stop();
+      ringingRef.current = null;
       try {
         incomingSession.answer({
           mediaConstraints: { audio: true, video: false },
@@ -605,7 +631,7 @@ export function WebPhone({
         console.error('[WebPhone] Answer failed:', error);
       }
     }
-  }, [incomingSession]);
+  }, [incomingSession, getTonePlayer]);
 
   // Tap-to-redial from the calls log: switch to the dialer, prefill the number,
   // and queue an auto-dial (the redial effect fires once the number flushes).
@@ -619,6 +645,8 @@ export function WebPhone({
 
   const handleReject = useCallback(() => {
     if (incomingSession) {
+      getTonePlayer().stop();
+      ringingRef.current = null;
       try {
         incomingSession.terminate();
       } catch (error) {
@@ -628,7 +656,7 @@ export function WebPhone({
       setIncomingNumber('');
       setStatus('Registered');
     }
-  }, [incomingSession]);
+  }, [incomingSession, getTonePlayer]);
 
   const handleMute = useCallback(() => {
     if (sessionRef.current) {
@@ -718,7 +746,11 @@ export function WebPhone({
       {!open && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            // A click is the only moment browsers allow the notification-permission prompt.
+            if (!embedded) requestNotificationPermission();
+            setOpen(true);
+          }}
           className={`fixed ${cornerClass} z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all`}
           style={iconBackgroundColor ? { backgroundColor: iconBackgroundColor } : undefined}
           aria-label="Open Web Phone"
