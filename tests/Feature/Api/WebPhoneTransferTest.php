@@ -58,15 +58,15 @@ final class WebPhoneTransferTest extends TestCase
         ]);
 
         $this->agent = User::factory()->create(['organization_id' => $this->org->id, 'role' => UserRole::PBX_USER]);
-        $this->extension('1006', $this->agent);
-        $this->extension('1007', User::factory()->create(['organization_id' => $this->org->id, 'name' => 'Bob Target']));
+        $this->extension('1006', $this->agent, '5006');
+        $this->extension('1007', User::factory()->create(['organization_id' => $this->org->id, 'name' => 'Bob Target']), '5007');
     }
 
-    private function extension(string $number, ?User $user): Extension
+    private function extension(string $number, ?User $user, string $subscriberId): Extension
     {
         return Extension::factory()->create([
             'organization_id' => $this->org->id, 'user_id' => $user?->id, 'type' => ExtensionType::USER,
-            'status' => 'active', 'extension_number' => $number, 'cloudonix_subscriber_id' => null,
+            'status' => 'active', 'extension_number' => $number, 'cloudonix_subscriber_id' => $subscriberId,
         ]);
     }
 
@@ -122,7 +122,7 @@ final class WebPhoneTransferTest extends TestCase
     public function test_outbound_call_is_forked_hanging_up_the_web_phone_and_sending_the_callee_on(): void
     {
         $this->fakeCloudonix();
-        $this->row(['direction' => 'outgoing', 'caller_id' => '+1006', 'destination' => '+12025550199', 'call_ids' => [self::CALL_ID_WEBPHONE]]);
+        $this->row(['direction' => 'outgoing', 'subscriber_id' => '5006', 'caller_id' => '+1006', 'destination' => '+12025550199', 'call_ids' => [self::CALL_ID_WEBPHONE]]);
 
         $this->transfer(self::CALL_ID_WEBPHONE, '1007')->assertOk();
 
@@ -153,6 +153,17 @@ final class WebPhoneTransferTest extends TestCase
         $this->row(['direction' => 'internal', 'caller_id' => '+15551230000', 'destination' => '+1007', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE]]);
 
         $this->transfer(self::CALL_ID_WEBPHONE, '1009')->assertNotFound();
+        $this->assertSame([], $this->cloudonixRequests());
+    }
+
+    public function test_an_outside_caller_spoofing_the_extension_number_proves_nothing(): void
+    {
+        $this->fakeCloudonix();
+        // Inbound PSTN call presenting caller ID 1006, answered by extension 1007.
+        $this->row(['direction' => 'incoming', 'caller_id' => '1006', 'destination' => '+12025550101', 'call_ids' => [self::CALL_ID_CALLER]]);
+        $this->row(['direction' => 'internal', 'caller_id' => '1006', 'destination' => '+1007', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE]]);
+
+        $this->transfer(self::CALL_ID_CALLER, '+12025550199')->assertNotFound();
         $this->assertSame([], $this->cloudonixRequests());
     }
 
@@ -200,6 +211,21 @@ final class WebPhoneTransferTest extends TestCase
 
         // The agent is freed in the worker now, not when the transferred call eventually ends.
         Http::assertSent(fn (HttpRequest $r) => str_ends_with($r->url(), '/events') && $r['type'] === 'ended' && $r['agentUserId'] === (string) $this->agent->id);
+    }
+
+    public function test_a_queue_call_answered_by_another_agent_keeps_its_attribution(): void
+    {
+        $this->fakeCloudonix();
+        $this->inboundCall();
+        $queueCall = $this->answeredQueueCall();
+        $other = User::factory()->create(['organization_id' => $this->org->id]);
+        $queueCall->forceFill(['agent_user_id' => $other->id])->save();
+
+        $this->transfer(self::CALL_ID_WEBPHONE, '1007')->assertOk();
+
+        $queueCall = $queueCall->fresh();
+        $this->assertNull($queueCall->disposition);
+        $this->assertSame($other->id, $queueCall->agent_user_id);
     }
 
     private function answeredQueueCall(): QueueCall

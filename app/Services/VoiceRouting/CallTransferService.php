@@ -44,10 +44,14 @@ final class CallTransferService
     ) {}
 
     /**
-     * The latest session update that lists this SIP Call-ID, provided the call involves the
-     * extension; null otherwise. Every organization member can read live calls' call_ids, so the
-     * Call-ID alone does not prove the call is the user's: one of its legs must name the extension,
-     * as the dialled destination (the leg that rang it) or as the caller (a call it placed).
+     * The session update proving that the extension's own leg is this SIP Call-ID; null otherwise.
+     * Every organization member can read live calls' call_ids, so the Call-ID alone does not prove
+     * the call is the user's. Accepted proof, strongest first:
+     *
+     * - the extension placed the call: the Call-ID is the session's first (caller) leg and the
+     *   session was originated by the extension's own Cloudonix subscriber (a caller ID can be
+     *   spoofed by an outside caller, the subscriber cannot);
+     * - the extension was dialled: a leg carrying the Call-ID has the extension as its destination.
      */
     public function findSession(Extension $extension, string $callId): ?SessionUpdate
     {
@@ -60,14 +64,22 @@ final class CallTransferService
             ->limit(100)
             ->get();
 
-        $number = (string) $extension->extension_number;
         $subscriberId = (string) $extension->cloudonix_subscriber_id;
 
-        $involved = $rows->contains(fn (SessionUpdate $row) => ltrim((string) $row->destination, '+') === $number
-            || ltrim((string) $row->caller_id, '+') === $number
-            || ($subscriberId !== '' && (string) $row->subscriber_id === $subscriberId));
+        return $rows->first(fn (SessionUpdate $row) => $subscriberId !== ''
+                && ($row->call_ids[0] ?? null) === $callId
+                && (string) $row->subscriber_id === $subscriberId)
+            ?? $rows->first(fn (SessionUpdate $row) => ltrim((string) $row->destination, '+') === (string) $extension->extension_number);
+    }
 
-        return $involved ? $rows->first() : null;
+    /**
+     * Whether the proven row says the Web Phone placed the call (its Call-ID is the caller leg).
+     */
+    private function placedByWebPhone(SessionUpdate $session, string $callId, Extension $from): bool
+    {
+        return (string) $from->cloudonix_subscriber_id !== ''
+            && ($session->call_ids[0] ?? null) === $callId
+            && (string) $session->subscriber_id === (string) $from->cloudonix_subscriber_id;
     }
 
     public function blindTransfer(SessionUpdate $session, string $callId, Extension $from, string $destination): bool
@@ -88,7 +100,7 @@ final class CallTransferService
 
         $mode = match (true) {
             $callerToken !== null => 'conference',
-            ($session->call_ids[0] ?? null) === $callId => 'fork',
+            $this->placedByWebPhone($session, $callId, $from) => 'fork',
             default => 'switch',
         };
 

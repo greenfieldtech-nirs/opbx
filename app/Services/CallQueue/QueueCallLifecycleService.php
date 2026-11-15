@@ -402,6 +402,17 @@ class QueueCallLifecycleService
             return;
         }
 
+        // Only the agent who took the call (or anyone, when the winning leg is unknown) closes it.
+        if ($queueCall->agent_user_id !== null && $queueCall->agent_user_id !== $agentUserId) {
+            Log::warning('Queue call transfer by a different agent ignored', [
+                'queue_call_id' => $queueCall->id,
+                'agent_user_id' => $queueCall->agent_user_id,
+                'transferring_user_id' => $agentUserId,
+            ]);
+
+            return;
+        }
+
         $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)->find($queueCall->call_queue_id);
         $bridgeIso = Redis::get("acd:bridge:{$queueCall->call_id}");
         $answerAt = $bridgeIso ? Carbon::parse($bridgeIso) : $queueCall->answered_at;
