@@ -31,10 +31,17 @@ export function useSipLeader(enabled: boolean, lockName: string = SIP_LOCK_NAME)
     let disposed = false;
 
     // Holding the lock = keeping this promise pending until release() runs.
+    // Locks are granted asynchronously: if this effect was already cleaned up (a remount, e.g. React
+    // StrictMode in development), release at once, or the orphaned grant holds the lock forever and
+    // every later mount in this same tab reports "active in another tab".
     const hold = () =>
       new Promise<void>((resolve) => {
+        if (disposed) {
+          resolve();
+          return;
+        }
         release = resolve;
-        if (!disposed) setRole('leader');
+        setRole('leader');
       });
 
     const run = async () => {

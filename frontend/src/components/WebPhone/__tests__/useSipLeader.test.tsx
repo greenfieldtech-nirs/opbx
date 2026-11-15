@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useSipLeader } from '../useSipLeader';
 
 // Minimal single-name Web Locks fake: exclusive lock, FIFO queue, ifAvailable, steal, abort signals.
+// Like real browsers it answers asynchronously, so a component can unmount before its lock is granted.
 function installFakeLocks() {
   type Holder = { release: () => void; abort: (e: Error) => void };
   let holder: Holder | null = null;
@@ -29,8 +30,10 @@ function installFakeLocks() {
       cb({}).then(() => { finish(); resolve(); }, reject);
     });
 
+  const tick = () => new Promise<void>((r) => setTimeout(r, 0));
   const locks = {
-    request(_name: string, opts: any, cb: (lock: unknown) => Promise<void>): Promise<void> {
+    async request(_name: string, opts: any, cb: (lock: unknown) => Promise<void>): Promise<void> {
+      await tick();
       if (opts.steal) {
         holder?.abort(new DOMException('stolen', 'AbortError'));
         return grant(cb);
@@ -59,6 +62,15 @@ describe('useSipLeader', () => {
 
   it('is leader without Web Locks support', async () => {
     Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true });
+    const { result } = renderHook(() => useSipLeader(true));
+    await waitFor(() => expect(result.current.role).toBe('leader'));
+  });
+
+  it('a remount before the lock is granted still ends up the leader (React StrictMode in development)', async () => {
+    // StrictMode mounts, cleans up and mounts again before the browser grants the first request.
+    // The grant that arrives for the cleaned-up mount must release the lock, not keep it forever.
+    const first = renderHook(() => useSipLeader(true));
+    first.unmount();
     const { result } = renderHook(() => useSipLeader(true));
     await waitFor(() => expect(result.current.role).toBe('leader'));
   });
