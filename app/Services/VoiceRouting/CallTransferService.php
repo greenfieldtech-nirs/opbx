@@ -13,6 +13,7 @@ use App\Services\CloudonixClient\CloudonixCallsClient;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\ConferenceLegLinks;
 use App\Services\CxmlBuilder\CxmlBuilder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -48,9 +49,11 @@ final class CallTransferService
      * Every organization member can read live calls' call_ids, so the Call-ID alone does not prove
      * the call is the user's. Accepted proof, strongest first:
      *
-     * - the extension placed the call: the Call-ID is the session's first (caller) leg and the
-     *   session was originated by the extension's own Cloudonix subscriber (a caller ID can be
-     *   spoofed by an outside caller, the subscriber cannot);
+     * - the session carries the extension's own Cloudonix subscriber (a caller ID can be spoofed by
+     *   an outside caller, the subscriber cannot) and the Call-ID is either its first leg (the
+     *   extension placed the call) or its newest leg (Cloudonix dialled the extension, e.g. a DID
+     *   routed to it: the session's subscriber follows the last subscriber dialled, so a ring
+     *   group member rung earlier cannot claim it);
      * - the extension was dialled: a leg carrying the Call-ID has the extension as its destination.
      */
     public function findSession(Extension $extension, string $callId): ?SessionUpdate
@@ -67,8 +70,8 @@ final class CallTransferService
         $subscriberId = (string) $extension->cloudonix_subscriber_id;
 
         return $rows->first(fn (SessionUpdate $row) => $subscriberId !== ''
-                && ($row->call_ids[0] ?? null) === $callId
-                && (string) $row->subscriber_id === $subscriberId)
+                && (string) $row->subscriber_id === $subscriberId
+                && in_array($callId, [Arr::first($row->call_ids ?? []), Arr::last($row->call_ids ?? [])], true))
             ?? $rows->first(fn (SessionUpdate $row) => ltrim((string) $row->destination, '+') === (string) $extension->extension_number);
     }
 

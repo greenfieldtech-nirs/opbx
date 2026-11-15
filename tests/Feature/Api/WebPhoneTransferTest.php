@@ -253,6 +253,33 @@ final class WebPhoneTransferTest extends TestCase
             ->assertExactJson(['data' => ['session_token' => 'sess-tok']]);
     }
 
+    public function test_a_did_routed_straight_to_the_extension_is_found_by_its_subscriber(): void
+    {
+        // Live shape: one incoming session, destination the DID, subscriber the extension's,
+        // the Web Phone's leg appended after the caller's.
+        $this->row(['direction' => 'incoming', 'caller_id' => '+15551230000', 'destination' => '+972538450880',
+            'subscriber_id' => '5006', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE]]);
+        $this->fakeCloudonix();
+        Sanctum::actingAs($this->agent);
+
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode(self::CALL_ID_WEBPHONE))
+            ->assertOk()->assertJsonPath('data.session_token', 'sess-tok');
+        // Not placed by the Web Phone: the caller's session is switched, not forked.
+        $this->transfer(self::CALL_ID_WEBPHONE, '1007')->assertOk();
+        $this->assertStringEndsWith('/sessions/sess-tok/application', $this->cloudonixRequests()[0]->url());
+    }
+
+    public function test_a_member_rung_before_the_answering_extension_cannot_claim_the_session(): void
+    {
+        // Rang 1006 (unanswered), then 1007: the session now carries 1007's subscriber.
+        $this->row(['direction' => 'incoming', 'caller_id' => '+15551230000', 'destination' => '+972538450880',
+            'subscriber_id' => '5007', 'call_ids' => [self::CALL_ID_CALLER, self::CALL_ID_WEBPHONE, 'bob-leg@pbx.test']]);
+        Sanctum::actingAs($this->agent);
+
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode(self::CALL_ID_WEBPHONE))->assertNotFound();
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode('bob-leg@pbx.test'))->assertNotFound();
+    }
+
     public function test_session_lookup_of_a_call_not_involving_the_users_extension_is_not_found(): void
     {
         $this->row(['direction' => 'internal', 'caller_id' => '+15551230000', 'destination' => '+1007', 'call_ids' => [self::CALL_ID_CALLER, 'other-leg@pbx.test']]);
