@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import InstallGuide, { CodeBlock } from '../InstallGuide';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import InstallGuide, { CodeBlock, DEV_PORTS } from '../InstallGuide';
 
 describe('InstallGuide page', () => {
   it('shows the install, everyday and upgrade commands', () => {
@@ -15,6 +17,26 @@ describe('InstallGuide page', () => {
       './scripts/update-compose.sh', './opbx.sh upgrade', './install.sh reconfigure', './install.sh reset']) {
       expect(text).toContain(cmd);
     }
+  });
+});
+
+describe('development ports table', () => {
+  it('lists every port with its service and .env variable', () => {
+    render(<MemoryRouter><InstallGuide /></MemoryRouter>);
+    const table = screen.getByRole('table', { name: /local ports/i });
+    for (const [port, service, , variable] of DEV_PORTS) {
+      const row = within(table).getByText(String(port)).closest('tr') as HTMLElement;
+      expect(row).toHaveTextContent(service);
+      expect(row).toHaveTextContent(variable);
+    }
+  });
+
+  // The repo root (with the overlay) is not mounted in the Vite dev container: reported as skipped there.
+  const overlay = resolve(process.cwd(), '../docker-compose.ports.yml'); // tests run from frontend/
+  it.skipIf(!existsSync(overlay))('matches docker-compose.ports.yml (port and variable)', () => {
+    const yml = readFileSync(overlay, 'utf8');
+    const fromYml = [...yml.matchAll(/\$\{(\w+):-(\d+)\}/g)].map(([, v, p]) => `${p} ${v}`).sort();
+    expect(DEV_PORTS.map(([p, , , v]) => `${p} ${v}`).sort()).toEqual(fromYml);
   });
 });
 

@@ -139,12 +139,31 @@ const UPGRADE_STEPS = [
   'Starts the rest and waits until every service is up',
 ];
 
-const TROUBLE: [string, string, string?][] = [
-  ['A service is not up', 'See which one and why:', './opbx.sh status\n./opbx.sh logs <service>'],
-  ['The installer says a port is in use', 'Pick another port when asked, or stop the program that uses it. In development, OPBX also uses a few local ports on 127.0.0.1 (3306, 6379, 8080, 8181, 8333, 9333).'],
-  ['The WebSocket check times out', 'Live updates cannot reach the WebSocket server. On Docker hosts this is often a firewall rule Docker left behind for an earlier network. The installer prints the exact commands to find and delete it; for example:', "sudo iptables-save -t raw | grep -- '-d 172.18.0.3/32'"],
-  ['I lost the owner password', 'Set a new one:', 'docker compose exec app \\\n  php artisan user:reset-password <owner email>'],
-  ['The development UI says "Blocked request" from another computer', 'Add the name you use (VPN, IP) to the allowed host names:', './install.sh reconfigure'],
+// Development-only loopback ports (docker-compose.ports.yml), for local tools on the same computer.
+export const DEV_PORTS: [port: number, service: string, purpose: string, variable: string][] = [
+  [3306, 'MySQL', 'The database, for a database client such as TablePlus or DBeaver', 'DB_EXPOSE_PORT'],
+  [6379, 'Redis', 'Cache, queues and live call state, for redis-cli', 'REDIS_EXPOSE_PORT'],
+  [8080, 'MCP server', 'Lets AI assistants (MCP clients) work with OPBX', 'MCP_PORT'],
+  [8181, 'Dialer worker', 'Health endpoint of the auto-dialer service', 'DIALER_WEBHOOK_HOST_PORT'],
+  [8333, 'SeaweedFS S3 API', 'Storage for recordings and archived call records, for any S3 client', 'MINIO_EXPOSE_PORT'],
+  [9333, 'SeaweedFS master UI', 'Web page showing the storage cluster\'s state', 'MINIO_CONSOLE_EXPOSE_PORT'],
+];
+
+type Trouble = { q: string; a: string; code?: string; ports?: boolean };
+const TROUBLE: Trouble[] = [
+  { q: 'A service is not up', a: 'See which one and why:', code: './opbx.sh status\n./opbx.sh logs <service>' },
+  {
+    q: 'The installer says a port is in use',
+    a: 'Pick another port when asked, or stop the program that uses it. On a development machine OPBX also publishes these ports, on 127.0.0.1 only (this computer). If one is taken, the installer offers a free port instead and saves it in .env under the variable shown.',
+    ports: true,
+  },
+  {
+    q: 'The WebSocket check times out',
+    a: 'Live updates cannot reach the WebSocket server. On Docker hosts this is often a firewall rule Docker left behind for an earlier network. The installer prints the exact commands to find and delete it; for example:',
+    code: "sudo iptables-save -t raw | grep -- '-d 172.18.0.3/32'",
+  },
+  { q: 'I lost the owner password', a: 'Set a new one:', code: 'docker compose exec app \\\n  php artisan user:reset-password <owner email>' },
+  { q: 'The development UI says "Blocked request" from another computer', a: 'Add the name you use (VPN, IP) to the allowed host names:', code: './install.sh reconfigure' },
 ];
 
 function Section({ id, icon: Icon, title, children }: { id: string; icon: typeof Terminal; title: string; children: React.ReactNode }) {
@@ -163,7 +182,7 @@ export default function InstallGuide() {
   return (
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular flex flex-col">
       <HomeHeader />
-      <main className="container mx-auto px-4 py-12 flex-1 max-w-4xl space-y-14">
+      <main className="container mx-auto px-4 py-12 flex-1 space-y-14">
         <div>
           <h1 className="text-4xl font-bold mb-3">Install &amp; Upgrade OPBX</h1>
           <p className="text-lg text-muted-foreground">
@@ -180,7 +199,7 @@ export default function InstallGuide() {
         </div>
 
         <Section id="requirements" icon={Settings2} title="Requirements">
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {REQUIREMENTS.map(([title, text]) => (
               <li key={title} className="rounded-lg border border-border bg-card p-4">
                 <p className="font-semibold mb-1">{title}</p>
@@ -287,11 +306,36 @@ export default function InstallGuide() {
 
         <Section id="troubleshooting" icon={Wrench} title="Troubleshooting">
           <div className="space-y-4">
-            {TROUBLE.map(([q, a, code]) => (
+            {TROUBLE.map(({ q, a, code, ports }) => (
               <div key={q} className="rounded-lg border border-border bg-card p-4">
                 <p className="font-semibold mb-1">{q}</p>
                 <p className="text-sm text-muted-foreground">{a}</p>
                 {code && <CodeBlock code={code} />}
+                {ports && (
+                  <div className="mt-3 overflow-x-auto rounded-md border border-border">
+                    <table className="w-full text-sm">
+                      <caption className="sr-only">Local ports used by a development installation</caption>
+                      <thead className="bg-background/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                        <tr>
+                          <th scope="col" className="p-2">Port</th>
+                          <th scope="col" className="p-2">Service</th>
+                          <th scope="col" className="p-2">Purpose</th>
+                          <th scope="col" className="p-2">.env variable</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {DEV_PORTS.map(([port, service, purpose, variable]) => (
+                          <tr key={port} className="border-t border-border">
+                            <td className="p-2 font-mono">{port}</td>
+                            <td className="p-2 whitespace-nowrap">{service}</td>
+                            <td className="p-2 text-muted-foreground">{purpose}</td>
+                            <td className="p-2 font-mono text-xs">{variable}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             ))}
           </div>
