@@ -45,14 +45,15 @@ services:
 
   nginx:
     # Swap the reverse-proxy vhost for the production one that serves the built
-    # SPA (frontend:80) instead of proxying to the Vite dev server (frontend:3000).
-    # We mount the prod conf.d directory over the whole /etc/nginx/conf.d so the
-    # dev default.conf (which proxies to frontend:3000) is not present.
-    # `!override` replaces (not merges) the base list so the dev templates mount
-    # is gone; the base sed-render command is replaced by a plain nginx start
-    # because /etc/nginx/conf.d is a read-only mount here.
-    command: ["nginx", "-g", "daemon off;"]
+    # SPA (frontend:80). It is mounted as a template so render.sh fills in the
+    # resolver and the WAF/hook includes like in dev; `!override` drops the dev mount.
+    command: ["/bin/sh", "/opt/opbx/render.sh"]
     volumes: !override
       - ./:/var/www/html
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/conf.d.prod:/etc/nginx/conf.d:ro
+      - ./docker/nginx/conf.d.prod:/etc/nginx/templates/conf.d:ro
+      - ./docker/nginx/render.sh:/opt/opbx/render.sh:ro
+
+  soketi:
+    # Reached only through nginx (/app/); never publish it on a production host.
+    ports: !reset []

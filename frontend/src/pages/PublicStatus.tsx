@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, XOctagon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, CheckCircle2, ChevronDown, Scale, XOctagon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryKeys';
@@ -36,6 +37,57 @@ const BANNERS: Record<Banner, { text: string; box: string; Icon: typeof CheckCir
   unknown: { text: 'Status currently unavailable', box: 'border-border bg-card', Icon: AlertTriangle },
 };
 
+// Legal notice for the hosted OPBX Cloud demo. Clause order and wording follow the usual
+// scope / warranty / risk / liability structure of a service disclaimer.
+const DISCLAIMER: [title: string, text: string][] = [
+  [
+    'Demonstration service only',
+    'The OPBX Cloud application (the "Service") is provided solely for demonstration and evaluation purposes. It is not intended for, and must not be used or relied upon for, any production purpose.',
+  ],
+  [
+    'No warranty; no service level',
+    'The Service is provided "as is" and "as available", without warranty of any kind, whether express or implied, including any warranty of availability, reliability, merchantability or fitness for a particular purpose. No service level agreement (SLA) applies. The Service may be modified, suspended or taken offline at any time, including for upgrades and updates, without prior notice.',
+  ],
+  [
+    'Use at your own risk',
+    'Any use of the Service is at the user\'s sole risk and responsibility.',
+  ],
+  [
+    'Limitation of liability',
+    'To the maximum extent permitted by applicable law, neither the OPBX Project, Cloudonix, nor any of their contributors, affiliates or other related third parties shall be liable, directly or indirectly, for any loss or damage of any kind arising from or in connection with the use of, or inability to use, the Service.',
+  ],
+];
+
+// Folded by default (native <details>: keyboard and screen-reader support without state).
+export function ServiceDisclaimer() {
+  return (
+    <aside aria-labelledby="service-disclaimer-title" className="mb-10 rounded-lg border border-amber-500/40 border-l-4 border-l-amber-500 bg-amber-500/5">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <Scale className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+          <h2 id="service-disclaimer-title" className="text-sm font-semibold uppercase tracking-wider text-amber-300">Disclaimer</h2>
+          <span className="flex-1 truncate text-sm text-muted-foreground">
+            OPBX Cloud is a demonstration service, with no warranty or SLA.
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground group-open:hidden">Read more</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <ol className="space-y-2 px-5 pb-5 text-sm leading-relaxed text-muted-foreground">
+        {DISCLAIMER.map(([title, text], i) => (
+          <li key={title} className="flex gap-2">
+            <span className="shrink-0 font-semibold text-foreground">{i + 1}.</span>
+            <p><span className="font-semibold text-foreground">{title}.</span> {text}</p>
+          </li>
+        ))}
+        </ol>
+        <p className="px-5 pb-5 text-sm text-muted-foreground">
+          See the full <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link>.
+        </p>
+      </details>
+    </aside>
+  );
+}
+
 export default function PublicStatus() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.publicStatus.all,
@@ -50,6 +102,7 @@ export default function PublicStatus() {
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular flex flex-col">
       <HomeHeader />
       <main className="container mx-auto px-4 py-12 flex-1 max-w-4xl">
+        <ServiceDisclaimer />
         <h1 className="text-4xl font-bold mb-2">Platform Status</h1>
         <p className="text-muted-foreground mb-8">
           {data?.updated_at ? `Last updated ${new Date(data.updated_at).toLocaleString()}` : 'Current status of OPBX services'}

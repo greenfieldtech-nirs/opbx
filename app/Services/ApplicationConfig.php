@@ -169,6 +169,7 @@ class ApplicationConfig
             ],
             'saas_enabled' => (bool) config('services.auth0.enabled', false),
             'auth0' => self::getAuth0Config(),
+            'front_page' => config('app.front_page', 'home'),
         ];
     }
 }

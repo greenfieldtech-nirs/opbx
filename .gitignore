@@ -202,3 +202,9 @@ acd-worker/target/
 # scripts/update-compose.sh backups and scratch dirs
 docker-compose.yml.bak-*
 .compose-update.*/
+
+# First-time installer output (contains the owner password)
+opbx-install-summary.txt
+
+# Installer dev dependencies
+installer/node_modules/

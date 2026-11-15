@@ -5,7 +5,21 @@ vi.mock('pusher-js', () => ({ default: class {} }));
 vi.mock('@/services/api', () => ({ default: { post: vi.fn() } }));
 
 import api from '@/services/api';
-import { channelAuthorizer } from '../echo.service';
+import { channelAuthorizer, resolveWsHost } from '../echo.service';
+
+describe('resolveWsHost', () => {
+  it('in development follows the page host when the configured host is localhost or unset', () => {
+    expect(resolveWsHost('localhost', 'dev-box.tailnet.ts.net', true)).toBe('dev-box.tailnet.ts.net');
+    expect(resolveWsHost(undefined, '100.64.0.7', true)).toBe('100.64.0.7');
+    expect(resolveWsHost('localhost', 'localhost', true)).toBe('localhost');
+  });
+
+  it('keeps an explicitly configured host, and always in production builds', () => {
+    expect(resolveWsHost('pbx.example.com', 'dev-box.tailnet.ts.net', true)).toBe('pbx.example.com');
+    expect(resolveWsHost('localhost', 'dev-box.tailnet.ts.net', false)).toBe('localhost');
+    expect(resolveWsHost('pbx.example.com', 'pbx.example.com', false)).toBe('pbx.example.com');
+  });
+});
 
 describe('channelAuthorizer', () => {
   beforeEach(() => vi.clearAllMocks());

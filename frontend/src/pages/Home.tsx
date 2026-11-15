@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useConfig } from '@/context/ConfigContext';
 import { HomeHeader } from './Home/HomeHeader';
 import { AnnouncementBanner } from './Home/AnnouncementBanner';
 import { Hero } from './Home/Hero';
@@ -18,6 +19,7 @@ import { Footer } from './Home/Footer';
 
 export default function Home() {
   const { hash } = useLocation();
+  const { config, isLoading } = useConfig();
 
   // Arriving from another page (e.g. /status -> /#pricing) the browser looks for the anchor before
   // the sections render, so scroll once they exist and again once web fonts settle the layout.
@@ -28,6 +30,10 @@ export default function Home() {
     document.fonts?.ready.then(scroll);
     return () => cancelAnimationFrame(frame);
   }, [hash]);
+
+  // OPBX_FRONT_PAGE=login: /ui sends visitors to sign in, or to the dashboard when signed in.
+  if (isLoading) return null;
+  if (config?.front_page === 'login') return <Navigate to="/ui" replace />;
 
   return (
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular">

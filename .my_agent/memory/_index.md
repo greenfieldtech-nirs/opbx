@@ -69,6 +69,7 @@
 | **Scoped API Keys** | [api-keys.md](api-keys.md) | ApiKeyController, ApiKeyService, ResolveApiKey + EnforceApiKeyScope middleware | ApiKeysSettings, apiKeys.service |
 | **Trunk Management** | [trunk-management.md](trunk-management.md) | TrunkController, CloudonixTrunksClient (CRUD), TrunkResource | Trunks page, trunks.service |
 | **Infrastructure & Docker** | [infrastructure-docker.md](infrastructure-docker.md) | docker-compose.yml, Dockerfile, nginx.conf | N/A |
+| **First-Time Installer** | [installer.md](installer.md) | install.sh, installer/src/*.js (Node, runs in a container), opbx:install-owner | N/A |
 
 ---
 

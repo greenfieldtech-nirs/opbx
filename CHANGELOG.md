@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-12
+
+- **Guided installer**: `./install.sh` (needs only Docker with Compose, or Podman) replaces the manual bootstrap. It asks for production or development, the public address, tenancy, company and owner, the email provider (Mailgun, Mailjet, MailerLite, Brevo (Sendinblue) or none), optional Auth0, reCAPTCHA and UserCheck, log collection and the SafeLine WAF; generates all secrets; starts the stack; creates the platform owner; runs post-install checks; and prints a summary (saved to `opbx-install-summary.txt`, mode 600, git-ignored). `.env` carries `COMPOSE_FILE`, `COMPOSE_PROFILES` and `COMPOSE_PARALLEL_LIMIT=2`, so `docker compose up -d` stays the everyday command. Source and developer notes: `installer/README.md`.
+- `./install.sh reconfigure` changes the public address and the WAF (off, monitor, block). `./install.sh reset` lists what it destroys, offers a database backup into `./backups/`, requires typing the domain (production) or `RESET` (development), and removes data and generated config. A plain `./install.sh` on an existing install offers Change settings, Start over or Exit, and resumes an interrupted install.
+- Production installs require an `https://` address. TLS is terminated by your own reverse proxy, which forwards one domain to the OPBX nginx port; the installer prints a ready-to-paste snippet. `TRUSTED_PROXY_CIDR` enables real client IPs (nginx realip).
+- Installer-made systems (`OPBX_INSTALLER_MANAGED=true`) have no `admin@example.com` account; the owner is created with a generated password shown once.
+- The installer shows progress (elapsed time and the latest output line) while it builds images and installs PHP packages, checks the storage buckets after install, keeps the owner email in `.env` (`OPBX_OWNER_EMAIL`, pre-filled on resume) and offers to back up and replace a `docker-compose.yml` that differs from the example.
+
+### Added - 2026-11-13
+
+- **Front page choice**: `OPBX_FRONT_PAGE=login` makes the site root (`/`) open the sign-in page (or the dashboard when already signed in) instead of the public homepage. The installer asks and defaults to the sign-in page; `./install.sh reconfigure` switches it. Unset or `home` keeps the homepage, so existing installs do not change.
+- **Allowed host names (development)**: the installer asks for the other names developers use to reach the development UI (a VPN name such as Tailscale, the machine's IP, an ngrok domain) and writes them to `VITE_ALLOWED_HOSTS`; `./install.sh reconfigure` changes them and restarts the frontend.
+- The installation summary includes the Grafana login (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`) when log collection is on. In development, the allowed host names also go into `GRAFANA_CSRF_TRUSTED_ORIGINS`, so Grafana accepts logins from them.
+- Development installs with the WAF ask whether other computers (VPN, network) may open the firewall console. If so it binds `0.0.0.0` (`WAF_CONSOLE_BIND`) with an optional allowlist (`WAF_CONSOLE_ALLOW`); otherwise it stays on `127.0.0.1`. `./install.sh reconfigure` has a new "Change who can open the firewall console" option.
+- In development, a page opened by a name other than `localhost` (VPN, IP) connects its live-update WebSocket to that same name on port 6001, unless `VITE_WS_HOST` names another host. Production builds keep `VITE_WS_HOST`.
+- A failed installer WebSocket check now shows nginx's latest error lines instead of only "timeout". When Soketi does not answer at all, it also names Soketi's address and the commands to find a stale Docker firewall rule (seen on Docker 29 hosts after a network was recreated).
+
+### Added - 2026-11-15
+
+- **`./opbx.sh`** starts and stops the stack in the right order: `start [--no-waf]`, `stop`, `restart`, `status`, `logs`, `upgrade`. It starts SafeLine first and waits for its detector when the WAF is on, then the database, Redis, SeaweedFS and the app, then the rest, and waits until every service is running and healthy. `--no-waf` skips the WAF for one run without changing `.env`. `stop` uses `docker compose stop` (never `down`) for OPBX, every profile included, then SafeLine. `upgrade` also runs `composer install` inside the app image as the host user (`--no-dev` in production), so the host needs no PHP or Composer. It defaults `COMPOSE_PARALLEL_LIMIT` to 2 when `.env` has none. Tests: `scripts/tests/opbx-sh-test.sh`.
+
+- **Install & Upgrade page** on the project website (`/install`, linked from the header and footer): requirements, the three install steps with an example installer run, `./opbx.sh` start/stop, the upgrade procedure, reconfigure/reset and troubleshooting. Commands are shown in terminal windows with a copy button.
+
+- **Terms of Use page** on the project website (`/terms`, linked from the footer and the status page disclaimer): covers both OPBX Cloud and the open-source software (MIT), with demonstration-only use, no warranty, sole user responsibility, limitation of liability and indemnification for the OPBX Project, Cloudonix and related parties.
+- The status page opens with a foldable OPBX Cloud disclaimer (closed by default).
+
+### Changed - 2026-11-15
+
+- Installation and upgrade docs (README, user guide, `docker/README.md`) describe `./opbx.sh`, the in-image Composer step, the automatic storage buckets and migrations, Compose 2.24.4+ and the `greenfieldtech-nirs/opbx` repository URL.
+- `./scripts/upgrade.sh` runs `./opbx.sh upgrade`. With an installer-made `.env`, `COMPOSE_FILE` decides the compose files: `--prod` no longer drops the WAF and development port settings.
+
+### Changed - 2026-11-13
+
+- `vite.config.ts` no longer allows the OPBX team's `opbx.ngrok.io` by default. Add your own tunnel or VPN names to `VITE_ALLOWED_HOSTS`.
+
+### Changed - 2026-11-12
+
+- `opbx_bootstrap.sh` now only prints that it has been replaced and runs `./install.sh`.
+- The SafeLine WAF console is served by the OPBX nginx on a port chosen during install (default 9443, `WAF_CONSOLE_PORT`; development binds it to `127.0.0.1` via `WAF_CONSOLE_BIND`); SafeLine's own `127.0.0.1:9443` mapping is removed. Behind a TLS proxy, forward that port as well. The console allowlist is set only when a proxy IP is given (it always admits `127.0.0.1`, for the installer's own check); otherwise SafeLine's login is the only protection.
+- The WAF hook sends the detector nginx's `$remote_addr` instead of the last `X-Forwarded-For` hop, which a client reaching nginx directly could forge. With `TRUSTED_PROXY_CIDR` that is the real client; without it, WAF events show the proxy's IP, as rate limits do.
+- `/up` is routed to Laravel's health check through nginx.
+
+### Upgrade notes - 2026-11-12
+
+- Run `./scripts/update-compose.sh` to pick up the new nginx command (`docker/nginx/render.sh`) and its environment (`TRUSTED_PROXY_CIDR`, `WAF_CONSOLE_ENABLED`, `WAF_CONSOLE_ALLOW`). An old generated `docker-compose.yml` together with the new `docker-compose.waf.yml` loses the WAF hook.
+- Production no longer publishes Soketi's ports 6001 and 9601. Frontends must use the nginx `/app/` proxy: `VITE_WS_PORT=443`, `VITE_WS_SCHEME=https`, then rebuild the frontend.
+- `opbx_bootstrap.sh` is now interactive (it forwards to `./install.sh`). Automation that ran it must switch to the manual setup steps in the README.
+- `/up` now returns Laravel's health page, not the SPA.
+- SafeLine's own `127.0.0.1:9443` console mapping is gone: the OPBX nginx serves the console on `WAF_CONSOLE_PORT`.
+- The installer writes `.env` with mode 0640, owned by the host user and group 82 (`www-data` in the app container, which reads it). `./install.sh reconfigure` refuses installations without `OPBX_INSTALLER_MANAGED=true` and a `COMPOSE_FILE`; edit `.env` by hand there.
+
 ### Changed - 2026-10-25
 
 - PHP image upgraded to **PHP 8.5.12** (`php:8.5.12-fpm-alpine3.24`) for `app`, both queue workers and the scheduler; CI runs on PHP 8.5. Dependabot proposed 8.5.11, which is still affected by CVE-2026-109618 / CVE-2026-109619, so the image is pinned to 8.5.12. OPcache is built into PHP 8.5 and is no longer installed as an extension (`docker/php/opcache.ini` still configures it). Rebuild with `./scripts/upgrade.sh` or `docker compose build --pull`.

@@ -55,6 +55,11 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <Link to="/install" className="hover:text-foreground transition-colors">
+                  Install &amp; Upgrade
+                </Link>
+              </li>
+              <li>
                 <Link to="/status" className="hover:text-foreground transition-colors">
                   Platform Status
                 </Link>
@@ -106,7 +111,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://github.com/greenfieldtech-nirs/OPBX/blob/main/LICENSE"
+                  href="https://github.com/greenfieldtech-nirs/OPBX/blob/main/LICENSE.md"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-foreground transition-colors"
@@ -114,12 +119,18 @@ export function Footer() {
                   License (MIT)
                 </a>
               </li>
+              <li>
+                <Link to="/terms" className="hover:text-foreground transition-colors">
+                  Terms of Use
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
         <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xl text-muted-foreground">
-            © {new Date().getFullYear()} OPBX. Open source under MIT License.
+            © {new Date().getFullYear()} OPBX. Open source under MIT License.{' '}
+            <Link to="/terms" className="underline hover:text-foreground transition-colors">Terms of Use</Link>
           </p>
           <div className="flex items-center gap-4">
             <a
