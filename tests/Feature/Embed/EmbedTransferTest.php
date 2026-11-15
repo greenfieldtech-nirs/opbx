@@ -80,6 +80,13 @@ final class EmbedTransferTest extends TestCase
         $bare()->withHeaders(['Sec-Fetch-Site' => 'same-origin'])->getJson('/api/v1/embed/directory')->assertOk();
     }
 
+    public function test_session_lookup_needs_no_transfer_switch_but_a_widget_origin(): void
+    {
+        // Reaches the shared lookup: no such call for this extension.
+        $this->embed()->getJson('/api/v1/embed/session?call_id=x@pbx')->assertNotFound();
+        $this->flushHeaders()->withHeaders(['Authorization' => "Bearer {$this->token}"])->getJson('/api/v1/embed/session?call_id=x@pbx')->assertForbidden();
+    }
+
     public function test_owner_turns_the_switch_on_from_the_embed_settings(): void
     {
         $owner = User::factory()->create(['organization_id' => $this->user->organization_id, 'role' => UserRole::OWNER]);

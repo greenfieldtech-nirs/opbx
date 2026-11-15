@@ -70,6 +70,17 @@ final class EmbedConfigController extends Controller
         return response()->json(['data' => WebPhoneTransferController::directoryFor($request->attributes->get('embedUser'))]);
     }
 
+    public function session(Request $request, CallTransferService $transfers): JsonResponse
+    {
+        if (! $this->fromWidget($request)) {
+            return response()->json(['message' => 'Origin required.'], 403);
+        }
+
+        $input = $request->validate(['call_id' => ['required', 'string', 'max:255']]);
+
+        return WebPhoneTransferController::sessionFor($request->attributes->get('embedUser'), $input['call_id'], $transfers);
+    }
+
     /**
      * A browser request from the widget: cross-origin callers send an Origin (which the middleware
      * checked against the allowlist); the OPBX-served iframe calls same-origin, where browsers send

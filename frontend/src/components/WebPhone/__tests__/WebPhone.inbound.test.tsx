@@ -69,6 +69,7 @@ async function renderRegisteredPhone(props: Partial<ComponentProps<typeof WebPho
         configQueryFn={() => Promise.resolve({ data: cfg } as any)}
         callsLogQueryFn={() => Promise.resolve({ data: [] } as any)}
         directoryQueryFn={() => Promise.resolve({ data: [{ extension_number: '1007', name: 'Bob Target' }] })}
+        sessionQueryFn={() => Promise.resolve('sess-default')}
         {...props}
       />
     </QueryClientProvider>,
@@ -245,6 +246,22 @@ describe('WebPhone registration status', () => {
     ring(makeSession('1007'));
     await screen.findByRole('button', { name: 'Answer' });
     expect(screen.getByRole('button', { name: 'Re-register' })).toBeDisabled();
+  });
+});
+
+describe('WebPhone session token', () => {
+  it('shows the Cloudonix session token of the connected call, looked up by its SIP Call-ID', async () => {
+    const sessionQueryFn = vi.fn().mockResolvedValue('SESS-abc123');
+    await renderRegisteredPhone({ sessionQueryFn });
+    const call = makeSession('1002', 'Alice');
+    ring(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer' }));
+    expect(sessionQueryFn).not.toHaveBeenCalled();
+
+    act(() => call.emit('confirmed'));
+
+    expect(await screen.findByText('Session: SESS-abc123')).toBeInTheDocument();
+    expect(sessionQueryFn).toHaveBeenCalledWith('cid-1002@pbx.test');
   });
 });
 

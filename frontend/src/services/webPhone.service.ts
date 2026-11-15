@@ -42,6 +42,15 @@ export async function getWebPhoneDirectory(): Promise<WebPhoneDirectoryResponse>
 }
 
 /**
+ * The Cloudonix session token of the Web Phone's call (named by its SIP Call-ID). Rejects (404)
+ * until Cloudonix has reported the session.
+ */
+export async function getWebPhoneSession(callId: string): Promise<string> {
+  const response = await api.get<{ data: { session_token: string } }>('/webphone/session', { params: { call_id: callId } });
+  return response.data.data.session_token;
+}
+
+/**
  * Blind-transfer the Web Phone's call (named by its SIP Call-ID) to an extension or number.
  * Rejects with the server's message when the transfer fails; the call is then still connected.
  */

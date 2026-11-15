@@ -13,10 +13,12 @@ use App\Models\User;
 use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\CallTransferService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Web Phone blind transfer, and the extension directory its transfer field suggests from.
+ * Web Phone blind transfer, the extension directory its transfer field suggests from, and the
+ * Cloudonix session token shown on the in-call screen.
  */
 final class WebPhoneTransferController extends Controller
 {
@@ -30,6 +32,27 @@ final class WebPhoneTransferController extends Controller
     public function directory(): JsonResponse
     {
         return response()->json(['data' => self::directoryFor($this->getAuthenticatedUser())]);
+    }
+
+    public function session(Request $request, CallTransferService $transfers): JsonResponse
+    {
+        $input = $request->validate(['call_id' => ['required', 'string', 'max:255']]);
+
+        return self::sessionFor($this->getAuthenticatedUser(), $input['call_id'], $transfers);
+    }
+
+    /**
+     * The Cloudonix session token of the user's call, proven theirs as for a transfer. 404 until
+     * Cloudonix has reported the session (the Web Phone retries).
+     */
+    public static function sessionFor(User $user, string $callId, CallTransferService $transfers): JsonResponse
+    {
+        $extension = self::extensionOf($user);
+        $session = $extension ? $transfers->findSession($extension, $callId) : null;
+
+        return $session
+            ? response()->json(['data' => ['session_token' => (string) $session->session_token]])
+            : response()->json(['message' => 'The call was not found.'], 404);
     }
 
     /**

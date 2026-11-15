@@ -242,6 +242,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('calls-log', [EmbedConfigController::class, 'callsLog'])->name('embed.calls-log');
             Route::post('transfer', [EmbedConfigController::class, 'transfer'])->name('embed.transfer');
             Route::get('directory', [EmbedConfigController::class, 'directory'])->name('embed.directory');
+            Route::get('session', [EmbedConfigController::class, 'session'])->name('embed.session');
         });
     });
 
@@ -465,6 +466,9 @@ Route::prefix('v1')->group(function (): void {
             ->name('webphone.transfer');
         Route::get('webphone/directory', [WebPhoneTransferController::class, 'directory'])
             ->name('webphone.directory');
+        // Cloudonix session token of the Web Phone's call, for the in-call screen
+        Route::get('webphone/session', [WebPhoneTransferController::class, 'session'])
+            ->name('webphone.session');
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);

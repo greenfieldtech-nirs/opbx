@@ -69,6 +69,11 @@ function mount(): void {
     return res.data;
   };
 
+  const sessionQueryFn = async (callId: string): Promise<string> => {
+    const res = await embedApi.get<{ data: { session_token: string } }>('/embed/session', { params: { call_id: callId } });
+    return res.data.data.session_token;
+  };
+
   // Install the postMessage bridge before mounting so WebPhone's embed effect
   // finds the bus on first render.
   createEmbedBus();
@@ -87,6 +92,7 @@ function mount(): void {
           callsLogQueryFn={callsLogQueryFn}
           transferFn={transferFn}
           directoryQueryFn={directoryQueryFn}
+          sessionQueryFn={sessionQueryFn}
           iconPosition={embed.iconPosition}
           iconBackgroundColor={embed.iconBackgroundColor}
           autoOpen

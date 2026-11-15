@@ -128,7 +128,7 @@ The ringing stops, the call is ended and the panel returns to the keypad.
 
 Who can do this: any user with a user extension.
 
-During a connected call the panel shows the timer and the number at the top (for an incoming call, the caller ID with the caller's name below it in larger type, or the caller ID alone when the call carries no name), **Mute**, **Keypad**, **Hold** and **Transfer** in one row above the red hang-up button at the bottom, and the volume buttons on the right edge:
+During a connected call the panel shows the call's Cloudonix session token at the very top (select it to copy it, for example when reporting a call problem; it appears a moment after the call connects), then the timer and the number (for an incoming call, the caller ID with the caller's name below it in larger type, or the caller ID alone when the call carries no name), **Mute**, **Keypad**, **Hold** and **Transfer** in one row above the red hang-up button at the bottom, and the volume buttons on the right edge:
 
 | Control | What it does |
 |---------|--------------|
@@ -274,6 +274,7 @@ The config contains your SIP password. It is returned only to you, for your own 
 | GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 "No extension is assigned to this user." when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
 | GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
 | POST | `/v1/webphone/transfer` | Blind-transfer the user's call: `call_id` (the Web Phone's SIP Call-ID) and `destination` (extension or number, digits with an optional `+`). 404 when the call is not found or does not involve the user's extension; 422 for the user's own extension; 502 when Cloudonix refuses (the call stays connected) |
+| GET | `/v1/webphone/session?call_id=` | The Cloudonix session token of the user's call, named by its SIP Call-ID; 404 until Cloudonix has reported the session |
 | GET | `/v1/webphone/directory` | The organization's active user extensions other than the user's own, with the user's name, for transfer suggestions |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
 

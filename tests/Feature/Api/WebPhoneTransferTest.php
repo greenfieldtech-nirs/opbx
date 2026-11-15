@@ -243,6 +243,25 @@ final class WebPhoneTransferTest extends TestCase
         ]);
     }
 
+    public function test_session_lookup_returns_the_cloudonix_session_token_of_the_users_call(): void
+    {
+        $this->inboundCall();
+        Sanctum::actingAs($this->agent);
+
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode(self::CALL_ID_WEBPHONE))
+            ->assertOk()
+            ->assertExactJson(['data' => ['session_token' => 'sess-tok']]);
+    }
+
+    public function test_session_lookup_of_a_call_not_involving_the_users_extension_is_not_found(): void
+    {
+        $this->row(['direction' => 'internal', 'caller_id' => '+15551230000', 'destination' => '+1007', 'call_ids' => [self::CALL_ID_CALLER, 'other-leg@pbx.test']]);
+        Sanctum::actingAs($this->agent);
+
+        $this->getJson('/api/v1/webphone/session?call_id='.urlencode('other-leg@pbx.test'))->assertNotFound();
+        $this->getJson('/api/v1/webphone/session')->assertUnprocessable();
+    }
+
     public function test_directory_lists_other_active_user_extensions_with_names(): void
     {
         Sanctum::actingAs($this->agent);

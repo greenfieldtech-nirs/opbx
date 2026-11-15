@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   getWebPhoneConfig,
+  getWebPhoneSession,
   transferWebPhoneCall,
   type WebPhoneConfigResponse,
   type WebPhoneCallsLogResponse,
@@ -62,6 +63,8 @@ interface WebPhoneProps {
   // Blind transfer and its extension suggestions; embed overrides these too.
   transferFn?: (callId: string, destination: string) => Promise<void>;
   directoryQueryFn?: () => Promise<WebPhoneDirectoryResponse>;
+  // Cloudonix session token of the connected call, by SIP Call-ID; embed overrides it.
+  sessionQueryFn?: (callId: string) => Promise<string>;
   // Pull-tab placement + color (embed is themable per token).
   iconPosition?: IconPosition;
   iconBackgroundColor?: string;
@@ -166,6 +169,7 @@ export function WebPhone({
   callsLogQueryFn,
   transferFn = transferWebPhoneCall,
   directoryQueryFn,
+  sessionQueryFn = getWebPhoneSession,
   iconPosition = 'bottom-right',
   iconBackgroundColor,
   autoOpen = false,
@@ -204,6 +208,7 @@ export function WebPhone({
   const [incomingNumber, setIncomingNumber] = useState('');
   // The answered inbound caller, shown during the call (null for outbound calls).
   const [connectedCaller, setConnectedCaller] = useState<CallerIdentity | null>(null);
+  const [connectedCallId, setConnectedCallId] = useState<string | null>(null);
   const pendingCoachRef = useRef<string | null>(null);
   const isCoachCallRef = useRef(false);
   const [coachLabel, setCoachLabel] = useState<string | null>(null);
@@ -264,6 +269,16 @@ export function WebPhone({
   // Coaching calls are never transferred; an embed snippet may disallow transfer.
   const transferEnabled = config?.transfer_enabled !== false && !coachLabel;
 
+  const { data: sessionToken } = useQuery({
+    queryKey: ['webphone-session', connectedCallId],
+    queryFn: () => sessionQueryFn(connectedCallId as string),
+    enabled: callState === 'connected' && connectedCallId !== null,
+    // Cloudonix reports the session by webhook, which can land just after the call connects.
+    retry: 5,
+    retryDelay: 2000,
+    staleTime: Infinity,
+  });
+
   const resetCallState = useCallback(() => {
     setCallState('idle');
     setIsMuted(false);
@@ -274,6 +289,7 @@ export function WebPhone({
     setIncomingSession(null);
     setIncomingNumber('');
     setConnectedCaller(null);
+    setConnectedCallId(null);
     ringingRef.current = null;
     setCoachLabel(null);
     isCoachCallRef.current = false;
@@ -328,6 +344,7 @@ export function WebPhone({
       session.on('confirmed', () => {
         getTonePlayer().stop();
         setCallState('connected');
+        setConnectedCallId(sipCallId(session));
         setStatus('On call');
         startCallTimer();
         attachRemoteStream(session);
@@ -966,6 +983,11 @@ export function WebPhone({
                     </div>
                   ) : callState === 'connected' ? (
                     <div className="relative flex flex-1 min-h-0 flex-col items-center gap-5">
+                      {sessionToken && (
+                        <p className="text-xs font-mono text-muted-foreground break-all select-all px-4 text-center">
+                          Session: {sessionToken}
+                        </p>
+                      )}
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
