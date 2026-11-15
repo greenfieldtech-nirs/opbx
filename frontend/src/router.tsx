@@ -18,6 +18,7 @@ import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
 import PublicStatus from '@/pages/PublicStatus';
 import InstallGuide from '@/pages/InstallGuide';
+import TermsOfUse from '@/pages/TermsOfUse';
 
 // Lazy load pages for code splitting. trackedLazy() is React.lazy() plus a
 // signal to the global page loading indicator while the chunk downloads.
@@ -89,6 +90,11 @@ export const router = createBrowserRouter([
   {
     path: '/install',
     element: <InstallGuide />,
+  },
+  // Public terms of use (OPBX Cloud and the open-source software)
+  {
+    path: '/terms',
+    element: <TermsOfUse />,
   },
   // Public auth routes (under /ui for consistency with existing setup)
   {

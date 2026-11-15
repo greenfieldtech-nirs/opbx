@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Install & Upgrade page** on the project website (`/install`, linked from the header and footer): requirements, the three install steps with an example installer run, `./opbx.sh` start/stop, the upgrade procedure, reconfigure/reset and troubleshooting. Commands are shown in terminal windows with a copy button.
 
+- **Terms of Use page** on the project website (`/terms`, linked from the footer and the status page disclaimer): covers both OPBX Cloud and the open-source software (MIT), with demonstration-only use, no warranty, sole user responsibility, limitation of liability and indemnification for the OPBX Project, Cloudonix and related parties.
+- The status page opens with a foldable OPBX Cloud disclaimer (closed by default).
+
 ### Changed - 2026-11-15
 
 - Installation and upgrade docs (README, user guide, `docker/README.md`) describe `./opbx.sh`, the in-image Composer step, the automatic storage buckets and migrations, Compose 2.24.4+ and the `greenfieldtech-nirs/opbx` repository URL.

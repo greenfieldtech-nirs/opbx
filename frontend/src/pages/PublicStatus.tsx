@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, ChevronDown, Scale, XOctagon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -79,6 +80,9 @@ export function ServiceDisclaimer() {
           </li>
         ))}
         </ol>
+        <p className="px-5 pb-5 text-sm text-muted-foreground">
+          See the full <Link to="/terms" className="underline hover:text-foreground">Terms of Use</Link>.
+        </p>
       </details>
     </aside>
   );
