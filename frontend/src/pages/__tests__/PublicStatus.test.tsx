@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -45,6 +45,10 @@ describe('PublicStatus page', () => {
       expect(notice).toHaveTextContent(clause);
     }
     expect(notice).toHaveTextContent(/without prior notice/);
+    const fold = notice.querySelector('details') as HTMLDetailsElement;
+    expect(fold.open).toBe(false); // folded by default
+    fireEvent.click(within(notice).getByText('Disclaimer'));
+    expect(fold.open).toBe(true);
     const title = screen.getByRole('heading', { level: 1, name: 'Platform Status' });
     expect(notice.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());

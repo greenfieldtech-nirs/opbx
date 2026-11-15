@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, Scale, XOctagon } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Scale, XOctagon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/queryKeys';
@@ -57,21 +57,29 @@ const DISCLAIMER: [title: string, text: string][] = [
   ],
 ];
 
+// Folded by default (native <details>: keyboard and screen-reader support without state).
 export function ServiceDisclaimer() {
   return (
-    <aside aria-labelledby="service-disclaimer-title" className="mb-10 rounded-lg border border-amber-500/40 border-l-4 border-l-amber-500 bg-amber-500/5 p-5">
-      <h2 id="service-disclaimer-title" className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-amber-300">
-        <Scale className="h-4 w-4" aria-hidden="true" />
-        Disclaimer
-      </h2>
-      <ol className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+    <aside aria-labelledby="service-disclaimer-title" className="mb-10 rounded-lg border border-amber-500/40 border-l-4 border-l-amber-500 bg-amber-500/5">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-3 p-4 [&::-webkit-details-marker]:hidden">
+          <Scale className="h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+          <h2 id="service-disclaimer-title" className="text-sm font-semibold uppercase tracking-wider text-amber-300">Disclaimer</h2>
+          <span className="flex-1 truncate text-sm text-muted-foreground">
+            OPBX Cloud is a demonstration service, with no warranty or SLA.
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground group-open:hidden">Read more</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        <ol className="space-y-2 px-5 pb-5 text-sm leading-relaxed text-muted-foreground">
         {DISCLAIMER.map(([title, text], i) => (
           <li key={title} className="flex gap-2">
             <span className="shrink-0 font-semibold text-foreground">{i + 1}.</span>
             <p><span className="font-semibold text-foreground">{title}.</span> {text}</p>
           </li>
         ))}
-      </ol>
+        </ol>
+      </details>
     </aside>
   );
 }
