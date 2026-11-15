@@ -18,6 +18,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   getWebPhoneConfig,
   type WebPhoneConfigResponse,
@@ -39,6 +40,14 @@ import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
 
 type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error' | 'other_tab';
 type CallState = 'idle' | 'ringing' | 'connected';
+// SIP registration as JsSIP last reported it; drives the header status badge.
+type Registration = 'registering' | 'registered' | 'unregistered' | 'disconnected';
+const REGISTRATION_BADGE: Record<Registration, { label: string; dot: string }> = {
+  registering: { label: 'Registering…', dot: 'bg-amber-500' },
+  registered: { label: 'Registered', dot: 'bg-green-500' },
+  unregistered: { label: 'Not registered', dot: 'bg-red-500' },
+  disconnected: { label: 'Disconnected', dot: 'bg-red-500' },
+};
 
 type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
@@ -169,7 +178,8 @@ export function WebPhone({
   const isLeader = role === 'leader';
   const [initNonce, setInitNonce] = useState(0);
   const [state, setState] = useState<PhoneLifecycle>('loading');
-  const [status, setStatus] = useState('Initializing...');
+  const [status, setStatus] = useState('');
+  const [registration, setRegistration] = useState<Registration>('registering');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
   const [number, setNumber] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -320,7 +330,7 @@ export function WebPhone({
           return;
         }
         resetCallState();
-        setStatus('Registered');
+        setStatus('');
       });
 
       session.on('failed', (event: any) => {
@@ -342,7 +352,7 @@ export function WebPhone({
         }
 
         resetCallState();
-        setStatus('Registered');
+        setStatus('');
       });
 
       session.on('hold', () => setIsHeld(true));
@@ -357,7 +367,7 @@ export function WebPhone({
     if (!isLeader) {
       setState(role === 'follower' ? 'other_tab' : 'loading');
       resetCallState();
-      setStatus('Initializing...');
+      setStatus('');
       setErrorDetail(null);
       getTonePlayer().stop();
       if (uaRef.current) {
@@ -399,6 +409,7 @@ export function WebPhone({
     }
 
     let cancelled = false;
+    setRegistration('registering');
 
     async function initPhone() {
       try {
@@ -413,7 +424,6 @@ export function WebPhone({
             hint: 'Reload the page and retry. If it persists, check your network or contact your administrator.',
           });
           setState('error');
-          setStatus('Failed to load the Web Phone.');
           return;
         }
 
@@ -431,26 +441,20 @@ export function WebPhone({
           session_timers: false,
         });
 
-        ua.on('connecting', () => {
-          setStatus('Connecting...');
-        });
-
-        ua.on('connected', () => {
-          setStatus('Connected, registering...');
-        });
-
-        ua.on('disconnected', () => {
-          setStatus('Disconnected');
-        });
+        ua.on('connecting', () => setRegistration('registering'));
+        ua.on('connected', () => setRegistration('registering'));
+        ua.on('disconnected', () => setRegistration('disconnected'));
+        // Fired when the binding is lost: un-REGISTER, failed refresh, or transport closed.
+        ua.on('unregistered', () => setRegistration('unregistered'));
 
         ua.on('registered', () => {
-          setStatus('Registered');
+          setRegistration('registered');
           setState('ready');
         });
 
         ua.on('registrationFailed', (event: any) => {
           const cause = event?.cause || 'unknown';
-          setStatus(`Registration failed: ${cause}`);
+          setRegistration('unregistered');
           setErrorDetail(explainRegistrationFailure(cause));
           setState('error');
         });
@@ -488,7 +492,6 @@ export function WebPhone({
         uaRef.current = ua;
       } catch (error: any) {
         console.error('[WebPhone] Initialization failed:', error);
-        setStatus('The Web Phone could not register.');
         setErrorDetail({
           title: 'Web Phone Error',
           message: 'The Web Phone could not start.',
@@ -657,7 +660,7 @@ export function WebPhone({
       }
       setIncomingSession(null);
       setIncomingNumber('');
-      setStatus('Registered');
+      setStatus('');
     }
   }, [incomingSession, getTonePlayer]);
 
@@ -734,7 +737,7 @@ export function WebPhone({
   // failures need a full UA re-init, so close+reopen to re-run the init effect.
   const handleRetry = useCallback(() => {
     setErrorDetail(null);
-    setStatus('Initializing...');
+    setStatus('');
     setState('loading');
     if (configError) {
       refetch();
@@ -742,6 +745,32 @@ export function WebPhone({
     }
     setInitNonce((n) => n + 1);
   }, [configError, refetch]);
+
+  // Forced re-registration. JsSIP emits 'registered' only on a transition, so a plain refresh
+  // would never confirm: drop the binding first, then register once the un-REGISTER settles
+  // (its response is not CSeq-guarded, so registering in parallel could be undone by it).
+  const handleReregister = useCallback(() => {
+    const ua = uaRef.current;
+    if (!ua?.isConnected()) {
+      // No live socket: rebuild the UA; the init effect reconnects and registers.
+      setState('loading');
+      setInitNonce((n) => n + 1);
+      return;
+    }
+    setRegistration('registering');
+    if (ua.isRegistered()) {
+      ua.once('unregistered', () => {
+        setRegistration('registering'); // batched with the red 'unregistered' update: no flicker
+        ua.register();
+      });
+      ua.unregister();
+    } else {
+      ua.register();
+    }
+  }, []);
+
+  const badge = REGISTRATION_BADGE[state === 'error' ? 'unregistered' : registration];
+  const showBadge = isLeader && state !== 'no_extension';
 
   return (
     <>
@@ -781,7 +810,27 @@ export function WebPhone({
                   <Phone className="h-4 w-4" />
                   Web Phone
                 </div>
-                <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>
+                {showBadge && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Badge variant="outline" role="status" className="gap-1.5 px-2 py-0 font-medium">
+                      <span className={`h-2 w-2 rounded-full ${badge.dot}`} aria-hidden="true" />
+                      {badge.label}
+                    </Badge>
+                    {state === 'ready' && (
+                      <button
+                        type="button"
+                        onClick={handleReregister}
+                        disabled={inActiveCall || registration === 'registering'}
+                        className="rounded-full p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Re-register"
+                        title={inActiveCall ? 'End the call before re-registering' : 'Re-register'}
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${registration === 'registering' ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                {inActiveCall && <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>}
               </div>
               <button
                 type="button"

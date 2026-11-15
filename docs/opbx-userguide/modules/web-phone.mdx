@@ -53,8 +53,17 @@ No role check applies to these tasks; the Web Phone only needs your user extensi
 Who can do this: any user with a user extension.
 
 1. Click the round phone button in the bottom-right corner of any page (tooltip **Web Phone**).
-2. The panel opens. Its header shows **Web Phone** and the registration status: "Initializing...", "Connecting...", "Connected, registering..." and then **Registered**.
-3. When it reads **Registered**, the **Keypad** tab is ready.
+2. The panel opens. Under **Web Phone**, the header shows a registration badge: amber **Registering…** while it connects, then green **Registered**.
+3. When the badge reads **Registered**, the **Keypad** tab is ready.
+
+The badge always shows what Cloudonix last confirmed:
+
+| Badge | Meaning |
+|-------|---------|
+| Green **Registered** | Cloudonix accepted the registration; calls to your extension reach this browser. |
+| Amber **Registering…** | The phone is connecting or registering. |
+| Red **Not registered** | Cloudonix no longer holds the registration (it was refused or lost). Incoming calls do not reach you. |
+| Red **Disconnected** | The connection to Cloudonix dropped. The phone reconnects and registers again by itself. |
 
 The first time you open the Web Phone, the browser asks whether OPBX may show notifications. Allow it to be alerted to incoming calls while you work in another tab or application (see [Answer an incoming call](#answer-an-incoming-call)). You can change this later in the browser's site settings.
 
@@ -64,7 +73,18 @@ Close the panel with **X**. While a call is ringing or active, **X** is disabled
 The Web Phone registers when you sign in to OPBX and stays registered while you are signed in, whether the panel is open or not. An incoming call opens the panel and rings. Closing the panel does not unregister the phone; signing out does.
 :::
 
-{/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, header status Registered, a number entered in the display */}
+{/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, green Registered badge with the re-register button in the header, a number entered in the display */}
+
+### Re-register the phone
+
+Who can do this: any user with a user extension.
+
+Use this when you suspect calls are not reaching you, or the badge is red.
+
+1. Open the Web Phone.
+2. Click the circular-arrow button next to the badge (tooltip **Re-register**).
+
+The badge turns amber **Registering…** while the Web Phone drops its registration and registers again, then green **Registered** once Cloudonix accepts it. If the connection to Cloudonix is gone, the Web Phone reconnects first. If Cloudonix refuses the registration, the panel shows the error (see [Common errors](#common-errors)). The button is disabled during a call.
 
 ### Place a call
 
@@ -77,7 +97,7 @@ Who can do this: any user with a user extension.
 5. When the call connects, the status reads "On call" and a timer starts: `M:SS`, then `H:MM:SS` after one hour.
 6. Hang up with the red button.
 
-The panel returns to **Registered**. If the call fails because the other side is busy or the network is congested, the matching tone plays.
+The panel returns to the keypad. If the call fails because the other side is busy or the network is congested, the matching tone plays.
 
 While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** tab bar is locked. The keypad is not shown once the call connects, so you cannot send touch tones (DTMF) from the Web Phone. Transferring a call is not available in the Web Phone.
 
@@ -102,7 +122,7 @@ Who can do this: any user with a user extension.
 
 1. When the panel shows **Incoming call**, click the red **Reject** button.
 
-The ringing stops, the call is ended and the panel returns to **Registered**.
+The ringing stops, the call is ended and the panel returns to the keypad.
 
 ### Use the call controls
 
@@ -175,7 +195,7 @@ Who can do this: any user with a user extension.
 
 1. When the panel shows an error (see [Common errors](#common-errors)), click **Retry**.
 
-The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the header goes back to "Initializing...". **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
+The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the badge goes back to **Registering…**. **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
 
 ## Coaching from Live Calls
 

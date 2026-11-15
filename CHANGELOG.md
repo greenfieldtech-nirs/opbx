@@ -13,8 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **In-call screen redesign.** During a call, Mute, Keypad and Hold sit in one row above a centred red hang-up button at the bottom, and the volume slider is replaced by + / − buttons (10% steps) on the right edge with a bar showing the level. An answered inbound call shows the caller ID, with the caller name below it in larger type (or the caller ID alone, large, when there is no name).
 
+- **Registration badge and re-register.** The Web Phone header shows a status badge (green Registered, amber Registering…, red Not registered or Disconnected) driven by the SIP stack's registration events, and a Re-register button that drops the registration and registers again (or reconnects first when the connection is gone). Disabled during a call.
+
 ### Fixed - 2026-11-15 (Web Phone)
 
+- The Web Phone said "Registered" after every call and after declining a call, whether or not it still was, and never noticed a lost registration. The status now follows the actual registration.
 - "Web Phone is active in another tab" showed in a single tab when the Web Phone remounted before its tab lock was granted (always in development under React StrictMode).
 - A second inbound call while one was ringing or in progress replaced the first call's state, and answering it left the call in progress without controls. It is now answered 486 Busy Here, so routing moves on.
 

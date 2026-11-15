@@ -18,14 +18,28 @@ import WebPhone from '../WebPhone';
 type Handler = (event?: any) => void;
 const emitter = () => {
   const handlers: Record<string, Handler[]> = {};
+  const on = (name: string, fn: Handler) => { (handlers[name] ??= []).push(fn); };
   return {
-    on: (name: string, fn: Handler) => { (handlers[name] ??= []).push(fn); },
-    emit: (name: string, event?: any) => handlers[name]?.forEach((fn) => fn(event)),
+    on,
+    once: (name: string, fn: Handler) => {
+      const wrapped: Handler = (event) => {
+        handlers[name] = handlers[name].filter((h) => h !== wrapped);
+        fn(event);
+      };
+      on(name, wrapped);
+    },
+    emit: (name: string, event?: any) => [...(handlers[name] ?? [])].forEach((fn) => fn(event)),
   };
 };
 
 // Minimal JsSIP: a UA we can drive, and sessions that record answer/terminate.
-let ua: ReturnType<typeof emitter> & { start: () => void; stop: () => void; call: () => any };
+type FakeUA = ReturnType<typeof emitter> & {
+  start: () => void; stop: () => void; call: () => any;
+  isConnected: () => boolean; isRegistered: () => boolean;
+  register: ReturnType<typeof vi.fn>; unregister: ReturnType<typeof vi.fn>;
+};
+let ua: FakeUA;
+let uaCount = 0;
 const makeSession = (user: string, displayName = '') => {
   const e = emitter();
   let ended = false;
@@ -65,11 +79,16 @@ beforeEach(() => {
   tones.play.mockClear();
   tones.stop.mockClear();
   ua = undefined as any;
+  uaCount = 0;
   (window as any).JsSIP = {
     WebSocketInterface: class {},
     UA: class {
       constructor() {
-        ua = Object.assign(emitter(), { start: () => {}, stop: () => {}, call: () => makeSession('x') });
+        uaCount += 1;
+        ua = Object.assign(emitter(), {
+          start: () => {}, stop: () => {}, call: () => makeSession('x'),
+          isConnected: () => true, isRegistered: () => true, register: vi.fn(), unregister: vi.fn(),
+        });
         return ua as any;
       }
     },
@@ -153,5 +172,74 @@ describe('WebPhone inbound calls', () => {
     expect(first.terminate).not.toHaveBeenCalled();
     expect(tones.play).not.toHaveBeenCalled();
     expect(screen.getByText('1004')).toBeInTheDocument(); // still showing (and ringing for) the first caller
+  });
+});
+
+describe('WebPhone registration status', () => {
+  const openPanel = () => fireEvent.click(screen.getByRole('button', { name: 'Open Web Phone' }));
+
+  it('badge follows the real registration, including a dropped binding and a lost socket', async () => {
+    await renderRegisteredPhone();
+    openPanel();
+    expect(screen.getByRole('status')).toHaveTextContent('Registered');
+
+    act(() => ua.emit('unregistered'));
+    expect(screen.getByRole('status')).toHaveTextContent('Not registered');
+
+    act(() => ua.emit('disconnected'));
+    expect(screen.getByRole('status')).toHaveTextContent('Disconnected');
+
+    act(() => ua.emit('connecting'));
+    expect(screen.getByRole('status')).toHaveTextContent('Registering…');
+    act(() => ua.emit('registered'));
+    expect(screen.getByRole('status')).toHaveTextContent('Registered');
+  });
+
+  it('does not claim Registered after a call ends while the registration is gone', async () => {
+    await renderRegisteredPhone();
+    const call = makeSession('1006');
+    ring(call);
+    await screen.findByRole('button', { name: 'Answer' });
+
+    act(() => ua.emit('unregistered'));
+    act(() => call.hangUp());
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Answer' })).not.toBeInTheDocument());
+    expect(screen.getByRole('status')).toHaveTextContent('Not registered');
+    expect(screen.queryByText('Registered')).not.toBeInTheDocument();
+  });
+
+  it('Re-register drops the binding, then registers afresh once it is gone', async () => {
+    await renderRegisteredPhone();
+    openPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-register' }));
+    expect(ua.unregister).toHaveBeenCalled();
+    expect(ua.register).not.toHaveBeenCalled(); // waits for the un-REGISTER to settle
+    expect(screen.getByRole('status')).toHaveTextContent('Registering…');
+    expect(screen.getByRole('button', { name: 'Re-register' })).toBeDisabled();
+
+    act(() => ua.emit('unregistered'));
+    expect(ua.register).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Registering…');
+
+    act(() => ua.emit('registered'));
+    expect(screen.getByRole('status')).toHaveTextContent('Registered');
+  });
+
+  it('Re-register rebuilds the phone when the connection is gone', async () => {
+    await renderRegisteredPhone();
+    openPanel();
+    ua.isConnected = () => false;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Re-register' }));
+    await waitFor(() => expect(uaCount).toBe(2));
+  });
+
+  it('Re-register is disabled during a call', async () => {
+    await renderRegisteredPhone();
+    ring(makeSession('1007'));
+    await screen.findByRole('button', { name: 'Answer' });
+    expect(screen.getByRole('button', { name: 'Re-register' })).toBeDisabled();
   });
 });
