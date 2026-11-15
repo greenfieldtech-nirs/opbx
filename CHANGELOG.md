@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **In-call screen redesign.** During a call, Mute, Keypad and Hold sit in one row above a centred red hang-up button at the bottom, and the volume slider is replaced by + / − buttons (10% steps) on the right edge with a bar showing the level. An answered inbound call shows the caller ID, with the caller name below it in larger type (or the caller ID alone, large, when there is no name).
 
+- **Blind call transfer.** During a call, **Transfer** sends the other party to an extension or an outside number, with suggestions from the organization's extensions, and ends the user's side. The destination is routed as if the user's extension dialled it (extension forwarding and voicemail, the outbound whitelist and the extension's outbound caller ID apply). Works for calls placed, calls received, and ring group or call queue calls; a transferred queue call is closed as answered by the agent (`queue_calls.transferred_to`) and frees the agent. New `POST /v1/webphone/transfer` and `GET /v1/webphone/directory`; new `CloudonixCallsClient::forkCall()`.
+- **Embedded dialer: Allow call transfer.** A per-user switch in the Embedded Dialer dialog (off by default) shows the Transfer button in that user's embedded dialer. New `POST /v1/embed/transfer` and `GET /v1/embed/directory`.
 - **Registration badge and re-register.** The Web Phone header shows a status badge (green Registered, amber Registering…, red Not registered or Disconnected) driven by the SIP stack's registration events, and a Re-register button that drops the registration and registers again (or reconnects first when the connection is gone). Disabled during a call.
 
 ### Fixed - 2026-11-15 (Web Phone)
