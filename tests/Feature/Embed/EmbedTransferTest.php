@@ -70,6 +70,16 @@ final class EmbedTransferTest extends TestCase
         $this->embed()->postJson('/api/v1/embed/transfer', ['call_id' => 'x@pbx', 'destination' => '1002'])->assertNotFound();
     }
 
+    public function test_a_bare_token_without_a_browser_origin_is_refused(): void
+    {
+        $this->allowTransfer();
+        $bare = fn () => $this->withHeaders(['Authorization' => "Bearer {$this->token}"]);
+
+        $bare()->getJson('/api/v1/embed/directory')->assertForbidden();
+        $bare()->postJson('/api/v1/embed/transfer', ['call_id' => 'x@pbx', 'destination' => '1002'])->assertForbidden();
+        $bare()->withHeaders(['Sec-Fetch-Site' => 'same-origin'])->getJson('/api/v1/embed/directory')->assertOk();
+    }
+
     public function test_owner_turns_the_switch_on_from_the_embed_settings(): void
     {
         $owner = User::factory()->create(['organization_id' => $this->user->organization_id, 'role' => UserRole::OWNER]);
