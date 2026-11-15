@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\WebPhoneTransferRequest;
+use App\Services\VoiceRouting\CallTransferService;
 use App\Services\WebPhoneCallsLogBuilder;
 use App\Services\WebPhoneConfigBuilder;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +31,9 @@ final class EmbedConfigController extends Controller
             return response()->json(['message' => 'Embedded dialer configuration is unavailable.'], 404);
         }
 
+        // The embed snippet's own switch decides whether the widget offers call transfer.
+        $config['transfer_enabled'] = (bool) $request->attributes->get('embedToken')->allow_transfer;
+
         return response()->json(['data' => $config]);
     }
 
@@ -37,5 +42,23 @@ final class EmbedConfigController extends Controller
         $user = $request->attributes->get('embedUser');
 
         return response()->json(['data' => $builder->buildForUser($user)]);
+    }
+
+    public function transfer(WebPhoneTransferRequest $request, CallTransferService $transfers): JsonResponse
+    {
+        if (! $request->attributes->get('embedToken')->allow_transfer) {
+            return response()->json(['message' => 'Call transfer is not enabled for this embedded dialer.'], 403);
+        }
+
+        return WebPhoneTransferController::performTransfer($request->attributes->get('embedUser'), $request->validated(), $transfers);
+    }
+
+    public function directory(Request $request): JsonResponse
+    {
+        if (! $request->attributes->get('embedToken')->allow_transfer) {
+            return response()->json(['message' => 'Call transfer is not enabled for this embedded dialer.'], 403);
+        }
+
+        return response()->json(['data' => WebPhoneTransferController::directoryFor($request->attributes->get('embedUser'))]);
     }
 }

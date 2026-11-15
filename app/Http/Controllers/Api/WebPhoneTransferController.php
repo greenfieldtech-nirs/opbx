@@ -10,6 +10,7 @@ use App\Http\Controllers\Traits\ApiRequestHandler;
 use App\Http\Requests\WebPhoneTransferRequest;
 use App\Models\Extension;
 use App\Models\User;
+use App\Scopes\OrganizationScope;
 use App\Services\VoiceRouting\CallTransferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -77,7 +78,8 @@ final class WebPhoneTransferController extends Controller
      */
     public static function directoryFor(User $user): array
     {
-        return Extension::where('organization_id', $user->organization_id)
+        // Explicit organization filter: the embed widget has no session for the global scope.
+        return OrganizationScope::bypass(fn () => Extension::where('organization_id', $user->organization_id)
             ->where('type', ExtensionType::USER)
             ->where('status', 'active')
             ->where(fn ($query) => $query->whereNull('user_id')->orWhere('user_id', '!=', $user->id))
@@ -88,14 +90,14 @@ final class WebPhoneTransferController extends Controller
                 'extension_number' => (string) $extension->extension_number,
                 'name' => $extension->user?->name,
             ])
-            ->all();
+            ->all());
     }
 
     private static function extensionOf(User $user): ?Extension
     {
-        return Extension::where('user_id', $user->id)
+        return OrganizationScope::bypass(fn () => Extension::where('user_id', $user->id)
             ->where('type', ExtensionType::USER)
             ->where('organization_id', $user->organization_id)
-            ->first();
+            ->first());
     }
 }

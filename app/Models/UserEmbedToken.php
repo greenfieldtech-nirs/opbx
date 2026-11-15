@@ -22,6 +22,7 @@ class UserEmbedToken extends Model
         'token',
         'icon_position',
         'icon_background_color',
+        'allow_transfer',
         'last_used_at',
     ];
 
@@ -31,6 +32,7 @@ class UserEmbedToken extends Model
     {
         return [
             'icon_position' => EmbedIconPosition::class,
+            'allow_transfer' => 'boolean',
             'last_used_at' => 'datetime',
         ];
     }

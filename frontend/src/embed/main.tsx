@@ -13,6 +13,7 @@ import { createEmbedBus } from './embedApi';
 import type {
   WebPhoneConfigResponse,
   WebPhoneCallsLogResponse,
+  WebPhoneDirectoryResponse,
 } from '@/services/webPhone.service';
 import '../index.css';
 
@@ -58,6 +59,16 @@ function mount(): void {
     return res.data;
   };
 
+  // Offered only when the snippet allows transfer (config.transfer_enabled).
+  const transferFn = async (callId: string, destination: string): Promise<void> => {
+    await embedApi.post('/embed/transfer', { call_id: callId, destination });
+  };
+
+  const directoryQueryFn = async (): Promise<WebPhoneDirectoryResponse> => {
+    const res = await embedApi.get<WebPhoneDirectoryResponse>('/embed/directory');
+    return res.data;
+  };
+
   // Install the postMessage bridge before mounting so WebPhone's embed effect
   // finds the bus on first render.
   createEmbedBus();
@@ -74,6 +85,8 @@ function mount(): void {
         <WebPhone
           configQueryFn={configQueryFn}
           callsLogQueryFn={callsLogQueryFn}
+          transferFn={transferFn}
+          directoryQueryFn={directoryQueryFn}
           iconPosition={embed.iconPosition}
           iconBackgroundColor={embed.iconBackgroundColor}
           autoOpen

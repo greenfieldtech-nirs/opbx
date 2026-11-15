@@ -230,7 +230,7 @@ Route::prefix('v1')->group(function (): void {
 
             return response('', 204)->withHeaders([
                 'Access-Control-Allow-Origin' => $origin,
-                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
                 'Access-Control-Max-Age' => '600',
                 'Vary' => 'Origin',
@@ -240,6 +240,8 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['throttle:embed', 'resolve.embed.token'])->group(function (): void {
             Route::get('config', [EmbedConfigController::class, 'config'])->name('embed.config');
             Route::get('calls-log', [EmbedConfigController::class, 'callsLog'])->name('embed.calls-log');
+            Route::post('transfer', [EmbedConfigController::class, 'transfer'])->name('embed.transfer');
+            Route::get('directory', [EmbedConfigController::class, 'directory'])->name('embed.directory');
         });
     });
 

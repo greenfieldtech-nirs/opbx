@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -57,6 +58,7 @@ export function EmbeddedDialerDialog({
 
   const [iconPosition, setIconPosition] = useState<EmbedIconPosition>('bottom-right');
   const [iconColor, setIconColor] = useState('#007acc');
+  const [allowTransfer, setAllowTransfer] = useState(false);
   // The one-time snippet revealed after a regenerate (never re-fetchable).
   const [snippet, setSnippet] = useState<string | null>(null);
 
@@ -71,6 +73,7 @@ export function EmbeddedDialerDialog({
     if (config) {
       setIconPosition(config.icon_position ?? 'bottom-right');
       setIconColor(config.icon_background_color ?? '#007acc');
+      setAllowTransfer(config.allow_transfer ?? false);
     }
   }, [config]);
 
@@ -84,6 +87,7 @@ export function EmbeddedDialerDialog({
       embedTokensService.update(userId!, {
         icon_position: iconPosition,
         icon_background_color: iconColor,
+        allow_transfer: allowTransfer,
       }),
     onSuccess: () => {
       toast.success('Embedded dialer settings saved');
@@ -166,6 +170,16 @@ export function EmbeddedDialerDialog({
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-md border p-3">
+              <div className="space-y-1">
+                <Label htmlFor="embed-allow-transfer">Allow call transfer</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show the Transfer button during calls in the embedded dialer.
+                </p>
+              </div>
+              <Switch id="embed-allow-transfer" checked={allowTransfer} onCheckedChange={setAllowTransfer} />
             </div>
 
             {/* One-time snippet reveal */}
