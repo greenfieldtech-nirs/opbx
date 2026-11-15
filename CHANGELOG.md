@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`./opbx.sh`** starts and stops the stack in the right order: `start [--no-waf]`, `stop`, `restart`, `status`, `logs`, `upgrade`. It starts SafeLine first and waits for its detector when the WAF is on, then the database, Redis, SeaweedFS and the app, then the rest, and waits until every service is running and healthy. `--no-waf` skips the WAF for one run without changing `.env`. `stop` uses `docker compose stop` (never `down`) for OPBX, every profile included, then SafeLine. `upgrade` also runs `composer install` inside the app image as the host user (`--no-dev` in production), so the host needs no PHP or Composer. It defaults `COMPOSE_PARALLEL_LIMIT` to 2 when `.env` has none. Tests: `scripts/tests/opbx-sh-test.sh`.
 
+- **Install & Upgrade page** on the project website (`/install`, linked from the header and footer): requirements, the three install steps with an example installer run, `./opbx.sh` start/stop, the upgrade procedure, reconfigure/reset and troubleshooting. Commands are shown in terminal windows with a copy button.
+
 ### Changed - 2026-11-15
 
 - Installation and upgrade docs (README, user guide, `docker/README.md`) describe `./opbx.sh`, the in-image Composer step, the automatic storage buckets and migrations, Compose 2.24.4+ and the `greenfieldtech-nirs/opbx` repository URL.

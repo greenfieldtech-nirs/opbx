@@ -55,6 +55,11 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <Link to="/install" className="hover:text-foreground transition-colors">
+                  Install &amp; Upgrade
+                </Link>
+              </li>
+              <li>
                 <Link to="/status" className="hover:text-foreground transition-colors">
                   Platform Status
                 </Link>
