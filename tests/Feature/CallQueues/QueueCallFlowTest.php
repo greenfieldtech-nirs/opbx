@@ -1055,7 +1055,9 @@ class QueueCallFlowTest extends TestCase
 
     public function test_cdr_without_answer_marks_abandoned(): void
     {
-        $enteredAt = now()->subMinutes(2);
+        // Whole seconds: entered_at is stored without fractions, and getTimestampMs() rounds, so a
+        // time just under a second boundary would round up and add a second to the expected wait.
+        $enteredAt = now()->subMinutes(2)->startOfSecond();
         $queueCall = QueueCall::factory()->create([
             'call_queue_id' => $this->queue->id,
             'organization_id' => $this->organization->id,
@@ -1085,7 +1087,8 @@ class QueueCallFlowTest extends TestCase
 
     public function test_cdr_with_answer_finalizes_handling_time(): void
     {
-        $enteredAt = now()->subMinutes(3);
+        // Whole seconds, as in test_cdr_without_answer_marks_abandoned.
+        $enteredAt = now()->subMinutes(3)->startOfSecond();
         $queueCall = QueueCall::factory()->create([
             'call_queue_id' => $this->queue->id,
             'organization_id' => $this->organization->id,
