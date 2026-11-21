@@ -16,7 +16,8 @@ public class OnnxModel {
 
     public void load() throws OrtException {
         this.env = OrtEnvironment.getEnvironment();
-        // onnxruntime 1.31 ships a telemetry client; a PBX worker sends nothing to third parties.
+        // A PBX worker sends nothing to third parties. ORT_DISABLE_TELEMETRY (Dockerfile) stops the
+        // 1DS client before this env exists; this call covers runs outside the image.
         this.env.setTelemetry(false);
         OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
         this.session = env.createSession(modelPath, opts);
