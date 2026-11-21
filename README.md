@@ -337,6 +337,8 @@ Starting and stopping:
 ./opbx.sh start             # SafeLine first when the WAF is on, then the database, Redis, storage and the app,
                             # then the rest; waits until every service is up and prints the URLs
 ./opbx.sh start --no-waf    # this run without the WAF (.env unchanged; the next start brings it back)
+./opbx.sh start --nofork    # stay in the foreground with every service's log; Ctrl-C stops the stack
+./opbx.sh start --with-ngrok  # this run also starts the ngrok tunnel (needs NGROK_AUTHTOKEN in .env)
 ./opbx.sh stop              # stops OPBX, then SafeLine; containers, network and data are kept
 ./opbx.sh restart           # stop + start
 ./opbx.sh status            # every service's state and health, the WAF, the URLs

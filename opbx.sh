@@ -3,12 +3,12 @@
 # Start, stop and upgrade the OPBX stack in the right order.
 #
 # Usage (from the repo root):
-#   ./opbx.sh start [--no-waf]      start everything; SafeLine (the WAF) first when it is on
+#   ./opbx.sh start [options]       start everything; SafeLine (the WAF) first when it is on
 #   ./opbx.sh stop                  stop OPBX, then SafeLine. Containers, network and data are kept
-#   ./opbx.sh restart [--no-waf]    stop, then start
+#   ./opbx.sh restart [options]     stop, then start
 #   ./opbx.sh status                state and health of every service, the WAF, and the URLs
 #   ./opbx.sh logs [service...]     follow the logs (all services, or the ones named)
-#   ./opbx.sh upgrade [--no-waf]    after `git pull` and ./scripts/update-compose.sh: copies MinIO data to
+#   ./opbx.sh upgrade [options]     after `git pull` and ./scripts/update-compose.sh: copies MinIO data to
 #                                   SeaweedFS once, rebuilds with fresh base images, installs the PHP packages
 #                                   inside the app image, starts in order
 #
@@ -17,6 +17,9 @@
 #              for good use ./install.sh reconfigure.
 #   --prod     only for a hand-made .env without COMPOSE_FILE: add docker-compose.prod.yml.
 #              (An installer-made .env lists its compose files in COMPOSE_FILE, which always wins.)
+#   --nofork   stay in the foreground once everything is up, showing every service's log. Ctrl-C stops
+#              the stack (OPBX, then SafeLine) the same way ./opbx.sh stop does.
+#   --with-ngrok  this run only: also start the ngrok tunnel (the dev profile). Needs NGROK_AUTHTOKEN in .env.
 #
 # START_TIMEOUT (seconds, default 300) bounds the wait for the services; UPGRADE_TIMEOUT (default 1800)
 # bounds the app's first start after an upgrade (database migrations can be slow).
@@ -28,18 +31,22 @@
 set -euo pipefail
 cd "$(dirname "$0")" >/dev/null
 
-usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 die() { echo "❌ $*" >&2; exit 1; }
 
 cmd="${1:-}"
 [ $# -gt 0 ] && shift
 NO_WAF=false
 PROD=false
+NOFORK=false
+WITH_NGROK=false
 ARGS=()
 for a in "$@"; do
     case "$a" in
         --no-waf) NO_WAF=true ;;
         --prod) PROD=true ;;
+        --nofork) NOFORK=true ;;
+        --with-ngrok) WITH_NGROK=true ;;
         -h|--help) usage ;;
         -*) die "Unknown option: $a (see ./opbx.sh --help)" ;;
         *) ARGS+=("$a") ;;
@@ -82,6 +89,11 @@ fi
 
 # OPBX compose with the chosen files (overrides COMPOSE_FILE from .env for this run only).
 OPBX=(env "COMPOSE_FILE=$FILES" docker compose)
+if $WITH_NGROK; then
+    [ -n "$(env_get NGROK_AUTHTOKEN)" ] || [ -n "${NGROK_AUTHTOKEN:-}" ] \
+        || die "--with-ngrok needs NGROK_AUTHTOKEN in .env (https://dashboard.ngrok.com/get-started/your-authtoken)."
+    OPBX+=(--profile dev)   # ngrok is the only dev-profile service
+fi
 # SafeLine is its own project; it reads docker/safeline/.env and must not see OPBX's COMPOSE_FILE.
 SAFELINE=(env -u COMPOSE_FILE -u COMPOSE_PROFILES docker compose --project-directory docker/safeline -p safeline)
 safeline_configured() { [ -f docker/safeline/.env ]; }
@@ -162,6 +174,7 @@ urls() {
     fi
     profiles="$(env_get COMPOSE_PROFILES)"
     case ",$profiles," in *,logs,*) echo "  Grafana:      $app/logs/" ;; esac
+    if $WITH_NGROK; then echo "  ngrok:        public URL at http://localhost:4040 (or ./opbx.sh logs ngrok)"; fi
     if $WAF_SKIPPED; then echo "  WAF:          skipped for this run (--no-waf); the next start brings it back"; fi
 }
 
@@ -201,6 +214,14 @@ start_stack() {
     fi
     echo "✓ OPBX is running."
     urls
+    if $NOFORK; then
+        echo "▶ Showing the logs of every service. Ctrl-C stops the stack."
+        # compose handles Ctrl-C itself; the trap only keeps this script alive to stop SafeLine afterwards
+        trap ':' INT
+        "${OPBX[@]}" up || true
+        trap - INT
+        stop_stack
+    fi
 }
 
 # The repo is bind-mounted over the app image's vendor/, so PHP packages live on the host. Composer runs inside

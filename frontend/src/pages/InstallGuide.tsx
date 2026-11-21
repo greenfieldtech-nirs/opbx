@@ -129,6 +129,7 @@ const EVERYDAY: [string, string][] = [
   ['./opbx.sh status', 'The state and health of every service, the WAF, and the URLs.'],
   ['./opbx.sh logs app', 'Follow the logs of one service (or all, without a name).'],
   ['./opbx.sh start --no-waf', 'Start once without the WAF. Your settings are not changed; the next start brings it back.'],
+  ['./opbx.sh start --nofork', 'Start, then stay in the foreground showing every service\'s log. Ctrl-C stops the stack.'],
 ];
 
 const UPGRADE_STEPS = [

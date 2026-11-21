@@ -218,6 +218,8 @@ curl http://localhost/api/health
 ```bash
 ./opbx.sh start             # SafeLine first when the WAF is on, then the database, Redis, storage and app, then the rest
 ./opbx.sh start --no-waf    # this run without the WAF; .env is not changed, the next start brings it back
+./opbx.sh start --nofork    # stay in the foreground with every service's log; Ctrl-C stops the stack
+./opbx.sh start --with-ngrok  # this run also starts the ngrok tunnel for webhook development (needs NGROK_AUTHTOKEN)
 ./opbx.sh stop              # stops OPBX, then SafeLine; containers, network and data are kept
 ./opbx.sh restart           # stop + start
 ./opbx.sh status            # state and health of every service, the WAF, the URLs
