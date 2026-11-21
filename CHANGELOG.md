@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-21 (opbx.sh)
+
+- `./opbx.sh start|restart|upgrade --nofork`: after the ordered start, stays in the foreground showing every service's log; Ctrl-C stops OPBX, then SafeLine, like `./opbx.sh stop` (containers and data are kept).
+- `--with-ngrok`: starts the ngrok tunnel (the `dev` profile) for this run only and prints where to find its public URL. Refused when `NGROK_AUTHTOKEN` is not set; `.env` is not changed.
+
 ### Added - 2026-11-15 (Web Phone)
 
 - **Inbound calls ring and alert.** An inbound call to the Web Phone now plays the country's ringing tone until it is answered, declined or abandoned; the tab title flashes "Incoming call: <caller>"; and when the browser window is not in front, a notification ("Incoming call", with the caller) brings OPBX forward with the Web Phone open when clicked. Notification permission is requested when the user opens the Web Phone. The caller shows as "Name (number)" instead of a SIP address. Not in the embed widget.

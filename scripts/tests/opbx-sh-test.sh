@@ -126,4 +126,34 @@ setup "$WAF_ENV" safeline
 run frobnicate && bad "unknown command accepted" || pass "unknown command refused"
 run start --nope && bad "unknown option accepted" || pass "unknown option refused"
 
+# 10. --nofork: the ordered, health-checked start, then `up` attached; when it returns (Ctrl-C), everything stops.
+setup "$WAF_ENV" safeline
+if FAKE_SAFELINE_RUNNING=abc123 run start --nofork; then
+    rest=$(calls | grep -n -- 'compose up -d$' | head -1 | cut -d: -f1); fg=$(line_of 'compose up$')
+    o=$(line_of "--profile \* stop"); s=$(line_of '-p safeline stop')
+    [ -n "$rest" ] && [ -n "$fg" ] && [ "$rest" -lt "$fg" ] && pass "--nofork: detached start first, then attached up" || { bad "--nofork up order"; calls; }
+    [ -n "$o" ] && [ -n "$s" ] && [ "$fg" -lt "$o" ] && [ "$o" -lt "$s" ] && pass "--nofork: leaving the foreground stops OPBX, then SafeLine" || { bad "--nofork stop"; calls; }
+else bad "start --nofork exited non-zero"; cat "$T/out.log"; fi
+setup "$WAF_ENV" safeline
+run start
+calls | grep -q -- 'compose up$' && bad "plain start attached to the stack" || pass "plain start stays detached"
+calls | grep -q -- ' stop' && bad "plain start stopped something" || pass "plain start stops nothing"
+
+# 11. --with-ngrok: the dev profile (ngrok) for this run only; refused without NGROK_AUTHTOKEN.
+setup "$WAF_ENV
+NGROK_AUTHTOKEN=tok" safeline
+before=$(cat "$T/.env")
+if run start --with-ngrok; then
+    calls | grep -- ' up -d$' | grep -q -- '--profile dev' && pass "--with-ngrok starts the dev profile" || { bad "--with-ngrok profile"; calls; }
+    calls | grep -- 'config --services' | grep -q -- '--profile dev' && pass "--with-ngrok waits for ngrok too" || { bad "--with-ngrok wait"; calls; }
+    [ "$(cat "$T/.env")" = "$before" ] && pass "--with-ngrok leaves .env unchanged" || bad ".env changed"
+else bad "start --with-ngrok exited non-zero"; cat "$T/out.log"; fi
+run start
+calls | grep -- 'compose up -d$' | grep -q -- '--profile dev' && bad "plain start enabled ngrok" || pass "plain start leaves ngrok off"
+setup "$WAF_ENV" safeline
+if run start --with-ngrok; then bad "--with-ngrok without NGROK_AUTHTOKEN accepted"; else
+    calls | grep -q 'up -d' && bad "started something anyway" || pass "--with-ngrok without NGROK_AUTHTOKEN stops before starting anything"
+    grep -q 'NGROK_AUTHTOKEN' "$T/out.log" && pass "and names NGROK_AUTHTOKEN" || bad "ngrok message"
+fi
+
 exit $fail
