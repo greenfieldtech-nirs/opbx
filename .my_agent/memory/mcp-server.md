@@ -104,6 +104,8 @@
 - `tests/unit/` — errors, config, auth, security, http (30 tests incl. full JSON-RPC initialize+tools/call round-trip via app.inject; responses may be SSE frames — parse `data:` lines).
 - `Dockerfile` (multi-stage, non-root, wget healthcheck), `docker-compose.yml` (+ optional `telemetry` profile w/ OTel collector), `.env.example`, `eslint.config.mjs` (flat).
 
+- `package.json` `overrides`: protobufjs, js-yaml, gaxios `^7.3.1` (2026-11-21: gcp-metadata 8.1.4 pins vulnerable gaxios 7.1.3 → rimraf/glob/minimatch; don't let `npm audit fix` downgrade gcp-metadata instead). Regenerate the lockfile in node:26 Docker.
+
 ## Verified
 
 - `npm run typecheck|lint|test|build` all pass.
