@@ -43,6 +43,7 @@
   },
   "overrides": {
     "protobufjs": "^8.6.6",
-    "js-yaml": "^4.3.2"
+    "js-yaml": "^4.3.2",
+    "gaxios": "^7.3.1"
   }
 }
