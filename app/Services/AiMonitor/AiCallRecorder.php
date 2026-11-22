@@ -125,14 +125,14 @@ class AiCallRecorder
         }
 
         $this->safely('cdr', $ids[0], function () use ($organizationId, $ids, $cdr) {
-            $open = $this->query()
+            // One query for every CDR: most calls never reached an AI assistant.
+            $attempts = $this->query()
                 ->where('organization_id', $organizationId)
                 ->whereIn('call_id', $ids)
-                ->where('status', AiCallAttemptStatus::IN_PROGRESS)
                 ->orderBy('id')
                 ->get();
 
-            if ($open->isEmpty()) {
+            if ($attempts->isEmpty()) {
                 return;
             }
 
@@ -141,6 +141,27 @@ class AiCallRecorder
                 ? Carbon::createFromTimestampMs((int) $cdr['session']['callEndTime'])
                 : now();
 
+            // A campaign call counts only when a person answered; otherwise it counts for no
+            // assistant, including members that already failed on it before a failover.
+            $fromAutoDialer = $attempts->contains(fn (AiCallAttempt $a) => $a->source === AiCallAttemptSource::AUTO_DIALER);
+            if ($fromAutoDialer && (! $answered || ! $this->reachedPerson($organizationId, $ids, $cdr))) {
+                foreach ($attempts as $attempt) {
+                    $attempt->update([
+                        'status' => AiCallAttemptStatus::EXCLUDED,
+                        'failure_reason' => null,
+                        'ended_at' => $attempt->ended_at ?? $endedAt,
+                        'billsec' => 0,
+                    ]);
+                }
+
+                return;
+            }
+
+            $open = $attempts->where('status', AiCallAttemptStatus::IN_PROGRESS)->values();
+            if ($open->isEmpty()) {
+                return;
+            }
+
             $last = $open->pop();
             // Earlier open attempts lost their failure callback; the call moved past them.
             foreach ($open as $stale) {
@@ -148,9 +169,6 @@ class AiCallRecorder
             }
 
             $status = $answered ? AiCallAttemptStatus::ANSWERED : AiCallAttemptStatus::FAILED;
-            if ($last->source === AiCallAttemptSource::AUTO_DIALER && ! $this->reachedPerson($organizationId, $ids, $cdr)) {
-                $status = AiCallAttemptStatus::EXCLUDED;
-            }
 
             // The CDR covers the whole call; this assistant only had it from its hand-off on.
             $segment = max(0, (int) $last->started_at->diffInSeconds($endedAt, false));

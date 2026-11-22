@@ -241,6 +241,43 @@ final class AiCallRecordingTest extends TestCase
         $this->assertSame($expected, $this->attempts()->sole()->status);
     }
 
+    public function test_unanswered_auto_dialer_call_counts_for_no_assistant(): void
+    {
+        app(AiCallRecorder::class)->started($this->org->id, $this->assistant()->id, null, 'CA-1', AiCallAttemptSource::AUTO_DIALER);
+
+        $this->cdr('NOANSWER', 0);
+
+        $attempt = $this->attempts()->sole();
+        $this->assertSame(AiCallAttemptStatus::EXCLUDED, $attempt->status);
+        $this->assertNull($attempt->failure_reason);
+        $this->assertNotNull($attempt->ended_at);
+    }
+
+    public function test_auto_dialer_voicemail_after_a_failover_counts_for_no_member(): void
+    {
+        [$first, $second] = [$this->assistant(), $this->assistant()];
+        $lb = $this->loadBalancer([$first, $second]);
+        app(AiCallRecorder::class)->started($this->org->id, $first->id, $lb->id, 'CA-1', AiCallAttemptSource::AUTO_DIALER);
+        $this->followThrough($lb, $first);
+        $this->assertSame(AiCallAttemptSource::FAILOVER, $this->attempts()->last()->source);
+
+        $this->cdr('CONNECTED', 25, ['amd' => ['result' => 'voicemail']]);
+
+        $this->assertSame([AiCallAttemptStatus::EXCLUDED, AiCallAttemptStatus::EXCLUDED], $this->attempts()->pluck('status')->all());
+    }
+
+    public function test_auto_dialer_person_after_a_failover_counts_normally(): void
+    {
+        [$first, $second] = [$this->assistant(), $this->assistant()];
+        $lb = $this->loadBalancer([$first, $second]);
+        app(AiCallRecorder::class)->started($this->org->id, $first->id, $lb->id, 'CA-1', AiCallAttemptSource::AUTO_DIALER);
+        $this->followThrough($lb, $first);
+
+        $this->cdr('CONNECTED', 25, ['amd' => ['result' => 'human']]);
+
+        $this->assertSame([AiCallAttemptStatus::FAILED, AiCallAttemptStatus::ANSWERED], $this->attempts()->pluck('status')->all());
+    }
+
     public function test_cdr_from_another_organization_does_not_settle_the_attempt(): void
     {
         app(AiCallRecorder::class)->started(Organization::factory()->create()->id, $this->assistant()->id, null, 'CA-1', AiCallAttemptSource::ROUTING);
