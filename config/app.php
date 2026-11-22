@@ -23,6 +23,9 @@ return [
     // What "/" shows: 'home' (public homepage) or 'login' (sign-in, or the dashboard when signed in).
     'front_page' => env('OPBX_FRONT_PAGE') === 'login' ? 'login' : 'home',
 
+    // True only on the hosted OPBX Cloud demo: shows its service disclaimer on the public status page.
+    'opbx_cloud' => (bool) env('OPBX_CLOUD', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

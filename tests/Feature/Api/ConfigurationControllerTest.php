@@ -42,6 +42,15 @@ class ConfigurationControllerTest extends TestCase
         $this->getJson('/api/v1/config/application')->assertOk()->assertJsonPath('front_page', 'login');
     }
 
+    public function test_application_config_says_whether_this_is_opbx_cloud(): void
+    {
+        Config::set('app.opbx_cloud', false);
+        $this->getJson('/api/v1/config/application')->assertOk()->assertJsonPath('opbx_cloud', false);
+
+        Config::set('app.opbx_cloud', true);
+        $this->getJson('/api/v1/config/application')->assertOk()->assertJsonPath('opbx_cloud', true);
+    }
+
     public function test_application_config_derives_endpoints_from_request_and_config(): void
     {
         Config::set('services.mcp.port', 9090);

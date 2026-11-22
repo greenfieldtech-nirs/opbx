@@ -306,7 +306,7 @@ It shows six groups, each the worst status of its components:
 
 The banner reads **All systems operational**, **Partial outage** or **Major outage**. The page shows a six-hour strip per group and refreshes every minute.
 
-Above the status, a folded **Disclaimer** reads "OPBX Cloud is a demonstration service, with no warranty or SLA." **Read more** opens the full text. It is shown on every installation.
+On the hosted OPBX Cloud demo, a folded **Disclaimer** above the status reads "OPBX Cloud is a demonstration service, with no warranty or SLA." **Read more** opens the full text. A self-hosted installation does not show it: it appears only when `OPBX_CLOUD=true` is set in `.env`.
 
 Internal components (scheduler, Loki, Grafana, MCP server) and all details (versions, latency, hostnames, error messages) are never shown on the public page. The data comes from `GET /api/v1/public/status`, cached for 30 seconds.
 
