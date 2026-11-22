@@ -14,6 +14,8 @@ paths:
       operationId: getAiMonitor
       security:
         - bearerAuth: []
+        - apiKeyAuth: []
+      x-api-key-scope: ai-monitor:read
       parameters:
         - name: minutes
           in: query
@@ -45,16 +47,16 @@ paths:
                           properties:
                             id: { type: integer }
                             name: { type: string, example: Sales Bot }
-                            provider: { type: string, nullable: true, example: openai }
-                            status: { type: string, nullable: true, example: active }
+                            provider: { type: [string, 'null'], example: openai }
+                            status: { type: [string, 'null'], example: active }
                             active: { type: integer, description: Calls with the assistant now }
                             calls: { type: integer }
                             answered: { type: integer }
                             failed: { type: integer }
-                            success_rate: { type: number, nullable: true, description: 'answered / (answered + failed), percent; null when no call finished', example: 96.5 }
-                            avg_duration_seconds: { type: integer, nullable: true, description: Average talk time of answered calls }
+                            success_rate: { type: [number, 'null'], description: 'answered / (answered + failed), percent; null when no call finished', example: 96.5 }
+                            avg_duration_seconds: { type: [integer, 'null'], description: Average talk time of answered calls }
                             ai_minutes: { type: integer }
-                            last_call_at: { type: string, format: date-time, nullable: true, description: Most recent call, also outside the window }
+                            last_call_at: { type: [string, 'null'], format: date-time, description: 'Most recent call, also outside the window' }
                             series: { type: array, items: { type: integer }, description: 'Calls per point, oldest first (12 points)' }
                       load_balancers:
                         type: array
@@ -64,12 +66,12 @@ paths:
                             id: { type: integer }
                             name: { type: string, example: Main AI Pool }
                             strategy: { type: string, enum: [round_robin, priority, percentage] }
-                            status: { type: string, nullable: true }
+                            status: { type: [string, 'null'] }
                             active: { type: integer }
                             calls: { type: integer, description: Distinct calls }
                             failovers: { type: integer, description: Times a failed member handed the call to the next one }
                             fell_back: { type: integer, description: Calls that ended in the load balancer's fallback }
-                            handled_rate: { type: number, nullable: true, description: 'Calls an AI assistant kept (did not fall back), percent' }
+                            handled_rate: { type: [number, 'null'], description: 'Calls an AI assistant kept (did not fall back), percent' }
                             series: { type: array, items: { type: integer } }
                             members:
                               type: array
@@ -77,12 +79,12 @@ paths:
                                 type: object
                                 properties:
                                   ai_assistant_id: { type: integer }
-                                  name: { type: string, nullable: true }
+                                  name: { type: [string, 'null'] }
                                   active: { type: boolean }
-                                  priority: { type: integer, nullable: true }
+                                  priority: { type: [integer, 'null'] }
                                   calls: { type: integer }
-                                  actual_share: { type: number, nullable: true, description: Percent of the load balancer's attempts }
-                                  configured_share: { type: number, nullable: true, description: 'From weights (percentage) or equal (round robin); null for priority and inactive members' }
+                                  actual_share: { type: [number, 'null'], description: "Percent of the load balancer's attempts" }
+                                  configured_share: { type: [number, 'null'], description: 'From weights (percentage) or equal (round robin); null for priority and inactive members' }
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
         '403':

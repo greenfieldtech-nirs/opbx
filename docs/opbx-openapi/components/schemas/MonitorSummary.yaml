@@ -79,7 +79,7 @@ properties:
           example: ai_assistant
         routing_destination_label:
           type: string
-          description: Label of the routing destination type (AI Assistant, AI Load Balancer or Hangup)
+          description: Label of the routing destination type (AI Assistant, AI Load Balancer, Ring Group, Call Queue or Hang Up)
           example: AI Assistant
         start_date:
           type: string

@@ -39,11 +39,31 @@ paths:
                       refresh_on_hangup: { type: boolean }
         '401':
           $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '403':
+          description: API keys are refused (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
         '404':
-          description: No extension is assigned to this user
+          description: No extension is assigned to this user (`error.code` `NOT_FOUND`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
         '409':
-          description: Cloudonix is not configured, or the extension is not synced to Cloudonix
+          description: |
+            Cloudonix is not configured for the organization (`error.code` `CLOUDONIX_NOT_CONFIGURED`), or the
+            extension is not synced to Cloudonix yet (`EXTENSION_NOT_SYNCED`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'
         '422':
           $ref: '../../openapi.yaml#/components/responses/ValidationError'
         '502':
-          description: Cloudonix could not be read or did not accept the update
+          description: Cloudonix could not be read or did not accept the update (`error.code` `CLOUDONIX_UNAVAILABLE`)
+          content:
+            application/json:
+              schema:
+                $ref: '../../openapi.yaml#/components/schemas/Error'

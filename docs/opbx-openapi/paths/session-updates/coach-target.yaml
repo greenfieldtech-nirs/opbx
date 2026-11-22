@@ -16,7 +16,9 @@ paths:
           with a non-empty session token (422 otherwise).
 
         The returned `destination` embeds the target session's secret token and the
-        coaching policy. Dialing it triggers the `/voice/route` webhook, where
+        coaching policy. For an agent or member leg that OPBX originated for a caller (call
+        queue, simultaneous ring group), the token is that of the caller's session, so the
+        whole call is coached. Dialing it triggers the `/voice/route` webhook, where
         `CoachRoutingService` re-authorizes the request and emits `<Coach>` CXML — the
         real telephony-side gate. The token is only ever handed out per-request here;
         it is never included in the bulk active-calls list.

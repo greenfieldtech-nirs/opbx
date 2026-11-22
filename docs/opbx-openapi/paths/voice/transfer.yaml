@@ -1,0 +1,69 @@
+paths:
+  /callbacks/voice/transfer:
+    get:
+      tags:
+        - Voice Routing
+      summary: Web Phone blind transfer destination
+      description: |
+        Fetched by the session that a Web Phone blind transfer (`POST /v1/webphone/transfer` or
+        `POST /v1/embed/transfer`) moved. OPBX sends the party that stays on the line here (a
+        conference-bridged caller or a dialled Web Phone call is switched with `POST
+        /calls/{domain}/sessions/{token}/application`; a call the Web Phone placed is forked) and
+        routes the destination as a call dialled by the transferring extension, so extension
+        routing (voicemail, forwarding), the outbound whitelist and the organization's caller ID
+        rules apply. The response is the same CXML as `POST /voice/route` for that call.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires 120 seconds
+        after it is issued. The route is registered with `Route::any`, so every HTTP method is
+        accepted; GET and POST are documented. Not rate-limited.
+      operationId: callTransferGet
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`organization_id`, `from` = the transferring extension number, `to` = the transfer destination, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of `transfer:` followed by the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML routing the destination; `<Hangup/>` when the signature is invalid or expired"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+    post:
+      tags:
+        - Voice Routing
+      summary: Web Phone blind transfer destination
+      description: |
+        Same as the GET form (the route accepts every HTTP method). Cloudonix fetches a forked
+        call's URL with POST.
+      operationId: callTransferPost
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: "Base64-encoded JSON context (`organization_id`, `from` = the transferring extension number, `to` = the transfer destination, `exp`)"
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: "HMAC-SHA256 of `transfer:` followed by the decoded `sd` JSON, keyed with the application key (`APP_KEY`)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "CXML routing the destination; `<Hangup/>` when the signature is invalid or expired"
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'

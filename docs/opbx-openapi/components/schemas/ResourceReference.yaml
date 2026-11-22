@@ -24,5 +24,8 @@ properties:
     example: Main menu
   detail:
     type: string
-    description: Human-readable context of the reference (for example the routing slot or field that points at the resource).
-    example: option 1
+    description: >-
+      Where the reference sits, for example `fallback`, `member`, `menu option`, `failover`,
+      `routing target`, `extension destination`, `open hours action`, `default caller ID`
+      or `caller ID pool`.
+    example: menu option

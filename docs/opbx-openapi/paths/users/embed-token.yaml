@@ -16,7 +16,7 @@ paths:
       summary: Get user embed token settings
       description: |
         Get the [Embedded Dialer](/opbx/modules/embedded-dialer) settings for a
-        user's embed token (icon position/color, last-used timestamp). Never
+        user's embed token (icon position/color, call transfer switch, last-used timestamp). Never
         returns the plaintext token — only the initial generate/regenerate
         response does.
 
@@ -51,8 +51,9 @@ paths:
         - Users
       summary: Update user embed token settings
       description: |
-        Update the floating launcher icon position and/or background color
-        for a user's embed token. Does not rotate the token value — use the
+        Update the floating launcher icon position, background color and/or the
+        "Allow call transfer" switch (`allow_transfer`) for a user's embed token.
+        Only the fields sent change. Does not rotate the token value — use the
         `regenerate` endpoint for that.
 
         Caller must be Owner or PBX Admin, in the same organization as the
@@ -80,6 +81,10 @@ paths:
                   type: string
                   pattern: '^#[0-9a-fA-F]{6}$'
                   example: '#007acc'
+                allow_transfer:
+                  type: boolean
+                  description: Let the widget blind-transfer calls.
+                  example: true
       responses:
         '200':
           description: Embed token settings updated

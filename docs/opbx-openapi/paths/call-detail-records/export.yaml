@@ -78,3 +78,9 @@ paths:
                 type: string
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          description: '`extension_destination_match` is not `all` or `any`'
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'

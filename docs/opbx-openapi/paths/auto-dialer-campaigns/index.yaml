@@ -120,7 +120,7 @@ paths:
                   type:
                   - integer
                   - 'null'
-                  description: ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type. Required unless routing_destination_type is `hangup`.
+                  description: ID of the AI assistant, AI load balancer, ring group or call queue (in your organization) matching routing_destination_type. Required unless routing_destination_type is `hangup`.
                   example: 5
                 dial_timeout:
                   type: integer
@@ -607,7 +607,7 @@ paths:
                   type:
                   - integer
                   - 'null'
-                  description: ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
+                  description: ID of the AI assistant, AI load balancer, ring group or call queue (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
                   example: 5
                 dial_timeout:
                   type: integer
@@ -1027,7 +1027,7 @@ paths:
                   type:
                   - integer
                   - 'null'
-                  description: ID of the AI assistant or AI load balancer (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
+                  description: ID of the AI assistant, AI load balancer, ring group or call queue (in your organization) matching routing_destination_type (or the campaign's current type when not sent). When sent, it must not be null unless routing_destination_type in the same request is `hangup`.
                   example: 5
                 dial_timeout:
                   type: integer

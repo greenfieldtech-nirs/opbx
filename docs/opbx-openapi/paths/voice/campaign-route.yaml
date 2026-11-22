@@ -1,0 +1,78 @@
+paths:
+  /callbacks/voice/campaign-route:
+    get:
+      tags:
+        - Voice Routing
+      summary: Answered auto-dialer call to a ring group or call queue
+      description: |
+        Fetched by an auto-dialer call's session once the contact answers, when the campaign
+        sends answered calls to a ring group or a call queue. The campaign's CXML redirects
+        here; OPBX swaps `From` and `To` (the contact becomes the caller) and hands the call to
+        the ring group or call queue routing used for inbound calls, recorded as an outbound
+        call. `<Hangup/>` when the signature is invalid or expired, or the ring group or call
+        queue no longer exists in the organization.
+
+        Authentication: none; the URL is a Laravel temporary signed route (`expires` +
+        `signature`, signed over the relative URL) that is valid for 15 minutes. The route is
+        registered with `Route::any`, so every HTTP method is accepted; GET and POST are
+        documented. Not rate-limited.
+      operationId: campaignRouteGet
+      security: []
+      parameters:
+        - &campaignRouteOrg
+          name: organization_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - &campaignRouteType
+          name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [ring_group, call_queue]
+        - &campaignRouteDestination
+          name: destination_id
+          in: query
+          required: true
+          description: ID of the ring group or call queue
+          schema:
+            type: integer
+        - &campaignRouteExpires
+          name: expires
+          in: query
+          required: true
+          description: Unix time the signature expires
+          schema:
+            type: integer
+        - &campaignRouteSignature
+          name: signature
+          in: query
+          required: true
+          description: Laravel URL signature (HMAC-SHA256 with `APP_KEY`)
+          schema:
+            type: string
+      responses:
+        '200': &campaignRouteOk
+          description: CXML of the ring group or call queue routing; `<Hangup/>` when the signature is invalid or expired, or the destination is not found
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+    post:
+      tags:
+        - Voice Routing
+      summary: Answered auto-dialer call to a ring group or call queue
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
+      operationId: campaignRoutePost
+      security: []
+      parameters:
+        - *campaignRouteOrg
+        - *campaignRouteType
+        - *campaignRouteDestination
+        - *campaignRouteExpires
+        - *campaignRouteSignature
+      responses:
+        '200': *campaignRouteOk

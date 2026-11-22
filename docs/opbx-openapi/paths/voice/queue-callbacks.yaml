@@ -220,8 +220,10 @@ paths:
       description: |
         Fetched by an originated agent leg when the agent answers (conference-mediated
         ring-all). The first leg to arrive claims the call (agent from `agent_user_id` in
-        `sd`, session from the `Session` or `CallSid` request field) and is joined to the
-        call's conference room; every other leg gets `<Hangup/>`.
+        `sd`, session from the `Session` or `CallSid` request field) and waits silently
+        (`<Pause length="1"/>` + `<Redirect>` to `/callbacks/voice/queue-agent-join`) until the
+        caller is in the conference room, so the room always starts on the caller's leg; every
+        other leg gets `<Hangup/>`.
 
         Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
         agent ring timeout plus 60 seconds after it is issued. The route is registered with
@@ -278,6 +280,74 @@ paths:
               schema:
                 $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
 
+  /callbacks/voice/queue-agent-join:
+    get:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all agent wait loop
+      description: |
+        Wait loop of the agent leg that claimed a call in `/callbacks/voice/queue-agent-connect`.
+        When the caller is in the conference room, the agent gets `<Dial><Conference>` into the
+        same room. Until then each request answers a one-second `<Pause>` and a `<Redirect>`
+        back here with the next `check`. After 30 checks without the caller the agent is
+        released and the leg gets `<Hangup/>`. A leg that no longer holds the call, or a call
+        that is no longer waiting, also gets `<Hangup/>`.
+
+        Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
+        agent ring timeout plus 60 seconds after it is issued (each redirect gets a fresh URL).
+        The route is registered with `Route::any`, so every HTTP method is accepted; GET and
+        POST are documented. Not rate-limited.
+      operationId: queueAgentJoinGet
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`, `check`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+    post:
+      tags:
+        - Voice Routing
+      summary: Conference ring-all agent wait loop
+      description: |
+        Same as the GET form (the route accepts every HTTP method).
+      operationId: queueAgentJoinPost
+      security: []
+      parameters:
+        - name: sd
+          in: query
+          required: true
+          description: Base64-encoded JSON context (`call_queue_id`, `call_id`, `organization_id`, `exp`, `agent_user_id`, `check`)
+          schema:
+            type: string
+        - name: sig
+          in: query
+          required: true
+          description: HMAC-SHA256 of the decoded `sd` JSON, keyed with the application key (`APP_KEY`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: CXML instructions (`<Hangup/>` when the signature is invalid or expired, or the call is no longer waiting)
+          content:
+            application/xml:
+              schema:
+                $ref: '../../components/schemas/cxml/CxmlResponse.yaml'
+
   /callbacks/voice/queue-conference-join:
     get:
       tags:
@@ -286,8 +356,9 @@ paths:
       description: |
         Fetched by the caller's session after an agent claimed the call (application switch,
         or the next poll). Joins the caller to the winner's conference room (recorded when
-        inbound recording applies); when no agent has claimed the call yet the caller keeps
-        holding.
+        inbound recording applies) and marks the caller as joined, which lets the waiting agent
+        leg in (see `/callbacks/voice/queue-agent-join`); when no agent has claimed the call yet
+        the caller keeps holding.
 
         Authentication: none; the URL is HMAC-signed (`sd` + `sig`) and expires the queue's
         agent ring timeout plus 60 seconds after it is issued. The route is registered with

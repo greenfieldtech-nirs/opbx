@@ -88,7 +88,7 @@ or Redoc. Validate it with the Redocly command under [Validation](#validation).
 | **Business Hours** | CRUD + duplicate + toggle status |
 | **IVR Menus** | CRUD + voices + toggle status |
 | **Phone Numbers** | DID management |
-| **AI Assistants** | AI assistant configuration and providers |
+| **AI Assistants** | AI assistant configuration, providers and the AI Real Time Monitor |
 | **AI Load Balancers** | Load balancer configuration |
 | **Call Detail Records** | CDR records, statistics, export and recording |
 | **Recordings** | Recording management and download |
@@ -98,8 +98,8 @@ or Redoc. Validate it with the Redocly command under [Validation](#validation).
 | **Trunks** | SIP trunk management (proxied from Cloudonix) |
 | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
 | **Supervisors** | Supervisor assignments + supervisor dashboard |
-| **Web Phone** | In-browser softphone SIP provisioning + recent calls log (any role with a user extension) |
-| **Embedded Dialer** | Token-authenticated widget runtime API (config + calls log) for embedding the Web Phone on third-party sites |
+| **Web Phone** | In-browser softphone SIP provisioning, settings, recent calls log, blind transfer, transfer directory and session token (any role with a user extension) |
+| **Embedded Dialer** | Token-authenticated widget runtime API (config, calls log, blind transfer, transfer directory, session token) for embedding the Web Phone on third-party sites |
 | **Call Notifications** | Webhook notification settings, logs and test |
 | **Auto Dialer** | Campaign management, monitoring, lifecycle |
 | **Distribution Lists** | List upload, assignment, management |
@@ -128,9 +128,12 @@ or Redoc. Validate it with the Redocly command under [Validation](#validation).
 | `GET /voice/health` | Voice routing health |
 | `POST /voice/amd-session`, `POST /voice/amd-action` | AMD worker session check and detection result |
 | `POST /callbacks/voice/ring-group-callback` | Ring group routing |
+| `/callbacks/voice/ring-group-member-connect`, `/callbacks/voice/ring-group-fallback` | Simultaneous ring group member answer and fallback (signed URLs) |
 | `POST /callbacks/voice/conference-pin` | Conference room PIN entry |
 | `POST /callbacks/voice/albs-follow-through` | AI load balancer failover routing |
 | `/callbacks/voice/queue-*` | Call queue polling, dialing and conference callbacks |
+| `/callbacks/voice/transfer` | Web Phone blind transfer: routes the destination for the moved call (signed URL) |
+| `/callbacks/voice/campaign-route` | Answered auto-dialer call routed to a ring group or call queue (signed URL) |
 
 ### Platform Manager
 

@@ -1,0 +1,172 @@
+paths:
+  /v1/webphone/transfer:
+    post:
+      tags:
+        - Web Phone
+      summary: Blind-transfer the Web Phone's call
+      description: |
+        Moves the other party of the signed-in user's current call to `destination` (an extension or a
+        phone number) and drops the Web Phone's own leg. The call must be the user's: its live session
+        must carry the user's extension (its Cloudonix subscriber, or the extension as the dialled
+        destination). Destinations are routed as if dialled by the user's extension.
+
+        Available to any authenticated role with a `user`-type extension (not to API keys).
+      operationId: transferWebPhoneCall
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [call_id, destination]
+              properties:
+                call_id:
+                  type: string
+                  maxLength: 255
+                  description: SIP Call-ID of the Web Phone's leg, as JsSIP reports it.
+                destination:
+                  type: string
+                  pattern: '^\+?[0-9]{1,20}$'
+                  description: Extension number or phone number (digits, optional leading `+`). Feature codes are not accepted.
+                  example: '1002'
+      responses:
+        '200':
+          description: The transfer was started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      transferred: { type: boolean, example: true }
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: API keys are refused (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '404':
+          description: No extension is assigned to this user, or the call was not found (it may have ended)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: The call was not found. It may have ended. }
+        '422':
+          description: Validation failed (`message` + `errors`), or `destination` is the user's own extension (`message` only)
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '../../components/schemas/ValidationError.yaml'
+                  - type: object
+                    properties:
+                      message: { type: string }
+              examples:
+                ownExtension:
+                  value:
+                    message: You cannot transfer a call to your own extension.
+        '502':
+          description: Cloudonix did not accept the transfer; the call is still connected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: The transfer failed. The call is still connected. }
+
+  /v1/webphone/directory:
+    get:
+      tags:
+        - Web Phone
+      summary: Extensions to suggest as transfer targets
+      description: |
+        Active `user`-type extensions of the organization other than the signed-in user's own, ordered by
+        extension number. Used by the Web Phone's transfer field. Not available to API keys.
+      operationId: getWebPhoneDirectory
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Directory entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        extension_number: { type: string, example: '1002' }
+                        name:
+                          type: [string, 'null']
+                          description: Name of the extension's user
+                          example: Sam Agent
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: API keys are refused (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+
+  /v1/webphone/session:
+    get:
+      tags:
+        - Web Phone
+      summary: Cloudonix session token of the Web Phone's call
+      description: |
+        Returns the Cloudonix session token of the signed-in user's call, shown on the in-call screen.
+        The call must be proven the user's, as for a transfer. Answers 404 until Cloudonix has reported
+        the session (the Web Phone retries). Not available to API keys.
+      operationId: getWebPhoneSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: call_id
+          in: query
+          required: true
+          description: SIP Call-ID of the Web Phone's leg.
+          schema:
+            type: string
+            maxLength: 255
+      responses:
+        '200':
+          description: Session token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      session_token: { type: string }
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          description: API keys are refused (no API-key grant covers this route)
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/Error.yaml'
+        '404':
+          description: The call was not found (not reported yet, or not the user's), or the user has no extension
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: The call was not found. }
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

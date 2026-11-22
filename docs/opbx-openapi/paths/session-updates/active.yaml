@@ -12,6 +12,12 @@ paths:
         or `deleted` event in the last 24 hours. Calls are ordered by last update (newest
         first) and capped at 100. Not rate-limited.
 
+        One row per call: the agent and member legs OPBX originates for a caller (a call queue
+        that rings agents in separate calls, a simultaneous ring group) are not listed on
+        their own while the caller's session is active; they belong to the caller's row. A
+        Supervisor sees the call when any of its legs is in scope (for example the answering
+        queue agent's extension).
+
         `meta` counts are computed over the returned (filtered, capped) list.
       operationId: getActiveSessions
       security:
@@ -106,7 +112,7 @@ paths:
                           type: boolean
                         user_full_name:
                           type: string
-                          description: Name of the user whose extension matches `subscriber_id`, or `Unassigned`
+                          description: For a queue or ring group call, the user whose extension answered its originated leg; otherwise the user whose extension matches `subscriber_id`, or `Unassigned`
                         error:
                           type: string
                           description: Only on an item that could not be processed (`Data processing error`); such an item carries only `session_id`, `caller_id`, `destination`, `direction`, `status`, `user_full_name` and `error`.

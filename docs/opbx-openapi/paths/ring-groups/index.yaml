@@ -252,7 +252,7 @@ paths:
       tags:
         - Ring Groups
       summary: Delete ring group
-      description: Owner and PBX Admin only. Refused with 409 when the ring group is still referenced (for example as a fallback or from an extension). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the ring group is still referenced (for example as a fallback, from an extension, or as an auto-dialer campaign's routing destination). The 409 body lists the references.
       operationId: deleteRingGroup
       security:
         - bearerAuth: []

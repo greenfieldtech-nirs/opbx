@@ -131,6 +131,12 @@ paths:
                     $ref: '../../components/schemas/PaginationMeta.yaml'
         '401':
           $ref: '../../components/responses/Unauthorized.yaml'
+        '422':
+          description: '`extension_destination_match` is not `all` or `any`'
+          content:
+            application/json:
+              schema:
+                $ref: '../../components/schemas/ValidationError.yaml'
 
   /v1/call-detail-records/{call_detail_record}:
     parameters:

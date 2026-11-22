@@ -1,8 +1,8 @@
 type: object
 description: >-
   Business hours schedule create/update request. On create, `name`, `timezone`,
-  `open_hours_action`, `closed_hours_action` and `schedule` are required, days that
-  are not sent are stored as disabled, and `status` defaults to `active`. On update
+  `open_hours_action` and `closed_hours_action` are required, days that are not sent
+  (or a missing `schedule`) are stored as disabled, and `status` defaults to `active`. On update
   (PUT or PATCH) every field is optional: only the fields sent are validated and
   saved, and the others keep their stored values.
 properties:
