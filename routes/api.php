@@ -418,7 +418,7 @@ Route::prefix('v1')->group(function (): void {
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
-        Route::get('ai-monitor', AiMonitorController::class)->name('ai-assistants.monitor');
+        Route::get('ai-monitor', AiMonitorController::class)->name('ai-monitor.show');
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
