@@ -93,6 +93,19 @@ final class WebPhoneSettingsTest extends TestCase
         $this->assertSame([], $this->updates());
     }
 
+    public function test_launch_still_works_without_cloudonix_api_credentials(): void
+    {
+        Http::fake();
+        CloudonixSettings::where('organization_id', $this->user->organization_id)->update(['domain_api_key' => null, 'domain_uuid' => null]);
+
+        $settings = $this->getJson('/api/v1/webphone/config')->assertOk()->json('data.settings');
+
+        $this->assertSame(['auto_answer' => false, 'keep_alive' => true, 'refresh_on_hangup' => true], $settings);
+        Http::assertNothingSent();
+        $this->putJson('/api/v1/webphone/settings', ['auto_answer' => true, 'keep_alive' => true, 'refresh_on_hangup' => true])
+            ->assertStatus(502);
+    }
+
     public function test_save_merges_into_the_existing_profile(): void
     {
         $this->cloudonix(['other-key' => 'keep me', 'webphone-auto-answer' => 'false']);

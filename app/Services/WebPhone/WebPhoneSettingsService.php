@@ -85,7 +85,18 @@ class WebPhoneSettingsService
             return null;
         }
 
-        $subscriber = (new CloudonixClient($cloudonix))->getSubscriber((string) $extension->cloudonix_subscriber_id);
+        try {
+            // The client throws when the org has no API key or domain UUID; the phone must still start.
+            $subscriber = (new CloudonixClient($cloudonix))->getSubscriber((string) $extension->cloudonix_subscriber_id);
+        } catch (\Throwable $e) {
+            Log::warning('Web Phone settings could not be read from Cloudonix', [
+                'extension_id' => $extension->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
         if (! is_array($subscriber)) {
             return null;
         }
