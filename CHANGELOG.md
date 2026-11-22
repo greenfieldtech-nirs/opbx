@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation - 2026-11-22
+
+- Full review of the user guide, the OpenAPI spec, the READMEs and AGENTS.md against the code: installer and `./opbx.sh`, SafeLine WAF, AI Real Time Monitor, Web Phone settings and transfer, campaign destinations (ring groups, call queues, wait for available agents), `ai_call_attempts`, and many smaller corrections.
+- OpenAPI: transfer, directory and session operations for the Web Phone and the embed, the transfer and campaign-route voice callbacks; the spec passes Redocly lint again.
+- Every Mermaid diagram in scope renders; new and retaken screenshots for the AI monitor, login page, queue statistics and current dialogs.
+
 ### Added - 2026-11-22 (Web Phone settings)
 
 - Web Phone **Settings** tab: **Auto-Answer** (answer after 2 s of ringing, default off), **Keep-Alive** (re-register every 60 s, default on) and **Refresh on hangup** (re-register after each call, default on). **Save** stores them in the extension's Cloudonix subscriber profile (merged; other profile keys kept) and they apply at once. On start the Web Phone reads them from the profile and stores the defaults when missing. The Embedded Dialer applies them but has no Settings tab.
