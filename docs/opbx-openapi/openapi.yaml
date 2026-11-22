@@ -264,6 +264,9 @@ paths:
   /v1/ai-assistants/{ai_assistant}:
     $ref: './paths/ai-assistants/index.yaml#/paths/~1v1~1ai-assistants~1{ai_assistant}'
 
+  /v1/ai-monitor:
+    $ref: './paths/ai-monitor/index.yaml#/paths/~1v1~1ai-monitor'
+
   /v1/auth/login:
     $ref: './paths/auth/login.yaml#/paths/~1v1~1auth~1login'
 

@@ -1,0 +1,74 @@
+---
+sidebar_position: 20
+slug: /modules/ai-realtime-monitor
+sidebar_class_name: cxGuidesSidebar
+title: "AI Real Time Monitor"
+description: "A slide-show of live figures for your AI assistants and AI load balancers"
+---
+
+# AI Real Time Monitor
+
+The AI Real Time Monitor shows, at a glance, how your [AI assistants](/opbx/modules/ai-assistants) and [AI load balancers](/opbx/modules/ai-load-balancers) are doing right now. It runs as a slide-show, so it can stay open on a wall screen: the **Assistants** view and the **Load Balancers** view take turns every 30 seconds.
+
+Open it from **AI Configuration → Real Time Monitor**. Only the **Owner** and **PBX Admin** roles see it.
+
+## Controls
+
+| Control | What it does |
+|---------|--------------|
+| Time frame | The period the figures cover: the last 1, 5, 15 or 30 minutes, or the last 1, 3, 6 or 12 hours. The default is the last 60 minutes. Your choice is remembered in this browser. |
+| Assistants / Load Balancers | Jump to a view. The 30-second countdown starts again. |
+| ◀ ▶ | Previous or next view. |
+| Pause / Resume | Stop the slide-show on the current view, or start it again. |
+
+The figures refresh every 10 seconds. While the browser tab is hidden, the slide-show and the refresh both wait. The bar at the bottom counts down to the next view.
+
+## The Assistants view
+
+One card per AI assistant. The coloured edge on the left shows its health over the time frame:
+
+| Edge | Meaning |
+|------|---------|
+| Green | Fewer than 5% of its finished calls failed |
+| Amber | 5% to 20% failed |
+| Red | 20% or more failed. The card is also tinted. |
+| Grey | No calls in the time frame |
+
+| Figure | Meaning |
+|--------|---------|
+| Success ring | Answered calls as a share of the calls that finished |
+| Active now | Calls the assistant has right now |
+| Calls | Calls handed to the assistant in the time frame |
+| Avg duration | Average talk time of its answered calls (minutes:seconds) |
+| AI minutes | Total talk time of its answered calls |
+| Last call | When it last got a call, even if that is before the time frame. A long gap points to an assistant nobody is reaching. |
+| Chart | Calls over the time frame, oldest on the left |
+
+## The Load Balancers view
+
+One card per AI load balancer, with the same colours. Its health is the share of calls that ended in the load balancer's **fallback**.
+
+| Figure | Meaning |
+|--------|---------|
+| Handled ring | Calls that an AI assistant kept: they did not end in the fallback |
+| Active now | Calls in the load balancer right now |
+| Calls | Calls that reached the load balancer in the time frame |
+| Failovers | Times a member failed and **Follow Through** passed the call to the next member |
+| Fell back | Calls where no member could take the call and the fallback ran |
+| Member bars | Each member's share of the load balancer's calls. For the **percentage** strategy the marker shows the share you configured (from the weights), for **round robin** an equal share. For **priority** the member's priority is shown instead. |
+
+Comparing a member's bar with its marker shows whether the load balancer is spreading calls the way it is set up to.
+
+## What counts as a call
+
+A call counts once for every AI assistant it is handed to. When a load balancer moves a call from a failed member to the next one, the failed member gets a failed call and the next member gets a new one.
+
+A call counts as **answered** when its call record (CDR) says it connected. AI minutes count only the time after the call reached that assistant.
+
+**Auto-dialer campaigns** count only calls where a person answered: voicemail detection said *human*, or the campaign does not use voicemail detection. Calls that reached voicemail, or where detection could not decide, are left out.
+
+The monitor starts counting from the day it was installed: earlier calls do not appear. Its data is kept for 30 days (`RETENTION_AI_CALL_ATTEMPTS_DAYS` in `.env`).
+
+## API
+
+`GET /v1/ai-monitor?minutes=60` returns the same figures (see the [REST API](/opbxRestOpenAPI)). API keys need the **AI Monitor** (`ai-monitor`) grant; the AI Assistants and AI Load Balancers grants do not cover it, because the monitor shows both.
