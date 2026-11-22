@@ -33,6 +33,14 @@ class AiAssistantPolicy
     }
 
     /**
+     * Determine if the user can open the AI Real Time Monitor (admins only).
+     */
+    public function monitor(User $user): bool
+    {
+        return $user->isOwner() || $user->isPBXAdmin();
+    }
+
+    /**
      * Determine if the user can create AI assistants.
      */
     public function create(User $user): bool

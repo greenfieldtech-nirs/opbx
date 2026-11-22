@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\AiMonitorController;
 use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
@@ -417,6 +418,7 @@ Route::prefix('v1')->group(function (): void {
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
+        Route::get('ai-monitor', AiMonitorController::class)->name('ai-assistants.monitor');
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
