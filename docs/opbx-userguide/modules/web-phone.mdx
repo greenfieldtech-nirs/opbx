@@ -16,7 +16,9 @@ Use the Web Phone to:
 
 - place calls from any page of OPBX;
 - answer calls to your extension in the browser, whether or not the panel is open;
+- send tones and transfer calls during a call;
 - redial your recent outbound calls;
+- choose auto-answer and re-registration behaviour on the **Settings** tab;
 - spy, whisper or barge from [Live Calls](/opbx/modules/live-calls) (Owners and Supervisors).
 
 The same Web Phone can be placed on another website, such as a CRM. See [Embedded Dialer](/opbx/modules/embedded-dialer).
@@ -99,7 +101,7 @@ Who can do this: any user with a user extension.
 
 The panel returns to the keypad. If the call fails because the other side is busy or the network is congested, the matching tone plays.
 
-While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** tab bar is locked. The keypad is not shown once the call connects, so you cannot send touch tones (DTMF) from the Web Phone. Transferring a call is not available in the Web Phone.
+While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** / **Settings** tab bar is locked. To send tones or transfer the call, use the call controls (see [Use the call controls](#use-the-call-controls)).
 
 ### Answer an incoming call
 
@@ -144,7 +146,7 @@ During a connected call the panel shows the call's Cloudonix session token at th
 3. Click **+** or **−** to change the incoming audio level. Lowering it all the way silences the other party.
 4. Click the red button to hang up.
 
-{/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the timer, Mute, Keypad and Hold in a row above the red Hang Up button, the + / − volume buttons with the level bar on the right edge, and the page behind dimmed */}
+{/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the session token at the top, the timer, Mute, Keypad, Hold and Transfer in a row above the red Hang Up button, the + / − volume buttons with the level bar on the right edge, and the page behind dimmed */}
 
 ### Send tones during a call
 
@@ -185,8 +187,8 @@ Who can do this: any user with a user extension.
 
 1. [Open the Web Phone](#open-the-web-phone).
 2. Click the **Settings** tab.
-3. Turn the settings on or off. **Save** becomes available once something has changed.
-4. Click **Save**.
+3. Turn the settings on or off. **Save** stays disabled until you change something.
+4. Click **Save**. The button reads **Saving...**, then "Saved." appears below it.
 
 | Setting | Default | What it does |
 |---------|---------|--------------|
@@ -194,7 +196,7 @@ Who can do this: any user with a user extension.
 | **Keep-Alive** | On | Registers the phone again every 60 seconds, so a dropped registration comes back within a minute. |
 | **Refresh on hangup** | On | Registers the phone again after each call ends. |
 
-The settings are stored in your extension's Cloudonix subscriber profile, so they follow your extension to every browser, and they apply at once, without reloading. When the Web Phone starts and the profile has no settings yet, OPBX stores the defaults there. Other values in the profile are kept.
+The settings are stored in your extension's Cloudonix subscriber profile, so they follow your extension to every browser, and they apply at once, without reloading. When the Web Phone starts and the profile has no settings yet, OPBX stores the defaults there. Other values in the profile are kept. If Cloudonix cannot be reached when the Web Phone starts, the phone still starts, with the defaults, and nothing is stored.
 
 If Cloudonix does not accept the settings, the tab shows the reason (for example "Cloudonix did not accept the settings. Try again shortly.") and keeps your changes so you can save again. An extension that is not synced to Cloudonix yet cannot store settings: "This extension is not synced to Cloudonix yet, so its settings cannot be stored."
 

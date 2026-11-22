@@ -117,7 +117,7 @@ Resetting the concurrent-call counter (`reset-cac`) and restarting the caller-ID
 | Calls per second (CPS) | 1 to 30. Default: 1 |
 | Max dial attempts | 1 to 5. Form default: 1 |
 | Record calls | Off by default |
-| Wait for available agents | Call Queue routing only, off by default. While no agent of the queue is available (all on calls, in wrap-up or logged out), the dialer places no new calls; dialing resumes on the next dialer cycle after an agent becomes available |
+| Wait for available agents | Call Queue routing only, off by default. While no agent of the queue is available (all on calls, in wrap-up or logged out), the dialer places no new calls; dialing resumes on the next dialer cycle after an agent becomes available. If the agent states cannot be read (the ACD worker is unreachable), dialing goes on as if the setting were off |
 | Voicemail, human and unknown actions | `HANGUP` or `CONTINUE`, or empty (treated as Hang up while any action is set). Empty on all three means no detection |
 | Retry on voicemail | Off by default |
 | Retry on busy / no-answer | `retry_on_busy_no_answer`, off by default. Cancelled and failed calls are never retried |
@@ -203,7 +203,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 ## Related modules
 
 - [Distribution Lists](/opbx/modules/distribution-lists) — the numbers a campaign dials
-- [AI Assistants](/opbx/modules/ai-assistants) and [AI Load Balancers](/opbx/modules/ai-load-balancers) — routing destinations
+- [AI Assistants](/opbx/modules/ai-assistants), [AI Load Balancers](/opbx/modules/ai-load-balancers), [Ring Groups](/opbx/modules/ring-groups) and [Call Queues](/opbx/modules/call-queues) — routing destinations
+- [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) — counts a campaign call for its AI assistant only when a person answered
 - [Phone Numbers](/opbx/modules/phone-numbers) — caller IDs
 - [Outbound Whitelist](/opbx/modules/outbound-whitelist) — trunk selection for campaign calls
 - [Dialer Worker](/opbx/workers/dialer-worker) and [AMD Worker](/opbx/workers/amd-worker)

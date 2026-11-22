@@ -27,11 +27,11 @@ Use this module to:
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|:-----:|:---------:|:--------:|:--------:|
-| See Call Notifications in the sidebar (Analytics section) | Yes | Yes | No | No |
-| View settings, delivery logs and rate-limit status | Yes | Yes | No | No |
-| Create or change settings, send a test | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See Call Notifications in the sidebar (Analytics section) | Yes | Yes | No | No | No |
+| View settings, delivery logs and rate-limit status | Yes | Yes | No | No | No |
+| Create or change settings, send a test | Yes | Yes | No | No | No |
 
 Other roles get `403` from the API, so the page shows an error state if they open its address directly.
 
@@ -103,7 +103,7 @@ The `Authorization` header is never stored: the logs show it as `[redacted]`. Lo
 2. The **Call Notification Debug** dialog opens. The **Notifications** list on the left has every notification for that call; click one to select it.
 3. Read the **Request** (URL, method, headers, body) and the **Response** (status, time, headers, body). "No response received" means the request timed out or could not connect.
 
-{/* SCREENSHOT: call-notifications-debug-dialog — debug dialog for one call session showing the request headers with Authorization: [redacted], the JSON body and the response */}
+![Call Notification Debug dialog for one call session: the Notifications list on the left, the request headers with Authorization: [redacted], the JSON body and the response](../img/screens/call-notifications-debug-dialog.jpg)
 
 ## Payload
 

@@ -23,7 +23,7 @@ Call logs are read-only. They are created by the Cloudonix call-end webhook and 
 
 ## Prerequisites
 
-- Calls are flowing through Cloudonix to your OPBX instance. If the Call Logs page is empty after a test call, check the webhook settings on [Settings](/opbx/administration) and [Cloudonix Setup](/opbx/installation/cloudonix-setup).
+- Calls are flowing through Cloudonix to your OPBX instance. If the Call Logs page is empty after a test call, check the webhook settings on [Settings](/opbx/modules/settings) and [Cloudonix Setup](/opbx/installation/cloudonix-setup).
 - Only recorded calls have a recording to play. Recordings of IVR prompts and announcements are a different thing; see [Recordings](/opbx/modules/recordings).
 
 ## Who can see what
@@ -57,7 +57,7 @@ PBX Users see the play button on recorded calls, but the server refuses the reco
 | User | The OPBX user who owns the extension that placed the call, or *Unassigned User* |
 | Destination | The called number (`to`) |
 | Direction | `incoming`, `outgoing`, `internal` or `application` |
-| Disposition | How the call ended, for example ANSWERED, NO ANSWER, BUSY or FAILED |
+| Disposition | How the call ended, as Cloudonix reported it, for example CONNECTED, NO ANSWER, BUSY or FAILED |
 | AMD Status | Answering machine detection result (see [AMD results](#amd-results)) |
 | Duration | Total call length |
 | Connected Time | Billable (connected) time |
@@ -80,7 +80,7 @@ The list shows 50 calls per page, with **Previous** and **Next** below it.
    | Extension | Number search (see below) on the call's extension |
    | Destination | Number search (see below) on the called number |
    | Match | Shown when both Extension and Destination are filled. **All (Extension and Destination)** (default) finds calls of that extension to that destination. **Any (Extension or Destination)** finds calls of the extension or to the destination; with the same number in both, that is every call of one extension, placed or received |
-   | Disposition | Exact match: Answered, No Answer, Busy, Failed, Cancelled or Congestion |
+   | Disposition | Exact match: Answered (`ANSWERED`), No Answer, Busy, Failed, Cancelled or Congestion. The list has no Connected value, so it does not find calls stored as `CONNECTED`; the API's `disposition=CONNECTED` does |
    | User | Part of the name of the user who owns the extension |
    | Direction | Exact match: Incoming, Outgoing, Internal or Application |
    | From Date / To Date | From the start of the first day to the end of the last day, by session time |
@@ -223,7 +223,7 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 | Symptom | Likely cause |
 |---------|--------------|
-| A call is missing | The call-end webhook did not reach OPBX. Check [Settings](/opbx/administration) and the Cloudonix webhook configuration |
+| A call is missing | The call-end webhook did not reach OPBX. Check [Settings](/opbx/modules/settings) and the Cloudonix webhook configuration |
 | Recording button is missing | The call was not recorded, or the recording was deleted by retention |
 | A search finds nothing for a number | Number search matches the start of the number. Add a wildcard (`*`) in front of the part you want |
 | A call older than 6 months is missing from this page | It moved to the warm tier. Use the API with an API key and `archive=1` |

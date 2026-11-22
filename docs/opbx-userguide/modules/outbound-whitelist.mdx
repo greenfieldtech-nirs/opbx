@@ -51,6 +51,8 @@ When an extension dials a number, OPBX checks it in this order:
 
 If no rule matches, the caller hears "Outbound calls to this destination are not allowed. Goodbye." and the call ends.
 
+A [Web Phone](/opbx/modules/web-phone#transfer-a-call) transfer to an outside number is checked the same way, as if the transferring extension had dialled the number, and uses the same caller ID rules.
+
 ### Example
 
 | Rule | Country | Prefix | Trunk |

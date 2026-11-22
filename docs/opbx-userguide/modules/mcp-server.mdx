@@ -92,7 +92,9 @@ The MCP server checks the caller's role on every tool call, using the same rules
 | PBX User | Read tools only, except the user and supervisor tools |
 | Reporter | Read tools only (configuration, call records, analytics), except the user and supervisor tools |
 | Supervisor | Read tools, scoped views and `start_call_coaching`, limited to the people and groups assigned to them |
-| API key | Whatever the key's grants allow, enforced by OPBX |
+| API key | Whatever the key's grants allow, enforced by OPBX. `start_call_coaching` always fails with an API key (OPBX answers `403`) |
+
+`start_call_coaching` only returns a dial target. The coaching starts when the Owner's or Supervisor's own [Web Phone](/opbx/modules/web-phone) dials it, so it needs that user's personal access token.
 
 ## Confirmation for risky actions
 

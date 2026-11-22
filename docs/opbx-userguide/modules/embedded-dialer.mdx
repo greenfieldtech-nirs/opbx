@@ -79,7 +79,7 @@ From then on the dialer no longer loads on that website, for every user.
 
 The icon inside the dialer follows the saved settings the next time the host page loads. The corner where the dialer frame sits on the host page comes from the `iconPosition` in the installed snippet, so after changing the position, also change `iconPosition` in the installed snippet (or install a new one).
 
-![Embedded Dialer dialog for Emma Wilson with Icon Position Bottom Right, Icon Color #007acc and the Regenerate Token and Save Settings buttons (the one-time snippet appears only after Regenerate Token)](../img/screens/embedded-dialer-dialog.jpg)
+![Embedded Dialer dialog for Emma Wilson with Icon Position Bottom Right, Icon Color #007acc, the Allow call transfer switch and the Regenerate Token and Save Settings buttons (the one-time snippet appears only after Regenerate Token)](../img/screens/embedded-dialer-dialog.jpg)
 
 ### Get the installation snippet for a user
 
@@ -176,7 +176,7 @@ The embedded phone stays registered while the page is open, even when the panel 
 | Protection | How it works |
 |------------|--------------|
 | Allowed domains | The iframe page sends a `frame-ancestors` Content-Security-Policy listing only the allowed domains, with `https://`. With no allowed domains it is `'none'`. The embed API refuses an `Origin` that is not on the list ("Origin not allowed.") |
-| Origin required for the SIP config | `/v1/embed/config` returns the extension's SIP password. It is answered only to an allowed `Origin`, or to the iframe's own same-origin request (marked by the browser with `Sec-Fetch-Site: same-origin`). Anything else gets "Origin required." |
+| Origin required | `/v1/embed/config` returns the extension's SIP password. It, and the transfer, directory and session endpoints, are answered only to an allowed `Origin`, or to the iframe's own same-origin request (marked by the browser with `Sec-Fetch-Site: same-origin`). A bare token request, for example from `curl`, gets "Origin required." (403) |
 | Per-user token | One token per user, stored hashed, shown once. An invalid token gets "Invalid embed token." |
 | Active user and organization | An inactive user or organization gets "Embed token is not active." (403), on the API and on the dialer page |
 | Regenerate = revoke | A new token replaces the old one immediately |
@@ -230,8 +230,9 @@ Widget runtime (embed token):
 | GET | `/embed/dialer?token=…` | The iframe page |
 | GET | `/v1/embed/config` | SIP settings for the embedded user |
 | GET | `/v1/embed/calls-log` | The user's last 50 outbound calls |
-| POST | `/v1/embed/transfer` | Blind-transfer the user's call (as `/v1/webphone/transfer`). 403 when the snippet does not allow call transfer |
-| GET | `/v1/embed/directory` | Extensions for transfer suggestions. 403 when the snippet does not allow call transfer |
+| GET | `/v1/embed/session?call_id=…` | The Cloudonix session token of the user's current call, shown on the in-call screen. 404 until Cloudonix has reported the call |
+| POST | `/v1/embed/transfer` | Blind-transfer the user's call (as `/v1/webphone/transfer`). 403 "Call transfer is not enabled for this embedded dialer." when **Allow call transfer** is off |
+| GET | `/v1/embed/directory` | Extensions for transfer suggestions. 403 when **Allow call transfer** is off |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 
