@@ -10,6 +10,7 @@ const navLinks: { href: string; label: string; external?: boolean; internal?: bo
   { href: '/#how-it-works', label: 'How It Works' },
   { href: '/#pricing', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ' },
+  { href: '/install', label: 'Install', internal: true },
   { href: '/status', label: 'Status', internal: true },
   { href: 'https://developers.cloudonix.com/opbx', label: 'Docs', external: true },
 ];

@@ -40,6 +40,8 @@
 | **Conference Rooms** | [conference-rooms.md](conference-rooms.md) | ConferenceRoomController, ConferenceRoom model | ConferenceRooms |
 | **AI Assistants** | [ai-assistants.md](ai-assistants.md) | AiAssistantController, ProviderRegistry | AiAssistants |
 | **AI Load Balancers** | [ai-load-balancers.md](ai-load-balancers.md) | AiAssistantLoadBalancerController, AlbsDistributionService | AiAssistantLoadBalancers |
+| **Web Phone** | [web-phone.md](web-phone.md) | WebPhoneConfigBuilder, WebPhoneSettingsService | WebPhone (component) |
+| **AI Real Time Monitor** | [ai-assistants.md](ai-assistants.md) (section "AI Real Time Monitor") | AiCallRecorder, AiMonitorStats, AiMonitorController | AiMonitor |
 | **Recordings & Announcements** | [recordings-announcements.md](recordings-announcements.md) | RecordingsController, Recording model | Announcements |
 | **Call Logs** | [call-logs.md](call-logs.md) | CallDetailRecordController, CDR model | CallLogs |
 | **Call Detail Records** | [call-detail-records.md](call-detail-records.md) | CallDetailRecordController, CDR model (amd_status accessor) | (via CallLogs) |
@@ -69,6 +71,7 @@
 | **Scoped API Keys** | [api-keys.md](api-keys.md) | ApiKeyController, ApiKeyService, ResolveApiKey + EnforceApiKeyScope middleware | ApiKeysSettings, apiKeys.service |
 | **Trunk Management** | [trunk-management.md](trunk-management.md) | TrunkController, CloudonixTrunksClient (CRUD), TrunkResource | Trunks page, trunks.service |
 | **Infrastructure & Docker** | [infrastructure-docker.md](infrastructure-docker.md) | docker-compose.yml, Dockerfile, nginx.conf | N/A |
+| **First-Time Installer** | [installer.md](installer.md) | install.sh, installer/src/*.js (Node, runs in a container), opbx:install-owner | N/A |
 
 ---
 

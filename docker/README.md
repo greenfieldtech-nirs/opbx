@@ -149,7 +149,7 @@ docker/
 
 ### Prerequisites
 
-- Docker Engine 24.0+ and Docker Compose v2
+- Docker Engine 24.0+ and the Docker Compose plugin 2.24.4+ (the compose files use `!reset` and `!override`), or Podman with its Docker-compatible CLI
 - A valid `.env` file in the project root (see `.env.example`)
 - For ngrok: a valid `NGROK_AUTHTOKEN`
 
@@ -160,18 +160,20 @@ docker/
 cp .env.example .env && cp docker-compose.yml.example docker-compose.yml
 docker/scripts/generate-secrets.sh
 
-# 1. Start the stack (optional services: --profile dev, --profile logs)
-docker compose up -d
+# 1. Start the stack in order (SafeLine first when the WAF is on; waits until every service is up)
+./opbx.sh start            # or: docker compose up -d (optional services: --profile dev, --profile logs)
 
 # 2. View logs for a specific service
-docker compose logs -f app
+./opbx.sh logs app
 
 # 3. Run Laravel Artisan commands
 docker compose exec app php artisan migrate
 
-# 4. Stop all services
-docker compose down
+# 4. Stop all services (containers, network and data are kept)
+./opbx.sh stop
 ```
+
+`./opbx.sh stop` uses `docker compose stop`, not `down`: `down` deletes the Docker network, and recreating it has been seen to leave a stale host firewall rule that silently drops traffic to a container. See `./opbx.sh --help`.
 
 ### Rebuilding After Code Changes
 
@@ -187,9 +189,9 @@ The PHP images are built from the repository root (`COPY . .`). `.dockerignore` 
 
 ### Start-up Order After an Upgrade
 
-`app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./scripts/upgrade.sh` (add `--prod` with `docker-compose.prod.yml`), which builds the images with fresh base images (`build --pull`), starts the stack in order and shows the `app` log until it is ready.
+`app` runs the database migrations, the seeding check and `storage:initialize` before it starts php-fpm, so the first start after an upgrade can take minutes. Its health check has a 15-minute `start_period`: while it runs, `app` stays *starting* and nginx, the queue workers and the scheduler wait (they depend on `app` being healthy). It turns healthy within 10 seconds of php-fpm starting. Follow it with `docker compose logs -f app`, or run `./opbx.sh upgrade` (also `./scripts/upgrade.sh`), which builds the images with fresh base images (`build --pull`), runs `composer install` inside the app image, starts the stack in order (SafeLine first when the WAF is on) and shows the `app` log until it is ready. It uses `COMPOSE_FILE` from `.env`; `--prod` adds `docker-compose.prod.yml` only for a hand-made `.env` without it.
 
-The PHP image is pinned to an exact base (`php:8.5.12-fpm-alpine3.24` in `docker/php/Dockerfile`); Dependabot proposes the next patch release. A plain `docker compose build` reuses a cached base image, so use `docker compose build --pull` (or `./scripts/upgrade.sh`) after a base image change.
+The PHP image is pinned to an exact base (`php:8.5.12-fpm-alpine3.24` in `docker/php/Dockerfile`); Dependabot proposes the next patch release. A plain `docker compose build` reuses a cached base image, so use `docker compose build --pull` (or `./opbx.sh upgrade`) after a base image change.
 
 ---
 
@@ -245,11 +247,11 @@ After pulling a new version, bring your `docker-compose.yml` up to date with the
 ./scripts/update-compose.sh --yes       # unattended: take the new version of every changed service
 ```
 
-New services are added, services that exist only in your file are always kept, and services removed upstream (e.g. `minio`) are removed only when you confirm (`--yes` keeps them). The result is validated with `docker compose config` before it is written, and the old file is kept as `docker-compose.yml.bak-<timestamp>`. Nothing is restarted. Then start the new version with `./scripts/upgrade.sh` (see [Start-up Order After an Upgrade](#start-up-order-after-an-upgrade)). Needs only Docker (YAML is handled by the `mikefarah/yq` image).
+New services are added, services that exist only in your file are always kept, and services removed upstream (e.g. `minio`) are removed only when you confirm (`--yes` keeps them). The result is validated with `docker compose config` before it is written, and the old file is kept as `docker-compose.yml.bak-<timestamp>`. Nothing is restarted. Then start the new version with `./opbx.sh upgrade` (see [Start-up Order After an Upgrade](#start-up-order-after-an-upgrade)). Needs only Docker (YAML is handled by the `mikefarah/yq` image).
 
 ### SeaweedFS Configuration
 
-> **Upgrading an install that used MinIO?** `./scripts/upgrade.sh` runs `./scripts/migrate-minio-to-seaweedfs.sh` once when `./volumes/minio` holds data (it can also be run by hand before switching `MINIO_ENDPOINT`). It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).
+> **Upgrading an install that used MinIO?** `./opbx.sh upgrade` runs `./scripts/migrate-minio-to-seaweedfs.sh` once when `./volumes/minio` holds data (it can also be run by hand before switching `MINIO_ENDPOINT`). It copies and verifies every bucket from `./volumes/minio`. See [Upgrading from MinIO](../docs/DATABASE-PERSISTENCE.md#upgrading-from-minio).
 
 SeaweedFS replaces MinIO as the S3-compatible store. The app still reads the `MINIO_*` variables; they are only the S3 endpoint and keys. On AWS, point `MINIO_ENDPOINT` and the keys at real S3 instead.
 

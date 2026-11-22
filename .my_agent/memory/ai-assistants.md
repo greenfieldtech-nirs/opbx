@@ -49,6 +49,15 @@ Common providers include: OpenAI, Anthropic, Google, Azure, and custom CXML endp
 
 ---
 
+## AI Real Time Monitor (2026-11-22)
+Every hand-off to an assistant writes an `ai_call_attempts` row (`AiCallAttempt`, `App\Services\AiMonitor\AiCallRecorder`,
+best-effort). Writers: `AiAgentRoutingStrategy::connect()`, `AiLoadBalancerRoutingStrategy::connect()` (+ `fellBackWithoutMember`),
+`AlbsFollowThroughController` (`failed()` with failed_over/fell_back; `recordHandOff()` for next member/AI fallback, skipped when
+`cxmlErrorResponse()` set `$handOffFailed`), `DialerWorkerController::initiateCall` (`ai_target` from `AutoDialerCloudonixService`).
+CDR webhook → `callEnded()`: CONNECTED → answered, billsec capped at the attempt's share; auto-dialer AMD ≠ human → `excluded`.
+Stats: `AiMonitorStats` → `GET /v1/ai-monitor` (`AiMonitorController`, policy `AiAssistantPolicy::monitor`, API-key grant `ai-monitor`).
+UI: `frontend/src/pages/AiMonitor.tsx` + `AiMonitor/widgets.tsx`, route `/ui/ai-monitor`. Docs: modules/ai-realtime-monitor.mdx.
+
 ## Extension Integration
 
 Extensions of type `AI_ASSISTANT` link to an `AiAssistant` record via `ai_assistant_id`.

@@ -88,6 +88,7 @@ const sidebarSections: SidebarSection[] = [
       { name: 'AI Configuration', href: '', icon: '', isHeader: true },
       { name: 'AI Assistants', href: '/ui/ai-assistants', icon: 'codicon-copilot', roles: ['owner', 'pbx_admin', 'pbx_user', 'reporter'] },
       { name: 'AI Load Balancers', href: '/ui/ai-assistant-load-balancers', icon: 'codicon-layers', roles: ['owner', 'pbx_admin', 'reporter'] },
+      { name: 'Real Time Monitor', href: '/ui/ai-monitor', icon: 'codicon-pulse', roles: ['owner', 'pbx_admin'] },
       { name: 'Call Tracking', href: '', icon: '', isHeader: true },
       { name: 'Dashboard', href: '/ui/call-tracking/dashboard', icon: 'codicon-dashboard', roles: ['owner', 'pbx_admin', 'reporter'] },
       { name: 'Campaigns', href: '/ui/call-tracking/campaigns', icon: 'codicon-target', roles: ['owner', 'pbx_admin', 'reporter'] },
@@ -293,7 +294,7 @@ export function Sidebar() {
 
     return (
       <NavLink
-        key={item.name}
+        key={item.href}
         to={item.href}
         className={cn(
           'flex items-center gap-3 py-2 pr-3 text-[13px] transition-colors relative group',

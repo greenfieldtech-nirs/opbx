@@ -94,8 +94,8 @@ fi
 # Fail fast if Composer dependencies are missing (e.g. host bind-mount without `composer install`)
 if [ ! -f /var/www/html/vendor/autoload.php ]; then
     echo "ERROR: /var/www/html/vendor/autoload.php not found."
-    echo "Composer dependencies are not installed. Run 'composer install' on the host"
-    echo "(the repo is bind-mounted over the image's vendor/ directory)."
+    echo "Composer dependencies are not installed (the repo is bind-mounted over the image's vendor/ directory)."
+    echo "Run ./opbx.sh upgrade, which installs them inside the app image (no PHP needed on the host)."
     exit 1
 fi
 

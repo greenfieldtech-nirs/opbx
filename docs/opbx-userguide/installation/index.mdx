@@ -10,14 +10,18 @@ description: "Install OPBX using Docker Compose"
 
 This guide installs OPBX with Docker Compose. The same compose file is used for local development and, with the production overlay, for production.
 
+:::tip Guided installer
+`./install.sh` does the whole installation for you. It needs only Docker with Compose (or Podman). It asks for the deployment type, the public address (production) or the extra host names allowed to open it (development), the company and owner details, what the site root shows (the sign-in page by default, or the OPBX homepage), the email provider, and whether to enable the log viewer and the WAF. It then generates the secrets, installs the PHP packages inside the app image, starts the stack, creates the owner, runs checks and prints a summary with the URLs and logins. Production needs an `https://` address: your own reverse proxy terminates TLS and forwards one domain to the OPBX nginx port, and the installer prints a proxy snippet. `./install.sh reconfigure` changes the public address, the front page, the allowed host names, the WAF and who can open its console; `./install.sh reset` deletes all data. Start and stop the stack with `./opbx.sh start` and `./opbx.sh stop` (see [Starting and Stopping](#starting-and-stopping)). The steps below are the manual setup, for people who do not use the installer.
+:::
+
 ## Prerequisites
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
 | RAM | 4 GB | 8 GB |
 | Disk Space | 20 GB | 50 GB |
-| Docker | 20.10+ | Latest |
-| Docker Compose | 2.0+ | Latest |
+| Docker (or Podman with its Docker-compatible CLI) | 20.10+ | Latest |
+| Docker Compose plugin | 2.24.4+ (the compose files use `!reset` and `!override`) | Latest |
 | Git | 2.30+ | Latest |
 
 These host ports are published by default (each can be remapped in `.env`):
@@ -29,6 +33,7 @@ These host ports are published by default (each can be remapped in `.env`):
 | 6001 | Soketi WebSocket server | `SOKETI_PORT` |
 | 9601 | Soketi metrics | `SOKETI_METRICS_PORT` |
 | 4040 | ngrok web interface (only with the `dev` profile) | — |
+| 9443 | SafeLine WAF console, served by Nginx (only with the WAF on) | `WAF_CONSOLE_PORT` |
 
 MySQL, Redis, SeaweedFS, the dialer worker and the MCP server publish **no** host ports. For local tools, `docker-compose.ports.yml` adds loopback-only ports (`127.0.0.1`):
 
@@ -65,8 +70,8 @@ cp docker-compose.yml.example docker-compose.yml
 
 `docker-compose.yml` is ignored by git, so you can adapt it to your host.
 
-:::tip Bootstrap script
-`./opbx_bootstrap.sh` does steps 2 and 3 for you and runs a few checks. It verifies that Docker and Docker Compose are installed and running, copies `docker-compose.yml` and `.env` from the examples when they are missing, generates `APP_KEY` when it is empty, runs `docker/scripts/generate-secrets.sh`, creates `config/broadcasting.php` if it is missing, creates the `storage/` and `bootstrap/cache` directories, and warns when `APP_NAME`, `APP_KEY`, `DB_DATABASE`, `DB_USERNAME` or `DB_PASSWORD` is empty. You still set `DB_PASSWORD`, `DB_ROOT_PASSWORD` and `REDIS_PASSWORD` by hand. Ignore its warning about `CLOUDONIX_API_TOKEN`: Cloudonix credentials are entered per organization in the web UI.
+:::note Manual setup
+The old `./opbx_bootstrap.sh` now only runs `./install.sh`. Do steps 2 and 3 by hand as described here.
 :::
 
 ### 3. Set the Secrets
@@ -126,21 +131,22 @@ Never commit `.env` or `docker-compose.yml` to version control.
 
 ### 4. Install the PHP Dependencies
 
-The compose file bind-mounts the repository over the app image, so the `vendor/` directory must exist on the host. The app container stops with "Composer dependencies are not installed" when it is missing. Run Composer on the host, or through the Composer image:
+The compose file bind-mounts the repository over the app image, so the `vendor/` directory must exist on the host. The app container stops with "Composer dependencies are not installed" when it is missing. Install them inside the app image (no PHP needed on the host):
 
 ```bash
-composer install
-# or, without PHP on the host:
-docker run --rm -v "$PWD":/app -w /app composer:2 install --ignore-platform-reqs
+docker compose run --rm --no-deps --user "$(id -u):$(id -g)" -e COMPOSER_HOME=/tmp/composer \
+  --entrypoint composer app install --no-interaction --prefer-dist --optimize-autoloader
 ```
+
+`--user` keeps `vendor/` owned by you. Add `--no-dev` for production. `./opbx.sh upgrade` runs this step for you on later upgrades.
 
 ### 5. Start the Services
 
 ```bash
-docker compose up -d
+./opbx.sh start
 ```
 
-This builds the local images and starts these services:
+This builds any missing images, starts the database, Redis, SeaweedFS and `app` first, waits for `app` to be healthy, starts the rest and waits until every service is up. A plain `docker compose up -d` also works. These services start:
 
 | Service | Container | Purpose | Host Port |
 |---------|-----------|---------|-----------|
@@ -170,22 +176,17 @@ Two groups of services start only with a profile:
 On start, the `app` container validates the environment, waits for MySQL (up to `MYSQL_WAIT_TIMEOUT`, default 60 seconds), runs migrations, seeds a fresh database, checks object storage and validates the configuration. Wait **120 seconds** after starting the containers before testing.
 :::
 
-### 6. Create the Storage Buckets
+### 6. Storage Buckets
 
-The app expects two private buckets in SeaweedFS: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold call-record archive). Startup only checks that they are reachable. Create them once:
-
-```bash
-echo "s3.bucket.create -name recordings" | docker compose exec -T seaweedfs weed shell
-echo "s3.bucket.create -name cdr-archive" | docker compose exec -T seaweedfs weed shell
-```
+The app expects two private buckets in SeaweedFS: `recordings` (call recordings, IVR audio) and `cdr-archive` (cold call-record archive). On every start, `app` waits for SeaweedFS (up to `STORAGE_WAIT_TIMEOUT`, default 120 seconds), creates either bucket if it is missing and checks that both are writable. Nothing to do by hand; to create them yourself, see `docker/README.md`.
 
 ### 7. Verify the Installation
 
 ```bash
-docker compose ps
+./opbx.sh status
 ```
 
-Every service with a healthcheck should show `healthy`. The `app`, `mysql`, `redis`, `seaweedfs`, `soketi`, queue workers, `scheduler`, the three workers and `mcp-server` all have one.
+It lists every service with its state and health (`docker compose ps` shows the same) and ends with "All services are up" when everything is running. Every service with a healthcheck should show `healthy`. The `app`, `mysql`, `redis`, `seaweedfs`, `soketi`, queue workers, `scheduler`, the three workers and `mcp-server` all have one.
 
 Test the public health endpoint:
 
@@ -210,8 +211,26 @@ curl http://localhost/api/health
 | `http://localhost:4040` | ngrok dashboard (`dev` profile) |
 | `http://localhost/logs/` | Grafana log viewer (`logs` profile) |
 
+## Starting and Stopping
+
+`./opbx.sh` (in the repository root) starts and stops the stack in the right order:
+
+```bash
+./opbx.sh start             # SafeLine first when the WAF is on, then the database, Redis, storage and app, then the rest
+./opbx.sh start --no-waf    # this run without the WAF; .env is not changed, the next start brings it back
+./opbx.sh start --nofork    # stay in the foreground with every service's log; Ctrl-C stops the stack
+./opbx.sh start --with-ngrok  # this run also starts the ngrok tunnel for webhook development (needs NGROK_AUTHTOKEN)
+./opbx.sh stop              # stops OPBX, then SafeLine; containers, network and data are kept
+./opbx.sh restart           # stop + start
+./opbx.sh status            # state and health of every service, the WAF, the URLs
+./opbx.sh logs [service]    # follow the logs
+./opbx.sh upgrade           # after git pull (see Updating OPBX)
+```
+
+`start` waits up to 5 minutes for every service (`START_TIMEOUT`, in seconds) and names any service that did not come up. `stop` uses `docker compose stop`, never `down`: `down` deletes the Docker network, and recreating it has been seen to leave a stale host firewall rule that silently drops traffic to a container. To remove everything and start over, use `./install.sh reset`.
+
 :::tip Next Steps
-Proceed to [First Login](/opbx/installation/first-login). A fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
+Proceed to [First Login](/opbx/installation/first-login). If you used the installer, the owner account it created is ready: the generated password was shown once and saved to `opbx-install-summary.txt` (delete that file after storing the password). With the manual setup, a fresh database is seeded with a default organization and an owner account (`admin@example.com` / `password`) whose password you must change. If you are enabling Auth0 social login, also see [Auth0 Setup](/opbx/installation/auth0-setup). To understand how calls are handled, see the [Call Routing Overview](/opbx/installation/call-routing-overview) and [Outbound Calling Overview](/opbx/installation/outbound-calling-overview).
 :::
 
 ## Troubleshooting
@@ -296,16 +315,19 @@ git pull
 ./scripts/update-compose.sh --dry-run   # report only
 ./scripts/update-compose.sh             # asks per changed service
 
-# Update PHP dependencies, then rebuild and start in order
-composer install
-./scripts/upgrade.sh          # add --prod when you deploy with docker-compose.prod.yml
+# Rebuild, install the PHP packages and start in order
+./opbx.sh upgrade             # same as ./scripts/upgrade.sh; add --prod only for a hand-made .env without COMPOSE_FILE
 ```
 
-`scripts/upgrade.sh` starts the stack in the right order and shows progress instead of failing:
+`./opbx.sh upgrade` needs only Docker on the host. It starts the stack in the right order and shows progress instead of failing:
 
 1. If `./volumes/minio` still holds data from an older installation, it runs `./scripts/migrate-minio-to-seaweedfs.sh` once (see below). With many recordings this takes a while.
-2. It builds every image, pulling fresh base images (so a security release of PHP or another base image is picked up), starts MySQL, Redis, SeaweedFS and `app`, then shows the `app` log (database migrations, seeding, bucket creation) until the container is healthy. The first start after an upgrade can take several minutes; that is expected.
-3. It starts the rest of the stack and prints `docker compose ps`.
+2. It builds every image, pulling fresh base images (so a security release of PHP or another base image is picked up).
+3. It runs `composer install` inside the app image as your user (`--no-dev` when `APP_ENV=production`) and refreshes Laravel's package cache.
+4. It starts SafeLine first when the WAF is on, then MySQL, Redis, SeaweedFS and `app`, and shows the `app` log (database migrations, seeding, bucket creation) until the container is healthy. The first start after an upgrade can take several minutes; that is expected.
+5. It starts the rest of the stack and waits until every service is up.
+
+It uses the compose files listed in `.env` (`COMPOSE_FILE`, written by the installer), so the WAF and development port settings are kept.
 
 It stops with an error only if `app` exits, turns unhealthy, or is not ready after 30 minutes (`UPGRADE_TIMEOUT`, in seconds). A plain `docker compose up -d` also works: nginx, the queue workers and the scheduler wait while `app` is still starting (its health check allows up to 15 minutes for the first start); follow it with `docker compose logs -f app`.
 
@@ -322,7 +344,7 @@ Older installations stored objects in MinIO (`./volumes/minio`). SeaweedFS repla
 ./scripts/migrate-minio-to-seaweedfs.sh             # copy and verify every bucket
 ```
 
-`./scripts/upgrade.sh` runs this for you the first time (and records it in `./volumes/.minio-migrated-to-seaweedfs`); run it by hand only to check first or to re-run. The script starts SeaweedFS and a temporary MinIO container on the old data, mirrors every bucket, verifies it, and leaves `./volumes/minio` in place as a fallback. It is safe to re-run. When it succeeds, make sure `.env` has `MINIO_ENDPOINT=http://seaweedfs:8333` and start the stack (`./scripts/upgrade.sh`). A bucket that MinIO never had (for example `cdr-archive`) is created when `app` starts. Copied objects get a new modification date, so recording retention counts from the migration date.
+`./opbx.sh upgrade` runs this for you the first time (and records it in `./volumes/.minio-migrated-to-seaweedfs`); run it by hand only to check first or to re-run. The script starts SeaweedFS and a temporary MinIO container on the old data, mirrors every bucket, verifies it, and leaves `./volumes/minio` in place as a fallback. It is safe to re-run. When it succeeds, make sure `.env` has `MINIO_ENDPOINT=http://seaweedfs:8333` and start the stack (`./opbx.sh upgrade`). A bucket that MinIO never had (for example `cdr-archive`) is created when `app` starts. Copied objects get a new modification date, so recording retention counts from the migration date.
 
 ### Upgrading from MySQL 8.0
 
@@ -334,7 +356,7 @@ MySQL, Redis and SeaweedFS data live in bind mounts under `./volumes/` (`mysql`,
 
 ## Production Deployment
 
-Serve the compiled frontend instead of the Vite dev server with the production overlay:
+The installer sets up production for you (choose **Production**). By hand, serve the compiled frontend instead of the Vite dev server with the production overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build

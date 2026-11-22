@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -35,6 +35,23 @@ describe('PublicStatus page', () => {
     expect(screen.getByTestId('group-b')).toHaveTextContent('Outage');
     expect(screen.getByTestId('group-a')).toHaveTextContent('Operational');
     expect(screen.getByTestId('group-a').querySelectorAll('[title]')).toHaveLength(72);
+  });
+
+  it('opens with the OPBX Cloud disclaimer, above the title', async () => {
+    get.mockResolvedValue({ status: 'ok', updated_at: null, groups: [g('a', 'ok')] });
+    renderPage();
+    const notice = screen.getByRole('complementary', { name: 'Disclaimer' });
+    for (const clause of ['Demonstration service only', 'No warranty; no service level', 'Use at your own risk', 'Limitation of liability']) {
+      expect(notice).toHaveTextContent(clause);
+    }
+    expect(notice).toHaveTextContent(/without prior notice/);
+    const fold = notice.querySelector('details') as HTMLDetailsElement;
+    expect(fold.open).toBe(false); // folded by default
+    fireEvent.click(within(notice).getByText('Disclaimer'));
+    expect(fold.open).toBe(true);
+    const title = screen.getByRole('heading', { level: 1, name: 'Platform Status' });
+    expect(notice.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
   });
 
   it('shows a friendly error when the request fails', async () => {

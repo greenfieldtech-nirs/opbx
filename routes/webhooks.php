@@ -53,6 +53,7 @@ Route::prefix('webhooks/cloudonix')->middleware('log.callflow')->group(function 
 
 use App\Http\Controllers\Voice\AlbsFollowThroughController;
 use App\Http\Controllers\Voice\AmdActionController;
+use App\Http\Controllers\Voice\CallTransferController;
 use App\Http\Controllers\Voice\CampaignRouteController;
 use App\Http\Controllers\Voice\QueueConferenceController;
 use App\Http\Controllers\Voice\QueueDialCallbackController;
@@ -131,6 +132,10 @@ Route::prefix('callbacks')->middleware(['log.callflow', 'log.voice'])->group(fun
         ->name('voice.ring-group-member-connect');
     Route::any('/voice/ring-group-fallback', [RingGroupConferenceController::class, 'fallback'])
         ->name('voice.ring-group-fallback');
+
+    // Blind transfer from the Web Phone: the moved session routes the destination (signed URL, no Bearer auth).
+    Route::any('/voice/transfer', CallTransferController::class)
+        ->name('voice.transfer');
 
     // Answered auto-dialer call routed to a ring group or call queue (signed URL, no Bearer auth).
     Route::any('/voice/campaign-route', CampaignRouteController::class)

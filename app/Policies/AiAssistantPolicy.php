@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Models\AiAssistant;
+use App\Models\ApiKey;
 use App\Models\User;
 
 /**
@@ -30,6 +31,14 @@ class AiAssistantPolicy
     {
         // User can view if the assistant belongs to their organization
         return $user->organization_id === $aiAssistant->organization_id;
+    }
+
+    /**
+     * Determine if the user can open the AI Real Time Monitor (admins only).
+     */
+    public function monitor(User|ApiKey $user): bool
+    {
+        return $user->isOwner() || $user->isPBXAdmin();
     }
 
     /**

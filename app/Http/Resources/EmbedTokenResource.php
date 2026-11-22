@@ -25,6 +25,7 @@ final class EmbedTokenResource extends JsonResource
             'user_id' => $this->user_id,
             'icon_position' => $this->icon_position?->value,
             'icon_background_color' => $this->icon_background_color,
+            'allow_transfer' => (bool) $this->allow_transfer,
             'last_used_at' => $this->last_used_at?->toIso8601String(),
         ];
     }

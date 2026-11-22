@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AiAssistantLoadBalancerController;
 use App\Http\Controllers\Api\AiAssistantProviderController;
+use App\Http\Controllers\Api\AiMonitorController;
 use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\Auth0Controller;
 use App\Http\Controllers\Api\AuthController;
@@ -51,6 +52,8 @@ use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WebPhoneCallsLogController;
 use App\Http\Controllers\Api\WebPhoneConfigController;
+use App\Http\Controllers\Api\WebPhoneSettingsController;
+use App\Http\Controllers\Api\WebPhoneTransferController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
 use App\Http\Controllers\DistributionListController;
@@ -229,7 +232,7 @@ Route::prefix('v1')->group(function (): void {
 
             return response('', 204)->withHeaders([
                 'Access-Control-Allow-Origin' => $origin,
-                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Methods' => 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers' => 'Authorization, Content-Type',
                 'Access-Control-Max-Age' => '600',
                 'Vary' => 'Origin',
@@ -239,6 +242,9 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware(['throttle:embed', 'resolve.embed.token'])->group(function (): void {
             Route::get('config', [EmbedConfigController::class, 'config'])->name('embed.config');
             Route::get('calls-log', [EmbedConfigController::class, 'callsLog'])->name('embed.calls-log');
+            Route::post('transfer', [EmbedConfigController::class, 'transfer'])->name('embed.transfer');
+            Route::get('directory', [EmbedConfigController::class, 'directory'])->name('embed.directory');
+            Route::get('session', [EmbedConfigController::class, 'session'])->name('embed.session');
         });
     });
 
@@ -413,6 +419,7 @@ Route::prefix('v1')->group(function (): void {
 
         // AI Assistants
         Route::apiResource('ai-assistants', AiAssistantController::class);
+        Route::get('ai-monitor', AiMonitorController::class)->name('ai-monitor.show');
 
         // Ring Groups
         Route::apiResource('ring-groups', RingGroupController::class);
@@ -453,9 +460,22 @@ Route::prefix('v1')->group(function (): void {
         Route::get('webphone/config', [WebPhoneConfigController::class, 'config'])
             ->name('webphone.config');
 
+        // Web Phone settings (stored in the extension's Cloudonix subscriber profile)
+        Route::put('webphone/settings', [WebPhoneSettingsController::class, 'update'])
+            ->name('webphone.settings.update');
+
         // Web Phone calls log
         Route::get('webphone/calls-log', [WebPhoneCallsLogController::class, 'index'])
             ->name('webphone.calls-log');
+
+        // Web Phone blind transfer, and the extensions its transfer field suggests
+        Route::post('webphone/transfer', [WebPhoneTransferController::class, 'transfer'])
+            ->name('webphone.transfer');
+        Route::get('webphone/directory', [WebPhoneTransferController::class, 'directory'])
+            ->name('webphone.directory');
+        // Cloudonix session token of the Web Phone's call, for the in-call screen
+        Route::get('webphone/session', [WebPhoneTransferController::class, 'session'])
+            ->name('webphone.session');
 
         // AI Assistant Load Balancers
         Route::apiResource('ai-assistant-load-balancers', AiAssistantLoadBalancerController::class);

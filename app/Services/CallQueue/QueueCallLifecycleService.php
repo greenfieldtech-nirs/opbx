@@ -327,45 +327,14 @@ class QueueCallLifecycleService
                 $answerAt = Carbon::parse($bridgeIso);
             }
 
-            $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($answerAt));
-            $handlingSeconds = max(0, (int) $answerAt->diffInSeconds($endAt));
-
-            $agentUserId = $this->attributedAgentId($queueCall->call_id);
+            // Null for a ring_all <Dial>: the winning leg is unknown.
+            $agentUserId = $queueCall->agent_user_id ?? $this->attributedAgentId($queueCall->call_id);
 
             // Claim-first: a duplicate CDR / reconcile job finds the row already
             // finalized and must not emit a second 'ended' event.
-            if (! $this->claimPending($queueCall, [
-                'answered_at' => $answerAt,
-                'ended_at' => $endAt,
-                'agent_user_id' => $queueCall->agent_user_id ?? $agentUserId,
-                'waiting_seconds' => $waitingSeconds,
-                'handling_seconds' => $handlingSeconds,
-                'disposition' => QueueCallDisposition::ANSWERED,
-            ])) {
+            if (! $this->closeAnswered($queueCall, $callQueue, $answerAt, $endAt, $agentUserId)) {
                 return;
             }
-
-            // The call belongs to the agent who took it (null for a ring_all <Dial>: the winning leg is unknown).
-            if ($queueCall->agent_user_id !== null) {
-                CallDetailRecord::recordAnsweringExtension(
-                    $queueCall->organization_id,
-                    $queueCall->session_token ?: $queueCall->call_id,
-                    Extension::withoutGlobalScope(OrganizationScope::class)
-                        ->where('organization_id', $queueCall->organization_id)
-                        ->where('user_id', $queueCall->agent_user_id)
-                        ->value('extension_number'),
-                );
-            }
-
-            $this->worker->event(
-                $queueCall->organization_id,
-                $queueCall->call_queue_id,
-                $queueCall->call_id,
-                'ended',
-                $queueCall->agent_user_id ?? $agentUserId,
-                $handlingSeconds,
-                $callQueue?->wrap_up_seconds
-            );
         } else {
             $waitingSeconds = max(0, (int) $enteredAt->diffInSeconds($endAt));
             $demotedAgentId = $queueCall->agent_user_id ?? $this->attributedAgentId($queueCall->call_id);
@@ -405,15 +374,113 @@ class QueueCallLifecycleService
             }
         }
 
-        Redis::del(self::DIAL_MARKER_PREFIX.$queueCall->call_id);
-        Redis::del("acd:bridge:{$queueCall->call_id}");
-        Redis::del("acd:dialresult:{$queueCall->call_id}");
+        $this->clearMarkers($queueCall);
 
         Log::info('Queue call finalized from CDR', [
             'queue_call_id' => $queueCall->id,
             'call_id' => $queueCall->call_id,
             'disposition' => $queueCall->disposition->value,
         ]);
+    }
+
+    /**
+     * The agent blind-transferred an answered queue call: the call stays alive in Cloudonix (its CDR
+     * arrives only when the transferred call ends), so close the queue's record now. It counts as
+     * answered by that agent, handling time ends at the transfer, and the agent is freed (wrap-up
+     * applies). The later CDR finds no pending record and changes nothing.
+     */
+    public function finalizeTransferred(int $organizationId, string $callerToken, int $agentUserId, string $destination): void
+    {
+        $queueCall = QueueCall::withoutGlobalScope(OrganizationScope::class)
+            ->where('organization_id', $organizationId)
+            ->where('call_id', $callerToken)
+            ->whereNull('disposition')
+            ->whereNotNull('answered_at')
+            ->first();
+
+        if (! $queueCall) {
+            return;
+        }
+
+        // Only the agent who took the call (or anyone, when the winning leg is unknown) closes it.
+        if ($queueCall->agent_user_id !== null && $queueCall->agent_user_id !== $agentUserId) {
+            Log::warning('Queue call transfer by a different agent ignored', [
+                'queue_call_id' => $queueCall->id,
+                'agent_user_id' => $queueCall->agent_user_id,
+                'transferring_user_id' => $agentUserId,
+            ]);
+
+            return;
+        }
+
+        $callQueue = CallQueue::withoutGlobalScope(OrganizationScope::class)->find($queueCall->call_queue_id);
+        $bridgeIso = Redis::get("acd:bridge:{$queueCall->call_id}");
+        $answerAt = $bridgeIso ? Carbon::parse($bridgeIso) : $queueCall->answered_at;
+
+        if (! $this->closeAnswered($queueCall, $callQueue, $answerAt, now(), $agentUserId, ['transferred_to' => $destination])) {
+            return;
+        }
+
+        $this->clearMarkers($queueCall);
+
+        Log::info('Queue call transferred', [
+            'queue_call_id' => $queueCall->id,
+            'call_id' => $queueCall->call_id,
+            'agent_user_id' => $agentUserId,
+            'transferred_to' => $destination,
+        ]);
+    }
+
+    /**
+     * Close a pending, answered queue call: claim it, credit the answering extension, and tell the
+     * worker the agent's call ended (starting wrap-up). False when another transition won the claim.
+     *
+     * @param  array<string, mixed>  $extra  additional columns to store with the claim
+     */
+    private function closeAnswered(QueueCall $queueCall, ?CallQueue $callQueue, Carbon $answerAt, Carbon $endAt, ?int $agentUserId, array $extra = []): bool
+    {
+        $handlingSeconds = max(0, (int) $answerAt->diffInSeconds($endAt));
+
+        if (! $this->claimPending($queueCall, [
+            'answered_at' => $answerAt,
+            'ended_at' => $endAt,
+            'agent_user_id' => $agentUserId,
+            'waiting_seconds' => max(0, (int) $queueCall->entered_at->diffInSeconds($answerAt)),
+            'handling_seconds' => $handlingSeconds,
+            'disposition' => QueueCallDisposition::ANSWERED,
+        ] + $extra)) {
+            return false;
+        }
+
+        if ($agentUserId !== null) {
+            CallDetailRecord::recordAnsweringExtension(
+                $queueCall->organization_id,
+                $queueCall->session_token ?: $queueCall->call_id,
+                Extension::withoutGlobalScope(OrganizationScope::class)
+                    ->where('organization_id', $queueCall->organization_id)
+                    ->where('user_id', $agentUserId)
+                    ->value('extension_number'),
+            );
+        }
+
+        $this->worker->event(
+            $queueCall->organization_id,
+            $queueCall->call_queue_id,
+            $queueCall->call_id,
+            'ended',
+            $agentUserId,
+            $handlingSeconds,
+            $callQueue?->wrap_up_seconds
+        );
+
+        return true;
+    }
+
+    private function clearMarkers(QueueCall $queueCall): void
+    {
+        Redis::del(self::DIAL_MARKER_PREFIX.$queueCall->call_id);
+        Redis::del("acd:bridge:{$queueCall->call_id}");
+        Redis::del("acd:dialresult:{$queueCall->call_id}");
     }
 
     /**

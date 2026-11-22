@@ -1,0 +1,28 @@
+# Edge reverse proxy with the SafeLine WAF hook (PoC).
+#
+# OpenResty (nginx 1.27 core + ngx_lua) plus chaitin/lua-resty-t1k, laid out so
+# the stock OPBX nginx.conf / conf.d work unchanged: same /etc/nginx paths, the
+# `nginx` user, and /var/log/nginx pointing at stdout/stderr like nginx:alpine.
+FROM openresty/openresty:1.27.1.2-13-alpine
+
+ARG T1K_VERSION=1.2.1
+ARG T1K_SHA256=707c7ac2fc4f0ffd26251515f19b05b7564b6c1bf1098dd842fa68399096568c
+
+RUN set -eux; \
+    apk add --no-cache --virtual .fetch curl; \
+    curl -fsSL -o /tmp/t1k.tgz \
+        "https://github.com/chaitin/lua-resty-t1k/archive/refs/tags/v${T1K_VERSION}.tar.gz"; \
+    echo "${T1K_SHA256}  /tmp/t1k.tgz" | sha256sum -c -; \
+    tar -xzf /tmp/t1k.tgz -C /tmp; \
+    mkdir -p /usr/local/openresty/site/lualib/resty; \
+    cp -r "/tmp/lua-resty-t1k-${T1K_VERSION}/lib/resty/." /usr/local/openresty/site/lualib/resty/; \
+    rm -rf /tmp/t1k.tgz "/tmp/lua-resty-t1k-${T1K_VERSION}"; \
+    apk del .fetch; \
+    addgroup -S nginx && adduser -S -D -H -G nginx nginx; \
+    mkdir -p /var/log/nginx /etc/nginx/conf.d; \
+    ln -sf /dev/stdout /var/log/nginx/access.log; \
+    ln -sf /dev/stderr /var/log/nginx/error.log; \
+    ln -sf /usr/local/openresty/nginx/conf/mime.types /etc/nginx/mime.types; \
+    ln -sf /etc/nginx/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+
+CMD ["nginx", "-g", "daemon off;"]

@@ -117,6 +117,7 @@ paths:
                       - call-queues
                       - queue-calls
                       - ai-assistant-load-balancers
+                      - ai-monitor
                       - ivr-menus
                       - business-hours
                       - phone-numbers

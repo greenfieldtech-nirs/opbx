@@ -53,8 +53,19 @@ No role check applies to these tasks; the Web Phone only needs your user extensi
 Who can do this: any user with a user extension.
 
 1. Click the round phone button in the bottom-right corner of any page (tooltip **Web Phone**).
-2. The panel opens. Its header shows **Web Phone** and the registration status: "Initializing...", "Connecting...", "Connected, registering..." and then **Registered**.
-3. When it reads **Registered**, the **Keypad** tab is ready.
+2. The panel opens. Under **Web Phone**, the header shows a registration badge: amber **Registering…** while it connects, then green **Registered**.
+3. When the badge reads **Registered**, the **Keypad** tab is ready.
+
+The badge always shows what Cloudonix last confirmed:
+
+| Badge | Meaning |
+|-------|---------|
+| Green **Registered** | Cloudonix accepted the registration; calls to your extension reach this browser. |
+| Amber **Registering…** | The phone is connecting or registering. |
+| Red **Not registered** | Cloudonix no longer holds the registration (it was refused or lost). Incoming calls do not reach you. |
+| Red **Disconnected** | The connection to Cloudonix dropped. The phone reconnects and registers again by itself. |
+
+The first time you open the Web Phone, the browser asks whether OPBX may show notifications. Allow it to be alerted to incoming calls while you work in another tab or application (see [Answer an incoming call](#answer-an-incoming-call)). You can change this later in the browser's site settings.
 
 Close the panel with **X**. While a call is ringing or active, **X** is disabled ("End the call before closing").
 
@@ -62,7 +73,18 @@ Close the panel with **X**. While a call is ringing or active, **X** is disabled
 The Web Phone registers when you sign in to OPBX and stays registered while you are signed in, whether the panel is open or not. An incoming call opens the panel and rings. Closing the panel does not unregister the phone; signing out does.
 :::
 
-{/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, header status Registered, a number entered in the display */}
+{/* SCREENSHOT: web-phone-keypad — Web Phone panel open on the Keypad tab, green Registered badge with the re-register button in the header, a number entered in the display */}
+
+### Re-register the phone
+
+Who can do this: any user with a user extension.
+
+Use this when you suspect calls are not reaching you, or the badge is red.
+
+1. Open the Web Phone.
+2. Click the circular-arrow button next to the badge (tooltip **Re-register**).
+
+The badge turns amber **Registering…** while the Web Phone drops its registration and registers again, then green **Registered** once Cloudonix accepts it. If the connection to Cloudonix is gone, the Web Phone reconnects first. If Cloudonix refuses the registration, the panel shows the error (see [Common errors](#common-errors)). The button is disabled during a call.
 
 ### Place a call
 
@@ -75,7 +97,7 @@ Who can do this: any user with a user extension.
 5. When the call connects, the status reads "On call" and a timer starts: `M:SS`, then `H:MM:SS` after one hour.
 6. Hang up with the red button.
 
-The panel returns to **Registered**. If the call fails because the other side is busy or the network is congested, the matching tone plays.
+The panel returns to the keypad. If the call fails because the other side is busy or the network is congested, the matching tone plays.
 
 While a call is ringing or active, the rest of the page is dimmed and blocked, the panel cannot be closed, and the **Keypad** / **Recents** tab bar is locked. The keypad is not shown once the call connects, so you cannot send touch tones (DTMF) from the Web Phone. Transferring a call is not available in the Web Phone.
 
@@ -83,12 +105,16 @@ While a call is ringing or active, the rest of the page is dimmed and blocked, t
 
 Who can do this: any user with a user extension.
 
-1. While the phone is registered, an incoming call opens the panel by itself and shows **Incoming call** with the caller's SIP address.
-2. Click the green **Answer** button. The browser asks for microphone access the first time.
+1. While the phone is registered, an incoming call opens the panel by itself, rings with your country's ringing tone, and shows **Incoming call** with the caller: their name and number when the call carries a name (for example `Alice (1001)`), otherwise the number.
+2. Click the green **Answer** button. The ringing stops. The browser asks for microphone access the first time.
 
-The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts.
+The call controls appear (see [Use the call controls](#use-the-call-controls)) and the timer starts. The ringing also stops if the caller hangs up first.
 
-{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller address such as sip:+12025550142@acme.example.com and the green Answer and red Reject buttons */}
+While the call rings, the browser tab title alternates with "Incoming call: …". If you are in another tab or application and allowed notifications, the browser also shows an **Incoming call** notification with the caller. Click it to bring OPBX to the front with the Web Phone open, then click **Answer**.
+
+If a call comes in while you are already on a call (or another call is ringing), the Web Phone answers it as busy, so the call continues to the next step of its routing, such as other ring group members or voicemail.
+
+{/* SCREENSHOT: web-phone-incoming — Web Phone panel showing "Incoming call" with a caller such as Alice (+12025550142) and the green Answer and red Reject buttons */}
 
 ### Reject an incoming call
 
@@ -96,29 +122,29 @@ Who can do this: any user with a user extension.
 
 1. When the panel shows **Incoming call**, click the red **Reject** button.
 
-The call is ended and the panel returns to **Registered**.
+The ringing stops, the call is ended and the panel returns to the keypad.
 
 ### Use the call controls
 
 Who can do this: any user with a user extension.
 
-During a connected call the panel shows the timer, the number and these controls:
+During a connected call the panel shows the call's Cloudonix session token at the very top (select it to copy it, for example when reporting a call problem; it appears a moment after the call connects), then the timer and the number (for an incoming call, the caller ID with the caller's name below it in larger type, or the caller ID alone when the call carries no name), **Mute**, **Keypad**, **Hold** and **Transfer** in one row above the red hang-up button at the bottom, and the volume buttons on the right edge:
 
 | Control | What it does |
 |---------|--------------|
 | **Mute** / **Unmute** | Stops or resumes sending your microphone |
 | **Keypad** | Shows or hides the in-call keypad for sending tones (see below) |
 | **Hold** / **Resume** | Puts the other party on hold |
-| Speaker button | Mutes or unmutes the incoming audio |
-| Volume slider | Sets the incoming audio level |
-| Hang up (red) | Ends the call |
+| **Transfer** | Sends the other party to another extension or number (see [Transfer a call](#transfer-a-call)) |
+| **+** / **−** (right edge) | Raise or lower the incoming audio in 10% steps; the bar between them shows the level |
+| Hang up (red, bottom) | Ends the call |
 
 1. Click **Mute** to stop sending your microphone; the button turns blue and reads **Unmute**. Click it again to resume.
 2. Click **Hold** to put the other party on hold; the button reads **Resume**. Click it again to take the call off hold.
-3. Drag the volume slider, or click the speaker button to silence and restore the incoming audio.
+3. Click **+** or **−** to change the incoming audio level. Lowering it all the way silences the other party.
 4. Click the red button to hang up.
 
-{/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the timer, Mute, Keypad, Hold, Hang Up and the volume slider, and the page behind dimmed */}
+{/* SCREENSHOT: web-phone-in-call — Web Phone during a connected call with the timer, Mute, Keypad and Hold in a row above the red Hang Up button, the + / − volume buttons with the level bar on the right edge, and the page behind dimmed */}
 
 ### Send tones during a call
 
@@ -153,6 +179,29 @@ When there are none, the tab reads "No recent calls yet." If the list cannot be 
 
 {/* SCREENSHOT: web-phone-recents — Web Phone Recents tab listing several recent outbound calls with time, duration and coloured dispositions */}
 
+### Change the Web Phone settings
+
+Who can do this: any user with a user extension.
+
+1. [Open the Web Phone](#open-the-web-phone).
+2. Click the **Settings** tab.
+3. Turn the settings on or off. **Save** becomes available once something has changed.
+4. Click **Save**.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Auto-Answer** | Off | Answers an incoming call once it has rung for 2 seconds. A call that arrives while you are already on a call is still answered busy, so Auto-Answer only ever picks up a call when the phone is free. |
+| **Keep-Alive** | On | Registers the phone again every 60 seconds, so a dropped registration comes back within a minute. |
+| **Refresh on hangup** | On | Registers the phone again after each call ends. |
+
+The settings are stored in your extension's Cloudonix subscriber profile, so they follow your extension to every browser, and they apply at once, without reloading. When the Web Phone starts and the profile has no settings yet, OPBX stores the defaults there. Other values in the profile are kept.
+
+If Cloudonix does not accept the settings, the tab shows the reason (for example "Cloudonix did not accept the settings. Try again shortly.") and keeps your changes so you can save again. An extension that is not synced to Cloudonix yet cannot store settings: "This extension is not synced to Cloudonix yet, so its settings cannot be stored."
+
+The [Embedded Dialer](/opbx/modules/embedded-dialer) applies the same settings but has no **Settings** tab.
+
+{/* SCREENSHOT: web-phone-settings — Web Phone Settings tab with the three switches and the Save button */}
+
 ### Move the Web Phone to this tab
 
 Who can do this: any user with a user extension.
@@ -170,7 +219,30 @@ Who can do this: any user with a user extension.
 
 1. When the panel shows an error (see [Common errors](#common-errors)), click **Retry**.
 
-The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the header goes back to "Initializing...". **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
+The Web Phone loads its configuration again (for configuration errors) or starts a new registration (for registration errors), and the badge goes back to **Registering…**. **Web Phone Unavailable — No extension is assigned to your account** has no **Retry** button: assign a user extension and reload the page.
+
+### Transfer a call
+
+Who can do this: any user with a user extension. In the [Embedded Dialer](/opbx/modules/embedded-dialer), only when the user's snippet allows call transfer.
+
+Transfer hands the other party to another extension or an outside number and takes you off the call (a blind transfer: you do not speak to the new party first).
+
+1. During a connected call, click **Transfer**. The button turns blue and a **Transfer to** field opens.
+2. Type an extension or a phone number. As you type, up to four of your organization's extensions appear below the field, matched by number or by the user's name; click one to fill the field.
+3. Click **Transfer**.
+
+The other party is sent on, your side of the call ends, and the keypad shows "Call transferred to `<destination>`". **Cancel** closes the field and leaves the call as it was.
+
+The transfer routes the destination exactly as if you had dialled it from your extension:
+
+- **An extension** rings as a normal call to it, including its forwarding and voicemail. The new party sees the original caller's number.
+- **An outside number** must be allowed by your organization's [outbound whitelist](/opbx/modules/outbound-whitelist), and the new party sees the caller ID your extension uses for its own outbound calls.
+
+Transfer works for calls you placed, calls to your extension, and calls you took from a ring group or a call queue. A transferred queue call counts as answered by you; its handling time ends at the transfer and you become available for the next queue call (after wrap-up). Transfer is not offered on coaching calls.
+
+If the transfer fails, the field shows why ("The transfer failed. The call is still connected.") and you stay on the call. You cannot transfer a call to your own extension.
+
+{/* SCREENSHOT: web-phone-transfer — Web Phone during a connected call with Transfer highlighted, the Transfer to field showing "10", and two extension suggestions below it */}
 
 ## Coaching from Live Calls
 
@@ -215,6 +287,7 @@ Registration errors also show the raw cause from the SIP library (for example `R
 | `wss_server`, `websocket_port`, `server_path` | `wss://webrtc.cloudonix.io`, `443`, empty |
 | `registration_mode` | `Direct` |
 | `country` | Country code for tones |
+| `settings` | `auto_answer`, `keep_alive`, `refresh_on_hangup` (booleans) from the subscriber profile; the defaults when Cloudonix cannot be reached |
 
 The config contains your SIP password. It is returned only to you, for your own extension, and every request is logged as a security event.
 
@@ -224,6 +297,10 @@ The config contains your SIP password. It is returned only to you, for your own 
 |--------|----------|---------|
 | GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 "No extension is assigned to this user." when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
 | GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
+| PUT | `/v1/webphone/settings` | Store `auto_answer`, `keep_alive` and `refresh_on_hangup` (all required booleans) in the extension's Cloudonix subscriber profile. 409 when the extension is not synced to Cloudonix; 502 when Cloudonix does not accept them |
+| POST | `/v1/webphone/transfer` | Blind-transfer the user's call: `call_id` (the Web Phone's SIP Call-ID) and `destination` (extension or number, digits with an optional `+`). 404 when the call is not found or does not involve the user's extension; 422 for the user's own extension; 502 when Cloudonix refuses (the call stays connected) |
+| GET | `/v1/webphone/session?call_id=` | The Cloudonix session token of the user's call, named by its SIP Call-ID; 404 until Cloudonix has reported the session |
+| GET | `/v1/webphone/directory` | The organization's active user extensions other than the user's own, with the user's name, for transfer suggestions |
 | POST | `/v1/session-updates/{sessionId}/coach-target` | Dial target for coaching |
 
 These endpoints are for signed-in users only; scoped API keys cannot call them.

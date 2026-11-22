@@ -14,30 +14,46 @@ import {
   Delete,
   Grid3x3,
   X,
-  Volume1,
-  Volume2,
-  VolumeX,
+  Plus,
+  Minus,
+  PhoneForwarded,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   getWebPhoneConfig,
+  getWebPhoneSession,
+  transferWebPhoneCall,
   type WebPhoneConfigResponse,
   type WebPhoneCallsLogResponse,
+  type WebPhoneDirectoryResponse,
 } from '@/services/webPhone.service';
 import { loadJsSipScript } from './loadJsSipScript';
 import { subscribeCoach } from './webPhoneBus';
 import { getEmbedBus, handleEmbedClose } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
+import { SettingsView } from './SettingsView';
 import { TonePlayer } from '@/lib/TonePlayer';
-import type { WebPhoneConfig } from '@/types/webPhone.types';
+import { DEFAULT_WEBPHONE_SETTINGS, type WebPhoneConfig, type WebPhoneSettings } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
+import { callerIdentity, callerLabel, isLive, sipCallId, type CallerIdentity } from './incomingCall';
+import { TransferPanel } from './TransferPanel';
+import { requestNotificationPermission, useIncomingCallAlert } from './useIncomingCallAlert';
 import { dtmfTransportFor } from './dtmf';
 import { useSipLeader, SIP_LOCK_NAME } from './useSipLeader';
 
 type PhoneLifecycle = 'loading' | 'ready' | 'no_extension' | 'error' | 'other_tab';
 type CallState = 'idle' | 'ringing' | 'connected';
+// SIP registration as JsSIP last reported it; drives the header status badge.
+type Registration = 'registering' | 'registered' | 'unregistered' | 'disconnected';
+const REGISTRATION_BADGE: Record<Registration, { label: string; dot: string }> = {
+  registering: { label: 'Registering…', dot: 'bg-amber-500' },
+  registered: { label: 'Registered', dot: 'bg-green-500' },
+  unregistered: { label: 'Not registered', dot: 'bg-red-500' },
+  disconnected: { label: 'Disconnected', dot: 'bg-red-500' },
+};
 
 type IconPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
@@ -45,6 +61,11 @@ interface WebPhoneProps {
   // Config/calls-log sources; embed overrides these to hit /embed/*.
   configQueryFn?: () => Promise<WebPhoneConfigResponse>;
   callsLogQueryFn?: () => Promise<WebPhoneCallsLogResponse>;
+  // Blind transfer and its extension suggestions; embed overrides these too.
+  transferFn?: (callId: string, destination: string) => Promise<void>;
+  directoryQueryFn?: () => Promise<WebPhoneDirectoryResponse>;
+  // Cloudonix session token of the connected call, by SIP Call-ID; embed overrides it.
+  sessionQueryFn?: (callId: string) => Promise<string>;
   // Pull-tab placement + color (embed is themable per token).
   iconPosition?: IconPosition;
   iconBackgroundColor?: string;
@@ -147,6 +168,9 @@ export function formatCallDuration(totalSeconds: number): string {
 export function WebPhone({
   configQueryFn,
   callsLogQueryFn,
+  transferFn = transferWebPhoneCall,
+  directoryQueryFn,
+  sessionQueryFn = getWebPhoneSession,
   iconPosition = 'bottom-right',
   iconBackgroundColor,
   autoOpen = false,
@@ -155,6 +179,8 @@ export function WebPhone({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const uaRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
+  // The inbound call that is ringing right now (a ref: the UA's event handlers outlive renders).
+  const ringingRef = useRef<any>(null);
   const tonePlayerRef = useRef<TonePlayer | null>(null);
 
   const cornerClass = CORNER_CLASSES[iconPosition];
@@ -166,7 +192,8 @@ export function WebPhone({
   const isLeader = role === 'leader';
   const [initNonce, setInitNonce] = useState(0);
   const [state, setState] = useState<PhoneLifecycle>('loading');
-  const [status, setStatus] = useState('Initializing...');
+  const [status, setStatus] = useState('');
+  const [registration, setRegistration] = useState<Registration>('registering');
   const [errorDetail, setErrorDetail] = useState<ErrorDetail | null>(null);
   const [number, setNumber] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -176,8 +203,13 @@ export function WebPhone({
   // In-call keypad: shown on demand; digits sent this call are echoed in place of the number.
   const [showKeypad, setShowKeypad] = useState(false);
   const [dtmfDigits, setDtmfDigits] = useState('');
+  // In-call transfer form, shown in place of the keypad.
+  const [showTransfer, setShowTransfer] = useState(false);
   const [incomingSession, setIncomingSession] = useState<any>(null);
   const [incomingNumber, setIncomingNumber] = useState('');
+  // The answered inbound caller, shown during the call (null for outbound calls).
+  const [connectedCaller, setConnectedCaller] = useState<CallerIdentity | null>(null);
+  const [connectedCallId, setConnectedCallId] = useState<string | null>(null);
   const pendingCoachRef = useRef<string | null>(null);
   const isCoachCallRef = useRef(false);
   const [coachLabel, setCoachLabel] = useState<string | null>(null);
@@ -216,6 +248,12 @@ export function WebPhone({
   // dialer cannot be collapsed and the rest of the UI is blocked.
   const inActiveCall = callState !== 'idle' || incomingSession !== null;
 
+  // Title flash + browser notification while an inbound call rings; clicking the notification
+  // brings this tab forward with the panel open. Not in the embed widget (another site's page).
+  const embedded = getEmbedBus() !== undefined;
+  const openPanel = useCallback(() => setOpen(true), []);
+  useIncomingCallAlert(incomingSession !== null, incomingNumber, openPanel, !embedded);
+
   // During a coaching call the header names the coaching function, e.g. "On call - Coaching: Spy".
   const headerStatus =
     coachLabel && callState === 'connected' ? `${status} - Coaching: ${coachLabel}` : status;
@@ -230,14 +268,48 @@ export function WebPhone({
 
   const config = configResponse?.data as WebPhoneConfig | undefined;
 
+  // Auto-answer / keep-alive / refresh on hangup. Kept apart from config so a save applies at once
+  // without restarting the SIP agent (its effect depends on config). Ref: read inside JsSIP handlers.
+  const [settings, setSettings] = useState<WebPhoneSettings>(DEFAULT_WEBPHONE_SETTINGS);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  useEffect(() => {
+    if (config?.settings) setSettings(config.settings);
+  }, [config?.settings]);
+
+  // A fresh REGISTER on the running agent (keep-alive and refresh on hangup).
+  const reRegister = useCallback((reason: string) => {
+    try {
+      uaRef.current?.register();
+    } catch (error) {
+      console.error(`[WebPhone] Re-register (${reason}) failed:`, error);
+    }
+  }, []);
+  // Coaching calls are never transferred; an embed snippet may disallow transfer.
+  const transferEnabled = config?.transfer_enabled !== false && !coachLabel;
+
+  const { data: sessionToken } = useQuery({
+    queryKey: ['webphone-session', connectedCallId],
+    queryFn: () => sessionQueryFn(connectedCallId as string),
+    enabled: callState === 'connected' && connectedCallId !== null,
+    // Cloudonix reports the session by webhook, which can land just after the call connects.
+    retry: 5,
+    retryDelay: 2000,
+    staleTime: Infinity,
+  });
+
   const resetCallState = useCallback(() => {
     setCallState('idle');
     setIsMuted(false);
     setIsHeld(false);
     setShowKeypad(false);
+    setShowTransfer(false);
     setDtmfDigits('');
     setIncomingSession(null);
     setIncomingNumber('');
+    setConnectedCaller(null);
+    setConnectedCallId(null);
+    ringingRef.current = null;
     setCoachLabel(null);
     isCoachCallRef.current = false;
     stopCallTimer();
@@ -291,6 +363,7 @@ export function WebPhone({
       session.on('confirmed', () => {
         getTonePlayer().stop();
         setCallState('connected');
+        setConnectedCallId(sipCallId(session));
         setStatus('On call');
         startCallTimer();
         attachRemoteStream(session);
@@ -301,13 +374,16 @@ export function WebPhone({
         getTonePlayer().stop();
         getEmbedBus()?.emit('call.ended');
         stopCallTimer();
+        if (settingsRef.current.refresh_on_hangup) {
+          reRegister('after hangup');
+        }
         if (isCoachCallRef.current) {
           isCoachCallRef.current = false;
           setOpen(false); // Coaching finished: close the Web Phone entirely.
           return;
         }
         resetCallState();
-        setStatus('Registered');
+        setStatus('');
       });
 
       session.on('failed', (event: any) => {
@@ -329,7 +405,7 @@ export function WebPhone({
         }
 
         resetCallState();
-        setStatus('Registered');
+        setStatus('');
       });
 
       session.on('hold', () => setIsHeld(true));
@@ -337,14 +413,14 @@ export function WebPhone({
       session.on('muted', () => setIsMuted(true));
       session.on('unmuted', () => setIsMuted(false));
     },
-    [attachRemoteStream, config, getTonePlayer, resetCallState, startCallTimer, stopCallTimer]
+    [attachRemoteStream, config, getTonePlayer, reRegister, resetCallState, startCallTimer, stopCallTimer]
   );
 
   useEffect(() => {
     if (!isLeader) {
       setState(role === 'follower' ? 'other_tab' : 'loading');
       resetCallState();
-      setStatus('Initializing...');
+      setStatus('');
       setErrorDetail(null);
       getTonePlayer().stop();
       if (uaRef.current) {
@@ -386,6 +462,7 @@ export function WebPhone({
     }
 
     let cancelled = false;
+    setRegistration('registering');
 
     async function initPhone() {
       try {
@@ -400,7 +477,6 @@ export function WebPhone({
             hint: 'Reload the page and retry. If it persists, check your network or contact your administrator.',
           });
           setState('error');
-          setStatus('Failed to load the Web Phone.');
           return;
         }
 
@@ -418,41 +494,48 @@ export function WebPhone({
           session_timers: false,
         });
 
-        ua.on('connecting', () => {
-          setStatus('Connecting...');
-        });
-
-        ua.on('connected', () => {
-          setStatus('Connected, registering...');
-        });
-
-        ua.on('disconnected', () => {
-          setStatus('Disconnected');
-        });
+        ua.on('connecting', () => setRegistration('registering'));
+        ua.on('connected', () => setRegistration('registering'));
+        ua.on('disconnected', () => setRegistration('disconnected'));
+        // Fired when the binding is lost: un-REGISTER, failed refresh, or transport closed.
+        ua.on('unregistered', () => setRegistration('unregistered'));
 
         ua.on('registered', () => {
-          setStatus('Registered');
+          setRegistration('registered');
           setState('ready');
         });
 
         ua.on('registrationFailed', (event: any) => {
           const cause = event?.cause || 'unknown';
-          setStatus(`Registration failed: ${cause}`);
+          setRegistration('unregistered');
           setErrorDetail(explainRegistrationFailure(cause));
           setState('error');
         });
 
         ua.on('newRTCSession', (event: any) => {
           const session = event.session;
-          handleSessionEvents(session);
 
           if (event.originator === 'remote') {
-            const remoteUri = session.remote_identity?.uri?.toString() || 'Unknown';
-            setIncomingNumber(remoteUri);
+            // Already on a call or ringing: answer busy, so routing moves on (other ring group
+            // members, voicemail). Checked before handleSessionEvents, whose failed/ended handlers
+            // would otherwise reset the call that is in progress.
+            if (isLive(sessionRef.current) || isLive(ringingRef.current)) {
+              try {
+                session.terminate({ status_code: 486, reason_phrase: 'Busy Here' });
+              } catch (error) {
+                console.error('[WebPhone] Busy reply failed:', error);
+              }
+              return;
+            }
+            handleSessionEvents(session);
+            ringingRef.current = session;
+            setIncomingNumber(callerLabel(session));
             setIncomingSession(session);
             setStatus('Incoming call');
             setOpen(true); // ring: bring the panel up even if it was closed
+            getTonePlayer().play('ring', config!.country); // stopped on answer, decline, or caller hang-up
           } else {
+            handleSessionEvents(session);
             setCallState('ringing');
             setStatus('Calling...');
           }
@@ -462,7 +545,6 @@ export function WebPhone({
         uaRef.current = ua;
       } catch (error: any) {
         console.error('[WebPhone] Initialization failed:', error);
-        setStatus('The Web Phone could not register.');
         setErrorDetail({
           title: 'Web Phone Error',
           message: 'The Web Phone could not start.',
@@ -592,20 +674,38 @@ export function WebPhone({
     }
   }, [state]);
 
+  // Keep-alive: re-register every 60 seconds while the phone is registered and ready.
+  useEffect(() => {
+    if (state !== 'ready' || !settings.keep_alive) return;
+    const timer = setInterval(() => reRegister('keep-alive'), 60_000);
+    return () => clearInterval(timer);
+  }, [state, settings.keep_alive, reRegister]);
+
   const handleAnswer = useCallback(() => {
     if (incomingSession) {
+      getTonePlayer().stop();
+      ringingRef.current = null;
       try {
         incomingSession.answer({
           mediaConstraints: { audio: true, video: false },
         });
         sessionRef.current = incomingSession;
+        setConnectedCaller(callerIdentity(incomingSession));
         setIncomingSession(null);
         setIncomingNumber('');
       } catch (error) {
         console.error('[WebPhone] Answer failed:', error);
       }
     }
-  }, [incomingSession]);
+  }, [incomingSession, getTonePlayer]);
+
+  // Auto-answer: a call still ringing after 2 seconds is answered. Answering, declining or the
+  // caller hanging up changes incomingSession, which cancels the timer.
+  useEffect(() => {
+    if (!incomingSession || !settings.auto_answer) return;
+    const timer = setTimeout(handleAnswer, 2000);
+    return () => clearTimeout(timer);
+  }, [incomingSession, settings.auto_answer, handleAnswer]);
 
   // Tap-to-redial from the calls log: switch to the dialer, prefill the number,
   // and queue an auto-dial (the redial effect fires once the number flushes).
@@ -619,6 +719,8 @@ export function WebPhone({
 
   const handleReject = useCallback(() => {
     if (incomingSession) {
+      getTonePlayer().stop();
+      ringingRef.current = null;
       try {
         incomingSession.terminate();
       } catch (error) {
@@ -626,9 +728,29 @@ export function WebPhone({
       }
       setIncomingSession(null);
       setIncomingNumber('');
-      setStatus('Registered');
+      setStatus('');
     }
-  }, [incomingSession]);
+  }, [incomingSession, getTonePlayer]);
+
+  // Blind transfer: the server moves the other party to the destination, then this leg hangs up.
+  // Its 'ended' handler resets the call; the idle status then says where the call went.
+  const handleTransfer = useCallback(
+    async (destination: string) => {
+      const session = sessionRef.current;
+      const callId = sipCallId(session);
+      if (!callId) throw new Error('This call cannot be transferred.');
+      await transferFn(callId, destination);
+      if (!session.isEnded()) {
+        try {
+          session.terminate();
+        } catch (error) {
+          console.error('[WebPhone] Hang-up after transfer failed:', error);
+        }
+      }
+      setStatus(`Call transferred to ${destination}`);
+    },
+    [transferFn]
+  );
 
   const handleMute = useCallback(() => {
     if (sessionRef.current) {
@@ -703,7 +825,7 @@ export function WebPhone({
   // failures need a full UA re-init, so close+reopen to re-run the init effect.
   const handleRetry = useCallback(() => {
     setErrorDetail(null);
-    setStatus('Initializing...');
+    setStatus('');
     setState('loading');
     if (configError) {
       refetch();
@@ -712,13 +834,43 @@ export function WebPhone({
     setInitNonce((n) => n + 1);
   }, [configError, refetch]);
 
+  // Forced re-registration. JsSIP emits 'registered' only on a transition, so a plain refresh
+  // would never confirm: drop the binding first, then register once the un-REGISTER settles
+  // (its response is not CSeq-guarded, so registering in parallel could be undone by it).
+  const handleReregister = useCallback(() => {
+    const ua = uaRef.current;
+    if (!ua?.isConnected()) {
+      // No live socket: rebuild the UA; the init effect reconnects and registers.
+      setState('loading');
+      setInitNonce((n) => n + 1);
+      return;
+    }
+    setRegistration('registering');
+    if (ua.isRegistered()) {
+      ua.once('unregistered', () => {
+        setRegistration('registering'); // batched with the red 'unregistered' update: no flicker
+        ua.register();
+      });
+      ua.unregister();
+    } else {
+      ua.register();
+    }
+  }, []);
+
+  const badge = REGISTRATION_BADGE[state === 'error' ? 'unregistered' : registration];
+  const showBadge = isLeader && state !== 'no_extension';
+
   return (
     <>
       {/* Right-edge pull tab — hidden while the dialer is open */}
       {!open && (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            // A click is the only moment browsers allow the notification-permission prompt.
+            if (!embedded) requestNotificationPermission();
+            setOpen(true);
+          }}
           className={`fixed ${cornerClass} z-40 flex h-16 w-16 items-center justify-center rounded-full rounded-br-none bg-primary text-primary-foreground shadow-lg hover:scale-105 hover:shadow-xl transition-all`}
           style={iconBackgroundColor ? { backgroundColor: iconBackgroundColor } : undefined}
           aria-label="Open Web Phone"
@@ -746,7 +898,27 @@ export function WebPhone({
                   <Phone className="h-4 w-4" />
                   Web Phone
                 </div>
-                <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>
+                {showBadge && (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Badge variant="outline" role="status" className="gap-1.5 px-2 py-0 font-medium">
+                      <span className={`h-2 w-2 rounded-full ${badge.dot}`} aria-hidden="true" />
+                      {badge.label}
+                    </Badge>
+                    {state === 'ready' && (
+                      <button
+                        type="button"
+                        onClick={handleReregister}
+                        disabled={inActiveCall || registration === 'registering'}
+                        className="rounded-full p-1 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Re-register"
+                        title={inActiveCall ? 'End the call before re-registering' : 'Re-register'}
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${registration === 'registering' ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                {inActiveCall && <p className="truncate text-xs text-muted-foreground">{headerStatus}</p>}
               </div>
               <button
                 type="button"
@@ -847,7 +1019,12 @@ export function WebPhone({
                       </div>
                     </div>
                   ) : callState === 'connected' ? (
-                    <div className={`flex flex-col items-center justify-center ${showKeypad ? 'gap-5' : 'gap-10 py-6'}`}>
+                    <div className="relative flex flex-1 min-h-0 flex-col items-center gap-5">
+                      {sessionToken && (
+                        <p className="text-xs font-mono text-muted-foreground break-all select-all px-4 text-center">
+                          Session: {sessionToken}
+                        </p>
+                      )}
                       <div className="text-center space-y-2">
                         {coachLabel ? (
                           // Coaching: show only the function name, never the raw sentinel destination.
@@ -864,7 +1041,20 @@ export function WebPhone({
                             <p className="text-sm text-muted-foreground tabular-nums">
                               {formatCallDuration(callSeconds)}
                             </p>
-                            {/* With the keypad open, echo the digits sent (last 18 fit on one line). */}
+                            {showTransfer ? null : !showKeypad && connectedCaller ? (
+                              // Inbound: caller ID, then the name in the larger font; the ID alone gets the larger font.
+                              connectedCaller.name ? (
+                                <>
+                                  <p className="text-base text-muted-foreground break-all px-4">{connectedCaller.id}</p>
+                                  <p className="text-2xl font-semibold break-words px-4">{connectedCaller.name}</p>
+                                </>
+                              ) : (
+                                <p className={`font-medium break-all px-4 ${numberSizeClass(connectedCaller.id.length)}`}>
+                                  {connectedCaller.id}
+                                </p>
+                              )
+                            ) : (
+                            /* With the keypad open, echo the digits sent (last 18 fit on one line). */
                             <p
                               className={`font-medium break-all px-4 ${numberSizeClass(
                                 showKeypad ? Math.min(dtmfDigits.length, 18) : number.length
@@ -873,9 +1063,18 @@ export function WebPhone({
                             >
                               {(showKeypad ? dtmfDigits.slice(-18) : number) || ' '}
                             </p>
+                            )}
                           </>
                         )}
                       </div>
+
+                      {showTransfer && (
+                        <TransferPanel
+                          onTransfer={handleTransfer}
+                          onCancel={() => setShowTransfer(false)}
+                          directoryQueryFn={directoryQueryFn}
+                        />
+                      )}
 
                       {showKeypad && (
                         <div className="grid grid-cols-3 gap-x-6 gap-y-2">
@@ -893,7 +1092,8 @@ export function WebPhone({
                         </div>
                       )}
 
-                      <div className="flex items-center justify-center gap-4">
+                      {/* Call controls in one row, pushed to the bottom above the hang-up button. */}
+                      <div className="mt-auto flex items-center justify-center gap-4">
                         <button
                           type="button"
                           onClick={handleMute}
@@ -909,7 +1109,10 @@ export function WebPhone({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShowKeypad((v) => !v)}
+                          onClick={() => {
+                            setShowTransfer(false);
+                            setShowKeypad((v) => !v);
+                          }}
                           className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
                             showKeypad
                               ? 'bg-primary text-primary-foreground'
@@ -934,44 +1137,70 @@ export function WebPhone({
                           {isHeld ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
                           <span className="text-[10px] font-medium">{isHeld ? 'Resume' : 'Hold'}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={handleHangup}
-                          className="h-16 w-16 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
-                          aria-label="Hang Up"
-                        >
-                          <PhoneOff className="h-7 w-7" />
-                        </button>
+                        {transferEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowKeypad(false); // its key listener would send typed digits as DTMF
+                              setShowTransfer((v) => !v);
+                            }}
+                            className={`h-16 w-16 rounded-full shadow-lg active:scale-95 transition-all flex flex-col items-center justify-center gap-1 ${
+                              showTransfer
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                            }`}
+                            aria-label="Transfer"
+                            aria-pressed={showTransfer}
+                          >
+                            <PhoneForwarded className="h-6 w-6" />
+                            <span className="text-[10px] font-medium">Transfer</span>
+                          </button>
+                        )}
                       </div>
 
-                      {/* Volume control */}
-                      <div className="flex w-full max-w-[260px] items-center gap-3 px-2">
+                      <button
+                        type="button"
+                        onClick={handleHangup}
+                        className="h-[72px] w-[72px] shrink-0 rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center"
+                        aria-label="Hang Up"
+                      >
+                        <PhoneOff className="h-8 w-8" />
+                      </button>
+
+                      {/* Speaker volume: +/- on the right edge, in 10% steps. */}
+                      <div
+                        className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
+                        role="group"
+                        aria-label={`Call volume ${Math.round(volume * 100)}%`}
+                      >
                         <button
                           type="button"
-                          onClick={() => setVolume((v) => (v === 0 ? 1 : 0))}
-                          className="text-muted-foreground hover:text-foreground shrink-0"
-                          aria-label={volume === 0 ? 'Unmute speaker' : 'Mute speaker'}
+                          onClick={() => setVolume((v) => Math.min(1, Math.round(v * 10 + 1) / 10))}
+                          disabled={volume >= 1}
+                          className="h-9 w-9 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Volume up"
                         >
-                          {volume === 0 ? (
-                            <VolumeX className="h-5 w-5" />
-                          ) : volume < 0.5 ? (
-                            <Volume1 className="h-5 w-5" />
-                          ) : (
-                            <Volume2 className="h-5 w-5" />
-                          )}
+                          <Plus className="h-4 w-4" />
                         </button>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          value={volume}
-                          onChange={(e) => setVolume(Number(e.target.value))}
-                          className="h-1.5 w-full cursor-pointer accent-primary"
-                          aria-label="Call volume"
-                        />
+                        <div className="relative h-24 w-1.5 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
+                          <div
+                            className="absolute inset-x-0 bottom-0 rounded-full bg-primary transition-[height]"
+                            style={{ height: `${volume * 100}%` }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setVolume((v) => Math.max(0, Math.round(v * 10 - 1) / 10))}
+                          disabled={volume <= 0}
+                          className="h-9 w-9 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 active:scale-95 transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Volume down"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
+                  ) : activeTab === 'settings' && !embedded ? (
+                    <SettingsView settings={settings} onSaved={setSettings} />
                   ) : activeTab === 'calls' ? (
                     <CallsLogView
                       onRedial={handleRedial}
@@ -1070,6 +1299,7 @@ export function WebPhone({
                 active={activeTab}
                 onChange={setActiveTab}
                 disabled={inActiveCall}
+                showSettings={!embedded}
               />
             )}
         </div>

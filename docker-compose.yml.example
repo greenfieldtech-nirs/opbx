@@ -39,21 +39,14 @@ services:
       - ./:/var/www/html
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/templates/conf.d:ro
-    # Fill the resolver address from the container's own /etc/resolv.conf so the
-    # config works under both Docker (127.0.0.11) and Podman (network gateway).
-    # The mounted conf.d is read-only, so render into /etc/nginx/conf.d first.
-    command:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        RESOLVER=$$(awk '/^nameserver/ {print $$2; exit}' /etc/resolv.conf)
-        : "$${RESOLVER:?could not determine DNS resolver from /etc/resolv.conf}"
-        mkdir -p /etc/nginx/conf.d
-        for f in /etc/nginx/templates/conf.d/*.conf; do
-          sed "s/__NGINX_RESOLVER__/$${RESOLVER}/g" "$$f" > "/etc/nginx/conf.d/$$(basename "$$f")"
-        done
-        exec nginx -g 'daemon off;'
+      - ./docker/nginx/render.sh:/opt/opbx/render.sh:ro
+    environment:
+      WAF_MODE: ${WAF_MODE:-off}
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:-}
+      WAF_CONSOLE_ENABLED: ${WAF_CONSOLE_ENABLED:-false}
+      WAF_CONSOLE_ALLOW: ${WAF_CONSOLE_ALLOW:-}
+    # Renders the templates (resolver, WAF, hooks) then starts nginx; shared by dev, prod and WAF.
+    command: ["/bin/sh", "/opt/opbx/render.sh"]
     depends_on:
       app:
         condition: service_healthy

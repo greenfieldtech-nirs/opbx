@@ -42,6 +42,7 @@ final class UserEmbedTokenController extends Controller
             $model->fill(array_filter([
                 'icon_position' => $validated['icon_position'] ?? null,
                 'icon_background_color' => $validated['icon_background_color'] ?? null,
+                'allow_transfer' => $validated['allow_transfer'] ?? null,
             ], static fn ($v) => $v !== null));
 
             $model->save();

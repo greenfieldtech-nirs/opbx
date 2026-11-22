@@ -66,7 +66,7 @@ While the list is empty, Settings shows "No domains yet — the embedded dialer 
 
 From then on the dialer no longer loads on that website, for every user.
 
-### Set the dialer icon for a user
+### Set the dialer icon and call transfer for a user
 
 **Who can do this:** Owner; PBX Admin for any user except an Owner.
 
@@ -74,7 +74,8 @@ From then on the dialer no longer loads on that website, for every user.
 2. On the user's row, in the **Embed** column, click **Get Code** (tooltip "Embedded dialer settings"). The **Embedded Dialer** dialog opens. The first time, OPBX creates the user's token record.
 3. Choose the **Icon Position**: Bottom Right (default), Bottom Left, Top Right or Top Left.
 4. Choose the **Icon Color** with the colour picker, or type it in `#RRGGBB` form (default `#007acc`).
-5. Click **Save Settings**. A toast confirms "Embedded dialer settings saved".
+5. Turn **Allow call transfer** on to show the **Transfer** button during calls in this user's embedded dialer (off by default; see [Transfer a call](/opbx/modules/web-phone#transfer-a-call)).
+6. Click **Save Settings**. A toast confirms "Embedded dialer settings saved".
 
 The icon inside the dialer follows the saved settings the next time the host page loads. The corner where the dialer frame sits on the host page comes from the `iconPosition` in the installed snippet, so after changing the position, also change `iconPosition` in the installed snippet (or install a new one).
 
@@ -168,7 +169,7 @@ document.querySelector('#call-lead').addEventListener('click', () => {
 });
 ```
 
-The embedded phone stays registered while the page is open, even when the panel is closed, and an incoming call opens the panel. Several tabs showing the dialer for the same user share one registration: the first tab holds it, the others show "Web Phone is active in another tab" with a **Use here** button, and the next tab takes over when the first one closes. This is independent of the OPBX app's own Web Phone. A host `close` during a call is ignored and answered with the `close.rejected` event; outside a call it closes the panel.
+The embedded phone stays registered while the page is open, even when the panel is closed, and an incoming call opens the panel. Several tabs showing the dialer for the same user share one registration: the first tab holds it, the others show "Web Phone is active in another tab" with a **Use here** button, and the next tab takes over when the first one closes. This is independent of the OPBX app's own Web Phone. The embedded phone applies the user's [Web Phone settings](/opbx/modules/web-phone#change-the-web-phone-settings) (auto-answer, keep-alive, refresh on hangup) but has no **Settings** tab: they can only be changed in OPBX. A host `close` during a call is ignored and answered with the `close.rejected` event; outside a call it closes the panel.
 
 ## Security model
 
@@ -217,7 +218,7 @@ Token management (signed-in Owner or PBX Admin):
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/v1/users/{user}/embed-token` | Icon settings. Creates the user's token record if it does not exist yet |
-| PATCH | `/v1/users/{user}/embed-token` | Update `icon_position` and `icon_background_color` |
+| PATCH | `/v1/users/{user}/embed-token` | Update `icon_position`, `icon_background_color` and `allow_transfer` |
 | POST | `/v1/users/{user}/embed-token/regenerate` | New token; returns the token and the snippet once |
 | PUT | `/v1/settings/cloudonix` | Update `embed_allowed_domains` (Owner) |
 
@@ -229,6 +230,8 @@ Widget runtime (embed token):
 | GET | `/embed/dialer?token=…` | The iframe page |
 | GET | `/v1/embed/config` | SIP settings for the embedded user |
 | GET | `/v1/embed/calls-log` | The user's last 50 outbound calls |
+| POST | `/v1/embed/transfer` | Blind-transfer the user's call (as `/v1/webphone/transfer`). 403 when the snippet does not allow call transfer |
+| GET | `/v1/embed/directory` | Extensions for transfer suggestions. 403 when the snippet does not allow call transfer |
 
 See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenAPI) for full schemas.
 

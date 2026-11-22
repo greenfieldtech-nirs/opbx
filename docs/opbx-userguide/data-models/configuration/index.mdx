@@ -31,6 +31,7 @@ This page documents the environment variables and configuration values used by O
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPBX_APPLICATION_MODE` | `development` | `development` or `production` (SaaS) |
+| `OPBX_FRONT_PAGE` | `home` | What the site root (`/`) shows: `home` (the public OPBX homepage) or `login` (the sign-in page, or the dashboard when signed in). The installer defaults to `login` |
 | `OPBX_APPLICATION_WEBHOOK_BASEURL` | — | Application-level webhook base URL. When set, it overrides every organization's `cloudonix_settings.webhook_base_url` |
 
 ### Database
@@ -98,7 +99,7 @@ This page documents the environment variables and configuration values used by O
 | `VITE_WS_HOST` | `localhost` | WebSocket host |
 | `VITE_WS_PORT` | `6001` | WebSocket port |
 | `VITE_WS_SCHEME` | `http` | WebSocket scheme |
-| `VITE_ALLOWED_HOSTS` | `localhost,.localhost` | Host names the Vite dev server accepts |
+| `VITE_ALLOWED_HOSTS` | `localhost,.localhost` | Extra host names the Vite dev server accepts (comma-separated; a leading dot such as `.ts.net` allows every name under it). `localhost` and `.localhost` are always accepted |
 
 ### S3 Storage (SeaweedFS)
 

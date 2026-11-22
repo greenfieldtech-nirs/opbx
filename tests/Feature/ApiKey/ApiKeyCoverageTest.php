@@ -60,6 +60,18 @@ class ApiKeyCoverageTest extends TestCase
         $this->withToken($withoutProviders)->getJson('/api/v1/ai-assistant/providers')->assertStatus(403);
     }
 
+    public function test_ai_monitor_uses_its_own_grant(): void
+    {
+        $withMonitor = $this->keyFor([['resource' => 'ai-monitor', 'level' => 'read']]);
+        $this->withToken($withMonitor)->getJson('/api/v1/ai-monitor')->assertStatus(200);
+
+        // It shows load-balancer figures too, so neither AI grant alone may open it.
+        foreach (['ai-assistants', 'ai-assistant-load-balancers'] as $resource) {
+            $key = $this->keyFor([['resource' => $resource, 'level' => 'read']]);
+            $this->withToken($key)->getJson('/api/v1/ai-monitor')->assertStatus(403);
+        }
+    }
+
     public function test_call_tracking_resources_are_grantable(): void
     {
         $token = $this->keyFor([

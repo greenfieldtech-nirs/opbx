@@ -25,6 +25,7 @@ final class UpdateEmbedTokenRequest extends FormRequest
         return [
             'icon_position' => ['sometimes', Rule::enum(EmbedIconPosition::class)],
             'icon_background_color' => ['sometimes', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'allow_transfer' => ['sometimes', 'boolean'],
         ];
     }
 }

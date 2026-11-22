@@ -17,6 +17,8 @@ import Auth0Onboarding from '@/pages/Auth0Onboarding';
 import Dashboard from '@/pages/Dashboard';
 import Home from '@/pages/Home';
 import PublicStatus from '@/pages/PublicStatus';
+import InstallGuide from '@/pages/InstallGuide';
+import TermsOfUse from '@/pages/TermsOfUse';
 
 // Lazy load pages for code splitting. trackedLazy() is React.lazy() plus a
 // signal to the global page loading indicator while the chunk downloads.
@@ -28,6 +30,7 @@ const Extensions = trackedLazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = trackedLazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = trackedLazy(() => import('@/pages/AiAssistants'));
 const AiAssistantLoadBalancers = trackedLazy(() => import('@/pages/AiAssistantLoadBalancers'));
+const AiMonitor = trackedLazy(() => import('@/pages/AiMonitor'));
 const PhoneNumbers = trackedLazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = trackedLazy(() => import('@/pages/RingGroups'));
 const CallQueues = trackedLazy(() => import('@/pages/CallQueues'));
@@ -83,6 +86,16 @@ export const router = createBrowserRouter([
   {
     path: '/status',
     element: <PublicStatus />,
+  },
+  // Public install / upgrade guide
+  {
+    path: '/install',
+    element: <InstallGuide />,
+  },
+  // Public terms of use (OPBX Cloud and the open-source software)
+  {
+    path: '/terms',
+    element: <TermsOfUse />,
   },
   // Public auth routes (under /ui for consistency with existing setup)
   {
@@ -151,6 +164,14 @@ export const router = createBrowserRouter([
       {
         path: 'ai-assistant-load-balancers',
         element: <AiAssistantLoadBalancers />,
+      },
+      {
+        path: 'ai-monitor',
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AiMonitor />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'phone-numbers',

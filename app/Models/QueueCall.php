@@ -37,6 +37,7 @@ class QueueCall extends Model
         'waiting_seconds',
         'handling_seconds',
         'disposition',
+        'transferred_to',
     ];
 
     protected function casts(): array

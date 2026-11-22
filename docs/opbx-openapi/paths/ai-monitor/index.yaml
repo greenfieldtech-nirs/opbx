@@ -1,0 +1,91 @@
+paths:
+  /v1/ai-monitor:
+    get:
+      tags:
+        - AI Assistants
+      summary: AI Real Time Monitor figures
+      description: |
+        Live figures for the organization's AI assistants and AI load balancers over the last
+        `minutes` (1 to 720, default 60). Every hand-off of a call to an AI assistant counts as one
+        call for that assistant; it is settled when the call's CDR arrives. Auto-dialer calls count
+        only when a person answered (voicemail detection said `human`, or the campaign does not use
+        voicemail detection). Owner and PBX Admin only; API keys need the `ai-monitor` grant
+        (the `ai-assistants` and `ai-assistant-load-balancers` grants do not cover it).
+      operationId: getAiMonitor
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: minutes
+          in: query
+          required: false
+          description: Time frame in minutes.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 720
+            default: 60
+      responses:
+        '200':
+          description: Monitor figures
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      window_minutes: { type: integer, example: 60 }
+                      bucket_seconds: { type: integer, description: Width of one series point, example: 300 }
+                      generated_at: { type: string, format: date-time }
+                      assistants:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            name: { type: string, example: Sales Bot }
+                            provider: { type: string, nullable: true, example: openai }
+                            status: { type: string, nullable: true, example: active }
+                            active: { type: integer, description: Calls with the assistant now }
+                            calls: { type: integer }
+                            answered: { type: integer }
+                            failed: { type: integer }
+                            success_rate: { type: number, nullable: true, description: 'answered / (answered + failed), percent; null when no call finished', example: 96.5 }
+                            avg_duration_seconds: { type: integer, nullable: true, description: Average talk time of answered calls }
+                            ai_minutes: { type: integer }
+                            last_call_at: { type: string, format: date-time, nullable: true, description: Most recent call, also outside the window }
+                            series: { type: array, items: { type: integer }, description: 'Calls per point, oldest first (12 points)' }
+                      load_balancers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            name: { type: string, example: Main AI Pool }
+                            strategy: { type: string, enum: [round_robin, priority, percentage] }
+                            status: { type: string, nullable: true }
+                            active: { type: integer }
+                            calls: { type: integer, description: Distinct calls }
+                            failovers: { type: integer, description: Times a failed member handed the call to the next one }
+                            fell_back: { type: integer, description: Calls that ended in the load balancer's fallback }
+                            handled_rate: { type: number, nullable: true, description: 'Calls an AI assistant kept (did not fall back), percent' }
+                            series: { type: array, items: { type: integer } }
+                            members:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  ai_assistant_id: { type: integer }
+                                  name: { type: string, nullable: true }
+                                  active: { type: boolean }
+                                  priority: { type: integer, nullable: true }
+                                  calls: { type: integer }
+                                  actual_share: { type: number, nullable: true, description: Percent of the load balancer's attempts }
+                                  configured_share: { type: number, nullable: true, description: 'From weights (percentage) or equal (round robin); null for priority and inactive members' }
+        '401':
+          $ref: '../../components/responses/Unauthorized.yaml'
+        '403':
+          $ref: '../../components/responses/Forbidden.yaml'
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'

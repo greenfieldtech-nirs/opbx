@@ -26,6 +26,7 @@ use App\Models\CloudonixSettings;
 use App\Models\DidNumber;
 use App\Models\SessionUpdate;
 use App\Scopes\OrganizationScope;
+use App\Services\AiMonitor\AiCallRecorder;
 use App\Services\AutoDialer\CDRPublisher;
 use App\Services\AutoDialer\DialerWorkerCampaignService;
 use App\Services\CallNotifications\NotificationPayloadBuilder;
@@ -535,6 +536,9 @@ class CloudonixWebhookController extends Controller
             if ($sessionUpdate && ! $isReplay) {
                 $this->triggerCallNotification($sessionUpdate, $organizationId);
             }
+
+            // Settle the AI Real Time Monitor's record of this call (never throws)
+            app(AiCallRecorder::class)->callEnded((int) $organizationId, $request->all());
 
             // Finalize queue call statistics (waiting/handling times, disposition)
             try {
