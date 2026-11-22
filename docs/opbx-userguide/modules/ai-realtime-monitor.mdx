@@ -121,7 +121,7 @@ A call counts once for every AI assistant it is handed to, whether it came from 
 
 A call counts as **answered** when its call record (CDR) says it connected. AI minutes count only the time after the call reached that assistant.
 
-**Auto-dialer campaigns** count only calls where a person answered: voicemail detection said *human*, or the campaign does not use voicemail detection. Calls that were not answered, reached voicemail, or where detection could not decide count for no assistant.
+**Auto-dialer campaigns** count only calls where a person answered: the call connected and [voicemail detection](/opbx/applications/auto-dialer/answering-machine-detection) did not report a voicemail. A campaign without voicemail detection counts every connected call. Calls that were not answered or reached voicemail count for no assistant.
 
 The monitor starts counting from the day it was installed: earlier calls do not appear. Its data is kept for 30 days (`RETENTION_AI_CALL_ATTEMPTS_DAYS` in `.env`).
 

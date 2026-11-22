@@ -215,7 +215,7 @@ $aiCallAttempt->loadBalancer() → AiAssistantLoadBalancer (ai_assistant_load_ba
 | The dialer worker starts a campaign call routed to an assistant or load balancer | New row, `source` `auto_dialer` |
 | A member's dial fails (`/api/callbacks/voice/albs-follow-through`) | That row becomes `failed`, with `failed_over` or `fell_back` set |
 | A load balancer has no member to offer | New row with no assistant, `status` `failed`, `failure_reason` `no_available_assistant`, `fell_back` true |
-| The CDR arrives | The last open row becomes `answered` (disposition `CONNECTED`, `ANSWERED` or `ANSWER`) or `failed`; earlier open rows become `failed` with `no_result`. For a campaign call, every row of the call becomes `excluded` unless a person answered (voicemail detection said `human`, or the campaign does not use it) |
+| The CDR arrives | The last open row becomes `answered` (disposition `CONNECTED`, `ANSWERED` or `ANSWER`) or `failed`; earlier open rows become `failed` with `no_result`. For a campaign call, every row of the call becomes `excluded` unless a person answered (the call connected and voicemail detection did not report `voicemail`; the detector reports `unknown` when it found no voicemail) |
 
 `excluded` rows are not counted by the monitor. Rows whose `started_at` is older than `RETENTION_AI_CALL_ATTEMPTS_DAYS` (default 30) are deleted daily by `model:prune`; the monitor itself looks back at most 12 hours. See [Data Retention](/opbx/data-models/configuration/index#data-retention).
 

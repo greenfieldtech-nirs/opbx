@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-11-22 (AI Real Time Monitor)
+
+- Auto-dialer calls answered by a person now count on the AI monitor when the campaign uses voicemail detection. The AMD worker reports `unknown` (no voicemail found) rather than `human`, and only `voicemail` excludes a call.
+
 ### Documentation - 2026-11-22
 
 - Full review of the user guide, the OpenAPI spec, the READMEs and AGENTS.md against the code: installer and `./opbx.sh`, SafeLine WAF, AI Real Time Monitor, Web Phone settings and transfer, campaign destinations (ring groups, call queues, wait for available agents), `ai_call_attempts`, and many smaller corrections.
