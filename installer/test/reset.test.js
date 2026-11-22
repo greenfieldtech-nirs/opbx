@@ -115,7 +115,7 @@ test('development uses RESET; previousAnswers carries no secrets', async () => {
   const h = harness({ phrases: ['RESET'] });
   await go(h, dir);
   const json = JSON.stringify(h.out.installed.defaults);
-  assert.ok(json.includes('auth0') || json.includes('x.auth0.com'));
+  assert.ok(json.includes('auth0')); // the Auth0 answers are carried over
   assert.ok(!/SuperSecretRoot|Auth0Secret/.test(json));
   assert.equal(h.out.installed.resume, false);
   assert.ok(!h.calls.some((c) => c[0] === 'compose' && c.includes('safeline')));

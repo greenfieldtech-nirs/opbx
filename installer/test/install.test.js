@@ -212,7 +212,7 @@ test('resume with an existing owner saves the final summary and carries the earl
   assert.ok(saved.includes('OPBX installation summary') && !saved.includes('still in progress'));
   assert.match(saved, /Owner login \(from the earlier run\)\n  Email:    ann@example.com\n  Password: OldOwnerPw/);
   assert.ok(saved.includes('WafPw') === false); // no WAF in this run, summary still complete
-  assert.ok(saved.includes('https://pbx.example.com/api/v1'));
+  assert.match(saved, /^  API: {6}https:\/\/pbx\.example\.com\/api\/v1$/m);
 });
 
 test('resume with an existing owner and no password in the earlier file says so', async () => {
