@@ -8,13 +8,14 @@ OPBX is a multi-tenant business PBX platform built on Laravel (backend) and Reac
 
 **Key Capabilities:**
 
-- **User & Extension Management** — Manage SIP extensions, users, and ring groups
+- **User & Extension Management** — Manage SIP extensions, users, supervisors, ring groups and call queues
 - **Phone Number Management** — Configure DID numbers and inbound routing
 - **IVR & Call Flows** — Build interactive voice response menus and business hours
 - **Auto-Dialer** — Create and monitor outbound campaigns with real-time statistics
 - **Live Call Monitoring** — Real-time call presence via WebSocket (Soketi/Pusher)
 - **Call Analytics** — Searchable call logs, recordings, and CDR data
-- **AI Assistants** — Configure AI-powered voice assistants and load balancers
+- **AI Assistants** — Configure AI-powered voice assistants and load balancers, and watch them on the AI Real Time Monitor
+- **Web Phone** — In-browser softphone (JsSIP over WebRTC) with transfer, recent calls and a Settings tab; the same component powers the embeddable dialer
 - **Platform Administration** — Multi-tenant organization and user management
 
 ## Technology Stack
@@ -24,17 +25,18 @@ OPBX is a multi-tenant business PBX platform built on Laravel (backend) and Reac
 | **Framework** | React 19 | UI library with concurrent features |
 | **Language** | TypeScript | Type-safe development (strict mode: off) |
 | **Build Tool** | Vite 8 | Fast dev server and optimized production builds |
-| **Routing** | React Router 6 | Declarative routing with lazy loading |
+| **Routing** | React Router 7 | Declarative routing with lazy loading |
 | **Server State** | TanStack Query 5 | Data fetching, caching, and synchronization |
 | **Client State** | React Context | Global state for Auth and Config |
 | **Forms** | react-hook-form + Zod | Type-safe form handling with schema validation |
 | **UI Components** | shadcn/ui | Accessible components built on Radix UI primitives |
-| **Styling** | Tailwind CSS 3 | Utility-first CSS framework |
+| **Styling** | Tailwind CSS 4 | Utility-first CSS framework (`@tailwindcss/vite` plugin) |
 | **HTTP Client** | Axios | API requests with interceptors for auth and error handling |
 | **Real-time** | Laravel Echo + Pusher JS | WebSocket connections for live call updates |
+| **Web Phone** | JsSIP | SIP over WebRTC for the browser phone |
 | **Drag & Drop** | @dnd-kit | Sortable lists for IVR menus and call flows |
-| **Icons** | Lucide React | Consistent, lightweight iconography |
-| **Testing** | Playwright | End-to-end testing framework |
+| **Icons** | Lucide React, VS Code Codicons | Iconography (sidebar uses Codicons) |
+| **Testing** | Vitest + React Testing Library | Unit and component tests (`npm test`); Playwright is installed for browser automation |
 
 ## Directory Structure
 
@@ -45,18 +47,23 @@ frontend/
 │   ├── components/            # Reusable UI components
 │   │   ├── ui/               # shadcn/ui components (Button, Dialog, Table, etc.)
 │   │   ├── Layout/           # AppLayout, Sidebar, Header
-│   │   ├── Auth/             # ProtectedRoute, OwnerRoute
+│   │   ├── Auth/             # ProtectedRoute, OwnerRoute, SupervisorGuard
+│   │   ├── WebPhone/         # Web Phone (keypad, recents, settings, transfer)
+│   │   ├── platform/         # PlatformManagerRoute, PlatformLayout
 │   │   └── ...               # Shared components
-│   ├── pages/                # Route-level page components (33+ pages)
+│   ├── embed/                # Embedded dialer entry point (built with vite.embed.config.ts)
+│   ├── pages/                # Route-level page components
 │   │   ├── Dashboard.tsx
 │   │   ├── UsersComplete.tsx
-│   │   ├── Extensions/
+│   │   ├── Extensions.tsx
 │   │   ├── PhoneNumbers.tsx
-│   │   ├── RingGroups/
-│   │   ├── IVRMenus/
+│   │   ├── RingGroups.tsx
+│   │   ├── CallQueues.tsx
+│   │   ├── IVRMenus.tsx
 │   │   ├── BusinessHours.tsx
 │   │   ├── ConferenceRooms.tsx
 │   │   ├── AiAssistants.tsx
+│   │   ├── AiMonitor.tsx
 │   │   ├── AutoDialerCampaigns.tsx
 │   │   ├── AutoDialerMonitor.tsx
 │   │   ├── CallLogs.tsx
@@ -72,26 +79,30 @@ frontend/
 │   ├── hooks/                # Custom React hooks
 │   ├── context/              # React Context providers
 │   │   ├── AuthContext.tsx   # Authentication state
+│   │   ├── OperateAsContext.tsx # Platform manager "operate as" an organization
 │   │   └── ConfigContext.tsx # Application configuration
+│   ├── lib/                  # queryClient, query keys and invalidation helpers
 │   ├── types/                # TypeScript type definitions
 │   ├── schemas/              # Zod validation schemas
 │   ├── utils/                # Utility functions
 │   ├── router.tsx            # Route definitions with lazy loading
 │   ├── main.tsx              # Application entry point
-│   └── index.css             # Global styles + Tailwind directives
+│   └── index.css             # Global styles: Tailwind CSS 4 setup (@theme tokens, CSS variables)
 ├── .env.example              # Environment variable template
+├── Dockerfile                # Production build: npm run build, served by nginx
+├── Dockerfile.dev            # Development: Vite dev server with HMR
 ├── package.json
 ├── tsconfig.json             # TypeScript configuration (strict: false)
 ├── vite.config.ts            # Vite configuration with proxy and code splitting
-└── src/index.css             # Tailwind CSS 4 setup (@theme tokens, CSS variables)
+├── vite.embed.config.ts      # Embedded dialer bundle
+└── vitest.config.ts          # Vitest configuration
 ```
 
 ## Development Setup
 
 ### Prerequisites
 
-- **Node.js** 18+ (recommended: 20 LTS)
-- **npm** 9+ or **yarn**
+- **Node.js** 26 (the Docker images use `node:26-alpine`) and npm
 - Running **Laravel backend** on `http://localhost:8000` (or configured API URL)
 - (Optional) **Soketi/WebSocket server** for real-time features
 
@@ -118,7 +129,6 @@ cp .env.example .env
 | `VITE_WS_HOST` | WebSocket server host | `localhost` |
 | `VITE_WS_PORT` | WebSocket server port | `6001` |
 | `VITE_WS_SCHEME` | WebSocket scheme (`http` or `https`) | `http` |
-| `VITE_APP_NAME` | Application display name | `OPBX - Open Source Business PBX` |
 
 ### Running the Development Server
 
@@ -126,7 +136,9 @@ cp .env.example .env
 npm run dev
 ```
 
-The Vite dev server starts on **port 3000** (configurable in `vite.config.ts`). It proxies `/api` requests to the Laravel backend automatically.
+The Vite dev server starts on **port 3000** (configurable in `vite.config.ts`). It proxies `/api` requests to
+`VITE_API_PROXY_TARGET` (default `http://localhost:8000`). It answers only to the host names in `VITE_ALLOWED_HOSTS`
+plus `localhost`.
 
 **Access the app:**
 - Frontend: `http://localhost:3000`
@@ -134,12 +146,14 @@ The Vite dev server starts on **port 3000** (configurable in `vite.config.ts`). 
 
 ### Docker Development
 
-When using the project's `docker-compose.yml`, the frontend container runs automatically. No manual `.env` file is needed — variables are injected by Docker Compose.
+When using the project's `docker-compose.yml`, the frontend container runs automatically. No manual `.env` file is needed — variables are injected by Docker Compose (`VITE_API_BASE_URL=/api/v1`, `VITE_API_PROXY_TARGET=http://nginx`, and the WebSocket settings from the root `.env`). The container runs `npm ci` when `package.json` or `package-lock.json` changed.
 
 ```bash
-docker compose up -d
-# Access at http://localhost:3000
+./opbx.sh start
+# Access at http://localhost (through nginx) or http://localhost:3000
 ```
+
+In production (`docker-compose.prod.yml`) the frontend is built once by `frontend/Dockerfile` and served as static files; the `VITE_*` values are baked in at build time.
 
 ## Build Commands
 
@@ -147,8 +161,10 @@ docker compose up -d
 |---------|-------------|
 | `npm run dev` | Start Vite dev server on `:3000` with HMR |
 | `npm run build` | Production build (TypeScript compile + Vite bundle) |
+| `npm run build:embed` | Build the embedded dialer bundle into `../public/embed/assets/` |
+| `npm test` | Run the Vitest unit tests |
 | `npm run preview` | Preview the production build locally |
-| `npm run lint` | Run ESLint on `.ts` and `.tsx` files |
+| `npm run lint` | Run ESLint (no warnings allowed) |
 | `npm run type-check` | Run TypeScript compiler check only (`tsc --noEmit`) |
 
 ### Production Build
@@ -213,11 +229,11 @@ sequenceDiagram
     participant Router
 
     Browser->>main.tsx: Load SPA
-    main.tsx->>main.tsx: Create QueryClient<br/>(no client-side caching)
+    main.tsx->>main.tsx: Use shared QueryClient<br/>(lib/queryClient.ts)
     main.tsx->>AuthContext: Initialize auth state
     AuthContext->>AuthContext: Verify token via /auth/me
     main.tsx->>ConfigContext: Fetch app configuration
-    ConfigContext->>ConfigContext: GET /config
+    ConfigContext->>ConfigContext: GET /config/application
     main.tsx->>Router: Render route tree
     Router->>Browser: Lazy-load page component
 ```
@@ -226,29 +242,33 @@ sequenceDiagram
 
 ### Server State: TanStack Query
 
-All server data is managed via **TanStack Query** (`@tanstack/react-query`). The QueryClient is configured with **client-side caching explicitly disabled** to prevent stale data bugs:
+All server data is managed via **TanStack Query** (`@tanstack/react-query`). The shared client lives in
+`src/lib/queryClient.ts`:
 
 ```typescript
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0,      // Data is never "fresh" — always refetch
-      gcTime: 0,         // Don't keep inactive data in memory
-      refetchOnWindowFocus: false,
-      retry: (failureCount, error) => {
+      retry: (failureCount, error: AxiosError) => {
         // Don't retry on 401/403
         if (error.response?.status === 401 || error.response?.status === 403) {
           return false;
         }
         return failureCount < 1;
       },
+      refetchOnWindowFocus: false,
+      refetchIntervalInBackground: false,
+      staleTime: 30_000,
     },
     mutations: { retry: false },
   },
 });
 ```
 
-**Why no client-side caching?** The backend's server-side caching is fast enough. Disabling client-side caching eliminates an entire class of stale-data bugs that are difficult to reproduce and fix.
+Data stays fresh for 30 seconds and there is **no global invalidation**: every mutation invalidates the query keys it
+affects (`src/lib/invalidation.ts`, `src/lib/queryKeys.ts`). A new mutation must do the same, or the UI shows stale
+data for up to 30 seconds. Pages that poll opt in per query with `refetchInterval`; polling stops while the tab is
+hidden.
 
 ### Client State: React Context
 
@@ -258,7 +278,7 @@ Two global contexts manage client-side state:
 - Stores `user`, `token`, `isAuthenticated`
 - Handles login, register, logout, and token verification
 - Clears TanStack Query cache on auth state changes
-- Persists auth data to `localStorage`
+- Keeps the token in `localStorage` with "Remember me", otherwise in `sessionStorage`
 
 #### ConfigContext
 - Stores `ApplicationConfig` (mode, webhooks, warnings)
@@ -269,7 +289,7 @@ Two global contexts manage client-side state:
 
 The centralized `api.ts` client provides:
 
-- **Auth header injection** — Bearer token from `localStorage`
+- **Auth header injection** — Bearer token from browser storage
 - **Cache-busting headers** on GET requests (`Cache-Control: no-cache`)
 - **Automatic 401 handling** — Clears storage and redirects to `/ui/login`
 - **FormData support** — Removes `Content-Type` header for multipart uploads
@@ -308,6 +328,9 @@ The centralized `api.ts` client provides:
 | **Call Logs** | `/ui/call-logs` | Searchable CDR with filters and playback |
 | **Announcements** | `/ui/announcements` | Manage system audio announcements |
 | **Call Notifications** | `/ui/call-notifications` | Configure call alert settings |
+| **Call Queues** | `/ui/call-queues`, `/ui/call-queues/:id` | Queues, agents and the live queue view |
+| **Queue Reports** | `/ui/queue-reports` | Queue statistics and call history |
+| **Queues Dashboard** | `/ui/queues-dashboard` | Wallboard (also public at `/public/queues-dashboard/:token`) |
 
 ### AI & Advanced
 
@@ -315,7 +338,10 @@ The centralized `api.ts` client provides:
 |---------|------|-------------|
 | **AI Assistants** | `/ui/ai-assistants` | Configure AI voice assistants |
 | **AI Load Balancers** | `/ui/ai-assistant-load-balancers` | Distribute AI assistant traffic |
-| **Outbound Whitelist** | `/ui/outbound-whitelist` | Restrict outbound dialing (owner only) |
+| **AI Real Time Monitor** | `/ui/ai-monitor` | Live figures per AI assistant and load balancer (owner, PBX admin) |
+| **Outbound Whitelist** | `/ui/outbound-whitelist` | Restrict outbound dialing (owner, PBX admin) |
+| **Trunks** | `/ui/trunks` | Cloudonix SIP trunks (owner, PBX admin) |
+| **API Keys** | `/ui/api-keys` | Scoped API keys (owner only) |
 | **Inbound Blacklist** | `/ui/inbound-blacklist` | Block unwanted incoming numbers |
 
 ### Platform Management (Platform Manager Role)
@@ -326,11 +352,13 @@ The centralized `api.ts` client provides:
 | **Organizations** | `/ui/platform/organizations` | Manage tenant organizations |
 | **Platform Users** | `/ui/platform/users` | Cross-organization user management |
 | **Audit Log** | `/ui/platform/audit-log` | System-wide activity logging |
+| **Platform Status** | `/ui/platform/status` | Component health with 24-hour history |
 
 ### Route Guards
 
 - **ProtectedRoute** — Requires authentication for all `/ui/*` routes
-- **OwnerRoute** — Restricts access to organization owners (Settings, Outbound Whitelist)
+- **OwnerRoute** — Restricts a page to the roles it lists, owners by default (Settings, API Keys; Outbound Whitelist and Trunks also allow PBX Admin)
+- **SupervisorGuard** — Limits pages for the Supervisor role
 - **PlatformManagerRoute** — Restricts platform admin pages to platform managers
 
 ## Real-Time Features (WebSocket)
@@ -361,13 +389,12 @@ The frontend connects to a **Soketi** WebSocket server via **Laravel Echo** for 
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_BASE_URL` | Yes | Full URL to Laravel API (e.g., `http://localhost:8000/api/v1`) |
+| `VITE_API_BASE_URL` | Yes | Laravel API base URL (e.g., `http://localhost:8000/api/v1`, or `/api/v1` behind nginx) |
 | `VITE_PUSHER_APP_KEY` | No | Pusher app key for Laravel Echo |
 | `VITE_PUSHER_APP_CLUSTER` | No | Pusher cluster identifier |
-| `VITE_WS_HOST` | No | WebSocket server hostname |
+| `VITE_WS_HOST` | No | WebSocket server hostname (in development, `localhost` follows the page's host name) |
 | `VITE_WS_PORT` | No | WebSocket server port |
 | `VITE_WS_SCHEME` | No | `http` or `https` |
-| `VITE_APP_NAME` | No | Display name in browser title |
 | `VITE_API_PROXY_TARGET` | No | Proxy target for dev server (default: `http://localhost:8000`) |
 | `VITE_ALLOWED_HOSTS` | No | Comma-separated list of allowed hosts for Vite dev server |
 
@@ -376,7 +403,7 @@ The frontend connects to a **Soketi** WebSocket server via **Laravel Echo** for 
 - [OPBX Backend Documentation](../README.md) — Laravel API and architecture
 - [Cloudonix Docs](https://developers.cloudonix.com/) — CPaaS platform documentation
 - [OPBX REST API](https://developers.cloudonix.com/opbxRestOpenAPI) — API endpoint reference
-- [Laravel Docs](https://laravel.com/docs/12.x) — Backend framework documentation
+- [Laravel Docs](https://laravel.com/docs/13.x) — Backend framework documentation
 - [shadcn/ui](https://ui.shadcn.com/) — UI component library documentation
 
 ## License

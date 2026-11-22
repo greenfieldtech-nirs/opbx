@@ -1,11 +1,11 @@
 # OPBX - Open Source Business PBX
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
-[![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)](https://laravel.com)
-[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org)
+[![Laravel](https://img.shields.io/badge/Laravel-13-red.svg)](https://laravel.com)
+[![React](https://img.shields.io/badge/React-19-blue.svg)](https://reactjs.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
 
-A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, IVR menus, business hours management, AI assistant integration, automated outbound dialing, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
+A modern, containerized business PBX application built on top of the [Cloudonix CPaaS](https://cloudonix.com) platform. OPBX provides enterprise-grade call routing, ring groups, call queues, IVR menus, business hours management, AI assistant integration, a browser Web Phone, automated outbound dialing, and real-time call monitoring — all without the complexity of managing SIP infrastructure.
 
 > **Documentation**: [User Guide](https://developers.cloudonix.com/opbx) | [REST API Reference](https://developers.cloudonix.com/opbxRestOpenAPI)
 
@@ -35,15 +35,18 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 - **Ring Groups**: Distribute calls with simultaneous, round-robin, or sequential strategies
 - **IVR Menus**: Interactive voice menus with DTMF input, TTS, and configurable destinations
 - **Business Hours**: Time-based routing with weekly schedules, holiday exceptions, and public holiday import
-- **AI Assistant Integration**: Route calls to 17 AI-powered voice providers via SIP or WebSocket
+- **AI Assistant Integration**: Route calls to 47 AI voice providers (42 over SIP, 5 over WebSocket)
 - **AI Load Balancers**: Distribute calls across multiple AI assistants with round-robin, priority, or percentage strategies and automatic failover
 - **Conference Rooms**: Multi-party conference calls with PIN protection, recording, and host waiting
+- **Call Queues (ACD)**: FIFO queues run by a dedicated Java worker, with agent states, ring-all, round-robin, least-talk-time and fewest-calls strategies, a live view, queue reports and a public wallboard
+- **Call Transfer**: Blind transfer from the Web Phone and the embedded dialer to an extension or number
 
 ### Auto Dialer (Outbound Campaigns)
 - **Campaign Management**: Create, schedule, and monitor outbound calling campaigns
 - **Distribution Lists**: CSV-based phone number lists with validation and versioning
-- **Rate Limiting**: Concurrent Active Calls (CAC, 1-50) + Calls Per Second (CPS, 1-5) for precise call pacing
-- **Answering Machine Detection**: Java/Vert.x 5 AMD worker with ML + energy-based tone detection for voicemail beep detection
+- **Rate Limiting**: Concurrent Active Calls (CAC, 1-50) + Calls Per Second (CPS, 1-30) for precise call pacing
+- **Answering Machine Detection**: Java/Vert.x 5 AMD worker with an ONNX model and energy-based tone detection for voicemail beeps
+- **Campaign Destinations**: Answered calls go to an AI assistant, an AI load balancer, a ring group (dialing waits for an available agent) or a call queue
 - **Caller ID Pooling**: Multi-DID caller ID rotation with round-robin, random, and LRU strategies
 - **Real-Time Monitor**: Command-center dashboard with bird's-eye campaign cards and drill-down views
 - **Go Dialer Worker**: Dedicated microservice for rate-limited call execution with Redis-based CAC counters
@@ -51,16 +54,24 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
 
 ### Phone Number Management
 - **DID Management**: Full support for Direct Inward Dialing numbers in E.164 format
-- **Flexible Routing**: Route DIDs to extensions, ring groups, IVR menus, AI assistants, conference rooms, AI load balancers, or business hours schedules
+- **Flexible Routing**: Route DIDs to extensions, ring groups, call queues, IVR menus, AI assistants, conference rooms, AI load balancers, or business hours schedules
 - **Outbound Whitelist**: Control outbound calling with country/prefix-based rules and trunk selection
 - **Inbound Blacklist**: Block unwanted callers with exact, prefix, or wildcard matching and configurable rejection strategies
+- **Trunks**: Create and manage the organization's Cloudonix SIP trunks from OPBX
+
+### Web Phone & Embedded Dialer
+- **Web Phone**: In-browser softphone (WebRTC) for the signed-in user's extension: inbound ring and pop-up, in-call keypad (DTMF), recent calls, registration status, blind transfer
+- **Web Phone Settings**: A Settings tab with auto-answer, keep-alive and refresh-on-hangup, stored in the user's Cloudonix subscriber profile
+- **Embedded Dialer**: The same phone as a widget for third-party websites, authenticated by a per-user token, with a per-snippet "Allow call transfer" switch
 
 ### Real-Time Monitoring
 - **Live Call Dashboard**: Real-time call presence via WebSockets with automatic stale record cleanup
 - **Auto Dialer Monitor**: Real-time campaign monitoring with active calls, disposition pie charts, and KPI cards
+- **AI Real Time Monitor**: Live call figures for every AI assistant and AI load balancer as a card wall with a slide-show refresh (AI Configuration > Real Time Monitor, Owner and PBX Admin)
 - **Call Detail Records (CDR)**: Complete call history with search, filtering, and streaming CSV export; older records move to a warm archive (6 to 12 months) and then to compressed cold files kept 7 years by default
 - **Call Statistics**: Volume, duration, and disposition metrics
 - **Call Notifications**: Webhook-based notifications for call events with SSRF protection and retry logic
+- **Platform Status**: Component health with a 24-hour history for platform managers, plus a public status page
 - **Centralized Logging**: Optional Loki + Grafana stack aggregating structured logs from all services, with per-call audit trails searchable by Cloudonix session token ([docs](docs/LOG-AGGREGATION.md))
 
 ### Performance & Reliability
@@ -80,7 +91,15 @@ A modern, containerized business PBX application built on top of the [Cloudonix 
   - **PBX Admin**: Manage users, extensions, ring groups, business hours, campaigns
   - **PBX User**: Access own extension and basic features
   - **Reporter**: Read-only access to reports and call logs
+  - **Supervisor**: Read-only monitoring of the users and ring groups assigned to them
 - **Platform Management**: Cross-tenant administration for service providers hosting multiple organizations
+- **Scoped API Keys and MCP Server**: Revocable `opbxk_` API keys with per-resource read/write grants, and an MCP server for AI agents
+
+### Deployment & Security
+- **Guided Installer**: `./install.sh` asks plain-language questions, generates every secret, writes `.env`, builds and starts the stack, creates the owner and runs checks
+- **Stack Script**: `./opbx.sh` starts, stops, upgrades and reports on the stack in the right order
+- **SafeLine WAF**: Optional web application firewall; nginx checks every request with the SafeLine detector, in monitor or block mode
+- **SeaweedFS Storage**: S3-compatible storage for recordings and the CDR archive (replaced MinIO)
 
 ---
 
@@ -92,88 +111,96 @@ OPBX separates concerns into distinct planes for scalability and maintainability
 
 ```mermaid
 graph TB
-    subgraph "External Services"
+    subgraph "External"
         CX[Cloudonix CPaaS]
-        NGROK[ngrok Tunnel]
+        BROWSER[Browser]
+        AGENT[MCP client / AI agent]
+        NGROK["ngrok tunnel<br/>(dev profile)"]
+    end
+
+    subgraph "Edge"
+        NGINX["nginx<br/>APP_PORT (80)"]
+        WAF["SafeLine WAF detector<br/>(optional)"]
     end
 
     subgraph "Frontend"
-        REACT[React SPA<br/>Port 3000]
-    end
-
-    subgraph "Load Balancer"
-        NGINX[nginx<br/>Port 80]
+        REACT["React SPA<br/>Vite dev server 3000<br/>or static build"]
     end
 
     subgraph "Application Layer"
         APP[Laravel App<br/>PHP-FPM]
-        QUEUE[Queue Worker]
+        QUEUE["queue-worker<br/>queue-worker-long"]
         SCHEDULER[Task Scheduler]
-    end
-
-    subgraph "Dialer Service"
-        GOWORKER[Go Dialer Worker<br/>10s Poll Cycle]
-    end
-
-    subgraph "AMD Service"
-        AMD[AMD Worker<br/>Java/Vert.x 5]
-    end
-
-    subgraph "ACD Service"
-        ACD[Call Queue Worker<br/>Java/Vert.x 5]
     end
 
     subgraph "Voice Routing Services"
         VRM[VoiceRoutingManager]
+        IRS[InboundRoutingService]
         ORS[OutboundRoutingService]
         BHRS[BusinessHoursRoutingService]
-        IVR[IVRRoutingStrategy]
+        STRAT[Routing strategies]
+    end
+
+    subgraph "Workers"
+        GOWORKER["Go Dialer Worker<br/>10s poll cycle"]
+        AMD["AMD Worker<br/>Java/Vert.x 5"]
+        ACD["ACD Worker (call queues)<br/>Java/Vert.x 5"]
+        MCP["MCP Server<br/>Node.js"]
     end
 
     subgraph "Data Layer"
-        MYSQL[(MySQL 8.4 LTS<br/>Port 3306)]
-        REDIS[(Redis 7<br/>Port 6379)]
-        SEAWEEDFS[(SeaweedFS S3<br/>Port 8333)]
+        MYSQL[(MySQL 8.4 LTS)]
+        REDIS[(Redis 7)]
+        SEAWEEDFS[(SeaweedFS S3)]
     end
 
     subgraph "Real-Time"
-        SOKETI[Soketi<br/>WebSocket Server<br/>Port 6001]
+        SOKETI[Soketi<br/>WebSocket server]
     end
 
     subgraph "Observability (optional, profile: logs)"
-        ALLOY[Alloy Collector]
-        LOKI[(Loki Log Store)]
-        GRAFANA[Grafana UI<br/>at /logs/]
+        ALLOY[Alloy collector]
+        LOKI[(Loki log store)]
+        GRAFANA[Grafana UI]
     end
 
-    CX -->|Webhooks| NGROK
-    NGROK --> NGINX
-    REACT --> NGINX
-    NGINX --> APP
+    CX -->|Webhooks, AMD audio stream| NGINX
+    NGROK -.-> NGINX
+    BROWSER --> NGINX
+    AGENT --> NGINX
+    NGINX -.->|Request check| WAF
+    NGINX -->|/| REACT
+    NGINX -->|/api/| APP
+    NGINX -->|/app/| SOKETI
+    NGINX -->|/ws/amd/| AMD
+    NGINX -->|/mcp| MCP
+    NGINX -->|/logs/| GRAFANA
     APP --> VRM
+    VRM --> IRS
     VRM --> ORS
-    VRM --> BHRS
-    VRM --> IVR
+    IRS --> BHRS
+    IRS --> STRAT
     APP --> MYSQL
     APP --> REDIS
     APP --> SEAWEEDFS
-    APP --> SOKETI
-    APP --> CX
-    GOWORKER -->|Poll API| APP
-    GOWORKER --> REDIS
-    AMD -->|Audio Stream| CX
-    AMD -->|AMD Result| APP
-    ACD -->|Queue State| REDIS
-    APP -->|Queue Decisions| ACD
-    APP & GOWORKER & AMD & ACD -.->|JSON stdout| ALLOY
-    ALLOY --> LOKI
-    LOKI --> GRAFANA
-    NGINX --> GRAFANA
+    APP -->|Broadcast| SOKETI
+    APP -->|REST API| CX
+    APP -->|HTTP| ACD
+    ACD --> REDIS
+    GOWORKER -->|Poll and initiate calls| NGINX
+    GOWORKER -->|CAC counters| REDIS
+    AMD -->|AMD session check and result| NGINX
+    MCP -->|REST API| NGINX
     QUEUE --> REDIS
     QUEUE --> MYSQL
-    SCHEDULER --> APP
-    SOKETI --> REACT
+    SCHEDULER --> MYSQL
+    APP & GOWORKER & AMD & ACD -.->|JSON stdout| ALLOY
+    ALLOY --> LOKI
+    GRAFANA --> LOKI
 ```
+
+With the WAF on, nginx asks the SafeLine detector about each request before it proxies it (monitor mode only logs,
+block mode rejects; Cloudonix webhook, voice and callback routes are only logged, never blocked). In development, ngrok can forward Cloudonix webhooks to nginx.
 
 ### Inbound Call Flow
 
@@ -184,22 +211,28 @@ sequenceDiagram
     participant OPBX
     participant Redis
     participant MySQL
+    participant Soketi
     participant UI
 
-    Caller->>Cloudonix: Inbound Call
-    Cloudonix->>OPBX: POST /voice/route
-    OPBX->>Redis: Acquire Lock (call_id)
-    OPBX->>Redis: Check Idempotency
-    OPBX->>Redis: Cache Lookup (routing)
-    alt Cache Miss
-        OPBX->>MySQL: Query DID/Extension Config
-        OPBX->>MySQL: Check Business Hours
-        OPBX->>Redis: Store in Cache
+    Caller->>Cloudonix: Inbound call
+    Cloudonix->>OPBX: POST /api/voice/route (Bearer token)
+    OPBX->>OPBX: Verify the organization's token
+    OPBX->>MySQL: Look up the DID and check the inbound blacklist
+    alt Caller blacklisted
+        OPBX->>Cloudonix: Rejection CXML
+    else
+        OPBX->>Redis: Routing cache lookup
+        alt Cache miss
+            OPBX->>MySQL: Load routing configuration
+            OPBX->>Redis: Store in cache
+        end
+        OPBX->>OPBX: Route by the DID's destination (business hours, extension, ring group, queue, IVR, AI, conference)
+        OPBX->>Cloudonix: CXML response (Dial, Gather, ...)
     end
-    OPBX->>MySQL: Log Call
-    OPBX->>Cloudonix: CXML Response (<Dial>, <Gather>)
-    OPBX->>Redis: Broadcast Event
-    Redis->>UI: Real-time Update
+    Cloudonix->>OPBX: Session-update and CDR webhooks (idempotent)
+    OPBX->>MySQL: Store session state and call records
+    OPBX->>Soketi: Broadcast call event
+    Soketi->>UI: Real-time update
 ```
 
 ### Outbound Call Flow
@@ -213,12 +246,12 @@ sequenceDiagram
 
     Ext->>OPBX: Dial External Number
     OPBX->>OPBX: Validate Extension Active
-    OPBS->>OW: Match Destination
+    OPBX->>OW: Match Destination
     alt Whitelist Match Found
         OW->>OPBX: Return Trunk Configuration
         OPBX->>CX: CXML <Dial trunks="Trunk-X">
     else No Match
-        OPBX->>Ext: Reject Call
+        OPBX->>Ext: Say "Outbound call not permitted" and hang up
     end
 ```
 
@@ -238,23 +271,25 @@ sequenceDiagram
 ### Backend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| [Laravel](https://laravel.com) | 12 | PHP application framework |
-| [PHP](https://php.net) | 8.4+ | Server-side language |
-| [Go](https://go.dev) | 1.21+ | Dialer worker microservice |
+| [Laravel](https://laravel.com) | 13 | PHP application framework |
+| [PHP](https://php.net) | 8.4+ (the image ships 8.5) | Server-side language |
+| [Go](https://go.dev) | 1.27 | Dialer worker microservice |
 | [Java](https://openjdk.org) | 21 | AMD & ACD (call queue) workers (Vert.x 5) |
 | [MySQL](https://mysql.com) | 8.4 LTS | Relational database |
 | [Redis](https://redis.io) | 7 | Cache, queues, CAC counters |
+| [Node.js](https://nodejs.org) | 26 | MCP server and installer |
 | [Laravel Sanctum](https://laravel.com/docs/sanctum) | - | API authentication |
 
 ### Frontend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| [React](https://reactjs.org) | 18 | UI framework |
+| [React](https://reactjs.org) | 19 | UI framework |
 | [TypeScript](https://typescriptlang.org) | 5 | Type-safe JavaScript |
-| [Vite](https://vitejs.dev) | - | Build tool |
-| [Tailwind CSS](https://tailwindcss.com) | 3 | Utility-first CSS |
-| [Radix UI](https://radix-ui.com) | - | Accessible components |
-| [React Query](https://tanstack.com/query) | - | Server state management |
+| [Vite](https://vitejs.dev) | 8 | Build tool |
+| [Tailwind CSS](https://tailwindcss.com) | 4 | Utility-first CSS |
+| [Radix UI](https://radix-ui.com) / shadcn/ui | - | Accessible components |
+| [TanStack Query](https://tanstack.com/query) | 5 | Server state management |
+| [JsSIP](https://jssip.net) | 3 | Web Phone (WebRTC SIP) |
 
 ### Infrastructure
 | Technology | Purpose |
@@ -264,6 +299,7 @@ sequenceDiagram
 | [Soketi](https://soketi.app) | WebSocket server (Laravel Echo compatible) |
 | [SeaweedFS](https://github.com/seaweedfs/seaweedfs) | S3-compatible object storage for recordings and the CDR archive |
 | [ngrok](https://ngrok.com) | Webhook tunneling for local development |
+| [SafeLine CE](https://waf.chaitin.com) | Optional web application firewall (WAF) |
 | [Grafana Loki](https://grafana.com/oss/loki/) | Log aggregation store (optional, `logs` profile) |
 | [Grafana](https://grafana.com) | Log viewer at `/logs/` (optional, `logs` profile) |
 | [Grafana Alloy](https://grafana.com/docs/alloy/) | Container log collector (optional, `logs` profile) |
@@ -426,7 +462,7 @@ Use this only if you do not want the installer. It starts the stack with the def
 5. **Access the application**
    - **Web app**: http://localhost (nginx; in development it serves the Vite dev server, also on http://localhost:3000)
    - **API**: http://localhost/api/v1
-   - **ngrok Dashboard**: http://localhost:4040 (after `docker compose --profile dev up -d ngrok`)
+   - **ngrok Dashboard**: http://localhost:4040 (after `./opbx.sh start --with-ngrok`)
    - **SeaweedFS master UI**: http://localhost:9333 (requires `-f docker-compose.ports.yml`)
 
 ### Upgrading an existing installation
@@ -510,24 +546,28 @@ See [docs/DATABASE-PERSISTENCE.md](docs/DATABASE-PERSISTENCE.md) for full detail
 
 | Service | Description | Port |
 |---------|-------------|------|
-| `frontend` | React SPA (Vite dev server) | 3000 (dev only) |
+| `frontend` | React SPA (Vite dev server; static build in production) | 3000 (dev only) |
 | `nginx` | Web server / API gateway | `APP_PORT` (default 80) |
 | `app` | Laravel PHP-FPM application | - |
-| `queue-worker` | Laravel queue processor | - |
+| `queue-worker` | Laravel queue processor (`auto-dialer`, `default`) | - |
+| `queue-worker-long` | Long jobs (`auto-dialer-long`: list uploads, hold music) | - |
 | `scheduler` | Laravel cron scheduler | - |
-| `dialer-worker` | Go auto-dialer worker | 8181 |
-| `amd-worker` | Java/Vert.x AMD worker | - |
-| `acd-worker` | Java/Vert.x call queue worker | 8084 |
-| `mcp-server` | MCP server for AI agents ([docs](mcp-server/README.md)) | 8080 |
-| `mysql` | MySQL 8.4 LTS database | 3306 |
-| `redis` | Redis 7 cache/queue/CAC | 6379 |
+| `dialer-worker` | Go auto-dialer worker | 8181 (loopback, opt-in) |
+| `amd-worker` | Java/Vert.x AMD worker (reached through nginx at `/ws/amd/`) | - |
+| `acd-worker` | Java/Vert.x call queue worker (internal 8084) | - |
+| `mcp-server` | MCP server for AI agents, reached through nginx at `/mcp` ([docs](mcp-server/README.md)) | 8080 (loopback, opt-in) |
+| `mysql` | MySQL 8.4 LTS database | 3306 (loopback, opt-in) |
+| `redis` | Redis 7 cache/queue/CAC | 6379 (loopback, opt-in) |
 | `seaweedfs` | S3-compatible storage (SeaweedFS) | 8333, 9333 (loopback, opt-in) |
-| `soketi` | WebSocket server (reached through nginx at `/app/`) | 6001 (dev only) |
+| `soketi` | WebSocket server (reached through nginx at `/app/`) | 6001, 9601 (dev only) |
 | `nginx` WAF console | SafeLine console, only with the WAF overlay and `WAF_CONSOLE_ENABLED=true` (`WAF_CONSOLE_PORT`) | 9443 |
 | `ngrok` | Webhook tunnel — *profile `dev`* | 4040 |
 | `loki` | Log store — *profile `logs`* | - |
 | `alloy` | Log collector — *profile `logs`* | - |
 | `grafana` | Log viewer via nginx at `/logs/` — *profile `logs`* | - |
+| `docker-socket-proxy` | Read-only Docker API for Alloy — *profile `logs`* | - |
+
+"Loopback, opt-in" ports are published on `127.0.0.1` only with `-f docker-compose.ports.yml` (never in production).
 
 ### Default Credentials
 
@@ -535,7 +575,7 @@ On a system made by `./install.sh` there are no default credentials. The install
 shows the generated password once (it is also saved to `opbx-install-summary.txt`; delete that file after storing the
 password). A lost owner password is reset with `docker compose exec app php artisan user:reset-password <email>`.
 
-Only the manual setup seeds an account (`php artisan migrate --seed`):
+Only the manual setup seeds an account (the `app` container runs `php artisan db:seed-if-fresh` on a fresh database):
 
 - **Email**: `admin@example.com`
 - **Password**: `password`
@@ -552,13 +592,23 @@ See `.env.example` for all available configuration options. Key variables:
 
 | Variable | Description |
 |----------|-------------|
+| `APP_URL` | Public address of the web app |
+| `APP_PORT` | Host port of the OPBX nginx (default 80) |
+| `OPBX_FRONT_PAGE` | `login` opens the sign-in page at `/`; anything else (or unset) shows the OPBX homepage |
 | `REDIS_PASSWORD` | Redis authentication password |
 | `DB_PASSWORD` | MySQL database password |
+| `DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN` | Worker tokens (filled in by `docker/scripts/generate-secrets.sh`) |
+| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | S3 endpoint and keys (SeaweedFS by default; the names are kept from MinIO) |
+| `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` | `true` rejects Cloudonix webhooks from organizations without a webhook key |
+| `VITE_ALLOWED_HOSTS` | Extra host names the development Vite server answers to (comma-separated) |
 | `NGROK_AUTHTOKEN` | ngrok authentication token |
 | `LOG_STACK_ENABLED` | Enable centralized logging (use with `--profile logs`) |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password for the log viewer |
 | `GRAFANA_ROOT_URL` | Public URL of the log viewer (`<APP_URL>/logs/`); must match or Grafana 403s queries |
 | `LOKI_RETENTION_HOURS` | Log retention (default 168 = 7 days) |
+
+The installer also writes `COMPOSE_FILE`, `COMPOSE_PROFILES`, `TRUSTED_PROXY_CIDR` and the WAF settings (`WAF_MODE`,
+`WAF_CONSOLE_ENABLED`, `WAF_CONSOLE_PORT`, `WAF_CONSOLE_BIND`, `WAF_CONSOLE_ALLOW`); they are not in `.env.example`.
 
 ### Cloudonix Webhook Configuration
 
@@ -581,12 +631,13 @@ Webhooks are configured per-organization in **Settings → Cloudonix** in the ad
 - **Multi-Tenant Isolation**: Global query scopes enforce organization boundaries
 - **RBAC Authorization**: Policy-based access control at all layers
 - **API Authentication**: Laravel Sanctum with token rotation
-- **Webhook Security**: 
-  - HMAC signature verification for CDR/status webhooks
-  - Bearer token authentication for voice routing
+- **Webhook Security**:
+  - Per-organization Bearer token (the Cloudonix domain requests API key) on CDR, status and session-update webhooks; keyless organizations are rejected once `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`
+  - The same Bearer token, always required, on voice routing and voice callbacks
   - Idempotency protection against duplicate processing
 - **Rate Limiting**: Configurable per-endpoint limits
 - **Security Headers**: CSP, HSTS, X-Frame-Options, and more
+- **Web Application Firewall**: Optional SafeLine CE in monitor or block mode (`./install.sh` or `./install.sh reconfigure`)
 - **API Key Masking**: Cloudonix API keys are encrypted and masked in API responses
 
 ### Monitoring
@@ -617,12 +668,12 @@ dashboards, session-token filtering, exporting logs for bug reports).
 
 **Queue Monitoring:**
 ```bash
-docker compose exec app php artisan queue:monitor
+docker compose exec app php artisan queue:monitor redis:default,redis:auto-dialer,auto-dialer:auto-dialer-long
 ```
 
 **Cache Statistics:**
 ```bash
-docker compose exec redis redis-cli -a $REDIS_PASSWORD INFO stats
+docker compose exec redis redis-cli INFO stats   # the container's REDISCLI_AUTH supplies the password
 ```
 
 **Cleanup Stale Session Updates:**
@@ -630,11 +681,11 @@ docker compose exec redis redis-cli -a $REDIS_PASSWORD INFO stats
 # Dry run to see what would be cleaned
 docker compose exec app php artisan session-updates:cleanup --hours=2 --dry-run
 
-# Actually clean stale records
+# Actually clean stale records (asks for confirmation; --force skips it)
 docker compose exec app php artisan session-updates:cleanup --hours=2
 ```
 
-For detailed security implementation, see [`docs/architecture/security-implementation.md`](docs/architecture/security-implementation.md).
+For detailed security implementation, see the [security architecture](docs/opbx-userguide/architecture/security.mdx) page of the user guide and [docs/WEBHOOK-AUTHENTICATION.md](docs/WEBHOOK-AUTHENTICATION.md).
 
 ---
 
@@ -648,7 +699,7 @@ curl -X POST http://localhost/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "<your-email>", "password": "<your-password>"}'
 
-# Response: {"token": "YOUR_TOKEN", "user": {...}}
+# Response: {"access_token": "YOUR_TOKEN", "token_type": "Bearer", "expires_in": 86400, "user": {...}}
 
 # Use token in subsequent requests
 curl http://localhost/api/v1/extensions \
@@ -705,18 +756,18 @@ curl -X POST http://localhost/api/v1/extensions \
   -d '{
     "extension_number": "1001",
     "type": "user",
-    "name": "John Doe",
+    "status": "active",
     "user_id": 1
   }'
 
-# Update extension routing
-curl -X PUT http://localhost/api/v1/extensions/1001 \
+# Turn extension 12 (by ID) into a forward to an external number
+curl -X PUT http://localhost/api/v1/extensions/12 \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "call_forwarding_enabled": true,
+    "type": "forward",
     "configuration": {
-      "forwarding_number": "+1234567890"
+      "forward_to": "+1234567890"
     }
   }'
 ```
@@ -735,8 +786,9 @@ curl -X POST http://localhost/api/v1/phone-numbers \
   -d '{
     "phone_number": "+12125551234",
     "friendly_name": "Main Line",
+    "status": "active",
     "routing_type": "extension",
-    "routing_config": {"extension_id": "1"}
+    "routing_config": {"extension_id": 1}
   }'
 
 # Route to AI Assistant
@@ -745,7 +797,7 @@ curl -X PUT http://localhost/api/v1/phone-numbers/1 \
   -H "Content-Type: application/json" \
   -d '{
     "routing_type": "ai_assistant",
-    "routing_config": {"ai_assistant_id": "5"}
+    "routing_config": {"ai_assistant_id": 5}
   }'
 
 # Route to IVR Menu
@@ -754,7 +806,7 @@ curl -X PUT http://localhost/api/v1/phone-numbers/1 \
   -H "Content-Type: application/json" \
   -d '{
     "routing_type": "ivr_menu",
-    "routing_config": {"ivr_menu_id": "3"}
+    "routing_config": {"ivr_menu_id": 3}
   }'
 ```
 
@@ -783,8 +835,9 @@ curl -X POST http://localhost/api/v1/ai-assistant-load-balancers \
   -d '{
     "name": "Customer Service LB",
     "strategy": "round_robin",
+    "status": "active",
     "fallback_action": "extension",
-    "fallback_config": {"extension_id": "1"},
+    "fallback_extension_id": 1,
     "members": [
       {"ai_assistant_id": 1, "weight": 50},
       {"ai_assistant_id": 2, "weight": 50}
@@ -816,6 +869,7 @@ curl -X DELETE http://localhost/api/v1/session-updates/12345/disconnect \
 | `POST` | `/api/v1/extensions` | Create extension |
 | `GET` | `/api/v1/ring-groups` | List ring groups |
 | `POST` | `/api/v1/ring-groups` | Create ring group |
+| `GET` | `/api/v1/call-queues` | List call queues |
 | `GET` | `/api/v1/business-hours` | List schedules |
 | `POST` | `/api/v1/business-hours` | Create schedule |
 | `GET` | `/api/v1/ivr-menus` | List IVR menus |
@@ -824,6 +878,7 @@ curl -X DELETE http://localhost/api/v1/session-updates/12345/disconnect \
 | `POST` | `/api/v1/phone-numbers` | Create DID |
 | `GET` | `/api/v1/ai-assistants` | List AI assistants |
 | `GET` | `/api/v1/ai-assistant-load-balancers` | List AI load balancers |
+| `GET` | `/api/v1/ai-monitor` | AI Real Time Monitor figures |
 | `GET` | `/api/v1/auto-dialer-campaigns` | List auto-dialer campaigns |
 | `POST` | `/api/v1/auto-dialer-campaigns` | Create campaign |
 | `PATCH` | `/api/v1/auto-dialer-campaigns/{id}/start` | Start campaign |
@@ -834,7 +889,7 @@ curl -X DELETE http://localhost/api/v1/session-updates/12345/disconnect \
 | `GET` | `/api/v1/session-updates/active` | Active calls |
 | `GET` | `/api/v1/settings/cloudonix` | Get Cloudonix settings |
 
-For the complete REST API reference (162 endpoints), see the [OpenAPI specification](docs/opbx-openapi/openapi.yaml).
+For the complete REST API reference, see the [OpenAPI specification](docs/opbx-openapi/openapi.yaml) or the [online reference](https://developers.cloudonix.com/opbxRestOpenAPI).
 
 ---
 
@@ -850,6 +905,7 @@ For the complete REST API reference (162 endpoints), see the [OpenAPI specificat
 ### Frontend
 
 ```bash
+cd frontend && npm test                    # Vitest unit tests
 cd frontend && npm run build               # Production build
 cd frontend && npm run lint                # ESLint
 cd frontend && npm run type-check          # TypeScript check
@@ -862,10 +918,21 @@ vendor/bin/pint                            # PHP lint (PSR-12)
 vendor/bin/pint --dirty                    # Lint changed files only
 ```
 
-### Go Worker
+### Workers, MCP Server and Installer
 
 ```bash
-cd dialer-worker && docker compose build dialer-worker   # Build
+# Go dialer worker (in Docker: a local Go older than 1.27 rewrites go.mod/go.sum)
+docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.27-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
+
+# Java AMD and ACD workers (JDK 21)
+docker run --rm -v "$PWD/amd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
+docker run --rm -v "$PWD/acd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
+
+# MCP server (Node 26)
+cd mcp-server && npm ci && npm test
+
+# Installer unit tests
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
 ```
 
 ---
@@ -883,7 +950,7 @@ We welcome contributions from the community! Here's how to get started:
 
 ### Guidelines
 
-- **Code Style**: Follow PSR-12 for PHP and ESLint/Prettier for TypeScript
+- **Code Style**: Follow PSR-12 (Laravel Pint) for PHP and ESLint for TypeScript
 - **Testing**: Add tests for new features and bug fixes
 - **Documentation**: Update relevant docs for any changes
 - **Commits**: Use conventional commit messages (`feat:`, `fix:`, `docs:`, etc.)
@@ -964,72 +1031,53 @@ SOFTWARE.
 ## Documentation
 
 ### User & Admin Guides
-Comprehensive Docusaurus-compatible documentation (30 pages):
-- [User Guide](docs/opbx-userguide/) — Installation, modules, call routing, AI assistants, auto dialer, administration
+- [User Guide](https://developers.cloudonix.com/opbx) ([source](docs/opbx-userguide/)) — installation, modules, call routing, AI assistants, auto dialer, workers, administration
 
 ### API Reference
-- [OpenAPI 3.1.0 Specification](docs/opbx-openapi/openapi.yaml) — 162 endpoints, multi-file spec
-- [REST API (online)](https://developers.cloudonix.com/opbxRestOpenAPI) — Interactive API explorer
+- [OpenAPI 3.1 Specification](docs/opbx-openapi/openapi.yaml) — multi-file spec ([README](docs/opbx-openapi/README.md))
+- [REST API (online)](https://developers.cloudonix.com/opbxRestOpenAPI) — interactive API explorer
+
+### Operations
+- [Database Persistence and Backups](docs/DATABASE-PERSISTENCE.md)
+- [Log Aggregation](docs/LOG-AGGREGATION.md) and [Submitting Logs](SUBMITTING_LOGS.md)
+- [Webhook Authentication](docs/WEBHOOK-AUTHENTICATION.md)
+- [Auth0 SaaS Setup](docs/AUTH0-SAAS-SETUP.md)
+- [Email Troubleshooting](docs/EMAIL-TROUBLESHOOTING.md)
 
 ### Architecture
-- [Architecture Overview](docs/architecture/architecture-overview.md)
-- [Security Implementation](docs/architecture/security-implementation.md)
-- [Database Schema](docs/architecture/database-schema.md)
-- [Docker Setup](docs/architecture/docker-setup.md)
+- [Architecture Overview](docs/opbx-userguide/architecture/index.mdx)
+- [Call Flow](docs/opbx-userguide/architecture/call-flow.mdx)
+- [Security](docs/opbx-userguide/architecture/security.mdx)
+- [Data Models](docs/opbx-userguide/data-models/index.mdx)
 
 ### Module Documentation
 - [Backend (Laravel)](app/) — API controllers, models, services, middleware
-- [Frontend (React)](frontend/) — React SPA with TypeScript, TanStack Query, shadcn/ui
-- [Dialer Worker (Go)](dialer-worker/) — Auto-dialer campaign execution microservice
-- [AMD Worker (Java)](amd-worker/) — Stream-based voicemail detection microservice
-- [Docker Infrastructure](docker/) — Docker Compose stack, Nginx, PHP-FPM configs
-- [Tests](tests/) — PHPUnit test suite with feature, unit, and integration tests
-
-### Feature Specifications
-- [Auto Dialer Worker v2.0](docs/specifications/auto-dialer-worker-v2.md)
-- [CPS Parameter](docs/specifications/auto-dialer-cps-parameter.md)
-- [Real-Time Monitor](docs/specifications/auto-dialer-realtime-monitor.md)
+- [Frontend (React)](frontend/README.md) — React SPA with TypeScript, TanStack Query, shadcn/ui
+- [Dialer Worker (Go)](dialer-worker/README.md) — auto-dialer campaign execution
+- [AMD Worker (Java)](amd-worker/README.md) — stream-based voicemail detection
+- [ACD Worker (Java)](acd-worker/) — call queue engine ([user guide page](docs/opbx-userguide/workers/acd-worker.mdx))
+- [MCP Server (Node.js)](mcp-server/README.md) — MCP interface for AI agents
+- [Installer](installer/README.md) — guided install, reconfigure and reset
+- [Docker Infrastructure](docker/README.md) — Docker Compose stack, nginx, PHP-FPM configs
+- [SafeLine WAF](docker/safeline/README.md) — the optional web application firewall
 
 ---
 
 ## Recent Updates
 
-### Auto Dialer & Real-Time Monitor (Latest)
-- Auto Dialer campaign management with scheduling, AMD, and retry logic
-- Go-based dialer worker with 10-second poll cycle and Redis CAC counters
-- CPS (Calls Per Second) parameter for independent rate control (1-5 calls/sec)
-- Caller ID pooling with multi-DID rotation (round-robin, random, LRU strategies)
-- Real-time monitor with card-row campaign view, drill-down KPIs, and disposition pie charts
-- Distribution list management with CSV upload, validation, and versioning
-- Comprehensive documentation: 30-page user guide + OpenAPI spec (162 endpoints)
+See [CHANGELOG.md](CHANGELOG.md) for the full list. Recent highlights:
 
-### AMD Worker (Answering Machine Detection)
-- Java/Vert.x 5 microservice for stream-based voicemail detection
-- ML-based beep detection (ONNX Runtime) + energy-based tone detection
-- WebSocket audio streaming from Cloudonix `<Start><Stream>` CXML verb
-- Automatic action execution (HANGUP, CONTINUE, URL redirect) based on detection result
-- AMD results stored in Cloudonix session profile and displayed in Call Logs
-
-### Call Notifications
-- Webhook notifications for call events (initiated, answered, ended, etc.)
-- Per-organization configuration with event filtering
-- SSRF protection, rate limiting, and retry with exponential backoff
-- Delivery audit logging with request/response capture
-
-### UI/UX Improvements
-- Campaign Manager with status toggle, archive workflow, and edit gating
-- Distribution Lists page aligned with Campaign Manager layout
-- Full timezone selector (65+ timezones grouped by region)
-- Weekly calendar schedule with `expandHeight` for full visibility
-
-### Bug Fixes & Reliability
-- Redis key prefix mismatch resolved (prefix-free `dialer` connection)
-- CDR session token path fixed (`session.token` not `session_token`)
-- OrganizationScope bypass for webhook handlers
-- Duplicate call prevention via `sync.Map` concurrency guard
-- Stale session cleanup on campaign pause
-- AMD mode mapping corrected (`Enabled` to `Enable`)
-- WebSocket URL placeholder substitution fixed
+- **Guided installer and stack script**: `./install.sh` (install, reconfigure, reset) and `./opbx.sh` (start, stop,
+  restart, status, logs, upgrade; `--no-waf`, `--nofork`, `--with-ngrok`)
+- **SafeLine WAF**: optional firewall in monitor or block mode, with its console on its own port
+- **SeaweedFS**: replaces MinIO; `./opbx.sh upgrade` copies existing MinIO data once
+- **Front page choice**: `OPBX_FRONT_PAGE` shows the sign-in page or the OPBX homepage at `/`
+- **Web Phone**: inbound ring and pop-up, redesigned in-call screen, keypad DTMF, registration status, blind transfer,
+  and a Settings tab (auto-answer, keep-alive, refresh on hangup)
+- **Embedded dialer**: per-snippet "Allow call transfer" switch
+- **AI Real Time Monitor**: live figures per AI assistant and AI load balancer
+- **Auto dialer**: campaign calls routed to ring groups and call queues; ring group campaigns wait for available agents
+- **Business hours**: schedule dialog in three tabs; "Unprovisioned" shown as the schedule's status badge
 
 <p align="center">
   Made with ❤️ by <a href="https://github.com/greenfieldtech-nirs">Greenfield Technologies</a>&nbsp;&nbsp;Empowered by <a href="https://developers.cloudonix.com">Cloudonix</a>

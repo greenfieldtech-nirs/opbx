@@ -5,11 +5,13 @@ This document provides essential information for AI coding agents working in thi
 ## Project Overview
 
 OPBX is an open-source business PBX platform built on Laravel (PHP 8.5) and React (TypeScript).
-- **Backend**: Laravel 12 API with MySQL + Redis
+- **Backend**: Laravel 13 API with MySQL + Redis (composer requires PHP ^8.4; the image runs 8.5)
 - **Frontend**: React 19 SPA with Vite, TanStack Query, shadcn/ui
 - **Dialer Worker**: Go-based service for outbound campaigns
 - **AMD Worker**: Java (Vert.x 5) service for stream-based voicemail detection
 - **ACD Worker**: Java (Vert.x 5) service for stateful call queues (FIFO, agent states)
+- **MCP Server**: Node.js 26 / TypeScript (Fastify) MCP facade over the REST API (`mcp-server/`)
+- **Installer**: Node.js 26 guided installer run in a container by `./install.sh` (`installer/`); `./opbx.sh` starts/stops/upgrades the stack
 - **Architecture**: Multi-tenant, uses Cloudonix CPaaS for VoIP
 
 ## Project Memory
@@ -52,9 +54,10 @@ php artisan queue:listen                   # Queue worker
 ### Frontend (React)
 ```bash
 cd frontend
-npm run dev                  # Vite dev server on :5173
+npm run dev                  # Vite dev server on :3000
+npm test                     # Vitest unit tests
 npm run build                # Production build (tsc + vite build)
-npm run lint                 # ESLint on .ts/.tsx files
+npm run lint                 # ESLint (max 0 warnings)
 npm run type-check           # TypeScript check only (tsc --noEmit)
 ```
 
@@ -85,9 +88,23 @@ mvn package -DskipTests -B   # Build shaded JAR
 docker run --rm -v "$PWD/acd-worker":/build -w /build maven:3.9-eclipse-temurin-21 mvn -B test
 ```
 
+### MCP Server (Node.js)
+```bash
+cd mcp-server
+npm ci && npm test           # Unit + contract + security tests (local Node must be 26)
+npm run validate:opbx-api    # OpenAPI drift check against docs/opbx-openapi
+```
+
+### Installer (Node.js)
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/repo -w /repo/installer node:26-alpine sh -c 'npm ci && npm test'
+```
+
 ### Docker
 ```bash
-docker compose up -d                        # Full stack startup
+./opbx.sh start                             # Full stack startup in order (SafeLine first when the WAF is on); waits for health
+./opbx.sh stop                              # Stop (never `docker compose down`: it deletes the network)
+docker compose up -d                        # Plain compose startup
 docker compose logs -f [service]            # View logs
 docker compose exec app php artisan migrate # Run migrations
 # IMPORTANT: Wait 120 seconds after restart before testing.
@@ -103,7 +120,7 @@ docker compose exec app php artisan migrate # Run migrations
 - Classes: `PascalCase` | Methods: `camelCase` | Constants: `UPPER_SNAKE_CASE`
 - Enums: `PascalCase` class, `UPPER_SNAKE_CASE` cases, backed by `string` values
 - Use `match` expressions over `switch`; use constructor property promotion
-- Controllers: thin logic, delegate to services; most extend `AbstractApiCrudController`
+- Controllers: thin logic, delegate to services; CRUD controllers extend `AbstractApiCrudController`
 - Validation: use dedicated FormRequest classes in `app/Http/Requests/`
 - API responses: use Resource classes in `app/Http/Resources/`
 - Error handling: structured JSON errors; log with context (`call_id` for webhooks)
@@ -152,12 +169,12 @@ docker compose exec app php artisan migrate # Run migrations
 
 ### Webhook Handling
 - Idempotency keys in Redis: `idem:webhook:{event_id}`
-- Distributed locks: `lock:call:{call_id}`
-- Signature verification: `VerifyCloudonixSignature` middleware (Bearer or HMAC-SHA256)
+- Distributed locks: `Cache::lock` (e.g. `cdr:create:{organization_id}:{call_id}` for CDR creation)
+- Webhook auth: `VerifyCloudonixSignature` middleware: the organization's `domain_requests_api_key` as Bearer token (no HMAC); keyless orgs rejected when `CLOUDONIX_WEBHOOK_REQUIRE_AUTH=true`. Voice routing uses `VerifyVoiceWebhookAuth` (Bearer always required)
 - Voice webhooks return **CXML** (not JSON) on error
 
 ### Voice Routing
-- Strategy pattern: 8 strategies in `app/Services/VoiceRouting/Strategies/`
+- Strategy pattern: one strategy per destination type in `app/Services/VoiceRouting/Strategies/`
 - CXML generation: `app/Services/CxmlBuilder/CxmlBuilder.php` (DOMDocument-based)
 - Cache-aside pattern via `VoiceRoutingCacheService` with Redis
 
@@ -177,8 +194,9 @@ cd frontend && npm run lint && npm run type-check # Frontend lint + types
 ## Environment Variables
 
 Key variables (see `.env.example`):
-- `CLOUDONIX_API_TOKEN` - Bearer token for Cloudonix API
-- `CLOUDONIX_WEBHOOK_SECRET` - Webhook signature verification
+- Cloudonix API credentials and webhook keys are per organization (Settings → Cloudonix), not in `.env`
+- `CLOUDONIX_API_BASE_URL` - Cloudonix API base URL
+- `CLOUDONIX_WEBHOOK_REQUIRE_AUTH` - `true` rejects webhooks from organizations without a webhook key
 - `NGROK_AUTHTOKEN` - Local webhook testing
 - `DIALER_WORKER_API_TOKEN` - Dialer worker authentication
 - `AMD_WORKER_API_TOKEN` - AMD worker authentication
@@ -192,10 +210,10 @@ Never commit `.env` files or secrets to git.
 - **Cloudonix REST API**: https://developers.cloudonix.com/cloudonixRestOpenAPI
 - **OPBX Docs**: https://developers.cloudonix.com/opbx
 - **OPBX REST API**: https://developers.cloudonix.com/opbxRestOpenAPI
-- **Laravel Docs**: https://laravel.com/docs/12.x
+- **Laravel Docs**: https://laravel.com/docs/13.x
 - **shadcn/ui**: https://ui.shadcn.com/
 
 ---
 
-**Last Updated**: 2026-05-03
+**Last Updated**: 2026-11-22
 **Agent Instructions Version**: 3.0

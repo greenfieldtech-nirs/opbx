@@ -28,12 +28,13 @@ OPBX is an open-source business PBX platform built on top of the Cloudonix CPaaS
 Before contributing, ensure you have:
 
 - Git installed and configured
-- Docker and Docker Compose
+- Docker with the Compose plugin 2.24.4+ (or Podman with its Docker-compatible socket and CLI)
 - A GitHub account
 - Basic understanding of the technologies used:
   - Laravel (PHP)
   - React with TypeScript
   - MySQL and Redis
+  - Go (dialer worker), Java/Vert.x (AMD and ACD workers) and Node.js (MCP server, installer), if you work on those
   - Cloudonix CPaaS platform
 
 ### Initial Steps
@@ -47,7 +48,7 @@ Before contributing, ensure you have:
 
 ### 1. Fork the Repository
 
-1. Navigate to the [OPBX repository](https://github.com/greenfieldtech-nirs/OPBX)
+1. Navigate to the [OPBX repository](https://github.com/greenfieldtech-nirs/opbx)
 2. Click the **Fork** button in the top-right corner
 3. Select your GitHub account as the fork destination
 4. Wait for the fork to complete
@@ -56,40 +57,37 @@ Before contributing, ensure you have:
 
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR-USERNAME/OPBX.git
+git clone https://github.com/YOUR-USERNAME/opbx.git
 
 # Navigate to the project directory
-cd OPBX
+cd opbx
 
 # Add the original repository as upstream
-git remote add upstream https://github.com/greenfieldtech-nirs/OPBX.git
+git remote add upstream https://github.com/greenfieldtech-nirs/opbx.git
 ```
 
 ### 3. Set Up Development Environment
 
 ```bash
-# Copy environment example
-cp .env.example .env
+# Guided install: choose "development machine" when asked
+./install.sh
 
-# Start Docker containers
-docker compose up -d
-
-# Run database migrations
-docker compose exec app php artisan migrate
-
-# Install frontend dependencies
-docker compose exec frontend npm install
-
-# Start frontend development server
-docker compose exec frontend npm run dev
+# Everyday start and stop
+./opbx.sh start
+./opbx.sh stop
 ```
+
+The installer generates the secrets, writes `.env` and `docker-compose.yml`, installs the PHP packages inside the app
+image, starts the stack and creates the owner account. On every start the `app` container runs the database
+migrations itself, and the `frontend` container runs the Vite dev server with hot reload. For a setup without the
+installer, follow "Advanced: manual setup" in the [README](README.md#advanced-manual-setup).
 
 ### 4. Verify Your Setup
 
 - Access the application at `http://localhost`
 - Access the frontend at `http://localhost:3000`
-- Access ngrok for webhook testing at `http://localhost:4040` (start it with `docker compose --profile dev up -d ngrok`)
-- Check logs: `docker compose logs -f`
+- Access ngrok for webhook testing at `http://localhost:4040` (start the stack with `./opbx.sh start --with-ngrok`)
+- Check the stack: `./opbx.sh status`; follow logs: `./opbx.sh logs [service]`
 
 ### 5. Sync Your Fork
 
@@ -229,7 +227,7 @@ interface User {
 }
 
 // Use functional components with hooks
-export function UserCard({ user }: UserCardProps): JSX.Element {
+export function UserCard({ user }: UserCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   return (
@@ -241,7 +239,7 @@ export function UserCard({ user }: UserCardProps): JSX.Element {
 ```
 
 **Guidelines:**
-- Enable strict mode in TypeScript
+- TypeScript `strict` is off in `frontend/tsconfig.json`; still type props and data explicitly
 - Use functional components with hooks
 - Use `.tsx` extension for React components
 - Define interfaces for props and data types
@@ -325,15 +323,17 @@ describe('UserCard', () => {
 ### Running Tests
 
 ```bash
-# Backend tests
-docker compose exec app php artisan test
+# Backend tests (MySQL opbx_test database, inside Docker)
+./run-tests.sh
+./run-tests.sh --filter=TestClassName
 
-# Frontend tests
-docker compose exec frontend npm run test
-
-# With coverage
-docker compose exec frontend npm run test:coverage
+# Frontend tests (Vitest)
+docker compose exec frontend npm test
 ```
+
+Always run the PHP tests through `./run-tests.sh`. Never run `php artisan test` directly in the `app` container: the
+script points the tests at the `opbx_test` database and takes a backup of the main database first. All tests run on
+MySQL, never SQLite.
 
 ## Commit Message Guidelines
 
@@ -377,7 +377,7 @@ Closes #123
 ```
 
 ```
-fix(api: prevent race condition in webhook processing
+fix(api): prevent race condition in webhook processing
 
 Add Redis distributed lock to prevent concurrent webhook
 processing that was causing duplicate call routing.
@@ -390,7 +390,7 @@ Ref: SECURITY-456
 
 1. Use imperative mood ("add feature" not "adding feature")
 2. Limit subject line to 72 characters
-3. Capitalize the subject line
+3. Start the subject in lowercase after the type and scope
 4. Do not end with a period
 5. Use body to explain what and why, not how
 
@@ -400,14 +400,15 @@ Ref: SECURITY-456
 
 1. **Ensure all tests pass**
    ```bash
-   docker compose exec app php artisan test
-   docker compose exec frontend npm run test
+   ./run-tests.sh
+   docker compose exec frontend npm test
    ```
 
 2. **Run linting and formatting**
    ```bash
-   docker compose exec app composer lint
+   docker compose exec app vendor/bin/pint --dirty
    docker compose exec frontend npm run lint
+   docker compose exec frontend npm run type-check
    ```
 
 3. **Update documentation**
@@ -422,35 +423,8 @@ Ref: SECURITY-456
 
 ### PR Template
 
-All PRs must use the provided template:
-
-```markdown
-## Description
-Brief description of changes
-
-## Type of Change
-- [ ] Bug fix (non-breaking change)
-- [ ] New feature (non-breaking change)
-- [ ] Breaking change (fix or feature that causes existing functionality to change)
-- [ ] Documentation update
-- [ ] Refactoring (no functional changes)
-
-## Testing
-Describe how changes were tested
-
-## Screenshots (if applicable)
-Add screenshots to explain changes visually
-
-## Checklist
-- [ ] My code follows project coding standards
-- [ ] I have performed self-review of my code
-- [ ] I have commented my code where necessary
-- [ ] I have made corresponding changes to documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or my feature works
-- [ ] New and existing tests pass locally
-- [ ] Any dependent changes have been merged and published
-```
+GitHub fills in [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) when you open a pull request.
+Complete every section that applies.
 
 ### After Submitting
 
@@ -513,7 +487,6 @@ When suggesting features:
 
 Contributors are recognized in:
 
-- **CONTRIBUTORS.md** - List of all contributors
 - **Release notes** - Significant contributions mentioned
 - **GitHub profile** - Linked from the project
 - **Community acknowledgments** - Regular shoutouts
