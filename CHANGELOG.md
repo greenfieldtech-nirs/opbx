@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-11-22 (Call Logs)
+
+- The Disposition filter has a **Connected** option, the value Cloudonix stores for an answered call; before, the filter could not find answered calls. CONNECTED dispositions show a green badge.
+
 ### Fixed - 2026-11-22 (AI Real Time Monitor)
 
 - Auto-dialer calls answered by a person now count on the AI monitor when the campaign uses voicemail detection. The AMD worker reports `unknown` (no voicemail found) rather than `human`, and only `voicemail` excludes a call.

@@ -80,7 +80,7 @@ The list shows 50 calls per page, with **Previous** and **Next** below it.
    | Extension | Number search (see below) on the call's extension |
    | Destination | Number search (see below) on the called number |
    | Match | Shown when both Extension and Destination are filled. **All (Extension and Destination)** (default) finds calls of that extension to that destination. **Any (Extension or Destination)** finds calls of the extension or to the destination; with the same number in both, that is every call of one extension, placed or received |
-   | Disposition | Exact match: Answered (`ANSWERED`), No Answer, Busy, Failed, Cancelled or Congestion. The list has no Connected value, so it does not find calls stored as `CONNECTED`; the API's `disposition=CONNECTED` does |
+   | Disposition | Exact match: Connected (`CONNECTED`, what Cloudonix reports for an answered call), Answered (`ANSWERED`), No Answer, Busy, Failed, Cancelled or Congestion |
    | User | Part of the name of the user who owns the extension |
    | Direction | Exact match: Incoming, Outgoing, Internal or Application |
    | From Date / To Date | From the start of the first day to the end of the last day, by session time |
