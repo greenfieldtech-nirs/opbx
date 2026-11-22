@@ -183,8 +183,9 @@ class AiCallRecorder
     }
 
     /**
-     * Auto-dialer calls count only when a person answered: voicemail detection said "human",
-     * or the campaign does not use voicemail detection (no result at all).
+     * Auto-dialer calls count only when a person answered: anything but a voicemail result.
+     * The AMD worker never reports "human": it says "voicemail", or "unknown" when it found
+     * no voicemail before its timeout. No result at all means the campaign does not use it.
      */
     private function reachedPerson(int $organizationId, array $ids, array $cdr): bool
     {
@@ -197,7 +198,7 @@ class AiCallRecorder
                 ->value('amd_result');
         }
 
-        return $result === null || strtolower((string) $result) === 'human';
+        return strtolower((string) $result) !== 'voicemail';
     }
 
     private function query()

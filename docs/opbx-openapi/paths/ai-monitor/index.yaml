@@ -8,8 +8,8 @@ paths:
         Live figures for the organization's AI assistants and AI load balancers over the last
         `minutes` (1 to 720, default 60). Every hand-off of a call to an AI assistant counts as one
         call for that assistant; it is settled when the call's CDR arrives. Auto-dialer calls count
-        only when a person answered (voicemail detection said `human`, or the campaign does not use
-        voicemail detection). Owner and PBX Admin only; API keys need the `ai-monitor` grant
+        only when a person answered: the call connected and voicemail detection did not report
+        `voicemail`. Owner and PBX Admin only; API keys need the `ai-monitor` grant
         (the `ai-assistants` and `ai-assistant-load-balancers` grants do not cover it).
       operationId: getAiMonitor
       security:
