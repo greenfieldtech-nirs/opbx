@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import AiMonitor from '../AiMonitor';
+import AiMonitor, { columnsFor } from '../AiMonitor';
 import { healthOf } from '../AiMonitor/widgets';
 
 const snapshot = vi.hoisted(() => vi.fn());
@@ -31,6 +31,15 @@ describe('healthOf', () => {
     expect(healthOf(92, 10)).toBe('warn');
     expect(healthOf(80, 10)).toBe('bad');
     expect(healthOf(null, 0)).toBe('idle');
+  });
+});
+
+describe('columnsFor', () => {
+  it('fills the screen: 4 cards in 2 lines of 2, 6 cards in 2 lines of 3, never more than 4 a line', () => {
+    expect(columnsFor(1)).toBe(1);
+    expect(columnsFor(4)).toBe(2);
+    expect(columnsFor(6)).toBe(3);
+    expect(columnsFor(40)).toBe(4);
   });
 });
 
@@ -87,6 +96,13 @@ describe('AiMonitor page', () => {
     expect(screen.getByText('Load Balancers next in 30s')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(30_000));
     expect(await screen.findByTestId('load-balancer-7')).toBeInTheDocument();
+  });
+
+  it('lays the cards out by how many there are', async () => {
+    snapshot.mockResolvedValue(data({ assistants: [1, 2, 3, 4, 5, 6].map((id) => assistant(id, `Bot ${id}`)) }));
+    renderPage();
+    await screen.findByTestId('assistant-6');
+    expect(screen.getByRole('main')).toHaveAttribute('data-columns', '3');
   });
 
   it('shows an empty state when there are no assistants', async () => {

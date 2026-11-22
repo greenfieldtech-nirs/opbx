@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - 2026-11-22 (AI Real Time Monitor)
 
-- **AI Configuration → Real Time Monitor** (Owner and PBX Admin): a slide-show of health-card widgets that alternates (every 30 s by default; Refresh selector 10 s to 5 min) between the AI Assistants view (active now, calls, success rate, average duration, AI minutes, last call, calls over time) and the AI Load Balancers view (active, calls, failovers, fell back, handled rate, each member's actual vs configured share). Time frame 1 minute to 12 hours, default 60 minutes; figures refresh every 10 s.
+- **AI Configuration → Real Time Monitor** (Owner and PBX Admin): a slide-show of health-card widgets that alternates (every 30 s by default; Refresh selector 10 s to 5 min) between the AI Assistants view (active now, calls, success rate, average duration, AI minutes, last call, calls over time) and the AI Load Balancers view (active, calls, failovers, fell back, handled rate, each member's actual vs configured share). Cards fill the screen, 1 to 4 a line by how many there are. Time frame 1 minute to 12 hours, default 60 minutes; figures refresh every 10 s.
 - Every hand-off of a call to an AI assistant is now recorded (`ai_call_attempts`, kept 30 days via `RETENTION_AI_CALL_ATTEMPTS_DAYS`) from direct routing, load balancers, load-balancer failover and the auto dialer, and settled by the CDR. Auto-dialer calls count only when a person answered.
 - `GET /v1/ai-monitor?minutes=`; API keys need the new `ai-monitor` grant.
 

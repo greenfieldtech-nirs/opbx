@@ -57,6 +57,26 @@ function saved(key: string, allowed: readonly number[], fallback: number): numbe
   }
 }
 
+/**
+ * Widgets per line for a view with `count` cards: 1 to 4, chosen so the cards use as much
+ * of the screen as possible (e.g. 4 cards -> 2 lines of 2, 6 cards -> 2 lines of 3).
+ */
+export function columnsFor(count: number): 1 | 2 | 3 | 4 {
+  // Near-square grid: n x n holds up to n² cards (2 -> 4 cards, 3 -> 9), capped at 4 a line.
+  return Math.min(4, Math.max(1, Math.ceil(Math.sqrt(count)))) as 1 | 2 | 3 | 4;
+}
+
+// Full class names so Tailwind keeps them. Narrower screens cap the count: a card needs ~330 px.
+const GRID_COLUMNS = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-1 lg:grid-cols-2',
+  3: 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3',
+  4: 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-4',
+} as const;
+
+/** Rows share the free height (auto-rows-fr), so few cards fill the screen; many cards scroll. */
+const gridClass = (count: number) => `grid flex-1 auto-rows-fr gap-5 ${GRID_COLUMNS[columnsFor(count)]}`;
+
 function remember(key: string, value: number) {
   try {
     localStorage.setItem(key, String(value));
@@ -185,7 +205,7 @@ export default function AiMonitor() {
         data.assistants.length === 0 ? (
           <EmptyState icon={Bot} title="No AI assistants yet" description="Add an AI assistant to see its live figures here." />
         ) : (
-          <main className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+          <main className={gridClass(data.assistants.length)} data-columns={columnsFor(data.assistants.length)}>
             {data.assistants.map((a) => (
               <AssistantCard key={a.id} assistant={a} windowLabel={frame.short} />
             ))}
@@ -197,7 +217,7 @@ export default function AiMonitor() {
         data.load_balancers.length === 0 ? (
           <EmptyState icon={Layers} title="No AI load balancers yet" description="Add an AI load balancer to see its live figures here." />
         ) : (
-          <main className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+          <main className={gridClass(data.load_balancers.length)} data-columns={columnsFor(data.load_balancers.length)}>
             {data.load_balancers.map((lb) => (
               <LoadBalancerCard key={lb.id} loadBalancer={lb} windowLabel={frame.short} />
             ))}
