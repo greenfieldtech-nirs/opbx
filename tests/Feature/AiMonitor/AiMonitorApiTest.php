@@ -14,6 +14,7 @@ use App\Models\AiCallAttempt;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -85,6 +86,19 @@ final class AiMonitorApiTest extends TestCase
         $this->assertSame(0, $row['calls']);
         $this->assertNull($row['success_rate']);
         $this->assertNotNull($row['last_call_at']);
+    }
+
+    public function test_last_call_skips_excluded_attempts_and_other_organizations(): void
+    {
+        $bot = $this->assistant('Survey Bot');
+        $this->callAttempt(['ai_assistant_id' => $bot->id, 'started_at' => now()->subHours(6)->startOfSecond()])->update(['status' => 'answered']);
+        $this->callAttempt(['ai_assistant_id' => $bot->id, 'started_at' => now()->subHour()])->update(['status' => 'excluded']);
+        $this->callAttempt(['organization_id' => Organization::factory()->create()->id, 'ai_assistant_id' => $bot->id, 'started_at' => now()->subMinutes(5)])
+            ->update(['status' => 'answered']);
+
+        $row = $this->row($this->monitor()['assistants'], $bot->id);
+
+        $this->assertEquals(now()->subHours(6)->startOfSecond(), Carbon::parse($row['last_call_at']));
     }
 
     public function test_load_balancer_figures_and_split(): void

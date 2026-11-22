@@ -57,14 +57,19 @@ class AiMonitorStats
             ->pluck('n', 'ai_assistant_id');
 
         // Beyond the window on purpose: "last call 4h ago" is what flags an idle assistant.
-        $lastCall = $this->counted()->whereNotNull('ai_assistant_id')
-            ->groupBy('ai_assistant_id')->selectRaw('ai_assistant_id, MAX(started_at) AS last_at')
-            ->pluck('last_at', 'ai_assistant_id');
+        // Newest attempt per assistant via the (ai_assistant_id, started_at) index, not a retention scan.
+        $lastCall = $this->counted()->select('ai_call_attempts.started_at')
+            ->whereColumn('ai_call_attempts.ai_assistant_id', 'ai_assistants.id')
+            ->orderByDesc('ai_call_attempts.started_at')
+            ->limit(1);
 
         $series = $this->series($from, $bucketSeconds, 'ai_assistant_id', 'COUNT(*)');
 
-        return AiAssistant::query()->orderBy('name')->get(['id', 'name', 'provider', 'status'])
-            ->map(function (AiAssistant $assistant) use ($totals, $active, $lastCall, $series) {
+        return AiAssistant::query()->orderBy('name')
+            ->select(['ai_assistants.id', 'ai_assistants.name', 'ai_assistants.provider', 'ai_assistants.status'])
+            ->addSelect(['last_call_at' => $lastCall])
+            ->get()
+            ->map(function (AiAssistant $assistant) use ($totals, $active, $series) {
                 $row = $totals->get($assistant->id);
                 $answered = (int) ($row->answered ?? 0);
                 $failed = (int) ($row->failed ?? 0);
@@ -81,7 +86,7 @@ class AiMonitorStats
                     'success_rate' => $this->rate($answered, $answered + $failed),
                     'avg_duration_seconds' => isset($row->avg_billsec) ? (int) round((float) $row->avg_billsec) : null,
                     'ai_minutes' => (int) round(((int) ($row->billsec_total ?? 0)) / 60),
-                    'last_call_at' => isset($lastCall[$assistant->id]) ? Carbon::parse($lastCall[$assistant->id])->toIso8601String() : null,
+                    'last_call_at' => $assistant->last_call_at !== null ? Carbon::parse($assistant->last_call_at)->toIso8601String() : null,
                     'series' => $series[$assistant->id] ?? array_fill(0, self::BUCKETS, 0),
                 ];
             })->all();
@@ -182,7 +187,7 @@ class AiMonitorStats
     /** Attempts that count as AI calls (auto-dialer calls that reached voicemail do not). */
     private function counted(): Builder
     {
-        return AiCallAttempt::query()->where('status', '!=', AiCallAttemptStatus::EXCLUDED->value);
+        return AiCallAttempt::query()->where('ai_call_attempts.status', '!=', AiCallAttemptStatus::EXCLUDED->value);
     }
 
     private function inWindow(Carbon $from): Builder
