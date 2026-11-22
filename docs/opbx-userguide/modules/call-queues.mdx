@@ -28,7 +28,7 @@ Use a queue for a support or sales line where you need to know how long callers 
 Before you create a queue, prepare these:
 
 1. **Agents.** Each agent is an **active** user with an **extension assigned**. A user without an extension is not offered in the agent list. See [User Management](/opbx/modules/user-management) and [Extensions](/opbx/modules/extensions).
-2. **Hold music (optional).** An audio recording with the **Hold music** tag (set on the **Announcements** page). Only tagged recordings are offered. See [Recordings](/opbx/modules/recordings). Without hold music, waiting callers hear "Please hold the line." between pauses.
+2. **Hold music (optional).** An audio recording with the **Hold music** tag (set on the **Announcements** page). Only tagged recordings are offered. See [Announcements](/opbx/modules/recordings). Without hold music, waiting callers hear "Please hold the line." between pauses.
 3. **An overflow fallback (optional).** Where callers go when they wait too long. It must exist and be active. The default is **Hang Up**.
 
 ## Permissions
@@ -339,6 +339,6 @@ Common causes of "nobody gets the call":
 - [Ring Groups](/opbx/modules/ring-groups) — a simpler alternative, and a common queue fallback
 - [IVR Menus](/opbx/modules/ivr-menus) — route callers into a queue from a menu option
 - [Phone Numbers](/opbx/modules/phone-numbers) — route a number directly to a queue
-- [Recordings](/opbx/modules/recordings) — hold music
+- [Announcements](/opbx/modules/recordings) — hold music
 - [Supervisors](/opbx/modules/supervisors) — supervisors have no Call Queues pages; through the API they can read the queues where their assigned users are agents
 - [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) — send answered campaign calls to a queue, and hold dialing while no agent is available

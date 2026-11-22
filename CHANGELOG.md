@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full review of the user guide, the OpenAPI spec, the READMEs and AGENTS.md against the code: installer and `./opbx.sh`, SafeLine WAF, AI Real Time Monitor, Web Phone settings and transfer, campaign destinations (ring groups, call queues, wait for available agents), `ai_call_attempts`, and many smaller corrections.
 - OpenAPI: transfer, directory and session operations for the Web Phone and the embed, the transfer and campaign-route voice callbacks; the spec passes Redocly lint again.
 - Every Mermaid diagram in scope renders; new and retaken screenshots for the AI monitor, login page, queue statistics and current dialogs.
+- The guide page for audio files is titled **Announcements**, as in the sidebar (it was "Recordings"; the address `/opbx/modules/recordings` is unchanged). `docs/WEBHOOK-AUTHENTICATION.md` renders its diagram again; CONTRIBUTING and the PR template say pull requests target `develop`.
 
 ### Added - 2026-11-22 (Web Phone settings)
 
