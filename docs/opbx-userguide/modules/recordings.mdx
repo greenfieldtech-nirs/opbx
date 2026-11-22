@@ -2,13 +2,15 @@
 sidebar_position: 10
 slug: /modules/recordings
 sidebar_class_name: cxGuidesSidebar
-title: "Recordings"
-description: "Upload or link the audio files used for IVR greetings and queue hold music, on the Announcements page"
+title: "Announcements"
+description: "Upload or link the audio files callers hear: IVR greetings, closed messages and queue hold music"
 ---
 
-# Recordings (Announcements)
+# Announcements
 
-Recordings are the audio files OPBX plays to callers: IVR menu greetings, closed messages and call-queue hold music. In the application they are managed on the **Announcements** page. The old `/ui/recordings` address redirects there.
+Announcements are the audio files OPBX plays to callers: IVR menu greetings, closed messages and call-queue hold music. You manage them on the **Announcements** page (**PBX Configuration → Announcements**, `/ui/announcements`; the old `/ui/recordings` address redirects there).
+
+Each announcement is stored as a **recording**: that is the name used in the rest of this page, in the IVR and call queue forms, and in the API (`/v1/recordings`, API-key grant `recordings`).
 
 This page is about announcement audio. Recordings of **calls** are played from [Call Logs](/opbx/modules/call-logs).
 
