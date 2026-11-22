@@ -92,7 +92,7 @@ On a retry, the dialer prefers a caller ID from the pool that has not been tried
 ## Choosing values
 
 1. **Start small.** CAC 1, CPS 1, one test list of a few of your own numbers.
-2. **Match the destination.** Set CAC no higher than the number of simultaneous calls your AI assistant or load balancer can handle.
+2. **Match the destination.** Set CAC no higher than the number of simultaneous calls your AI assistant or load balancer can handle, or than the number of people in the ring group or queue.
 3. **Respect the carrier.** Keep CPS within what your trunk allows.
 4. **Watch the monitor.** CAC utilization near 100 % with callers waiting means the destination is the bottleneck; low utilization with pending numbers means CPS or the schedule is.
 
@@ -100,7 +100,7 @@ On a retry, the dialer prefers a caller ID from the pool that has not been tried
 
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
-| Campaign is Running but nothing is dialed | Outside the schedule; no pending numbers; CAC full | Check the schedule and the list; see the monitor's Active Calls and CAC Utilization |
+| Campaign is Running but nothing is dialed | Outside the schedule; no pending numbers; CAC full; a call-queue campaign [waiting for an available agent](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents) | Check the schedule and the list; see the monitor's Active Calls and CAC Utilization |
 | Active calls stays at the CAC limit with no calls in progress | Ended calls were not reported yet | Wait for the per-minute reconciliation, or pause and resume (resets the count) |
 | Numbers stay pending | Their retry time has not passed, or attempts reached the maximum | Check the number's attempts and last result on the list's detail page |
 

@@ -59,11 +59,25 @@ OPBX asks the load balancer for an assistant according to its strategy, consider
 
 ### Ring group and call queue
 
-When the contact answers, OPBX routes the live call to the ring group or queue exactly as it routes an inbound call to it. Agents and members see the **contact's number** as the caller (on a simultaneous ring group and on a queue that rings agents in separate calls), and the call appears in Live Calls and the queue's statistics like any other. Distribution-list metadata is not passed to people. If voicemail detection is on, it runs first, as for any other destination.
+When the contact answers, OPBX routes the live call to the ring group or queue exactly as it routes an inbound call to it. Agents and members see the **contact's number** as the caller (on a simultaneous ring group and on a queue that rings agents in separate calls), and the call appears in Live Calls and the queue's statistics like any other. Distribution-list metadata is not passed to people. If voicemail detection is on, it starts with the call and listens alongside the conversation, as for any other destination.
 
 #### Wait for available agents
 
-For a call queue, turn on **Wait for available agents** (Basic Info tab, under **Strategy** in Caller ID Configuration; the switch is greyed out for other destinations). While no agent of the queue is available, the dialer stops placing new calls and the numbers stay pending. When an agent becomes available, dialing resumes on the dialer's next cycle, so there can be a short gap before the next call.
+For a call queue, **Wait for available agents** keeps the dialer from calling contacts that no one can take. While no agent of the queue is available, the dialer stops placing new calls and the numbers stay pending (they use no attempt). When an agent becomes available, dialing resumes on the dialer's next cycle (10 seconds by default), so there can be a short gap before the next call.
+
+Who can do this: Owner and PBX Admin.
+
+1. Open **Auto Dialer → Campaign Manager**. Pause the campaign if it is Running.
+2. Click **Edit** on the campaign (or **Create Campaign** for a new one). The form opens on the **Basic Info** tab.
+3. Under **Routing Destination**, choose **Call Queue** and pick the queue under **Select Destination**.
+4. Under **Caller ID Configuration**, below the strategies, switch on **Wait for available agents** ("When no agent in the queue is available (all are on calls, in wrap-up or logged out), stop dialing until one is."). For any other destination the switch is greyed out with "Available when routing to a Call Queue."
+5. Click **Update Campaign** (or **Create Campaign**).
+
+Result: the toast "Campaign updated successfully" (or "Campaign created successfully") appears. The setting is not shown on the campaign's detail page; open **Edit** to check it.
+
+![Basic Info tab with Routing Destination Call Queue and the Wait for available agents switch on, below the caller ID strategies](../../img/screens/auto-dialer-wait-for-agents.jpg)
+
+How availability is judged:
 
 - An agent is available when the queue shows them **Available** (logged in, not on a queue call, not in wrap-up) and their extension is not on another call. Logged-out agents never count, so a campaign with no agent logged in does not dial.
 - The check is "at least one agent is available", not "one call per available agent": with one agent available the dialer can still place up to the campaign's concurrent-call limit (CAC). Contacts beyond that wait in the queue on hold; lower the CAC to match the size of the team.
@@ -83,13 +97,17 @@ The metadata is kept when a load balancer fails over to another assistant. Numbe
 
 ## What happens if the destination is missing
 
-The destination is checked when the call is placed, not when you save the campaign. If the assistant, load balancer, ring group or queue no longer exists, belongs to another organization, or (for a load balancer) has no available member, the callee answers and the call is **hung up at once**. An inactive ring group or queue plays its unavailable message instead. Check the campaign's routing before you start it.
+When you save the campaign, OPBX checks that the destination exists in your organization ("The selected routing destination is invalid." otherwise). It is checked again when each call is placed: if the assistant, load balancer, ring group or queue cannot be found, or (for a load balancer) has no available member, the callee answers and the call is **hung up at once**. An inactive ring group or queue plays its unavailable message instead. Check the campaign's routing before you start it.
 
 ## Deleting a destination that a campaign uses
 
 An AI assistant, AI load balancer, ring group or call queue that a campaign routes to cannot be deleted. The delete is refused and the **Cannot delete: still in use** dialog lists the campaign. Change the campaign's routing (pause it first if it is running), then delete again. Archived and completed campaigns count too.
 
 ![Cannot delete: still in use dialog for the AI assistant Aria, listing the auto-dialer campaign Fall Webinar Follow-up among its references](../../img/screens/ai-assistants-in-use-dialog.jpg)
+
+## Watching AI calls
+
+Campaign calls handed to an AI assistant or load balancer also appear on the [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) (Owner and PBX Admin). A campaign call counts there only when a person answered: calls that were not answered, reached voicemail, or where voicemail detection could not decide are counted for no assistant.
 
 ## Call recording
 
@@ -100,6 +118,7 @@ With **Record Calls** on (Advanced tab), Cloudonix records each call of the camp
 | Symptom | Likely cause | What to do |
 |---------|--------------|-----------|
 | Callees answer and the line drops at once | Routing is Hang Up, or the destination is missing or has no available member | Check the campaign's routing and the assistant's or load balancer's status |
+| A call-queue campaign is Running but places no calls | **Wait for available agents** is on and no agent is Available (all logged out, on calls or in wrap-up) | Have an agent log in to the queue, or switch the setting off |
 | Callees answer and the line drops after about 30 seconds | Voicemail detection with "If Detection Unclear = Hang up" | See [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection) |
 | The assistant does not receive the lead's details | The columns were not mapped as metadata, or the assistant ignores them | Re-upload with the columns ticked as metadata; check the assistant's header or parameter handling |
 

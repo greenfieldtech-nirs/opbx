@@ -30,7 +30,7 @@ graph TB
         API["internal/api/client.go"]
         EXEC["internal/executor/executor.go"]
         LIM["internal/limiter/cac.go"]
-        WH["internal/webhook/handler.go"]
+        WH["internal/webhook/handler.go (health route)"]
         RDC["internal/redis/client.go"]
         CID["internal/callerid/"]
     end
@@ -51,7 +51,6 @@ graph TB
     EXEC --> LIM
     EXEC --> CID
     LIM --> RDC
-    WH --> EXEC
     API --> LARAVEL
     RDC --> REDIS
     LARAVEL --> CLOUDONIX
@@ -64,8 +63,10 @@ graph TB
 The worker starts automatically with the full OPBX stack:
 
 ```bash
-docker compose up -d
+./opbx.sh start
 ```
+
+See [Starting and Stopping](/opbx/installation#starting-and-stopping).
 
 ### Local Development
 
@@ -80,10 +81,10 @@ make build
 make run
 ```
 
-The worker needs Go 1.25 (see `go.mod`). With an older local Go, build and test in Docker instead:
+The worker needs Go 1.27 (see `go.mod`; the image builds with `golang:1.27-alpine`). An older local Go rewrites `go.mod` and `go.sum` when it runs, so build and test in Docker instead:
 
 ```bash
-docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.25-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
+docker run --rm -v "$PWD/dialer-worker":/src -w /src golang:1.27-alpine sh -c 'go build ./... && go vet ./... && go test ./...'
 ```
 
 ### Makefile Targets
@@ -145,9 +146,9 @@ All calls go to `LARAVEL_API_URL` with `Authorization: Bearer <LARAVEL_API_TOKEN
 
 1. Every `POLL_INTERVAL` the worker calls `GET /api/v1/dialer/worker/campaigns/active`. Laravel returns only campaigns that are Active and inside their schedule (see [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling)).
 2. For each campaign it registers the CAC and CPS limits. A campaign still being processed from the previous poll is skipped, and at most 10 campaigns are processed at the same time.
-3. It fetches pending destinations: `GET /api/v1/dialer/worker/campaigns/{id}/destinations/pending?limit=N`, where N is CPS × poll interval in seconds, capped at CAC.
+3. It fetches pending destinations: `GET /api/v1/dialer/worker/campaigns/{id}/destinations/pending?limit=N`, where N is CPS × poll interval in seconds, capped at CAC. Laravel returns none while a call-queue campaign with **Wait for available agents** has no available agent (see [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents)).
 4. For each destination, it waits for the CPS spacing (1000 ÷ CPS ms), reserves a CAC slot (an atomic Lua increment that refuses when the campaign is at its limit), selects a Caller ID, and calls `POST /api/v1/dialer/worker/calls/initiate` with an `Idempotency-Key` header (`{destination_id}-{dial_attempts}`), so a replayed request gets the original answer instead of a second call
-5. If the initiate fails, the reserved slot is released. A `409` means another claim owns the destination and is skipped. A `429` makes the worker wait the `Retry-After` time (5 minutes when none is given) and stop that campaign's batch
+5. If the initiate fails, the reserved slot is released. A `409` means the destination cannot be dialed now (another claim owns it, or a call-queue campaign is waiting for an available agent); it is skipped and stays pending. A `429` makes the worker wait the `Retry-After` time (5 minutes when none is given) and stop that campaign's batch
 6. Laravel receives the call result from Cloudonix and owns the active-call count; it decrements the count when the call ends
 7. Retries are scheduled by Laravel from the result as well (see [Rate Limiting](/opbx/applications/auto-dialer/rate-limiting#attempts-and-retries))
 
