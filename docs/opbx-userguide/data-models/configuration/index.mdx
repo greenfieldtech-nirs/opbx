@@ -32,6 +32,7 @@ This page documents the environment variables and configuration values used by O
 |----------|---------|-------------|
 | `OPBX_APPLICATION_MODE` | `development` | `development` or `production` (SaaS) |
 | `OPBX_FRONT_PAGE` | `home` | What the site root (`/`) shows: `home` (the public OPBX homepage) or `login` (the sign-in page, or the dashboard when signed in). The installer defaults to `login` |
+| `OPBX_CLOUD` | `false` | Only for the hosted OPBX Cloud demo: `true` shows its service disclaimer on the public `/status` page. Leave it `false` on a self-hosted installation |
 | `OPBX_APPLICATION_WEBHOOK_BASEURL` | — | Application-level webhook base URL. When set, it overrides every organization's `cloudonix_settings.webhook_base_url` |
 | `OPBX_INSTALLER_MANAGED` | `false` | Not in `.env.example`; `./install.sh` sets it to `true`. When true, the seeder does not create the default `admin@example.com` account, because the installer creates the owner (`opbx:install-owner`) |
 

@@ -36,6 +36,8 @@ export interface ApplicationConfig {
   auth0: Auth0Config;
   /** What "/" shows; absent on older backends (treated as 'home'). */
   front_page?: 'home' | 'login';
+  /** Hosted OPBX Cloud demo (OPBX_CLOUD); false on self-hosted installs */
+  opbx_cloud?: boolean;
   /** Present on OPBX >= the endpoints feature; absent on error fallback. */
   endpoints?: ApplicationEndpoints;
 }
