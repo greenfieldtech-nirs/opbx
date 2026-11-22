@@ -1,24 +1,28 @@
-import { Grid3x3, Clock } from 'lucide-react';
+import { Grid3x3, Clock, Settings } from 'lucide-react';
 
-export type WebPhoneTab = 'dialer' | 'calls';
+export type WebPhoneTab = 'dialer' | 'calls' | 'settings';
 
 interface WebPhoneTabsProps {
   active: WebPhoneTab;
   onChange: (tab: WebPhoneTab) => void;
   disabled?: boolean;
+  /** The embedded dialer applies the settings but cannot change them. */
+  showSettings?: boolean;
 }
 
 const TABS: { id: WebPhoneTab; label: string; Icon: typeof Grid3x3 }[] = [
   { id: 'dialer', label: 'Keypad', Icon: Grid3x3 },
   { id: 'calls', label: 'Recents', Icon: Clock },
+  { id: 'settings', label: 'Settings', Icon: Settings },
 ];
 
 // Bottom tab bar, iOS/Samsung phone style. Locked (disabled) during an active
 // call so the user cannot navigate away from the live dialer.
-export function WebPhoneTabs({ active, onChange, disabled }: WebPhoneTabsProps) {
+export function WebPhoneTabs({ active, onChange, disabled, showSettings = true }: WebPhoneTabsProps) {
+  const tabs = showSettings ? TABS : TABS.filter((t) => t.id !== 'settings');
   return (
-    <div className="grid grid-cols-2 border-t bg-background" role="tablist">
-      {TABS.map(({ id, label, Icon }) => {
+    <div className={`grid ${tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2'} border-t bg-background`} role="tablist">
+      {tabs.map(({ id, label, Icon }) => {
         const isActive = active === id;
         return (
           <button

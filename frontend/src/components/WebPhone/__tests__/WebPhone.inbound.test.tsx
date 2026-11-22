@@ -62,7 +62,11 @@ const config: WebPhoneConfig = {
   profile_name: 'p', registration_mode: 'r', country: 'us',
 };
 
-async function renderRegisteredPhone(props: Partial<ComponentProps<typeof WebPhone>> = {}, cfg: WebPhoneConfig = config) {
+async function renderRegisteredPhone(
+  props: Partial<ComponentProps<typeof WebPhone>> = {},
+  cfg: WebPhoneConfig = config,
+  beforeRegistered?: () => void,
+) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <WebPhone
@@ -75,6 +79,7 @@ async function renderRegisteredPhone(props: Partial<ComponentProps<typeof WebPho
     </QueryClientProvider>,
   );
   await waitFor(() => expect(ua).toBeDefined());
+  beforeRegistered?.();
   act(() => ua.emit('registered'));
 }
 
@@ -330,5 +335,78 @@ describe('WebPhone blind transfer', () => {
     await connectedCall({}, { ...config, transfer_enabled: false });
     expect(screen.getByRole('button', { name: 'Hang Up' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Transfer' })).not.toBeInTheDocument();
+  });
+});
+
+describe('WebPhone settings behaviour', () => {
+  const withSettings = (settings: Partial<NonNullable<WebPhoneConfig['settings']>>): WebPhoneConfig => ({
+    ...config,
+    settings: { auto_answer: false, keep_alive: true, refresh_on_hangup: true, ...settings },
+  });
+  const fakeTimers = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  afterEach(() => vi.useRealTimers());
+
+  it('auto-answers a call that is still ringing after 2 seconds', async () => {
+    await renderRegisteredPhone({}, withSettings({ auto_answer: true }));
+    fakeTimers();
+    const call = makeSession('+15551234567');
+    ring(call);
+
+    act(() => vi.advanceTimersByTime(1900));
+    expect(call.answer).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(200));
+    expect(call.answer).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not auto-answer by default', async () => {
+    await renderRegisteredPhone({}, withSettings({}));
+    fakeTimers();
+    const call = makeSession('+15551234567');
+    ring(call);
+
+    act(() => vi.advanceTimersByTime(5000));
+    expect(call.answer).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-answer a call the caller already hung up', async () => {
+    await renderRegisteredPhone({}, withSettings({ auto_answer: true }));
+    fakeTimers();
+    const call = makeSession('+15551234567');
+    ring(call);
+    act(() => call.hangUp());
+
+    act(() => vi.advanceTimersByTime(3000));
+    expect(call.answer).not.toHaveBeenCalled();
+  });
+
+  it('keep-alive re-registers every 60 seconds', async () => {
+    await renderRegisteredPhone({}, withSettings({ keep_alive: true }), fakeTimers); // the interval starts on registration
+    act(() => vi.advanceTimersByTime(60_000));
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(ua.register).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not re-register periodically with keep-alive off', async () => {
+    await renderRegisteredPhone({}, withSettings({ keep_alive: false }), fakeTimers);
+    act(() => vi.advanceTimersByTime(180_000));
+    expect(ua.register).not.toHaveBeenCalled();
+  });
+
+  it('re-registers after a call ends when refresh on hangup is on', async () => {
+    await renderRegisteredPhone({}, withSettings({ refresh_on_hangup: true, keep_alive: false }));
+    const call = makeSession('+15551234567');
+    ring(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer' }));
+    act(() => call.emit('ended'));
+    expect(ua.register).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-register after a call with refresh on hangup off', async () => {
+    await renderRegisteredPhone({}, withSettings({ refresh_on_hangup: false, keep_alive: false }));
+    const call = makeSession('+15551234567');
+    ring(call);
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer' }));
+    act(() => call.emit('ended'));
+    expect(ua.register).not.toHaveBeenCalled();
   });
 });

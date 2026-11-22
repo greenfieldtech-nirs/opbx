@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\UserInvitationController;
 use App\Http\Controllers\Api\UsersController;
 use App\Http\Controllers\Api\WebPhoneCallsLogController;
 use App\Http\Controllers\Api\WebPhoneConfigController;
+use App\Http\Controllers\Api\WebPhoneSettingsController;
 use App\Http\Controllers\Api\WebPhoneTransferController;
 use App\Http\Controllers\AutoDialerCampaignController;
 use App\Http\Controllers\DialerWorkerController;
@@ -458,6 +459,10 @@ Route::prefix('v1')->group(function (): void {
         // Web Phone config
         Route::get('webphone/config', [WebPhoneConfigController::class, 'config'])
             ->name('webphone.config');
+
+        // Web Phone settings (stored in the extension's Cloudonix subscriber profile)
+        Route::put('webphone/settings', [WebPhoneSettingsController::class, 'update'])
+            ->name('webphone.settings.update');
 
         // Web Phone calls log
         Route::get('webphone/calls-log', [WebPhoneCallsLogController::class, 'index'])

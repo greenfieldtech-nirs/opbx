@@ -9,9 +9,12 @@ use App\Models\CloudonixSettings;
 use App\Models\Extension;
 use App\Models\User;
 use App\Scopes\OrganizationScope;
+use App\Services\WebPhone\WebPhoneSettingsService;
 
 final class WebPhoneConfigBuilder
 {
+    public function __construct(private readonly WebPhoneSettingsService $settings) {}
+
     /**
      * Build the JsSIP config array for a user's USER-type extension.
      * Returns null if the user has no extension or the org has no Cloudonix domain.
@@ -61,6 +64,8 @@ final class WebPhoneConfigBuilder
                 'profile_name' => $user->name,
                 'registration_mode' => 'Direct',
                 'country' => $country,
+                // Auto-answer, keep-alive, refresh on hangup: from the subscriber profile (defaults written when missing)
+                'settings' => $this->settings->load($extension, $cloudonixSettings),
             ];
         });
     }
