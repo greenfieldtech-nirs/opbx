@@ -325,6 +325,7 @@ export default function CallLogs() {
                       <SelectValue placeholder="All dispositions" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="CONNECTED">Connected</SelectItem>
                       <SelectItem value="ANSWERED">Answered</SelectItem>
                       <SelectItem value="NO ANSWER">No Answer</SelectItem>
                       <SelectItem value="BUSY">Busy</SelectItem>
