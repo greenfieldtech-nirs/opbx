@@ -83,7 +83,7 @@ flowchart TD
     ST -->|Yes| SO[Attach _organization_id<br/>Proceed to controller]
     ST -->|No| SJ2[401 JSON:<br/>Invalid Bearer token]
     SA -->|No| SR{CLOUDONIX_WEBHOOK_<br/>REQUIRE_AUTH?}
-    SR -->|false| SB[Proceed<br/>(warn: webhook.unauthenticated)]
+    SR -->|false| SB["Proceed<br/>(warn: webhook.unauthenticated)"]
     SR -->|true| SJ3[401 JSON:<br/>Webhook key not configured]
 
     AC --> AT{Bearer matches<br/>AMD_WORKER_API_TOKEN?}
