@@ -39,6 +39,9 @@ class AutoDialerCloudonixService
 
     private PhoneNumberService $phoneNumberService;
 
+    /** The AI assistant (and load balancer) the call being built is routed to, for the AI Real Time Monitor. */
+    private ?array $aiTarget = null;
+
     public function __construct(
         OutboundRoutingService $outboundRouting,
         PhoneNumberService $phoneNumberService
@@ -59,7 +62,7 @@ class AutoDialerCloudonixService
      * @param  AutoDialerDestination  $destination  The destination to call
      * @param  CloudonixSettings  $settings  Organization's Cloudonix settings
      * @param  string  $webhookUrl  The webhook URL for call status updates
-     * @return array{success: bool, call_id: string|null, session_token: string|null, error: string|null}
+     * @return array{success: bool, call_id: string|null, session_token: string|null, error: string|null, ai_target?: array{ai_assistant_id: int, ai_load_balancer_id: int|null}|null}
      */
     public function initiateCall(
         AutoDialerCampaign $campaign,
@@ -69,6 +72,8 @@ class AutoDialerCloudonixService
         ?string $selectedCallerId = null,
         ?int $selectedCallerDidId = null
     ): array {
+        $this->aiTarget = null;
+
         try {
             // Validate that Cloudonix is configured for this organization
             if (! $settings->isConfigured()) {
@@ -129,6 +134,7 @@ class AutoDialerCloudonixService
                 'call_id' => $result['id'] ?? null,
                 'session_token' => $result['token'] ?? null,
                 'error' => null,
+                'ai_target' => $this->aiTarget,
             ];
 
         } catch (\Exception $e) {
@@ -329,6 +335,8 @@ class AutoDialerCloudonixService
             return $this->buildHangupCxml();
         }
 
+        $this->aiTarget = ['ai_assistant_id' => $aiAssistant->id, 'ai_load_balancer_id' => null];
+
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
         $provider = $aiAssistant->provider;
@@ -518,6 +526,7 @@ class AutoDialerCloudonixService
         // Build the follow-through callback URL so Cloudonix can try the next
         // assistant if this one fails (busy, no-answer, etc.)
         $callbackUrl = $this->buildAlbFollowThroughUrl($loadBalancer, $aiAssistant, $campaign);
+        $this->aiTarget = ['ai_assistant_id' => $aiAssistant->id, 'ai_load_balancer_id' => $loadBalancer->id];
 
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;

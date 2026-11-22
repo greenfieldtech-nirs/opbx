@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting\Strategies;
 
+use App\Enums\AiCallAttemptSource;
 use App\Enums\AlbsStatus;
 use App\Enums\ExtensionType;
 use App\Enums\RingGroupFallbackAction;
@@ -18,6 +19,7 @@ use App\Models\RingGroup;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\AiMonitor\AiCallRecorder;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use App\Services\VoiceRouting\AlbsDistributionService;
@@ -176,6 +178,12 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
                 'strategy' => $aiLoadBalancer->strategy->value,
             ]);
 
+            app(AiCallRecorder::class)->fellBackWithoutMember(
+                $aiLoadBalancer->organization_id,
+                $aiLoadBalancer->id,
+                AiCallRecorder::callIdFrom($request),
+            );
+
             return $this->handleFallback($aiLoadBalancer, $request);
         }
 
@@ -199,7 +207,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         }
 
         if ($protocol === 'dummy') {
-            return $this->routeDummy($aiAssistant, $aiLoadBalancer);
+            return $this->routeDummy($aiAssistant, $aiLoadBalancer, $request);
         }
 
         return $this->routeSip($aiAssistant, $aiLoadBalancer, $config, $provider, $request);
@@ -260,11 +268,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             // Using action parameter on Connect verb for callback
             $callbackUrl = $this->getFollowThroughCallbackUrl($aiLoadBalancer, $aiAssistant, $request);
 
-            return response(
-                CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
+            return $this->connect($request, $aiAssistant, $aiLoadBalancer, CxmlBuilder::streamToWebSocketWithAction($websocketUrl, $callbackUrl));
         } catch (\InvalidArgumentException $e) {
             Log::error('AiLoadBalancerRoutingStrategy: Failed to build WebSocket URL', [
                 'ai_assistant_id' => $aiAssistant->id,
@@ -281,7 +285,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         }
     }
 
-    private function routeDummy(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer): Response
+    private function routeDummy(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response
     {
         Log::info('AiLoadBalancerRoutingStrategy: Routing to Dummy AI provider', [
             'ai_assistant_id' => $aiAssistant->id,
@@ -289,11 +293,7 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
             'ai_load_balancer_id' => $aiLoadBalancer->id,
         ]);
 
-        return response(
-            CxmlBuilder::dummyAiMessage(),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        return $this->connect($request, $aiAssistant, $aiLoadBalancer, CxmlBuilder::dummyAiMessage());
     }
 
     private function routeSip(AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, array $config, ?string $provider, Request $request): Response
@@ -325,11 +325,21 @@ class AiLoadBalancerRoutingStrategy implements RoutingStrategy
         // Generate callback URL for follow-through when call fails
         $callbackUrl = $this->getFollowThroughCallbackUrl($aiLoadBalancer, $aiAssistant, $request);
 
-        return response(
-            CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl),
-            200,
-            ['Content-Type' => 'application/xml']
+        return $this->connect($request, $aiAssistant, $aiLoadBalancer, CxmlBuilder::dialServiceProviderWithAction($provider, $phoneNumber, $callbackUrl));
+    }
+
+    /** The call is handed to a member (or the AI fallback): record it for the AI Real Time Monitor. */
+    private function connect(Request $request, AiAssistant $aiAssistant, AiAssistantLoadBalancer $aiLoadBalancer, string $cxml): Response
+    {
+        app(AiCallRecorder::class)->started(
+            $aiLoadBalancer->organization_id,
+            $aiAssistant->id,
+            $aiLoadBalancer->id,
+            AiCallRecorder::callIdFrom($request),
+            AiCallAttemptSource::LOAD_BALANCER,
         );
+
+        return response($cxml, 200, ['Content-Type' => 'application/xml']);
     }
 
     private function handleFallback(AiAssistantLoadBalancer $aiLoadBalancer, Request $request): Response

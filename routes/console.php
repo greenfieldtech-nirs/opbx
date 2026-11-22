@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\AiCallAttempt;
 use App\Models\AutoDialerCallSession;
 use App\Models\BlockedCallLog;
 use App\Models\CallNotificationLog;
@@ -35,6 +36,7 @@ Schedule::command('model:prune', ['--model' => [
     QueueCall::class,
     CallTrackingSession::class,
     AutoDialerCallSession::class,
+    AiCallAttempt::class,
     PlatformAuditLog::class,
     PlatformHealthCheck::class,
 ]])
