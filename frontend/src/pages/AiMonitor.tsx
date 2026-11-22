@@ -2,7 +2,7 @@
  * AI Real Time Monitor
  *
  * Slide-show of widgets for admins: the AI Assistants view and the AI Load Balancers view
- * alternate every 30 seconds. Figures cover the chosen time frame (last 60 minutes by
+ * alternate every 30 seconds by default (10 seconds to 5 minutes). Figures cover the chosen time frame (last 60 minutes by
  * default, 1 minute to 12 hours) and refresh every 10 seconds.
  */
 
@@ -27,30 +27,52 @@ export const TIME_FRAMES = [
   { minutes: 720, label: 'Last 12 hours', short: '12 h' },
 ] as const;
 
+export const SLIDE_INTERVALS = [
+  { seconds: 10, label: 'Every 10 seconds' },
+  { seconds: 15, label: 'Every 15 seconds' },
+  { seconds: 30, label: 'Every 30 seconds' },
+  { seconds: 60, label: 'Every minute' },
+  { seconds: 120, label: 'Every 2 minutes' },
+  { seconds: 300, label: 'Every 5 minutes' },
+] as const;
+
 const DEFAULT_MINUTES = 60;
-const SLIDE_SECONDS = 30;
+const DEFAULT_SLIDE_SECONDS = 30;
 const REFRESH_MS = 10_000;
 const TIME_FRAME_KEY = 'ai-monitor-minutes';
+const SLIDE_KEY = 'ai-monitor-slide-seconds';
 
 const VIEWS = [
   { id: 'assistants', label: 'Assistants' },
   { id: 'load-balancers', label: 'Load Balancers' },
 ] as const;
 
-function savedMinutes(): number {
+/** A remembered choice, or the default when nothing valid was saved (or storage is blocked). */
+function saved(key: string, allowed: readonly number[], fallback: number): number {
   try {
-    const saved = Number(localStorage.getItem(TIME_FRAME_KEY));
-    return TIME_FRAMES.some((t) => t.minutes === saved) ? saved : DEFAULT_MINUTES;
+    const value = Number(localStorage.getItem(key));
+    return allowed.includes(value) ? value : fallback;
   } catch {
-    return DEFAULT_MINUTES;
+    return fallback;
+  }
+}
+
+function remember(key: string, value: number) {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // private mode: the choice just isn't remembered
   }
 }
 
 export default function AiMonitor() {
-  const [minutes, setMinutes] = useState<number>(savedMinutes);
+  const [minutes, setMinutes] = useState(() => saved(TIME_FRAME_KEY, TIME_FRAMES.map((t) => t.minutes), DEFAULT_MINUTES));
+  const [slideSeconds, setSlideSeconds] = useState(() =>
+    saved(SLIDE_KEY, SLIDE_INTERVALS.map((i) => i.seconds), DEFAULT_SLIDE_SECONDS),
+  );
   const [view, setView] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(SLIDE_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(slideSeconds);
 
   const { data, isError, dataUpdatedAt } = useQuery({
     queryKey: ['ai-monitor', minutes],
@@ -62,7 +84,7 @@ export default function AiMonitor() {
 
   const go = (next: number) => {
     setView((next + VIEWS.length) % VIEWS.length);
-    setSecondsLeft(SLIDE_SECONDS);
+    setSecondsLeft(slideSeconds);
   };
 
   useEffect(() => {
@@ -77,17 +99,18 @@ export default function AiMonitor() {
   useEffect(() => {
     if (secondsLeft > 0) return;
     setView((v) => (v + 1) % VIEWS.length);
-    setSecondsLeft(SLIDE_SECONDS);
-  }, [secondsLeft]);
+    setSecondsLeft(slideSeconds);
+  }, [secondsLeft, slideSeconds]);
 
   const changeMinutes = (value: string) => {
-    const next = Number(value);
-    setMinutes(next);
-    try {
-      localStorage.setItem(TIME_FRAME_KEY, String(next));
-    } catch {
-      // private mode: the choice just isn't remembered
-    }
+    setMinutes(Number(value));
+    remember(TIME_FRAME_KEY, Number(value));
+  };
+
+  const changeSlideSeconds = (value: string) => {
+    setSlideSeconds(Number(value));
+    setSecondsLeft(Number(value)); // the new interval starts now
+    remember(SLIDE_KEY, Number(value));
   };
 
   const frame = TIME_FRAMES.find((t) => t.minutes === minutes) ?? TIME_FRAMES[4];
@@ -113,6 +136,18 @@ export default function AiMonitor() {
               {TIME_FRAMES.map((t) => (
                 <SelectItem key={t.minutes} value={String(t.minutes)}>
                   {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(slideSeconds)} onValueChange={changeSlideSeconds}>
+            <SelectTrigger className="w-[180px]" aria-label="Refresh">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SLIDE_INTERVALS.map((i) => (
+                <SelectItem key={i.seconds} value={String(i.seconds)}>
+                  {i.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -178,7 +213,7 @@ export default function AiMonitor() {
         </span>
         <span>{current.label}</span>
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full bg-primary transition-[width] duration-1000 ease-linear" style={{ width: `${((SLIDE_SECONDS - secondsLeft) / SLIDE_SECONDS) * 100}%` }} />
+          <div className="h-full bg-primary transition-[width] duration-1000 ease-linear" style={{ width: `${((slideSeconds - secondsLeft) / slideSeconds) * 100}%` }} />
         </div>
         <span>{paused ? 'Paused' : `${nextView.label} next in ${secondsLeft}s`}</span>
       </footer>

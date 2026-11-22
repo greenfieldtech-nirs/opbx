@@ -78,6 +78,17 @@ describe('AiMonitor page', () => {
     await waitFor(() => expect(snapshot).toHaveBeenCalledWith(180));
   });
 
+  it('rotates on the remembered refresh interval', async () => {
+    localStorage.setItem('ai-monitor-slide-seconds', '60');
+    renderPage();
+    await screen.findByTestId('assistant-1');
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(screen.getByTestId('assistant-1')).toBeInTheDocument();
+    expect(screen.getByText('Load Balancers next in 30s')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(await screen.findByTestId('load-balancer-7')).toBeInTheDocument();
+  });
+
   it('shows an empty state when there are no assistants', async () => {
     snapshot.mockResolvedValue(data({ assistants: [] }));
     renderPage();
