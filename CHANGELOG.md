@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-22 (Web Phone settings)
+
+- Web Phone **Settings** tab: **Auto-Answer** (answer after 2 s of ringing, default off), **Keep-Alive** (re-register every 60 s, default on) and **Refresh on hangup** (re-register after each call, default on). **Save** stores them in the extension's Cloudonix subscriber profile (merged; other profile keys kept) and they apply at once. On start the Web Phone reads them from the profile and stores the defaults when missing. The Embedded Dialer applies them but has no Settings tab.
+- `PUT /v1/webphone/settings`; `GET /v1/webphone/config` and the embed config return `settings`.
+
 ### Added - 2026-11-22 (AI Real Time Monitor)
 
 - **AI Configuration → Real Time Monitor** (Owner and PBX Admin): a slide-show of health-card widgets that alternates every 30 s between the AI Assistants view (active now, calls, success rate, average duration, AI minutes, last call, calls over time) and the AI Load Balancers view (active, calls, failovers, fell back, handled rate, each member's actual vs configured share). Time frame 1 minute to 12 hours, default 60 minutes; figures refresh every 10 s.

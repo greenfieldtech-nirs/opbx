@@ -1,3 +1,19 @@
+/** Stored in the extension's Cloudonix subscriber profile; the server fills in defaults. */
+export interface WebPhoneSettings {
+  /** Answer an inbound call 2 seconds after it starts ringing. */
+  auto_answer: boolean;
+  /** Re-register every 60 seconds. */
+  keep_alive: boolean;
+  /** Re-register after a call ends. */
+  refresh_on_hangup: boolean;
+}
+
+export const DEFAULT_WEBPHONE_SETTINGS: WebPhoneSettings = {
+  auto_answer: false,
+  keep_alive: true,
+  refresh_on_hangup: true,
+};
+
 export interface WebPhoneConfig {
   sip_username: string;
   sip_password: string;
@@ -13,6 +29,7 @@ export interface WebPhoneConfig {
   country: string;
   /** False in an embed snippet that does not allow call transfer; absent means allowed. */
   transfer_enabled?: boolean;
+  settings?: WebPhoneSettings;
 }
 
 export interface WebPhoneCallLogEntry {

@@ -33,8 +33,9 @@ import { subscribeCoach } from './webPhoneBus';
 import { getEmbedBus, handleEmbedClose } from './embedBus';
 import { WebPhoneTabs, type WebPhoneTab } from './WebPhoneTabs';
 import { CallsLogView } from './CallsLogView';
+import { SettingsView } from './SettingsView';
 import { TonePlayer } from '@/lib/TonePlayer';
-import type { WebPhoneConfig } from '@/types/webPhone.types';
+import { DEFAULT_WEBPHONE_SETTINGS, type WebPhoneConfig, type WebPhoneSettings } from '@/types/webPhone.types';
 
 import { classifyConfigError } from './configError';
 import { callerIdentity, callerLabel, isLive, sipCallId, type CallerIdentity } from './incomingCall';
@@ -266,6 +267,24 @@ export function WebPhone({
   });
 
   const config = configResponse?.data as WebPhoneConfig | undefined;
+
+  // Auto-answer / keep-alive / refresh on hangup. Kept apart from config so a save applies at once
+  // without restarting the SIP agent (its effect depends on config). Ref: read inside JsSIP handlers.
+  const [settings, setSettings] = useState<WebPhoneSettings>(DEFAULT_WEBPHONE_SETTINGS);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  useEffect(() => {
+    if (config?.settings) setSettings(config.settings);
+  }, [config?.settings]);
+
+  // A fresh REGISTER on the running agent (keep-alive and refresh on hangup).
+  const reRegister = useCallback((reason: string) => {
+    try {
+      uaRef.current?.register();
+    } catch (error) {
+      console.error(`[WebPhone] Re-register (${reason}) failed:`, error);
+    }
+  }, []);
   // Coaching calls are never transferred; an embed snippet may disallow transfer.
   const transferEnabled = config?.transfer_enabled !== false && !coachLabel;
 
@@ -355,6 +374,9 @@ export function WebPhone({
         getTonePlayer().stop();
         getEmbedBus()?.emit('call.ended');
         stopCallTimer();
+        if (settingsRef.current.refresh_on_hangup) {
+          reRegister('after hangup');
+        }
         if (isCoachCallRef.current) {
           isCoachCallRef.current = false;
           setOpen(false); // Coaching finished: close the Web Phone entirely.
@@ -391,7 +413,7 @@ export function WebPhone({
       session.on('muted', () => setIsMuted(true));
       session.on('unmuted', () => setIsMuted(false));
     },
-    [attachRemoteStream, config, getTonePlayer, resetCallState, startCallTimer, stopCallTimer]
+    [attachRemoteStream, config, getTonePlayer, reRegister, resetCallState, startCallTimer, stopCallTimer]
   );
 
   useEffect(() => {
@@ -652,6 +674,13 @@ export function WebPhone({
     }
   }, [state]);
 
+  // Keep-alive: re-register every 60 seconds while the phone is registered and ready.
+  useEffect(() => {
+    if (state !== 'ready' || !settings.keep_alive) return;
+    const timer = setInterval(() => reRegister('keep-alive'), 60_000);
+    return () => clearInterval(timer);
+  }, [state, settings.keep_alive, reRegister]);
+
   const handleAnswer = useCallback(() => {
     if (incomingSession) {
       getTonePlayer().stop();
@@ -669,6 +698,14 @@ export function WebPhone({
       }
     }
   }, [incomingSession, getTonePlayer]);
+
+  // Auto-answer: a call still ringing after 2 seconds is answered. Answering, declining or the
+  // caller hanging up changes incomingSession, which cancels the timer.
+  useEffect(() => {
+    if (!incomingSession || !settings.auto_answer) return;
+    const timer = setTimeout(handleAnswer, 2000);
+    return () => clearTimeout(timer);
+  }, [incomingSession, settings.auto_answer, handleAnswer]);
 
   // Tap-to-redial from the calls log: switch to the dialer, prefill the number,
   // and queue an auto-dial (the redial effect fires once the number flushes).
@@ -1162,6 +1199,8 @@ export function WebPhone({
                         </button>
                       </div>
                     </div>
+                  ) : activeTab === 'settings' && !embedded ? (
+                    <SettingsView settings={settings} onSaved={setSettings} />
                   ) : activeTab === 'calls' ? (
                     <CallsLogView
                       onRedial={handleRedial}
@@ -1260,6 +1299,7 @@ export function WebPhone({
                 active={activeTab}
                 onChange={setActiveTab}
                 disabled={inActiveCall}
+                showSettings={!embedded}
               />
             )}
         </div>

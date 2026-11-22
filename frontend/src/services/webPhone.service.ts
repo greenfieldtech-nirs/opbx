@@ -3,6 +3,7 @@ import type {
   WebPhoneCallLogEntry,
   WebPhoneConfig,
   WebPhoneDirectoryEntry,
+  WebPhoneSettings,
 } from '@/types/webPhone.types';
 
 export interface WebPhoneConfigResponse {
@@ -56,4 +57,10 @@ export async function getWebPhoneSession(callId: string): Promise<string> {
  */
 export async function transferWebPhoneCall(callId: string, destination: string): Promise<void> {
   await api.post('/webphone/transfer', { call_id: callId, destination });
+}
+
+/** Store the Web Phone settings in the user's Cloudonix subscriber profile; resolves with what was stored. */
+export async function saveWebPhoneSettings(settings: WebPhoneSettings): Promise<WebPhoneSettings> {
+  const response = await api.put<{ data: WebPhoneSettings }>('/webphone/settings', settings);
+  return response.data.data;
 }

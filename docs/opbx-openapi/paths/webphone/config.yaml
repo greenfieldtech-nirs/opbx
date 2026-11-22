@@ -66,6 +66,15 @@ paths:
                         type: string
                         description: ISO country code driving tone cadences.
                         example: us
+                      settings:
+                        type: object
+                        description: |
+                          From the extension's Cloudonix subscriber profile. Missing keys are stored with
+                          their defaults; when Cloudonix cannot be reached the defaults are returned.
+                        properties:
+                          auto_answer: { type: boolean, description: 'Answer after 2 s of ringing', example: false }
+                          keep_alive: { type: boolean, description: 'Re-register every 60 s', example: true }
+                          refresh_on_hangup: { type: boolean, description: 'Re-register after each call', example: true }
         '401':
           $ref: '../../openapi.yaml#/components/responses/Unauthorized'
         '403':

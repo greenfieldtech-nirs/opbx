@@ -1,0 +1,49 @@
+paths:
+  /v1/webphone/settings:
+    put:
+      tags:
+        - Web Phone
+      summary: Save Web Phone settings
+      description: |
+        Stores the signed-in user's Web Phone settings in their extension's Cloudonix subscriber profile.
+        The current profile is read and the three keys (`webphone-auto-answer`, `webphone-keep-alive`,
+        `webphone-refresh-on-hangup`) are merged in, because Cloudonix replaces the whole profile on update;
+        other profile keys are kept. API keys are refused.
+      operationId: updateWebPhoneSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auto_answer, keep_alive, refresh_on_hangup]
+              properties:
+                auto_answer: { type: boolean, example: true }
+                keep_alive: { type: boolean, example: true }
+                refresh_on_hangup: { type: boolean, example: true }
+      responses:
+        '200':
+          description: Stored settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      auto_answer: { type: boolean }
+                      keep_alive: { type: boolean }
+                      refresh_on_hangup: { type: boolean }
+        '401':
+          $ref: '../../openapi.yaml#/components/responses/Unauthorized'
+        '404':
+          description: No extension is assigned to this user
+        '409':
+          description: Cloudonix is not configured, or the extension is not synced to Cloudonix
+        '422':
+          $ref: '../../openapi.yaml#/components/responses/ValidationError'
+        '502':
+          description: Cloudonix could not be read or did not accept the update
