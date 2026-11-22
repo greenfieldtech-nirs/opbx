@@ -40,6 +40,7 @@
 | **Conference Rooms** | [conference-rooms.md](conference-rooms.md) | ConferenceRoomController, ConferenceRoom model | ConferenceRooms |
 | **AI Assistants** | [ai-assistants.md](ai-assistants.md) | AiAssistantController, ProviderRegistry | AiAssistants |
 | **AI Load Balancers** | [ai-load-balancers.md](ai-load-balancers.md) | AiAssistantLoadBalancerController, AlbsDistributionService | AiAssistantLoadBalancers |
+| **Web Phone** | [web-phone.md](web-phone.md) | WebPhoneConfigBuilder, WebPhoneSettingsService | WebPhone (component) |
 | **AI Real Time Monitor** | [ai-assistants.md](ai-assistants.md) (section "AI Real Time Monitor") | AiCallRecorder, AiMonitorStats, AiMonitorController | AiMonitor |
 | **Recordings & Announcements** | [recordings-announcements.md](recordings-announcements.md) | RecordingsController, Recording model | Announcements |
 | **Call Logs** | [call-logs.md](call-logs.md) | CallDetailRecordController, CDR model | CallLogs |

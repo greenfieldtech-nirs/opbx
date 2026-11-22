@@ -179,6 +179,29 @@ When there are none, the tab reads "No recent calls yet." If the list cannot be 
 
 {/* SCREENSHOT: web-phone-recents — Web Phone Recents tab listing several recent outbound calls with time, duration and coloured dispositions */}
 
+### Change the Web Phone settings
+
+Who can do this: any user with a user extension.
+
+1. [Open the Web Phone](#open-the-web-phone).
+2. Click the **Settings** tab.
+3. Turn the settings on or off. **Save** becomes available once something has changed.
+4. Click **Save**.
+
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| **Auto-Answer** | Off | Answers an incoming call once it has rung for 2 seconds. A call that arrives while you are already on a call is still answered busy, so Auto-Answer only ever picks up a call when the phone is free. |
+| **Keep-Alive** | On | Registers the phone again every 60 seconds, so a dropped registration comes back within a minute. |
+| **Refresh on hangup** | On | Registers the phone again after each call ends. |
+
+The settings are stored in your extension's Cloudonix subscriber profile, so they follow your extension to every browser, and they apply at once, without reloading. When the Web Phone starts and the profile has no settings yet, OPBX stores the defaults there. Other values in the profile are kept.
+
+If Cloudonix does not accept the settings, the tab shows the reason (for example "Cloudonix did not accept the settings. Try again shortly.") and keeps your changes so you can save again. An extension that is not synced to Cloudonix yet cannot store settings: "This extension is not synced to Cloudonix yet, so its settings cannot be stored."
+
+The [Embedded Dialer](/opbx/modules/embedded-dialer) applies the same settings but has no **Settings** tab.
+
+{/* SCREENSHOT: web-phone-settings — Web Phone Settings tab with the three switches and the Save button */}
+
 ### Move the Web Phone to this tab
 
 Who can do this: any user with a user extension.
@@ -264,6 +287,7 @@ Registration errors also show the raw cause from the SIP library (for example `R
 | `wss_server`, `websocket_port`, `server_path` | `wss://webrtc.cloudonix.io`, `443`, empty |
 | `registration_mode` | `Direct` |
 | `country` | Country code for tones |
+| `settings` | `auto_answer`, `keep_alive`, `refresh_on_hangup` (booleans) from the subscriber profile; the defaults when Cloudonix cannot be reached |
 
 The config contains your SIP password. It is returned only to you, for your own extension, and every request is logged as a security event.
 
@@ -273,6 +297,7 @@ The config contains your SIP password. It is returned only to you, for your own 
 |--------|----------|---------|
 | GET | `/v1/webphone/config` | SIP settings for the signed-in user. 404 "No extension is assigned to this user." when there is no user extension; 409 with `error: cloudonix_not_configured` when the organization has no Cloudonix domain |
 | GET | `/v1/webphone/calls-log` | The last 50 calls placed from the user's extension |
+| PUT | `/v1/webphone/settings` | Store `auto_answer`, `keep_alive` and `refresh_on_hangup` (all required booleans) in the extension's Cloudonix subscriber profile. 409 when the extension is not synced to Cloudonix; 502 when Cloudonix does not accept them |
 | POST | `/v1/webphone/transfer` | Blind-transfer the user's call: `call_id` (the Web Phone's SIP Call-ID) and `destination` (extension or number, digits with an optional `+`). 404 when the call is not found or does not involve the user's extension; 422 for the user's own extension; 502 when Cloudonix refuses (the call stays connected) |
 | GET | `/v1/webphone/session?call_id=` | The Cloudonix session token of the user's call, named by its SIP Call-ID; 404 until Cloudonix has reported the session |
 | GET | `/v1/webphone/directory` | The organization's active user extensions other than the user's own, with the user's name, for transfer suggestions |

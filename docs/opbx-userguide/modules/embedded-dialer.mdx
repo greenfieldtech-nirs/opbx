@@ -169,7 +169,7 @@ document.querySelector('#call-lead').addEventListener('click', () => {
 });
 ```
 
-The embedded phone stays registered while the page is open, even when the panel is closed, and an incoming call opens the panel. Several tabs showing the dialer for the same user share one registration: the first tab holds it, the others show "Web Phone is active in another tab" with a **Use here** button, and the next tab takes over when the first one closes. This is independent of the OPBX app's own Web Phone. A host `close` during a call is ignored and answered with the `close.rejected` event; outside a call it closes the panel.
+The embedded phone stays registered while the page is open, even when the panel is closed, and an incoming call opens the panel. Several tabs showing the dialer for the same user share one registration: the first tab holds it, the others show "Web Phone is active in another tab" with a **Use here** button, and the next tab takes over when the first one closes. This is independent of the OPBX app's own Web Phone. The embedded phone applies the user's [Web Phone settings](/opbx/modules/web-phone#change-the-web-phone-settings) (auto-answer, keep-alive, refresh on hangup) but has no **Settings** tab: they can only be changed in OPBX. A host `close` during a call is ignored and answered with the `close.rejected` event; outside a call it closes the panel.
 
 ## Security model
 
