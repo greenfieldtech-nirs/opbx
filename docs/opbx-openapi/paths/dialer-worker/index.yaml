@@ -189,6 +189,15 @@ paths:
 
         `meta.total` is the number of rows returned; `meta.offset` is always 0.
 
+
+        A call queue campaign with `wait_for_available_agents` returns no destinations and
+
+        `meta.waiting_for_agents: true` while no agent of its queue is available (AVAILABLE
+
+        in the ACD worker and not on another call). When the ACD worker cannot be reached the
+
+        campaign is not held.
+
         '
       operationId: getPendingDestinations
       security:
@@ -221,6 +230,9 @@ paths:
                         type: integer
                       offset:
                         type: integer
+                      waiting_for_agents:
+                        type: boolean
+                        description: True when dialing is held until a call queue agent is available (data is then empty)
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '404':
@@ -309,7 +321,11 @@ paths:
 
         + 1, `last_dialed_at` set); if it is not pending the request returns 409 and no
 
-        call is placed. When Cloudonix rejects the call the claim is released (the
+        call is placed. A call queue campaign with `wait_for_available_agents` also returns
+
+        409 (`Waiting for an available agent in the call queue`) while no agent of its queue
+
+        is available; the destination stays pending. When Cloudonix rejects the call the claim is released (the
 
         attempt stays counted) and the request returns 500. On success the campaign
 
@@ -402,7 +418,9 @@ paths:
         '401':
           $ref: ../../components/responses/Unauthorized.yaml
         '409':
-          description: The destination is not pending (already claimed or finished); no call was placed
+          description: >-
+            The destination is not pending (already claimed or finished), or the campaign is waiting
+            for an available call queue agent; no call was placed
           content:
             application/json:
               schema:
@@ -427,7 +445,15 @@ paths:
       summary: Generate CXML for call
       description: 'Generate the CXML document for an answered outbound call, based on the
 
-        campaign routing destination (AI assistant, AI load balancer, or hangup).
+        campaign routing destination: AI assistant, AI load balancer, ring group (a plain
+
+        `<Dial>` to the group''s active members) or hangup; a `call_queue` campaign returns
+
+        500. Not called by the current Go worker: the CXML of a live campaign call is set when
+
+        `calls/initiate` places it, and ring group and call queue calls are routed by the
+
+        signed `/callbacks/voice/campaign-route` callback.
 
         '
       operationId: generateCxml
@@ -467,10 +493,8 @@ paths:
                       cxml:
                         type: string
                       routing_type:
-                        type:
-                        - string
-                        - 'null'
-                        enum: [ai_assistant, ai_load_balancer, hangup, null]
+                        type: string
+                        enum: [ai_assistant, ai_load_balancer, ring_group, hangup]
         '404':
           description: Campaign not found
           content:

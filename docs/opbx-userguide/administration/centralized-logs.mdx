@@ -24,25 +24,34 @@ Call-related entries are shown with the session token as a prefix:
 ## Prerequisites
 
 - The stack is started with Docker Compose. The `logs` profile adds the Loki, Grafana, Alloy and docker-socket-proxy services.
-- Port 80 (the nginx proxy) is reachable from your browser, because Grafana is served at `/logs/`.
-- You can edit `.env`.
+- The OPBX web address is reachable from your browser, because Grafana is served there at `/logs/`.
+- You can edit `.env`, or run `./install.sh`.
 
-## Enable the stack
+## Enable the stack with the installer
 
-1. Make sure `.env` has a Grafana password. It is required, even when the `logs` profile is off, and there is no default; `docker/scripts/generate-secrets.sh` sets one. Also set `LOG_STACK_ENABLED=true`.
+Answer yes to **Collect logs in Grafana?** during `./install.sh`. The installer adds `logs` to `COMPOSE_PROFILES`, sets `LOG_STACK_ENABLED=true`, `GRAFANA_ROOT_URL` (your address plus `/logs/`) and a generated `GRAFANA_ADMIN_PASSWORD`, and starts the stack with it. The final summary lists the Grafana URL and login. `./opbx.sh start` then starts the log stack every time, and `./opbx.sh status` prints the Grafana URL.
+
+## Enable the stack by hand
+
+1. Make sure `.env` has a Grafana password. It is required, even when the `logs` profile is off, and there is no default; `docker/scripts/generate-secrets.sh` sets one. Also set `LOG_STACK_ENABLED=true`, and add `logs` to `COMPOSE_PROFILES` so that `./opbx.sh start` includes the log stack.
 
    ```bash
    LOG_STACK_ENABLED=true
+   COMPOSE_PROFILES=logs
    GRAFANA_ADMIN_PASSWORD=<a long random value, for example from: openssl rand -hex 32>
    ```
 
-2. Start the profile:
+   If `COMPOSE_PROFILES` already lists other profiles, separate them with commas (for example `dev,logs`).
+
+2. Start the stack:
 
    ```bash
-   docker compose --profile logs up -d
+   ./opbx.sh start
    ```
 
-3. Open `http://localhost/logs/` (or your public URL plus `/logs/`) and log in as `admin` with `GRAFANA_ADMIN_PASSWORD`.
+   `docker compose --profile logs up -d` also works.
+
+3. Open `http://localhost/logs/` (or your public URL plus `/logs/`) and log in as `admin` with `GRAFANA_ADMIN_PASSWORD`. Grafana keeps the password it first started with: to change it later, change it inside Grafana.
 
 Two dashboards are provisioned: **OPBX Call Flow Logs** (with the session-token audit-trail filter) and **OPBX Platform Logs**. Both have a free-text search box. Click a log row to see its parsed fields in the details panel.
 
@@ -56,7 +65,7 @@ Two dashboards are provisioned: **OPBX Call Flow Logs** (with the session-token 
 | `GRAFANA_ADMIN_USER` | `admin` | Grafana admin user name |
 | `GRAFANA_ADMIN_PASSWORD` | none | Grafana admin password. Required: Compose refuses to start any service while it is unset |
 | `GRAFANA_ROOT_URL` | `http://localhost/logs/` | Must match the URL your browser uses. A mismatch makes Grafana refuse dashboard queries with "origin not allowed" |
-| `GRAFANA_CSRF_TRUSTED_ORIGINS` | empty | Extra hostnames that reach the UI (for example an ngrok or second domain). Space-separated, no scheme |
+| `GRAFANA_CSRF_TRUSTED_ORIGINS` | empty | Extra hostnames that reach the UI (for example an ngrok or second domain). Space-separated, no scheme. On a development install the installer fills it from the allowed host names |
 | `LOKI_RETENTION_HOURS` | `168` | How long logs are kept (7 days) |
 
 Restart Grafana after changing these: `docker compose --profile logs up -d --force-recreate grafana`.

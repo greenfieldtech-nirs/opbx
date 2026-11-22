@@ -9,8 +9,8 @@ paths:
         `Origin` and allows the `Authorization` and `Content-Type` headers, with a 600 second
         max age. Not token-authenticated, because preflight requests cannot carry the bearer
         token. The real GET enforces the token and the origin allowlist (`embed_allowed_domains`).
-        The same preflight answer is returned for any `OPTIONS /v1/embed/*` path,
-        including `/v1/embed/calls-log`.
+        The same preflight answer is returned for any `OPTIONS /v1/embed/*` path
+        (`calls-log`, `transfer`, `directory`, `session`).
       operationId: embedConfigPreflight
       security: []
       responses:
@@ -24,7 +24,7 @@ paths:
             Access-Control-Allow-Methods:
               schema:
                 type: string
-                example: GET, OPTIONS
+                example: GET, POST, OPTIONS
             Access-Control-Allow-Headers:
               schema:
                 type: string
@@ -108,6 +108,17 @@ paths:
                       country:
                         type: string
                         example: us
+                      settings:
+                        type: object
+                        description: Web Phone settings from the user's Cloudonix subscriber profile, as in `GET /v1/webphone/config`.
+                        properties:
+                          auto_answer: { type: boolean, example: false }
+                          keep_alive: { type: boolean, example: true }
+                          refresh_on_hangup: { type: boolean, example: true }
+                      transfer_enabled:
+                        type: boolean
+                        description: The embed token's "Allow call transfer" switch (`allow_transfer`); when false the widget offers no transfer and `POST /v1/embed/transfer` answers 403.
+                        example: false
         '401':
           description: Missing or invalid embed token
           content:
@@ -198,11 +209,14 @@ paths:
                           example: 125
                         duration_formatted:
                           type: string
-                          description: MM:SS
+                          description: MM:SS (minutes are not wrapped into hours)
                           example: '02:05'
                         disposition:
-                          type: string
-                          example: answered
+                          type:
+                            - string
+                            - 'null'
+                          description: Cloudonix CDR disposition
+                          example: ANSWER
         '401':
           description: Missing or invalid embed token
           content:
@@ -229,5 +243,144 @@ paths:
                 inactive:
                   value:
                     message: Embed token is not active.
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+
+  /v1/embed/transfer:
+    post:
+      tags:
+        - Embedded Dialer
+      summary: Blind-transfer the embedded dialer's call
+      description: |
+        Same as `POST /v1/webphone/transfer` for the embed token's target user. Only when the embed
+        token has "Allow call transfer" on (`allow_transfer`), otherwise 403. Like `GET /v1/embed/config`,
+        a request without an `Origin` header is accepted only when the browser marks it
+        `Sec-Fetch-Site: same-origin` (the widget iframe). Rate limited to 60 requests per minute per
+        token and IP.
+      operationId: transferEmbedCall
+      security:
+        - embedTokenAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [call_id, destination]
+              properties:
+                call_id:
+                  type: string
+                  maxLength: 255
+                  description: SIP Call-ID of the widget's leg.
+                destination:
+                  type: string
+                  pattern: '^\+?[0-9]{1,20}$'
+                  description: Extension number or phone number (digits, optional leading `+`).
+                  example: '1002'
+      responses:
+        '200':
+          description: The transfer was started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      transferred: { type: boolean, example: true }
+        '401':
+          description: Missing or invalid embed token
+        '403':
+          description: Origin not allowed or missing, token's user or organization not active, or call transfer not enabled for this embedded dialer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Call transfer is not enabled for this embedded dialer.
+        '404':
+          description: The user has no extension, or the call was not found (it may have ended)
+        '422':
+          description: Validation failed, or `destination` is the user's own extension
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+        '502':
+          description: Cloudonix did not accept the transfer; the call is still connected
+
+  /v1/embed/directory:
+    get:
+      tags:
+        - Embedded Dialer
+      summary: Extensions to suggest as transfer targets (embedded dialer)
+      description: |
+        Same list as `GET /v1/webphone/directory` for the embed token's target user. Requires
+        `allow_transfer` on the token and a widget request (an `Origin`, or `Sec-Fetch-Site: same-origin`),
+        otherwise 403.
+      operationId: getEmbedDirectory
+      security:
+        - embedTokenAuth: []
+      responses:
+        '200':
+          description: Directory entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        extension_number: { type: string, example: '1002' }
+                        name: { type: [string, 'null'], example: Sam Agent }
+        '401':
+          description: Missing or invalid embed token
+        '403':
+          description: Origin not allowed or missing, token's user or organization not active, or call transfer not enabled
+        '429':
+          $ref: '../../components/responses/TooManyRequests.yaml'
+
+  /v1/embed/session:
+    get:
+      tags:
+        - Embedded Dialer
+      summary: Cloudonix session token of the embedded dialer's call
+      description: |
+        Same as `GET /v1/webphone/session` for the embed token's target user. Requires a widget request
+        (an `Origin`, or `Sec-Fetch-Site: same-origin`), otherwise 403; does not require `allow_transfer`.
+      operationId: getEmbedSession
+      security:
+        - embedTokenAuth: []
+      parameters:
+        - name: call_id
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 255
+      responses:
+        '200':
+          description: Session token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      session_token: { type: string }
+        '401':
+          description: Missing or invalid embed token
+        '403':
+          description: Origin not allowed or missing, or the token's user or organization is not active
+        '404':
+          description: The call was not found (not reported yet, or not the user's)
+        '422':
+          $ref: '../../components/responses/ValidationError.yaml'
         '429':
           $ref: '../../components/responses/TooManyRequests.yaml'

@@ -33,7 +33,7 @@ sequenceDiagram
     OPBX->>OPBX: Match destination against Outbound Whitelist
     Note over OPBX: No match → call rejected
     OPBX->>OPBX: Resolve outbound caller ID
-    OPBX->>Cloudonix: CXML &lt;Dial callerId="..."&gt; via trunk
+    OPBX->>Cloudonix: CXML Dial with the caller ID, via trunk
     Cloudonix->>Destination: Places call, presenting caller ID
 ```
 

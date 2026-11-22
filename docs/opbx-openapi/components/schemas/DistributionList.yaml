@@ -65,6 +65,12 @@ properties:
     - 'null'
     description: When the list was assigned to a campaign (`Y-m-d H:i:s`)
     example: '2024-01-15 14:30:00'
+  original_filename:
+    type:
+    - string
+    - 'null'
+    description: Name of the last uploaded file (null until a file is uploaded)
+    example: leads.csv
   statistics:
     type: object
     description: List statistics (the counters are `null` in the create response)
@@ -187,6 +193,13 @@ properties:
       name:
         type: string
         example: Previous Campaign
+      status:
+        type: string
+        enum: [draft, active, paused, completed, archived]
+        example: completed
+      status_label:
+        type: string
+        example: Completed
 required:
 - id
 - name

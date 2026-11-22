@@ -52,6 +52,9 @@ properties:
     - integer
     - 'null'
     description: Billable seconds of the last call
+  total_duration:
+    type: integer
+    description: Cumulative call duration in seconds across all attempts
   last_error:
     type:
     - string

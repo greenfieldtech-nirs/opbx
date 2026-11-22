@@ -16,7 +16,7 @@ Before you start:
 
 - An Auth0 tenant (the free tier is sufficient).
 - OPBX deployed behind HTTPS. Auth0 requires TLS redirect URIs in production.
-- `OPBX_SAAS_ENABLED=true` in your OPBX `.env` file.
+- `OPBX_SAAS_ENABLED=true` in your OPBX `.env` file (the installer sets it when you enable Auth0 sign-in).
 - (Optional) Transactional email configured if you plan to send user invitations.
 
 ## Supported Providers
@@ -54,7 +54,9 @@ The callback must point to the frontend route `/ui/auth/callback`. This page exc
 
 ## OPBX Environment Configuration
 
-Add the following variables to your OPBX `.env` file:
+The installer can do this for you: answer yes to **Allow sign-in with Google or GitHub through Auth0?** and give it the Auth0 domain, client ID, client secret and providers. It shows the callback address to add in Auth0 (`<your public address>/ui/auth/callback`) and writes the variables below, with `AUTH0_REDIRECT_URI` set to that address. When you change the public address later with `./install.sh reconfigure`, it updates `AUTH0_REDIRECT_URI` too; update **Allowed Callback URLs** in Auth0 to match.
+
+For a manual setup, or to turn Auth0 on after installing, add the following variables to your OPBX `.env` file:
 
 ```bash
 OPBX_SAAS_ENABLED=true
@@ -111,7 +113,7 @@ Once configured, the **Login** (`/ui/login`) and **Register** (`/ui/register`) p
 
 The end-user screens and messages are described in [Auth0 Syndicated Authentication](/opbx/modules/auth0-syndicated-auth).
 
-{/* SCREENSHOT: auth0-login-buttons — sign-in page with email and password fields and the Google and GitHub buttons below */}
+![Sign-in page with the email and password fields and the Google and GitHub buttons under Or continue with](../img/screens/login-page.jpg)
 
 ## Linking and Unlinking Identities
 

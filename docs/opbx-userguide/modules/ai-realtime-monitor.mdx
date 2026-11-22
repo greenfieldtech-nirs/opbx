@@ -10,32 +10,85 @@ description: "A slide-show of live figures for your AI assistants and AI load ba
 
 The AI Real Time Monitor shows, at a glance, how your [AI assistants](/opbx/modules/ai-assistants) and [AI load balancers](/opbx/modules/ai-load-balancers) are doing right now. It runs as a slide-show, so it can stay open on a wall screen: the **Assistants** view and the **Load Balancers** view take turns every 30 seconds, or at the interval you choose.
 
-Open it from **AI Configuration → Real Time Monitor**. Only the **Owner** and **PBX Admin** roles see it.
+## Prerequisites
 
-## Controls
+- At least one AI assistant or AI load balancer. A view with none shows **No AI assistants yet** or **No AI load balancers yet**.
+- You are the **Owner** or a **PBX Admin**.
 
-| Control | What it does |
-|---------|--------------|
-| Time frame | The period the figures cover: the last 1, 5, 15 or 30 minutes, or the last 1, 3, 6 or 12 hours. The default is the last 60 minutes. Your choice is remembered in this browser. |
-| Refresh | How often the slide-show moves to the next view: every 10, 15 or 30 seconds, every minute, or every 2 or 5 minutes. The default is every 30 seconds. Your choice is remembered in this browser. |
-| Assistants / Load Balancers | Jump to a view. The 30-second countdown starts again. |
-| ◀ ▶ | Previous or next view. |
-| Pause / Resume | Stop the slide-show on the current view, or start it again. |
+## Permissions
 
-The cards are laid out to fill the screen: 1 card on its own, up to 4 cards in 2 lines of 2, up to 9 cards 3 to a line, and 4 to a line beyond that (on narrower screens, at most 2 to a line). The figures refresh every 10 seconds. While the browser tab is hidden, the slide-show and the refresh both wait. The bar at the bottom counts down to the next view.
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See **Real Time Monitor** under **AI Configuration** and open the page | Yes | Yes | No | No | No |
+| Read the figures through the API (`GET /v1/ai-monitor`) | Yes | Yes | No | No | No |
 
-Cards are laid out up to three across. With more assistants or load balancers than fit on the screen, the page scrolls; the slide-show keeps alternating between the two views.
+Other roles that open `/ui/ai-monitor` directly see **Access denied** and are sent to the Dashboard.
+
+## Workflows
+
+### Open the monitor
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open **Apps and Security → AI Configuration → Real Time Monitor** in the sidebar.
+2. The page opens on the **Assistants** view. The line under the title shows the view, the time frame and when the figures were last updated, for example **Assistants · last 60 minutes · updated 10:42:17**.
+3. Leave the page open. The figures refresh every 10 seconds, and the bar at the bottom counts down to the next view (**Load Balancers next in 24s**).
+
+![AI Real Time Monitor on the Assistants view: time frame Last 60 minutes, Refresh Every 30 seconds, Assistants selected, and two assistant cards side by side: Aria - Front Desk Receptionist (green ring, 97% success) and Max - Support Triage (amber ring with a "6.2% failed" badge), each with active now, calls, avg duration, AI minutes and the calls over time chart, and the countdown bar to the Load Balancers view at the bottom](../img/screens/ai-monitor-assistants.jpg)
+
+![AI Real Time Monitor on the Load Balancers view: the Front Desk AI Pool card (Round robin, 2 members, 100% handled) with active now, calls, failovers and fell back, a bar per member showing its actual share against the 50% set marker, and the calls over time chart](../img/screens/ai-monitor-load-balancers.jpg)
+
+### Change the time frame
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the **Time frame** list (it shows **Last 60 minutes** at first).
+2. Choose **Last minute**, **Last 5 minutes**, **Last 15 minutes**, **Last 30 minutes**, **Last 60 minutes**, **Last 3 hours**, **Last 6 hours** or **Last 12 hours**.
+
+The figures reload for the new period. Your choice is remembered in this browser.
+
+### Change how often the view changes
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Open the **Refresh** list (it shows **Every 30 seconds** at first).
+2. Choose **Every 10 seconds**, **Every 15 seconds**, **Every 30 seconds**, **Every minute**, **Every 2 minutes** or **Every 5 minutes**.
+
+The countdown starts again from the new interval. Your choice is remembered in this browser. **Refresh** sets only the slide-show: the figures still reload every 10 seconds.
+
+### Switch, pause and resume the slide-show
+
+**Who can do this:** Owner, PBX Admin.
+
+1. Click **Assistants** or **Load Balancers** to jump to a view, or click **◀** or **▶** for the previous or next view. The countdown starts again.
+2. Click **Pause** to stay on the current view. The footer shows **Paused**; the figures keep refreshing.
+3. Click **Resume** to start the slide-show again.
+
+While the browser tab is hidden, the slide-show and the refresh both wait.
+
+## How the cards are laid out
+
+The cards are laid out to fill the screen:
+
+| Cards in the view | Cards per line |
+|-------------------|----------------|
+| 1 | 1 |
+| 2 to 4 | 2 (for example 4 cards in 2 lines of 2) |
+| 5 to 9 | 3 |
+| 10 or more | 4 |
+
+On narrower screens there are at most 2 cards per line, and on a small screen 1. When the cards do not fit on the screen, the page scrolls; the slide-show keeps alternating between the two views.
 
 ## The Assistants view
 
-One card per AI assistant. The coloured edge on the left shows its health over the time frame:
+One card per AI assistant, in name order. The card shows the assistant's name, its provider and when it last got a call. The coloured edge on the left shows its health over the time frame:
 
 | Edge | Meaning |
 |------|---------|
 | Green | Fewer than 5% of its finished calls failed |
-| Amber | 5% to 20% failed |
-| Red | 20% or more failed. The card is also tinted. |
-| Grey | No calls in the time frame |
+| Amber | 5% to 20% failed. A badge shows the share, for example **7% failed**. |
+| Red | 20% or more failed. The card is also tinted and the badge shows the share. |
+| Grey | No calls in the time frame. The badge says **no calls**. |
 
 | Figure | Meaning |
 |--------|---------|
@@ -43,13 +96,13 @@ One card per AI assistant. The coloured edge on the left shows its health over t
 | Active now | Calls the assistant has right now |
 | Calls | Calls handed to the assistant in the time frame |
 | Avg duration | Average talk time of its answered calls (minutes:seconds) |
-| AI minutes | Total talk time of its answered calls |
+| AI minutes | Total talk time of its answered calls, in minutes |
 | Last call | When it last got a call, even if that is before the time frame. A long gap points to an assistant nobody is reaching. |
-| Chart | Calls over the time frame, oldest on the left |
+| Chart | Calls over the time frame in 12 steps, oldest on the left |
 
 ## The Load Balancers view
 
-One card per AI load balancer, with the same colours. Its health is the share of calls that ended in the load balancer's **fallback**.
+One card per AI load balancer, in name order, with the same colours. The card shows the strategy and the number of members. Its health is the share of calls that ended in the load balancer's **fallback**; when any did, the badge shows how many, for example **2 fell back**.
 
 | Figure | Meaning |
 |--------|---------|
@@ -58,20 +111,32 @@ One card per AI load balancer, with the same colours. Its health is the share of
 | Calls | Calls that reached the load balancer in the time frame |
 | Failovers | Times a member failed and **Follow Through** passed the call to the next member |
 | Fell back | Calls where no member could take the call and the fallback ran |
-| Member bars | Each member's share of the load balancer's calls. For the **percentage** strategy the marker shows the share you configured (from the weights), for **round robin** an equal share. For **priority** the member's priority is shown instead. |
+| Member bars | Each member's share of the load balancer's calls. For the **percentage** strategy the marker shows the share you configured (from the weights, for example **40% / 50% set**), for **round robin** an equal share. For **priority** the member's priority is shown instead. Inactive members are dimmed and have no marker. |
 
 Comparing a member's bar with its marker shows whether the load balancer is spreading calls the way it is set up to.
 
 ## What counts as a call
 
-A call counts once for every AI assistant it is handed to. When a load balancer moves a call from a failed member to the next one, the failed member gets a failed call and the next member gets a new one.
+A call counts once for every AI assistant it is handed to, whether it came from routing, a load balancer or an auto-dialer campaign. When a load balancer moves a call from a failed member to the next one, the failed member gets a failed call and the next member gets a new one.
 
 A call counts as **answered** when its call record (CDR) says it connected. AI minutes count only the time after the call reached that assistant.
 
-**Auto-dialer campaigns** count only calls where a person answered: voicemail detection said *human*, or the campaign does not use voicemail detection. Calls that reached voicemail, or where detection could not decide, are left out.
+**Auto-dialer campaigns** count only calls where a person answered: voicemail detection said *human*, or the campaign does not use voicemail detection. Calls that were not answered, reached voicemail, or where detection could not decide count for no assistant.
 
 The monitor starts counting from the day it was installed: earlier calls do not appear. Its data is kept for 30 days (`RETENTION_AI_CALL_ATTEMPTS_DAYS` in `.env`).
 
+## Common errors
+
+| Message | What to do |
+|---------|------------|
+| **The monitor could not load its figures. It will retry shortly.** | The page could not reach the API. It tries again on the next refresh; check your connection if it stays. |
+
 ## API
 
-`GET /v1/ai-monitor?minutes=60` returns the same figures (see the [REST API](/opbxRestOpenAPI)). API keys need the **AI Monitor** (`ai-monitor`) grant; the AI Assistants and AI Load Balancers grants do not cover it, because the monitor shows both.
+`GET /v1/ai-monitor?minutes=60` returns the same figures; `minutes` is 1 to 720 and defaults to 60 (see the [REST API](https://developers.cloudonix.com/opbxRestOpenAPI)). API keys need the **AI Monitor** (`ai-monitor`) grant; the AI Assistants and AI Load Balancers grants do not cover it, because the monitor shows both. See [API Keys](/opbx/modules/api-keys).
+
+## Related modules
+
+- [AI Assistants](/opbx/modules/ai-assistants)
+- [AI Load Balancers](/opbx/modules/ai-load-balancers)
+- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns)

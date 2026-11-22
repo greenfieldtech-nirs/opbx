@@ -53,7 +53,7 @@ info:
       | **Business Hours** | CRUD + duplicate + toggle status |
       | **IVR Menus** | CRUD + voices + toggle status |
       | **Phone Numbers** | DID management |
-      | **AI Assistants** | AI assistant configuration and providers |
+      | **AI Assistants** | AI assistant configuration, providers and the AI Real Time Monitor |
       | **AI Load Balancers** | AI assistant load balancer configuration |
       | **Call Detail Records** | CDR records, statistics, export and recording |
       | **Recordings** | Recording management and download |
@@ -63,8 +63,8 @@ info:
       | **Trunks** | SIP trunk management (proxied from Cloudonix) |
       | **Session Updates** | Real-time call session management + call coaching (spy/whisper/barge) |
       | **Supervisors** | Supervisor assignments + supervisor dashboard |
-      | **Web Phone** | In-browser softphone SIP provisioning + recent calls log (any role with a user extension) |
-      | **Embedded Dialer** | Token-authenticated widget runtime API (config + calls log) |
+      | **Web Phone** | In-browser softphone SIP provisioning, settings, recent calls log, blind transfer, transfer directory and session token (any role with a user extension) |
+      | **Embedded Dialer** | Token-authenticated widget runtime API (config, calls log, blind transfer, transfer directory, session token) |
       | **Call Notifications** | Webhook notification settings, logs and test |
       | **Auto Dialer** | Campaign management, monitoring, lifecycle |
       | **Distribution Lists** | List upload, assignment, management |
@@ -97,6 +97,8 @@ info:
       | `POST /callbacks/voice/conference-pin` | Conference room PIN entry |
       | `POST /callbacks/voice/albs-follow-through` | AI load balancer failover routing |
       | `/callbacks/voice/queue-*` | Call queue polling, dialing and conference callbacks |
+      | `/callbacks/voice/transfer` | Web Phone blind transfer: routes the destination for the moved call (signed URL) |
+      | `/callbacks/voice/campaign-route` | Answered auto-dialer call routed to a ring group or call queue (signed URL) |
 
     ### Platform Manager
 
@@ -219,6 +221,9 @@ paths:
   /callbacks/voice/queue-agent-connect:
     $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-agent-connect'
 
+  /callbacks/voice/queue-agent-join:
+    $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-agent-join'
+
   /callbacks/voice/queue-conference-join:
     $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-conference-join'
 
@@ -230,6 +235,12 @@ paths:
 
   /callbacks/voice/queue-poll:
     $ref: './paths/voice/queue-callbacks.yaml#/paths/~1callbacks~1voice~1queue-poll'
+
+  /callbacks/voice/transfer:
+    $ref: './paths/voice/transfer.yaml#/paths/~1callbacks~1voice~1transfer'
+
+  /callbacks/voice/campaign-route:
+    $ref: './paths/voice/campaign-route.yaml#/paths/~1callbacks~1voice~1campaign-route'
 
   /health:
     $ref: './paths/health.yaml#/paths/~1health'
@@ -542,6 +553,15 @@ paths:
   /v1/embed/calls-log:
     $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1calls-log'
 
+  /v1/embed/transfer:
+    $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1transfer'
+
+  /v1/embed/directory:
+    $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1directory'
+
+  /v1/embed/session:
+    $ref: './paths/embed/index.yaml#/paths/~1v1~1embed~1session'
+
   /v1/extensions:
     $ref: './paths/extensions/index.yaml#/paths/~1v1~1extensions'
 
@@ -748,6 +768,15 @@ paths:
 
   /v1/webphone/settings:
     $ref: './paths/webphone/settings.yaml#/paths/~1v1~1webphone~1settings'
+
+  /v1/webphone/transfer:
+    $ref: './paths/webphone/transfer.yaml#/paths/~1v1~1webphone~1transfer'
+
+  /v1/webphone/directory:
+    $ref: './paths/webphone/transfer.yaml#/paths/~1v1~1webphone~1directory'
+
+  /v1/webphone/session:
+    $ref: './paths/webphone/transfer.yaml#/paths/~1v1~1webphone~1session'
 
   /v1/users:
     $ref: './paths/users/index.yaml#/paths/~1v1~1users'
@@ -1089,7 +1118,7 @@ tags:
   - name: Supervisors
     description: Supervisor role assignments and supervisor-scoped dashboard
   - name: Web Phone
-    description: In-browser softphone (JsSIP/WebRTC) SIP provisioning and recent calls log for any user with a user extension
+    description: In-browser softphone (JsSIP/WebRTC) SIP provisioning, settings, recent calls log and blind transfer for any user with a user extension
   - name: Embedded Dialer
     description: Runtime API of the embeddable dialer widget (Embedded Dialer token)
   - name: Call Notifications

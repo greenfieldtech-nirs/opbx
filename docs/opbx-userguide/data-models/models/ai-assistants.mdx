@@ -7,7 +7,7 @@ title: "AI Assistants and Load Balancers"
 
 # AI Assistants and Load Balancers
 
-AI assistant connections and load balancers.
+AI assistant connections, load balancers, and the record of each call handed to an assistant.
 
 ## AiAssistant
 
@@ -160,6 +160,64 @@ An AI assistant in a load balancer.
 $aiAssistantLoadBalancerMember->loadBalancer() → AiAssistantLoadBalancer (load_balancer_id) [BelongsTo]
 $aiAssistantLoadBalancerMember->aiAssistant() → AiAssistant (ai_assistant_id) [BelongsTo]
 ```
+
+## AiCallAttempt
+
+One hand-off of a call to an AI assistant. The [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) aggregates these rows. A call that a load balancer fails over has one row per assistant it reached.
+
+**Table:** `ai_call_attempts`  
+**Model:** `App\Models\AiCallAttempt`  
+**Tenant scoped:** yes (`OrganizationScope`)  
+**Traits:** `PrunesByRetention`
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | bigint unsigned | No | auto | Primary key |
+| `organization_id` | bigint unsigned | No | - | Tenant. Foreign key to `organizations`, on delete cascade |
+| `ai_assistant_id` | bigint unsigned | Yes | null | Assistant that got the call. Null on a load-balancer row that had no assistant to offer. Foreign key to `ai_assistants`, on delete set null |
+| `ai_assistant_load_balancer_id` | bigint unsigned | Yes | null | Load balancer the call came through, if any. Foreign key to `ai_assistant_load_balancers`, on delete set null |
+| `call_id` | varchar(255) | No | - | Cloudonix session token of the call (the CDR carries the same value) |
+| `source` | varchar(20) | No | - | How the call reached the assistant. Values: `routing`, `load_balancer`, `failover`, `auto_dialer` (cast to `AiCallAttemptSource`) |
+| `status` | varchar(20) | No | - | Values: `in_progress`, `answered`, `failed`, `excluded` (cast to `AiCallAttemptStatus`) |
+| `failure_reason` | varchar(50) | Yes | null | Why the attempt failed: the dial status reported by the load-balancer callback, `no_available_assistant`, `no_result`, or the CDR disposition in lower case |
+| `failed_over` | boolean | No | `false` | The load balancer moved the call on to its next member after this attempt failed |
+| `fell_back` | boolean | No | `false` | The load balancer sent the call to its fallback after this attempt |
+| `started_at` | timestamp | No | - | When the call was handed to the assistant |
+| `ended_at` | timestamp | Yes | null | When the attempt ended |
+| `duration` | int unsigned | Yes | null | Seconds from the hand-off to the end of the attempt |
+| `billsec` | int unsigned | Yes | null | Answered seconds with this assistant (at most `duration`; 0 when not answered) |
+| `created_at` | timestamp | Yes | null |  |
+| `updated_at` | timestamp | Yes | null |  |
+
+**Indexes**
+
+- `ai_call_attempts_ai_assistant_id_started_at_index`: `ai_assistant_id`, `started_at`
+- `ai_call_attempts_ai_assistant_load_balancer_id_foreign`: `ai_assistant_load_balancer_id`
+- `ai_call_attempts_organization_id_call_id_index`: `organization_id`, `call_id`
+- `ai_call_attempts_organization_id_started_at_index`: `organization_id`, `started_at`
+
+**Casts:** `failed_over`, `fell_back` (boolean), `started_at`, `ended_at` (datetime), `duration`, `billsec` (integer)  
+
+**Relationships**
+
+```php
+$aiCallAttempt->aiAssistant() → AiAssistant (ai_assistant_id) [BelongsTo]
+$aiCallAttempt->loadBalancer() → AiAssistantLoadBalancer (ai_assistant_load_balancer_id) [BelongsTo]
+```
+
+`App\Services\AiMonitor\AiCallRecorder` writes the rows. Every write is best effort: a failure is logged and never affects call routing.
+
+| Event | What is written |
+|-------|-----------------|
+| A DID, extension, IVR option or fallback routes to an assistant (`AiAgentRoutingStrategy`), or a load balancer's fallback is an assistant | New row, `source` `routing`, `status` `in_progress` |
+| A load balancer offers the call to a member | New row, `source` `load_balancer` |
+| Follow-through offers the call to the next member | New row, `source` `failover` |
+| The dialer worker starts a campaign call routed to an assistant or load balancer | New row, `source` `auto_dialer` |
+| A member's dial fails (`/api/callbacks/voice/albs-follow-through`) | That row becomes `failed`, with `failed_over` or `fell_back` set |
+| A load balancer has no member to offer | New row with no assistant, `status` `failed`, `failure_reason` `no_available_assistant`, `fell_back` true |
+| The CDR arrives | The last open row becomes `answered` (disposition `CONNECTED`, `ANSWERED` or `ANSWER`) or `failed`; earlier open rows become `failed` with `no_result`. For a campaign call, every row of the call becomes `excluded` unless a person answered (voicemail detection said `human`, or the campaign does not use it) |
+
+`excluded` rows are not counted by the monitor. Rows whose `started_at` is older than `RETENTION_AI_CALL_ATTEMPTS_DAYS` (default 30) are deleted daily by `model:prune`; the monitor itself looks back at most 12 hours. See [Data Retention](/opbx/data-models/configuration/index#data-retention).
 
 ## Related Documentation
 

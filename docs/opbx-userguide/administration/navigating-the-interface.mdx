@@ -19,7 +19,7 @@ Every signed-in page has the same frame:
 - **Activity bar** (far left): one icon per sidebar section. Hover an icon to see the section name; click it to show that section's items in the sidebar. The **Dashboards** icon also opens your dashboard.
 - **Sidebar**: the items of the selected section. Drag its right edge to make it wider or narrower (200 to 400 pixels); the width and the selected section are remembered in your browser.
 - **Header** (top): your name, the queue agent widget when you are a call-queue agent, and the **user menu**.
-- **Web Phone**: a floating softphone, shown when an extension is assigned to you. See [Web Phone](/opbx/modules/web-phone).
+- **Web Phone**: the round phone button in the bottom-right corner of every page opens a floating softphone. It is shown to everyone; it works when a user extension is assigned to you, and otherwise opens with **Web Phone Unavailable**. See [Web Phone](/opbx/modules/web-phone).
 
 ## Sidebar Areas
 
@@ -29,10 +29,12 @@ The sidebar is grouped into sections. Items you cannot use for your role are hid
 |---------|---------------|
 | **Dashboards** | Your home dashboard |
 | **PBX Configuration** | Users, Supervisors, Extensions, Conference Rooms, Ring Groups, Call Queues, IVR Menus, Business Hours, Announcements, Phone Numbers, Trunks |
-| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
+| **Apps and Security** | Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers, Real Time Monitor), Security (Inbound Blacklist, Outbound Whitelist). Shown to Owners, PBX Admins and Reporters only |
 | **Analytics** | Live Calls, Queues Dashboard, Queue Reports, Call Logs, Call Notifications, API Keys |
 | **Supervisor** | Shown to Supervisors instead of the sections above: Dashboard, Live Calls, Call Logs, Users, Ring Groups, Call Queues |
-| **Platform Management** | Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers, and hidden while they [operate as an organization](#operating-as-an-organization-platform-managers) |
+| **Platform Management** | Dashboard, Organizations, Users, Audit Log, Platform Status. Shown only to platform managers (amber icon at the bottom of the activity bar), and hidden while they [operate as an organization](#operating-as-an-organization-platform-managers) |
+
+![Sidebar with the Apps and Security section selected: Auto Dialer (Campaign Manager, Distribution Lists, Real Time Monitor), AI Configuration (AI Assistants, AI Load Balancers, Real Time Monitor) and Security (Inbound Blacklist, Outbound Whitelist)](../img/screens/applications-sidebar.jpg)
 
 Which roles see each item comes from the sidebar configuration. Examples:
 
@@ -45,6 +47,7 @@ Which roles see each item comes from the sidebar configuration. Examples:
 | Phone Numbers | Yes | Yes | No | Yes | No |
 | Auto Dialer, AI Load Balancers | Yes | Yes | No | Yes | No |
 | AI Assistants | Yes | Yes | No (section hidden) | Yes | No |
+| AI Configuration: Real Time Monitor | Yes | Yes | No | No | No |
 | Inbound Blacklist, Outbound Whitelist | Yes | Yes | No | No | No |
 | Live Calls, Queues Dashboard, Queue Reports | Yes | Yes | No | Yes | Live Calls only |
 | Call Logs | Yes | Yes | Yes | Yes | Yes |
@@ -106,14 +109,15 @@ The server enforces the in-use check. The dialog is the display of that result, 
 An **Unprovisioned** badge marks a resource that has at least one route set to **Destination unavailable**. This is the "set up for future use" state. Callers who reach that route hear "Destination doesn't exist" and the call ends.
 
 - The badge appears on the list row and in the edit dialog title.
-- Six resource types can be unprovisioned: IVR menus, phone numbers (DIDs), ring groups, call queues, AI load balancers and business hours schedules. Each list page has an **Unprovisioned** filter.
-- A new resource must be fully connected when it is created. "Destination unavailable" is only offered on **edit** screens, under **Disconnect**.
+- Six resource types can be unprovisioned: IVR menus, phone numbers (DIDs), ring groups, call queues, AI load balancers and business hours schedules.
+- The IVR Menus, Phone Numbers, Ring Groups, Call Queues and AI Load Balancers pages have an **Unprovisioned** filter. A new resource must be fully connected when it is created; "Destination unavailable" is only offered on their **edit** screens, under **Disconnect**.
+- Business hours schedules have no filter and never offer "Destination unavailable". A schedule becomes unprovisioned only when an action pointed at the extension of a deleted user. Its list row then shows **Unprovisioned** in place of the status badge until you pick a new destination.
 
 ![Ring Groups list with the Unprovisioned filter on and Executive Line showing the Unprovisioned badge](../img/screens/navigating-unprovisioned-filter.jpg)
 
 ### Live Data
 
-Pages with live data (Live Calls, Queues Dashboard, Platform Status) refresh themselves while the browser tab is visible and stop when the tab is hidden. Use the page's refresh control or reload if a value looks stale.
+Pages with live data (Live Calls, Queues Dashboard, AI Real Time Monitor, Platform Status) refresh themselves while the browser tab is visible and stop when the tab is hidden. Use the page's refresh control or reload if a value looks stale.
 
 ### Notifications
 

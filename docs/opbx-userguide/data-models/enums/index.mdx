@@ -209,6 +209,34 @@ Load balancer states.
 | `ACTIVE` | active | Operational |
 | `INACTIVE` | inactive | Disabled |
 
+### AiCallAttemptStatus
+
+State of one hand-off of a call to an AI assistant (AI Real Time Monitor).
+
+**File:** `App\Enums\AiCallAttemptStatus`  
+**Table Column:** `ai_call_attempts.status` (varchar)
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `IN_PROGRESS` | in_progress | The assistant has the call |
+| `ANSWERED` | answered | The call ended answered while this assistant had it |
+| `FAILED` | failed | The assistant did not take the call, or the call ended unanswered |
+| `EXCLUDED` | excluded | Auto-dialer call that did not reach a person (voicemail detection did not say `human`). Not counted as an AI call |
+
+### AiCallAttemptSource
+
+How the call reached the assistant.
+
+**File:** `App\Enums\AiCallAttemptSource`  
+**Table Column:** `ai_call_attempts.source` (varchar)
+
+| Case | Value | Description |
+|------|-------|-------------|
+| `ROUTING` | routing | Voice routing straight to the assistant (DID, extension, IVR, business hours, fallbacks) |
+| `LOAD_BALANCER` | load_balancer | Offered by an AI load balancer |
+| `FAILOVER` | failover | The next load-balancer member after a failed one |
+| `AUTO_DIALER` | auto_dialer | Auto-dialer campaign call |
+
 ## User & Organization Enums
 
 ### UserRole
@@ -491,11 +519,13 @@ Agent states (`AVAILABLE`, `BUSY`, `WRAP_UP`, `LOGGED_OUT`) are not a PHP enum; 
 
 | Case | Value | Description |
 |------|-------|-------------|
-| `GOOGLE` | google | Google |
-| `FACEBOOK` | facebook | Facebook |
-| `MICROSOFT` | microsoft | Microsoft |
-| `GITHUB` | github | GitHub |
-| `X` | x | X (Twitter) |
+| `GOOGLE` | google | Google (Auth0 connection `google-oauth2`) |
+| `GITHUB` | github | GitHub (Auth0 connection `github`) |
+| `FACEBOOK` | facebook | No longer supported for sign-in or linking; kept so rows stored earlier still load |
+| `MICROSOFT` | microsoft | No longer supported (as above) |
+| `X` | x | No longer supported (as above) |
+
+Only Google and GitHub (`SocialIdentityProvider::SUPPORTED`) can be used to sign in or link an identity.
 
 ## API Key Enums
 

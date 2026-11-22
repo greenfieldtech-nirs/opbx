@@ -62,7 +62,7 @@ paths:
             schema:
               allOf:
                 - $ref: '../../components/schemas/BusinessHoursScheduleInput.yaml'
-                - required: [name, timezone, open_hours_action, closed_hours_action, schedule]
+                - required: [name, timezone, open_hours_action, closed_hours_action]
       responses:
         '201':
           description: Business Hours Schedule created
@@ -203,7 +203,7 @@ paths:
       tags:
         - Business Hours
       summary: Delete Business Hours Schedule
-      description: Owner and PBX Admin only. Refused with 409 when the schedule is still referenced by routing (for example a business-hours action on a DID, extension, or IVR menu). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the schedule is still referenced by routing (a DID routed to it, or an IVR menu option or failover that points at it). The 409 body lists the references.
       operationId: deleteBusinessHoursSchedule
       security:
         - bearerAuth: []

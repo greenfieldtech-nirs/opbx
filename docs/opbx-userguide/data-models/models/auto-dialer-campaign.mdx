@@ -23,8 +23,9 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `description` | text | Yes | null | Campaign description |
 | `status` | enum | No | draft | `draft`, `active`, `paused`, `completed`, `archived` |
 | `auto_start` | boolean | No | false | Auto-start when ready |
-| `routing_destination_type` | enum | No | - | `ai_assistant`, `ai_load_balancer`, `hangup` |
+| `routing_destination_type` | enum | No | - | `ai_assistant`, `ai_load_balancer`, `ring_group`, `call_queue`, `hangup` (cast to `RoutingDestinationType`) |
 | `routing_destination_id` | bigint unsigned | Yes | null | Target destination ID |
+| `wait_for_available_agents` | boolean | No | false | Call queue routing only: hold dialing while no agent of the queue is available (see below) |
 | `dial_timeout` | smallint unsigned | No | 60 | Seconds to ring before timeout |
 | `destination_connect` | enum | No | connected | `connected` or `immediately` |
 | `caller_id` | varchar(255) | No | - | Default Caller ID, E.164 |
@@ -69,7 +70,9 @@ The `AutoDialerCampaign` model represents an outbound dialing campaign with conf
 | `adc_dates_idx` | `start_date`, `end_date` |
 | `auto_dialer_campaigns_routing_destination_id_foreign` | `routing_destination_id` |
 
-`organization_id` references `organizations` with `ON DELETE CASCADE`. `routing_destination_id` has no foreign key constraint: it points to an AI assistant or an AI load balancer depending on `routing_destination_type`.
+`organization_id` references `organizations` with `ON DELETE CASCADE`. `routing_destination_id` has no foreign key constraint: it points to an AI assistant or an AI load balancer depending on `routing_destination_type` (an AI assistant, an AI load balancer, a ring group or a call queue).
+
+`wait_for_available_agents` applies only when `routing_destination_type` is `call_queue` (`CampaignAgentAvailability`). While no agent of the queue is `AVAILABLE` in the ACD worker with an extension that is not on another call, the dialer worker gets no pending destinations and an initiate is refused with 409 before the destination is claimed, so the number stays pending. When the ACD worker cannot be reached, the campaign keeps dialing.
 
 ## Relationships
 
@@ -116,6 +119,8 @@ campaign.callerIds() → DidNumber[]
 |------|-------|
 | `AI_ASSISTANT` | ai_assistant |
 | `AI_LOAD_BALANCER` | ai_load_balancer |
+| `RING_GROUP` | ring_group |
+| `CALL_QUEUE` | call_queue |
 | `HANGUP` | hangup |
 
 ### CallerIdStrategy

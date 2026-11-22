@@ -83,7 +83,7 @@ Store the webhook key securely. Anyone with this key could potentially send fake
 
 OPBX automatically configures the webhook URLs for Cloudonix callbacks. The effective base URL is resolved in this priority order:
 
-1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable, whenever it is set to a valid http(s) URL (required when `OPBX_APPLICATION_MODE=production`). The Settings page then shows it read-only as **Webhook Base URL (Application Level)** ("Managed by system administrator") and hides the endpoint fields.
+1. `OPBX_APPLICATION_WEBHOOK_BASEURL` environment variable, whenever it is set to a valid http(s) URL (required when `OPBX_APPLICATION_MODE=production`). The Settings page then shows it read-only as **Webhook Base URL (Application Level)** ("Managed by system administrator") and hides the endpoint fields. The installer sets both to your public address when you answer that the server runs **many customer organizations**, and leaves them unset for **just my company**.
 2. The **Webhook Base URL** field saved on the Settings page
 3. `APP_URL` from the `.env` file
 
@@ -119,17 +119,18 @@ Enter the public base address in the **Webhook Base URL** field on the Settings 
 
 For local development, use ngrok to expose your local OPBX instance:
 
-1. Add your ngrok authtoken to `.env`:
+1. Add your ngrok authtoken to `.env` (a development install made with `./install.sh` asks for it and writes it):
    ```bash
    NGROK_AUTHTOKEN=your_token_here
    ```
 
-2. Start the tunnel (it is in the `dev` profile, so a plain `up` does not start it):
+2. Start the stack with the tunnel (ngrok is in the `dev` profile, so a plain start does not run it):
    ```bash
-   docker compose --profile dev up -d ngrok
+   ./opbx.sh start --with-ngrok
    ```
+   When you gave the installer an ngrok token, `COMPOSE_PROFILES` already contains `dev` and `./opbx.sh start` runs ngrok every time. `docker compose --profile dev up -d ngrok` starts only the tunnel.
 
-3. Access the ngrok dashboard at `http://localhost:4040` to see your public URL.
+3. Access the ngrok dashboard at `http://localhost:4040` (or run `./opbx.sh logs ngrok`) to see your public URL.
 
 4. Copy the HTTPS URL, enter it in **Webhook Base URL** on the Settings page and click **Validate and Save Settings**.
 
@@ -180,11 +181,12 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 | "Invalid credentials" error | Verify Domain UUID and API key are correct and belong to the same domain |
 | Webhooks not received | Check webhook base URL is publicly accessible; verify firewall rules |
 | Calls fail to connect | Ensure extensions are synced to Cloudonix (**Sync Extensions**); check SIP credentials |
-| "Settings saved, but not synced to Cloudonix" | The local save worked but the push to Cloudonix or the voice application setup failed. Check the reason in the toast and `docker compose logs app`, then save again |
+| "Settings saved, but not synced to Cloudonix" | The local save worked but the push to Cloudonix or the voice application setup failed. Check the reason in the toast and `./opbx.sh logs app`, then save again |
+| Public address changed | After `./install.sh reconfigure` changes the address of a server for just your company, click **Validate and Save Settings** again so the new webhook address reaches Cloudonix |
 | "This Cloudonix domain is already registered to another organization." | Each Cloudonix domain can be connected to one OPBX organization only |
 | No audio on calls | Verify NAT settings; check Cloudonix media server connectivity |
 | Voice app update fails | OPBX reconciles stale voice apps automatically; verify the stored `voice_application_name` matches Cloudonix |
 
 :::info Support
-For Cloudonix-specific issues, consult the [Cloudonix documentation](https://developers.cloudonix.com/). For OPBX integration issues, check the application logs with `docker compose logs -f app`.
+For Cloudonix-specific issues, consult the [Cloudonix documentation](https://developers.cloudonix.com/). For OPBX integration issues, check the application logs with `./opbx.sh logs app`.
 :::

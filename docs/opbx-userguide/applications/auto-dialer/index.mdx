@@ -3,24 +3,25 @@ sidebar_position: 1
 slug: /applications/auto-dialer
 sidebar_class_name: cxGuidesSidebar
 title: Auto Dialer Overview
-description: Outbound campaigns that dial a distribution list on a schedule and connect answered calls to an AI assistant
+description: Outbound campaigns that dial a distribution list on a schedule and connect answered calls to an AI assistant, a load balancer, a ring group or a call queue
 ---
 
 # Auto Dialer Overview
 
-The Auto Dialer places outbound calls for you. A **campaign** dials every number on a **distribution list**, inside a weekly schedule, at a rate you control, and connects each answered call to an **AI assistant** or an **AI load balancer** (or hangs up, for testing). Optional answering machine detection hangs up on, or keeps, calls that reach a voicemail.
+The Auto Dialer places outbound calls for you. A **campaign** dials every number on a **distribution list**, inside a weekly schedule, at a rate you control, and connects each answered call to an **AI assistant**, an **AI load balancer**, a **ring group** or a **call queue** (or hangs up, for testing). Optional answering machine detection hangs up on, or keeps, calls that reach a voicemail.
 
 ## Purpose
 
-Use the Auto Dialer for outbound work such as webinar follow-ups, appointment reminders, surveys and lead qualification, where an AI assistant holds the conversation.
+Use the Auto Dialer for outbound work such as webinar follow-ups, appointment reminders, surveys and lead qualification, where an AI assistant holds the conversation, or for callback and outreach work where agents take the answered calls.
 
 ## Prerequisites
 
 1. **Role.** You are the **Owner** or a **PBX Admin**. A **Reporter** sees the three Auto Dialer pages read-only; PBX Users and Supervisors do not see them.
-2. **A routing destination.** An [AI assistant](/opbx/modules/ai-assistants) or an [AI load balancer](/opbx/modules/ai-load-balancers). See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations).
+2. **A routing destination.** An [AI assistant](/opbx/modules/ai-assistants), an [AI load balancer](/opbx/modules/ai-load-balancers), a [ring group](/opbx/modules/ring-groups) or a [call queue](/opbx/modules/call-queues). See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations).
 3. **At least one caller ID.** An **active** phone number of your organization, used as the caller ID. See [Phone Numbers](/opbx/modules/phone-numbers).
 4. **The dialer worker is running.** The Go dialer worker places the calls. It runs as a single replica. See [Dialer Worker](/opbx/workers/dialer-worker).
 5. **For voicemail detection:** the AMD worker is running. See [AMD Worker](/opbx/workers/amd-worker).
+6. **For call-queue campaigns:** the ACD worker is running, as for any call queue. See [ACD Worker](/opbx/workers/acd-worker).
 
 ## The three pages
 
@@ -42,16 +43,17 @@ graph LR
     Worker[Dialer worker] -->|polls every 10 s| API
     API -->|create call| CX[Cloudonix]
     CX -->|dials| Callee[Callee phone]
-    CX -->|connects answered call| AI[AI assistant]
+    CX -->|connects answered call| DEST["AI assistant, load balancer, ring group or call queue"]
+    CX -->|"ring group or queue: fetches the routing"| API
     CX -->|status and CDR webhooks| API
     CX -.->|audio stream when AMD is on| AMD[AMD worker]
     AMD -.->|verdict| API
 ```
 
 1. Every poll (10 seconds by default), the dialer worker asks OPBX for campaigns that are **Active and inside their schedule**.
-2. For each one it fetches a batch of pending numbers, picks a caller ID from the campaign's pool and asks OPBX to place each call, paced by the campaign's rate limits.
+2. For each one it fetches a batch of pending numbers (none while a call-queue campaign [waits for an available agent](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents)), picks a caller ID from the campaign's pool and asks OPBX to place each call, paced by the campaign's rate limits.
 3. OPBX claims the number, builds the call instructions for the routing destination and asks Cloudonix to dial.
-4. When the callee answers, Cloudonix connects the call to the AI assistant.
+4. When the callee answers, Cloudonix connects the call to the AI assistant or load balancer. For a ring group or call queue, Cloudonix asks OPBX, which routes the live call there exactly as it routes an inbound call.
 5. Cloudonix reports the outcome to OPBX, which updates the number's status and the campaign counters.
 
 The dialer worker has no schedule logic of its own: OPBX decides which campaigns may dial right now.
@@ -61,7 +63,7 @@ The dialer worker has no schedule logic of its own: OPBX decides which campaigns
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> Active: Start (needs a list)
+    Draft --> Active: Start or auto-start (needs a list)
     Active --> Paused: Pause
     Paused --> Active: Resume
     Active --> Completed: every number finished

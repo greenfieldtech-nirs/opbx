@@ -157,6 +157,10 @@ paths:
                             billsec:
                               type: integer
                               example: 0
+                            total_duration:
+                              type: integer
+                              description: Cumulative seconds across all attempts
+                              example: 0
                             last_cdr_id:
                               type:
                               - integer

@@ -29,7 +29,9 @@ The AMD Worker solves the problem of detecting voicemail systems during outbound
 4. **Analyzes** segments with two complementary detectors:
    - **ML Detector (`beep_ml`)**: Uses an ONNX model with MFCC features to classify beep tones.
    - **Energy Detector (`tone_energy`)**: Uses FFT-based spectral analysis to detect stable tones in the 300–1000 Hz band.
-5. **Reports** the result (`voicemail`, `human`, or `unknown`) back to the Laravel backend via HTTP POST to `/voice/amd-action`.
+5. **Reports** the result back to the Laravel backend via HTTP POST to `/api/voice/amd-action`: `voicemail` when a beep is found, `unknown` when the timeout passes without one. (The protocol also has `human`, but no detector produces it today.)
+
+Before it reports anything, the worker checks the stream's session token with Laravel (`POST /api/voice/amd-session`) and closes streams for unknown or inactive sessions.
 
 The service is designed for low latency, high concurrency (up to 100 concurrent streams by default), and graceful degradation if the ML model fails to load.
 
@@ -58,10 +60,11 @@ graph TB
 
     subgraph "OPBX Backend (Laravel)"
         API['/api/voice/amd-action']
+        SESS['/api/voice/amd-session']
     end
 
     CXML -->|&lt;Start&gt;&lt;Stream&gt;| STREAM
-    STREAM -->|ws://amd-worker:8082/ws/detect| WS
+    STREAM -->|wss://WEBHOOK_BASE/ws/amd/detect<br/>via nginx to amd-worker:8082/ws/detect| WS
     WS --> SH
     SH --> SS
     SS --> VAD
@@ -72,6 +75,7 @@ graph TB
     TED -->|FFT + Energy| EA[EnergyAnalyzer]
     DP --> CB
     CB -->|HTTP POST + Bearer| API
+    SH -->|Session check + Bearer| SESS
     HTTP -->|GET /health| METRICS[Metrics JSON]
 ```
 
@@ -92,12 +96,12 @@ graph TB
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
 | Runtime | Java (Eclipse Temurin) | 21 | Language runtime |
-| Framework | Eclipse Vert.x | 5.0.10 | Async event-driven framework |
-| Serialization | Jackson | 2.19.0 | JSON parsing for stream protocol |
-| ML Inference | ONNX Runtime | 1.22.0 | Run `beep_detector.onnx` model |
-| FFT / DSP | JTransforms | 3.1 | Fast Fourier Transform for spectral analysis |
-| Logging | SLF4J + SimpleLogger | 2.0.16 | Structured logging |
-| Testing | JUnit Jupiter | 5.12.2 | Unit tests |
+| Framework | Eclipse Vert.x | 5.2.3 | Async event-driven framework |
+| Serialization | Jackson | 2.23.0 | JSON parsing for stream protocol |
+| ML Inference | ONNX Runtime | 1.32.0 | Run `beep_detector.onnx` model |
+| FFT / DSP | JTransforms | 3.2 | Fast Fourier Transform for spectral analysis |
+| Logging | SLF4J + Logback + logstash-logback-encoder | 2.0.20 / 1.6.7 / 9.0 | JSON logs on stdout (collected by the log stack) |
+| Testing | JUnit Jupiter | 6.1.3 | Unit tests |
 | Build | Apache Maven | 3.9+ | Dependency management & packaging |
 | Container | Docker | — | Multi-stage build (Maven → JRE) |
 
@@ -111,7 +115,7 @@ amd-worker/
 ├── pom.xml                             # Maven build configuration
 ├── models/
 │   └── beep_detector.onnx              # ONNX model for beep detection
-├── scripts/                            # Helper scripts (if any)
+├── scripts/                            # generate_model.py, test-websocket.ts (WebSocket test client)
 ├── src/
 │   ├── main/java/com/cloudonix/opbx/amd/
 │   │   ├── Main.java                   # Entry point: loads Config, deploys verticle
@@ -142,13 +146,17 @@ amd-worker/
 │   │   │   └── OnnxModel.java          # ONNX Runtime wrapper
 │   │   └── metrics/
 │   │       └── MetricsService.java     # Atomic metrics (streams, detections, errors)
+│   ├── main/resources/logback.xml      # JSON console logging
 │   └── test/java/com/cloudonix/opbx/amd/
+│       ├── ConfigTest.java, LogFormatTest.java, DebugToneDetector.java
+│       ├── audio/                        # AudioDumperTest, EnergyVadTest
+│       ├── stream/                       # CallbackPostTest, StreamHandlerAuthTest
 │       └── detector/
+│           ├── DetectionPipelineTest.java
 │           ├── OfflineToneTest.java      # Offline analysis of dumped WAV files
 │           ├── AnalyzeFalsePositive.java # False-positive analysis tool
 │           ├── AnalyzeAllBeeps.java      # Batch beep analysis
-│           ├── CompareBeepCharacteristics.java # Beep characteristic comparison
-│           └── DebugToneDetector.java    # Tone detector debug utility
+│           └── CompareBeepCharacteristics.java # Beep characteristic comparison
 └── target/                             # Maven build output (gitignored)
 ```
 
@@ -198,11 +206,14 @@ docker run -p 8082:8082 -p 8083:8083 \
 The service is typically started as part of the full OPBX stack:
 
 ```bash
-cd /path/to/opbx.cloudonix.com
-docker compose up -d
+cd /path/to/opbx
+./opbx.sh start            # or: docker compose up -d amd-worker
 ```
 
 > **Important:** Wait 120 seconds after a Docker Compose restart before testing, to allow all services to fully initialize.
+
+The container publishes no host ports. Cloudonix reaches it through nginx at `/ws/amd/` (rewritten to `/ws/` on
+`amd-worker:8082`); the health port 8083 is internal.
 
 ---
 
@@ -225,6 +236,7 @@ export AMD_HTTP_PORT=8083
 export AMD_MODEL_PATH="./models/beep_detector.onnx"
 export AMD_MAX_CONCURRENT_STREAMS=100
 export AMD_DEFAULT_TIMEOUT_SECONDS=30
+export AMD_MIN_BEEP_START_MS=2000
 export AMD_DETECTORS="beep_ml,tone_energy"
 export AMD_LOG_LEVEL="info"
 export AMD_DUMP_AUDIO="false"
@@ -245,7 +257,7 @@ flowchart TD
     A[Audio Chunk<br/>20ms mu-law] --> B[Base64 Decode]
     B --> C[mu-law → PCM16]
     C --> D[Resample 8kHz → 16kHz]
-    D --> E{Total Audio ≥ 11.5s?}
+    D --> E{"Total audio ≥ AMD_MIN_BEEP_START_MS (2 s)?"}
     E -->|Yes| F[Rolling Buffer<br/>Tone Check]
     E -->|No| G[Skip Tone Check]
     F --> H{Tone Detected?}
@@ -264,7 +276,7 @@ flowchart TD
     R --> S{Stable Tone?}
     S -->|Yes| I
     S -->|No| T[Continue Streaming]
-    I --> U[Send Callback<br/>POST /voice/amd-action]
+    I --> U[Send Callback<br/>POST /api/voice/amd-action]
     U --> V[Close WebSocket]
     T --> A
 ```
@@ -274,13 +286,14 @@ flowchart TD
 1. **Audio Ingestion**: Every 20 ms, a Base64-encoded mu-law audio chunk arrives.
 2. **Decoding**: `AudioDecoder` converts mu-law → PCM16 → normalized float64.
 3. **Resampling**: Linear resampling from 8 kHz (Cloudonix) to 16 kHz (model requirement).
-4. **Rolling Buffer Check** (after ~11.5 s): A 1.5-second sliding window is analyzed by `ToneEnergyDetector` every 500 ms. This catches beeps that occur in silence (after the greeting ends).
+4. **Rolling Buffer Check** (once `AMD_MIN_BEEP_START_MS` of audio has arrived, default 2 s): A 1.5-second sliding window is analyzed by `ToneEnergyDetector` every 500 ms. This catches beeps that occur in silence (after the greeting ends). Tones that start earlier are ignored.
 5. **VAD Segmentation**: `EnergyVad` groups audio into speech segments (200 ms – 3 s).
 6. **Detector Chain**: For each VAD segment:
    - **BeepMlDetector** runs first (async on worker thread). It extracts MFCC features and runs ONNX inference.
    - **ToneEnergyDetector** runs as fallback. It analyzes 20 ms FFT windows for a 400 ms run of stable energy in the 300–1000 Hz band with low coefficient-of-variation (CV ≤ 0.22).
 7. **Resolution**: The first positive detection resolves the pipeline. The result is logged, sent via HTTP callback, and the WebSocket is closed.
 8. **Timeout**: If no detection occurs within the configured timeout (default 30 s), the result is `unknown`.
+9. **Stop**: If Cloudonix sends `stop` first (the call ended), pending VAD segments are flushed and checked once more; with no beep, no callback is sent.
 
 ---
 
@@ -290,48 +303,53 @@ flowchart TD
 sequenceDiagram
     participant L as Laravel Backend
     participant C as Cloudonix CPaaS
+    participant N as nginx
     participant A as AMD Worker
 
-    L->>C: Initiate call with <Start><Stream>
-    Note over L,C: CXML includes ws://amd-worker:8082/ws/detect
-    C->>A: WebSocket CONNECT /ws/detect
+    L->>C: Campaign call CXML with <Start><Stream>
+    Note over L,C: Stream URL: wss://WEBHOOK_BASE/ws/amd/detect
+    C->>N: WebSocket CONNECT /ws/amd/detect
+    N->>A: Proxy to amd-worker:8082/ws/detect
     A-->>C: connected event
-    C->>A: start event (callSid, streamSid, customParameters)
+    C->>A: start event (callSid, streamSid, session, customParameters)
     Note over A: Extract action_human, action_voicemail, action_unknown
+    A->>L: POST /api/voice/amd-session (session token)
+    Note over A,L: Unknown or inactive session: close with 1008
 
     loop Every 20ms
         C->>A: media event (Base64 mu-law audio)
         A->>A: Decode, resample, VAD, detect
     end
 
-    alt Voicemail Beep Detected
+    alt Voicemail beep detected
         A->>L: POST /api/voice/amd-action
         Note over A,L: JSON: {callSid, result:"voicemail", action:"HANGUP", ...}
-        A->>C: Close WebSocket
-    else Human Detected
-        A->>L: POST /api/voice/amd-action
-        Note over A,L: JSON: {callSid, result:"human", action:"CONTINUE", ...}
         A->>C: Close WebSocket
     else Timeout
         A->>L: POST /api/voice/amd-action
         Note over A,L: JSON: {callSid, result:"unknown", action:"CONTINUE", ...}
         A->>C: Close WebSocket
+    else Cloudonix sends stop first
+        A->>C: Close WebSocket (no callback without a beep)
     end
 ```
 
 ### CXML Stream Verb
 
-The Laravel backend initiates streaming by returning CXML with a `<Stream>` verb:
+For campaigns with AMD on, Laravel (`AutoDialerCloudonixService`) prepends a `<Start><Stream>` to the call's CXML. The
+URL is the organization's webhook base URL with `ws://`/`wss://` and `/ws/amd/detect`; a `<Parameter>` is added for
+each action the campaign sets:
 
 ```xml
 <Response>
   <Start>
-    <Stream url="ws://amd-worker:8082/ws/detect" track="inbound">
-      <Parameter name="action_human" value="CONTINUE"/>
-      <Parameter name="action_voicemail" value="HANGUP"/>
-      <Parameter name="action_unknown" value="CONTINUE"/>
+    <Stream url="wss://opbx.example.com/ws/amd/detect">
+        <Parameter name="action_voicemail" value="HANGUP"/>
+        <Parameter name="action_human" value="CONTINUE"/>
+        <Parameter name="action_unknown" value="CONTINUE"/>
     </Stream>
   </Start>
+  <!-- the call's own CXML follows -->
 </Response>
 ```
 
@@ -367,17 +385,19 @@ The `action` field is resolved from the `action_*` custom parameters, with defau
 | `AMD_MODEL_PATH` | `./models/beep_detector.onnx` | No | Filesystem path to the ONNX model |
 | `AMD_MAX_CONCURRENT_STREAMS` | `100` | No | Maximum concurrent WebSocket connections |
 | `AMD_DEFAULT_TIMEOUT_SECONDS` | `30` | No | Detection timeout per stream |
+| `AMD_MIN_BEEP_START_MS` | `2000` | No | Tones that start earlier than this are ignored (greeting tones) |
 | `AMD_DETECTORS` | `beep_ml,tone_energy` | No | Comma-separated detector list |
 | `AMD_LOG_LEVEL` | `info` | No | SLF4J log level (`trace`, `debug`, `info`, `warn`, `error`) |
 | `AMD_DUMP_AUDIO` | `false` | No | If `true`, dumps raw audio to WAV files for debugging |
 | `AMD_DUMP_AUDIO_PATH` | `/tmp/amd-dumps` | No | Directory for audio dump files |
-| `AMD_WORKER_API_TOKEN` | *(empty)* | **Yes** | Bearer token for callback authentication |
+| `AMD_WORKER_API_TOKEN` | *(none)* | **Yes** | Bearer token for the callback and session check; the worker refuses to start when it is empty or a shipped default |
 | `AMD_ACTION_CALLBACK_URL` | `http://nginx/api/voice/amd-action` | No | Laravel callback endpoint URL |
+| `AMD_SESSION_CHECK_URL` | `AMD_ACTION_CALLBACK_URL` with `/amd-action` replaced by `/amd-session` | No | Session admission check |
 
 ### Health Endpoint
 
 ```bash
-curl http://localhost:8083/health
+docker compose exec amd-worker wget -qO- http://localhost:8083/health   # port 8083 is not published
 ```
 
 Response:
@@ -451,7 +471,7 @@ Files with beep after 10500ms: 1/1
 
 1. Ensure the full OPBX stack is running:
    ```bash
-   docker compose up -d
+   ./opbx.sh start
    ```
 2. Wait 120 seconds for all services to initialize.
 3. Place an outbound call through OPBX that triggers AMD.
@@ -470,7 +490,7 @@ To verify concurrent stream handling:
 
 ```bash
 # Check active streams via health endpoint
-watch -n 1 'curl -s http://localhost:8083/health | jq .active_streams'
+watch -n 1 'docker compose exec -T amd-worker wget -qO- http://localhost:8083/health | jq .active_streams'
 ```
 
 The service will reject new WebSocket connections with code `1013` if `max_streams` is reached.

@@ -17,7 +17,8 @@ paths:
 
         - No matching call detail record: 200 `No matching call detail record found` (nothing
           is checked or written).
-        - `RecordingStatus` `absent`, or no recording URL: 200 `No recording to download`.
+        - `RecordingStatus` `absent`, or no recording URL: the CDR's recording is marked
+          `failed`; 200 `No recording to download`.
         - Otherwise the CDR's recording is marked `pending` (source URL and duration stored)
           and a download job is queued: 200 `Recording status processed`.
 

@@ -86,6 +86,15 @@ Live call coaching (spy/whisper/barge) is protected by two independent layers
    Cloudonix `<Coach>` verb. This is the authoritative gate — a guessed or replayed
    target is re-checked at call time.
 
+### Call Transfer Authorization
+
+A blind transfer (`POST /v1/webphone/transfer` from the Web Phone, `POST /v1/embed/transfer` from the embedded dialer) names the call by its SIP Call-ID. Every organization member can read the Call-IDs of live calls, so the Call-ID alone does not prove the call is the user's. `CallTransferService::findSession` accepts the call only when a session update from the last 4 hours shows that the user's own extension is on it:
+
+- the session carries the extension's Cloudonix subscriber and the Call-ID is the session's first leg (the extension placed the call) or its newest leg (Cloudonix dialed the extension), or
+- a leg with that Call-ID has the extension as its destination.
+
+Otherwise the request returns 404. The moved session then fetches the signed `/api/callbacks/voice/transfer` URL (HMAC, valid 120 seconds), which routes the destination as a call dialed by the transferring extension, so the outbound whitelist and caller ID rules still apply. The embedded dialer can transfer only when its snippet has **Allow call transfer** on (`user_embed_tokens.allow_transfer`); otherwise the endpoint returns 403.
+
 ---
 
 ## Rate Limiting
@@ -255,6 +264,32 @@ Laravel authenticates to the ACD worker with `ACD_WORKER_API_TOKEN` (Bearer, con
 
 ---
 
+## Web Application Firewall (SafeLine)
+
+The optional SafeLine Community Edition WAF inspects every request at the edge nginx. It is turned on by `./install.sh` (or `./install.sh reconfigure`), or by hand with the `docker-compose.waf.yml` overlay and the SafeLine stack in `docker/safeline`.
+
+```mermaid
+flowchart LR
+    Client["Browser, API client, Cloudonix"] --> Proxy["Your TLS reverse proxy"]
+    Proxy --> Nginx["opbx_nginx (OpenResty + lua-resty-t1k)"]
+    Nginx -->|"T1K, port 8000"| Detector["safeline-detector"]
+    Nginx --> Upstreams["frontend, app, soketi, mcp-server, grafana"]
+    Admin["Administrator"] -->|"WAF_CONSOLE_PORT (9443)"| Nginx
+    Nginx -->|"console"| Mgt["safeline-mgt"]
+```
+
+- With the overlay, `opbx_nginx` is an OpenResty image. `docker/nginx/waf/00-safeline-waf.conf` runs in the `http` context, so every location is inspected once (internal redirects are skipped).
+- `WAF_MODE` sets what happens: `off` (the hook is not loaded), `monitor` (log would-be blocks) or `block` (the detector's verdict returns 403 before Laravel). The overlay defaults to `monitor`.
+- Cloudonix call-control paths (`/api/webhooks/*`, `/api/voice/*`, `/api/callbacks/*`) are always inspected in `monitor` mode, even in `block` mode: a 403 there would drop a live call. They are protected by their own authentication (see [Webhooks](/opbx/architecture/webhooks)).
+- It fails open: if the detector is slow or down (200 ms connect, 500 ms send and read timeouts), the request goes through and nginx logs `safeline-waf: detection failed, failing open`. Would-be blocks are logged as `safeline-waf: would block` in `/var/log/nginx/opbx_error.log`.
+- The SafeLine console is served by `opbx_nginx` on its own port (`WAF_CONSOLE_PORT`, default 9443, plain HTTP) when `WAF_CONSOLE_ENABLED=true`. Limit it with `WAF_CONSOLE_ALLOW` (IPs or CIDRs); without a list only SafeLine's own login protects it.
+
+### Client Address Behind a Proxy
+
+When OPBX runs behind your own reverse proxy, set `TRUSTED_PROXY_CIDR` to the proxy's addresses. Nginx then replaces the client address with the one in `X-Forwarded-For` for requests from those addresses only (`real_ip_recursive on`), so a client that reaches nginx directly cannot choose its address. The WAF and the access logs use that address. See [Configuration Reference](/opbx/data-models/configuration/index#reverse-proxy-and-waf-safeline).
+
+---
+
 ## Container Hardening
 
 - Docker Compose refuses to start without the shared secrets (`DIALER_WORKER_API_TOKEN`, `AMD_WORKER_API_TOKEN`, `ACD_WORKER_API_TOKEN`, `PUSHER_APP_SECRET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`; Grafana in the `logs` profile also needs `GRAFANA_ADMIN_PASSWORD`). `docker/scripts/generate-secrets.sh` fills in missing ones without printing them.
@@ -277,6 +312,7 @@ For production deployments:
 - Run HTTPS in production so Bearer tokens are never sent in clear text and HSTS is effective.
 - Keep `APP_DEBUG=false` in production.
 - Restrict `SANCTUM_STATEFUL_DOMAINS` to your actual domains.
+- Consider the SafeLine WAF (`monitor` first, then `block`), set `TRUSTED_PROXY_CIDR` to your proxy, and restrict the WAF console with `WAF_CONSOLE_ALLOW`.
 
 ---
 

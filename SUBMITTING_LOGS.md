@@ -11,19 +11,28 @@ per-call audit trail to a bug report.
 
 ## 1. Setup: Enabling the Log Stack
 
-The stack is **off by default** and runs as an optional Docker Compose profile.
+The stack is **off by default** and runs as an optional Docker Compose profile (`logs`).
 
-1. Edit your `.env` and set:
+**Installed with `./install.sh`?** Answer yes to "collect logs in Grafana" during the install. The installer sets
+`LOG_STACK_ENABLED=true`, adds `logs` to `COMPOSE_PROFILES`, generates the Grafana admin password and sets
+`GRAFANA_ROOT_URL`, so `./opbx.sh start` starts the log stack with everything else. The final summary shows the
+Grafana login.
+
+**Manual setup:**
+
+1. Edit your `.env`:
 
    ```bash
    LOG_STACK_ENABLED=true
-   GRAFANA_ADMIN_PASSWORD=<pick-a-strong-password>
+   GRAFANA_ADMIN_PASSWORD=<pick-a-strong-password>   # required; docker/scripts/generate-secrets.sh sets one
+   GRAFANA_ROOT_URL=<APP_URL>/logs/                    # must match the URL the browser uses
    ```
 
    Optional knobs (defaults shown):
 
    ```bash
    GRAFANA_ADMIN_USER=admin
+   GRAFANA_CSRF_TRUSTED_ORIGINS=   # extra host names that open Grafana (space-separated, no scheme)
    LOKI_RETENTION_HOURS=168        # 7 days of log retention
    ```
 
@@ -33,11 +42,13 @@ The stack is **off by default** and runs as an optional Docker Compose profile.
    docker compose --profile logs up -d
    ```
 
-3. Give it ~60 seconds to come up (three extra containers: `loki`, `alloy`,
-   `grafana`). Verify:
+   To have `./opbx.sh start` include it every time, add `COMPOSE_PROFILES=logs` to `.env`.
+
+3. Give it ~60 seconds to come up (four extra containers: `loki`, `alloy`,
+   `grafana`, `docker-socket-proxy`). Verify:
 
    ```bash
-   docker compose ps | grep -E "loki|alloy|grafana"
+   docker compose --profile logs ps | grep -E "loki|alloy|grafana|docker-socket-proxy"
    ```
 
 No application changes are needed — all services already emit structured JSON
@@ -55,8 +66,8 @@ logs; the profile only adds collection, storage, and the UI.
    domain, use `<your-base-url>/logs/` instead.
 2. Log in with:
    - **Username**: `admin` (or your `GRAFANA_ADMIN_USER`)
-   - **Password**: your `GRAFANA_ADMIN_PASSWORD` (if you left it empty, the
-     default is `admin` and Grafana asks you to change it on first login)
+   - **Password**: your `GRAFANA_ADMIN_PASSWORD` (there is no default: Docker
+     Compose refuses to start while it is empty)
 
 ---
 
@@ -147,6 +158,7 @@ This exports exactly what your current filters show.
 | Symptom | Fix |
 |---------|-----|
 | `http://localhost/logs/` shows a login page but dashboards are empty | Check the time window (top-right) and wait for traffic; logs start accumulating from stack start |
-| `502` on `/logs/` | The `logs` profile isn't running: `docker compose --profile logs up -d` |
+| `502` on `/logs/` | The `logs` profile isn't running: `docker compose --profile logs up -d` (or add `logs` to `COMPOSE_PROFILES` and run `./opbx.sh restart`) |
+| Dashboards show "origin not allowed" (403) | `GRAFANA_ROOT_URL` does not match the URL in the browser; fix it, or add the host to `GRAFANA_CSRF_TRUSTED_ORIGINS` |
 | "No data" with a session token filter | Token typo, or the call is older than retention (default 7 days) or outside the selected time window |
 | Grafana layout looks broken | Hard-refresh (`Cmd/Ctrl+Shift+R`) — nginx proxies Grafana assets under `/logs/` |

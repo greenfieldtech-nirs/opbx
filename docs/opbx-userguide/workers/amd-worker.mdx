@@ -35,34 +35,22 @@ Streams whose session is not an active auto-dialer call are closed (see Session 
 ## Architecture
 
 ```mermaid
-graph TB
-    CXML[CXML Application]
-    STREAM[WebSocket Audio Stream]
-    WS[WebSocket Server port 8082]
-    HTTP[HTTP Health Server port 8083]
-    SH[StreamHandler]
-    SS[StreamSession]
-    VAD[EnergyVAD]
-    DP[DetectionPipeline]
-    BML[BeepMlDetector]
-    TED[ToneEnergyDetector]
-    CB[Callback Client]
-    API[/api/voice/amd-action]
-
-    CXML --> STREAM
-    STREAM --> WS
-    WS --> SH
-    SH --> SS
-    SS --> VAD
-    SS --> DP
-    DP --> BML
-    DP --> TED
-    BML --> ML[ONNX Model]
+flowchart TB
+    CX["Cloudonix (Start / Stream)"] -->|"wss .../ws/amd/detect"| NGX[Nginx]
+    NGX -->|"/ws/detect"| WS["WebSocket server :8082"]
+    WS --> SH[StreamHandler]
+    SH -->|"session check"| SESS["Laravel /api/voice/amd-session"]
+    SH -->|"mu-law to PCM, 16 kHz"| SS[StreamSession]
+    SS --> VAD[EnergyVad]
+    VAD -->|"speech segments"| DP[DetectionPipeline]
+    DP --> BML[BeepMlDetector]
+    DP --> TED[ToneEnergyDetector]
+    SH -->|"rolling scan every 500 ms"| TED
+    BML --> ML["ONNX model (MFCC features)"]
     TED --> EA[EnergyAnalyzer]
-    DP --> CB
-    CB --> API
-    SH --> SESS[/api/voice/amd-session]
-    HTTP --> Health[Health / Metrics]
+    DP -->|"verdict"| SH
+    SH -->|"POST result"| API["Laravel /api/voice/amd-action"]
+    HTTP["HTTP server :8083"] --> Health["GET /health"]
 ```
 
 ## Build and Run
@@ -72,7 +60,7 @@ graph TB
 The worker starts automatically with the full OPBX stack:
 
 ```bash
-docker compose up -d
+./opbx.sh start
 ```
 
 ### Local Build
@@ -89,8 +77,8 @@ mvn test
 # Build shaded JAR
 mvn package -DskipTests -B
 
-# Run locally
-java -jar target/amd-worker-1.0.0.jar
+# Run locally (the token is required; see the telemetry note below)
+ORT_DISABLE_TELEMETRY=1 AMD_WORKER_API_TOKEN=your-token java -jar target/amd-worker-1.0.0.jar
 ```
 
 ### Docker Build
@@ -105,6 +93,10 @@ docker run -p 8082:8082 -p 8083:8083 \
 ```
 
 The image (`eclipse-temurin:21-jre`) runs as a non-root user (uid 10001). In the compose stack it publishes no ports; Cloudonix reaches it through Nginx at `/ws/amd/`.
+
+:::note No telemetry
+The ONNX runtime that runs the beep model ships a telemetry client. The image sets `ORT_DISABLE_TELEMETRY=1`, so that client never starts, and the worker also turns ONNX telemetry off when it loads the model. When you run the JAR outside the image, set `ORT_DISABLE_TELEMETRY=1` yourself: the in-code switch runs only after the runtime has started, too late to stop the client's first steps.
+:::
 
 ## Environment Variables
 

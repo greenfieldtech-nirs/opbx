@@ -31,40 +31,41 @@ graph TB
         SPA[React SPA]
     end
 
-    SPA -->|UI assets| Nginx[Nginx Reverse Proxy]
-    SPA -->|API /api/*| Nginx
-    SPA -->|WebSocket /app/| Nginx
+    SPA -->|"UI, /api/*, WebSocket /app/"| Nginx[Nginx Reverse Proxy]
+    Cloudonix[Cloudonix CPaaS] -->|"Voice routing, callbacks, status/CDR webhooks"| Nginx
+    Cloudonix -->|"AMD audio stream /ws/amd/"| Nginx
 
-    Nginx -->|/api/*| Laravel[Laravel 12 API]
-    Nginx -->|/app/| Soketi[Soketi / Pusher]
-    Nginx -->|/ws/amd/| AMD[AMD Worker]
-    Nginx -->|/mcp| MCP[MCP Server]
+    Nginx -.->|"Optional WAF check, port 8000"| WAF[SafeLine Detector]
+    Nginx -->|"/ (UI)"| Frontend[Frontend]
+    Nginx -->|"/api/*"| Laravel[Laravel 12 API]
+    Nginx -->|"/app/"| Soketi[Soketi / Pusher]
+    Nginx -->|"/ws/amd/"| AMD[AMD Worker]
+    Nginx -->|"/mcp"| MCP[MCP Server]
 
     Laravel --> MySQL[(MySQL 8.4)]
     Laravel --> Redis[(Redis 7)]
     Laravel --> SeaweedFS[(SeaweedFS S3)]
-    Laravel -->|REST API| Cloudonix[Cloudonix CPaaS]
-    Laravel -->|Queue state, HTTP| ACD[ACD Worker]
+    Laravel -->|REST API| Cloudonix
+    Laravel -->|"Broadcast events"| Soketi
+    Laravel -->|"Queue decisions, HTTP 8084"| ACD[ACD Worker]
     ACD --> Redis
 
-    Cloudonix -->|Voice routing webhooks /api/voice/*, /api/callbacks/voice/*| Laravel
-    Cloudonix -->|Status/CDR webhooks /api/webhooks/cloudonix/*| Laravel
-    Cloudonix -->|Audio stream| AMD
-
-    GoWorker[Go Dialer Worker] -->|Poll / initiate calls| Laravel
+    GoWorker[Go Dialer Worker] -->|"Poll / initiate calls via http://nginx"| Nginx
     GoWorker --> Redis
-
-    AMD -->|Session check and result /api/voice/amd-session, /api/voice/amd-action| Laravel
-    MCP -->|REST API| Nginx
+    AMD -->|"/api/voice/amd-session, /api/voice/amd-action via http://nginx"| Nginx
+    MCP -->|"REST API via http://nginx"| Nginx
 ```
+
+Cloudonix, the browser and the workers all reach Laravel through Nginx. With the SafeLine WAF on (`docker-compose.waf.yml`), Nginx is an OpenResty image that asks the SafeLine detector about every request before routing it. See [Security](/opbx/architecture/security#web-application-firewall-safeline).
 
 ### Component Responsibilities
 
 | Component | Technology | Role |
 |-----------|------------|------|
 | React SPA | React 19 + TypeScript | User interface for PBX configuration, live calls, reporting, and administration. |
-| Nginx | nginx:1.27-alpine | Reverse proxy, static asset delivery, WebSocket upgrade routing, and worker proxying. |
-| Laravel | Laravel 12 (PHP 8.4) | REST API, voice routing decisions, webhook processing, multi-tenancy, queues, and broadcasting. |
+| Nginx | nginx:1.27-alpine (OpenResty 1.27 with the WAF) | Reverse proxy, static asset delivery, WebSocket upgrade routing, and worker proxying. `docker/nginx/render.sh` renders its configuration at start (DNS resolver, trusted proxy, WAF hook and console). |
+| Frontend | Vite dev server, or a static nginx with `docker-compose.prod.yml` | Serves the React SPA behind Nginx. |
+| Laravel | Laravel 12 (PHP 8.5) | REST API, voice routing decisions, webhook processing, multi-tenancy, queues, and broadcasting. |
 | Queue workers and scheduler | Laravel (same image) | `queue-worker` and `queue-worker-long` run background jobs; `scheduler` runs `schedule:run` every minute (retention, CDR tiering, platform health checks). |
 | MySQL | MySQL 8.4 LTS | Persistent relational storage for organizations, users, calls, routing configuration, and CDRs. |
 | Redis | Redis 7 (Alpine) | Caching, sessions, queues, idempotency keys, distributed locks, rate-limit counters, and real-time state. |
@@ -75,6 +76,7 @@ graph TB
 | AMD Worker | Java / Vert.x 5 | Stream-based answering-machine detection for outbound campaigns. |
 | ACD Worker | Java / Vert.x 5 | Call queue state: FIFO order, agent states and agent selection. |
 | MCP Server | Node.js | MCP facade over the OPBX REST API for AI assistants, served at `/mcp`. |
+| SafeLine WAF (optional) | SafeLine CE, separate Compose project `docker/safeline` | Web application firewall. Nginx asks its detector about each request (`WAF_MODE` `monitor` or `block`); its console is served by Nginx on port 9443. |
 
 ---
 
@@ -91,6 +93,7 @@ MySQL stores all durable application data. Examples include:
 - Call detail records (CDRs), call logs, and session updates
 - Auto-dialer campaigns, destinations, and call sessions
 - Platform audit logs and call notification settings
+- AI assistant hand-offs for the AI Real Time Monitor (`ai_call_attempts`)
 
 MySQL data is preserved in a host bind mount (`./volumes/mysql`). Server settings come from `docker/mysql/my.cnf`, and the container is limited to 1 GB of memory. Back it up regularly with `./scripts/backup-database.sh`.
 
@@ -132,7 +135,7 @@ Data is stored in host bind mounts (`./volumes/seaweedfs`). External access to r
 |--------------|-------------|---------|--------|
 | Web UI | Nginx :80 | React SPA | HTML/JS |
 | REST API | Nginx :80 `/api/*` | Laravel controllers | JSON |
-| Voice routing | Nginx :80 `/api/voice/*`, `/api/callbacks/voice/*` | `VoiceRoutingController` and the queue/ALB callback controllers | CXML |
+| Voice routing | Nginx :80 `/api/voice/*`, `/api/callbacks/voice/*` | `VoiceRoutingController`, the queue, ALB and ring group callback controllers, `CampaignRouteController`, `CallTransferController` | CXML |
 | Status/CDR webhooks | Nginx :80 `/api/webhooks/cloudonix/*` | `CloudonixWebhookController` | JSON |
 | Auto-dialer webhooks | Nginx :80 `/api/webhooks/auto-dialer/*`, `/api/webhooks/cloudonix/dialer` | `AutoDialerWebhookController`, `DialerWebhookProxyController` | JSON |
 | Audio for Cloudonix | Nginx :80 `/api/storage/recordings/{path}` | `RecordingsController` (HMAC-signed, expiring URL) | Audio |
@@ -141,6 +144,8 @@ Data is stored in host bind mounts (`./volumes/seaweedfs`). External access to r
 | MCP clients | Nginx :80 `/mcp` | MCP Server | MCP (Streamable HTTP) |
 | Embeddable dialer | Nginx :80 `/embed/loader.js`, `/embed/dialer` | Laravel (own framing and permissions headers) | JS / HTML |
 | Log viewer (profile `logs`) | Nginx :80 `/logs/` | Grafana | HTML |
+| Laravel health | Nginx :80 `/up` | Laravel | HTML |
+| WAF console (WAF on, `WAF_CONSOLE_ENABLED=true`) | Nginx :9443 (`WAF_CONSOLE_PORT`) | SafeLine console (`safeline-mgt`) | HTML |
 
 ---
 

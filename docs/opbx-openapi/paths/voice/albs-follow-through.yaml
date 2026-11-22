@@ -21,6 +21,9 @@ paths:
         - Missing call ID, `albs_id` or `current_assistant_id`:
           `<Say>Missing required parameters. Goodbye.</Say><Hangup/>`.
 
+        Each failed hand-off is recorded for the AI Real Time Monitor (`GET /v1/ai-monitor`):
+        as a failover when the next member is tried, as a fall-back when the fallback action runs.
+
         There is no FormRequest. `albs_id` and `current_assistant_id` are read from the query
         string first, then from the body. The call ID is `CallSid`, else the `X-Cx-Session`
         header, else `SessionData.callSid`, `Session` or `session`.
@@ -90,7 +93,7 @@ paths:
                   type:
                   - integer
                   - 'null'
-                  description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
+                  description: Set by the authentication middleware to the matched organization; a value sent by the caller (body or query string) is overwritten
       responses:
         '200':
           description: CXML routing response to next AI assistant or fallback
@@ -103,8 +106,8 @@ paths:
                   summary: Route to next AI assistant
                   value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Connect action=\"https://opbx.example.com/api/callbacks/voice/albs-follow-through?albs_id=5&amp;current_assistant_id=13\">\n    <Stream url=\"wss://ai.example.com/stream/next\"/>\n  </Connect>\n</Response>\n"
                 fallbackHangup:
-                  summary: All assistants failed - hangup
-                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Say>All AI assistants are unavailable. Goodbye. Goodbye.</Say>\n  <Hangup/>\n</Response>\n"
+                  summary: All assistants failed, fallback action hangup
+                  value: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Hangup/>\n</Response>\n"
         '400':
           description: '`Domain` or `To` missing (CXML)'
           content:

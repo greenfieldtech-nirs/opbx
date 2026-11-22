@@ -39,10 +39,11 @@ The server is a service in the root `docker-compose.yml`:
 
 ```bash
 docker compose up -d --build mcp-server
-curl http://localhost:8080/health
+docker compose exec mcp-server wget -qO- http://127.0.0.1:8080/health
 ```
 
-MCP endpoint: `http://localhost:8080/mcp` (host port via `MCP_PORT`; requires `-f docker-compose.ports.yml`, loopback only).
+MCP endpoint: `<APP_URL>/mcp` through nginx (for example `http://localhost/mcp`). The container publishes no host
+port; for local tools, `-f docker-compose.ports.yml` adds `http://127.0.0.1:8080/mcp` (port via `MCP_PORT`).
 
 Standalone (without the OPBX compose stack):
 
@@ -59,8 +60,8 @@ never issues or stores credentials:
 
 | Credential | Format | Notes |
 |---|---|---|
-| OPBX Personal Access Token | Sanctum `id\|token` | Identity resolved via `GET /api/v1/auth/me` (cached 30 s; rejections cached 30 s). Expires after 24h and is revoked on any login/refresh/password change upstream — fine for interactive/dev use. |
-| Scoped API key | `opbxk_…` | The durable machine credential (never expires; per-resource read/write grants, deny-by-default). Created by an org owner in OPBX Settings → API Keys. Covers all business resources, including campaigns and live calls. |
+| OPBX Personal Access Token | Sanctum `id\|token` | Identity resolved via `GET /api/v1/auth/me` (cached 30 s; rejections cached 30 s). Expires after 24 hours (30 days for a "Remember me" login) and is revoked on the next login, a token refresh or a password change — fine for interactive/dev use. |
+| Scoped API key | `opbxk_…` | The durable machine credential (never expires; per-resource read/write grants, deny-by-default). Created by an org owner on the OPBX API Keys page (`/ui/api-keys`). Covers all business resources, including campaigns and live calls. |
 
 The organization is **always derived from the credential** — `organization_id` arguments are
 never accepted and never sent upstream.
@@ -71,7 +72,7 @@ Example MCP client configuration:
 {
   "mcpServers": {
     "opbx": {
-      "url": "http://localhost:8080/mcp",
+      "url": "http://localhost/mcp",
       "headers": { "Authorization": "Bearer opbxk_your_key_here" }
     }
   }
@@ -82,10 +83,10 @@ See [docs/authentication.md](docs/authentication.md).
 
 ## Capabilities
 
-- **107 tools** across extensions, phone numbers/DIDs, ring groups, IVR, business hours,
-  conference rooms, AI assistants & load balancers, auto-dialer campaigns & distribution
-  lists, call records & live calls, security lists (blacklist/whitelist), users, and a
-  cross-resource `validate_configuration` audit.
+- **112 tools** across extensions, phone numbers/DIDs, ring groups, call queues, IVR, business
+  hours, conference rooms, AI assistants & load balancers, auto-dialer campaigns & distribution
+  lists, call records, recordings & live calls, security lists (blacklist/whitelist), trunks,
+  users & supervisors, and a cross-resource `validate_configuration` audit.
 - **16 resources** (`opbx://extensions/{id}`, …) — read-only JSON snapshots.
 - **4 prompts** — `configure_pbx`, `build_inbound_call_flow`, `create_outbound_campaign`,
   `diagnose_call_problem`.
@@ -127,7 +128,7 @@ MCP Inspector (manual):
 
 ```bash
 npx @modelcontextprotocol/inspector
-# Connect to http://localhost:8080/mcp (transport: Streamable HTTP)
+# Connect to http://localhost/mcp (transport: Streamable HTTP)
 # Set header: Authorization: Bearer <your OPBX token>
 ```
 
@@ -136,7 +137,7 @@ npx @modelcontextprotocol/inspector
 - [docs/architecture.md](docs/architecture.md) — design, request lifecycle, scaling
 - [docs/authentication.md](docs/authentication.md) — credential model, identity resolution
 - [docs/security.md](docs/security.md) — RBAC, confirmation, rate limits, secret handling
-- [docs/opbx-api-inventory.md](docs/opbx-api-inventory.md) — all 267 OPBX operations classified, incl. 22 upstream discrepancies
+- [docs/opbx-api-inventory.md](docs/opbx-api-inventory.md) — OPBX operations classified, incl. upstream discrepancies
 - [docs/functional-validation.md](docs/functional-validation.md) — tool ↔ operation mapping
 - [docs/openapi-drift.md](docs/openapi-drift.md) — how drift detection works
 - [docs/deployment.md](docs/deployment.md) — Docker, env, health, OTel, production notes

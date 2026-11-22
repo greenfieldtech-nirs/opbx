@@ -56,7 +56,9 @@ Live calls (`session-updates`) are split on purpose: a key with Write can discon
 
 `users`, `extensions`, `conference-rooms`, `ai-assistants`, `ai-assistant-providers`, `ring-groups`, `call-queues`, `queue-calls`, `ai-assistant-load-balancers`, `ai-monitor`, `ivr-menus`, `business-hours`, `phone-numbers`, `outbound-whitelist`, `inbound-blacklist`, `call-detail-records`, `recordings`, `supervisors`, `auto-dialer-campaigns`, `distribution-lists`, `session-updates`, `call-notifications`, `dashboard`, `trunks`
 
-The live list comes from `GET /v1/api-keys/grantable-resources`. In the dialog the slugs are shown in title case, for example **Call Detail Records**.
+The live list comes from `GET /v1/api-keys/grantable-resources`. In the dialog the slugs are shown in title case, for example **Call Detail Records** or **AI Monitor**.
+
+`ai-monitor` covers the [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) (`GET /v1/ai-monitor`). It is a grant of its own: `ai-assistants` and `ai-assistant-load-balancers` do not include it.
 
 ### Archived call records
 
@@ -80,9 +82,9 @@ The new key is listed as **Active**, with **Never** under **Last used**. The key
 
 ![API Keys page with the REST API and MCP Server endpoint cards on top and two keys: Reporting Dashboard (call-detail-records:read, dashboard:read) and CRM Integration (extensions:write, phone-numbers:read, users:read), both Active with a last-used date](../img/screens/api-keys-list.jpg)
 
-![Create API Key dialog with the name CI pipeline, the Disable All, Grant Read-Only All and Grant Write All buttons and the per-resource selectors, Call Detail Records set to Read](../img/screens/api-keys-create-dialog.jpg)
+![Create API Key dialog with the name Wallboard, the Disable All, Grant Read-Only All and Grant Write All buttons and the per-resource selectors, AI Monitor set to Read](../img/screens/api-keys-create-dialog.jpg)
 
-{/* SCREENSHOT: api-keys-reveal-dialog — API Key Created dialog with a placeholder key (opbxk_ followed by Xs) and the Copy button */}
+![API Key Created dialog with a placeholder key (opbxk_ followed by Xs), the copy button and I've copied it](../img/screens/api-keys-reveal-dialog.jpg)
 
 ### Use a key
 

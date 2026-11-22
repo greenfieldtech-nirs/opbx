@@ -23,6 +23,12 @@ properties:
     pattern: '^#[0-9a-fA-F]{6}$'
     description: Hex color for the floating launcher. Defaults to `#007acc`.
     example: '#007acc'
+  allow_transfer:
+    type: boolean
+    description: >
+      Whether the widget may blind-transfer calls (`POST /v1/embed/transfer` and
+      `GET /v1/embed/directory`; otherwise 403). Default `false`.
+    example: false
   last_used_at:
     type: [string, 'null']
     format: date-time
@@ -31,4 +37,5 @@ required:
   - user_id
   - icon_position
   - icon_background_color
+  - allow_transfer
   - last_used_at

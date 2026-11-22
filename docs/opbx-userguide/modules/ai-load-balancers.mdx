@@ -253,6 +253,8 @@ See the [OPBX REST API reference](https://developers.cloudonix.com/opbxRestOpenA
 
 With the [centralized logging stack](/opbx/administration/centralized-logs) enabled, search for `AiLoadBalancerRoutingStrategy` to see which member was chosen for a call, and for `ALBS Follow Through` to follow a failover.
 
+The [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) shows, per load balancer, the calls, failovers and fallbacks over a time frame, and each member's share of the calls next to the share you configured.
+
 Common causes of "callers always get the fallback":
 
 - every member's assistant is inactive;
@@ -263,6 +265,7 @@ If callers hear "The AI load balancer you are trying to reach is unavailable." a
 ## Related modules
 
 - [AI Assistants](/opbx/modules/ai-assistants) — the members
+- [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) — live figures per load balancer and member
 - [Extensions](/opbx/modules/extensions) — AI Load Balancer extensions
 - [Phone Numbers](/opbx/modules/phone-numbers) — route a number to a load balancer
 - [AI Load Balancers (applications)](/opbx/applications/ai-load-balancers) — designs and use cases

@@ -50,13 +50,13 @@ properties:
     example: ai_assistant
   routing_destination_label:
     type: string
-    description: Label of the routing destination type (AI Assistant, AI Load Balancer, Hangup)
+    description: Label of the routing destination type (AI Assistant, AI Load Balancer, Ring Group, Call Queue, Hang Up)
     example: AI Assistant
   routing_destination_id:
     type:
     - integer
     - 'null'
-    description: ID of the routing destination (AI assistant or load balancer)
+    description: ID of the routing destination (AI assistant, AI load balancer, ring group or call queue); null for hangup
     example: 5
   dial_timeout:
     type: integer

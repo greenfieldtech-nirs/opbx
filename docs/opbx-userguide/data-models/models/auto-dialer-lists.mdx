@@ -45,6 +45,7 @@ A distribution list of phone numbers. Uploading a new file over a list's numbers
 **Indexes**
 
 - `auto_dialer_lists_campaign_id_foreign`: `campaign_id`
+- `auto_dialer_lists_uploaded_by_foreign`: `uploaded_by`
 - `auto_dialer_lists_used_by_campaign_id_foreign`: `used_by_campaign_id`
 - `idx_latest`: `organization_id`, `is_latest_version`
 - `idx_org_status`: `organization_id`, `status`
@@ -101,6 +102,8 @@ A previous version of a distribution list: the numbers one re-upload replaced, k
 
 - `auto_dialer_list_versions_list_id_version_number_unique`: `list_id`, `version_number` (unique)
 - `auto_dialer_list_versions_expires_at_index`: `expires_at`
+- `auto_dialer_list_versions_organization_id_foreign`: `organization_id`
+- `auto_dialer_list_versions_uploaded_by_foreign`: `uploaded_by`
 
 **Casts:** `uploaded_at`, `replaced_at`, `expires_at` (datetime)
 
@@ -142,6 +145,7 @@ One number of a previous list version, copied from `auto_dialer_destinations` wh
 **Indexes**
 
 - `adlvd_version_phone_idx`: `version_id`, `phone_number`
+- `auto_dialer_list_version_destinations_organization_id_foreign`: `organization_id`
 
 **Casts:** `status` (`DestinationStatus`), `metadata` (array), `last_dialed_at` (datetime)
 
@@ -172,6 +176,7 @@ One phone number in a distribution list, with its dialing state.
 | `next_retry_at` | timestamp | Yes | null | Earliest time of the next attempt |
 | `last_disposition` | varchar(50) | Yes | null | Disposition of the last attempt |
 | `duration` | int unsigned | No | `0` | Duration of the last call, seconds |
+| `total_duration` | int unsigned | No | `0` | Meant as the total duration over all attempts; OPBX only ever writes `0` to it |
 | `billsec` | int unsigned | No | `0` | Billed seconds of the last call |
 | `last_cdr_id` | bigint unsigned | Yes | null | Last call detail record |
 | `last_error` | varchar(500) | Yes | null | Last error message |
@@ -237,6 +242,7 @@ One call attempt placed by the dialer worker for a campaign destination.
 **Indexes**
 
 - `adcs_campaign_status_idx`: `campaign_id`, `status`
+- `adcs_created_at_idx`: `created_at` (used by the retention pruning)
 - `adcs_destination_idx`: `destination_id`
 - `adcs_session_token_idx`: `session_token`
 - `adcs_worker_id_idx`: `worker_id`

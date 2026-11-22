@@ -12,7 +12,7 @@ After installing OPBX, you either log in with the owner account or register a ne
 
 ## The Installer-Created Owner
 
-If you installed with `./install.sh`, the installer created the organization owner (who is also a platform manager) with the email you gave it. It generated the password, showed it once at the end, and saved it to `opbx-install-summary.txt` in the repository folder (mode 600). With the WAF on, the SafeLine admin login is shown and saved the same way. Store the password, then delete that file. There is no `admin@example.com` account on these systems. If you lose the password, reset it:
+If you installed with `./install.sh`, the installer created your organization (with the name you gave it, time zone UTC) and its owner, who is also a [platform manager](#platform-managers), with the email you gave it. It generated the password, showed it under **Write this down now** and in the final summary, and saved it to `opbx-install-summary.txt` in the repository folder (mode 600). With the WAF on, the SafeLine admin login is shown and saved the same way. Store the password, then delete that file. There is no `admin@example.com` account on these systems. If you lose the password, reset it:
 
 ```bash
 docker compose exec app php artisan user:reset-password <email>
@@ -36,8 +36,8 @@ Seeding runs only when the `organizations` table is empty. Sign in with this acc
 
 Who can do this: any active user of an active organization.
 
-1. Open `http://localhost/ui/login` (use your own host and `APP_PORT` if you changed them).
-2. Enter your **Email** and **Password**.
+1. Open `/ui/login` on your OPBX address: your `https://` address in production, `http://localhost/ui/login` on a development machine (add `:APP_PORT` if you changed the port). When the front page is the sign-in page (the installer's default, `OPBX_FRONT_PAGE=login`), the address alone opens it; with the OPBX homepage as front page, open `/ui/login`.
+2. On **Welcome back!**, enter your **Email** and **Password**.
 3. Optionally check **Remember me** to stay signed in on this browser.
 4. Click **Log In**.
 
@@ -50,7 +50,7 @@ The toast "Login successful!" appears and the Dashboard opens.
 
 Signing in again with your email and password ends your earlier sessions on every device.
 
-{/* SCREENSHOT: login-page — Login page ("Welcome back!") with the Email and Password fields, Remember me, Forgot password? and the Log In button */}
+![Login page ("Welcome back!") with the Email and Password fields, Remember me, Forgot password?, the Log In button and the Google and GitHub buttons under Or continue with](../img/screens/login-page.jpg)
 
 | Message | Meaning |
 |---------|---------|
@@ -67,7 +67,7 @@ Other controls on the page:
 
 ## Platform Managers
 
-A platform manager administers all organizations (see [Platform Management](/opbx/administration/platform-management)). Neither the seeded account nor a registered owner is one. Create one from the command line:
+A platform manager administers all organizations (see [Platform Management](/opbx/administration/platform-management)). The owner the installer creates is one. Neither the seeded account (manual setup) nor an owner who registers through the page is one. Create more from the command line:
 
 ```bash
 docker compose exec app php artisan opbx:create-platform-manager      # interactive: promote an existing user, or create a new user and organization
@@ -129,7 +129,7 @@ Complete these tasks in order to get your PBX operational:
 
 ### 1. Configure Cloudonix Integration
 
-Click your name at the top right and choose **Settings** (Owner only). Enter your Cloudonix credentials to enable telephony features.
+Click your name at the top right and choose **Settings** (Owner only). Enter your Cloudonix credentials to enable telephony features. The Web Phone and every call feature need this step.
 
 See the [Cloudonix Integration](/opbx/installation/cloudonix-setup) guide for detailed instructions.
 
@@ -201,5 +201,5 @@ With your initial setup complete, you are ready to:
 4. [Configure phone numbers](/opbx/modules/phone-numbers)
 
 :::info Need Help?
-If you encounter issues during setup, check the logs with `docker compose logs -f app` and verify all services are running with `docker compose ps`.
+If you encounter issues during setup, check the logs with `./opbx.sh logs app` and verify all services are running with `./opbx.sh status`.
 :::
