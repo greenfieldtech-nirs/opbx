@@ -33,6 +33,18 @@ This page documents the environment variables and configuration values used by O
 | `OPBX_APPLICATION_MODE` | `development` | `development` or `production` (SaaS) |
 | `OPBX_FRONT_PAGE` | `home` | What the site root (`/`) shows: `home` (the public OPBX homepage) or `login` (the sign-in page, or the dashboard when signed in). The installer defaults to `login` |
 | `OPBX_APPLICATION_WEBHOOK_BASEURL` | — | Application-level webhook base URL. When set, it overrides every organization's `cloudonix_settings.webhook_base_url` |
+| `OPBX_INSTALLER_MANAGED` | `false` | Not in `.env.example`; `./install.sh` sets it to `true`. When true, the seeder does not create the default `admin@example.com` account, because the installer creates the owner (`opbx:install-owner`) |
+
+### Installer and Stack Script
+
+`./install.sh` writes these keys to `.env`; `./opbx.sh` and `docker compose` read them. They are not in `.env.example`.
+
+| Variable | Description |
+|----------|-------------|
+| `COMPOSE_FILE` | Compose files to use, colon-separated: `docker-compose.yml`, then `docker-compose.prod.yml` (production) or `docker-compose.ports.yml` (development), then `docker-compose.waf.yml` when the WAF is on |
+| `COMPOSE_PROFILES` | Optional profiles: `dev` (ngrok, development with an ngrok token) and `logs` (log viewer) |
+| `COMPOSE_PARALLEL_LIMIT` | `2`, so image builds do not run all at once |
+| `OPBX_OWNER_EMAIL` | The owner's email, kept so a resumed installation can pre-fill it. Not a secret |
 
 ### Database
 
@@ -251,7 +263,7 @@ The `ngrok` service is in the `dev` profile: `docker compose --profile dev up -d
 | `AUTH0_CLIENT_ID` | — | |
 | `AUTH0_CLIENT_SECRET` | — | |
 | `AUTH0_REDIRECT_URI` | `https://app.opbx.com/ui/auth/callback` | OAuth callback URL |
-| `AUTH0_PROVIDERS` | `google,facebook,microsoft,github,x` | Enabled social providers. They map to the Auth0 connections `google-oauth2`, `facebook`, `windowslive`, `github` and `twitter` |
+| `AUTH0_PROVIDERS` | `google,github` | Enabled social providers: `google` and/or `github` (Auth0 connections `google-oauth2` and `github`). Any other value is ignored |
 | `OPBX_INVITE_TOKEN_TTL_HOURS` | `24` | Hours an invitation link is valid |
 | `OPBX_INVITE_RATE_LIMIT_PER_HOUR` | `10` | Invitations a user can send per hour |
 
@@ -276,6 +288,20 @@ Set in `config/security.php` and applied by the `SecurityHeaders` middleware. Se
 | `HSTS_PRELOAD` | `false` | Add `preload` |
 | `CSP_REPORT_URI` | — | CSP `report-uri` |
 | `CSP_CONNECT_DOMAINS` | empty | Comma-separated extra origins for the CSP `connect-src` |
+
+### Reverse Proxy and WAF (SafeLine)
+
+Read by the `nginx` container (`docker/nginx/render.sh`), not by Laravel. The installer sets them; they are not in `.env.example`. See [Security](/opbx/architecture/security#web-application-firewall-safeline).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRUSTED_PROXY_CIDR` | empty | Comma-separated IPs or CIDRs of your own reverse proxy. Nginx then takes the client address from `X-Forwarded-For` for requests that come from them. A value that is not an IPv4/IPv6 address or CIDR stops nginx from starting |
+| `WAF_MODE` | `off` | `off`, `monitor` or `block`. Any value other than `off` needs `docker-compose.waf.yml` (the OpenResty image) and the SafeLine stack. With the overlay and no value, the mode is `monitor` |
+| `WAF_DETECTOR_HOST` | `safeline-detector` | SafeLine detector host (port 8000) |
+| `WAF_CONSOLE_ENABLED` | `false` | `true` serves the SafeLine console through nginx on its own port |
+| `WAF_CONSOLE_PORT` | `9443` | Host port of the console (container port 8443, plain HTTP) |
+| `WAF_CONSOLE_BIND` | `0.0.0.0` | Host address the console port is published on. The installer sets `127.0.0.1` in development, unless other computers are allowed |
+| `WAF_CONSOLE_ALLOW` | empty | Comma-separated IPs or CIDRs allowed to open the console. Empty: anyone who reaches the port (SafeLine's login still applies; nginx logs a warning) |
 
 ### Recordings
 
@@ -364,6 +390,7 @@ Retention periods are set in days (or hours where noted) and enforced by the sch
 | `RETENTION_BLOCKED_CALL_LOGS_DAYS` | `90` | Blocked-call logs |
 | `RETENTION_QUEUE_CALLS_DAYS` | `183` | Call-queue call records (deleted, not archived) |
 | `RETENTION_AUTO_DIALER_CALL_SESSIONS_DAYS` | `183` | Auto-dialer call sessions (deleted) |
+| `RETENTION_AI_CALL_ATTEMPTS_DAYS` | `30` | AI assistant hand-offs behind the [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) (`ai_call_attempts`, by `started_at`). The monitor itself looks back at most 12 hours |
 | `RETENTION_AUTO_DIALER_LIST_VERSIONS_DAYS` | `30` | Previous versions of distribution lists, counted from the upload that replaced them (`distribution-lists:prune-versions`, daily at 03:15). Also removes list backup files left by older releases once they are this old. The value applies to versions replaced after it is set |
 | `RETENTION_PLATFORM_AUDIT_LOGS_DAYS` | `365` | Platform audit log |
 | `PLATFORM_HEALTH_RETENTION_HOURS` | `24` | Platform Status history, in **hours** |
@@ -418,8 +445,8 @@ The internal endpoints are what the Docker healthchecks call. Platform Status (`
 | Service | Container | Purpose |
 |---------|-----------|---------|
 | `app` | `opbx_app` | Laravel PHP-FPM |
-| `nginx` | `opbx_nginx` | Reverse proxy |
-| `frontend` | `opbx_frontend` | Vite dev server |
+| `nginx` | `opbx_nginx` | Reverse proxy (`nginx:1.27-alpine`; OpenResty with the SafeLine hook when `docker-compose.waf.yml` is used) |
+| `frontend` | `opbx_frontend` | Vite dev server (with `docker-compose.prod.yml`: the built SPA served by its own nginx) |
 | `mysql` | `opbx_mysql` | MySQL 8.4 LTS (`mysql_native_password` enabled for compatibility) |
 | `redis` | `opbx_redis` | Cache, sessions, queues |
 | `seaweedfs` | `opbx_seaweedfs` | S3-compatible object storage (SeaweedFS 4.47) for recordings, IVR audio and the cold CDR archive |
@@ -442,6 +469,8 @@ Services are started with `docker compose up -d`. Optional services need a profi
 | `logs` | Loki, Alloy, Grafana and the docker-socket-proxy. See [Centralized Logs](/opbx/administration/centralized-logs) |
 
 Host ports for the database, Redis and SeaweedFS are not published by default. `docker-compose.ports.yml` adds loopback ports for development.
+
+The SafeLine WAF is a separate Compose project (`docker/safeline`, project `safeline`: `safeline-pg`, `safeline-mgt`, `safeline-detector`, `safeline-tengine`, `safeline-luigi`, `safeline-fvm`, `safeline-chaos`). It owns the external `safeline-ce` network that `docker-compose.waf.yml` joins. `./opbx.sh start` starts it first when the WAF is on.
 
 ## Related Documentation
 

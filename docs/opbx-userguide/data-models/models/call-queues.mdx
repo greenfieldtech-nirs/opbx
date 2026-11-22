@@ -136,6 +136,7 @@ One call that entered a queue, kept for reports.
 | `waiting_seconds` | int unsigned | Yes | null | Seconds waited |
 | `handling_seconds` | int unsigned | Yes | null | Seconds with the agent |
 | `disposition` | enum | Yes | null | Outcome; null while the call is in progress. Values: `answered`, `abandoned`, `overflow` (cast to `QueueCallDisposition`) |
+| `transferred_to` | varchar(32) | Yes | null | The extension or number the answering agent blind-transferred the call to (Web Phone transfer); null when not transferred. A transferred call is closed as `answered` at the moment of the transfer |
 | `created_at` | timestamp | Yes | null |  |
 | `updated_at` | timestamp | Yes | null |  |
 

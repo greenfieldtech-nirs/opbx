@@ -63,6 +63,7 @@ Configuration files and environment variables:
 
 - [AiAssistant](/opbx/data-models/models/ai-assistants#aiassistant) — AI assistant configuration
 - [AiAssistantLoadBalancer](/opbx/data-models/models/ai-assistants#aiassistantloadbalancer) — Load balancer setup
+- [AiCallAttempt](/opbx/data-models/models/ai-assistants#aicallattempt) — AI assistant hand-offs behind the AI Real Time Monitor
 
 ### Users & Organizations
 
@@ -87,6 +88,17 @@ Configuration files and environment variables:
 - [BlockedCallLog](/opbx/data-models/models/security#blockedcalllog) — Log of blocked calls
 
 ## Recently Added
+
+### AI Monitor, Call Transfer and Campaign Routing (2026-11)
+
+| Change | Purpose |
+|--------|---------|
+| `ai_call_attempts` | One row per hand-off of a call to an AI assistant, read by the AI Real Time Monitor. Pruned after `RETENTION_AI_CALL_ATTEMPTS_DAYS` (30) |
+| `transferred_to` on `queue_calls` | Where an agent blind-transferred a queue call |
+| `allow_transfer` on `user_embed_tokens` | Whether the embedded dialer offers call transfer |
+| `ring_group` and `call_queue` in `auto_dialer_campaigns.routing_destination_type` | Campaign calls can go to a ring group or a call queue |
+| `wait_for_available_agents` on `auto_dialer_campaigns` | A call queue campaign holds dialing while no agent is available |
+| `su_updated_at_idx`, `adcs_created_at_idx` | Indexes for the nightly retention pruning of `session_updates` and `auto_dialer_call_sessions` |
 
 ### Call Record Tiers and Platform Status (2026-10)
 
