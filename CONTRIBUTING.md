@@ -97,14 +97,14 @@ Before starting work, always sync your fork with the upstream:
 # Fetch upstream changes
 git fetch upstream
 
-# Switch to main branch
-git checkout main
+# Switch to the develop branch
+git checkout develop
 
 # Merge upstream changes
-git merge upstream/main
+git merge upstream/develop
 
 # Push to your fork
-git push origin main
+git push origin develop
 ```
 
 ## Forking and Creating Pull Requests
@@ -112,9 +112,9 @@ git push origin main
 ### Creating a Feature Branch
 
 ```bash
-# Ensure you're on main and up to date
-git checkout main
-git pull upstream main
+# Ensure you're on develop and up to date
+git checkout develop
+git pull upstream develop
 
 # Create a new feature branch
 git checkout -b feature/your-feature-name
@@ -421,6 +421,10 @@ Ref: SECURITY-456
    - Check for unintended changes
    - Ensure clean commit history
 
+### Target Branch
+
+Always open pull requests against **`develop`**, never `main`. `develop` is where all work is integrated; `main` is updated from `develop` by the maintainers. On GitHub, set **base** to `develop` when you open the pull request.
+
 ### PR Template
 
 GitHub fills in [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) when you open a pull request.
@@ -430,7 +434,7 @@ Complete every section that applies.
 
 1. **Respond to feedback** - Address reviewer comments promptly
 2. **Make requested changes** - Push updates to your branch
-3. **Keep PR updated** - Sync with main if needed
+3. **Keep PR updated** - Sync with `develop` if needed
 4. **Be patient** - Maintainers will review as time allows
 
 ## Code Review Expectations
