@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\AiCallAttemptSource;
 use App\Enums\DestinationStatus;
 use App\Http\Resources\AutoDialerCampaignResource;
 use App\Http\Resources\ListDestinationResource;
 use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
+use App\Services\AiMonitor\AiCallRecorder;
 use App\Services\AutoDialer\AutoDialerCloudonixService;
 use App\Services\AutoDialer\CallSessionService;
 use App\Services\AutoDialer\CampaignAgentAvailability;
@@ -238,6 +240,16 @@ class DialerWorkerController extends Controller
         ]);
 
         $this->destinationService->clearInitiateFailures($destination->id);
+
+        if (! empty($result['ai_target'])) {
+            app(AiCallRecorder::class)->started(
+                $campaign->organization_id,
+                $result['ai_target']['ai_assistant_id'],
+                $result['ai_target']['ai_load_balancer_id'],
+                $session->session_token,
+                AiCallAttemptSource::AUTO_DIALER,
+            );
+        }
 
         // Increment campaign pending calls counter
         $this->campaignService->incrementPendingCalls($campaign);

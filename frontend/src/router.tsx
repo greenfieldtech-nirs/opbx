@@ -30,6 +30,7 @@ const Extensions = trackedLazy(() => import('@/pages/Extensions'));
 const ConferenceRooms = trackedLazy(() => import('@/pages/ConferenceRooms'));
 const AiAssistants = trackedLazy(() => import('@/pages/AiAssistants'));
 const AiAssistantLoadBalancers = trackedLazy(() => import('@/pages/AiAssistantLoadBalancers'));
+const AiMonitor = trackedLazy(() => import('@/pages/AiMonitor'));
 const PhoneNumbers = trackedLazy(() => import('@/pages/PhoneNumbers'));
 const RingGroups = trackedLazy(() => import('@/pages/RingGroups'));
 const CallQueues = trackedLazy(() => import('@/pages/CallQueues'));
@@ -163,6 +164,14 @@ export const router = createBrowserRouter([
       {
         path: 'ai-assistant-load-balancers',
         element: <AiAssistantLoadBalancers />,
+      },
+      {
+        path: 'ai-monitor',
+        element: (
+          <OwnerRoute roles={['owner', 'pbx_admin']}>
+            <AiMonitor />
+          </OwnerRoute>
+        ),
       },
       {
         path: 'phone-numbers',

@@ -21,6 +21,8 @@ enum GrantableResource: string
     case CALL_QUEUES = 'call-queues';
     case QUEUE_CALLS = 'queue-calls';
     case AI_ASSISTANT_LOAD_BALANCERS = 'ai-assistant-load-balancers';
+    /** AI Real Time Monitor: assistant and load-balancer figures together, so its own grant. */
+    case AI_MONITOR = 'ai-monitor';
     case IVR_MENUS = 'ivr-menus';
     case BUSINESS_HOURS = 'business-hours';
     case PHONE_NUMBERS = 'phone-numbers';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Voice;
 
 use App\Enums\AiAssistantStatus;
+use App\Enums\AiCallAttemptSource;
 use App\Enums\AlbsStatus;
 use App\Enums\RingGroupFallbackAction;
 use App\Http\Controllers\Controller;
@@ -17,6 +18,7 @@ use App\Models\IvrMenu;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\AiMonitor\AiCallRecorder;
 use App\Services\AutoDialer\MetadataHelper;
 use App\Services\CloudonixSettingsResolver;
 use App\Services\CxmlBuilder\CxmlBuilder;
@@ -41,6 +43,9 @@ class AlbsFollowThroughController extends Controller
     private const TENTATIVE_ASSISTANTS_KEY = 'albs:tried:';
 
     private const CACHE_TTL_SECONDS = 3600;
+
+    /** Set by cxmlErrorResponse(): the last hand-off produced an error instead of connecting the call. */
+    private bool $handOffFailed = false;
 
     public function __construct(
         private readonly ProviderRegistry $providerRegistry,
@@ -195,6 +200,8 @@ class AlbsFollowThroughController extends Controller
             ]);
 
             // Follow-through is disabled, execute fallback action immediately
+            app(AiCallRecorder::class)->failed((int) $albs->organization_id, $callSid, (int) $failedAssistantId, $status, fellBack: true);
+
             return $this->executeFallback($albs, $request, $metadata);
         }
 
@@ -231,6 +238,8 @@ class AlbsFollowThroughController extends Controller
             ]);
 
             // All assistants tried, execute original fallback
+            app(AiCallRecorder::class)->failed((int) $albs->organization_id, $callSid, (int) $failedAssistantId, $status, fellBack: true);
+
             return $this->executeFallback($albs, $request, $metadata);
         }
 
@@ -245,6 +254,8 @@ class AlbsFollowThroughController extends Controller
             'next_assistant_name' => $nextAssistant->name,
             'tried_count' => count($triedAssistantIds),
         ]);
+
+        app(AiCallRecorder::class)->failed((int) $albs->organization_id, $callSid, (int) $failedAssistantId, $status, fellBack: false);
 
         // Generate CXML to route to next assistant
         return $this->routeToAssistant($nextAssistant, $albs, $request, $metadata);
@@ -312,6 +323,14 @@ class AlbsFollowThroughController extends Controller
      * Generate CXML to route to an AI Assistant.
      */
     private function routeToAssistant(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request, array $metadata = []): Response
+    {
+        return $this->recordHandOff(
+            $aiAssistant, $albs, $request, AiCallAttemptSource::FAILOVER,
+            fn () => $this->connectToMember($aiAssistant, $albs, $request, $metadata),
+        );
+    }
+
+    private function connectToMember(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request, array $metadata): Response
     {
         $config = $aiAssistant->configuration ?? [];
         $protocol = $aiAssistant->protocol;
@@ -636,7 +655,23 @@ class AlbsFollowThroughController extends Controller
         ]);
 
         // Reuse existing routing logic (no follow-through callback for the fallback itself)
-        return $this->routeToAssistantDirect($aiAssistant, $request, $metadata);
+        return $this->recordHandOff(
+            $aiAssistant, $albs, $request, AiCallAttemptSource::ROUTING,
+            fn () => $this->routeToAssistantDirect($aiAssistant, $request, $metadata),
+        );
+    }
+
+    /** Route, and record the hand-off for the AI Real Time Monitor unless routing produced an error. */
+    private function recordHandOff(AiAssistant $aiAssistant, AiAssistantLoadBalancer $albs, Request $request, AiCallAttemptSource $source, callable $route): Response
+    {
+        $this->handOffFailed = false;
+        $response = $route();
+
+        if (! $this->handOffFailed) {
+            app(AiCallRecorder::class)->started($albs->organization_id, $aiAssistant->id, $albs->id, AiCallRecorder::callIdFrom($request), $source);
+        }
+
+        return $response;
     }
 
     /**
@@ -713,6 +748,8 @@ class AlbsFollowThroughController extends Controller
      */
     private function cxmlErrorResponse(string $message): Response
     {
+        $this->handOffFailed = true;
+
         return response(
             CxmlBuilder::unavailable($message),
             200,

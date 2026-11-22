@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VoiceRouting\Strategies;
 
+use App\Enums\AiCallAttemptSource;
 use App\Enums\ExtensionType;
 use App\Models\AiAssistant;
 use App\Models\DidNumber;
@@ -11,6 +12,7 @@ use App\Models\Extension;
 use App\Scopes\OrganizationScope;
 use App\Services\AiAssistant\ProviderRegistry;
 use App\Services\AiAssistant\WebSocketUrlBuilder;
+use App\Services\AiMonitor\AiCallRecorder;
 use App\Services\CxmlBuilder\CxmlBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -86,9 +88,9 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         if ($protocol === 'websocket') {
             return $this->routeWebSocket($request, $aiAssistant, $config, $provider, $extension);
         } elseif ($protocol === 'dummy') {
-            return $this->routeDummy($aiAssistant, $extension);
+            return $this->routeDummy($request, $aiAssistant, $extension);
         } else {
-            return $this->routeSip($aiAssistant, $config, $provider, $extension);
+            return $this->routeSip($request, $aiAssistant, $config, $provider, $extension);
         }
     }
 
@@ -154,11 +156,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
                 'to' => $cloudonixParams['to'] ?? null,
             ]);
 
-            return response(
-                CxmlBuilder::streamToWebSocket($websocketUrl),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
+            return $this->connect($request, $aiAssistant, CxmlBuilder::streamToWebSocket($websocketUrl));
         } catch (\InvalidArgumentException $e) {
             Log::error('Failed to build WebSocket URL', [
                 'ai_assistant_id' => $aiAssistant->id,
@@ -180,6 +178,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      * Returns a simple CXML response with a test message and hangup.
      */
     private function routeDummy(
+        Request $request,
         AiAssistant $aiAssistant,
         ?Extension $extension = null
     ): Response {
@@ -190,11 +189,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
             'extension_number' => $extension?->extension_number,
         ]);
 
-        return response(
-            CxmlBuilder::dummyAiMessage(),
-            200,
-            ['Content-Type' => 'application/xml']
-        );
+        return $this->connect($request, $aiAssistant, CxmlBuilder::dummyAiMessage());
     }
 
     /**
@@ -203,6 +198,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
      * This supports both legacy configuration and service_url column.
      */
     private function routeSip(
+        Request $request,
         AiAssistant $aiAssistant,
         array $config,
         ?string $provider,
@@ -229,11 +225,7 @@ class AiAgentRoutingStrategy implements RoutingStrategy
                 'service_url' => $serviceUrl,
             ]);
 
-            return response(
-                CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams),
-                200,
-                ['Content-Type' => 'application/xml']
-            );
+            return $this->connect($request, $aiAssistant, CxmlBuilder::dialService($serviceUrl, $serviceToken, $serviceParams));
         }
 
         // Fall back to legacy configuration format (provider + phone_number)
@@ -264,11 +256,21 @@ class AiAgentRoutingStrategy implements RoutingStrategy
         ]);
 
         // Route to AI Agent Service Provider using <Service> noun with provider and phone number
-        return response(
-            CxmlBuilder::dialServiceProvider($provider, $phoneNumber),
-            200,
-            ['Content-Type' => 'application/xml']
+        return $this->connect($request, $aiAssistant, CxmlBuilder::dialServiceProvider($provider, $phoneNumber));
+    }
+
+    /** The call is handed to the assistant: record it for the AI Real Time Monitor, then answer. */
+    private function connect(Request $request, AiAssistant $aiAssistant, string $cxml): Response
+    {
+        app(AiCallRecorder::class)->started(
+            $aiAssistant->organization_id,
+            $aiAssistant->id,
+            null,
+            AiCallRecorder::callIdFrom($request),
+            AiCallAttemptSource::ROUTING,
         );
+
+        return response($cxml, 200, ['Content-Type' => 'application/xml']);
     }
 
     /**

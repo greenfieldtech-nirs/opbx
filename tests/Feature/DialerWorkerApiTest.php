@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\AiCallAttemptSource;
 use App\Enums\CampaignStatus;
 use App\Enums\DestinationStatus;
 use App\Enums\ListStatus;
+use App\Models\AiAssistant;
+use App\Models\AiCallAttempt;
 use App\Models\AutoDialerCallSession;
 use App\Models\AutoDialerCampaign;
 use App\Models\AutoDialerDestination;
@@ -381,6 +384,27 @@ class DialerWorkerApiTest extends TestCase
         );
         $this->assertNotNull($session);
         $this->assertEquals('worker-001', $session->worker_id);
+    }
+
+    public function test_initiate_records_the_ai_assistant_for_the_ai_monitor(): void
+    {
+        [$campaign, $destination] = $this->initiateFixture();
+        $assistant = AiAssistant::factory()->create([
+            'organization_id' => $this->organization->id,
+            'provider' => 'retell',
+            'protocol' => 'sip',
+            'configuration' => ['phone_number' => '+12127773456'],
+            'status' => 'active',
+        ]);
+        OrganizationScope::bypass(fn () => $campaign->update(['routing_destination_id' => $assistant->id]));
+        Http::fake(['api.cloudonix.io/*' => Http::response(['id' => 'call-test-123', 'token' => 'sess-ai-1'], 200)]);
+
+        $this->workerRequest('POST', '/calls/initiate', $this->initiatePayload($campaign, $destination))->assertCreated();
+
+        $attempt = AiCallAttempt::withoutGlobalScope(OrganizationScope::class)->sole();
+        $this->assertSame($assistant->id, $attempt->ai_assistant_id);
+        $this->assertSame('sess-ai-1', $attempt->call_id);
+        $this->assertSame(AiCallAttemptSource::AUTO_DIALER, $attempt->source);
     }
 
     /** @return array{0: AutoDialerCampaign, 1: AutoDialerDestination} */

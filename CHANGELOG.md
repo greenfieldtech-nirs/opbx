@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - 2026-11-22 (AI Real Time Monitor)
+
+- **AI Configuration → Real Time Monitor** (Owner and PBX Admin): a slide-show of health-card widgets that alternates every 30 s between the AI Assistants view (active now, calls, success rate, average duration, AI minutes, last call, calls over time) and the AI Load Balancers view (active, calls, failovers, fell back, handled rate, each member's actual vs configured share). Time frame 1 minute to 12 hours, default 60 minutes; figures refresh every 10 s.
+- Every hand-off of a call to an AI assistant is now recorded (`ai_call_attempts`, kept 30 days via `RETENTION_AI_CALL_ATTEMPTS_DAYS`) from direct routing, load balancers, load-balancer failover and the auto dialer, and settled by the CDR. Auto-dialer calls count only when a person answered.
+- `GET /v1/ai-monitor?minutes=`; API keys need the new `ai-monitor` grant.
+
+### Changed - 2026-11-22
+
+- Sidebar links are keyed by their URL, so two items may share a name (Auto Dialer and AI Configuration both have **Real Time Monitor**).
+
 ### Added - 2026-11-21 (opbx.sh)
 
 - `./opbx.sh start|restart|upgrade --nofork`: after the ordered start, stays in the foreground showing every service's log; Ctrl-C stops OPBX, then SafeLine, like `./opbx.sh stop` (containers and data are kept).
