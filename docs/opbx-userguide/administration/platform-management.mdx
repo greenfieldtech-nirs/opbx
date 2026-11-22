@@ -32,7 +32,7 @@ When the server refuses an action on these pages, the toast at the top of the sc
 
 ## Access Requirements
 
-The `is_platform_manager` flag on a user account grants access. It is separate from the organization role. Set it from the server:
+The `is_platform_manager` flag on a user account grants access. It is separate from the organization role. The owner that `./install.sh` creates already has it. Set it for other users from the server:
 
 ```bash
 docker compose exec app php artisan opbx:create-platform-manager           # interactive: promote an existing user, or create a new user (and organization)
@@ -243,13 +243,13 @@ The Platform Status page shows every OPBX component, its current status, and wha
 | API / app | Application is answering; PHP and Laravel versions |
 | MySQL (main) and MySQL (CDR archive) | Query and server version. The archive is the warm CDR tier |
 | Redis | Ping and memory use |
-| SeaweedFS | Both buckets reachable (recordings and CDR archive) |
+| SeaweedFS storage | The cluster answers and both buckets are reachable (recordings and CDR archive) |
 | Queue | Pending and failed jobs across the queues |
 | Scheduler | Age of the heartbeat written by the scheduled health check |
 | ACD worker, AMD worker, Dialer worker | Their health endpoints |
-| Soketi (real-time updates) | Readiness endpoint |
+| Soketi (WebSocket) | Readiness endpoint |
 | MCP server | Health endpoint |
-| Loki, Grafana | Only when the `logs` profile is running |
+| Loki (logs), Grafana (logs UI) | Only when the `logs` profile is running |
 | Cloudonix API | A lightweight request to the Cloudonix API |
 
 Each card shows **Operational** (green), **Degraded** (amber), **Down** (red) or **Unknown**, with the latency and a short detail. An optional service that is not running (Loki or Grafana without the `logs` profile) shows "Not running (optional)".
@@ -304,7 +304,9 @@ It shows six groups, each the worst status of its components:
 | Recordings & storage | SeaweedFS, MySQL (CDR archive) |
 | Real-time updates | Soketi |
 
-The banner reads **All systems operational**, **Partial outage** or **Major outage**. The page shows a six-hour strip per group.
+The banner reads **All systems operational**, **Partial outage** or **Major outage**. The page shows a six-hour strip per group and refreshes every minute.
+
+Above the status, a folded **Disclaimer** reads "OPBX Cloud is a demonstration service, with no warranty or SLA." **Read more** opens the full text. It is shown on every installation.
 
 Internal components (scheduler, Loki, Grafana, MCP server) and all details (versions, latency, hostnames, error messages) are never shown on the public page. The data comes from `GET /api/v1/public/status`, cached for 30 seconds.
 

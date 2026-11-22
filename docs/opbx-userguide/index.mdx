@@ -22,43 +22,51 @@ OPBX is an open-source, multi-tenant business PBX platform built on top of the [
 - **Conference rooms** with optional PIN protection, host controls, and recording
 - **AI assistants** with registry-based provider configuration (SIP and WebSocket protocols)
 - **AI load balancers** for distributing calls across multiple AI providers with follow-through failover
+- **AI Real Time Monitor**, a wall-screen slide-show of live figures for AI assistants and AI load balancers
 - **Auto Dialer** for outbound campaigns with CAC/CPS rate limiting, scheduling, AMD, and retry logic
 - **Call recordings and CDR reporting** for compliance and analysis
 - **Inbound blacklist and outbound whitelist** for call security
+- **Call queues** with agent log-in, wrap-up time and four distribution strategies
 - **Real-time call monitoring** with live call status and WebSocket updates
 - **Supervisor role** for read-only, scoped monitoring of specific users and ring groups
 - **Live call coaching** with spy (listen), whisper, and barge modes for Owners and Supervisors
 - **Centralized logging** with an optional Loki + Grafana stack, including per-call audit trails searchable by Cloudonix session token
-- **In-browser Web Phone** (JsSIP/WebRTC softphone) for placing, receiving, and coaching calls
+- **In-browser Web Phone** (JsSIP/WebRTC softphone) for placing, receiving, transferring and coaching calls, with per-user settings such as auto-answer
 - **Call notifications** with per-organization webhook configuration, event filtering, and retry logic
 - **Platform management** tools for service providers hosting multiple organizations
+- **Guided installer** (`./install.sh`) and a stack script (`./opbx.sh`) to start, stop and upgrade, with an optional SafeLine web application firewall
 
 ## Architecture Overview
 
 ```mermaid
 graph TB
-    Browser[React SPA] --> Nginx[Nginx Reverse Proxy]
+    Browser["Browser (React SPA)"] --> Nginx[Nginx Reverse Proxy]
+    Nginx -.->|"Request check (optional)"| WAF[SafeLine WAF Detector]
+    Nginx --> Frontend["Frontend (Vite dev server, or static build in production)"]
     Nginx --> Laravel[Laravel API]
-    Nginx --> Frontend[Vite Dev Server]
-    Nginx --> Soketi[Soketi WebSocket /app/]
-    Nginx --> AMD[AMD Worker /ws/amd/]
+    Nginx --> Soketi["Soketi WebSocket /app/"]
+    Nginx --> AMD["AMD Worker /ws/amd/"]
+    Nginx --> MCP["MCP Server /mcp"]
+    MCP --> Laravel
     Laravel --> MySQL[(MySQL 8.4)]
     Laravel --> Redis[(Redis 7)]
     Laravel --> SeaweedFS[(SeaweedFS Storage)]
+    Laravel --> ACD[ACD Worker]
+    ACD --> Redis
     Laravel --> Cloudonix[Cloudonix CPaaS]
     GoWorker[Go Dialer Worker] --> Laravel
     GoWorker --> Redis
-    Cloudonix --> |Webhooks| Laravel
-    Cloudonix --> |Audio Stream| AMD
+    Cloudonix -->|Webhooks| Laravel
+    Cloudonix -->|Audio Stream| AMD
 ```
 
-The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in SeaweedFS (S3-compatible). Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, and the Java AMD worker analyzes audio streams for voicemail detection.
+The browser interacts with a React single-page application served through Nginx. API requests route to the Laravel backend, which manages data in MySQL, caches state in Redis, and stores files in SeaweedFS (S3-compatible). Real-time updates flow through Soketi. All VoIP functionality delegates to Cloudonix CPaaS via REST API and webhooks. The Go dialer worker executes outbound campaigns, the Java AMD worker analyzes audio streams for voicemail detection, and the Java ACD worker keeps the state of call queues. AI agents reach the OPBX API through the MCP server. When the optional SafeLine WAF is on, Nginx asks its detector about every request before passing it on.
 
 ## Technology Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Backend | Laravel 12 (PHP 8.4) | REST API and business logic |
+| Backend | Laravel 12 (PHP 8.5) | REST API and business logic |
 | Frontend | React 19 + TypeScript | User interface |
 | Database | MySQL 8.4 LTS | Persistent data storage |
 | Cache/Queue | Redis 7 | Caching, sessions, job queues, locks |
@@ -69,6 +77,7 @@ The browser interacts with a React single-page application served through Nginx.
 | AMD | Java/Vert.x 5 Worker | Stream-based voicemail detection |
 | ACD | Java/Vert.x 5 Worker | Call queue engine (waiting callers, agent states) |
 | MCP | MCP server | Lets AI agents use the OPBX API |
+| WAF (optional) | SafeLine CE | Web application firewall in front of the web app |
 
 ## Role Hierarchy
 
@@ -94,8 +103,8 @@ The OPBX REST API is documented with OpenAPI 3.1.0. You can explore the endpoint
 
 Ready to get started? Follow these steps:
 
-1. [Install OPBX](/opbx/installation) using Docker Compose
-2. Complete your [first login and organization setup](/opbx/installation/first-login)
+1. [Install OPBX](/opbx/installation) with the guided installer (`./install.sh`)
+2. Complete your [first login](/opbx/installation/first-login) with the owner account the installer created
 3. Configure [Cloudonix integration](/opbx/installation/cloudonix-setup) for telephony
 4. Learn the [core concepts](/opbx/installation/concepts) before configuring your PBX
 5. Learn the [admin interface](/opbx/administration/navigating-the-interface), then configure each module in the order given in the [modules index](/opbx/modules)
