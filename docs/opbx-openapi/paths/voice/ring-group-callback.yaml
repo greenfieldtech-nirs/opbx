@@ -159,6 +159,7 @@ paths:
                   type:
                   - integer
                   - 'null'
+                  minimum: 1
                   description: Set by the authentication middleware to the matched organization; a value sent by the caller is overwritten
               required:
               - CallSid

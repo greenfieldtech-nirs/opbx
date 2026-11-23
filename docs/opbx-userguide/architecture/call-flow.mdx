@@ -43,7 +43,7 @@ sequenceDiagram
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/session-update
     Cloudonix->>Laravel: POST /api/webhooks/cloudonix/cdr
     Laravel->>MySQL: Store CDR / session update
-    Laravel->>Soketi: Broadcast call.initiated
+    Laravel->>Soketi: Broadcast call.initiated, call.answered, call.ended
 ```
 
 ---
@@ -185,17 +185,35 @@ A Simultaneous ring group does not use a multi-number `<Dial>` (Cloudonix's acti
 
 For AI load balancers, `/api/callbacks/voice/albs-follow-through` handles failover when the primary AI provider is busy or unavailable. It tries the next assistant in the balancer distribution. When none is left, the balancer's fallback runs; a ring-group or call-queue fallback is handed to `AiLoadBalancerRoutingStrategy` (`handleFallbackRingGroup`, `handleFallbackCallQueue`), which runs the target's normal strategy.
 
+Every hand-off of a call to an AI assistant (direct routing, a load balancer member, a follow-through failover or an auto-dialer campaign call) is recorded in `ai_call_attempts` for the AI Real Time Monitor. The CDR settles it.
+
 A ring group is always routed through `RingGroupRoutingStrategy` (`VoiceRoutingManager::executeStrategy(RING_GROUP, ...)`), whatever reaches it: a DID, an extension, an IVR option or failover, a business-hours action (`BusinessHoursRoutingService` and the IVR business-hours path), or a ring group, call queue or AI load balancer fallback. So its strategy, fallback and answering-member attribution are the same on every path.
 
 ---
 
-## Step 8: Call Queues
+## Step 8: Call Queues and Routed Campaign Calls
 
 A call routed to a call queue is enqueued in the [ACD worker](/opbx/workers/acd-worker) and hears hold music. After each hold segment Cloudonix POSTs to `/api/callbacks/voice/queue-poll`. Laravel asks the ACD worker for a decision: **wait**, **dial** (the selected agents' extensions) or **overflow** (to the queue's fallback). The dial result comes back on `/api/callbacks/voice/queue-dial-callback`. Agents who are already on a call are skipped, using the extension presence kept in Redis from session updates.
 
+When an auto-dialer call whose campaign routes to a ring group or call queue is answered, it fetches the signed `/api/callbacks/voice/campaign-route` URL. The contact becomes the caller, and the ring group or queue strategy runs as for an inbound call.
+
 ---
 
-## Step 9: Asynchronous Notifications
+## Step 9: Web Phone Transfer
+
+A Web Phone user can blind-transfer the call they are on (`POST /api/v1/webphone/transfer` with the call's SIP Call-ID and a destination). After proving the call is the user's (see [Security](/opbx/architecture/security#call-transfer-authorization)), `CallTransferService` moves the party that stays on the line to the signed `/api/callbacks/voice/transfer` URL:
+
+| The call | What OPBX does |
+|----------|----------------|
+| Bridged in a conference room (Simultaneous ring group, queue conference) | Switches the waiting caller's own session to the transfer URL |
+| Placed by the Web Phone | Forks the session: the Web Phone's leg hangs up, the called party goes to the transfer URL |
+| Dialed to the Web Phone inside the caller's session | Switches that session to the transfer URL |
+
+`CallTransferController` then routes the destination as a `subscriber` call from the transferring extension (extension routing, outbound whitelist and caller ID rules apply). A transferred queue call is closed as answered by the agent at that moment, with `queue_calls.transferred_to` set.
+
+---
+
+## Step 10: Asynchronous Notifications
 
 While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPBX.
 
@@ -215,7 +233,8 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 - Filters statuses to the allowed notification list.
 - Creates a `SessionUpdate` record.
 - Triggers call notification webhooks if configured.
-- Does not broadcast. The `CallAnswered` and `CallEnded` event classes exist, but no code dispatches them; the Live Calls page polls the API instead (see [Real-Time](/opbx/architecture/real-time)).
+- Updates the call's `CallLog` (matched by session token or call IDs) and broadcasts `call.answered` on the first answered status and `call.ended` on the first terminal status, once each (see [Real-Time](/opbx/architecture/real-time)). Terminal statuses that are not stored (`completed`, `hangup`, `bye`, deleted sessions) still end the call log and the extension presence.
+- Passes the update to `QueueCallLifecycleService` (extension presence, queue and Simultaneous ring group legs).
 
 ### CDR
 
@@ -224,7 +243,10 @@ While the call is in progress, Cloudonix sends asynchronous JSON webhooks to OPB
 - Creates a `CallDetailRecord` via `CallDetailRecord::createFromWebhook()`. The call `direction` (`incoming`, `outgoing`, `internal` or `application`) is copied from the latest session update. `extension_number` comes from the calling subscriber, an extension caller ID, a DID routed directly to an extension, or else the answering extension recorded during routing (single-extension dial, answered ring group member of any strategy, answering queue agent). An answer recorded after the CDR (queue finalization runs after the CDR is stored) updates the CDR if its `extension_number` is still null.
 - Updates the legacy `CallLog` record if one exists.
 - Creates a final `SessionUpdate` with `action = 'cdr_final_status'`.
+- Ends the legacy `CallLog` and broadcasts `call.ended` if no session update did so first.
 - Triggers call notification webhooks for the final status.
+- Settles the AI hand-offs of the call for the [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) (`ai_call_attempts`, see [AiCallAttempt](/opbx/data-models/models/ai-assistants#aicallattempt)).
+- Finalizes the call queue statistics (`queue_calls`).
 - For auto-dialer calls:
   - Updates `AutoDialerCallSession` and `AutoDialerDestination`.
   - Updates campaign counters.

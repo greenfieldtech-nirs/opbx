@@ -33,7 +33,7 @@ Soketi runs as a Docker service (`opbx_websocket`) and listens on port 6001 inte
 
 ### Docker Configuration
 
-From `docker-compose.yml` (`docker-compose.yml.example` is the same file):
+From `docker-compose.yml.example`, which you copy to `docker-compose.yml`:
 
 ```yaml
 soketi:
@@ -56,7 +56,7 @@ soketi:
     test: ['CMD', 'wget', '-q', '-O', '-', 'http://127.0.0.1:9601/ready']
 ```
 
-`PUSHER_APP_SECRET` has no default: Compose refuses to start until it is set (generate one with `openssl rand -hex 32`).
+`PUSHER_APP_SECRET` has no default: Compose refuses to start until it is set (generate one with `openssl rand -hex 32`). `docker-compose.prod.yml` removes the two host ports, so in production Soketi is reached only through Nginx (`/app/`).
 
 ### Frontend Connection
 

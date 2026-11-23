@@ -50,6 +50,7 @@ properties:
     type:
       - integer
       - 'null'
+    description: Talk time with the agent. When the agent blind-transferred the call from the Web Phone, it ends at the transfer and the row is closed as `answered` by that agent.
   disposition:
     type:
       - string

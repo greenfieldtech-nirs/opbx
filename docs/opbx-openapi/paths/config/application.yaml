@@ -111,6 +111,23 @@ paths:
                         - github
                     required:
                     - enabled
+                  front_page:
+                    type: string
+                    enum:
+                    - home
+                    - login
+                    description: >-
+                      What the site root shows (`OPBX_FRONT_PAGE`): `home` (public
+                      homepage, the default) or `login` (sign-in, or the dashboard when
+                      signed in). Any value other than `login` is `home`.
+                    example: home
+                  opbx_cloud:
+                    type: boolean
+                    description: >-
+                      True only on the hosted OPBX Cloud demo (`OPBX_CLOUD`); the public
+                      status page then shows the service disclaimer. False on self-hosted
+                      installations.
+                    example: false
                   endpoints:
                     type: object
                     description: >-

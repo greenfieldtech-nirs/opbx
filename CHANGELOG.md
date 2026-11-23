@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-11-22 (Status page)
+
+- The public `/status` page shows the "OPBX Cloud is a demonstration service" disclaimer only on the hosted OPBX Cloud demo. New `OPBX_CLOUD` (default `false`); set `OPBX_CLOUD=true` on OPBX Cloud. `GET /v1/config/application` returns `opbx_cloud`.
+
+### Fixed - 2026-11-22 (Call Logs)
+
+- The Disposition filter has a **Connected** option, the value Cloudonix stores for an answered call; before, the filter could not find answered calls. CONNECTED dispositions show a green badge.
+
+### Fixed - 2026-11-22 (AI Real Time Monitor)
+
+- Auto-dialer calls answered by a person now count on the AI monitor when the campaign uses voicemail detection. The AMD worker reports `unknown` (no voicemail found) rather than `human`, and only `voicemail` excludes a call.
+
+### Documentation - 2026-11-22
+
+- Full review of the user guide, the OpenAPI spec, the READMEs and AGENTS.md against the code: installer and `./opbx.sh`, SafeLine WAF, AI Real Time Monitor, Web Phone settings and transfer, campaign destinations (ring groups, call queues, wait for available agents), `ai_call_attempts`, and many smaller corrections.
+- OpenAPI: transfer, directory and session operations for the Web Phone and the embed, the transfer and campaign-route voice callbacks; the spec passes Redocly lint again.
+- Every Mermaid diagram in scope renders; new and retaken screenshots for the AI monitor, login page, queue statistics and current dialogs.
+- The guide page for audio files is titled **Announcements**, as in the sidebar (it was "Recordings"; the address `/opbx/modules/recordings` is unchanged). `docs/WEBHOOK-AUTHENTICATION.md` renders its diagram again; CONTRIBUTING and the PR template say pull requests target `develop`.
+
 ### Added - 2026-11-22 (Web Phone settings)
 
 - Web Phone **Settings** tab: **Auto-Answer** (answer after 2 s of ringing, default off), **Keep-Alive** (re-register every 60 s, default on) and **Refresh on hangup** (re-register after each call, default on). **Save** stores them in the extension's Cloudonix subscriber profile (merged; other profile keys kept) and they apply at once. On start the Web Phone reads them from the profile and stores the defaults when missing. The Embedded Dialer applies them but has no Settings tab.

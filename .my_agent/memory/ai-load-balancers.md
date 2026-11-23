@@ -64,7 +64,7 @@ Every hand-off to an assistant writes an `ai_call_attempts` row (`AiCallAttempt`
 best-effort). Writers: `AiAgentRoutingStrategy::connect()`, `AiLoadBalancerRoutingStrategy::connect()` (+ `fellBackWithoutMember`),
 `AlbsFollowThroughController` (`failed()` with failed_over/fell_back; `recordHandOff()` for next member/AI fallback, skipped when
 `cxmlErrorResponse()` set `$handOffFailed`), `DialerWorkerController::initiateCall` (`ai_target` from `AutoDialerCloudonixService`).
-CDR webhook → `callEnded()`: CONNECTED → answered, billsec capped at the attempt's share; auto-dialer AMD ≠ human → `excluded`.
+CDR webhook → `callEnded()`: CONNECTED → answered, billsec capped at the attempt's share; auto-dialer not connected or AMD = voicemail → `excluded` (AMD reports only voicemail/unknown).
 Stats: `AiMonitorStats` → `GET /v1/ai-monitor` (`AiMonitorController`, policy `AiAssistantPolicy::monitor`, API-key grant `ai-monitor`).
 UI: `frontend/src/pages/AiMonitor.tsx` + `AiMonitor/widgets.tsx`, route `/ui/ai-monitor`. Docs: modules/ai-realtime-monitor.mdx.
 

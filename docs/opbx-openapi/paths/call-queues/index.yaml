@@ -277,7 +277,7 @@ paths:
       tags:
         - Call Queues
       summary: Delete call queue
-      description: Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, or a ring group / AI load balancer / call queue fallback). The 409 body lists the references.
+      description: Owner and PBX Admin only. Refused with 409 when the queue is still referenced by routing (for example from a DID, IVR option, extension, a ring group / AI load balancer / call queue fallback, or an auto-dialer campaign's routing destination). The 409 body lists the references.
       operationId: deleteCallQueue
       security:
         - bearerAuth: []
@@ -433,7 +433,8 @@ paths:
       summary: List queue call report rows
       description: |
         One row per caller that entered a queue, newest `entered_at` first. Owner, PBX Admin,
-        Reporter and PBX User only (Supervisor gets 403). `from`/`to` filter on `entered_at`.
+        Reporter and PBX User only (Supervisor gets 403). `from`/`to` filter on `entered_at`;
+        `to` includes the whole of its day (up to 23:59:59). `per_page` above 100 answers 422.
         The `meta` object has no `from`/`to` keys.
       operationId: listQueueCalls
       security:
@@ -491,7 +492,7 @@ paths:
       summary: Export queue calls (CSV)
       description: |
         Streams every matching row (no pagination) as `queue-calls-YYYY-MM-DD-HHMMSS.csv`, newest
-        first. Same filters and roles as `GET /v1/queue-calls`. Columns: Queue Call ID, Queue ID,
+        first. Same filters and roles as `GET /v1/queue-calls` (`to` includes its whole day). Columns: Queue Call ID, Queue ID,
         Call ID, From, To, Entered At, Answered At, Abandoned At, Ended At, Agent User ID,
         Waiting Seconds, Handling Seconds, Disposition.
       operationId: exportQueueCalls

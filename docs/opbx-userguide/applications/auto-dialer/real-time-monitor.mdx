@@ -99,8 +99,8 @@ Result: the toast "Campaign "*name*" paused" (or "… resumed") appears and the 
 
 | What you see | What it usually means | What to do |
 |--------------|-----------------------|-----------|
-| Active Calls stays at the CAC limit | The destination is the bottleneck, or calls are long | Raise CAC only if the assistant can take more calls |
-| Running, 0 active calls, pending numbers left | Outside the schedule window, or numbers are waiting for their retry time | Check the [schedule](/opbx/applications/auto-dialer/scheduling) |
+| Active Calls stays at the CAC limit | The destination is the bottleneck, or calls are long | Raise CAC only if the assistant (or the team) can take more calls |
+| Running, 0 active calls, pending numbers left | Outside the schedule window, numbers are waiting for their retry time, or a call-queue campaign is [waiting for an available agent](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents) | Check the [schedule](/opbx/applications/auto-dialer/scheduling) and the queue's agents |
 | Running, 0 pending, 0 active calls | The list is finished | The campaign switches to Completed within a minute; archive it if you like (see [Managing Campaigns](/opbx/applications/auto-dialer/campaigns#start-pause-resume)) |
 | Many Failed quickly | Calls are being refused (caller ID, trunk) or the destination is missing | Check [Call Logs](/opbx/modules/call-logs) and the [routing](/opbx/applications/auto-dialer/routing-destinations) |
 | Worker Health offline | The dialer worker is down | Check the worker. See [Dialer Worker](/opbx/workers/dialer-worker) |

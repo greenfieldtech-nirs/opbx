@@ -25,11 +25,11 @@ Use this module to:
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|:-----:|:---------:|:--------:|:--------:|
-| See Business Hours in the sidebar | Yes | Yes | No | No |
-| View schedules | Yes | Yes | Yes (API) | Yes (API) |
-| Create, edit, delete, duplicate, change status | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See Business Hours in the sidebar | Yes | Yes | No | No | No |
+| View schedules | Yes | Yes | Yes (API) | Yes (API) | Yes (API) |
+| Create, edit, delete, duplicate, change status | Yes | Yes | No | No | No |
 
 ## How a call is routed
 
@@ -73,6 +73,8 @@ The **Weekly Schedule** tab of the schedule dialog is a grid with one column per
 4. Click **Clear All** to close every day.
 5. Save the schedule (**Create Schedule** or **Save Changes**). The hours are only stored when you save.
 
+![Edit Schedule dialog for Support Desk Hours on the Weekly Schedule tab: the Clear All button, the Template: list, and the hour grid with Monday to Friday open from 8:00 (green with check marks) and Saturday and Sunday closed](../img/screens/business-hours-weekly-schedule.jpg)
+
 ### Add an exception date
 
 **Who can do this:** Owner, PBX Admin.
@@ -85,7 +87,7 @@ The **Weekly Schedule** tab of the schedule dialog is a grid with one column per
 
 To change a date, click its edit (pencil) icon, change it and click **Update Exception** ("Exception date has been updated."). To remove one, click its delete icon ("Exception date has been removed."). Both take effect when you save the schedule.
 
-![Add Exception Date dialog with date 24/12/2026, name Christmas Eve and type Special Hours with the range 09:00 to 13:00](../img/screens/business-hours-exception-dialog.jpg)
+![Add Exception Date dialog with date 31/12/2026, name New Year's Eve and type Special Hours with the range 10:00 to 14:00](../img/screens/business-hours-exception-dialog.jpg)
 
 ![Edit Schedule dialog for Main Office Hours on the Exception Dates (3) tab, with Add Exception and Import Holidays buttons and three exceptions: Dec 24, 2026 Christmas Eve (early close) as Special Hours 09:00-13:00, Dec 25, 2026 Christmas Day as Closed, and Jan 1, 2027 New Year's Day as Closed](../img/screens/business-hours-exceptions.jpg)
 
@@ -149,7 +151,7 @@ The toast "Business hours schedule has been deleted." appears and the row disapp
 
 An action becomes **Destination unavailable** when its destination is removed, for example when a user is deleted and the action pointed at that user's extension. Callers in that period hear "Destination doesn't exist" and the call ends. The schedule then shows **Unprovisioned** in the list's **Status** column and in the dialog title, and its status can't be switched from the list until every action has a destination again.
 
-**Destination unavailable** is never a choice in the dialog: it only appears, greyed out, as the current type of an action that lost its destination. To fix the schedule, open it, choose a new type and destination for that action, and save. The create dialog and the API refuse it on create with "Choose a destination.
+**Destination unavailable** is never a choice in the dialog: it only appears, greyed out, as the current type of an action that lost its destination. To fix the schedule, open it, choose a new type and destination for that action, and save. The create dialog and the API refuse it on create with "Choose a destination."
 
 ## Duplicate a schedule
 

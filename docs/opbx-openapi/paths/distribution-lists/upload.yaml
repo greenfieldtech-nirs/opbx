@@ -153,7 +153,9 @@ paths:
               example:
                 error: "Cannot upload to list in status: In Use"
         '500':
-          description: Processing could not be started
+          description: >-
+            Processing could not be started. A user whose role may not upload (Reporter) also gets
+            500 here (`Failed to process upload: This action is unauthorized.`), not 403.
           content:
             application/json:
               schema:

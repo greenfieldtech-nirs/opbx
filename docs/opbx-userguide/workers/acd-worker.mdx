@@ -18,11 +18,11 @@ The worker handles:
 - Agent states: `AVAILABLE`, `BUSY`, `WRAP_UP`, `LOGGED_OUT`
 - Agent selection strategies: `ring_all`, `round_robin`, `least_talk_time`, `fewest_calls`
 - Overflow when a caller waits longer than the queue's max wait
-- Live queue snapshots for the queue dashboards
+- Live queue snapshots for the queue dashboards, and for the auto-dialer's [Wait for available agents](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents) check on call-queue campaigns
 
 ## How It Fits the Call Flow
 
-1. An inbound call routes to a queue. Laravel enqueues the caller in the worker and answers with hold CXML (music on hold, or an announcement and a pause).
+1. An inbound call routes to a queue (an answered [auto-dialer campaign](/opbx/applications/auto-dialer/routing-destinations#ring-group-and-call-queue) call that routes to a queue takes the same path). Laravel enqueues the caller in the worker and answers with hold CXML (music on hold, or an announcement and a pause).
 2. Cloudonix calls Laravel's `/api/callbacks/voice/queue-poll` after each hold segment.
 3. Laravel asks the worker for a decision: **wait** (with the position), **dial** (with the selected agents) or **overflow**.
 4. On `dial`, Laravel returns `<Dial>` CXML to the agents' extensions directly, never to follow-me chains. Agents whose extension is already on a call are skipped (see Presence below).
@@ -94,7 +94,7 @@ All routes except health require `Authorization: Bearer {ACD_WORKER_API_TOKEN}`.
 | `ACD_REDIS_PASSWORD` | — | Redis password. The compose file passes `REDIS_PASSWORD`. It is given to the client directly, never in a URI |
 | `ACD_LOG_LEVEL` | `info` | Log level |
 
-Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue calls degrade instead of failing hard, and lost `ended`, `abandoned` and `dial_failed` events are replayed from the Laravel queue.
+Laravel talks to the worker **fail-soft**: if the worker is unreachable, queue calls degrade instead of failing hard, lost `ended`, `abandoned` and `dial_failed` events are replayed from the Laravel queue, and a call-queue campaign that waits for available agents keeps dialing as if the setting were off.
 
 ## Container
 

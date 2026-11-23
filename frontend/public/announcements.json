@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-11-22",
+    "type": "New Release",
+    "text": "Version 0.1.2-rc2 is now available for download, addressing stability and new web phone features.",
+    "badge": "new_release"
+  },
+  {
     "date": "2026-10-26",
     "type": "Emergency Security Release",
     "text": "Version 0.1.2-rc1 is now available for download, addressing the PHP2Shell issue (CVE-2026-109618 and CVE-2026-109619).",

@@ -6,6 +6,8 @@ import PublicStatus, { bannerFor } from '../PublicStatus';
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock('@/services/publicStatus.service', () => ({ publicStatusService: { get } }));
+const appConfig = vi.hoisted(() => ({ current: { opbx_cloud: true } as { opbx_cloud?: boolean } }));
+vi.mock('@/context/ConfigContext', () => ({ useConfig: () => ({ config: appConfig.current, isLoading: false }) }));
 
 const g = (key: string, status: string) => ({ key, name: key, status, history: [] });
 const renderPage = () =>
@@ -35,6 +37,15 @@ describe('PublicStatus page', () => {
     expect(screen.getByTestId('group-b')).toHaveTextContent('Outage');
     expect(screen.getByTestId('group-a')).toHaveTextContent('Operational');
     expect(screen.getByTestId('group-a').querySelectorAll('[title]')).toHaveLength(72);
+  });
+
+  it('has no disclaimer on a self-hosted install', async () => {
+    appConfig.current = { opbx_cloud: false };
+    get.mockResolvedValue({ status: 'ok', updated_at: null, groups: [g('a', 'ok')] });
+    renderPage();
+    await waitFor(() => expect(screen.getByRole('status')).toBeInTheDocument());
+    expect(screen.queryByRole('complementary', { name: 'Disclaimer' })).not.toBeInTheDocument();
+    appConfig.current = { opbx_cloud: true };
   });
 
   it('opens with the OPBX Cloud disclaimer, above the title', async () => {

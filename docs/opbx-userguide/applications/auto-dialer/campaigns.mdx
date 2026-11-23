@@ -22,7 +22,7 @@ Use **Campaign Manager** to:
 ## Prerequisites
 
 - You are the **Owner** or a **PBX Admin**. A **Reporter** can look at the campaigns but cannot change them (see [Permissions](#permissions)).
-- An [AI assistant](/opbx/modules/ai-assistants) or [AI load balancer](/opbx/modules/ai-load-balancers) to receive answered calls, unless you only want to test with **Hang Up**.
+- An [AI assistant](/opbx/modules/ai-assistants), [AI load balancer](/opbx/modules/ai-load-balancers), [ring group](/opbx/modules/ring-groups) or [call queue](/opbx/modules/call-queues) to receive answered calls, unless you only want to test with **Hang Up**.
 - At least one **active** [phone number](/opbx/modules/phone-numbers) of your organization to use as the caller ID.
 
 ## The Campaign Manager page
@@ -53,8 +53,8 @@ Who can do this: Owner and PBX Admin. Other roles do not see **Create Campaign**
 
 1. Open **Auto Dialer → Campaign Manager** and click **Create Campaign**. The **Create Campaign** form opens on the **Basic Info** tab.
 2. Enter the **Campaign Name**.
-3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer** or **Hang Up**, then pick the assistant or load balancer under **Select Destination** (not needed for Hang Up).
-4. Under **Caller ID Configuration**, choose a **Strategy**, then click **Add Caller IDs** (or **Add** once the pool has numbers) and pick one or more numbers from the search list. Remove a number with its **X**.
+3. Under **Routing Destination**, choose **AI Assistant**, **AI Load Balancer**, **Ring Group**, **Call Queue** or **Hang Up**, then pick the assistant, load balancer, ring group or queue under **Select Destination** (not needed for Hang Up).
+4. Under **Caller ID Configuration**, choose a **Strategy**. For a **Call Queue** destination you can also switch on **Wait for available agents** below the strategies. Then click **Add Caller IDs** (or **Add** once the pool has numbers) and pick one or more numbers from the search list. Remove a number with its **X**.
 5. Open the **Schedule** tab and set the **Timezone**, **Start Date**, **End Date** and the **Active Hours** (see [Campaign Scheduling](/opbx/applications/auto-dialer/scheduling#set-the-schedule)).
 6. Optionally open the **Answering Machine Detection** tab and switch on **Enable Detection** (see [Answering Machine Detection](/opbx/applications/auto-dialer/answering-machine-detection#turn-detection-on)).
 7. Open the **Advanced** tab and check the rate limits, attempts, retries, timeouts and recording.
@@ -71,9 +71,10 @@ When a field is wrong, the form shows "Please fix the errors above before submit
 | Field | Limits and default | Meaning |
 |-------|--------------------|---------|
 | Campaign Name | Required, up to 255 characters | Shown in lists and the monitor |
-| Routing Destination | **AI Assistant** (default), **AI Load Balancer** or **Hang Up** | Where answered calls go. See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
-| Select Destination | Required unless the type is Hang Up | The assistant or load balancer |
+| Routing Destination | **AI Assistant** (default), **AI Load Balancer**, **Ring Group**, **Call Queue** or **Hang Up** | Where answered calls go. See [Campaign Routing](/opbx/applications/auto-dialer/routing-destinations) |
+| Select Destination | Required unless the type is Hang Up. Must belong to your organization | The assistant, load balancer, ring group or call queue |
 | Strategy | Round Robin (default), Random, Least Recently Used | How the next caller ID is chosen from the pool |
+| Wait for available agents | Off by default. Can be switched on only when the destination is a **Call Queue** (otherwise greyed out, "Available when routing to a Call Queue.") | Stops dialing while no agent of the queue is available. See [Wait for available agents](/opbx/applications/auto-dialer/routing-destinations#wait-for-available-agents) |
 | Caller ID Pool | 1 to 100 numbers (the counter shows *n*/100). Only **active** numbers of your organization are offered | The numbers callees see. The first number is also stored as the campaign's main caller ID |
 
 The pool can only be changed while the campaign is **Draft** or **Paused**. On an active campaign the pool section shows **Pool Locked** and the strategy and pool are disabled.
@@ -157,6 +158,8 @@ For each number, OPBX:
 3. chooses the outbound trunk from the first matching [outbound whitelist](/opbx/modules/outbound-whitelist) rule. When no rule matches, Cloudonix chooses the trunk;
 4. asks Cloudonix to dial, with the dial timeout, time limit, recording flag and a 5-minute start deadline;
 5. counts the call against the CAC limit until Cloudonix reports it ended.
+
+For a call-queue campaign with **Wait for available agents** on, OPBX first checks that an agent of the queue is available. If none is, it does not claim the number: the number stays pending, uses no attempt, and is tried again on a later poll.
 
 If Cloudonix refuses the call, the number goes back to pending and is tried again after 1 minute, then 2 minutes; after **3 consecutive** refusals it is marked **Failed**. Each refusal uses one of the number's attempts, so with **Max Dial Attempts** 1 the number is marked **Failed** after the first refusal (within a minute).
 
@@ -275,6 +278,7 @@ For an Owner or PBX Admin each assigned list has **Unassign**, which takes the l
 | Caller ID must be in E.164 format | The main caller ID sent through the API is not E.164 | Use `+` and the country code |
 | Invalid Caller ID pool: some DIDs do not exist, do not belong to your organization, or are not active | A pool number is inactive or not yours | Activate the number or remove it |
 | A destination is required unless the campaign hangs up | No destination picked | Pick the assistant, load balancer, ring group or call queue |
+| The selected routing destination is invalid | The destination does not exist in your organization (API) | Pick an existing assistant, load balancer, ring group or call queue |
 | The start date must be a date after or equal to today | Start date in the past on create | Pick today or later |
 | Pause the campaign before editing it. | Edit sent while Running; nothing was changed | Pause, then edit |
 | Cannot start campaign without a destination list | No list assigned, or the assigned list is not Ready or In Use | Assign a Ready list |

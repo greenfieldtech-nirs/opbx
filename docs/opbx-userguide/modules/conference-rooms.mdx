@@ -25,12 +25,12 @@ Use this module to:
 
 ## Permissions
 
-| Action | Owner | PBX Admin | PBX User | Reporter |
-|--------|:-----:|:---------:|:--------:|:--------:|
-| See Conference Rooms in the sidebar | Yes | Yes | Yes (read-only page) | Yes (read-only page) |
-| View rooms | Yes | Yes | Yes | Yes |
-| See the PIN and host PIN | Yes | Yes | No | No |
-| Create, edit, delete, toggle status | Yes | Yes | No | No |
+| Action | Owner | PBX Admin | PBX User | Reporter | Supervisor |
+|--------|:-----:|:---------:|:--------:|:--------:|:----------:|
+| See Conference Rooms in the sidebar | Yes | Yes | Yes (read-only page) | Yes (read-only page) | No |
+| View rooms | Yes | Yes | Yes | Yes | Yes (API) |
+| See the PIN and host PIN | Yes | Yes | No | No | No |
+| Create, edit, delete, toggle status | Yes | Yes | No | No | No |
 
 The API leaves `pin` and `host_pin` out of the response for anyone who cannot edit the room. The **Security** column still shows whether a PIN is set.
 
@@ -85,7 +85,7 @@ A caller who enters the host PIN joins as the host: never muted on entry, and th
 
 The toast "Conference room updated successfully" appears.
 
-![Edit Conference Room dialog for Weekly All-Hands showing PIN 4821, host PIN 9034, Wait for Host, Mute on Entry and Announce Join/Leave on](../img/screens/conference-rooms-edit-dialog.jpg)
+![Edit Conference Room dialog for Weekly All-Hands showing PIN Protection on, participant PIN 4821, Host PIN (Required) 9034, Wait for Host, Mute on Entry, Announce Join/Leave and Music on Hold on](../img/screens/conference-rooms-edit-dialog.jpg)
 
 ### Activate or deactivate a room
 

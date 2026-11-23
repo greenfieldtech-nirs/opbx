@@ -134,6 +134,7 @@ export function getDispositionColor(disposition: string): string {
   const dispositionColors: Record<string, string> = {
     ANSWERED: 'bg-green-100 text-green-800 border border-green-200',
     ANSWER: 'bg-green-100 text-green-800 border border-green-200',
+    CONNECTED: 'bg-green-100 text-green-800 border border-green-200',
     BUSY: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
     CANCEL: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
     CANCELLED: 'bg-yellow-100 text-yellow-800 border border-yellow-200',

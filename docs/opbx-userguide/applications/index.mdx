@@ -8,15 +8,16 @@ description: "AI voice agents, AI load balancing and outbound campaign dialing b
 
 # PBX Applications
 
-The applications build on the core PBX: they add AI voice agents and automated outbound dialing. They are found in the sidebar under **Apps and Security**, which Owners, PBX Admins and Reporters can see. Creating and changing them needs the Owner or PBX Admin role.
+The applications build on the core PBX: they add AI voice agents and automated outbound dialing. They are found in the sidebar under **Apps and Security**, which Owners, PBX Admins and Reporters can see. Creating and changing them needs the Owner or PBX Admin role, and only those two roles see the AI **Real Time Monitor**.
 
 | Application | What it does | Sidebar |
 |-------------|--------------|---------|
 | [AI Assistants](/opbx/applications/ai-assistants) | Connects callers to an AI voice agent at one of 47 providers (42 over SIP, 5 over WebSocket), plus a Dummy Test provider for checking routes | **AI Configuration → AI Assistants** |
 | [AI Load Balancers](/opbx/applications/ai-load-balancers) | Spreads calls across several assistants (round robin, priority or percentage), fails over between them and falls back to a person or menu | **AI Configuration → AI Load Balancers** |
+| [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) | A live slide-show of call figures for every assistant and load balancer | **AI Configuration → Real Time Monitor** (Owner and PBX Admin) |
 | [Auto Dialer](/opbx/applications/auto-dialer) | Runs outbound calling campaigns from distribution lists, with scheduling, pacing, answering-machine detection and a live monitor | **Auto Dialer** (read-only for Reporters) |
 
-![The Apps and Security sidebar section with the Auto Dialer, AI Configuration and Security groups](../img/screens/applications-sidebar.jpg)
+![The Apps and Security sidebar section with the Auto Dialer, AI Configuration (including Real Time Monitor) and Security groups](../img/screens/applications-sidebar.jpg)
 
 ## AI voice agents
 
@@ -39,8 +40,9 @@ The [Auto Dialer](/opbx/applications/auto-dialer) places outbound calls for a ca
 - answering-machine detection;
 - a real-time monitor with live statistics.
 
-Answered calls are connected to an AI assistant or an AI load balancer (or hung up, for testing). Step-by-step screens: [Managing Campaigns](/opbx/applications/auto-dialer/campaigns), [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) and [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor).
+Answered calls are connected to an AI assistant, an AI load balancer, a ring group or a call queue (or hung up, for testing). Step-by-step screens: [Managing Campaigns](/opbx/applications/auto-dialer/campaigns), [Distribution Lists](/opbx/applications/auto-dialer/distribution-lists) and [Real-Time Monitor](/opbx/applications/auto-dialer/real-time-monitor).
 
 ## Related modules
 
 - [Phone Numbers](/opbx/modules/phone-numbers) — route numbers to assistants and load balancers
+- [AI Real Time Monitor](/opbx/modules/ai-realtime-monitor) — live figures for assistants and load balancers

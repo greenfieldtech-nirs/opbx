@@ -28,7 +28,7 @@ Use a queue for a support or sales line where you need to know how long callers 
 Before you create a queue, prepare these:
 
 1. **Agents.** Each agent is an **active** user with an **extension assigned**. A user without an extension is not offered in the agent list. See [User Management](/opbx/modules/user-management) and [Extensions](/opbx/modules/extensions).
-2. **Hold music (optional).** An audio recording with the **Hold music** tag (set on the **Announcements** page). Only tagged recordings are offered. See [Recordings](/opbx/modules/recordings). Without hold music, waiting callers hear "Please hold the line." between pauses.
+2. **Hold music (optional).** An audio recording with the **Hold music** tag (set on the **Announcements** page). Only tagged recordings are offered. See [Announcements](/opbx/modules/recordings). Without hold music, waiting callers hear "Please hold the line." between pauses.
 3. **An overflow fallback (optional).** Where callers go when they wait too long. It must exist and be active. The default is **Hang Up**.
 
 ## Permissions
@@ -59,7 +59,7 @@ An available agent who is already on another call is skipped automatically. Pres
 
 ## Queue behaviour in practice
 
-1. A call reaches the queue (from a phone number, an IVR option, a ring group, AI load balancer or call queue fallback, business hours or a Call Queue extension).
+1. A call reaches the queue (from a phone number, an IVR option, a ring group, AI load balancer or call queue fallback, business hours, a Call Queue extension, or an [auto-dialer campaign](/opbx/modules/auto-dialer-campaigns) that routes answered calls to the queue).
 2. The caller hears the hold music and, if enabled, their position.
 3. The strategy picks an agent, whose extension rings for the agent ring timeout.
 4. If the agent answers, the call connects and is recorded as answered.
@@ -70,6 +70,12 @@ An available agent who is already on another call is skipped automatically. Pres
 When a call is requeued (for example after an offer is not answered), it keeps its **original position and its original enqueue time**. A requeued call that is already past the max wait overflows on its next check.
 
 If the agent hangs up after the caller has joined, the call ends.
+
+With **Ring Agents in Separate Calls**, the agent who answers first is put into the call only after the caller has been moved in, so the agent may hear a short silence of a second or two. If the caller has not joined within about 30 seconds, the agent's leg hangs up and the caller is offered to an agent again.
+
+An agent can [blind-transfer](/opbx/modules/web-phone#transfer-a-call) a queue call from the Web Phone. The queue call is then closed as answered by that agent, at the moment of the transfer, and the agent goes into wrap-up as after any answered call.
+
+[Live Calls](/opbx/modules/live-calls) shows a queue call as one row, with the agent who answered.
 
 ## Workflows
 
@@ -160,7 +166,7 @@ The toast "Call queue deleted" appears and the row disappears. If other configur
 
 To pause, click **Wrap-up**: you stay in Wrap-up, without new offers, until you change it. To stop, click **Log out**. The menu refreshes every 15 seconds.
 
-{/* SCREENSHOT: call-queues-agent-widget — page header with the Queues menu open: My Queue Status listing Support Queue (Available) and Billing Queue (Logged out) with the Go Available, Wrap-up and Log out actions */}
+{/* SCREENSHOT: call-queues-agent-widget — Page header with the Queues menu open: My Queue Status listing Support Queue (Available) and Billing Queue (Logged out) with the Go Available, Wrap-up and Log out actions */}
 
 ### Log in or out by phone
 
@@ -200,6 +206,8 @@ To add or remove agents, edit the queue.
 2. Read **Waiting Time (answered calls)** and **Handling Time (answered calls)** (Min, Max, Average, Std Dev) and **Totals (last 24 hours)**: Handled, Abandoned and Overflowed.
 
 The tab covers the last 24 hours and refreshes every 30 seconds. The API (`GET /v1/call-queues/{id}/stats`) also accepts `from` and `to`. The **Queue Reports** link opens the per-call report.
+
+![Statistics tab of Support Queue with the Waiting Time (answered calls) and Handling Time (answered calls) cards (Min, Max, Average, Std Dev) and Totals (last 24 hours): Handled, Abandoned and Overflowed](../img/screens/call-queues-statistics-tab.jpg)
 
 ### Use the Queues Dashboard
 
@@ -331,5 +339,6 @@ Common causes of "nobody gets the call":
 - [Ring Groups](/opbx/modules/ring-groups) — a simpler alternative, and a common queue fallback
 - [IVR Menus](/opbx/modules/ivr-menus) — route callers into a queue from a menu option
 - [Phone Numbers](/opbx/modules/phone-numbers) — route a number directly to a queue
-- [Recordings](/opbx/modules/recordings) — hold music
+- [Announcements](/opbx/modules/recordings) — hold music
 - [Supervisors](/opbx/modules/supervisors) — supervisors have no Call Queues pages; through the API they can read the queues where their assigned users are agents
+- [Auto Dialer Campaigns](/opbx/modules/auto-dialer-campaigns) — send answered campaign calls to a queue, and hold dialing while no agent is available

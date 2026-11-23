@@ -1,13 +1,14 @@
 # OPBX installer
 
 Guided first-time installer, reconfigure and reset for OPBX. Start it from the repository root with `./install.sh`.
-User-facing description: the Installation section of the top-level [README](../README.md).
+User-facing description: the Installation section of the top-level [README](../README.md). After installing, start and stop
+the stack with `./opbx.sh` (see the README).
 
 ## Run
 
 ```bash
 ./install.sh               # install (or, on an existing install: Change settings / Start over / Exit; resumes an interrupted install)
-./install.sh reconfigure   # public address; WAF off / monitor / block
+./install.sh reconfigure   # public address, front page, allowed host names (development), WAF on/off/mode, WAF console access
 ./install.sh reset         # delete data and generated config
 ```
 
@@ -50,7 +51,7 @@ changes end to end, run `./install.sh` against a scratch checkout, never against
 |---|---|
 | `src/main.js` | Entry point: parses the mode, detects state, `chooseAction`, the Change settings / Start over / Exit menu |
 | `src/modes/install.js` | Install and resume: questions, secrets, config files, SafeLine host steps, build, start, owner, checks, summary |
-| `src/modes/reconfigure.js` | Change the public address and WAF settings; rewrites only owned keys, restarts affected services |
+| `src/modes/reconfigure.js` | Change the public address, front page, allowed host names (development), WAF mode, WAF console access, or turn the WAF on/off; rewrites only owned keys, restarts affected services |
 | `src/modes/reset.js` | List what is destroyed, optional DB backup, confirmation phrase, delete data and config, offer to reuse answers |
 | `src/questions.js` | The interview (mode, address, allowed host names, tenancy, front page, email, Auth0, reCAPTCHA, UserCheck, logs, WAF and console access, advanced) and review |
 | `src/validate.js` | Validators: public URL, email, port, CIDR list, safe absolute path |

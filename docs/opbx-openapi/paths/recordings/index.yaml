@@ -201,7 +201,9 @@ paths:
       tags:
         - Recordings
       summary: Partially update recording
-      description: Owner and PBX Admin only. Every field is optional.
+      description: >-
+        Owner and PBX Admin only. Every field is optional. Same as PUT: API keys get 403
+        because `updated_by` records the user.
       operationId: patchRecording
       security:
         - bearerAuth: []

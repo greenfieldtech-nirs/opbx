@@ -123,6 +123,7 @@ The delete is refused while other configuration still routes calls to the group.
 - an IVR menu option or failover;
 - another ring group's, call queue's or AI load balancer's fallback;
 - a business-hours open or closed action;
+- an auto-dialer campaign that sends answered calls to the group;
 - an extension of type Ring Group that points at it.
 
 Change those first, then delete again. A group that falls back to itself does not block its own delete. Call history never blocks a delete.
@@ -186,6 +187,9 @@ A ring group appears as a destination in:
 - **IVR menus**: as an option target or the failover.
 - **Business hours**: as the open-hours or closed-hours action.
 - **Other ring groups, call queues and AI load balancers**: as the fallback.
+- **Auto-dialer campaigns**: answered campaign calls can be sent to the group, with the contact as the caller. See [Routing Destinations](/opbx/applications/auto-dialer/routing-destinations).
+
+A member who answers a call in the [Web Phone](/opbx/modules/web-phone#transfer-a-call) can transfer it.
 
 However the call reaches the group, it rings the members with the group's own strategy (Sequential, Round Robin or Simultaneous), and the group's fallback runs when no member answers.
 

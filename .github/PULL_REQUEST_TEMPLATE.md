@@ -33,6 +33,7 @@ Please describe in detail how you tested your changes. Include details of:
 ## Checklist
 Please go through all the items below and check the boxes for items you have completed:
 
+- [ ] This pull request targets the `develop` branch (not `main`)
 - [ ] I have read the [CONTRIBUTING guidelines](CONTRIBUTING.md)
 - [ ] I have followed the project's coding standards
 - [ ] My changes generate no new warnings
@@ -90,7 +91,7 @@ When reviewing this PR, please consider:
 - [ ] Security - Are there security implications?
 
 ### Automated Checks
-- [ ] Linting passes (`npm run lint` / `composer lint`)
+- [ ] Linting passes (`npm run lint` / `vendor/bin/pint --test`)
 - [ ] Tests pass
 - [ ] TypeScript types are correct
 - [ ] No security vulnerabilities detected

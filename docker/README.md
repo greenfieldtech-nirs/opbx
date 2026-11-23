@@ -4,7 +4,9 @@ This directory contains the complete Docker-based infrastructure for the **OPBX*
 
 ## Overview
 
-OPBX is a multi-tenant business PBX built on **Laravel 12 (PHP 8.5)** and **React 18 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack runs 14 services on a single bridge network: the web frontend, API backend, queue workers, scheduler, real-time WebSocket messaging, the data stores, an MCP server, and workers for outbound dialing, voicemail detection and call queues. Five more are optional and start only with a profile: `ngrok` (profile `dev`) and the log stack `loki`, `alloy`, `grafana`, `docker-socket-proxy` (profile `logs`).
+OPBX is a multi-tenant business PBX built on **Laravel 13 (PHP 8.5)** and **React 19 (TypeScript)**, using **Cloudonix CPaaS** for VoIP services. The Docker stack runs 14 services on a single bridge network: the web frontend, API backend, queue workers, scheduler, real-time WebSocket messaging, the data stores, an MCP server, and workers for outbound dialing, voicemail detection and call queues. Five more are optional and start only with a profile: `ngrok` (profile `dev`) and the log stack `loki`, `alloy`, `grafana`, `docker-socket-proxy` (profile `logs`).
+
+The optional SafeLine WAF is a separate Compose project (`docker/safeline`, project name `safeline`, see [safeline/README.md](safeline/README.md)). With the WAF on, `docker-compose.waf.yml` swaps the nginx image for an OpenResty build (`docker/nginx/Dockerfile.waf`) that asks the SafeLine detector about every request, and joins the external `safeline-ce` network. Production adds `docker-compose.prod.yml` (static frontend build, no Soketi host ports).
 
 ---
 
@@ -48,6 +50,10 @@ graph TB
             Ngrok["ngrok<br/>(Secure Tunnel)"]
         end
 
+        subgraph "Optional: SafeLine WAF (project safeline)"
+            Detector["safeline-detector"]
+        end
+
         subgraph "Optional: profile logs"
             Alloy["alloy"] --> Loki[("loki")]
             Grafana["grafana"] --> Loki
@@ -61,10 +67,11 @@ graph TB
 
     Nginx -->|/api/| App
     Nginx -->|/| Frontend
-    Nginx -->|/app/ (WS)| Soketi
-    Nginx -->|/ws/amd/ (WS)| AMD
+    Nginx -->|"/app/ (WS)"| Soketi
+    Nginx -->|"/ws/amd/ (WS)"| AMD
     Nginx -->|/mcp| MCP
     Nginx -->|/logs/| Grafana
+    Nginx -.->|request check, WAF on| Detector
 
     App -->|SQL| MySQL
     App -->|Cache/Queue| Redis
@@ -94,12 +101,12 @@ graph TB
 | 2 | **queue-worker** | Same as `app` | Laravel queue worker (`auto-dialer`, `default` queues) | None |
 | 3 | **queue-worker-long** | Same as `app` | Long jobs on the `auto-dialer-long` queue (list uploads, hold-music segmentation), 2-hour timeout | None |
 | 4 | **scheduler** | Same as `app` | Runs `schedule:run` every 60 seconds | None |
-| 5 | **frontend** | `frontend/Dockerfile.dev` (React/Vite) | React SPA development server with HMR | `3000` |
-| 6 | **nginx** | `nginx:1.27-alpine` | Reverse proxy; routes traffic to the right backend | `80` |
+| 5 | **frontend** | `frontend/Dockerfile.dev` (React/Vite); `frontend/Dockerfile` (static nginx) in production | React SPA development server with HMR | `3000` (`FRONTEND_PORT`; none in production) |
+| 6 | **nginx** | `nginx:1.27-alpine` (`opbx-nginx-waf:poc`, OpenResty, with the WAF overlay) | Reverse proxy; routes traffic to the right backend | `APP_PORT` (default `80`); WAF console `WAF_CONSOLE_PORT` (default `9443`) with the WAF overlay |
 | 7 | **mysql** | `mysql:8.4` (LTS) | Primary relational database | None (`3306` loopback via `docker-compose.ports.yml`) |
 | 8 | **redis** | `redis:7-alpine` | Cache, sessions, queues, locks, worker state | None (`6379` loopback via `docker-compose.ports.yml`) |
 | 9 | **seaweedfs** | `chrislusf/seaweedfs:4.47` | S3-compatible object storage for recordings and the CDR archive (replaces MinIO) | None (S3 `8333`, master UI `9333` loopback via `docker-compose.ports.yml`) |
-| 10 | **soketi** | `quay.io/soketi/soketi:1.6-16-alpine` | WebSocket server for real-time frontend updates | `6001`, `9601` (metrics) |
+| 10 | **soketi** | `quay.io/soketi/soketi:1.6-16-alpine` | WebSocket server for real-time frontend updates | `6001`, `9601` (metrics); none in production |
 | 11 | **dialer-worker** | `dialer-worker/Dockerfile` (Go) | Outbound campaign dialer; polls Laravel. Health endpoint only, no webhooks. One replica | None (`8181` → 8081 loopback via `docker-compose.ports.yml`) |
 | 12 | **amd-worker** | `amd-worker/Dockerfile` (Java/Vert.x 5) | Stream-based voicemail/beep detection via WebSocket | None |
 | 13 | **acd-worker** | `acd-worker/Dockerfile` (Java/Vert.x 5) | Call queue engine (FIFO, agent states) | None |
@@ -127,8 +134,12 @@ docker/
 │   └── zz-custom.conf      # PHP-FPM pool listen configuration
 ├── nginx/
 │   ├── nginx.conf          # Main Nginx configuration (gzip, logging, worker settings, embed header maps)
+│   ├── render.sh           # Renders the templates (resolver, trusted proxy, WAF hook, WAF console) and starts nginx
+│   ├── Dockerfile.waf      # OpenResty image used with docker-compose.waf.yml
+│   ├── waf/                # SafeLine detector hook (Lua), included when the WAF is on
+│   ├── tests/              # render.sh tests
 │   ├── conf.d/
-│   │   └── default.conf    # Dev virtual host: /api/, /app/, /ws/amd/, /mcp, /logs/, /embed/, /
+│   │   └── default.conf    # Dev virtual host: /api/, /app/, /ws/amd/, /mcp, /logs/, /embed/, /up, /
 │   └── conf.d.prod/
 │       └── default.conf    # Production virtual host (static SPA), used by docker-compose.prod.yml
 ├── mysql/
@@ -137,6 +148,7 @@ docker/
 ├── alloy/                  # Alloy collector config (profile logs)
 ├── grafana/                # Grafana data source and dashboard provisioning (profile logs)
 ├── ngrok/                  # ngrok config (profile dev)
+├── safeline/               # SafeLine WAF Compose project and its README
 ├── scripts/
 │   ├── validate-env.sh     # Security validation for critical environment variables
 │   └── generate-secrets.sh # Fills in missing shared secrets in .env
@@ -156,12 +168,13 @@ docker/
 ### Quick Start
 
 ```bash
-# 0. Configuration and secrets (first time)
-cp .env.example .env && cp docker-compose.yml.example docker-compose.yml
-docker/scripts/generate-secrets.sh
+# 0. First time: the guided installer writes .env and docker-compose.yml, installs the PHP packages and starts the stack
+./install.sh
+#    (manual alternative: copy .env.example and docker-compose.yml.example, run docker/scripts/generate-secrets.sh,
+#    set APP_KEY and the passwords, install the PHP packages; see "Advanced: manual setup" in ../README.md)
 
 # 1. Start the stack in order (SafeLine first when the WAF is on; waits until every service is up)
-./opbx.sh start            # or: docker compose up -d (optional services: --profile dev, --profile logs)
+./opbx.sh start            # --no-waf, --with-ngrok, --nofork; or: docker compose up -d (optional: --profile dev, --profile logs)
 
 # 2. View logs for a specific service
 ./opbx.sh logs app
@@ -209,7 +222,8 @@ The reverse proxy handles all inbound traffic and routes it based on path:
 | `/mcp` | `mcp-server:8080` | HTTP | MCP server |
 | `/logs/` | `grafana:3000` | HTTP | Grafana (profile `logs`) |
 | `/embed/loader.js`, `/embed/dialer` | Laravel | HTTP | Embeddable dialer (may be framed by other sites) |
-| `/` | `frontend:3000` | HTTP / WebSocket | React SPA and Vite HMR |
+| `/up` | Laravel | HTTP | Laravel health page |
+| `/` | `frontend:3000` (`frontend:80` in production) | HTTP / WebSocket | React SPA and Vite HMR |
 
 ### PHP-FPM Configuration
 
@@ -314,7 +328,7 @@ By default, **no database or internal service ports are exposed externally**:
 | Redis | Disabled | `REDIS_EXPOSE_PORT` |
 | SeaweedFS | Disabled | `MINIO_EXPOSE_PORT` (S3 API, 8333), `MINIO_CONSOLE_EXPOSE_PORT` (master UI, 9333) |
 
-Only `nginx` (port 80), `frontend` (port 3000) and `soketi` (ports 6001 and 9601) publish ports by default; `ngrok` (port 4040) does when the `dev` profile is started. The `*_EXPOSE_PORT` variables only change the loopback port numbers used by `docker-compose.ports.yml`:
+Only `nginx` (`APP_PORT`, default 80), `frontend` (port 3000) and `soketi` (ports 6001 and 9601) publish ports by default; production (`docker-compose.prod.yml`) publishes only `nginx`. `ngrok` (port 4040) publishes when the `dev` profile is started, and the WAF overlay adds the console port (`WAF_CONSOLE_BIND:WAF_CONSOLE_PORT`, default `0.0.0.0:9443`). The `*_EXPOSE_PORT` variables only change the loopback port numbers used by `docker-compose.ports.yml`:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.ports.yml up -d   # never in production
@@ -441,7 +455,7 @@ docker compose logs app | head -n 50
 Common causes:
 - Weak/default passwords or S3 keys in `.env` (`minioadmin` is rejected; `.env.example` ships the S3 keys empty and `generate-secrets.sh` fills them)
 - Missing required environment variables
-- Missing `vendor/` on the host (run `composer install`; the repository is bind-mounted over the image)
+- Missing `vendor/` on the host (the repository is bind-mounted over the image; install the PHP packages inside the app image as in "Advanced: manual setup" in [../README.md](../README.md), or run `./opbx.sh upgrade`)
 - MySQL not ready (health check failure)
 
 ### Database Connection Issues
@@ -467,15 +481,12 @@ docker compose exec nginx cat /var/log/nginx/opbx_error.log
 ### Reset Everything (Destructive)
 
 ```bash
-# Stop and remove all containers and networks (bind-mounted data in ./volumes is kept)
-docker compose down
-
-# Deleting the data as well needs the bind-mount directories removed by hand
-# rm -rf ./volumes/mysql ./volumes/redis ./volumes/seaweedfs
-
-# Rebuild from scratch
-docker compose up -d --build
+# Lists what it destroys, offers a database backup, asks for confirmation, then deletes the data
+# (./volumes, the Loki and Grafana volumes, SafeLine data) and the generated config
+./install.sh reset
 ```
+
+Avoid `docker compose down` for a normal stop: it deletes the Docker network (see `./opbx.sh stop` above).
 
 ---
 

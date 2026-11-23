@@ -226,7 +226,7 @@ final class AiCallRecordingTest extends TestCase
         return [
             'person' => ['human', AiCallAttemptStatus::ANSWERED],
             'voicemail' => ['voicemail', AiCallAttemptStatus::EXCLUDED],
-            'undecided' => ['unknown', AiCallAttemptStatus::EXCLUDED],
+            'no voicemail found (what the AMD worker reports for a person)' => ['unknown', AiCallAttemptStatus::ANSWERED],
             'no voicemail detection' => [null, AiCallAttemptStatus::ANSWERED],
         ];
     }
