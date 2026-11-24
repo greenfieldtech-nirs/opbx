@@ -73,6 +73,9 @@ W=/etc/nginx/conf.d/00-safeline-waf.conf
 # would let a client that reaches nginx directly pick its own address.
 check "waf hook uses \$remote_addr with realip" "grep -q 'remote_addr' $W && ! grep -qE 'remote_addr *=|http_x_forwarded_for' $W" y -e WAF_MODE=monitor -e TRUSTED_PROXY_CIDR=10.0.0.0/8
 check "waf hook uses \$remote_addr without realip" "! grep -qE 'remote_addr *=|http_x_forwarded_for' $W" y -e WAF_MODE=monitor
+# Vite's hashed build images (/assets/*.png) live in the frontend container, not Laravel's public/: they must be
+# proxied (50x here, frontend does not resolve), while Laravel's own static files stay local (404, no file here).
+check "built SPA images go to the frontend" "nginx && a=\$(wget -qO- http://127.0.0.1/assets/opbx_logo-abc.png 2>&1); s=\$(wget -qO- http://127.0.0.1/storage/x.png 2>&1); echo \"assets: \$a | storage: \$s\"; echo \"\$a\" | grep -q ' 50[0-9]' && echo \"\$s\" | grep -q ' 404'" n
 check "no opbx.d hook directory" "[ ! -e /etc/nginx/opbx.d ] && ! grep -rq opbx.d /etc/nginx/conf.d" n
 reject "bad TRUSTED_PROXY_CIDR rejected" "TRUSTED_PROXY_CIDR=10.0.0.0/8,evil;x" "evil;x"
 reject "bad octet-count rejected" "TRUSTED_PROXY_CIDR=10.0.0/8" "10.0.0/8"
