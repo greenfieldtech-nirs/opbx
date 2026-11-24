@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The homepage serves `/llms.txt` (a Markdown summary for AI agents) and `/robots.txt`; both returned the app's HTML before. Lighthouse Agentic Browsing on mobile goes from 22 to 100.
 - The announcement bar keeps a fixed one-line height, holding its space while loading and truncating long text, so the page no longer jumps when it loads or rotates (CLS 0.19 to 0.04).
+- Production: the OPBX logo (and any other image the frontend build emits under `/assets/`) returned 404. nginx served every `.png`/`.jpg` from Laravel's `public/` folder unless the path was excluded, and `/assets/` was not; those requests now go to the frontend container.
 - Accessibility: a `<main>` landmark, a name for the footer's GitHub icon link, footer headings in order, and lighter grey body text that meets 4.5:1 contrast. The dead `/vite.svg` favicon link is gone.
 
 ### Fixed - 2026-11-22 (Status page)
