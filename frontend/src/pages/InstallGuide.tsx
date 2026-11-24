@@ -72,7 +72,7 @@ const SECTIONS = [
   { id: 'troubleshooting', label: 'Troubleshooting' },
 ];
 
-const REQUIREMENTS = [
+export const REQUIREMENTS = [
   ['A Linux server or a Mac', '4 GB RAM (8 GB recommended) and 20 GB of disk (50 GB recommended).'],
   ['Docker 20.10+ with Compose 2.24.4+', 'Or Podman with its Docker-compatible CLI. Nothing else: Node.js, PHP and Composer run inside containers.'],
   ['Git', 'To download OPBX and, later, its updates.'],
@@ -80,7 +80,7 @@ const REQUIREMENTS = [
   ['A Cloudonix account', 'For calls. You connect it in the OPBX web app after installing.'],
 ];
 
-const ASKS = [
+export const ASKS = [
   'Production server or development machine, and the port OPBX listens on',
   'Production: the public https:// address and, optionally, your proxy\'s IP (for real visitor IPs)',
   'Development: other host names allowed to open it (a VPN or Tailscale name, the machine\'s IP, an ngrok domain)',
@@ -92,7 +92,7 @@ const ASKS = [
   'Optional: the SafeLine web application firewall (monitor or block), its console port and who may open it',
 ];
 
-const TRANSCRIPT = `$ ./install.sh
+export const TRANSCRIPT = `$ ./install.sh
 ◇  Is this a production server or a development machine?
 │  Production
 │
@@ -122,7 +122,7 @@ const TRANSCRIPT = `$ ./install.sh
 │
 ◇  All services are up`;
 
-const EVERYDAY: [string, string][] = [
+export const EVERYDAY: [string, string][] = [
   ['./opbx.sh start', 'Start everything in the right order and wait until every service is up. The WAF starts first when it is on.'],
   ['./opbx.sh stop', 'Stop OPBX, then the WAF. Containers, network and data are kept.'],
   ['./opbx.sh restart', 'Stop, then start.'],
@@ -132,7 +132,7 @@ const EVERYDAY: [string, string][] = [
   ['./opbx.sh start --nofork', 'Start, then stay in the foreground showing every service\'s log. Ctrl-C stops the stack.'],
 ];
 
-const UPGRADE_STEPS = [
+export const UPGRADE_STEPS = [
   'Copies old MinIO recordings to SeaweedFS (once, older installations only)',
   'Rebuilds every image with fresh base images, so security releases are picked up',
   'Installs the PHP packages inside the app image (no PHP on your server)',
@@ -151,7 +151,7 @@ export const DEV_PORTS: [port: number, service: string, purpose: string, variabl
 ];
 
 type Trouble = { q: string; a: string; code?: string; ports?: boolean };
-const TROUBLE: Trouble[] = [
+export const TROUBLE: Trouble[] = [
   { q: 'A service is not up', a: 'See which one and why:', code: './opbx.sh status\n./opbx.sh logs <service>' },
   {
     q: 'The installer says a port is in use',

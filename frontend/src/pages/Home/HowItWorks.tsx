@@ -1,6 +1,6 @@
 import { Phone, Server, Workflow } from 'lucide-react';
 
-const steps = [
+export const steps = [
   {
     number: '1',
     title: 'Deploy & Configure',

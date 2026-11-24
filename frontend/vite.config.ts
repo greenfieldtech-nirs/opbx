@@ -1,7 +1,26 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { readFileSync } from 'fs'
+
+// /llms-full.txt is llms.txt plus every public page's Markdown copy, assembled from public/ so it never drifts.
+const LLMS_FULL_PARTS = ['llms.txt', 'index.html.md', 'install.md', 'terms.md']
+const llmsFull = () =>
+  LLMS_FULL_PARTS.map((f) => readFileSync(path.resolve(import.meta.dirname, 'public', f), 'utf8').trim()).join('\n\n---\n\n') + '\n'
+
+const llmsFullPlugin = (): Plugin => ({
+  name: 'opbx-llms-full',
+  configureServer(server) {
+    server.middlewares.use('/llms-full.txt', (_req, res) => {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+      res.end(llmsFull())
+    })
+  },
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'llms-full.txt', source: llmsFull() })
+  },
+})
 
 // Parse allowed hosts from environment variable (comma-separated)
 const parseAllowedHosts = (): string[] => {
@@ -22,7 +41,7 @@ const parseAllowedHosts = (): string[] => {
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), llmsFullPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
