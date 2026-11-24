@@ -135,8 +135,13 @@ class SettingsController extends Controller
             $existing = CloudonixSettings::where('organization_id', $user->organization_id)->first();
             $uuid = $validated['domain_uuid'] ?? $existing?->domain_uuid;
             $domainKey = $validated['domain_api_key'] ?? $existing?->domain_api_key;
+            // The domain profile as it was before this save; compared after the push to spot
+            // endpoints that another installation had set.
+            $currentDomainProfile = [];
             if ($uuid && $domainKey) {
-                $profileDomain = CloudonixClient::validateDomainCredentials($uuid, $domainKey)['profile']['domain'] ?? null;
+                $domain = CloudonixClient::validateDomainCredentials($uuid, $domainKey)['profile'] ?? null;
+                $currentDomainProfile = is_array($domain['profile'] ?? null) ? $domain['profile'] : [];
+                $profileDomain = $domain['domain'] ?? null;
                 if ($profileDomain) {
                     $taken = DB::table('cloudonix_settings')->where('domain_name', $profileDomain)
                         ->where('organization_id', '!=', $user->organization_id)->exists();
@@ -205,8 +210,10 @@ class SettingsController extends Controller
 
             // Sync settings to Cloudonix if credentials are configured
             $cloudonixSyncWarning = null;
+            $endpointNotice = null;
             if ($settings->isConfigured()) {
                 $sync = app(CloudonixProfileSync::class);
+                $foreignEndpoints = $sync->foreignEndpoints($settings, $currentDomainProfile);
                 // Orgs without a webhook key get one generated and pushed in the same call.
                 $syncResult = $settings->hasWebhookAuth()
                     ? $sync->push($settings)
@@ -227,6 +234,21 @@ class SettingsController extends Controller
                         'user_id' => $user->id,
                         'organization_id' => $user->organization_id,
                     ]);
+
+                    if ($foreignEndpoints !== []) {
+                        Log::warning('Cloudonix domain webhook endpoints pointed elsewhere before this save', [
+                            'request_id' => $requestId,
+                            'organization_id' => $user->organization_id,
+                            'domain_uuid' => $settings->domain_uuid,
+                            'previous_endpoints' => $foreignEndpoints,
+                        ]);
+
+                        $endpointNotice = 'Cloudonix was sending this domain\'s webhooks to '
+                            .implode(' and ', array_unique(array_values($foreignEndpoints)))
+                            .'. They now point to this installation. If another OPBX installation uses the same '
+                            .'Cloudonix domain, it will point them back the next time its settings are saved. '
+                            .'Give each installation its own Cloudonix domain.';
+                    }
 
                     // Create or update voice application after successful domain sync
                     $voiceAppError = $this->setupVoiceApplication($settings, $requestId, $user->id, $user->organization_id);
@@ -269,6 +291,10 @@ class SettingsController extends Controller
 
             if ($cloudonixSyncWarning) {
                 $response['warning'] = $cloudonixSyncWarning;
+            }
+
+            if ($endpointNotice) {
+                $response['endpoint_notice'] = $endpointNotice;
             }
 
             return response()->json($response);

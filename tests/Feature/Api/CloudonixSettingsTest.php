@@ -260,6 +260,53 @@ class CloudonixSettingsTest extends TestCase
             && ($r['profile']['authorization-api-key'] ?? null) === $settings->domain_requests_api_key);
     }
 
+    public function test_saving_reports_webhook_endpoints_that_pointed_at_another_installation(): void
+    {
+        Sanctum::actingAs($this->owner);
+        Http::fake([
+            '*' => Http::response(['domain' => 'real.cloudonix.net', 'profile' => [
+                'session-update-endpoint' => 'https://opbx.ngrok.io/api/webhooks/cloudonix/session-update',
+                'cdr-endpoint' => 'https://opbx.ngrok.io/api/webhooks/cloudonix/cdr',
+            ]], 200),
+        ]);
+
+        $this->putJson('/api/v1/settings/cloudonix', [
+            'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
+            'domain_api_key' => 'test-api-key-12345678',
+            'no_answer_timeout' => 60,
+            'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
+        ])->assertStatus(200)
+            ->assertJsonMissingPath('warning')
+            ->assertJsonPath('endpoint_notice', fn (string $notice) => str_contains($notice, 'https://opbx.ngrok.io/api/webhooks/cloudonix/session-update')
+                && str_contains($notice, 'https://opbx.ngrok.io/api/webhooks/cloudonix/cdr'));
+
+        $settings = CloudonixSettings::where('organization_id', $this->organization->id)->first();
+        Http::assertSent(fn ($r) => $r->method() === 'PUT'
+            && ($r['profile']['session-update-endpoint'] ?? null) === $settings->getCallbackUrl());
+    }
+
+    public function test_saving_has_no_endpoint_notice_when_the_domain_already_points_here(): void
+    {
+        Sanctum::actingAs($this->owner);
+        $base = rtrim((string) config('app.url'), '/');
+        Http::fake([
+            '*' => Http::response(['domain' => 'real.cloudonix.net', 'profile' => [
+                'session-update-endpoint' => "{$base}/api/webhooks/cloudonix/session-update",
+                'cdr-endpoint' => "{$base}/api/webhooks/cloudonix/cdr",
+            ]], 200),
+        ]);
+
+        $this->putJson('/api/v1/settings/cloudonix', [
+            'domain_uuid' => '550e8400-e29b-41d4-a716-446655440000',
+            'domain_api_key' => 'test-api-key-12345678',
+            'no_answer_timeout' => 60,
+            'recording_format' => 'wav',
+            'call_recording_mode' => 'disabled',
+        ])->assertStatus(200)
+            ->assertJsonMissingPath('endpoint_notice');
+    }
+
     public function test_domain_name_owned_by_another_org_is_rejected(): void
     {
         Sanctum::actingAs($this->owner);

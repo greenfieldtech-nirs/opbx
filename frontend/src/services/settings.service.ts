@@ -86,10 +86,11 @@ export const settingsService = {
    * PUT /settings/cloudonix
    */
   updateCloudonixSettings: (data: UpdateCloudonixSettingsRequest): Promise<CloudonixSettings> => {
-    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string; warning?: string; webhook_url_details?: WebhookUrlDetails }>('/settings/cloudonix', data)
+    return api.put<{ message: string; settings: CloudonixSettings; callback_url: string; cdr_url: string; warning?: string; endpoint_notice?: string; webhook_url_details?: WebhookUrlDetails }>('/settings/cloudonix', data)
       .then(res => ({
         ...res.data.settings,
         warning: res.data.warning,
+        endpoint_notice: res.data.endpoint_notice,
         callback_url: res.data.callback_url,
         cdr_url: res.data.cdr_url,
         webhook_url_details: res.data.webhook_url_details,

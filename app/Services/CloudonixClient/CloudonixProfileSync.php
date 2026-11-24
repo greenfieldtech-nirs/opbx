@@ -46,6 +46,34 @@ class CloudonixProfileSync
     }
 
     /**
+     * Webhook endpoints on the domain profile that point somewhere other than this installation.
+     *
+     * Two OPBX installations sharing one Cloudonix domain (e.g. production and a dev machine
+     * behind ngrok) overwrite each other's endpoints and webhook key on every save: the last
+     * save wins and the other installation stops receiving session updates and CDRs.
+     *
+     * @param  array<string, mixed>  $domainProfile  The domain's `profile` object as read from Cloudonix
+     * @return array<string, string> Profile key => URL currently set there, for each mismatch
+     */
+    public function foreignEndpoints(CloudonixSettings $settings, array $domainProfile): array
+    {
+        $ours = [
+            'session-update-endpoint' => $settings->getCallbackUrl(),
+            'cdr-endpoint' => $settings->getCdrUrl(),
+        ];
+
+        $foreign = [];
+        foreach ($ours as $key => $url) {
+            $current = $domainProfile[$key] ?? null;
+            if (is_string($current) && $current !== '' && rtrim($current, '/') !== rtrim($url, '/')) {
+                $foreign[$key] = $current;
+            }
+        }
+
+        return $foreign;
+    }
+
+    /**
      * Generate a webhook key, store it and push it. The key is rolled back if the
      * push fails, so Cloudonix is never left sending a token we now reject.
      *

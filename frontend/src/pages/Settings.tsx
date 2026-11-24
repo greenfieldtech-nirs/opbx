@@ -251,6 +251,12 @@ export default function Settings() {
           if (savedSettings.warning) {
             // Saved locally, but the push to Cloudonix failed: do not claim success.
             toast.warning('Settings saved, but not synced to Cloudonix', { description: savedSettings.warning });
+          } else if (savedSettings.endpoint_notice) {
+            // Synced, but the domain's webhooks had been pointing elsewhere (another installation?).
+            toast.warning('Settings saved; webhooks moved to this installation', {
+              description: savedSettings.endpoint_notice,
+              duration: 20000,
+            });
           } else {
             toast.success('Settings validated and saved successfully', {
               description: settingsApplied

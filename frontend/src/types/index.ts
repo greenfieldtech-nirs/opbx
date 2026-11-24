@@ -956,6 +956,8 @@ export interface WebhookUrlDetails {
 export interface CloudonixSettings {
   /** Set by the update endpoint when the settings were saved locally but the Cloudonix sync failed. */
   warning?: string;
+  /** Set by the update endpoint when the domain's webhook endpoints pointed at another URL (e.g. another OPBX installation) before the sync. */
+  endpoint_notice?: string;
   id: number;
   organization_id: number;
   domain_uuid: string | null;
