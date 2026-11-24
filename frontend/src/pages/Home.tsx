@@ -39,18 +39,20 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground home-dark oranienbaum-regular">
       <AnnouncementBanner />
       <HomeHeader />
-      <Hero />
-      <WhatIsOPBX />
-      <BuiltDifferent />
-      <DograhSpotlight />
-      <FeaturesGrid />
-      {/* <ProjectStats /> — hidden until real statistics content is provided */}
-      <HowItWorks />
-      <AIHandoff />
-      <TechnologySection />
-      <Pricing />
-      <FAQSection />
-      <FinalCTA />
+      <main>
+        <Hero />
+        <WhatIsOPBX />
+        <BuiltDifferent />
+        <DograhSpotlight />
+        <FeaturesGrid />
+        {/* <ProjectStats /> — hidden until real statistics content is provided */}
+        <HowItWorks />
+        <AIHandoff />
+        <TechnologySection />
+        <Pricing />
+        <FAQSection />
+        <FinalCTA />
+      </main>
       <Footer />
     </div>
   );

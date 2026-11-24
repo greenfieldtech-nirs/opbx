@@ -17,7 +17,7 @@ export function Footer() {
             </p>
           </div>
           <div>
-            <h4 className="font-semibold mb-3 text-foreground">Product</h4>
+            <h3 className="font-semibold mb-3 text-foreground">Product</h3>
             <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <Link to="/ui/register" className="hover:text-foreground transition-colors">
@@ -42,7 +42,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold mb-3 text-foreground">Resources</h4>
+            <h3 className="font-semibold mb-3 text-foreground">Resources</h3>
             <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <a
@@ -87,7 +87,7 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold mb-3 text-foreground">Community</h4>
+            <h3 className="font-semibold mb-3 text-foreground">Community</h3>
             <ul className="space-y-2 text-xl text-muted-foreground">
               <li>
                 <a
@@ -137,6 +137,7 @@ export function Footer() {
               href="https://github.com/greenfieldtech-nirs/OPBX"
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="OPBX on GitHub"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <GithubIcon className="h-5 w-5" />
