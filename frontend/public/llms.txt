@@ -1,0 +1,29 @@
+# OPBX
+
+> OPBX is an open-source (MIT) business PBX built on the Cloudonix CPaaS. It connects AI voice agents and human teams on one phone system: extensions, ring groups, call queues, IVR menus, business hours, AI assistants, an auto dialer and a browser web phone. Cloudonix handles SIP, media and telephony; OPBX decides call routing in real time.
+
+OPBX can be self-hosted for free on your own infrastructure (Docker), or used as a managed cloud service.
+
+## Get started
+
+- [Create an account](/ui/register): sign up for the managed OPBX cloud service
+- [Sign in](/ui/login): the OPBX administration interface
+- [Install guide](/install): self-host OPBX with the guided installer
+- [Service status](/status): current status of the OPBX cloud service
+
+## Documentation
+
+- [OPBX documentation](https://developers.cloudonix.com/opbx): user guide, administration and architecture
+- [OPBX REST API](https://developers.cloudonix.com/opbxRestOpenAPI): OpenAPI reference for automating OPBX
+- [Cloudonix documentation](https://developers.cloudonix.com/): the CPaaS platform OPBX runs on
+
+## Source and community
+
+- [GitHub repository](https://github.com/greenfieldtech-nirs/OPBX): source code, issues and releases
+- [Contributing](https://github.com/greenfieldtech-nirs/OPBX/blob/main/CONTRIBUTING.md)
+- [License (MIT)](https://github.com/greenfieldtech-nirs/OPBX/blob/main/LICENSE.md)
+
+## Optional
+
+- [Terms of Use](/terms)
+- [Discord community](https://discord.gg/etCGgNh9VV)
