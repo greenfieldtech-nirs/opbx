@@ -163,19 +163,23 @@ export function LoadBalancerCard({ loadBalancer, windowLabel }: { loadBalancer: 
         <Stat value={lb.failovers} label="failovers" />
         <Stat value={lb.fell_back} label="fell back" />
       </div>
-      <div className="space-y-1.5" aria-label="Split of calls between members">
+      <div className="space-y-3" aria-label="Split of calls between members">
         {lb.members.map((m) => (
           <div key={m.ai_assistant_id} className={m.active ? '' : 'opacity-50'}>
-            <div className="flex justify-between text-[clamp(12px,0.85vw,16px)]">
+            <div className="mb-1 flex justify-between gap-3 font-medium text-[clamp(17px,1.25vw,24px)]">
               <span className="truncate">{m.name ?? 'Deleted assistant'}</span>
-              <span className="tabular-nums text-muted-foreground">
+              <span className="shrink-0 tabular-nums text-muted-foreground">
                 {m.actual_share ?? 0}%{m.configured_share !== null ? ` / ${m.configured_share}% set` : lb.strategy === 'priority' ? ` · priority ${m.priority}` : ''}
               </span>
             </div>
-            <div className="relative h-2 rounded-full bg-muted">
-              <div className="h-2 rounded-full bg-primary" style={{ width: `${m.actual_share ?? 0}%` }} />
+            <div className="relative rounded-full bg-muted [--bar:clamp(14px,1vw,20px)] h-[var(--bar)]">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${m.actual_share ?? 0}%` }} />
               {m.configured_share !== null && (
-                <div className="absolute -top-0.5 h-3 w-0.5 bg-foreground" style={{ left: `${m.configured_share}%` }} title="configured share" />
+                <div
+                  className="absolute -top-1 h-[calc(var(--bar)+8px)] w-1 -translate-x-1/2 rounded-full bg-foreground"
+                  style={{ left: `${m.configured_share}%` }}
+                  title="configured share"
+                />
               )}
             </div>
           </div>
