@@ -72,13 +72,18 @@ describe('AiMonitor page', () => {
     expect(card).toHaveTextContent('1 fell back');
   });
 
-  it('stays on the current view while paused', async () => {
+  it('stays on the current view while paused, but keeps counting down and refreshing', async () => {
     renderPage();
     await screen.findByTestId('assistant-1');
     fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
-    act(() => vi.advanceTimersByTime(60_000));
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByText('Paused · refreshing in 20s')).toBeInTheDocument();
+    const calls = snapshot.mock.calls.length;
+    act(() => vi.advanceTimersByTime(20_000));
     expect(screen.getByTestId('assistant-1')).toBeInTheDocument();
-    expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(screen.queryByTestId('load-balancer-7')).not.toBeInTheDocument();
+    expect(screen.getByText('Paused · refreshing in 30s')).toBeInTheDocument();
+    await waitFor(() => expect(snapshot.mock.calls.length).toBeGreaterThan(calls));
   });
 
   it('uses the remembered time frame', async () => {

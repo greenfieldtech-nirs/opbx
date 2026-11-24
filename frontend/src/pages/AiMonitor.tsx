@@ -94,7 +94,7 @@ export default function AiMonitor() {
   const [paused, setPaused] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(slideSeconds);
 
-  const { data, isError, dataUpdatedAt } = useQuery({
+  const { data, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ['ai-monitor', minutes],
     queryFn: () => aiMonitorService.snapshot(minutes),
     refetchInterval: REFRESH_MS,
@@ -107,20 +107,24 @@ export default function AiMonitor() {
     setSecondsLeft(slideSeconds);
   };
 
+  // The countdown keeps running while paused: Pause only stops the slide change.
   useEffect(() => {
-    if (paused) return;
     const timer = setInterval(() => {
       if (document.hidden) return; // no rotation while nobody is looking
       setSecondsLeft((s) => s - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [paused]);
+  }, []);
 
   useEffect(() => {
     if (secondsLeft > 0) return;
-    setView((v) => (v + 1) % VIEWS.length);
+    if (paused) {
+      void refetch(); // paused: refresh the figures and stay on this slide
+    } else {
+      setView((v) => (v + 1) % VIEWS.length);
+    }
     setSecondsLeft(slideSeconds);
-  }, [secondsLeft, slideSeconds]);
+  }, [secondsLeft, slideSeconds, paused, refetch]);
 
   const changeMinutes = (value: string) => {
     setMinutes(Number(value));
@@ -235,7 +239,7 @@ export default function AiMonitor() {
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
           <div className="h-full bg-primary transition-[width] duration-1000 ease-linear" style={{ width: `${((slideSeconds - secondsLeft) / slideSeconds) * 100}%` }} />
         </div>
-        <span>{paused ? 'Paused' : `${nextView.label} next in ${secondsLeft}s`}</span>
+        <span>{paused ? `Paused · refreshing in ${secondsLeft}s` : `${nextView.label} next in ${secondsLeft}s`}</span>
       </footer>
     </div>
   );
