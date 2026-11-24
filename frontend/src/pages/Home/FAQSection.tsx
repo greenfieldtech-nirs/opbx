@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import { useState } from 'react';
 
-const faqs = [
+export const faqs = [
   {
     question: 'What is OPBX?',
     answer:

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 
-const selfHostedFeatures = [
+export const selfHostedFeatures = [
   'Unlimited users & extensions',
   'AI voice agents',
   'Smart call routing',
@@ -14,7 +14,7 @@ const selfHostedFeatures = [
   'Community support',
 ];
 
-const cloudFeatures = [
+export const cloudFeatures = [
   'Hosted OPBX instance',
   'All self-hosted features included',
   'Automatic updates & backups',
@@ -23,7 +23,7 @@ const cloudFeatures = [
   'No server maintenance',
 ];
 
-const fdeFeatures = [
+export const fdeFeatures = [
   'All self-hosted features included',
   'Priority enterprise support',
   'Enterprise assigned FDE',

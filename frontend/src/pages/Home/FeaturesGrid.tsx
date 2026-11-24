@@ -20,7 +20,7 @@ import {
 
 type FeatureStatus = 'production' | 'development';
 
-const features: { icon: typeof Bot; title: string; description: string; status: FeatureStatus }[] = [
+export const features: { icon: typeof Bot; title: string; description: string; status: FeatureStatus }[] = [
   {
     icon: Bot,
     title: 'AI Voice Agents',
