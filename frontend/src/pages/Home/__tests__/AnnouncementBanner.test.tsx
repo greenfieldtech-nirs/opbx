@@ -46,4 +46,16 @@ describe('AnnouncementBanner', () => {
 
     expect((await screen.findByText('New Release')).className).toContain('bg-emerald-500');
   });
+
+  it('holds its fixed-height space while loading, then collapses when there is nothing to show', async () => {
+    let resolve!: (v: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise((r) => { resolve = r; })));
+
+    const { container } = render(<AnnouncementBanner />);
+
+    expect((container.firstChild as HTMLElement).className).toContain('h-11');
+
+    resolve({ ok: true, json: async () => [] });
+    await vi.waitFor(() => expect(container.firstChild).toBeNull());
+  });
 });

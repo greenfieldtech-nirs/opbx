@@ -49,8 +49,12 @@ export function badgeFor(badge: string | undefined): BadgeStyle {
 
 const ROTATE_SECONDS = 8;
 
+// Fixed one-line height (py-2 + the home theme's 1.75rem line) so loading and rotating never shift the page.
+const BAR_CLASS = 'relative z-[60] flex h-11 items-center justify-center gap-3 overflow-hidden bg-primary px-4 text-center sm:px-16';
+
 export function AnnouncementBanner() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  // null while loading: the empty bar holds the space the announcement will take.
+  const [announcements, setAnnouncements] = useState<Announcement[] | null>(null);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -66,17 +70,23 @@ export function AnnouncementBanner() {
       .catch(() => setAnnouncements([]));
   }, []);
 
+  const count = announcements?.length ?? 0;
+
   useEffect(() => {
-    if (announcements.length <= 1) {
+    if (count <= 1) {
       return;
     }
 
     const timer = setInterval(() => {
-      setIndex((i) => (i + 1) % announcements.length);
+      setIndex((i) => (i + 1) % count);
     }, ROTATE_SECONDS * 1000);
 
     return () => clearInterval(timer);
-  }, [announcements.length]);
+  }, [count]);
+
+  if (announcements === null) {
+    return <div className={BAR_CLASS} aria-hidden="true" />;
+  }
 
   if (announcements.length === 0) {
     return null;
@@ -87,16 +97,16 @@ export function AnnouncementBanner() {
   const Icon = badge.icon;
 
   return (
-    <div className="relative z-[60] flex items-center justify-center gap-3 bg-primary px-4 py-2 text-center">
-      <span className="inline-flex flex-wrap items-center justify-center gap-x-2 text-sm text-primary-foreground">
+    <div className={BAR_CLASS}>
+      <span className="inline-flex min-w-0 items-center justify-center gap-x-2 text-sm text-primary-foreground">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${badge.className}`}
+          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${badge.className}`}
         >
           <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {current.type || badge.label}
         </span>
-        <span>{current.text}</span>
-        <span className="text-xs text-primary-foreground/70">{current.date}</span>
+        <span className="truncate" title={current.text}>{current.text}</span>
+        <span className="hidden shrink-0 text-xs text-primary-foreground/70 sm:inline">{current.date}</span>
       </span>
       {announcements.length > 1 && (
         <span className="absolute right-4 hidden text-xs text-primary-foreground/70 sm:inline">
