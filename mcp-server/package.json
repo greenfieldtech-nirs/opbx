@@ -20,7 +20,7 @@
     "generate:docs": "tsx scripts/generate-docs.ts"
   },
   "dependencies": {
-    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/rate-limit": "^11.3.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@opentelemetry/api": "^1.10.0",
     "@opentelemetry/auto-instrumentations-node": "^0.83.1",
@@ -37,8 +37,8 @@
     "openapi-typescript": "^7.10.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.0",
-    "typescript-eslint": "^8.72.2",
-    "vitest": "^5.1.0",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1",
     "yaml": "^2.9.1"
   },
   "overrides": {
