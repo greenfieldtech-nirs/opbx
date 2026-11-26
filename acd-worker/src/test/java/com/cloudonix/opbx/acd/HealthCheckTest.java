@@ -13,6 +13,7 @@ import com.cloudonix.opbx.acd.store.QueueStore;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 
@@ -53,10 +54,17 @@ class HealthCheckTest {
         HttpServer server = await(vertx.createHttpServer()
                 .requestHandler(AcdWorkerVerticle.healthHandler(store))
                 .listen(0, LOOPBACK));
-        return await(vertx.createHttpClient()
-                .request(HttpMethod.GET, server.actualPort(), LOOPBACK, "/")
-                .compose(req -> req.send())
-                .map(resp -> resp.statusCode()));
+        // Keep a strong reference and close it explicitly: Vert.x closes an unreferenced HttpClient when it is
+        // garbage collected, which fails the in-flight request with "Pool closed" under full-suite GC pressure.
+        HttpClient client = vertx.createHttpClient();
+        try {
+            return await(client
+                    .request(HttpMethod.GET, server.actualPort(), LOOPBACK, "/")
+                    .compose(req -> req.send())
+                    .map(resp -> resp.statusCode()));
+        } finally {
+            await(client.close());
+        }
     }
 
     private static <T> T await(Future<T> future) throws Exception {
