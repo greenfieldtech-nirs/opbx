@@ -264,6 +264,9 @@ class CloudonixSettingsTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
         Http::fake([
+            // Voice application setup runs after a successful sync and needs an application id; without this
+            // route the catch-all answers it with the domain body and the save reports a voice-app warning.
+            '*/applications' => Http::response(['id' => 4242, 'name' => 'opbx-routing-application-test'], 200),
             '*' => Http::response(['domain' => 'real.cloudonix.net', 'profile' => [
                 'session-update-endpoint' => 'https://opbx.ngrok.io/api/webhooks/cloudonix/session-update',
                 'cdr-endpoint' => 'https://opbx.ngrok.io/api/webhooks/cloudonix/cdr',
